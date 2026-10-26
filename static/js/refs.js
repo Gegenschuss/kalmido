@@ -41,7 +41,7 @@ function rf_get(k) {
   const id = +k.slice(2);
   if (k[0] === 'l') { const l = listById(id); return l ? {name: lname(l), l} : null; }
   if (k[0] === 'd') { const p = k.slice(2); return folderNames().includes(p) ? {name: fName(p), path: p} : null; }
-  if (k[0] === 't') { const t = taskById(id); if (t && !t.deleted_at) return {name: mdPlain(t.title), t}; }
+  if (k[0] === 't') { const t = taskById(id); if (t && !t.deleted_at) return {name: mdPlain(t.title), t}; }  // 2.280.0 F (#3108): the card from the local task; only the preview loads a long note (rf_pvShow)
   const c = RF.cache.get(k);
   if (c && Date.now() - c.at < RF_TTL) return c.v;
   rf_fetch(k);
@@ -249,6 +249,7 @@ function rf_pvShow(a) {
   draw();
   requestAnimationFrame(() => el.classList.add('on'));
   if (rf_get(k) === undefined) rf_fetch(k)?.then(draw);
+  else if (k[0] === 't' && typeof tkNoteMissing === 'function' && tkNoteMissing(taskById(+k.slice(2)))) tkNoteLoad(+k.slice(2)).then(draw, () => {});  // 2.280.0 F (#3108): a long note not in the state
 }
 function rf_pvPlace(el, x, y) {  // next to the pointer, to the other side at the screen's edge, always inside it
   const w = el.offsetWidth, h = el.offsetHeight, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;

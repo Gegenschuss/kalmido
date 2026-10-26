@@ -23,7 +23,7 @@ from ..core.access import Denied, need_feat
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..contacts.model import _jl, book_touch, contact_store, contacts_on, need_book, need_contact, ITEMS_MAX
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 
 CTM_SINGLE = ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "bday", "anniversary",
               "note", "photo")
@@ -178,11 +178,20 @@ def ctm_lines(rows, f, refs, occ_names, unfit=0):
     return lines
 
 
+def _ctm_lock(c, ids):
+    """2.273.0 F2 (#3048): one lock per contact (sorted: no deadlock); merges / undos sharing a contact run one after the
+    other, all others (other address books / people) at the same time."""
+    for i in sorted({int(x) for x in ids if x}):
+        write_lock(c, f"contacts-merge:{i}")
+
+
 def ctm_merge(c, uid, target, ids, pick=None, dry=False):
     """Merges the contacts ids into target (see the module). dry: nothing changes, returns {lines, fields}; else
     {run_id, target_id}. The caller commits (the route does)."""
     all_ids = ctm_ids(target, ids)
     pick = ctm_pick(pick, all_ids)
+    if not dry:
+        _ctm_lock(c, all_ids)  # 2.273.0 C (#3048): two overlapping merges / undos one after the other (the second reads the first's result)
     rows, books = ctm_load(c, uid, all_ids)
     t, others = rows[0], [r["id"] for r in rows[1:]]
     tb = books[t["book_id"]]
@@ -291,6 +300,10 @@ def ctm_undo(c, uid, rid):
     if not contacts_on(c, uid):
         raise Denied(404)
     d = mg_run(c, rid, "contact")
+    if not d:
+        raise Denied(404)
+    _ctm_lock(c, [d["target_id"], *d["merged_ids"]])  # 2.273.0 C/F2 (#3048)
+    d = mg_run(c, rid, "contact")  # read again under the lock
     if not d:
         raise Denied(404)
     snap = d["snapshot"] or {}

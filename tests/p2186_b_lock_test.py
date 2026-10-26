@@ -170,7 +170,10 @@ r = purge(A, R_BILL)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: a receipt billed on a finalised invoice is kept " + r.text[:200])
 
 # ---------------------------------------------------------------- #2600 the version clean-up
-R_V = receipt(A, WSO, "versionen.pdf", None)
+# 2.239.0 (#2874): an unbooked receipt keeps its versions too now -- the file that loses the oldest is a plain document
+r = A.post(B + "/api/docs", data={"ws": WSO}, files={"files": ("versionen.pdf", tiny_pdf("Dokument"), "application/pdf")})
+assert r.status_code == 201, r.text
+R_V = r.json()["ids"][0]
 for nid in (R1, R_V):
     for no in range(100, 122):
         sql("INSERT INTO fs_versions(node_id, no, path, size, mime, sha256, created_by, created_at) VALUES(?,?,?,?,?,?,?,?)",

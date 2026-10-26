@@ -17,7 +17,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, need_collab, task_visible
+from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
 
 GATE_KINDS = ("integrate", "deploy")
@@ -25,12 +25,21 @@ DEPLOY_TAG = (os.environ.get("KALMIDO_DEPLOY_TAG") or "deploy").strip() or "depl
 GATE_REF_MAX, GATE_TEXT_MAX, GATE_INTEGRATIONS_MAX, CHECKLIST_MAX = 200, 4000, 50, 100
 
 
-def deploy_checklist(c, lid):
-    """Open (not completed, not deleted) tasks of list lid with the list tag DEPLOY_TAG: [{id, title}]."""
-    rows = c.execute("""SELECT t.id, t.title FROM tasks t JOIN task_list_tags x ON x.task_id=t.id JOIN list_tags lt ON lt.id=x.tag_id
+def deploy_checklist(c, lid, uid=None):
+    """Open (not completed, not deleted) tasks of list lid with the list tag DEPLOY_TAG: [{id, title}]. With uid: only
+    the tasks uid may see (2.223.7 D, #2941: a participant agent)."""
+    if uid and not list_role(c, lid, uid):
+        return []  # tvis only narrows inside lists uid can access
+    rows = c.execute(f"""SELECT t.id, t.title FROM tasks t JOIN task_list_tags x ON x.task_id=t.id JOIN list_tags lt ON lt.id=x.tag_id
                         WHERE t.list_id=? AND lt.list_id=? AND lower(lt.name)=lower(?) AND t.deleted_at IS NULL
-                        AND t.completed_at IS NULL ORDER BY t.id LIMIT ?""", (lid, lid, DEPLOY_TAG, CHECKLIST_MAX)).fetchall()
+                        AND t.completed_at IS NULL AND {tvis(c, uid, "t.") if uid else "TRUE"} ORDER BY t.id LIMIT ?""",
+                     (lid, lid, DEPLOY_TAG, CHECKLIST_MAX)).fetchall()  # 2.223.7 (#2941): the participant filter in SQL (no query per task)
     return [{"id": r["id"], "title": r["title"]} for r in rows]
+
+
+def _gt_is_agent(c, uid):
+    r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(r) and r["kind"] == "agent"
 
 
 def _text(s, k, mx, need=False):
@@ -70,7 +79,7 @@ def gate_clean(c, t, s):
             raise BadInput(tr("The integration {0} is not approved yet", cid))
         items.append({"comment_id": cid, "task_id": k["task_id"], "source": sg.get("source"), "target": sg.get("target")})
     out["integrations"] = items
-    out["checklist"] = deploy_checklist(c, t["list_id"])
+    out["checklist"] = deploy_checklist(c, t["list_id"], me())
     out["tag"] = DEPLOY_TAG
     return out
 
@@ -84,12 +93,13 @@ def gate_decide(c, k, t, uid, approve, skip=False):
     new = {**sug}
     if approve and sug["kind"] == "deploy":
         left = deploy_checklist(c, t["list_id"])
-        new["checklist"] = left
+        # 2.223.7 (#2941): the stored suggestion goes back to the requesting agent -- only the tasks it may see (blocking still counts all)
+        new["checklist"] = deploy_checklist(c, t["list_id"], k["user_id"]) if left and _gt_is_agent(c, k["user_id"]) else left
         if left and not skip:
             c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
             return "blocked"
         if left:
-            new["skipped"] = left
+            new["skipped"] = new["checklist"]
     new.update(state="approved" if approve else "rejected", by=uid, at=iso(now_utc()))
     c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
     return new["state"]

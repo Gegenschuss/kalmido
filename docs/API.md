@@ -323,7 +323,7 @@ had been made in the app. Webhooks fire too.
 | `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, remind_times? (up to 6 × HH:MM, 2.140.0), archived?}` |
 | `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
 | `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?, billable?}`. 2.144.6: a billed entry keeps everything but its note (`409`) and cannot be deleted (`409`) |
-| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export). 2.148.1: a personal token needs `account` as well (`403` with `required_scope`), an agent's token `export` only |
+| `GET /export` | export | 2.15.0: your lists (with their tasks, comments, files list, custom fields), tags, habits, focus sessions, time entries, filters and settings as JSON (as `GET /api/export.json`). 2.239.0: without webhook addresses, server-side settings and secret columns (filtered like the account export); the complete copy of an account (comments and messages elsewhere, knowledge pages, tables, absences, devices ...) is the account export in the app under Settings > Data (people only, no token). 2.148.1: a personal token needs `account` as well (`403` with `required_scope`), an agent's token `export` only |
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
@@ -1073,7 +1073,7 @@ carries `capacity_h` (the person's hours of that week: absent workdays and publi
 `GET /absences?start=&end=&org=` (2.50.0, #1195, MCP `get_absences`): who of the organisation is away when -
 `people` and `items` (`user_id`, `start_date`, `end_date`, `half_day` `""|am|pm`) plus the `holidays` of the
 organisation's state. Never the kind (vacation, sick leave, day off) or the note. An agent sees its own workspace only
-(a private agent: 404); entering absences and the disposition (#1194, booking crew and equipment) are the web app's.
+(a private agent: 404) and there only the people of the projects shared with it and the admins (2.223.7, #2917); entering absences and the disposition (#1194, booking crew and equipment) are the web app's.
 Since 2.125.0 (#2117) only approved absences are listed: an open or rejected vacation request never appears. Vacation
 accounts, deciding on requests and the working week of people stay in the web app.
 
@@ -1471,7 +1471,7 @@ a token sees only the documents whose file it may see (an agent: shared with it)
 | Call | Scope | What it does |
 |---|---|---|
 | `GET /documents` | files:read | `?q=` words of the text (whole words; words of 4+ letters also as a prefix), `review=1`, `state=wait\|run\|done\|failed`, `from` / `to` (document date), `limit`, `cursor` -> `{data: [Document], next_cursor}`, newest document date first. 2.122.0: `q` takes a search syntax (`tag:Name` - several = every one, `sender:` / `absender:`, `type:` / `typ:`, `date:` / `datum:` `2025` \| `2025-03` \| `2025-01..2025-06` \| `>2025-01-01`, `added:` / `eingang:` = date of arrival, `"exact phrase"`, `-word`, `-tag:Name`; names without regard to case, the whole name first, else a part); filters by id: `tag` (`1,7;3` = two tags, each with its ids in several workspaces), `tag_mode=all\|any`, `not_tag`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag=1`, `no_sender=1`, `no_type=1`, `ftype=pdf,image,office,text,other` |
-| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app) |
+| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app); 2.210 (#2761): `shared` (true when the file is shared with someone or open to the whole organisation; no names) |
 | `POST /documents` | files:write | 2.122.0 (#2098): a new document, recognised like an upload. JSON `{name, content_base64, mime?}` or multipart (`file`), plus optional `title`, `parent_id` (a folder you may edit), `ws` (`private` \| `org:<id>`, people without `parent_id` only), `sender`, `type`, `tags` (names), `date`, `due`, `amount`, `currency` (taken as given; an agent's `sender`/`type`/`tags` follow the levels like `PATCH`: on level *agent* they wait as suggestions in *To review*). An agent without `parent_id` writes into its own result folder. -> `201` the document |
 | `PATCH /documents/{id}` | files:write | Role *edit*: `{date?, due?, amount?, currency?, sender?, type?, tags?: [names], text?, custom_fields?}` (`text` only while none was recognised; 2.153.0 `custom_fields` = `{field id or name: value \| null}`, only fields of the document's workspace, select by option id or name, money `"12.50 EUR"`, checkbox `true`; the single document lists them as `custom_fields: [{id, name, type, options?, value, label}]`). An agent's values are marked `agent`; a feature the workspace leaves to an agent becomes a suggestion in *To review*. Unknown fields: `400` |
 | `POST /documents/{id}/receipt-suggestion` | files:read | 2.48.0 (#1356), agents only, the document shared with you: `{project_id?, category?, amount?, currency?, vat_pct?, note?}` (at least one of project, category, amount, vat_pct; 2.121.0 (#2096): `amount` = gross, more than 0, at most two decimals, `currency` = 3 letters, `vat_pct` = `"19"`, `"7"` or `"0"`; `project_id` = a project you can see in the document's workspace) -> `201` ReceiptSuggestion `{id, document_id, agent, state, project, category, amount, currency, vat_pct, note, created_at, decided_at}`. A person accepts or rejects it in the app; your open suggestion of the same document is replaced |
@@ -1495,6 +1495,10 @@ receipt at the next `POST /api/docs/{id}/redo` or move into the office's documen
 /api/docs/{id}/receipt` carries `einvoice_offer` (it could become one now) and `POST /api/docs/{id}/receipt/einvoice` (people,
 role edit) makes it one with the invoice's VAT rate (`409` when it is one, `400` for no e-invoice of an office). The receipts
 lists (`GET /api/office/books`, `GET /api/office/books/receipts`) mark a possible duplicate with `dup: true` (still counted).
+2.237.0 (#2865): an incoming e-invoice no longer becomes a receipt by itself (any way in: upload, mail, file request, scan,
+folder watcher, move); it stays an offer (`einvoice_offer`) until a person takes it over with `POST /api/docs/{id}/receipt/einvoice`
+or saves the receipt sheet. `GET /api/office/books` lists the offers in `einvoices: [{node_id, title, date, amount, currency,
+supplier, vat_pct}]` (newest first, at most 100; not those taken out of the receipts once). Receipts made before stay.
 2.122.0 (#2294): `GET /api/docs` takes the filters of `GET /api/v1/documents` (several `tag` / `sender` / `type` / `folder` values,
 each `1,7` = one name) and answers the folders of the visible documents in `facets.folders`; `POST /api/docs/bulk` `{ids, add_tags?,
 remove_tags?, type?, sender?}` changes the chosen documents one may change (at most 500 per request; answers `{changed, denied,
@@ -1528,9 +1532,12 @@ The key has no `read` and reaches exactly two routes; every other route answers 
 Errors: `401` key unknown or revoked (or the person deactivated), `403` the place is no longer open to the person (left the
 organisation, read-only role), `409` its folder is gone, `413` too large / no space left, `400` / `415` file not accepted,
 `429` slow down. The documents arrive with the source `scan` and are recognised like an upload.
+2.237.0 (#2865): a new scan inbox key runs out after one year (`expires_at`, then `401` "The API token has expired"); a password
+reset or change revokes all scan inbox keys of the person (the folder watcher needs a new setup code). Keys made before have no
+expiry date.
 
 Web routes of the settings: `GET /api/docs/scan-keys?ws=private|org:<id>` -> `{api, downloads: [{id, label, file, size}], keys:
-[{id, name, prefix, target, parent_id, ok, created_at, last_used_at}], encrypted, mail_notice}` (also as `scan` in `GET
+[{id, name, prefix, target, parent_id, ok, created_at, last_used_at, expires_at, expired}], encrypted, mail_notice}` (also as `scan` in `GET
 /api/docs/settings`); `POST /api/docs/scan-keys {ws, name, parent_id?}` -> `201 {id, name, target, code}` (`409` while the API is
 off); `DELETE /api/docs/scan-keys/{id}` (one's own); `POST /api/docs/mail-notice` (the note that mail is not end-to-end encrypted
 was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmido-folder-watcher-mac-arm64.zip`,
@@ -1718,6 +1725,14 @@ when someone changed it since). `GET /api/lists/{id}/status-report` (web) also c
 (`{job, text, at}` of the report taken over for exactly this period, else null); the fixed `markdown` stays as it is.
 `GET /api/docs/{id}` and `GET /api/v1/documents/{id}` carry `summary` (the text taken over, '' without one).
 
+*Since 2.299.0:* `kind: "receipt_read"` -- an agent reads a receipt. `GET /api/proposals/agents?kind=receipt_read&doc_id=`
+(as doc_summary, with the office right *Receipts*), `POST /api/proposals {agent_id, kind: "receipt_read", doc_id, wish?}`.
+The agent answers the values it read (AGENTS.md *Reading a receipt*); `GET /api/proposals/{id}` adds `target` {doc_id,
+name, editable, new (the fields Take over changes: amount, vat_pct, sender, date, category), checks, bank?};
+`POST /api/proposals/{id}/apply {select: ["0"], edits?: {"0": {fields: [...]}}}` sets them as the person (a locked month:
+409), `.../undo` / `.../redo` put the values back (skipped when one was changed since). `GET /api/docs/{id}` (people only,
+never API v1) carries `agent_read` {job, state: requested | ready, agent, values?, new?, checks?, bank?} or null.
+
 ## Ideas for the mind map
 
 *Since 2.156.0.*
@@ -1758,7 +1773,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "https://kalmido.example/api/v1/time/c
 | `GET /lists/{id}/weekly-status?days=7` | read | done, overdue, blocked, waiting, `waits` (who waits on whom) |
 | `GET /time/check`, `GET /time/from-events` | time (+ calendar) | `user_id`, `from`, `to` (at most 62 days) |
 | `POST /agent/proposals/time` | time | items `date`, `start`, `end` (local HH:MM), `task_id` or `list_id`, `note`, `event_id` |
-| `GET /dispo`, `GET /dispo/free` | calendar | the agent's workspace; absences only as away |
+| `GET /dispo`, `GET /dispo/free` | calendar | the agent's organisation (personal agents: 404); absences only as away; bookings of projects it does not read only as Booked (2.223.7, #2921) |
 | `POST /agent/proposals/shoot` | calendar | `list_id`, `days`, `crew`; applied = tentative events + option bookings |
 
 Event drafts are events with `status: "tentative"`; CalDAV sends them as `STATUS:TENTATIVE`.

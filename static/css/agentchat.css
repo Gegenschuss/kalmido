@@ -400,3 +400,47 @@ button.jcdh{cursor:pointer}
 .jcdrn b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .jcsgo:focus-visible{outline:.125rem solid var(--accent);outline-offset:.125rem}
 .jcsp span::before{content:"";display:inline-block;width:.375rem;height:.375rem;margin-right:.375rem;border-radius:50%;background:var(--jcol,var(--muted));vertical-align:middle}
+/* 2.233.0 A (#2848): the shelf of collected suggestions above the message box (one line folded, a capped scrolling list open)
+   and the chat settings dialog */
+.acsug{flex:0 0 auto;border-top:1px solid var(--line);background:var(--bg2);padding:0 .5rem}
+.acsug[hidden]{display:none}
+.acsug-t{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:0 .25rem;border:0;background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer;text-align:left}
+.acsug-t span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acsug-t[aria-expanded="true"] svg:last-child{transform:rotate(180deg)}
+.acsug-t:focus-visible,.acsug-q:focus-visible{outline:.125rem solid var(--accent);outline-offset:-.125rem}
+.acsug-l{display:flex;flex-direction:column;gap:.375rem;max-height:min(40vh,18rem);overflow-y:auto;overscroll-behavior:contain;padding:0 0 .5rem}
+body.kb-open .acsug-l{max-height:min(30vh,9rem)}
+.acsug-i{display:flex;flex-direction:column;gap:.125rem;padding:.25rem .5rem .375rem;border-radius:var(--radius);background:var(--bg);border-left:.1875rem solid var(--accent)}
+.acsug-j{border-left-color:var(--jcol)}
+.acsug-h{display:flex;align-items:center;gap:.5rem;min-width:0;font-size:var(--fs-xs);color:var(--muted)}
+.acsug-h b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text2)}
+.acsug-h time{flex:0 0 auto;margin-right:auto}
+.acsug-x{flex:0 0 auto;width:2.75rem;height:2.75rem;margin:-.5rem -.5rem -.5rem 0}
+.acsug-q{display:block;width:100%;padding:0;border:0;background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.acsug-i .cchoices{margin:.25rem 0 0}
+.acsug-i .cchb{min-height:2.75rem}
+.cnotice.acset-n1{max-width:min(90%,40rem);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acset-j1{display:flex}
+.acset-jl{flex:1;min-width:0;min-height:2.75rem;padding:.25rem .75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--text);font:inherit;font-size:var(--fs-s);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.acsetmd .card{max-width:30rem}
+.acset-f{border:0;margin:.75rem 0 0;padding:0}
+.acset-f legend{padding:0;margin-bottom:.25rem;font-weight:600}
+.acset-r{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;cursor:pointer}
+.acset-r input{flex:0 0 auto;width:1.125rem;height:1.125rem;margin:0;accent-color:var(--accent)}
+/* 2.236.0 A (#2904-#2911): the dialog "Work style and notifications" */
+.awdlg .card h4{margin:1.25rem 0 .25rem}
+.awdlg .awsub{padding-left:.75rem;border-left:2px solid var(--border,rgba(128,128,128,.25));margin:.25rem 0 .5rem}
+.awdlg .awtime{display:inline-flex}
+.awdlg .awdays{display:flex;flex-wrap:wrap;gap:.25rem}
+.awdlg .awdays{flex:1 1 100%}
+.awdlg .row .awdays label.awday{width:auto;min-width:2.75rem;flex:0 0 auto;padding:0 .5rem}  /* beats .modal .row label.chkl (full width on phones) */
+.awdlg .awday{min-width:2.75rem;min-height:2.75rem;justify-content:center;align-items:center;gap:.25rem}
+.awdlg textarea{width:100%;min-height:4.5rem;resize:vertical}
+.awdlg .awstate{font-size:var(--fs-s);color:var(--text2);margin:.25rem 0}
+.awdlg .awstate.warn{color:var(--danger)}
+.awdlg .awqi{min-height:2.75rem}
+.awdlg .awqi .n{white-space:normal;min-width:0}
+.awdlg .awqi small{display:block}
+.awdlg .awqi.waiting .awqs{color:var(--muted)}
+.awdlg .awqs{font-size:var(--fs-s);white-space:nowrap}
+@media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}

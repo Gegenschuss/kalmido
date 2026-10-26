@@ -12,7 +12,7 @@ from ..core.i18n import N_, tr
 from ..core.db import db, ensure_inbox, err, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
-from .pg import set_ctx_hook, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
+from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- access control
@@ -344,6 +344,7 @@ def acx_drop():
         g.pop("acx", None)
         g.pop("acx_users", None)
         g.pop("org_roles", None)  # 2.143.0 A (#2151): accounts/orgroles.py
+        g.pop("_lr_cache", None)  # 2.280.0 B (#3116): list_role's request cache
 
 
 def acx_session_apply(ctx=None):
@@ -596,9 +597,75 @@ def _org_list_writes(c, lid, uid):
     return not r or org_writes(c, uid, r[0])
 
 
+_LR_NO = object()
+
+
+def _lr_cache(c):
+    """2.280.0 B (#3116): the request cache of list_role ({_lr_key: role}) -- only while a GET / HEAD
+    runs (reads change no membership; a write request always asks the database), forgotten by acx_drop()."""
+    from flask import request
+    if not has_request_context() or request.method not in ("GET", "HEAD"):
+        return None
+    return g.setdefault("_lr_cache", {})
+
+
+def _lr_key(c, lid, uid):
+    # who asks counts too: the db context, the request's account and how it signed in (health / token filters of list_role)
+    u = getattr(g, "user", None)
+    return lid, uid, getattr(c, "ctx", None), u["id"] if u is not None else None, g.get("auth_via")
+
+
+def list_roles(c, uid, ids):
+    """2.280.0 B (#3116): {list id: role or None} of account uid for many lists -- list_role for each, with the list rows and
+    uid's memberships read in two queries for all (not two per list) and the answers kept in the request cache (_lr_cache),
+    so later list_role / list_roles calls of the same GET ask nothing again. Same answers as list_role one by one; only the
+    ids asked for (the caller's own visible lists / rooms), never every list of the instance."""
+    uid = uid or me()
+    ids = [int(x) for x in ids or ()]
+    cache = _lr_cache(c)
+    miss = sorted({x for x in ids if cache is None or _lr_key(c, x, uid) not in cache})
+    pre_r, pre_m = {}, {}
+    if len(miss) > 1:
+        q = st_ids(miss)
+        pre_r = {r[7]: r for r in c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at, id FROM lists "
+                                            "WHERE id = ANY(CAST(? AS BIGINT[]))", (q,)).fetchall()}
+        pre_m = {r[1]: r for r in c.execute("SELECT role, list_id FROM list_members WHERE list_id = ANY(CAST(? AS BIGINT[])) AND user_id=?",
+                                            (q, uid)).fetchall()}
+    out = {}
+    for x in ids:
+        if x in out:
+            continue
+        if x in miss and len(miss) > 1:
+            role = _list_role(c, x, uid, pre_r.get(x), pre_m.get(x))
+            if cache is not None:
+                cache[_lr_key(c, x, uid)] = role
+            if role and has_request_context() and g.get("audit_aid") == uid:
+                access_note(x)
+            out[x] = role
+        else:
+            out[x] = list_role(c, x, uid)
+    return out
+
+
 def list_role(c, lid, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at FROM lists WHERE id=?", (lid,)).fetchone()
+    cache = _lr_cache(c)  # 2.280.0 B (#3116)
+    key = _lr_key(c, lid, uid) if cache is not None else None
+    if cache is not None and key in cache:
+        role = cache[key]
+    else:
+        role = _list_role(c, lid, uid)
+        if cache is not None:
+            cache[key] = role
+    if role and has_request_context() and g.get("audit_aid") == uid:
+        access_note(lid)  # 2.30.0 (#919): the agents' list access log
+    return role
+
+
+def _list_role(c, lid, uid, r=_LR_NO, m=_LR_NO):
+    # r / m (2.280.0 B, #3116): the list row / uid's membership row (None = none) already read by list_roles
+    if r is _LR_NO:
+        r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r[6]:  # 2.102.0 A (#1988): a list in the trash has no roles (only the trash routes reach it)
         return None
     if r[1] in ("health", "budget") and health_hidden(c, uid):  # 2.22.0 (#663); 2.72.0 (#1333): budgets too
@@ -616,15 +683,14 @@ def list_role(c, lid, uid=None):
     if r[0] == uid:
         role = "owner"
     else:
-        m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+        if m is _LR_NO:
+            m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
         role = m[0] if m and collab_all() else None
         if not m:
             role = ov_role(c, lid, uid, r)  # 2.46.0 (#1603): a reader of an organisation-wide list (not shared with them)
     if role and r[2]:
         from ..accounts.orgroles import cap_list_role
         role = cap_list_role(c, uid, r[2], role)  # 2.143.0 A (#2151): read-only in the organisation -> view
-    if role and has_request_context() and g.get("audit_aid") == uid:
-        access_note(lid)  # 2.30.0 (#919): the agents' list access log
     return role
 
 

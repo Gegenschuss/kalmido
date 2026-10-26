@@ -141,7 +141,7 @@ async function le2eFileConvert(lid, row, mode) {
   const r = await le2fFetch(row.id), buf = await r.arrayBuffer();
   let f;
   if (row.enc === 2) f = await le2eFileDec(lid, buf);
-  else if (row.enc === 1) f = await e2eFileDecrypt(buf, row.task_id);
+  else if (row.enc === 1) f = await e2eFileDecrypt(buf, row.task_id, row.legacy_aad);  // 2.278.0 review N2 (#3091)
   else {
     const cd = r.headers.get('content-disposition') || '', m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
     f = {name: row.name || (m ? decodeURIComponent(m[1]) : 'file'), type: row.mime || 'application/octet-stream', data: new Uint8Array(buf)};

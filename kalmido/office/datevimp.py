@@ -18,6 +18,8 @@ office_import_runs (kind "datev"); undo per run removes what the run made (a cli
 the fields it filled while they still hold the imported value and puts replaced opening balances back. Admins only
 (a personal office: its owner); agents never reach it (office_gate)."""
 import csv
+import hashlib
+import hmac
 import io
 import json
 import re
@@ -26,7 +28,7 @@ from decimal import Decimal, InvalidOperation
 
 from flask import jsonify, request
 
-from ..core.config import app
+from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, now_utc
@@ -36,6 +38,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_need_feature, office_org, office_settings, pb_cl_org, pb_cl_sql
 from ..team.clients import cl_trash
+from .rights import NO_RIGHT, ofr_allows, ofr_need_area  # 2.237.0
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -216,6 +219,12 @@ DI_CLIENT_FIELDS = ("street", "zip", "city", "country", "vat_id", "email")
 DI_SUPPLIER_FIELDS = ("street", "zip", "city", "country", "vat_id", "iban")
 
 
+def _sup_fp(oid, vals):
+    """2.273.0 C (#3051): a keyed fingerprint of a supplier's values (the undo removes it only while it is unchanged)."""
+    raw = json.dumps([int(oid), *[str(vals.get(k) or "") for k in ("name", *DI_SUPPLIER_FIELDS)]], ensure_ascii=False)
+    return hmac.new(SECRET_KEY or b"kalmido-datev-undo", raw.encode(), hashlib.sha256).hexdigest()[:32]
+
+
 def di_suppliers(c, oid, deleted=False):
     """The suppliers of office area oid (decrypted), by account."""
     rows = c.execute("SELECT * FROM office_suppliers WHERE org_id=? AND deleted_at IS " + ("NOT NULL" if deleted else "NULL")
@@ -308,7 +317,7 @@ def _counts16(plan):
 
 def _apply16(c, oid, uid, rid, plan, ts):
     from ..team.clients import clean_client
-    filled_c, filled_s = {}, {}
+    filled_c, filled_s, made_s = {}, {}, {}
     for x in plan:
         if x["action"] == "new" and x["kind"] == "debtor":
             f = {k: x["values"][k] for k in ("name", *DI_CLIENT_FIELDS) if x["values"].get(k)}
@@ -330,8 +339,10 @@ def _apply16(c, oid, uid, rid, plan, ts):
         elif x["action"] == "new":
             row = {"org_id": oid, "account_no": x["account"], **{k: x["values"].get(k) or "" for k in ("name", *DI_SUPPLIER_FIELDS)},
                    "import_run_id": rid, "created_at": ts, "updated_at": ts}
+            fp = _sup_fp(oid, row)
             row = oc_enc_fields(c, oid, "office_suppliers", row)
-            insert_id(c, f"INSERT INTO office_suppliers({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+            sid = insert_id(c, f"INSERT INTO office_suppliers({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+            made_s[str(sid)] = fp            # 2.273.0 C (#3051): the state the undo compares with
         elif x["action"] == "update":
             r = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=? AND deleted_at IS NULL", (x["id"], oid)).fetchone()
             if not r:
@@ -343,7 +354,7 @@ def _apply16(c, oid, uid, rid, plan, ts):
                 c.execute(f"UPDATE office_suppliers SET {', '.join(k + '=?' for k in enc)}, updated_at=? WHERE id=? AND org_id=?",
                           [*enc.values(), ts, x["id"], oid])
                 filled_s[str(x["id"])] = f
-    return {"filled_clients": filled_c, "filled_suppliers": filled_s}
+    return {"filled_clients": filled_c, "filled_suppliers": filled_s, "made_suppliers": made_s}
 
 
 # ---------------------------------------------------------------- category 21: opening balances
@@ -479,10 +490,15 @@ def di_opening(c, oid, year):
 
 
 # ---------------------------------------------------------------- check, import, undo
-def di_plan(c, oid, raw):
+def di_plan(c, oid, raw, clients=True):
+    """2.237.0 A (#2861): clients=False (no right to change clients) skips the debtors (they would become / fill clients)."""
     p = di_parse(raw)
     if p["category"] == 16:
         plan = _plan16(c, oid, p)
+        if not clients:
+            for x in plan:
+                if x["kind"] == "debtor" and x["action"] != "skip":
+                    x.update(action="skip", reason=tr(NO_RIGHT))
         counts = _counts16(plan)
     else:
         plan = _plan21(c, oid, p)
@@ -506,9 +522,9 @@ def _public(p, plan, counts, c, oid):
             "total": len(plan), "rows": [{k: x.get(k) for k in keys} for x in rows[:DI_PREVIEW]]}
 
 
-def di_import(c, oid, uid, raw):
+def di_import(c, oid, uid, raw, clients=True):
     write_lock(c, f"office_import_{int(oid)}")
-    p, plan, counts = di_plan(c, oid, raw)
+    p, plan, counts = di_plan(c, oid, raw, clients)
     ts = iso(now_utc())
     rid = insert_id(c, "INSERT INTO office_import_runs(org_id, kind, created_by, created_at) VALUES(?,?,?,?)", (oid, "datev", uid, ts))
     detail = _apply16(c, oid, uid, rid, plan, ts) if p["category"] == 16 else _apply21(c, oid, rid, plan, ts)
@@ -528,6 +544,8 @@ def di_undo(c, oid, uid, r):
         raise Denied(409, tr("This import has already been undone"))
     fi_client_undo_check(c, oid, r)  # 2.272.0 D (#3027): its new clients go back only within 24 hours
     detail = bk_detail(r)
+    if detail.get("filled_clients") or c.execute(f"SELECT 1 FROM clients WHERE {pb_cl_sql(c, oid)} AND import_run_id=? LIMIT 1", (rid,)).fetchone():
+        ofr_need_area(c, uid, oid, "offers", "edit")  # 2.237.0 A (#2861): the undo removes / empties clients
     ts = iso(now_utc())
     removed = {"clients": 0, "suppliers": 0, "opening": 0, "filled": 0, "restored": 0}
     kept = {"clients": 0}
@@ -544,8 +562,18 @@ def di_undo(c, oid, uid, r):
             c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND {pb_cl_sql(c, oid)}",
                       [""] * len(back) + [ts, int(cid)])
             removed["filled"] += 1
-    n = c.execute("DELETE FROM office_suppliers WHERE org_id=? AND import_run_id=?", (oid, rid)).rowcount
-    removed["suppliers"] = max(n or 0, 0)
+    # 2.273.0 C (#3051): a supplier changed since the run (an IBAN filled in by a later run, renamed) stays; runs before
+    # 2.273 have no fingerprint: there an unchanged row (updated_at = created_at) goes
+    made, n = detail.get("made_suppliers") or {}, 0
+    for r2 in c.execute("SELECT * FROM office_suppliers WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
+        same = (_sup_fp(oid, oc_dec_fields(c, oid, "office_suppliers", r2)) == made[str(r2["id"])]) if str(r2["id"]) in made \
+            else r2["updated_at"] == r2["created_at"]
+        if same:
+            c.execute("DELETE FROM office_suppliers WHERE id=? AND org_id=?", (r2["id"], oid))
+            n += 1
+        else:
+            kept["suppliers"] = kept.get("suppliers", 0) + 1
+    removed["suppliers"] = n
     for sid, fill in (detail.get("filled_suppliers") or {}).items():
         r2 = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=?", (int(sid), oid)).fetchone()
         if not r2:
@@ -588,6 +616,11 @@ def _ctx():
     return c, uid, oid
 
 
+def _di_clients(c, uid, oid):
+    """2.237.0 A (#2861): may the import create / fill clients (quotes & invoices edit, like the client list)?"""
+    return ofr_allows(c, uid, oid, "offers", "edit")
+
+
 def _upload():
     f = request.files.get("file")
     if not f:
@@ -604,7 +637,7 @@ def di_check_post():
     {category, kind master | opening, counts, hints, total, rows (the first 20)}. Nothing is stored."""
     c, uid, oid = _ctx()
     office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): DATEV switched off -> no DATEV import
-    p, plan, counts = di_plan(c, oid, _upload())
+    p, plan, counts = di_plan(c, oid, _upload(), _di_clients(c, uid, oid))
     return jsonify(_public(p, plan, counts, c, oid))
 
 
@@ -613,7 +646,7 @@ def di_import_post():
     """Org admin. multipart 'file' -> takes the file over as the preview showed it: {run_id, category, counts}."""
     c, uid, oid = _ctx()
     office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): DATEV switched off -> no DATEV import
-    rid, p, plan, counts = di_import(c, oid, uid, _upload())
+    rid, p, plan, counts = di_import(c, oid, uid, _upload(), _di_clients(c, uid, oid))
     from .ledger import ofx_log
     ofx_log(c, oid, "import", target="datev_in", detail={"run_id": rid, "kind": p["category"], "counts": counts})
     bump(c)

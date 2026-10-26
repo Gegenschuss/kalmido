@@ -323,6 +323,16 @@ document.addEventListener('click', e => {
   if (a === 'menu' && n) { ab_menu(b, n); return; }
   if (a === 'restore' && n) ab_restore(n);
 });
+// 2.210 B (#2757): a right click / long press on a row of the list or a folder of the panel = its "…" menu (ab_menu)
+function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked for (the menu opens once it is there)
+  const n = ab_item(id) || Object.values(AB.pt).flatMap(x => x.items || []).find(x => x.id === +id);
+  return n ? Promise.resolve(n) : api('GET', `/api/files/nodes/${+id}`).catch(() => null);
+}
+cm_bind('#view .abview .abrow', r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
+  const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
+  ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n); });
+  return true;
+});
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
 document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.querySelector('.abname')?.textContent || ''); });

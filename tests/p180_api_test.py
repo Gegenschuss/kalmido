@@ -82,6 +82,8 @@ check(any(not t["due"] for t in opn), "an undated task")
 check(sum(1 for t in main if t["start"] and t["due"] and t["start"] < t["due"]) >= 5, "start dates (timeline bars)")
 check(by["Briefing with the client"]["status"] == 2, "one done task (progress)")
 con = by["Write the concept and treatment"]
+# 2.280.0 (#3108): a note longer than 200 characters is not in /api/state (content_n); the task's own route has it
+con = {**con, "content": A.get(B + f"/api/tasks/{con['id']}").json()["content"]} if "content" not in con else con
 check("- [ ] " in con["content"] and "**Goal:**" in con["content"], "Markdown description with a checklist")
 check("concept" in con["tags"] and "client" in by["Get the quote and budget approved"]["tags"], "tags")
 call = by["Weekly status call with the client"]

@@ -109,7 +109,7 @@ function dc_card(d) {
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.sender?.name || d.name)}</b>
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
-    ${st}${d.review ? `<span class="dc-revdot">${tr('To review')}</span>` : ''}${d.split?.stack ? `<span class="dc-revdot dsp-dot">${tr('Stack - split?')}</span>` : '' /* 2.154.0 A (#1111) */}</span></button></li>`;
+    ${d.shared ? `<span class="dc-shared abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : ''}${st}${d.review ? `<span class="dc-revdot">${tr('To review')}</span>` : ''}${d.split?.stack ? `<span class="dc-revdot dsp-dot">${tr('Stack - split?')}</span>` : '' /* 2.154.0 A (#1111) */}</span></button></li>`;
 }
 
 // ---- upload (button, dragging, the share sheet)
@@ -189,6 +189,7 @@ function dc_mdDraw(md) {
         <a class="btn sm" href="${dc_fileUrl(d, true)}" download>${ic('archive', 's')} ${tr('Download')}</a>
         ${typeof dsp_actBtn === 'function' ? dsp_actBtn(d, w) : '' /* 2.154.0 A (#1111): split a stack */}
         ${d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : ''}
+        ${d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : ''}${d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '' /* 2.210 C (#2761) */}
         ${w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
         ${w ? `<button type="button" class="btn sm danger" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}
       </div></div>
@@ -271,10 +272,19 @@ async function dc_mdChange(e) {
     folder: tr('Folder of {0} changed', DC.doc.name), asn: tr('Archive number of {0}', DC.doc.name)}[f] || tr('Edited {0}', DC.doc.name);
   await dc_patch(id, {[f]: dc_val(f, el)}, label);
 }
+async function dc_c168Refresh(id) {  // 2.210 C (#2761): re-read the open document and the list ("shared" mark)
+  try { const d = await api('GET', `/api/docs/${id}`); if (DC.doc?.id === id) { DC.doc = d; dc_mdDraw($('.dc-md')); } const i = DC.docs.findIndex(x => x.id === id); if (i >= 0) { DC.docs[i].shared = d.shared; if (typeof dc_draw === 'function') dc_draw(); } } catch { /* shown */ }
+}
 async function dc_mdClick(e) {
   const b = e.target.closest('[data-dc]'); if (!b || !DC.doc) return;
   const d = DC.doc, a = b.dataset.dc, md = b.closest('.dc-md');
   if (a === 'close') { md.remove(); return; }
+  if (a === 'share' || a === 'xlink') {  // 2.210 C (#2761): the file store's dialogs, refresh the card afterwards
+    if (a === 'xlink') { xl_newDlg(d.id, () => dc_c168Refresh(d.id)); return; }
+    await ab_share(d.id);
+    const dlg = $('.abshdlg'); if (dlg) onRemove(dlg, () => dc_c168Refresh(d.id));
+    return;
+  }
   if (a === 'space') { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md.remove(); return; }  // 2.96.0 A (#1941)
   if (a === 'view') {
     if (d.einvoice?.source === 'xml') { window.open(`/api/docs/${d.id}/einvoice`, '_blank', 'noopener'); return; }  // 2.146.0 A (#2451)
@@ -286,7 +296,16 @@ async function dc_mdClick(e) {
   if (a === 'showopt') { md.querySelectorAll('.dc-opt').forEach(e => { e.hidden = false; }); const ob = md.querySelector('.dc-optbtn'); if (ob) ob.hidden = true; md.querySelector('.dc-opt input')?.focus(); return; }
   if (a === 'asnnext') { await dc_patch(d.id, {asn: 'next'}, tr('Archive number of {0}', d.name)); return; }
   if (a.startsWith('edit:')) { $(`#dc-${a.slice(5)}`, md)?.focus(); return; }
-  if (a === 'redo') { DC.doc = await api('POST', `/api/docs/${d.id}/redo`).catch(() => d); dc_mdDraw(md); dc_load(); return; }
+  if (a === 'redo') {
+    // 2.273.0 C (#3047): values set by hand stay -- say so before and after the new run
+    const names = {date: tr('Date'), due: tr('Due'), amount: tr('Amount'), currency: tr('Currency')};
+    const hand = (d.hand || []).map(f => names[f]).filter(Boolean).join(', ');
+    if (hand && !await askConfirm(tr('Recognise again?'), tr('Values set by hand stay: {0}', hand), {ok: tr('Recognise again')})) return;
+    const r = await api('POST', `/api/docs/${d.id}/redo`).catch(() => null);
+    DC.doc = r || d; dc_mdDraw(md); dc_load();
+    if (r?.kept?.length) toast(tr('Not replaced, set by hand: {0}', r.kept.map(f => names[f]).filter(Boolean).join(', ')));
+    return;
+  }
   if (a === 'take' || a.startsWith('take:') || a === 'takeall') {
     const feats = a === 'takeall' ? null : [a.slice(5)];
     const before = Object.fromEntries((feats || Object.keys(d.suggest || {})).map(k => [k, dc_cur(d, k)]));

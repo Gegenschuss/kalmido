@@ -230,6 +230,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         if any(k in f for k in ("due", "due_time", "reminders", "assignee_id")):
             f["reminded"] = "[]"
         f["updated_at"] = iso(now_utc())
+        tmm = None  # 2.273.0 B (#3042): what a move / indent ends is kept for the way back (tasks/movememo.py)
+        if f.get("list_id", cur["list_id"]) != cur["list_id"] or ("parent_id" in f and _norm(f["parent_id"]) != _norm(cur["parent_id"])):
+            from ..tasks.movememo import tmm_snap
+            tmm = tmm_snap(c, tid)
         c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tid])
         if "list_id" in f:  # subtasks follow their parent (all levels)
             move_subtree(c, tid, f["list_id"])
@@ -251,6 +255,12 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         ltags_follow(c, tid, f["list_id"])
         from ..agents.core import agent_added_events
         agent_added_events(c, tid, cur["list_id"])  # 2.23.0 (#795): moved into a list shared with an agent
+    if f and tmm:  # 2.273.0 B (#3042): keep what ended; back where it came from = what ended there comes back
+        from ..tasks.movememo import tmm_after, tmm_restore
+        back = tmm_restore(c, tid, (cur["list_id"], cur["parent_id"]), set(b))  # first: the newest memo is the move out
+        ended = tmm_after(c, tid, tmm, me() if has_request_context() and getattr(g, "user", None) else None, set(b))
+        if has_request_context():
+            g.tmm = {**(getattr(g, "tmm", None) or {}), tid: {k: v for k, v in (("ended", ended), ("restored", back)) if v}}
     if "ltags" in b:
         try:
             set_ltags(c, tid, b["ltags"])

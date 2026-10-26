@@ -184,10 +184,12 @@ def le2f_left(c, lid, mode, gen, uid, limit=0):
     n = c.execute(f"SELECT COUNT(*) {sql}", (lid, *args)).fetchone()[0]
     if not limit or not n:
         return [], n
-    rows = c.execute(f"SELECT a.id, a.task_id, a.comment_id, a.enc, a.e2e_gen, a.size, a.name, a.mime {sql} ORDER BY a.id LIMIT ?",
+    rows = c.execute(f"SELECT a.id, a.task_id, a.comment_id, a.enc, a.e2e_gen, a.size, a.name, a.mime, a.legacy_aad {sql} ORDER BY a.id LIMIT ?",
                      (lid, *args, int(limit))).fetchall()
+    # 2.278.0 review N2 (#3091): legacy_aad only for the own per-person files (enc 1 here = enc_by uid): the AAD of before a move
     return [{"id": r["id"], "task_id": r["task_id"], "comment_id": r["comment_id"], "enc": r["enc"], "gen": r["e2e_gen"],
-             "size": r["size"], "name": r["name"], "mime": r["mime"]} for r in rows], n  # + name / mime: what a plain file is called
+             "size": r["size"], "name": r["name"], "mime": r["mime"], **({"legacy_aad": r["legacy_aad"]} if r["enc"] == 1 and r["legacy_aad"] else {})}
+            for r in rows], n  # + name / mime: what a plain file is called
 
 
 @app.post("/api/lists/<int:lid>/e2e/files/<int:aid>")
@@ -228,7 +230,7 @@ def le2f_convert(lid, aid):
             rel, size, mime, info = _le2f_plain_store(c, a["task_id"], f, name, saved, mime, uid)
         except ValueError as e:
             return err(str(e))
-        n = c.execute("UPDATE attachments SET name=?, mime=?, size=?, path=?, enc=0, enc_by=NULL, e2e_gen=0 WHERE id=? AND path IS NOT DISTINCT FROM ? "
+        n = c.execute("UPDATE attachments SET name=?, mime=?, size=?, path=?, enc=0, enc_by=NULL, e2e_gen=0, legacy_aad=NULL WHERE id=? AND path IS NOT DISTINCT FROM ? "
                       "AND enc=? AND e2e_gen=?", (name, mime, size, rel, aid, a["path"], a["enc"], a["e2e_gen"])).rowcount
     else:
         if not le2f_name_ok(name, gen):
@@ -238,7 +240,7 @@ def le2f_convert(lid, aid):
         except ValueError as e:
             unlink_files(saved)
             return err(str(e))
-        n = c.execute("UPDATE attachments SET name=?, mime='application/octet-stream', size=?, path=?, enc=2, enc_by=NULL, e2e_gen=? "
+        n = c.execute("UPDATE attachments SET name=?, mime='application/octet-stream', size=?, path=?, enc=2, enc_by=NULL, e2e_gen=?, legacy_aad=NULL "
                       "WHERE id=? AND path IS NOT DISTINCT FROM ? AND enc=? AND e2e_gen=?",
                       (name, size, rel, gen, aid, a["path"], a["enc"], a["e2e_gen"])).rowcount
     if not n:  # 2.64.2 review (L1): another browser converted it meanwhile -- keep theirs, drop this copy

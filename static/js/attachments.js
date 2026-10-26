@@ -34,14 +34,18 @@ function noEmpty(files) {
   if (e) toast(tr('{0}: the file is empty and was not uploaded', e.name || tr('Image')));
   return files.filter(f => f.size !== 0);
 }
+const upBusy = new Set();  // 2.273.0 D (#3051): one upload at a time per task (F2: another task's files are not dropped)
 async function uploadFiles(taskId, files) {
   files = noEmpty(files);
   if (!files.length) return;
   if (taskId < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   if (!canEdit(taskById(taskId))) { roToast(); return; }
   if (typeof le2eFileUpload === 'function' && le2eOn(taskById(taskId)?.list_id)) return le2eFileUpload(taskId, files);  // 2.64.2 B (#1817): encrypted with the list key
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const mb = S.maxFileMb || 50, max = mb * 1024 * 1024, big = files.find(f => f.size > max);  // 2.273.0 D (#3051): the server's limit
+  if (big) { toast(tr('{0} is larger than {1} MB', big.name, mb)); return; }
+  if (files.reduce((n, f) => n + f.size, 0) > max * 4) { toast(tr('The files together are larger than {0} MB: send fewer files at once', mb * 4)); return; }  // the request limit is 4 files' worth
+  if (upBusy.has(taskId)) { toast(tr('Uploading…')); return; }  // 2.273.0 D (#3051): a second tap during the upload would attach the files twice
+  upBusy.add(taskId);
   const fd = new FormData();
   files.forEach((f, i) => fd.append('file', f, f.name || `bild-${Date.now()}-${i}.png`));
   toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
@@ -50,6 +54,7 @@ async function uploadFiles(taskId, files) {
     putTask(t); render(); if (S.sel === taskId) renderDetail();
     toast(files.length === 1 ? tr('Attached') : tr('{0} files attached', files.length));
   } catch (e) { /* api() already showed the error / offline notice */ }
+  finally { upBusy.delete(taskId); }
 }
 function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
   const t = taskById(S.sel), imgs = (list || (t?.attachments || []).filter(isImg)).filter(a => !upLocked(a));  // 2.61.0 (#1818): never a locked file

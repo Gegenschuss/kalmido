@@ -269,6 +269,21 @@ ar.SESSION_RESUME = False
 cl = go(r, chat(9, "h"))
 check("--resume" not in cl[0]["args"], "KALMIDO_SESSION_RESUME=0: fresh runs")
 ar.SESSION_RESUME = True
+# 2.233.0 (#3189): the limits come from Kalmido's runtime (interim summary); KALMIDO_SESSION_* only when it sends none
+check(ar.rotate_limits({}) == (ar.SESSION_MAX_TOKENS, ar.SESSION_MAX_RUNS, ar.SESSION_IDLE_S), "older Kalmido: the env values")
+check(ar.rotate_limits({"rotate_tokens": 80000, "rotate_runs": 10, "rotate_idle_min": 0}) == (80000, 10, 0), "runtime values win, 0 = no pause limit")
+check(ar.rotate_limits({"rotate_runs": True, "rotate_tokens": "x"})[:2] == (ar.SESSION_MAX_TOKENS, ar.SESSION_MAX_RUNS), "bad values: the env values")
+r.agent = {"runtime": {"reset_seq": 5, "rotate_runs": 2, "rotate_idle_min": 0, "rotate_tokens": 10 ** 9}}
+r.state.data["sessions"].pop("chat:7", None)
+go(r, chat(10, "i"))
+r.state.data["sessions"]["chat:7"]["last"] = time.time() - 30 * 86400
+cl = go(r, chat(11, "j"))
+check(len(cl) == 1 and "--resume" in cl[0]["args"], "rotate_idle_min 0: a long pause keeps the conversation")
+cl = go(r, chat(12, "k"))
+check(len(cl) == 2 and "number of runs" in r.api.notices[-1][1], "rotate_runs 2 from the runtime: a new conversation after 2 runs")
+r.agent = {"runtime": {"reset_seq": 5, "nightly_reset": "23:59", "timezone": "UTC"}}
+check(ar.session_day(r.agent["runtime"]) == time.strftime("%Y-%m-%d", time.gmtime(time.time() - 86340)), "the day begins at nightly_reset")
+r.agent = {"runtime": {"reset_seq": 5}}
 
 # ---- #1448 robust_runs: 429, time limit, two tries, masked note, queue on disk, lock
 api = ar.Api("http://127.0.0.1:9", "t")

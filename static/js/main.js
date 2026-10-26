@@ -33,7 +33,7 @@ function bootDone() {
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   if (!MW_ON) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
-  if (!MW_ON) setTimeout(() => { if (!document.hidden && OUT.online && feat('wiki') && S.me?.kind !== 'agent') loadModule('wiki').then(() => wko_syncAll()).catch(() => {}); }, 6000);  // 2.169.0 (#2671): the knowledge pages' offline copy
+  // 2.280.0 C (#3114): no start sync of the knowledge pages' offline copy any more (2.169.0 #2671): a space syncs when it is opened (wiki.js wk_load)
   if (!MW_ON) setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed

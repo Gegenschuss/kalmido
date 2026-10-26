@@ -644,7 +644,7 @@ def _poll_in_time(box):
         try:
             out[0] = mbx_poll_one(box, hold)
         except Exception as e:  # noqa: BLE001 -- one mailbox never stops the others
-            print("mailbox:", type(e).__name__, e, flush=True)
+            print("mailbox:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no message text (addresses)
     t = threading.Thread(target=run, name="mailbox-poll", daemon=True)
     t.start()
     t.join(MBX_BOX_S)
@@ -673,7 +673,7 @@ def mbx_loop():
             elif due:
                 mbx_poll_all(due)
         except Exception as e:  # noqa: BLE001
-            print("mailbox:", type(e).__name__, e, flush=True)
+            print("mailbox:", type(e).__name__, flush=True)  # 2.240.0 A (#2883)
         MBX_WAKE.wait(max(1.0, IMAP["interval"] - (time.time() - last)))
         MBX_WAKE.clear()
 

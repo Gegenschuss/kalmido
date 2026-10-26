@@ -5,6 +5,8 @@
 // - abc_group: the group "Holidays and absences" of the "Calendars" window: three switches (settings cal_holidays,
 //   cal_abs, cal_abs_team; switched through cvxShow), my state of the holidays (setting holiday_state, '' = my area's)
 //   and the subscription link of my own absences + holidays (abc_feedModal)
+// - 2.240.0 C (#2868): whose busy times colleagues see in their availability bar (setting freebusy_share org | all | off),
+//   shown to members of an organisation only (nobody else can ask about a person without one)
 // - efb_draw: the availability bar of the event editor (GET /api/events/freebusy): me and every invited colleague, one
 //   line from 7 to 20 o'clock (wider when the event is earlier / later), busy spans grey, away hatched, the event's time
 //   marked; only spans come from the server, never what they are.
@@ -30,11 +32,16 @@ function abc_group() {
   const sel = ABC.info?.states ? `<div class="row abcst"><label for="abc-state">${tr('Holidays of')}</label><select id="abc-state" data-sheet-ico="cal">
       <option value="">${esc(ABC.info.area ? tr('As my organisation ({0})', st[ABC.info.area] || ABC.info.area) : tr('None'))}</option>
       ${Object.entries(st).map(([k, v]) => `<option value="${esc(k)}" ${k === ABC.info.own ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>` : '';
+  const fbv = S.settings.freebusy_share || 'org';
+  const fbo = [['org', tr('Only calendars of my organisations')], ['all', tr('All my calendars')], ['off', tr('To nobody')]];
+  const fb = team ? `<div class="row abcst"><label for="abc-fb">${tr('Show my free / busy times')}</label><select id="abc-fb" data-sheet-ico="cal">
+      ${fbo.map(([k, v]) => `<option value="${k}" ${k === fbv ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+      <span class="muted mhint">${esc(tr('Colleagues only see busy or free, never titles.'))}</span></div>` : '';
   return `<div class="cvxgrp">${tr('Holidays and absences')}</div>
     ${row('hol', S.settings.cal_holidays !== '0', tr('Public holidays'), cur ? st[cur] || cur : tr('no state chosen'))}
     ${row('abs', S.settings.cal_abs !== '0', tr('My absences'), '')}
     ${team ? row('team', S.settings.cal_abs_team === '1', tr('Team absences'), tr('only “away”')) : ''}
-    ${sel}<div class="row abcfeed"><button type="button" class="btn sm" data-abc="feed">${ic('link', 's')} ${tr('Subscription link…')}</button></div>`;
+    ${sel}${fb}<div class="row abcfeed"><button type="button" class="btn sm" data-abc="feed">${ic('link', 's')} ${tr('Subscription link…')}</button></div>`;
 }
 
 // once per "Calendars" window: the state picker, the link button and the redraw after loading
@@ -43,7 +50,15 @@ function abc_wire(md, draw) {
   md._abc = true;
   md.addEventListener('abc-redraw', () => draw());
   md.addEventListener('change', async e => {
-    const t = /** @type {any} */ (e.target); if (t.id !== 'abc-state') return;
+    const t = /** @type {any} */ (e.target);
+    if (t.id === 'abc-fb') {  // 2.240.0 C (#2868)
+      const was = S.settings.freebusy_share || 'org', to = t.value;
+      const put = v => async () => { await cvxSave('freebusy_share', v); const x = $('#abc-fb', md); if (x) x.value = v; };
+      await put(to)();
+      histAdd({label: tr('Changed setting: {0}', tr('Show my free / busy times')), sett: true, undo: put(was), redo: put(to)});
+      return;
+    }
+    if (t.id !== 'abc-state') return;
     const from = ABC.info?.own || '', to = t.value;
     const put = v => async () => { await cvxSave('holiday_state', v); if (ABC.info) ABC.info.own = v; await abc_load(); cvxRedraw(); draw(); };
     await put(to)();

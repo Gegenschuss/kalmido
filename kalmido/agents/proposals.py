@@ -39,6 +39,7 @@ from ..agents.chat import (
     chat_delivered, chat_dict, chat_file_access, chat_newest, jn9_chat_jobs, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
     chat_react_req, chat_reactions_of, chat_unlink_trimmed, cx_notice_post, APPROVAL_PUSH_HOUR,
 )
+from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 
 
 # ---- 2.3.0 (#260 #261 #262 #263): agent PROPOSALS. Kalmido never runs a model itself and an agent must not silently create
@@ -61,7 +62,7 @@ PROP_KINDS += ("import",)  # 2.68.0 (#1839): the agent proposes old data for the
 PROP_KINDS += ("merge",)  # 2.70.0 B (#1357): duplicate contacts merged (agents/dupprop.py), on request
 PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a note (agents/contractprop.py), never on request
 PROP_KINDS += ("rule",)  # 2.71.0 A (#1457): the agent proposes a rule of a list (lists/rules.py), never on request
-PROP_KINDS += ("office_text", "doc_summary", "report")  # 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
+PROP_KINDS += ("office_text", "doc_summary", "report", "receipt_read")  # 2.299.0 E (#3194): + receipt_read; 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
 PROP_KINDS += ("sheet_tasks",)  # 2.126.1 B (#2125): table rows -> tasks, proposed by the agent itself (agents/sheetprop.py)
 PROP_KINDS += ("ideas",)  # 2.156.0 A (#1201): sub-branches for a branch of the mind map, on request (agents/ideaprop.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
@@ -369,7 +370,7 @@ def prop_validate(kind, b, inp):
     elif kind == "rule":  # 2.71.0 A (#1457)
         from ..lists.rules import rul_prop_validate
         out.update(rul_prop_validate(b, inp))
-    elif kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
+    elif kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
         from ..agents.asstprop import ast_validate
         out.update(ast_validate(kind, b, inp))
     elif kind == "ideas":  # 2.156.0 A (#1201)
@@ -455,7 +456,7 @@ def prop_input(c, uid, kind, b):
 @app.get("/api/proposals/agents")
 def proposal_agents_get():
     c = db()
-    if request.args.get("kind") in ("office_text", "doc_summary", "report") and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
+    if request.args.get("kind") in ("office_text", "doc_summary", "report", "receipt_read") and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
         from ..agents.asstprop import ast_agents_get
         return ast_agents_get(c, me(), request.args)
     if request.args.get("kind") == "ideas" and not is_agent(g.user):  # 2.156.0 A (#1201): ?kind=ideas&list_id=
@@ -486,7 +487,7 @@ def proposal_request():
         return err(tr("Invalid value: {0}", "kind"))
     if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
         return err(tr("Invalid value: {0}", "kind"))
-    if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
+    if kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
         from ..agents.asstprop import ast_request
         return ast_request(c, uid, b)
     if kind == "ideas":  # 2.156.0 A (#1201): the agents of the list, only the branch's path (agents/ideaprop.py)
@@ -558,7 +559,7 @@ def prop_view(c, j):
     if j["kind"] == "rule":  # 2.71.0 A (#1457): the rule in names for the card
         from ..lists.rules import rul_prop_extra
         out.update(rul_prop_extra(c, j))
-    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the target as it is now
+    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the target as it is now
         from ..agents.asstprop import ast_view_extra
         out.update(ast_view_extra(c, j))
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the mind map of this list shows them
@@ -689,7 +690,7 @@ def prop_run(c, j, sel, ed, extra):
         from ..lists.rules import rul_prop_run
         return rul_prop_run(c, j, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
                                    "changes": {}, "list": None, "undone": False})
-    if kind in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
+    if kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
         from ..agents.asstprop import ast_run
         return ast_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
@@ -914,7 +915,7 @@ def proposal_apply(jid):
         counts.update(ctr_result(rec))
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         counts.update(rule_id=rec.get("rule_id"))
-    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124)
+    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_result
         counts.update(ast_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
@@ -983,7 +984,7 @@ def proposal_undo(jid):
     elif j["kind"] == "rule":  # 2.71.0 A (#1457): the accepted rule goes to the trash
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec)
-    elif j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
+    elif j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
@@ -1097,7 +1098,7 @@ def proposal_redo(jid):
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec, back=False)
         rec.update(undone=False)
-    elif j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124)
+    elif j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec, back=False)
     elif j["kind"] in ("triage", "dayplan"):
@@ -1192,7 +1193,7 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         from ..api.scopes import need_scope
         need_scope("structure")
-    if j["kind"] in ("office_text", "doc_summary", "report"):  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
+    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
         from ..agents.asstprop import ast_need_agent
         ast_need_agent(c, j, aid)
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the list still shared, nothing taken over yet
@@ -1286,11 +1287,11 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "approval", "offer_save", "kind", "job_msg"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to", "approval", "offer_save", "kind", "job_msg", "limit", "next_step"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
     unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "reply_to",
-                                               "approval", "offer_save", "kind", "job_msg"))  # 2.96.0 C (#2015): job_msg; 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
+                                               "approval", "offer_save", "kind", "job_msg", "limit", "next_step"))  # 2.236.0 B (#2909, #2911): limit, next_step; 2.96.0 C (#2015): job_msg; 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
     # 2.41.0 (#1206): kind = message (default) | notice (a small grey line, no push, never unread; older servers answer 400)
@@ -1303,6 +1304,13 @@ def v1_agent_chat_post(uid):
         chat_unlink_trimmed()
         return jsonify(chat_one(c, r, api=True)), 201
     b.pop("kind", None)
+    # 2.236.0 B (#2909): limit = this message reports a limit (one-way step, refusal, stop, error): it may push with push "limits"
+    lim = b.pop("limit", None)
+    if fb is not None and isinstance(lim, str):
+        lim = lim.lower() in ("1", "true", "yes")
+    if lim not in (None, True, False):
+        raise BadInput(tr("Invalid value: {0}", "limit"))
+    nid, ndrop = ws_next_step(c, aid, uid, b)  # 2.236.0 B (#2911): next_step = one answer button
     # 2.37.0 (#1159): offer_save: true = the button "Save as task" under the message; the person saves (POST /api/chat-save),
     # the agent never does
     offer = b.pop("offer_save", None)
@@ -1334,6 +1342,8 @@ def v1_agent_chat_post(uid):
     if fb is not None and isinstance(b.get("multi"), str):
         b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
+    if nid:
+        r = ws_next_mark(c, r, nid)
     from ..agents.steps import steps_take
     if jid or offer:
         c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=?, job_msg=? WHERE id=?", (jid, jpar, 1 if offer else 0, jmsg, r["id"]))
@@ -1350,6 +1360,7 @@ def v1_agent_chat_post(uid):
         name = user_names(c, [aid]).get(aid, "?")
         snippet = re.sub(r"\s+", " ", text)[:280]
         ch = json.loads(r["choices"]) if r["choices"] else {}
+        wsm = {"ws": "limit"} if lim or ch.get("approval") or ch.get("permission") else {}  # 2.236.0 B (#2909)
         # 2.35.0 (#1103): an approval request pushes as "Approval needed" (row approval of the notification settings, on by
         # default: a direct question to the person; the list ceiling of its task applies); off = the plain chat push
         if ch.get("approval") and notif_ok(c, uid, s, "approval", "push", _chat_task_lid(c, r["task_id"])) \
@@ -1357,13 +1368,13 @@ def v1_agent_chat_post(uid):
             lg = lang_of(s)
             own = c.execute("SELECT 1 FROM user_settings WHERE user_id=? AND key='push_priority'", (uid,)).fetchone()
             g.pushes.append((uid, tr("Approval needed: {0}", name, lg=lg), ch["approval"].get("title") or snippet,
-                             f"{PUBLIC_URL}/#agents/{aid}", push_prio(s) if own else push_prio(s, 4)))  # a chosen priority wins
+                             f"{PUBLIC_URL}/#agents/{aid}", push_prio(s) if own else push_prio(s, 4), {**wsm, "scope": f"a:{aid}"}))  # a chosen priority wins
         else:
-            g.pushes.append((uid, name, snippet, f"{PUBLIC_URL}/#agents/{aid}", push_prio(s)))
+            g.pushes.append((uid, name, snippet, f"{PUBLIC_URL}/#agents/{aid}", push_prio(s), {**wsm, "scope": f"a:{aid}"}))  # 2.240.0 B2 (#2867)
     bump(c)
     c.commit()
     chat_unlink_trimmed()
-    return jsonify(chat_one(c, r, api=True)), 201
+    return jsonify({**chat_one(c, r, api=True), **({"next_step_dropped": ndrop} if ndrop else {})}), 201
 
 
 @app.get("/api/v1/chat-attachments/<int:fid>")
@@ -1563,18 +1574,18 @@ def v1_agent_cross_proposal():
         return ctr_agent_proposal(aid, b)
     _p_keys(b, "", ("list_id", "title", "reason", "tasks", "summary"))
     lid = _p_int(b.get("list_id"), "list_id")
-    title = _p_str(b.get("title"), "title", PROP_TITLE_MAX, True)
-    reason = _p_str(b.get("reason"), "reason", PROP_NOTES_MAX, True, line=False)
     c = db()
     lst = c.execute("SELECT l.*, u.kind AS okind, u.disabled AS odis FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=?", (lid,)).fetchone()
-    if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or lst["archived"] or lst["life"] == "health" \
-            or not agent_shares(c, aid, lst["owner_id"]):
+    # 2.223.7 B (#2919): only a project shared with the agent (it can read it); budgets and read-later projects never. Every
+    # other list answers 404 before the body is validated (no oracle for list ids, no project name in the job input)
+    if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or lst["archived"] or lst["life"] in ("health", "budget") \
+            or not agent_shares(c, aid, lst["owner_id"]) or not list_role(c, lid, aid) or reading_ids(c, [lid]):
         raise Denied(404)
     ar = agent_row(c, aid)  # 2.190.0 C (#2496): only lists of the agent's own workspace (others answer like a missing list)
     if not ar or lst["org_id"] != ar["org_id"]:
         raise Denied(404)
-    if list_role(c, lid, aid):
-        raise BadInput(tr("You can see this project: create the tasks there directly"))
+    title = _p_str(b.get("title"), "title", PROP_TITLE_MAX, True)
+    reason = _p_str(b.get("reason"), "reason", PROP_NOTES_MAX, True, line=False)
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input ILIKE '%\"cross\": true%'",
                  (aid,)).fetchone()[0] >= XPROP_OPEN_MAX:
         return v1_err(429, tr("You have {0} open proposals for other topics: wait until people decided on them", XPROP_OPEN_MAX))

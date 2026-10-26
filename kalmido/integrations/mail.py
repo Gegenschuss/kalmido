@@ -39,7 +39,8 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 # list (-> that list, while they may change it). Subject = title, the text = the description, attachments = files (the
 # usual size limit), "Fwd:" / "WG:" prefixes are dropped. Optionally (setting mail_from_me) mails FROM the person's own
 # e-mail address to the plain address land in their inbox too (sender addresses can be forged: off by default).
-# Read mails are marked \Seen and never imported twice (Message-ID). Out: KALMIDO_SMTP_* sends the daily summary (digest
+# Read mails are marked \Seen and never imported twice (Message-ID); 2.240.0 A (#2883): once taken in (or dropped as for
+# nobody) they are deleted from the mailbox (KALMIDO_IMAP_KEEP=1: only marked \Seen). Out: KALMIDO_SMTP_* sends the daily summary (digest
 # time of the push, setting digest_mail) to the person's e-mail address.
 MAIL_ADDRESS = os.environ.get("KALMIDO_MAIL_ADDRESS", "").strip()
 IMAP = {"host": os.environ.get("KALMIDO_IMAP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_IMAP_PORT", "0") or 0),
@@ -51,8 +52,12 @@ SMTP = {"host": os.environ.get("KALMIDO_SMTP_HOST", "").strip(), "port": int(os.
         "user": os.environ.get("KALMIDO_SMTP_USER", "").strip(), "password": os.environ.get("KALMIDO_SMTP_PASSWORD", ""),
         "tls": (os.environ.get("KALMIDO_SMTP_TLS", "starttls").strip().lower() or "starttls"),
         "from": os.environ.get("KALMIDO_MAIL_FROM", "").strip() or MAIL_ADDRESS}
+IMAP_KEEP = env_bool("KALMIDO_IMAP_KEEP", False)  # 2.240.0 A (#2883)
+SMTP_INSECURE = env_bool("KALMIDO_SMTP_INSECURE", False)  # 2.240.0 A (#2883): admin SMTP/IMAP without a certificate check
 MAIL_IN_ON = bool(MAIL_ADDRESS and IMAP["host"] and IMAP["user"])
 MAIL_OUT_ON = bool(SMTP["host"] and SMTP["from"])
+if SMTP_INSECURE and (MAIL_IN_ON or MAIL_OUT_ON):
+    print("mail: WARNING KALMIDO_SMTP_INSECURE=1: the certificate of the admin mail server is not checked", flush=True)
 MAIL_TOKEN_RE = re.compile(r"\+([A-Za-z0-9_-]{10,40})@")
 MAIL_BODY_MAX, MAIL_PREFIX_RE = 20000, re.compile(r"^\s*((fwd?|wg|aw|re|tr|rv|fw|doorst|antw)\s*:\s*)+", re.I)
 
@@ -185,8 +190,22 @@ def mail_target(c, msg):
     return None, None
 
 
+class _MailDrop:
+    """2.240.0 A (#2883): an importer's answer "for nobody / already imported": falsy, but the mail may be deleted."""
+    def __bool__(self):
+        return False
+
+
+MAIL_DROP = _MailDrop()
+
+
+class MailKept(int):
+    """2.240.0 A (#2883): a task id whose mail stays in the mailbox (an attachment could not be stored)."""
+
+
 def mail_import(c, raw):
-    """One message (bytes) -> one task. Returns the task id, None when it is for nobody or already imported."""
+    """One message (bytes) -> one task. Returns the task id, MAIL_DROP when it is for nobody or already imported, None
+    when another importer (documents, hub, data protection) took nothing in (2.240.0 A, #2883: that mail stays)."""
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     from ..office.privacy import dsb_mail_import  # 2.154.0 C (#2192): a reply with the code of a mailed data protection sheet
     p = dsb_mail_import(c, msg, raw)
@@ -202,10 +221,10 @@ def mail_import(c, raw):
         return h or None
     mid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
     if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
-        return None
+        return MAIL_DROP
     uid, lid = mail_target(c, msg)
     if not uid:
-        return None
+        return MAIL_DROP
     subj = MAIL_PREFIX_RE.sub("", str(msg.get("Subject", "")).replace("\n", " ")).strip()
     text, files = mail_text(msg)
     us = usettings(c, uid)
@@ -234,15 +253,19 @@ def mail_import(c, raw):
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
     if eml is not None:
         files = [((subj[:60].replace("/", "-").strip() or "mail") + ".eml", "message/rfc822", eml)] + files
+    whole = len(files) <= 20
     for name, mime, data in files[:20]:
         if 0 < len(data) <= MAX_FILE_MB * 1024 * 1024:
             try:
                 save_attachment_bytes(c, tid, name, mime, data)
             except OSError:
+                whole = False
                 break
+        elif data:
+            whole = False
     bump(c)
     c.commit()
-    return tid
+    return tid if whole else MailKept(tid)
 
 
 MAIL_LITERAL_MAX = 40 * 1024 * 1024  # 2.148.1 D (#2485): largest literal read from an IMAP server (whatever size it announces)
@@ -288,12 +311,15 @@ def mail_seen_prune():
         c.close()
 
 
-def mail_fetch(M, folder, importer, max_bytes=None, box=""):
+def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
     afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
     max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server.
-    box (2.193.0 D, #2220): the mailbox's key for mail_seen_claim (a message is handled once, also by two processes)."""
-    n = 0
+    box (2.193.0 D, #2220): the mailbox's key for mail_seen_claim (a message is handled once, also by two processes).
+    delete (2.240.0 A, #2883): a mail taken in whole (or MAIL_DROP: for nobody / a double) is deleted (\\Deleted + UID EXPUNGE);
+    one that failed, was taken in only in part (MailKept), was refused by an importer (None / 0) or skipped as too large
+    stays (marked \\Seen)."""
+    n, gone = 0, []
     max_bytes = max_bytes or MAIL_LITERAL_MAX  # 2.148.1 G (#2485): a too large mail is skipped (seen), never fetched again
     mail_cap_literals(M, max_bytes + 1024 * 1024)  # 2.148.1 D (#2485)
     typ, _ = M.select(folder)
@@ -310,42 +336,64 @@ def mail_fetch(M, folder, importer, max_bytes=None, box=""):
                 continue
         typ, parts = M.uid("FETCH", u, "(RFC822)")
         raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
+        done = False
         if raw:
             with GATE.bg():
                 c = connect()
                 try:
+                    res = None
                     if box and not mail_seen_claim(c, box, u, raw):  # 2.193.0 D (#2220): another process had it
                         c.rollback()
-                    elif importer(c, raw):
+                    elif (res := importer(c, raw)):
                         n += 1
                         c.commit()  # (the importer committed; the claim went with it)
                     elif box:  # for nobody: nothing of it stays but the claim
                         c.rollback()
                         mail_seen_claim(c, box, u, raw)
                         c.commit()
+                    done = res is MAIL_DROP or bool(res) and not isinstance(res, MailKept)  # 2.240.0 A (#2883)
                 except Exception as e:  # noqa: BLE001 - 2.126.0 review: one mail that fails is skipped (marked seen), never blocks the rest
-                    print("mail: skipped one mail:", type(e).__name__, e, flush=True)
+                    print("mail: skipped one mail:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no message text (addresses)
                     try:
                         c.rollback()
                     except Exception:  # noqa: BLE001
                         pass
                 finally:
                     c.close()
-        M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+        if delete and done:
+            M.uid("STORE", u, "+FLAGS", "(\\Seen \\Deleted)")
+            gone.append(u)
+        else:
+            M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+    if gone:
+        mail_expunge(M, gone)
     if box:
         with GATE.bg():
             mail_seen_prune()  # 2.193.0 D (#2220)
     return n
 
 
+def mail_expunge(M, uids):
+    """2.240.0 A (#2883): removes exactly these deleted mails (UID EXPUNGE, RFC 4315 UIDPLUS); a server without it: the
+    plain EXPUNGE (removes every mail marked deleted in the folder). A failure leaves them marked seen + deleted."""
+    try:
+        if "UIDPLUS" in (getattr(M, "capabilities", ()) or ()):  # (imaplib's uid() knows no EXPUNGE: an extension command)
+            typ, _ = M.xatom("UID", "EXPUNGE", b",".join(u if isinstance(u, bytes) else str(u).encode() for u in uids).decode())
+            if typ == "OK":
+                return
+        M.expunge()
+    except Exception as e:  # noqa: BLE001 - the mails stay marked seen
+        print("mail: expunge failed:", type(e).__name__, flush=True)
+
+
 def mail_poll_once():
     """One round: the unseen mails of the folder -> tasks; each one is marked \\Seen afterwards (also when it was for
-    nobody: it is never looked at again)."""
+    nobody: it is never looked at again) and deleted unless KALMIDO_IMAP_KEEP=1 (2.240.0 A, #2883)."""
     port = IMAP["port"] or (993 if IMAP["ssl"] else 143)
-    M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
+    M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60, ssl_context=_admin_tls_ctx()) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
     try:
         M.login(IMAP["user"], IMAP["password"])
-        return mail_fetch(M, IMAP["folder"], mail_import, box="instance")
+        return mail_fetch(M, IMAP["folder"], mail_import, box="instance", delete=not IMAP_KEEP)
     finally:
         try:
             M.logout()
@@ -364,7 +412,7 @@ def mail_loop():
             if n:
                 print("mail: imported", n, "task(s)", flush=True)
         except Exception as e:  # noqa: BLE001
-            print("mail:", type(e).__name__, e, flush=True)
+            print("mail:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no message text
             aa_fail("mail", aa_err(e))
         _MAIL_WAKE.wait(IMAP["interval"])
         _MAIL_WAKE.clear()
@@ -404,9 +452,20 @@ class _SafeSMTP_SSL(smtplib.SMTP_SSL):
 
 def _tls_ctx():
     """2.141.0 A (#2141, review): a workspace's own server is only spoken to with a checked certificate (the stdlib default
-    of smtplib / imaplib checks none); KALMIDO_SMTP_* / KALMIDO_IMAP_* of the admin stay as they were."""
+    of smtplib / imaplib checks none); KALMIDO_SMTP_* / KALMIDO_IMAP_* of the admin: _admin_tls_ctx."""
     import ssl
     return ssl.create_default_context()
+
+
+def _admin_tls_ctx():
+    """2.240.0 A (#2883): KALMIDO_SMTP_* / KALMIDO_IMAP_* of the admin are checked too (certificate + host name); only
+    KALMIDO_SMTP_INSECURE=1 turns the check off (for both, warned once at start)."""
+    import ssl
+    ctx = ssl.create_default_context()
+    if SMTP_INSECURE:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 def smtp_open(smtp=None):
@@ -416,13 +475,13 @@ def smtp_open(smtp=None):
     tls = cfg["tls"]
     port = cfg["port"] or (465 if tls == "ssl" else 587 if tls == "starttls" else 25)
     if smtp is None:
-        S_ = smtplib.SMTP_SSL(cfg["host"], port, timeout=30) if tls == "ssl" else smtplib.SMTP(cfg["host"], port, timeout=30)
+        S_ = smtplib.SMTP_SSL(cfg["host"], port, timeout=30, context=_admin_tls_ctx()) if tls == "ssl" else smtplib.SMTP(cfg["host"], port, timeout=30)
     else:
         allow = cfg.get("allow") or frozenset()
         S_ = _SafeSMTP_SSL(cfg["host"], port, 30, allow) if tls == "ssl" else _SafeSMTP(cfg["host"], port, 30, allow)
     try:
         if tls == "starttls":
-            S_.starttls(context=None if smtp is None else _tls_ctx())
+            S_.starttls(context=_admin_tls_ctx() if smtp is None else _tls_ctx())
         if cfg["user"]:
             S_.login(cfg["user"], cfg["password"])
     except BaseException:
@@ -555,7 +614,7 @@ def digest_mail_user(c, uid, s, today):
         aa_ok("smtp")
         return True
     except Exception as e:  # noqa: BLE001
-        print("mail: summary for user", uid, "failed:", type(e).__name__, e, flush=True)
+        print("mail: summary for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses
         aa_fail("smtp", aa_err(e))
         return False
 

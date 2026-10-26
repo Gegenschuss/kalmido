@@ -92,7 +92,8 @@ VARS = (
     _v("KALMIDO_PUBLIC_RATE", "60", "Page views of public links per client address and minute.", "security"),
     _v("KALMIDO_PUBLIC_BURST", "300", "Views of one public link in a short time that raise a security alert.", "security"),
     _v("KALMIDO_SUPPORTER_EXTRA_PUBKEYS", "", "Additional public keys accepted for supporter licences.", "security"),
-    _v("KALMIDO_LOG_FULL_IP", "1", "Switch: failed sign-ins in the server log keep the full address (fail2ban bans by it); 0 shortens it like the alerts (IPv4 /24, IPv6 /48).", "security"),
+    _v("KALMIDO_LOG_FULL_IP", "0", "Switch: addresses in the server log are shortened like the alerts (IPv4 /24, IPv6 /48); 1 keeps them in full (for fail2ban, which bans by the address).", "security"),  # 2.239.0 B (#2888)
+    _v("KALMIDO_LOGIN_SLOW_S", "2.5", "Seconds a sign-in waits when its address had many failed logins (2.282.0: a delay instead of a lock; names known at that address are not delayed).", "security"),
 
     # ---- notifications and push
     _v("NTFY_URL", "https://ntfy.sh", "ntfy server for push notifications.", "notify"),
@@ -130,6 +131,7 @@ VARS = (
     _v("KALMIDO_SMTP_USER", "", "SMTP user.", "mail"),
     _v("KALMIDO_SMTP_PASSWORD", "", "SMTP password.", "mail"),
     _v("KALMIDO_SMTP_TLS", "starttls", "SMTP encryption: starttls, ssl or none.", "mail"),
+    _v("KALMIDO_SMTP_INSECURE", "0", "Switch: do not check the certificate of the admin mail server (SMTP and IMAP; warned at start).", "mail"),
     _v("KALMIDO_MAIL_FROM", "", "Sender address (empty = KALMIDO_MAIL_ADDRESS).", "mail"),
     _v("KALMIDO_MAIL_ADDRESS", "", "Address of the mailbox that turns incoming mails into tasks.", "mail"),
     _v("KALMIDO_MAIL_AUTHSERV_ID", "", "Name of the own mail server in Authentication-Results headers that are believed.", "mail"),
@@ -138,6 +140,7 @@ VARS = (
     _v("KALMIDO_IMAP_USER", "", "IMAP user.", "mail"),
     _v("KALMIDO_IMAP_PASSWORD", "", "IMAP password.", "mail"),
     _v("KALMIDO_IMAP_SSL", "1", "Switch: IMAP over TLS.", "mail"),
+    _v("KALMIDO_IMAP_KEEP", "0", "Switch: keep imported mails in the mailbox (only marked read) instead of deleting them. Mails not taken in whole (too large, refused, an attachment not stored) always stay, marked read.", "mail"),
     _v("KALMIDO_IMAP_FOLDER", "INBOX", "IMAP folder that is read.", "mail"),
     _v("KALMIDO_IMAP_INTERVAL", "60", "Seconds between two looks into the mailbox (at least 10).", "mail"),
     _v("KALMIDO_OFFICE_MAILS_DAY_ORG", "300", "Office documents sent by mail per organisation and day.", "mail"),

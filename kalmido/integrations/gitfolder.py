@@ -18,7 +18,9 @@ from flask import g, jsonify, request
 from ..core.config import app, SECRET_KEY
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.pg import st_ids
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, list_role, need_list
 from ..core.errors import BadInput
 from ..agents.core import is_agent
@@ -58,11 +60,12 @@ def _owner_lists(c, owner, folder):
                                  (owner,)) if _under(r["folder"], folder)]
 
 
-def _nearest(c, owner, path):
-    """(folder, [connection rows]) of the deepest folder of owner on path that has repositories, else (None, [])."""
+def _nearest(c, owner, path, rows=None):
+    """(folder, [connection rows]) of the deepest folder of owner on path that has repositories, else (None, []).
+    rows: the owner's folder repositories already read (2.280.0 B, #3116: gf_conns_of_lists reads them once per owner)."""
     if not path:
         return None, []
-    rows = c.execute("""SELECT k.*, f.folder AS gf_folder FROM git_folders f JOIN git_conns k ON k.id=f.conn_id
+    rows = rows if rows is not None else c.execute("""SELECT k.*, f.folder AS gf_folder FROM git_folders f JOIN git_conns k ON k.id=f.conn_id
                         WHERE f.owner_id=? ORDER BY k.id""", (owner,)).fetchall()
     best = None
     for r in rows:
@@ -80,6 +83,32 @@ def gf_conns_for_list(c, lid, ignore_own=False, ignore_off=False):
     if not ignore_own and gf_own_conns(c, lid):
         return []
     return _nearest(c, lst["owner_id"], lst["folder"])[1]
+
+
+def gf_conns_of_lists(c, ids):
+    """2.280.0 B (#3116): git_conns_of_list for many lists at once -> {list id: rows} (lists without a repository left out):
+    a few queries for all instead of a few per list, none more when the instance has no repository (like git_build_for)."""
+    ids = sorted({int(i) for i in ids or ()})
+    if not ids or not c.execute("SELECT 1 FROM git_conns LIMIT 1").fetchone():
+        return {}
+    out = {}
+    for r in c.execute("SELECT * FROM git_conns WHERE list_id = ANY(CAST(? AS BIGINT[])) AND id NOT IN (SELECT conn_id FROM git_folders) "
+                       "ORDER BY id", (st_ids(ids),)).fetchall():
+        out.setdefault(r["list_id"], []).append(r)
+    rest = [i for i in ids if i not in out]
+    if rest and c.execute("SELECT 1 FROM git_folders LIMIT 1").fetchone():
+        per_owner = {}  # owner -> their folder repositories (the query of _nearest, once per owner)
+        for lst in c.execute("SELECT id, owner_id, folder, kind, git_folder_off FROM lists WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id",
+                             (st_ids(rest),)).fetchall():
+            if lst["kind"] != "project" or not lst["folder"] or lst["git_folder_off"]:
+                continue  # the rules of gf_conns_for_list (a list with own repositories is already in out)
+            if lst["owner_id"] not in per_owner:
+                per_owner[lst["owner_id"]] = c.execute("""SELECT k.*, f.folder AS gf_folder FROM git_folders f JOIN git_conns k ON k.id=f.conn_id
+                                                          WHERE f.owner_id=? ORDER BY k.id""", (lst["owner_id"],)).fetchall()
+            rows = _nearest(c, lst["owner_id"], lst["folder"], per_owner[lst["owner_id"]])[1]
+            if rows:
+                out[lst["id"]] = rows
+    return out
 
 
 def gf_lists_of_conn(c, cid):
@@ -231,7 +260,7 @@ def gf_add():
     lists.sort(key=lambda r: (bool(r["archived"]), r["kind"] != "project", r["git_folder_off"]))
     resp = git_connect(c, lists[0]["id"], provider, base, owner, name, token, folder=f)
     if isinstance(resp, tuple) and resp[1] == 201:
-        print("folder", repr(f), "of", g.user["username"], "repository", f"{owner}/{name}", flush=True)
+        print("folder", repr(f), "of", login_log_who(g.user), "repository", f"{owner}/{name}", flush=True)
     return resp
 
 

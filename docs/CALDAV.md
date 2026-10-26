@@ -337,7 +337,9 @@ absences plus the holidays (`…/ical/abs/<id>.<secret>.ics`; a sick leave shows
 organisation for the day of the event (7 to 20 o'clock, wider when the event lies outside): busy spans grey, absences and
 holidays hatched, the event's time marked. The server sends only the spans (`GET /api/events/freebusy`), never titles,
 places or calendars; events shown as free, all-day and cancelled events do not count. People of other organisations get no
-bar; without an organisation you see your own. A CalDAV `free-busy-query` REPORT is still answered with 403.
+bar; without an organisation you see your own. Since 2.240 a colleague sees only your calendars, invitations and absences of
+the organisations you share; Calendar > Calendars > *Show my free / busy times* widens that to all your calendars (private
+ones, other organisations, subscriptions) or turns it off. The answers are limited per person (120 a minute). A CalDAV `free-busy-query` REPORT is still answered with 403.
 
 ## For admins
 
@@ -349,7 +351,7 @@ bar; without an organisation you see your own. A CalDAV `free-busy-query` REPORT
 | `KALMIDO_CALDAV_DONE_DAYS` | `90` | How many days completed tasks stay in the apps. |
 | `KALMIDO_CALDAV_HTTP` | `0` | CalDAV sends the app password with every request (HTTP Basic). It is accepted only over https: a trusted proxy (`KALMIDO_TRUSTED_PROXIES`) that sends `X-Forwarded-Proto: https`, or, for requests without that header, while `PUBLIC_URL` is `https://`. A trusted proxy that reports `http` is refused. Set `1` to allow plain http inside a trusted network. |
 
-App passwords are stored only as a hash, using the same key derivation as account passwords. Failed CalDAV logins count like failed web logins, per client address (behind a proxy the address it forwards, see `KALMIDO_TRUSTED_PROXIES` in the README): 10 per user name and address, 30 per address, and 150 per user name from all addresses together within 15 minutes, then 429. One attacker therefore cannot lock a person out. They are reported in the admin alerts. Passwords never appear in the log. Agents never get CalDAV.
+App passwords are stored only as a hash, using the same key derivation as account passwords. Failed CalDAV logins count like failed web logins, per client address (behind a proxy the address it forwards, see `KALMIDO_TRUSTED_PROXIES` in the README): 10 per user name and address within 15 minutes, then 429 for that name at that address. 30 per address and 150 per user name from all addresses together only raise an admin alert (2.282.0: before, 30 failures locked the whole address, so one old phone behind an office address locked out every colleague there). One attacker therefore cannot lock a person out, and an old device only locks its own account at its address. They are reported in the admin alerts. Passwords never appear in the log. Agents never get CalDAV.
 
 ### Reverse proxy: let /dav past the login proxy
 

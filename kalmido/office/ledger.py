@@ -39,6 +39,8 @@ from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, offic
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack
 from .rights import ofr_admin_or
+from .countries import fk_country_label  # 2.296.0 B (#3168)
+from .pdfweb import _stored  # 2.296.0 F (#3177)
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -252,7 +254,7 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     home = ((pack or {}).get("code") or "").upper()
     addr = [x for x in (f.get("street"), f.get("address_extra"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]  # 2.99.0 D (#2188): + extra line
     if f.get("country") and f["country"] != home and addr:
-        addr.append(f["country"])
+        addr.append(fk_country_label(f["country"], home) or f["country"])  # 2.296.0 B (#3168): the name in capitals, in the sender's language
     from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
     contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']}: {f['email']}" if f.get("email") else "") if x]  # 2.114.5 (#2300): "E-Mail:"
     reg = []
@@ -353,6 +355,8 @@ def ofx_finalize(c, oid, uid, did):
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
     sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
+    if s.get("exempt_reason"):
+        sender["exempt_reason"] = s["exempt_reason"]  # 2.296.0 B (#3169): the exemption reason, frozen (invoices.inv_render)
     from .letterhead import bp_snapshot
     lhs = bp_snapshot(c, oid, s)  # 2.120.0 E (#2091): the own letterhead frozen with the rest (only when there is one)
     if lhs:
@@ -457,11 +461,19 @@ def ofx_unlock_post(did):
         why = bga_offer_block(c, oid, r)
         if why:
             raise Denied(409, tr(why))
+        # 2.296.0 F (#3177): the frozen files and their checksums go too (only a quotation in draft gets here, never an invoice)
         c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
-                  "updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
+                  "pdf_sha256='', xml_sha256='', updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
         ofx_log(c, oid, "unlock", doc_id=did, detail={"number": r["number"]})
         bump(c)
         c.commit()
+        for ext in ("pdf", "xml"):
+            p = _stored(oid, r, ext)
+            try:
+                if p:
+                    os.unlink(p)
+            except OSError:
+                pass
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), True))
 
 

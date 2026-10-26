@@ -58,6 +58,7 @@ SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant 
 SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over midnight count on each day (personal/timesheet.py)
 SETTINGS_FLAGS += ("chat_read_receipts",)  # 2.139.0 A (#2129): read receipts in the team chat (collab/teamchat.py)
 SETTINGS_FLAGS += ("cal_holidays", "cal_abs", "cal_abs_team")  # 2.155.0 B (#2076): holidays / absences in the calendar (hub/abscal.py)
+SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo players without asking (static/js/videorev.js)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -121,6 +122,10 @@ def clean_setting(k, v):
         return tz_clean(sv)
     if k in ("mail_assign", "mail_mention"):  # 2.142.0 A (#2146): off | only without a push device | always
         if sv not in ("off", "nopush", "always"):
+            raise bad
+        return sv
+    if k == "freebusy_share":  # 2.240.0 (#2868): whose busy times colleagues see: org | all | off
+        if sv not in ("org", "all", "off"):
             raise bad
         return sv
     if k == "agent_comments":  # 2.62.0 (#1854): comments by agents: all | only replies to me
@@ -463,7 +468,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow")
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent")
 
 
 def clean_look_pref(v):
@@ -802,7 +807,10 @@ def umz_export_clean(table, row):
 @app.get("/api/export.json")
 def export_json():
     """My data: lists I own (also shared ones, with their tasks incl. link / sections / files / comments /
-    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/."""
+    activity / custom fields + values / dependencies / status updates), my tags, habits, focus sessions, my time entries, filters and settings. Attachment files stay in data/attachments/.
+    2.239.0 A (#2882): the rows filtered like the account export (no webhook address, no server-side settings, no secret
+    columns); the complete copy is the account export (Settings > Data, people only)."""
+    from ..admin.acctexport import umz_clean
     c = db()
     q = umz_export_queries(me())  # 2.73.0 B (#1473): shared with the account export (admin/acctexport.py)
     data = {t: [umz_export_clean(t, dict(r)) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}

@@ -666,16 +666,27 @@ def vdr_pub_key(c, s):
     return hmac.new(auth_key(c), f"vdrc:{s['id']}:{s['token_hash']}".encode(), hashlib.sha256).hexdigest()
 
 
-def vdr_player_html(v, origin, title):
-    """The player of a version (no script of the provider: an iframe of the built URL, or <video>), or the plain link."""
+def vdr_player_html(v, origin, title, lg=None):
+    """The player of a version (no script of the provider), or the plain link. 2.240.0 D (#2886): the customer page never loads a
+    player by itself -- a placeholder with the question comes first; static/js/pubvideo.js builds the iframe / <video> from data-src
+    after the click (nothing is remembered across visits)."""
     e = html.escape
     src = vdr_embed(v, origin)
     if v["provider"] in ("youtube", "vimeo") and src:
-        return (f'<div class="vdr-player" data-prov="{v["provider"]}" data-origin="{VDR_FRAME[v["provider"]]}"><iframe src="{e(src)}" title="{e(title)}" '
-                'allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="lazy"></iframe></div>')
-    if v["provider"] == "file" and src:
-        return f'<div class="vdr-player" data-prov="file"><video src="{e(src)}" controls playsinline preload="none"></video></div>'
-    return ""
+        who = {"youtube": "YouTube", "vimeo": "Vimeo"}[v["provider"]]
+        data = f'data-prov="{v["provider"]}" data-origin="{VDR_FRAME[v["provider"]]}"'
+    elif v["provider"] == "file" and src:
+        who = urlsplit(src).hostname or ""
+        data = 'data-prov="file"'
+    else:
+        return ""
+    return (f'<div class="vdr-player" {data} data-src="{e(src)}" data-title="{e(title)}"><div class="vdr-gate">'
+            '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4L16 10L6 16Z"/></svg>'
+            f'<p>{e(tr("Loading the video sends data (such as your IP address) to {0}.", who, lg=lg))}</p>'
+            f'<button type="button" class="btn" data-vdr-load>{e(tr("Load video", lg=lg))}</button>'
+            # 2.240.0 D2 (#2886): without JavaScript the page offers the plain link
+            f'<noscript><p><a href="{e(v["url"])}" target="_blank" rel="noopener noreferrer">{e(tr("Open the video", lg=lg))}</a></p></noscript>'
+            '</div></div>')
 
 
 def vdr_sig_html(c, s, lg, token, prefix):
@@ -683,7 +694,7 @@ def vdr_sig_html(c, s, lg, token, prefix):
     e = html.escape
     r, v = vdr_sig_row(c, s), vdr_sig_newest(c, s)
     origin = "{0.scheme}://{0.netloc}".format(urlsplit(PUBLIC_URL))
-    player = vdr_player_html(v, origin, r["title"])
+    player = vdr_player_html(v, origin, r["title"], lg)
     if not player:
         player = (f'<p class="vdr-hint">{e(tr(VDR_NO_TIME, lg=lg))}</p><p><a class="btn" href="{e(v["url"])}" target="_blank" '
                   f'rel="noopener noreferrer nofollow">{e(tr("Open the video", lg=lg))}</a></p>')
@@ -786,8 +797,9 @@ def vdr_pub_notify(c, s, r, name, text):
     from ..notify.push import notify
     click = vdr_click(r)
     click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
-    return lambda: [notify(uid, tr("Comment from the customer", lg=st.get("lang") or "en"), f"{name}: {text[:200]}", prio="4", click=click, s=st)
-                    for uid, st in sends]
+    sc = f"l:{lid}" if lid else f"o:{s['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the list / the office
+    return lambda: [notify(uid, tr("Comment from the customer", lg=st.get("lang") or "en"), f"{name}: {text[:200]}", prio="4", click=click, s=st,
+                           scope=sc) for uid, st in sends]
 
 
 def vdr_list_of(c, r):

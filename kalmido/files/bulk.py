@@ -26,7 +26,7 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
-from .fsref import fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742)
+from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
 
 ABM_IDS_MAX = 500  # ids per request
@@ -112,7 +112,13 @@ def files_bulk_restore():
         n = need_node(c, i, write=True, trash=True)
         if n["deleted_at"] and n["role"] != "owner" and n["deleted_by"] != uid:
             raise Denied(403)
+        if n["deleted_at"]:
+            fs_ref_need_move(c, uid, n, restore=True)  # 2.238.0 A (#2863) like POST /api/files/nodes/<id>/restore
         rows.append(n)
+    from ..office.periodlock import pl_tree_need_open
+    for n in rows:
+        if n["deleted_at"]:
+            pl_tree_need_open(c, n["id"])  # 2.237.0 B (#2864) like POST /api/files/nodes/<id>/restore: all or nothing
     for n in rows:
         if not n["deleted_at"]:
             continue

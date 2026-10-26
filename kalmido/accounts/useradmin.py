@@ -9,6 +9,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, now_utc, parse_iso, USER_DEFAULTS
 from ..core.pg import like_escape, system_ctx
+from ..core.rls import org_tables
 from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 from .orgretain import _until  # 2.186.0 A (#2566)
@@ -227,10 +228,7 @@ UA8_AREAS = (
     (N_("filed e-mails"), "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
     (N_("habits"), "SELECT 1 FROM habits WHERE user_id=? LIMIT 1"),
     (N_("time entries"), "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"),
-    (N_("personal office"), "SELECT 1 FROM orgs o WHERE o.personal_of=? AND ("
-        + " OR ".join(f"EXISTS (SELECT 1 FROM {t} x WHERE x.org_id=o.id)" for t in (
-            "office_docs", "office_cash_entries", "office_cash_log", "office_trips", "office_bank_tx", "office_drives",
-            "office_signoffs", "rc_receipts", "office_letters")) + ") LIMIT 1"),  # 2.184.0 A (#2579): + letters
+    (N_("personal office"), None),  # 2.239.0 C (#2866): every office table of the schema (ua8_office_sql)
     (N_("clients"), "SELECT 1 FROM clients WHERE created_by=? AND org_id IS NULL LIMIT 1"),
     (N_("bookmarks"), "SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NULL LIMIT 1"),
     (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? AND org_id IS NULL LIMIT 1"),  # 2.172.0 B (#2677)
@@ -239,17 +237,39 @@ UA8_AREAS = (
     (N_("booking page"), "SELECT 1 FROM appt_pages WHERE user_id=? LIMIT 1"),
     (N_("polls"), "SELECT 1 FROM sched_polls WHERE user_id=? AND org_id IS NULL LIMIT 1"),
     (N_("videos"), "SELECT 1 FROM video_reviews WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
-    (N_("agent chats"), "SELECT 1 FROM agent_chat WHERE user_id=? LIMIT 1"),
+    # 2.239.0 C (#2866): + the chats of the account's own agents; what upg_rest deletes with them, focus sessions, basket notes
+    (N_("agent chats"), "SELECT 1 FROM users p JOIN agent_chat x ON x.user_id=p.id "
+        "OR x.agent_id IN (SELECT a.user_id FROM agents a WHERE a.owner_id=p.id) WHERE p.id=? LIMIT 1"),
+    (N_("agents' projects"), "SELECT 1 FROM lists l JOIN agents a ON a.user_id=l.owner_id WHERE a.owner_id=? AND l.org_id IS NULL "
+        "AND (l.is_inbox=0 OR EXISTS (SELECT 1 FROM tasks t WHERE t.list_id=l.id)) LIMIT 1"),
+    (N_("focus sessions"), "SELECT 1 FROM pomos WHERE user_id=? LIMIT 1"),
+    (N_("notes"), "SELECT 1 FROM lists l WHERE l.owner_id=? AND l.is_inbox=1 AND (EXISTS (SELECT 1 FROM notes n WHERE n.list_id=l.id) "
+        "OR EXISTS (SELECT 1 FROM list_notepads p WHERE p.list_id=l.id)) LIMIT 1"),
     (N_("direct messages"), "SELECT 1 FROM tchat_rooms r WHERE r.kind='dm' AND ? IN (r.a, r.b) "
         "AND EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id) LIMIT 1"),
 )
 UA8_PRIVATE_AREAS = N_("The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.")
 
 
+# 2.239.0 C (#2866): office tables that hold the office's settings / structure (made by itself), not the person's records
+UA8_OFFICE_SKIP = frozenset((
+    "office_settings", "office_company", "office_numbers", "office_inv_series", "office_rgroups", "office_rgroup_members",
+    "office_rights_log", "office_pack_installs", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
+    "office_datev_guids", "office_peppol", "office_pay_props", "office_import_runs", "office_undo", "office_period_locks"))
+
+
+def ua8_office_sql(c):
+    """2.239.0 C (#2866): the personal office has records when any office table of the schema (rls.org_tables: office_*,
+    without UA8_OFFICE_SKIP) or the receipts hold a row of it -- a new office table counts without a change here."""
+    ts = sorted(t for t in org_tables(c) if (t.startswith("office_") and t not in UA8_OFFICE_SKIP) or t == "rc_receipts")
+    return ("SELECT 1 FROM orgs o WHERE o.personal_of=? AND ("
+            + " OR ".join(f"EXISTS (SELECT 1 FROM {t} x WHERE x.org_id=o.id)" for t in ts) + ") LIMIT 1")
+
+
 def ua8_private_areas(c, uid):
     """2.148.1 B (#2479): the names (translated) of the private areas of account uid that user_purge would delete."""
     with system_ctx(c):  # existence only, nothing read; the private rows of a person the organisation admin must not see
-        return [tr(name) for name, sql in UA8_AREAS if c.execute(sql, (uid,)).fetchone()]
+        return [tr(name) for name, sql in UA8_AREAS if c.execute(sql or ua8_office_sql(c), (uid,)).fetchone()]
 
 
 def ua8_private_left(c, uid):

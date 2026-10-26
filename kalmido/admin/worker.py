@@ -25,6 +25,7 @@ from flask import g, jsonify
 
 from ..core.config import app, APP_VERSION, DATABASE_URL
 from ..core.db import connect, db, gset, gsetting, iso, now_utc
+from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.pg import POOL_MAX, WEB_THREADS, connect_direct, pool_stats
 from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
@@ -162,7 +163,7 @@ def _wrk_heartbeat():
                 finally:
                     c.close()
         except Exception as e:  # noqa: BLE001
-            print("worker heartbeat:", type(e).__name__, e, flush=True)
+            print("worker heartbeat:", db_log_err(e), flush=True)
         time.sleep(WRK_HB_S)
 
 
@@ -177,7 +178,7 @@ def wrk_main():
         try:
             kick()
         except Exception as e:  # noqa: BLE001
-            print("worker: could not start", kick.__name__, type(e).__name__, e, flush=True)
+            print("worker: could not start", kick.__name__, db_log_err(e), flush=True)
     threading.Thread(target=_wrk_heartbeat, daemon=True, name="worker-heartbeat").start()
     print(f"Kalmido {APP_VERSION} worker: background loops only (no web server); loops:", ", ".join(sorted(_STATE)), flush=True)
     stop = threading.Event()
@@ -221,7 +222,7 @@ def wrk_conn_check():
                   f"but Postgres allows {b['max_connections']} ({b['reserved']} reserved). Raise max_connections or lower "
                   "KALMIDO_DB_POOL_MAX / KALMIDO_THREADS (see SELF-HOSTING).", flush=True)
     except Exception as e:  # noqa: BLE001 - a check never stops the start
-        print("connection budget check skipped:", type(e).__name__, e, flush=True)
+        print("connection budget check skipped:", db_log_err(e), flush=True)
     finally:
         c.close()
 

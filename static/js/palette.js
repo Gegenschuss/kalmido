@@ -249,6 +249,7 @@ function palAll() {
   }
   if (timeOn() && S.timer) add('a:stoptimer', 'action', tr('Stop timer'), 'stop', timerStop);
   if (timeOn()) add('a:addtime', 'action', tr('Add time…'), 'plus', () => entryModal(null, {}));
+  pg_actions(add);  // 2.250.0 B (#2993 #2996): create agent / client / invoice, enter an absence
   const light = document.documentElement.dataset.theme === 'light' || (document.documentElement.dataset.theme === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
   add('a:theme', 'action', light ? tr('Switch to dark theme') : tr('Switch to light theme'), 'eye', () => { LS.set('theme', light ? 'dark' : 'light'); applyTheme(); });
   const dens = document.documentElement.dataset.density;
@@ -285,14 +286,16 @@ function palAll() {
   if (teamOn()) add('v:team', 'view', tr('Team chat'), 'comment', () => go('team'));  // 2.17.0 (#419)
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
-  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')], ['office', 'receipt', N_('Office & finance')]])
-    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab
-  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_area(id)[1], () => go(mg_target(id)));  // 2.44.0 (#1187): the areas
+  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload & absences')], ['office', 'receipt', N_('Office & finance')]])
+    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
+  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_area(id)[1], () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
     if (!mg_on(aid) || o3a_hid(aid)) continue;
-    for (const [route, icon, name, on] of parts) if (on() && !o3a_hid(route) && !it.some(x => x.id === 'v:' + route)) add('v:' + route, 'view', tr(name), icon, () => go(route), {sub: tr(aname)});
+    for (const [route, icon, name, on] of parts) if (on() && !o3a_hid(route) && !it.some(x => x.id === 'v:' + route)) add('v:' + route, 'view', tr(name), icon, () => go(route), {sub: tr(aname), route});
   }
+  pg_officeItems(add);
+  pg_dedupe(it);
   palSubItems(add);
   if (feat('docs') && !S.me?.kid) {  // 2.87.9 (#1934): Paperless-ngx (paperless.js, loaded with the documents)
     add('a:plimp', 'action', tr('Import from Paperless-ngx…'), 'download', () => pl_importActive(), {qonly: true, sub: tr('Documents')});
@@ -319,10 +322,65 @@ function palAll() {
     if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
+  pg_settingParts(add);
   // tasks (open ones + the recently completed that are in the state)
   for (const x of S.tasks.values()) if (x.status === 0 && x.id > 0 && !archivedTask(x)) add('t:' + x.id, 'tasks', x.title, typeof le2eOn === 'function' && le2eOn(x.list_id) ? 'lock' : 'check', () => { const r = $(`#view .trow[data-id="${x.id}"]`); if (!r && x.list_id) go(x.list_id === inbox()?.id ? 'inbox' : 'l/' + x.list_id); setTimeout(() => openDetail(x.id), 30); },
     {sub: [lname(listById(x.list_id)), x.due ? dayLabel(x.due) : ''].filter(Boolean).join('  ·  ')});
   return it;
+}
+// 2.250.0 B (#2993): waits for an element (state, not time) and runs fn on it; gives up after ~3 s
+function pg_waitEl(sel, fn, n = 60) {
+  const el = $(sel);
+  if (el) fn(el); else if (n > 0) setTimeout(() => pg_waitEl(sel, fn, n - 1), 50);
+}
+// 2.250.0 B (#2993): one entry per target. Entries with the same route (module tab, area, office menu point) are merged: the
+// one with the higher prio stays (office menu 2 > area 1 > module part 0, i.e. the name the bar shows), the other names
+// become search words (kw) of it, so the old name still finds the target
+function pg_dedupe(it) {
+  const by = new Map();
+  for (const x of it.slice()) {
+    if (!x.route) continue;
+    const w = by.get(x.route);
+    if (!w) { by.set(x.route, x); continue; }
+    const [keep, drop] = (x.prio || 0) > (w.prio || 0) ? [x, w] : [w, x];
+    keep.kw = [keep.kw, drop.label, drop.kw].filter(Boolean).join(' ');
+    it.splice(it.indexOf(drop), 1);
+    by.set(x.route, keep);
+  }
+}
+// 2.250.0 B (#2993): every point of the office bar as a "Go to" target -- derived from the bar's own data (areas.js ofm_items:
+// rights, country pack and switches are checked there), so a regrouped bar (package 2.276) needs no second list here
+function pg_officeItems(add) {
+  if (S.me?.kid || !mg_on('office') || o3a_hid('office') || typeof ofm_items !== 'function') return;
+  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'offers' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
+}
+// 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
+function pg_actions(add) {
+  if (S.me && aiPaneOn()) add('a:ag-new', 'action', tr('Add agent…'), 'bot', () => {
+    settingsModal('agents');
+    pg_waitEl(S.me.is_admin ? '[data-ag="new"]' : '[data-aigo="setup"]', b => b.click());
+  }, {sub: tr('Settings: {0}', tr('Agents'))});
+  if (!S.me?.kid && clientsOn()) add('a:cl-new', 'action', tr('Add client'), 'brief', () => clientModal(null), {sub: tr('Clients')});
+  if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_newDialog('invoice')), {sub: tr('Office|area')});
+  if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
+    WLV.tab = 'abs'; go('workload');
+    loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
+  }, {sub: tr('Workload & absences'), kw: tr('vacation sick leave day off away absence')});  // 2.250.0 B (#2996)
+}
+// 2.250.0 B (#2993): the sections of the settings (only when typing): the same headings the settings search finds; the focus
+// names are the ones settingsModal knows, the heading is scrolled to once it is there
+function pg_settingParts(add) {
+  if (!S.me) return;
+  const adm = !!S.me.is_admin, parts = [
+    [N_('Language'), 'general', '#s-lang-h', 'sliders', 1], [N_('Sidebar'), 'sidebar', '#s-side-h', 'sliders', 1], [N_('Tab bar'), 'tabbar', '#s-tabbar-h', 'sliders', 1],
+    [N_('Storage'), 'account', '#s-storage-h', 'user', 1], [N_('Two-factor authentication'), 'account', '#s-2fa-h', 'key', 1],
+    [N_('API tokens'), 'tokens', '#s-toks', 'key', !!S.api?.enabled], [N_('Calendar subscription'), 'ical', '#s-ical-h', 'link', 1],
+    [N_('Templates'), 'templates', '#s-tpl-h', 'download', 1], [N_('Members'), 'org', '#og-mh', 'users', lmOrgPaneOn()], [N_('Groups'), 'groups', '#s-groups-h', 'users', adm]];
+  for (const [n, focus, sel, icon, on] of parts) if (on) add('sp:' + focus + ':' + sel, 'setting', tr('Settings: {0}', tr(n)), icon, () => {
+    settingsModal(focus);
+    pg_waitEl(sel, el => { el.scrollIntoView?.({block: 'center'}); (el.closest('.row, h4') || el).classList.add('flash'); setTimeout(() => (el.closest('.row, h4') || el).classList.remove('flash'), 1600); });
+  }, {qonly: true});
 }
 // 2.87.9 (#1934): what the views of the areas list on their side, as search hits: the senders, document types and tags of the
 // documents, the top folders of the file store. Fetched (quietly) when the search opens, for the shown workspace, at most
@@ -374,7 +432,7 @@ function palItems() {
   // 2.13.0: "#447" or "447" jumps straight to that task (only one this person can see)
   const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
   const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `#${hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
-  const hits = jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
+  const hits = jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0, x.kw ? fuzzy(q, x.kw) * 0.6 : 0)}))  // 2.250.0 B (#2993): kw = more words of the entry
     .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind] + lc_favBoost(x)})).sort((a, b) => b.score - a.score).slice(0, 60));
   // 2.16.0 (#644): what the field can do with the text itself: ask an agent (the text goes to its chat) and create a task
   // (quick add syntax, the list like the quick add). Real matches first; without one, "Create" is on top (Enter = create)
@@ -383,7 +441,8 @@ function palItems() {
   const asks = (S.agents || []).filter(x => x.enabled && x.chat !== false).slice(0, 3).map(x => ({id: 'ask:' + x.id, kind: 'action', cls: 'pdo', label: tr('Ask {0}: {1}', x.name, q), sub: tr('Sends it to the chat'), icon: 'bot', img: x.avatar || null, fn: () => palAsk(x.id, q)}));
   const msgs = palMsgItems(q);  // 2.33.0 (#1080): hits in comments and chats (chat.js), on their way while typing
   const fts = typeof ftsPalItems === 'function' ? ftsPalItems(q, hits) : [];  // 2.116.0 B (#2065): "Everywhere" (ftsearch.js)
-  return hits.length ? [...hits, ...asks, create, ...fts, ...msgs] : [create, ...asks, ...fts, ...msgs];
+  const fo = hits.length ? [] : fts.filter(x => x.group === 'office');  // 2.250.0 B (#2992): no local hit: the office hits (clients, quotations / invoices) go before "Create as task"
+  return hits.length ? [...hits, ...asks, create, ...fts, ...msgs] : [...fo, create, ...asks, ...fts.filter(x => !fo.includes(x)), ...msgs];
 }
 function palCreate(q) {
   const r = parseQuick(q, new Set()), d = quickDefaults();

@@ -237,7 +237,9 @@ async function wsPaneDraw(md) {
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
   wsc_paneDraw(box);  // 2.53.0 (#1474): each organisation's colour (its admins choose)
   pmeta_paneDraw(box);  // 2.61.0 B (#1819): whether photos lose their metadata on upload (its admins choose)
+  if (typeof chn_contentPaneDraw === 'function') chn_contentPaneDraw(box);  // 2.240.0 B (#2867): content to personal forwardings
   if (typeof xl_paneDraw === 'function') xl_paneDraw(box);  // 2.112.1 B (#2058): external share links of its files allowed
+  if (typeof asst_orgPaneDraw === 'function') asst_orgPaneDraw(box);  // 2.240.0 A (#2884): the assistant and other members' comments
   if (typeof oinvDraw === 'function') oinvDraw(box);  // 2.115.0 B (#2062): invite by e-mail + the open invitations
 }
 function wsPaneWire(md) {
@@ -275,7 +277,7 @@ function wsPaneWire(md) {
       if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(S.me?.is_admin ? (r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')) : tr('Invitation sent. With an account, the person accepts it in their News.')); }  // 2.148.1 A (#2480)
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;  // 2.273.0 B (#3042): + what ends
         await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
       }
       await load(); render();
@@ -974,7 +976,7 @@ async function bkDraw(md, j) {
   if (j.free_bytes && j.items.length && j.free_bytes < 3 * j.items[0].size) h += `<div class="shint cnote bkspace">${tr('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(j.items[0].size))}</div>`;
   if (j.last_error) h += `<div class="shint cnote">${tr('The last backup failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
   h += j.items.length ? `<div class="members bklist">${j.items.map(x => `<div class="mrow bkrow" data-bkn="${esc(x.name)}"><span class="n"><b>${esc(aaWhen(x.created_at))}</b> · ${tr(BK_KIND[x.kind] || x.kind)} · ${fmtBytes(x.size)}${x.encrypted ? ` · ${ic('lock', 's')} ${tr('encrypted')}` : ''}${x.legacy ? ` · ${tr('old (SQLite), moved over when restored')}` : ''}
-      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}`}</small></span>
+      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
       <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
   h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings dialog only */}</div>

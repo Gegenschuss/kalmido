@@ -350,7 +350,8 @@ const LS = {
 // design file: white figure on the dark plate, the eyes cut in the plate's colour, the antenna in the accent (svg.logo
 // color in app.css), so the mark follows the chosen accent colour; no ids (the logo can be on the page more than once)
 // 2.145.0 A (#2433): fixed brand colours of static/icon.svg (lilac plate, dark antenna), no longer the accent colour
-const logoSvg = (sz = 20) => `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${sz}" height="${sz}" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="22.5" fill="#6d4bd8"/><g transform="translate(50 50) scale(.9) translate(-50 -40)"><path d="M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z" fill="#fff"/><g class="lg-eyes"><path d="M41 44V56" fill="none" stroke="#6d4bd8" stroke-width="6.5" stroke-linecap="round"/><path d="M59 50V50.1" fill="none" stroke="#6d4bd8" stroke-width="8.5" stroke-linecap="round"/></g><path class="lg-ant" d="M58 6V15" stroke="#fff" stroke-width="7" stroke-linecap="round"/></g></svg>`;
+// 2.233.0 C (#3195): plate and eyes are currentColor again: svg.logo takes the workspace colour / accent colour (the sign-in logo, favicon and app icon keep the brand colour)
+const logoSvg = (sz = 20) => `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${sz}" height="${sz}" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="22.5" fill="currentColor"/><g transform="translate(50 50) scale(.9) translate(-50 -40)"><path d="M50 22C74 22 78 26 78 50S74 78 50 78 22 74 22 50 26 22 50 22Z" fill="#fff"/><g class="lg-eyes"><path d="M41 44V56" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round"/><path d="M59 50V50.1" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></g><path class="lg-ant" d="M58 6V15" stroke="#fff" stroke-width="7" stroke-linecap="round"/></g></svg>`;
 // 2.136.0 (#2193): the word mark of the design file (outlined, no font needed) next to the logo in the sidebar and on the
 // sign-in screens: dark text in the light theme (#18171D), light text in the dark one (#EEEDF3, svg.kword in app.css);
 // the name stays readable for screen readers and tests as text
@@ -494,9 +495,11 @@ const LOOK = {
   // The default is never stored (lookSet null), so every device that never picked a colour gets violet; picked ones stay.
   accent: [['violet', N_('Violet'), '#a78bfa', '#6d4bd8'], ['raspberry', N_('Raspberry'), '#f472b6', '#be185d'], ['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'],
     ['rose', N_('Rose'), '#f472b6', '#b8306f'], ['orange', N_('Orange'), '#fb923c', '#ad4c07'], ['lime', N_('Lime'), '#a3e635', '#4a7110']],
+  chatHuman: null, chatAgent: null,  // 2.233.0 C (#3196): filled below from the accent palette ("default" + the same colours)
   // 2.83.0 C (#1427): the theme (a preset of background tones + card style, listhead.js); "control" = the default look
   pack: [['control', N_('Control room')], ['paper', N_('Paper')], ['night', N_('Night')], ['contrast', N_('High contrast')]],
 };
+LOOK.chatHuman = LOOK.chatAgent = [['default', N_('Default')], ...LOOK.accent];
 try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setItem('tasks.accent', '"orange"'); } catch { /* private mode */ }  // 1.1.3: Amber became Orange
 // 2.8.0 (#434): a device that had the old default (mint) gets the new default once; a colour picked later stays
 try { if (!localStorage.getItem('tasks.accentMig280')) { if (localStorage.getItem('tasks.accent') === '"mint"') localStorage.removeItem('tasks.accent'); localStorage.setItem('tasks.accentMig280', '1'); } } catch { /* private mode */ }
@@ -518,6 +521,12 @@ function applyLook() {
   document.documentElement.classList.toggle('ui-small', pct < 100);
   r.font = lookPref('font'); r.accent = lookPref('accent');
   r.pack = lookPref('pack');  // 2.83.0 C (#1427)
+  // 2.233.0 C (#3196): chat bubble colour of people / agents; "default" = no attribute (the old look), else the palette's two tones
+  for (const [k, a, v] of [['chatHuman', 'chatHuman', 'h'], ['chatAgent', 'chatAgent', 'a']]) {
+    const row = lookRow(k), st = document.documentElement.style;
+    if (row[0] === 'default') { delete r[a]; st.removeProperty(`--chat-${v}-d`); st.removeProperty(`--chat-${v}-l`); }
+    else { r[a] = row[0]; st.setProperty(`--chat-${v}-d`, row[2]); st.setProperty(`--chat-${v}-l`, row[3]); }
+  }
 }
 applyLook();
 // one setter for all device appearance settings (settings pane, palette); v = null -> default

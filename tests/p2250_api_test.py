@@ -99,7 +99,8 @@ st = A.get(B + "/api/state").json()["settings"]
 check(st.get("sidebar", "") == "", "UX-26: the admin who set up the server: full sidebar")
 C = sess("carol")
 sc = json.loads(C.get(B + "/api/state").json()["settings"]["sidebar"] or "{}")
-check(set(sc.get("hidden", [])) == {"e:tomorrow", "e:week", "e:doable"}, "UX-26: an added account starts lean " + json.dumps(sc))
+# 2.250.0 C (#2995): added accounts start like the self-set-up one (no lean sidebar)
+check(not sc.get("hidden"), "#2995: an added account starts with the full sidebar " + json.dumps(sc))
 r = A.patch(B + "/api/settings", json={"sidebar": json.dumps({"order": ["lists", "focus", "lists"], "hidden": ["g:views", "e:week"]})})
 check(r.ok and json.loads(A.get(B + "/api/state").json()["settings"]["sidebar"]) == {"order": ["lists", "focus"], "hidden": ["g:views", "e:week"]},
       "UX-03: sidebar stored normalized")

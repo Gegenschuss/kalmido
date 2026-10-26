@@ -20,6 +20,7 @@ objects of another area 404). Agents never send: there is no route for them. Kal
 import hashlib
 import re
 import secrets
+from datetime import timedelta
 
 from flask import Response, g, jsonify, request
 
@@ -27,8 +28,9 @@ from ..core.config import app, MAX_FILE_MB, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, iso, now_utc
+from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.access import Denied
+from ..accounts.login import seal, unseal
 from ..personal.timetrack import BadInput
 from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, dt_hash, dt_kick, dt_lang, dt_pdf, dt_signed_sync,
                      dt_tpl, dt_values)
@@ -51,6 +53,7 @@ DSB_PLACEHOLDER_RE = re.compile(r"\[[^\[\]\n]{2,120}\]")
 DSB_MAIL_MB = min(MAX_FILE_MB, 20)  # a signed sheet by mail: one PDF / picture up to this size
 DSB_LINK = "[Link]"
 LIST_MAX = 2000
+DSB_LINK_DAYS = 30  # 2.239.0 D (#2874): a mailed signature link ends after this many days unless {expires} says otherwise
 
 
 def dsb_sheet(c, oid, sid):
@@ -67,7 +70,6 @@ def dsb_code_hash(code):
 def dsb_code(c, r):
     """The sheet's mail code (plain): the sealed one, else a new one (stored). None when it cannot be read any more
     (a changed server key) -- then a new one too."""
-    from ..accounts.login import seal, unseal
     if r["code"]:
         try:
             return unseal(c, f"privacy-sheet:{r['id']}", r["code"])
@@ -87,16 +89,25 @@ def dsb_status_label(r):
 
 def dsb_replies(c, oid):
     """2.209.0 C (#2589): the newest reply mail that was not filed per sheet, from the office log (dsb_reply_note):
-    {sheet id: {at, from, subject, text}} -- the customer's words, data only (the client escapes them)."""
+    {sheet id: {at, from, subject, text}} -- the customer's words, data only (the client escapes them). 2.239.0 D (#2874):
+    from the sheet (office_privacy_sheets.reply); log entries of older versions still carry the text."""
     import json
     out = {}
+    for r in c.execute("SELECT id, reply FROM office_privacy_sheets WHERE org_id=? AND reply IS NOT NULL AND reply<>'' ORDER BY id DESC LIMIT ?",
+                       (oid, LIST_MAX)):
+        try:
+            d = json.loads(unseal(c, f"privacy-reply:{r['id']}", r["reply"]))
+        except Exception:  # noqa: BLE001 -- a changed server key: the reply cannot be read any more
+            continue
+        if isinstance(d, dict):
+            out[r["id"]] = {k: str(d.get(k) or "") for k in ("at", "from", "subject", "text")}
     for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND action='privacy_reply' ORDER BY id DESC LIMIT ?", (oid, LIST_MAX)):
         try:
             d = json.loads(oc_dec_fields(c, oid, "office_doc_log", r).get("detail") or "{}")
         except (TypeError, ValueError):
             continue
         sid = d.get("privacy_sheet") if isinstance(d, dict) else None
-        if isinstance(sid, int) and sid not in out:
+        if isinstance(sid, int) and sid not in out and "text" in d:
             out[sid] = {"at": r["at"], "from": str(d.get("from") or ""), "subject": str(d.get("subject") or ""), "text": str(d.get("text") or "")}
     return out
 
@@ -350,7 +361,7 @@ def dsb_send(sid):
     (handed for the privacy information). 409 without SMTP / not finished; 429 like the invoice mails."""
     from .invoices import _mail, h6c_send_budget, inv_clean_subject
     from .ledger import ofx_log
-    from .signoff import SIG_PREFIX, sig_create
+    from .signoff import SIG_PREFIX, sig_create, sig_expiry
     from ..files.store import fs_read, fs_role
     from ..lists.public import public_links_on
     from ..integrations.mail import MAIL_OUT_ON
@@ -380,9 +391,11 @@ def dsb_send(sid):
     text = text or text0
     url = None
     if link:
-        srow, tok = sig_create(c, oid, "document", d["title"] or "", d["body_hash"], uid, None, gen_doc_id=gd["id"])
+        # 2.239.0 D (#2874): the link ends like the other approval links of the office ({expires} YYYY-MM-DD, else DSB_LINK_DAYS)
+        exp = sig_expiry(b.get("expires") or (local_now().date() + timedelta(days=DSB_LINK_DAYS)).isoformat())
+        srow, tok = sig_create(c, oid, "document", d["title"] or "", d["body_hash"], uid, exp, gen_doc_id=gd["id"])
         url = PUBLIC_URL.rstrip("/") + SIG_PREFIX + tok
-        ofx_log(c, oid, "signoff_link", target="gen_doc", detail={"signoff": srow["id"], "gen_doc": gd["id"], "expires_at": None,
+        ofx_log(c, oid, "signoff_link", target="gen_doc", detail={"signoff": srow["id"], "gen_doc": gd["id"], "expires_at": exp,
                                                                   "doc_hash": d["body_hash"]})
     if DSB_LINK in text:
         text = text.replace(DSB_LINK, url or "")
@@ -539,16 +552,35 @@ def dsb_mail_pick(c, r, files):
 def dsb_reply_note(c, r, msg, subj, text):
     """2.154.0 E (#2192): a reply with a known code that is not filed (a revocation, a question, a DOCX / HEIC file, an
     archived sheet) never goes silently: an office log entry with sender, subject and the start of its text, and a sheet
-    that is not archived shows "Reply received (please check)" (review=2) until a person confirms it."""
+    that is not archived shows "Reply received (please check)" (review=2) until a person confirms it. 2.239.0 D (#2874):
+    sender, subject and text are kept with the sheet (sealed, they go with it), the office log only notes the event."""
     import email.utils
+    import json
     from .ledger import ofx_log
     sender = email.utils.parseaddr(str(msg.get("From", "")))[1]
-    ofx_log(c, r["org_id"], "privacy_reply", target="privacy_sheet",
-            detail={"privacy_sheet": r["id"], "subject": subj[:200], "from": sender[:200], "text": (text or "").strip()[:2000], "taken": 0})
+    body_ = (text or "").strip()
+    reply = json.dumps({"at": iso(now_utc()), "from": sender[:200], "subject": subj[:200], "text": body_[:2000]})
+    c.execute("UPDATE office_privacy_sheets SET reply=? WHERE id=?", (seal(c, f"privacy-reply:{r['id']}", reply), r["id"]))
+    ofx_log(c, r["org_id"], "privacy_reply", target="privacy_sheet", detail={"privacy_sheet": r["id"], "chars": len(body_), "taken": 0})
     if not r["archived"]:
         c.execute("UPDATE office_privacy_sheets SET review=2, updated_at=? WHERE id=?", (iso(now_utc()), r["id"]))
     c.commit()
     return 0
+
+
+def dsb_sent_to(c, oid, sid):
+    """2.239.0 D (#2874): the addresses sheet sid was mailed to (the office log's send entries, lower case)."""
+    import json
+    out = set()
+    for x in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND action='send' AND target='privacy_sheet' ORDER BY id DESC LIMIT ?",
+                       (oid, LIST_MAX)):
+        try:
+            d = json.loads(oc_dec_fields(c, oid, "office_doc_log", x).get("detail") or "{}")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(d, dict) and d.get("privacy_sheet") == sid and isinstance(d.get("to"), str):
+            out.add(d["to"].strip().lower())
+    return out
 
 
 def dsb_mail_once(c, r, msg, raw):
@@ -589,6 +621,10 @@ def dsb_mail_import(c, msg, raw):
                 or c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NOT NULL", (r["client_id"],)).fetchone():  # 2.272.0 F (#3029, M2): client in the trash
             return dsb_reply_note(c, r, msg, subj, text)  # known, but nothing to take in (already signed / not mailed): never a task
         pick = dsb_mail_pick(c, r, files[:20])
+        import email.utils
+        frm = email.utils.parseaddr(str(msg.get("From", "")))[1].strip().lower()
+        if pick and frm not in dsb_sent_to(c, r["org_id"], r["id"]):
+            pick = None  # 2.239.0 D (#2874): signed only by the address it was mailed to; another sender is a reply to check
         if not pick:
             return dsb_reply_note(c, r, msg, subj, text)
         d = c.execute("SELECT title, lang FROM office_gen_docs WHERE id=? AND org_id=?", (r["gen_doc_id"], r["org_id"])).fetchone() if r["gen_doc_id"] else None

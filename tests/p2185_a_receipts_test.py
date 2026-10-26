@@ -7,9 +7,9 @@ freelancer-matrix: office, files  tenant-matrix: office, receipt
    the receipts list (all months) and the list of the month, both still count; "No duplicate" takes the mark away; an older
    document the person does not see marks nothing
  - an e-invoice uploaded without the office module: no receipt and no offer; office switched on: the offer, "Recognise
-   again" makes the receipt (once), POST /api/docs/<id>/receipt/einvoice makes it (409 the second time, 404 for others,
+   again" keeps the offer (2.237.0, #2865), POST /api/docs/<id>/receipt/einvoice makes it (409 the second time, 404 for others,
    400 for no e-invoice), a receipt taken away again stays away after a new run
- - an e-invoice moved from the private space into the documents of an organisation's office becomes a receipt there
+ - an e-invoice moved from the private space into the documents of an organisation's office is offered there (2.237.0)
 usage: p2185_a_receipts_test.py <datadir>   (P2185A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import os
 import subprocess
@@ -122,6 +122,7 @@ check(done(Fr, e1) is not None, "first e-invoice read")
 e2 = upload(Fr, "rechnung-mail.xml", ubl("ER-2026-41", "Beispiel Druck GmbH", "DE123456789", item="Papier (Kopie)"))
 d2 = done(Fr, e2)
 check(d2 and (d2.get("duplicate_of") or {}).get("id") == e1, f"the second one is a possible duplicate of the first {d2 and d2.get('duplicate_of')}")
+check(take(Fr, e1).ok and take(Fr, e2).ok, "both taken over")  # 2.237.0 (#2865): no receipt by itself any more
 check(rcs(Fr, e1)["receipt"]["is_receipt"] and rcs(Fr, e2)["receipt"]["is_receipt"], "both are receipts")
 j = Fr.get(B + RL + "?" + ALL).json()
 by = {x["node_id"]: x for x in j["rows"]}
@@ -165,11 +166,14 @@ check(not x["receipt"]["is_receipt"] and x.get("einvoice_offer") is True, f"offi
 check(rcs(G, g3).get("einvoice_offer") is False, "no offer on a document that is no e-invoice")
 check(take(G, g3).status_code == 400, "no e-invoice: 400")
 
-# a new recognition run makes the receipt up, once
+# 2.237.0 (#2865): a new recognition run keeps the offer (no receipt by itself); taken over once
 check(redo(G, g1), "g1 recognised again")
 x = rcs(G, g1)
+check(not x["receipt"]["is_receipt"] and x.get("einvoice_offer") is True, f"recognised again: still the offer {x['receipt']}")
+check(take(G, g1).ok, "g1 taken over")
+x = rcs(G, g1)
 check(x["receipt"]["is_receipt"] and x["receipt"]["vat_pct"] == "7" and x.get("einvoice_offer") is False,
-      f"recognised again: a receipt with the invoice's VAT rate {x['receipt']}")
+      f"taken over: a receipt with the invoice's VAT rate {x['receipt']}")
 check(redo(G, g1), "g1 recognised a third time")
 check([y["node_id"] for y in rows(G)].count(g1) == 1, "never two receipts of one document")
 
@@ -198,6 +202,10 @@ r = A.put(B + "/api/office/settings", json={"company_fields": {"name": "Alpha St
 check(r.ok, "Alpha's office set up " + r.text[:160])
 r = A.post(B + "/api/files/move-space", json={"ids": [a1], "to": f"org:{ORG}", "parent": "docs"})
 check(r.ok, f"moved into Alpha ({r.status_code} {r.text[:200]})")
+x = rcs(A, a1)
+# 2.237.0 (#2865): moved into the office it is an offer there, a receipt once taken over
+check(not x["receipt"]["is_receipt"] and x.get("einvoice_offer") is True, f"moved into the office: the offer there {x['receipt']}")
+check(take(A, a1).ok, "taken over in Alpha")
 x = rcs(A, a1)
 check(x["receipt"]["is_receipt"] and x["receipt"]["vat_pct"] == "7", f"moved into the office: a receipt there {x['receipt']}")
 check(a1 in [y["node_id"] for y in rows(A)], "in Alpha's receipts list")

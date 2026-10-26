@@ -23,6 +23,7 @@ function bp_settingsHtml(s, dis) {
   return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3><div class="shint">${tr('A PDF behind every quotation, invoice, credit note and reminder: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF behind all).')}</div>
     <p class="muted ofchint">${tr('PDF, A4 portrait, up to 10 MB')}</p>
     <div class="row"><span class="lacts">${file}</span></div>
+    ${st.on && st.pdfa_hint ? `<p class="dtp-warn" role="status">${esc(st.pdfa_hint)}</p>` : ''}
     <div class="lacts" style="margin-bottom:.5rem">${up}<button type="button" class="btn sm" data-bp-act="preview">${ic('eye', 's')} ${tr('Preview')}</button>${adm && st.on ? `<button type="button" class="btn sm" data-bp-act="del">${ic('trash', 's')} ${tr('Remove')}</button>` : ''}</div>
     ${st.on ? `<fieldset class="bpf" style="border:0;padding:0;margin:0" ${dis}>${ofcChk('bp-hide-head', tr('Leave out our own head (logo, company name, fold marks)'), st.hide_head)}
     ${ofcChk('bp-hide-foot', tr('Leave out our own footer (number and page stay)'), st.hide_footer)}

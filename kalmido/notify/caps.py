@@ -23,6 +23,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset
+from ..core.pg import st_ids
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab
 from ..core.errors import BadInput
@@ -95,17 +96,44 @@ def _has_g():
     return has_app_context()
 
 
-def _tpl_for(c, lid, uid):
-    lr = c.execute("SELECT l.owner_id, l.folder, u.kind AS owner_kind FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.id=?",
-                   (lid,)).fetchone()
+def tpl_prefetch(c, lids, uid):
+    """2.280.0 B (#3116): tpl_for of many lists for uid in three queries (instead of two and one per folder level per list):
+    fills the request cache tpl_for reads, the answers are the same."""
+    if not _has_g():
+        return
+    cache = g.setdefault("_notif_tpl", {})
+    lids = sorted({int(x) for x in lids or () if (x, uid) not in cache})
+    if not lids:
+        return
+    ids = st_ids(lids)
+    lr = {r["id"]: r for r in c.execute("SELECT l.id, l.owner_id, l.folder, u.kind AS owner_kind FROM lists l LEFT JOIN users u ON u.id=l.owner_id "
+                                        "WHERE l.id = ANY(CAST(? AS BIGINT[]))", (ids,)).fetchall()}
+    ln, fn = {}, {}
+    for r in c.execute("SELECT list_id, user_id, tpl, custom FROM list_notif WHERE list_id = ANY(CAST(? AS BIGINT[])) AND user_id IN (?, 0)",
+                       (ids, uid)).fetchall():
+        ln.setdefault(r["list_id"], {})[r["user_id"]] = r
+    owners = sorted({r["owner_id"] for r in lr.values() if r["owner_id"] and r["owner_id"] != uid and r["folder"]})
+    if owners:
+        for r in c.execute("SELECT owner_id, folder, user_id, tpl, custom FROM folder_notif WHERE owner_id = ANY(CAST(? AS BIGINT[])) "
+                           "AND user_id IN (?, 0)", (st_ids(owners), uid)).fetchall():
+            fn.setdefault((r["owner_id"], r["folder"]), {})[r["user_id"]] = r
+    for lid in lids:
+        cache[(lid, uid)] = _tpl_for(c, lid, uid, (lr, ln, fn))
+
+
+def _tpl_for(c, lid, uid, pre=None):
+    # pre (2.280.0 B, #3116): (list rows, list_notif rows, folder_notif rows) read by tpl_prefetch for many lists at once
+    lr = pre[0].get(lid) if pre else c.execute(
+        "SELECT l.owner_id, l.folder, u.kind AS owner_kind FROM lists l LEFT JOIN users u ON u.id=l.owner_id WHERE l.id=?", (lid,)).fetchone()
     if not lr or not lr["owner_id"] or lr["owner_id"] == uid or lr["owner_kind"] == "agent":
         return None  # the owner is never limited; a list of an agent has nobody who could choose a template: not limited
-    rows = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM list_notif WHERE list_id=? AND user_id IN (?, 0)", (lid, uid))}
+    rows = pre[1].get(lid, {}) if pre else \
+        {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM list_notif WHERE list_id=? AND user_id IN (?, 0)", (lid, uid))}
     for u, src in ((uid, "member"), (0, "list")):
         if u in rows:
             return {"tpl": rows[u]["tpl"], "custom": custom_of(rows[u]["custom"]), "source": src, "folder": None}
     for f in _ancestors(lr["folder"] or ""):
-        rows = _folder_rows(c, lr["owner_id"], f, uid)
+        rows = pre[2].get((lr["owner_id"], f), {}) if pre else _folder_rows(c, lr["owner_id"], f, uid)
         for u, src in ((uid, "folder-member"), (0, "folder")):
             if u in rows:
                 return {"tpl": rows[u]["tpl"], "custom": custom_of(rows[u]["custom"]), "source": src, "folder": f}

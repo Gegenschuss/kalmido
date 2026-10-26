@@ -109,6 +109,8 @@ CHECKS = {
     # 2.124.0 D (#2342): a statement balance whose import lies in another office area
     "bank_balance": ("SELECT b.id, b.import_id FROM office_bank_balances b JOIN office_bank_imports i ON i.id=b.import_id "
                      "WHERE i.org_id IS DISTINCT FROM b.org_id"),
+    # 2.299.0 B (#3191): a bank booking marked by a rule of another office area
+    "bank_rule": ("SELECT t.id, t.rule_id FROM office_bank_tx t JOIN office_bank_rules r ON r.id=t.rule_id WHERE r.org_id IS DISTINCT FROM t.org_id"),
     # 2.93.0 A (#1927): a document made from a template bound to a client / project list / quotation / template of another
     # office area (a personal office's documents bind the owner's private clients and lists), or a signature link of it
     # in another area than the document

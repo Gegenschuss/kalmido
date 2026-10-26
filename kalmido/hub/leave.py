@@ -141,7 +141,7 @@ def lv_notify(c, rcpts, kind, r, data):
         title = (tr("{0} asks for vacation", who, lg=lg) if kind == "leavereq" else
                  tr("{0} approved your vacation", who, lg=lg) if data.get("state") == "approved" else
                  tr("{0} rejected your vacation", who, lg=lg))
-        g.pushes.append((u, title, span, f"{PUBLIC_URL}/#workload", push_prio(s)))
+        g.pushes.append((u, title, span, f"{PUBLIC_URL}/#workload", push_prio(s), {"scope": f"o:{r['org_id']}"}))  # 2.240.0 B2 (#2867)
 
 
 def lv_requested(c, r):

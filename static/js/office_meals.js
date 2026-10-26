@@ -169,7 +169,7 @@ function bw_modal(m0) {
     <div class="row bwamt"><span class="rklab">${tr('Amounts (gross, as on the bill)')}</span><ul class="bwlines" role="list">${lines.map(bw_lineHtml).join('')}</ul>
       ${ro ? '' : `<button type="button" class="btn sm" data-bwm="addline">${ic('plus', 's')}<span>${tr('Add line')}</span></button>`}</div>
     ${ofcRowF('bw-tip', tr('Tip'), ofcIn('bw-tip', m && +m.tip ? fmtNum(+m.tip, 2) : '', {num: true, ph: tr('optional')}), tr('Not on the bill, no VAT; deductible like the bill.'))}
-    <p class="bwsum" aria-live="polite"></p><p class="muted ofchint bw250" hidden>${tr('From 250 € gross the restaurant bill must be made out to the company.')}</p>
+    <p class="bwsum" aria-live="polite"></p><p class="muted ofchint bw250" hidden>${tr('Above 250 € gross the restaurant bill must be made out to the company.')}</p>
     <div class="row"><label for="bw-note">${tr('Note')}</label><textarea id="bw-note" rows="2" maxlength="2000">${esc(m?.note || '')}</textarea></div>
     </fieldset>
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
@@ -194,7 +194,7 @@ function bw_modal(m0) {
   const sum = () => {
     const ls = lineVals(), bill = ls.reduce((s, l) => s + l.gross, 0), vat = ls.reduce((s, l) => s + (+l.rate ? l.gross * +l.rate / (100 + +l.rate) : 0), 0), tip = ofcNum(val('#bw-tip')) || 0;
     $('.bwsum', md).textContent = tr('Total {0} · of which VAT {1} · 70 % deductible {2}', bw_amt(bill + tip), bw_amt(vat), bw_amt((bill - vat + tip) * 0.7));
-    $('.bw250', md).hidden = bill < 250;
+    $('.bw250', md).hidden = bill <= 250;  // 2.296.0 A (#3176): above 250 EUR only
   };
   const hostVal = () => {
     const v = val('#bw-host');
@@ -286,7 +286,7 @@ function bw_reportHtml() {
   const q = bw_q();
   if (!BW.rep || BW.rep.q !== q) { setTimeout(bw_loadReport, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const r = BW.rep; if (r.error) return `<div class="empty">${esc(r.error)}</div>`;
-  const t = r.total, dl = ext => `<a class="btn sm" href="${BW_U}/report?${esc(q)}&format=${ext}" download>${ic('download', 's')}<span>${ext.toUpperCase()}</span></a>`;
+  const t = r.total, dl = ext => ofr_noSp('meals', 'export') ? '' : `<a class="btn sm" href="${BW_U}/report?${esc(q)}&format=${ext}" download>${ic('download', 's')}<span>${ext.toUpperCase()}</span></a>`;
   const card = (lab, v, cls = '') => `<div class="bwcard ${cls}"><small class="muted">${esc(lab)}</small><b>${bw_amt(v)}</b></div>`;
   const drafts = r.drafts ? `<p class="muted ofchint">${esc(trn('{0} draft is not in the sums.', '{0} drafts are not in the sums.', r.drafts))}</p>` : '';
   if (!r.count) return `<div class="ofcbar"><b>${tr('Evaluation')}</b><span class="spacer"></span>${dl('csv')}${dl('pdf')}</div><div class="empty nempty">${tr('No approved entertainment receipts in this period.')}</div>${drafts}`;

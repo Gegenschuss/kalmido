@@ -24,10 +24,11 @@ from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
+from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.db import appver_newer_minor
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
-from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
+from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
 from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
@@ -70,6 +71,9 @@ BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
 BK_TICK = _env_int("KALMIDO_BACKUP_TICK", 60)                          # s between schedule checks
 BK_MAX_BYTES = _env_int("KALMIDO_BACKUP_MAX_MB", 4096) * 1024 * 1024   # restore: upload size and unpacked total
 BK_MAX_MEMBERS = 200000
+BK_MISSING_SHOWN = 20          # 2.273.0 A (#3050): paths of vanished files named in the manifest and the log
+# 2.273.0 A (#3051 p. 13): a restore cannot reach the offline buffers of the devices
+BK_OFFLINE_NOTE = N_("Devices that still hold unsent changes send them after reloading: they can meet the restored state as conflicts or come back as new items. Check recent work on those devices.")
 BK_MAX_RATIO = 500             # unpacked / packed per member above 1 MB (zip bomb)
 BK_STALE_S = 2 * 86400         # "backup older than 2 days" alert
 BK_SAFETY_KEEP = 3
@@ -131,7 +135,9 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
           # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
           "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
-          "restore": N_("The restore failed ({0}); nothing was changed.")}
+          "restore": N_("The restore failed ({0}); nothing was changed."),
+          # 2.273.0 A (#3050): the way back to the state before failed too
+          "rollback": N_("The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
 
@@ -411,6 +417,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             z.write(dbp, BK_DUMP, compress_type=zipfile.ZIP_STORED)  # pg_dump -Fc compresses itself
             files.append([BK_DUMP, os.path.getsize(dbp), _sha256_file(dbp)])
             skipped = {}  # top folder -> files not matching BK_MEMBER_RE
+            missing = []  # 2.273.0 A (#3050): (full path, archive name) of files gone between listing and reading
             for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
                 if not os.path.isdir(base):
                     continue
@@ -432,14 +439,32 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                             z.write(full, rel, compress_type=zipfile.ZIP_STORED if size > 64 * 1024 and
                                     re.search(r"\.(jpe?g|png|gif|webp|avif|heic|mp4|mov|webm|mp3|m4a|ogg|zip|gz|7z|pdf|docx|xlsx|pptx|odt)$", fn, re.I)
                                     else zipfile.ZIP_DEFLATED)
-                        except FileNotFoundError:  # deleted meanwhile
+                        except FileNotFoundError:  # gone meanwhile (deleted): tried once more below (2.273.0 A, #3050)
+                            missing.append((full, rel))
                             continue
                         files.append([rel, size, digest])
                         att_bytes += size
+            gone = []
+            # 2.273.0 A (#3050): a second try of the same path (helps only when a file was replaced in place meanwhile; a deleted or
+            # moved one stays missing); what is still missing is named, never silently
+            for full, rel in missing:
+                try:
+                    digest, size = _sha256_file(full), os.path.getsize(full)
+                    z.write(full, rel, compress_type=zipfile.ZIP_DEFLATED)
+                except FileNotFoundError:
+                    gone.append(rel)
+                    continue
+                files.append([rel, size, digest])
+                att_bytes += size
+            if gone:  # 2.273.0 F1 (#3050): the log gets the count and the folders only, the paths stay in the manifest (admins)
+                tops = sorted({"/".join(r.split("/")[:2]) if r.count("/") > 1 else r.split("/")[0] + "/." for r in gone})
+                print(f"backup: {len(gone)} file(s) vanished while the backup was written (deleted or moved after the database dump),",
+                      "folders:", ", ".join(tops), flush=True)
             meta = {"format": "kalmido-backup", "format_version": 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
                     "attachment_files": len(files) - 1, "attachment_bytes": att_bytes,
-                    "skipped_files": sum(skipped.values())}  # 2.79.0 (#476 M8)
+                    "skipped_files": sum(skipped.values()),  # 2.79.0 (#476 M8)
+                    "missing_files": len(gone), "missing_paths": gone[:BK_MISSING_SHOWN]}  # 2.273.0 A (#3050)
             if skipped:  # folder names only (never file names): a new kind of stored file the archive does not know yet
                 print("backup: files outside the known folders were not saved:", json.dumps(skipped, sort_keys=True), flush=True)
             z.writestr("manifest.json", json.dumps({**meta, "files": files}, ensure_ascii=False))
@@ -532,7 +557,7 @@ def bk_public(x):
     return {"name": x["name"], "kind": x["kind"], "encrypted": x["encrypted"], "size": x["size"], "created_at": iso(x["at"]),
             "app_version": m.get("app_version", ""), "schema_version": m.get("schema_version"), "counts": m.get("counts") or {},
             "attachment_files": m.get("attachment_files"), "attachment_bytes": m.get("attachment_bytes"),
-            "unreadable": bool(m.get("unreadable")),
+            "unreadable": bool(m.get("unreadable")), "missing_files": m.get("missing_files") or 0,  # 2.273.0 A (#3050)
             # 2.37.0: a backup from before 2.37 (SQLite): listed and checked, restored only through 2.36 + the update
             "legacy": not m.get("unreadable") and m.get("format_version", 1) < 2}
 
@@ -693,7 +718,7 @@ def backup_loop():
                 finally:
                     c.close()
         except Exception as e:  # noqa: BLE001
-            print("backup loop error:", type(e).__name__, e, flush=True)
+            print("backup loop error:", db_log_err(e), flush=True)
             aa_count("watchdog", f"backup|{type(e).__name__}", "backup")
 
 
@@ -1126,8 +1151,9 @@ def _pool_renew():
 def _pg_restore(dump):
     """pg_restore --clean of a checked dump into the running database, in ONE transaction (an error leaves it as it was),
     with the filtered table of contents only (bk_toc: no code from the dump; init_db creates it afterwards). Tables of this
-    version that the dump does not have (a backup of an older version) are dropped first, so --clean cannot trip over
-    their foreign keys; init_db creates them again, empty."""
+    version that the dump does not have (a backup of an older version) lose their foreign keys first, so --clean cannot
+    trip over them, and are dropped once the restore went through (2.273.0 A, #3050: before, they were dropped in an own
+    transaction ahead of pg_restore - a stop in between left them empty); init_db creates them again, empty."""
     toc, tables = _toc_file(dump)
     if not {"users", "tasks", "kalmido_meta"} <= tables:  # (never drop anything on a list that was not understood)
         raise BackupError("format")
@@ -1137,13 +1163,13 @@ def _pg_restore(dump):
             c.execute("SET LOCAL statement_timeout = 0")
             extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
                      if r[0] not in tables]
-            for t in extra:
-                c.execute('DROP TABLE IF EXISTS "' + t.replace('"', '""') + '" CASCADE')
+            for t, k in c.execute("""SELECT r.relname, k.conname FROM pg_constraint k JOIN pg_class r ON r.oid=k.conrelid -- pg-ok: pg_catalog oid
+                                     JOIN pg_namespace n ON n.oid=r.relnamespace WHERE k.contype='f' AND n.nspname='public'""").fetchall():
+                if t in extra:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
+                    c.execute('ALTER TABLE "' + t.replace('"', '""') + '" DROP CONSTRAINT IF EXISTS "' + k.replace('"', '""') + '"')
         c.commit()
     finally:
         c.close()
-    if extra:
-        print("restore: dropped table(s) the backup does not have:", ", ".join(extra), flush=True)
     _pool_renew()
     try:
         # 2.209.0 E (#1627): work that runs outside the maintenance gate (queued work, pushes after a request) can meet
@@ -1160,6 +1186,17 @@ def _pg_restore(dump):
                 print(f"restore: deadlock in pg_restore (nothing changed), try {i + 2} of {BK_RESTORE_TRIES}", flush=True)
                 _pool_renew()
                 time.sleep(2 * (i + 1))
+        if extra:  # 2.273.0 A (#3050): the restore went through; the tables the backup does not have go now
+            c = _pg.connect_direct(DATABASE_URL)
+            try:
+                with _pg.system_ctx(c):
+                    c.execute("SET LOCAL statement_timeout = 0")
+                    for t in extra:
+                        c.execute('DROP TABLE IF EXISTS "' + t.replace('"', '""') + '" CASCADE')
+                c.commit()
+            finally:
+                c.close()
+            print("restore: dropped table(s) the backup does not have:", ", ".join(extra), flush=True)
     finally:
         _pool_renew()
 
@@ -1290,9 +1327,12 @@ def bk_restore(path, pw, admin, via):
         man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
         cur = connect()
         try:
-            keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\'")}
+            keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
             ver = int(gsetting(cur, "version") or 0)
             journal = bkr_read(cur)  # 2.152.0 B (#2172)
+            # 2.273.0 A (#3051 p. 12): the queue is never in a backup (#2220): what waits now is gone after the restore
+            with _pg.system_ctx(cur):
+                jobs = cur.execute("SELECT count(*) FROM bg_jobs WHERE state IN ('wait','run')").fetchone()[0]
         finally:
             cur.close()
         if not GATE.begin(own=1, timeout=60):
@@ -1335,12 +1375,14 @@ def bk_restore(path, pw, admin, via):
             finally:
                 c.close()
         except Exception:
+            back_failed = False
             if swapped:
                 try:
                     _pg_restore(pre)
                     _reset_caches()
                     init_db(guard=False)
                 except Exception as e2:  # noqa: BLE001 -- the original error is the one to report
+                    back_failed = True  # 2.273.0 A (#3050): never "nothing was changed" then
                     print("restore: rolling back to the state before FAILED:", type(e2).__name__, getattr(e2, "args_", e2),
                           f"(the safety backup {safety} holds it)", flush=True)
             if os.path.isdir(ATT_DIR) and moved:
@@ -1350,6 +1392,8 @@ def bk_restore(path, pw, admin, via):
                 os.rename(OFFICE_DIR, off_new)
             if omoved:
                 os.rename(off_old, OFFICE_DIR)
+            if back_failed:
+                raise BackupError("rollback", safety) from None
             raise
         for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
             left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
@@ -1357,15 +1401,19 @@ def bk_restore(path, pw, admin, via):
                 print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
             else:
                 shutil.rmtree(old, ignore_errors=True)
-        print(f"restore: {os.path.basename(path)} restored by {admin} (safety backup {safety})", flush=True)
+        print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal)  # 2.152.0 B (#2172)
+        # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
+        man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
+                         if jobs else []) + [(BK_OFFLINE_NOTE,)]
+        print(f"restore: {jobs} waiting background job(s) not restored; devices may send unsent changes after reloading", flush=True)
         aa_now("security", f"restore:{int(time.time())}", N_("{0} restored a backup from {1} (safety backup of the previous state: {2})."),
                [admin, str(man.get("created_at", "?"))[:16].replace("T", " ") + " UTC", safety])
         return tok, safety, man
     except BackupError:
         raise
     except Exception as e:  # noqa: BLE001
-        print("restore failed:", type(e).__name__, e, flush=True)
+        print("restore failed:", db_log_err(e), flush=True)
         raise BackupError("restore", str(e)[:300] if type(e).__name__ == "MigError" else type(e).__name__) from None
     finally:
         if gate:
@@ -1556,7 +1604,8 @@ def backups_verify(name):
         shutil.rmtree(work, ignore_errors=True)
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
-                   attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"))
+                   attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
+                   missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
 @app.post("/api/admin/backups/upload")
@@ -1617,8 +1666,9 @@ def backups_restore():
     if b.get("confirm") != BK_CONFIRM:
         return err(BK_ERR_TEXT("confirm", BK_CONFIRM))
     keys = _rate_keys(g.user["username"])
-    if _rate_blocked(keys):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(keys, g.user["username"])  # 2.282.0 (#3111)
+    if e:
+        return e
     up = str(b.get("upload") or "")
     p = bk_upload_path(up) if up else bk_path(str(b.get("name") or ""))
     pw = str(b.get("passphrase") or "") or bk_passphrase(c)
@@ -1635,7 +1685,8 @@ def backups_restore():
         with contextlib.suppress(OSError):
             os.remove(p)
     resp = jsonify(ok=True, safety=safety, relogin=tok is None and via != "proxy", created_at=man.get("created_at"),
-                   deleted_again=man.get("_again") or {})  # 2.152.0 B (#2172): accounts of the journal
+                   deleted_again=man.get("_again") or {},  # 2.152.0 B (#2172): accounts of the journal
+                   notes=[tr(*n) for n in man.get("_notes") or []])  # 2.273.0 A (#3051 p. 12, 13)
     if tok:
         set_cookie(resp, tok, SESSION_DAYS * 86400)
     return resp

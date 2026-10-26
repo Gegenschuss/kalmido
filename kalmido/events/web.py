@@ -137,6 +137,10 @@ def op_event_edit(c, uid, eid, b, occ=None):
     snap = evi_snap(c, eid)
     if send:
         evi_precheck(c, uid, evi_estimate(c, b, eid))
+    if isinstance(b, dict) and b.get("expect"):  # 2.273.0 C (#3051): the copy's change time checked under the row lock (also one occurrence)
+        r = c.execute("SELECT * FROM events WHERE id=? FOR UPDATE", (eid,)).fetchone() or r
+        if occ and b.pop("expect") != r["updated_at"]:
+            raise Denied(409, tr("The event was changed meanwhile"))
     if occ:
         ev_occ_change(c, r, occ, b)
         c.commit()

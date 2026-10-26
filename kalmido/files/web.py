@@ -608,6 +608,7 @@ def files_node_restore(nid):
         raise Denied(403)
     from ..office.periodlock import pl_tree_need_open
     pl_tree_need_open(c, nid)  # 2.148.0 A (#2471)
+    fs_ref_need_move(c, me(), n, restore=True)  # 2.238.0 A (#2863): filed documents come back into the folder's shares -- edit on them, like moving
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")
@@ -757,7 +758,8 @@ def files_share_patch(sid):
     if role not in ("view", "edit"):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b["expires_at"], b.get("tz")) if "expires_at" in b else s["expires_at"]
-    if role != s["role"]:
+    longer = s["expires_at"] is not None and (exp is None or str(exp) > str(s["expires_at"]))
+    if role != s["role"] or longer:  # 2.238.0 A (#2863): extending a share passes the filed documents on as well
         fs_ref_need_share(c, me(), need_node(c, s["node_id"]), role)  # 2.199.0 F (#2742, review)
     c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, sid))
     fs_log_add(c, s["node_id"], "share_change", f"{sid}:{role}")

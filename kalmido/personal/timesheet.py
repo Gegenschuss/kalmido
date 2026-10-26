@@ -348,7 +348,9 @@ def tsl_notify(c, rcpt, data, title_fn, msg_fn):
     s = collab_user(c, rcpt, None)
     if s and notif_ok(c, rcpt, s, "timesheet", "push") and push_reachable(c, rcpt, s):
         lg = lang_of(s)
-        g.setdefault("pushes", []).append((rcpt, title_fn(lg), msg_fn(lg), f"{PUBLIC_URL}/#time", push_prio(s)))
+        o = c.execute("SELECT org_id FROM time_sheets WHERE user_id=? AND month=?", (data.get("user_id"), data.get("month"))).fetchone()
+        g.setdefault("pushes", []).append((rcpt, title_fn(lg), msg_fn(lg), f"{PUBLIC_URL}/#time", push_prio(s),
+                                           {"scope": f"o:{o['org_id']}" if o else None}))  # 2.240.0 B2 (#2867): no sheet = neutral
 
 
 def tsl_news_live(c, uid, data):

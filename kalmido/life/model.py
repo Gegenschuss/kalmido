@@ -604,7 +604,8 @@ def _wd_care(c, users, S, LG, now):
         c.commit()
         lg = LG[uid]
         names = ", ".join(x["fn"] for x in due[:5]) + (" …" if len(due) > 5 else "")
-        notify(uid, tr("Time to get in touch", lg=lg), names, push_prio(s), f"{PUBLIC_URL}/#life", s=s, tag="care", ttl=20 * 3600)
+        notify(uid, tr("Time to get in touch", lg=lg), names, push_prio(s), f"{PUBLIC_URL}/#life", s=s, tag="care", ttl=20 * 3600,
+               scope="private")  # 2.240.0 B2 (#2867): own contacts
 
 
 # ---- review + journal

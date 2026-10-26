@@ -225,7 +225,9 @@ r = Ca.post(B + "/api/team/absences", json={"kind": "sick", "start_date": str(DA
 check(r.status_code == 201, f"setup: carol is away ({r.status_code})")
 r = AGS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
 j = r.json()
-check(r.ok and j["org_id"] == ORG and [b["title"] for b in j["bookings"]] == ["Other film"], f"agent reads the disposition of Alpha ({r.text[:200]})")
+# 2.223.7 (#2921): a booking without a project the agent reads is only "Booked" for it (people only of shared projects)
+check(r.ok and j["org_id"] == ORG and [b["title"] for b in j["bookings"]] == ["Booked"] and "Other film" not in r.text,
+      f"agent reads the disposition of Alpha ({r.text[:200]})")
 check(str(CAROL) in j["away"] and "sick" not in r.text and "flu" not in r.text, "away only, never the kind or the note")
 check(AGS.get(V + "/dispo", params={"org": ORG2}).status_code == 404, "another organisation: 404")
 check(AG0S.get(V + "/dispo").status_code == 403, "without the scope calendar: 403")
@@ -246,7 +248,8 @@ r = AGS.post(V + "/agent/proposals/shoot", json=SHOOT)
 check(r.status_code == 201 and r.json()["kind"] == "shoot", f"shoot proposal ({r.status_code} {r.text[:200]})")
 JS = r.json()["id"]
 p = r.json()["proposal"]
-check([w["kind"] for w in p["crew"][0]["warnings"]] == ["double"] and p["crew"][0]["warnings"][0]["titles"] == ["Other film"], f"bob: double booking ({p['crew'][0]})")
+# 2.223.7 (#2921): the other booking has no project the agent reads -> "Booked"
+check([w["kind"] for w in p["crew"][0]["warnings"]] == ["double"] and p["crew"][0]["warnings"][0]["titles"] == ["Booked"], f"bob: double booking ({p['crew'][0]})")
 check([w["kind"] for w in p["crew"][1]["warnings"]] == ["away"] and not p["crew"][2]["warnings"], "carol: away on day 1, free on day 2")
 check(p["days"][0]["warnings"] and p["days"][0]["warnings"][0]["kind"] == "other_projects" and not p["days"][1]["warnings"], "day 1: other projects")
 check(len(p["items"]) == 6 and p["days"][2]["alt_of"] == 0, "items = 3 days + 3 crew rows, the variant marked")
@@ -277,9 +280,8 @@ check(Er.put(B + f"/api/lists/{PE}/members", json={"user_id": PAG, "role": "edit
 r = Er.post(B + "/api/team/dispo/bookings", json={"title": "Erin booked", "start": str(DAY), "end": str(DAY), "status": "firm",
                                                   "resources": [{"kind": "user", "id": ERIN}]})
 check(r.status_code == 201, f"setup: erin books herself in her personal area ({r.status_code} {r.text[:120]})")
-j = PAGS.get(V + "/dispo", params={"start": str(DAY)}).json()
-check([b["title"] for b in j.get("bookings", [])] == ["Erin booked"] and [p["id"] for p in j["resources"]["people"]] == [ERIN],
-      f"personal agent reads her personal area ({str(j)[:200]})")
+# 2.223.7 (#2921): the owner's private disposition is not shared with her agent: 404 (as /absences)
+check(PAGS.get(V + "/dispo", params={"start": str(DAY)}).status_code == 404, "personal agent: no private disposition (404)")
 r = PAGS.post(V + "/agent/proposals/shoot", json={"list_id": PE, "days": [{"date": str(DAY), "title": "Erin shoot"}], "crew": [{"kind": "user", "id": ERIN}]})
 check(r.status_code == 201 and r.json()["proposal"]["crew"][0]["warnings"][0]["kind"] == "double", f"freelancer: shoot proposal with warning ({r.status_code} {r.text[:150]})")
 check(PAGS.get(V + "/time/check").json().get("user_id") == ERIN, "a personal agent checks its owner's time by default")
@@ -333,10 +335,13 @@ dbx("UPDATE api_tokens SET list_ids=? WHERE user_id=?", (str(P), LB), write=True
 r = LBS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
 bks = r.json().get("bookings", [])
 hid = [b for b in bks if b.get("hidden")]
-check(r.ok and "Other film" not in r.text and hid and all(b["title"] == "Booked" and b["list_id"] is None and not b["job"] for b in hid)
-      and [b for b in bks if b["list_id"] == P and b["title"].startswith("Shoot day")], f"review 5: list limit, other bookings only as Booked ({bks[:3]})")
+# 2.223.7 (#2921): P is not shared with limitbot (one agent per list) -> every booking only as Booked, also those of P
+check(r.ok and "Other film" not in r.text and "Shoot day" not in r.text and hid == bks
+      and all(b["title"] == "Booked" and b["list_id"] is None and not b["job"] for b in hid), f"review 5: list limit, other bookings only as Booked ({bks[:3]})")
 r = AGS.get(V + "/dispo", params={"start": str(DAY), "days": 2})
-check(r.ok and "Other film" in r.text, "review 5: without a list limit the agent still sees the titles")
+# 2.223.7 (#2921): without a list limit the agent sees the titles of its projects, never of a booking without one
+check(r.ok and "Other film" not in r.text and any(b["title"].startswith("Shoot day") for b in r.json()["bookings"]),
+      "review 5: without a list limit the agent sees its projects' titles")
 Bo.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")})
 check(AGS.get(V + "/dispo").status_code == 409 and AGS.get(V + "/dispo/free", params={"date": str(DAY)}).status_code == 409,
       "review 5: the module disposition off at the organisation's admin: 409 for its agent")

@@ -364,6 +364,8 @@ check(e and e[-1]["event"] == "chat" and e[-1]["data"]["message"]["body"] == "Hi
 cur = e[-1]["seq"] if e else cur
 ch = cl.get("/agent/chats").json()
 check(len(ch["data"]) == 1 and ch["data"][0]["from"] == "user" and ch["cursor"] == ch["data"][0]["id"], "agent reads the chats")
+# 2.236.0 B (#2909): a new agent pushes only at limits (work style push "limits"); this check is about the plain answer push
+check(A.patch(B + f"/api/agents/{CL}/work-style", json={"push": "results"}).ok, "the agent pushes its results (work style)")
 r = cl.post("/agent/chats/1", json={"body": "Working on the trailer.", "task_id": T2})
 check(r.status_code == 201 and r.json()["from"] == "agent", "agent answers")
 check(next(a for a in A.get(B + "/api/state").json()["agents"] if a["id"] == CL)["chat_unread"] == 1, "unread answer")

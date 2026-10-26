@@ -40,6 +40,8 @@ RCL_PAGE = 200  # rows per page of the list
 RCL_PAGE_MAX = 500
 RCL_STATUS = ("all", "paid", "open")
 RCL_NAME_MAX = 120
+RCL_RCK = ("rchk", "rchk_at", "rchk_ok", "updated_at", "extracted", "amount", "doc_date", "currency", "sender_id", "type_id", "set_at",
+           "category", "vat_pct")  # 2.299.0 D (#3193): what rck_seen reads (receipts/rchecks.py rck_stamp)
 
 
 def rcl_args(args):
@@ -74,6 +76,7 @@ def rcl_args(args):
         raise BadInput(tr("Invalid value: {0}", "limit"))
     return {"from": frm, "to": to, "by": by, "status": status, "category": (args.get("category") or "").strip()[:200],
             "supplier": ids["supplier"], "project": ids["project"], "novat": args.get("novat") in ("1", "true"),
+            "hints": args.get("hints") in ("1", "true"),  # 2.299.0 D (#3193): only receipts with hints of the check
             "q": (args.get("q") or "").strip().lower()[:200], "limit": max(1, min(limit, RCL_PAGE_MAX)), "offset": max(0, offset)}
 
 
@@ -89,8 +92,8 @@ def rcl_all(c, oid, f, uid, own=False):
     home = _home(s)
     day = ("COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if f["by"] == "paid"
            else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))")
-    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, d.doc_date, d.due_date, d.amount, d.currency, "
-                     f"d.sender_id, d.ws, d.extracted, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, r.list_name, d.doc_date, d.due_date, d.amount, d.currency, "
+                     f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
                      + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
                      + f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"]) + ((uid,) if own else ())).fetchall()
@@ -115,7 +118,7 @@ def rcl_all(c, oid, f, uid, own=False):
             lists[lid] = lr["name"] if ok else None
         out.append({"node_id": r["node_id"], "date": r["day"], "doc_date": r["doc_date"], "paid_at": r["paid_at"] or None,
                     "due_date": r["due_date"], "title": r["name"] or "", "category": r["category"] or "",
-                    "project_id": lid if lid and lists.get(lid) else None, "project": lists.get(lid) if lid else None,
+                    "project_id": lid if lid and lists.get(lid) else None, "project": lists.get(lid) if lid else (r["list_name"] or None),  # 2.239.0 D (#2874): a deleted project's name
                     "supplier_id": r["sender_id"], "supplier": label_name(c, ws, "sender", r["sender_id"]) or "",
                     "vat_pct": vat_pct, "net": net, "vat": vat, "amount": gross, "currency": home,
                     "orig_amount": money(a) if cur != home else None, "orig_currency": cur if cur != home else None,
@@ -124,6 +127,11 @@ def rcl_all(c, oid, f, uid, own=False):
     dups = dup_seen(c, [x["node_id"] for x in out], uid)  # 2.185.0 A (#2583): a possible duplicate (marked, still counted)
     for x in out:
         x["dup"] = x["node_id"] in dups
+    from ..receipts.rchecks import rck_seen  # 2.299.0 D (#3193): hints of the fixed check (stored; fill: stale ones now)
+    ids = {x["node_id"] for x in out}
+    seen, f["_rck_pending"] = rck_seen(c, [{"node_id": r["node_id"], **{k: r[k] for k in RCL_RCK}} for r in rows if r["node_id"] in ids], f.get("_rck_fill"))
+    for x in out:
+        x["hints"] = seen.get(x["node_id"], 0) + (1 if x["dup"] else 0)
     return out
 
 
@@ -150,6 +158,8 @@ def rcl_filter(rows, f):
         if f["status"] == "open" and x["paid_at"]:
             continue
         if f["novat"] and x["vat_pct"] is not None:
+            continue
+        if f.get("hints") and not x.get("hints"):
             continue
         if f["q"] and f["q"] not in " ".join((x["title"], x["supplier"], x["number"])).lower():
             continue
@@ -180,11 +190,12 @@ def rcl_public(x):
             "supplier": x["supplier"] or None, "number": x["number"] or None, "einvoice": x["einvoice"], "vat_pct": x["vat_pct"],
             "net": dstr(x["net"]), "vat": dstr(x["vat"]), "amount": dstr(x["amount"]), "currency": x["currency"],
             "orig_amount": dstr(x["orig_amount"]) if x["orig_amount"] is not None else None, "orig_currency": x["orig_currency"],
-            "dup": bool(x.get("dup"))}  # 2.185.0 A (#2583)
+            "dup": bool(x.get("dup")), "hints": x.get("hints") or 0}  # 2.185.0 A (#2583); 2.299.0 D (#3193): + hints
 
 
-def _rcl_load(c, oid, uid):
+def _rcl_load(c, oid, uid, fill=False):
     f = rcl_args(request.args)
+    f["_rck_fill"] = fill  # 2.299.0 D (#3193): the list checks stale receipts (the exports only read the stored hints)
     rows = rcl_all(c, oid, f, uid, own=ofr_own_only(c, uid, oid, "receipts"))
     return f, rows, rcl_filter(rows, f)
 
@@ -246,13 +257,16 @@ def _fname(f, ext):
 def rcl_get():
     """?from=&to= (ISO days, default: this year) &by=doc|paid &status=all|paid|open &category= &supplier=<sender id>
     &project=<list id> &novat=1 &q= &limit= (200, max 500) &offset= -> {rows (newest first), total {gross, net, vat, count},
-    more, categories, suppliers, projects (of the period), currency, from, to, by}."""
+    more, categories, suppliers, projects (of the period), currency, from, to, by}. 2.299.0 D (#3193): &hints=1 only receipts
+    with hints of the check (or a possible duplicate); + hints (receipts of the period with hints), hints_pending (not
+    checked yet: the next request checks them), row "hints" (their number)."""
     c, uid, oid = _ctx()
-    f, rows, hit = _rcl_load(c, oid, uid)
+    f, rows, hit = _rcl_load(c, oid, uid, fill=True)
     cats, sup, pro = rcl_choices(rows)
     page = list(reversed(hit))[f["offset"]:f["offset"] + f["limit"]]
     return jsonify(rows=[rcl_public(x) for x in page], total=rcl_total(hit), more=f["offset"] + len(page) < len(hit),
                    categories=cats, suppliers=sup, projects=pro, currency=_home(office_settings(c, oid)),
+                   hints=sum(1 for x in rows if x.get("hints")), hints_pending=f.get("_rck_pending") or 0,  # 2.299.0 D (#3193)
                    **{"from": f["from"], "to": f["to"], "by": f["by"]})
 
 

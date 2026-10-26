@@ -62,12 +62,15 @@ const FEAT = 'cal,comments,collab';
     // ===== #2433 / #2437; 2.161.2 (#2607): the mark moved to the top (the brand = the workspace switch), Start in its menu
     const mk = await ev(sbmark);
     check(mk && mk.tag === 'BUTTON' && mk.act === 'sbb-ws' && !mk.old, '#2607: the brand on top is a button opening the workspace menu, no mark at the bottom: ' + JSON.stringify(mk));  // 2.152.3 (#2619): the brand moved from the panel into the head bar (sbb-ws), none left in the panel
-    check(mk && mk.plate === '#6d4bd8' && mk.word && mk.inside, '#2433: the logo plate is lilac, the word mark shows, nothing overflows: ' + JSON.stringify(mk));
+    check(mk && mk.plate === 'currentColor' && mk.word  /* 2.233.0 (#3195): plate follows the accent */ && mk.inside, '#2433: the logo plate is lilac, the word mark shows, nothing overflows: ' + JSON.stringify(mk));
     check(await ev(wsNoStart), '#2619: the brand menu switches workspaces, no Start / Hide the sidebar');  // 2.152.3 (#2619): Start left the brand menu on a computer
     check(await ev(acctStart), '#2607: the account menu has Start');  // 2.152.3 (#2619): Start on a computer = the account menu
     check(await ready(ev, `S.route.mod === 'home'`), '#2437: Start opens the start page');
     await ev(`(() => { document.documentElement.style.setProperty('--accent', '#d4541b'); return 1; })()`);
-    check(await ev(`document.querySelector('#kbar .kbbrand svg.logo rect').getAttribute('fill') === '#6d4bd8'`), '#2433: the logo ignores the accent colour');  // 2.152.3 (#2619): the brand moved into the head bar
+    // 2.233.0 (#3195): with a workspace colour (#app.wsb-on) the plate wears it, without one the accent colour
+    check(await ev(`!document.querySelector('#app.wsb-on') || getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color !== 'rgb(212, 84, 27)'`), '#3195: with a workspace colour the plate wears it, not the accent');
+    await ev(`(() => { document.querySelector('#app').classList.remove('wsb-on'); return 1; })()`);
+    check(await ready(ev, `getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color === 'rgb(212, 84, 27)'`, 20), '#3195: the logo plate follows the accent colour ' + await ev(`getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color`));  // was "ignores the accent colour" (#2433)
     // ===== #2438 desktop
     await nav(B + '#news');
     await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 40);  // 2.152.3 (#2619): the workspace switch moved into the head bar

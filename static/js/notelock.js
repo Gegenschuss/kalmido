@@ -53,7 +53,9 @@ async function ln_load(tid) {
   if (S.sel === tid) renderDetail();
   try {
     const j = await rawFetch('GET', `/api/tasks/${tid}/note-lock`);
-    LN.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpen(E2E.ckey, j.body, ln_aad(tid))), open: true};
+    // 2.278.0 C (#3091): after an account move the note may carry the old server's AAD (sealed anew on the next save)
+    const old = /^kalmido-locknote:v1:\d+:\d+$/.test(j.legacy_aad) ? j.legacy_aad : '';
+    LN.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpenAny(E2E.ckey, j.body, [ln_aad(tid), old])), open: true};
   } catch { LN.notes[tid] = {tid, text: '', open: true, err: true}; }
   if (S.sel === tid) renderDetail();
   return LN.notes[tid];

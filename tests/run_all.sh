@@ -1158,6 +1158,9 @@ fresh; run p273_l_ui node p273_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.73.0 part B: moving an account -- account export + import with the mapping of people (#1473)
 fresh; run p273_b_api "$PY" p273_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p273_b_ui node p273_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.278.0 C (#3091): the key bundle moves with the account export, old AAD after the move, encrypted projects stay behind
+fresh; run p2278_c_e2e_move "$PY" p2278_c_e2e_move_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2278_c_e2e_move_ui node p2278_c_e2e_move_ui.js "$KALMIDO_TEST_DATA"
 shard 21  # 22.10.2026 (2.161.2 CI): was shard 3 (shard 3 ran into the 45 min CI limit in most runs since 2.151.1); 2.80.0: the 2.74-2.80 suites run here (shard 10 ran past the 45 min Mac limit with the 2.6x/2.7x suites)
 # 2.74.0 part A: the supporter licence (#338; own key pair in a temp folder, a hosted restart)
 fresh; run p274_a_api "$PY" p274_a_api_test.py "$KALMIDO_TEST_DATA"
@@ -1381,6 +1384,9 @@ fresh; run p2991_a_api "$PY" p2991_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2991_a_ui node p2991_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.99.1 part C: video sign-offs for agents (API v1 + MCP, #1959)
 fresh; run p2991_c_api "$PY" p2991_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.240.0 D (#2886): video sign-off asks before it loads YouTube / Vimeo (two clicks)
+fresh; run p2240_d_videogate "$PY" p2240_d_videogate_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2240_d_videogate_ui node p2240_d_videogate_ui.js "$KALMIDO_TEST_DATA"
 # 2.99.1 part B: contributing national e-invoice formats by pull request (#1961)
 fresh; run p2991_b "$PY" p2991_b_test.py "$KALMIDO_TEST_DATA"
 # 2.93.0 (#1927 #1928): document templates with signature, logbook
@@ -1522,6 +1528,9 @@ fresh; run p2126_e_ui node p2126_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.1 part A: agent drafts - office texts, receipt summary, client report (#2123 #2124)
 fresh; run p21261_a_api "$PY" p21261_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21261_a_ui node p21261_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.299.0 E (#3194): an agent reads a receipt (proposal kind receipt_read): rights, input, strict answer, take over / undo, locked month; freelancer-matrix: office
+fresh; run p2299_e_agentread "$PY" p2299_e_agentread_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2299_e_agentread_ui node p2299_e_agentread_ui.js "$KALMIDO_TEST_DATA"
 # 2.126.1 part B: table rows -> tasks as an agent proposal, planned inbox sorting (#2125 #2126)
 fresh; run p21261_b_api "$PY" p21261_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21261_b_ui node p21261_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1533,6 +1542,8 @@ fresh; run p2137_b_api "$PY" p2137_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.137.0 part D: personal office into an organisation (#1981)
 fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
+# 2.278.0 part B: org / account import keeps billed time billed, maps chat threads, names left-out rows (#3094)
+fresh; run p2278_b_import_ids "$PY" p2278_b_import_ids_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 now wed 10:00; fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1617,6 +1628,8 @@ fresh; run p2270_d_agent_conflict "$PY" p2270_d_agent_conflict_test.py "$KALMIDO
 # 2.142.0 part A: notification channels Slack/Matrix/Telegram/Signal, e-mail on single events (#2145 #2146)
 fresh; run p2142_a_api "$PY" p2142_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_a_ui node p2142_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.240.0 B (#2867): a person's notification channels after the list rules (health / budget / read later / trip, organisation content neutral, disabled accounts); freelancer-matrix: channels
+fresh; run p2240_b_channels "$PY" p2240_b_channels_test.py "$KALMIDO_TEST_DATA"
 # 2.142.0 part B: importers Notion, Google Tasks, ClickUp, Jira, generic CSV / Markdown (#2147)
 fresh; run p2142_b_api "$PY" p2142_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2142_b_ui node p2142_b_ui.js "$KALMIDO_TEST_DATA"
@@ -1815,6 +1828,10 @@ fresh; run p21481_a_ui node p21481_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p21481_b_api "$PY" p21481_b_api_test.py "$KALMIDO_TEST_DATA"
 # 2.148.1 part C: security fixes - encryption, backup, retention, account import/export (#2481 #2482 #2487 #2492 #2493 #2494)
 fresh; run p21481_c_api "$PY" p21481_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 A (#3030): the account import names every part of the file it leaves on the old server (preview, result, record); freelancer-matrix: own
+fresh; run p2273_a_umz "$PY" p2273_a_umz_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 A (#3050, #3051): backup names vanished files, a stopped restore keeps tables the backup lacks, a failed way back names the safety backup, restore notes; freelancer-matrix: own
+fresh; run p2273_a_backup "$PY" p2273_a_backup_test.py "$KALMIDO_TEST_DATA"
 # 2.148.1 part D: security fixes - resource limits, mail filing, assistant, agents (#2485 #2488 #2489 #2495)
 fresh; run p21481_d_api "$PY" p21481_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.148.1 part E: hardening (#2496)
@@ -1923,6 +1940,8 @@ fresh; run p2177_a_ui node p2177_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.168.0 part A (#2665): quotations / invoices bound to a project, the project page's documents (only with office rights)
 fresh; run p2168_a_api "$PY" p2168_a_docproject_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2168_a_ui node p2168_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.210 part C (#2761): "Share…" / external link in the document sheet, the "shared" mark on the card (also without an organisation)
+fresh; run p2168_4_c_ui node p2168_4_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.169.0 part A: knowledge pages offline - the copy per space, sync of changed texts, offline edits via the outbox, conflicts (#2671)
 fresh; run p2169_a_api "$PY" p2169_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2169_a_ui node p2169_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1957,6 +1976,8 @@ fresh; run p2186_a_retire "$PY" p2186_a_retire_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2186_b_lock "$PY" p2186_b_lock_test.py "$KALMIDO_TEST_DATA"
 # 2.186.0 part C (#2602): clean-up runs - orphan sweep in batches + resume, weekly backups cap only with the switch, suppression list, chat day limit, portal history row
 fresh; run p2186_c_retention "$PY" p2186_c_retention_test.py "$KALMIDO_TEST_DATA"
+# 2.239.0 part C (#2866 #2943 #2874): account deletion - heir admin/member only, private-space check, alerts by number; retention export own projects only; what retires an organisation
+fresh; run p2239_c_loeschung "$PY" p2239_c_loeschung_test.py "$KALMIDO_TEST_DATA"
 # 2.183.0 part A: the top bars stay inside their boxes with long texts (#2661)
 fresh; run p2183_a_topbar_ui node p2183_a_topbar_ui.js "$KALMIDO_TEST_DATA"
 # 2.189.0 part B (#2475): books, receipt list, export, cash flow, key figures, bank and travel in the home currency (GBP office, without organisation too)
@@ -2042,10 +2063,16 @@ fresh; run p2209_d_uploads "$PY" p2209_d_uploads_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2223_c_icons_ui node p2223_c_icons_ui.js "$KALMIDO_TEST_DATA"
 # 2.198.0 A (#2743): knowledge under "All workspaces" - an entry per space in the panel / on the phone, no space switch
 fresh; run p2198_a_wiki_spaces_ui node p2198_a_wiki_spaces_ui.js "$KALMIDO_TEST_DATA"
+# 2.210 part A (#2755): a deep knowledge wiki imported completely (500 characters / 32 levels, shortened not skipped), every page reachable in tree, panel and folder lists
+fresh; run p2168_4_a_wiki "$PY" p2168_4_a_wiki_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2168_4_a_ui node p2168_4_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.210 part B (#2757): right click / long press on a folder = its "…" menu (file store, knowledge; cm_bind)
+fresh; run p2168_4_b_ui node p2168_4_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.217.0 A (#2794, #2795, #2796): phone-width fixes (static CSS check)
 run p2217_a_handy_css node p2217_a_handy_css_test.js
 fresh; run p2217_a_handy_ui node p2217_a_handy_ui.js "$KALMIDO_TEST_DATA"
 run p2218_b_handy node p2218_b_handy_test.js
+shard 15  # Bundle 2.305 (26.10.2026): shard 16 held ~200 suites and ran into the 45 min limit on the Mac - its second quarter runs in shard 15 (12 min)
 # 2.217.0 B (#2797): Office & finance / Team switch the module Agents on; the agent chat with the module off asks to turn it on, reads nothing
 fresh; run p2217_b_preset_api "$PY" p2217_b_preset_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2217_b_agentoff_ui node p2217_b_agentoff_ui.js "$KALMIDO_TEST_DATA"
@@ -2087,6 +2114,8 @@ fresh; run p2270_b_sheets_conflict "$PY" p2270_b_sheets_conflict_test.py "$KALMI
 fresh; run p2199_b_office "$PY" p2199_b_office_test.py "$KALMIDO_TEST_DATA"
 # 2.199.0 B (#2742): office folders in the UI - documents tree in the panel, folder pick with path, office panel folders + automatic groups, filing a quotation
 fresh; run p2199_b_office_ui node p2199_b_office_ui.js "$KALMIDO_TEST_DATA"
+# 2.282.0 (#3111): sign-ins behind one shared address: the address counter delays instead of refusing (known names, pair, parallel cap, 2FA, password change, CalDAV per account + address); freelancer-matrix: n/a
+fresh; run p2282_a_api "$PY" p2282_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.269.0 B (#3014): two parallel saves of the office settings / of a list setting (set_delta) keep both changes; freelancer-matrix: office
 fresh; run p2269_b_settings "$PY" p2269_b_settings_test.py "$KALMIDO_TEST_DATA"
 # 2.269.0 B (#3034): the conflict checks of tasks, wiki pages, notes, contacts and sections run under the row lock (two parallel saves, one conflict)
@@ -2114,6 +2143,19 @@ fresh; run p2272_e1_contacts_trash "$PY" p2272_e1_contacts_trash_test.py "$KALMI
 fresh; run p2270_a_conflict "$PY" p2270_a_conflict_test.py "$KALMIDO_TEST_DATA"
 # 2.263.0 (#2976): typed numbers keep their value in every language (fields, clients, tables; core/numtext.py)
 fresh; run p2263_formats_api "$PY" p2263_formats_api_test.py "$KALMIDO_TEST_DATA"
+# 2.299.0 part A (#3190): bank import reads MT940 / MT942 statements
+fresh; run p2299_a_mt940 "$PY" p2299_a_mt940_test.py "$KALMIDO_TEST_DATA"
+# 2.299.0 D (#3193): the fixed check of a receipt (required details, arithmetic, rates, VAT ID) - rules, hints at the receipt, the receipts list; freelancer-matrix: files, office
+       run p2299_d_rcheck "$PY" p2299_d_rcheck_test.py
+fresh; run p2299_d_api "$PY" p2299_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2299_d_ui node p2299_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.299.0 B (#3191): bank rules - marking by rule after an import, specificity / tie, learning after two confirmations, category for receipts, locked months, two at once, rights; freelancer-matrix: office
+fresh; run p2299_b_bankrules "$PY" p2299_b_bankrules_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2299_b_bankrules_ui node p2299_b_bankrules_ui.js "$KALMIDO_TEST_DATA"
+# 2.299.0 C (#3192): bank bookings without a receipt (list, noreceipt, counter, reminder task)
+fresh; run p2299_c_norc "$PY" p2299_c_norc_test.py "$KALMIDO_TEST_DATA"
+shard 1  # Bundle 2.305: the third quarter of shard 16 (shard 1 took 15 min)
+fresh; run p2299_c_norc_ui node p2299_c_norc_ui.js "$KALMIDO_TEST_DATA"
 # 2.281.0 D (#3118): a backup holds no open transaction during pg_dump / ZIP (own container, idle-transaction cut after 1.5 s)
 fresh; run p2281_f_backup "$PY" p2281_f_backup_test.py "$KALMIDO_TEST_DATA"
 # 2.281.0 A (#3112): an index on every foreign key (exceptions with reasons), the filter columns use theirs, "Empty trash" of
@@ -2130,10 +2172,20 @@ fresh; run p2281_a_teamchat "$PY" p2281_a_teamchat_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2281_e_small "$PY" p2281_e_small_test.py "$KALMIDO_TEST_DATA"
 # 2.294.0 (#3154, #3155): dynamic air around the totals and below the intro of the office PDF, never an extra page; the draft watermark (no server)
        run p2294_pdf "$PY" p2294_pdf_test.py
+# 2.296.0 A (#3164, #3176, #3178): one footer for every office PDF (never cut), the layout check tests/pdfcheck.py, files for veraPDF (no server)
+       run p2296_a_pdfa "$PY" p2296_a_pdfa_test.py
+# 2.296.0 A (#3164, #3176): letters / documents / entertainment receipts with the shared footer, receipt page breaks, 250 EUR limit; freelancer-matrix: office
+fresh; run p2296_a_footer "$PY" p2296_a_footer_test.py "$KALMIDO_TEST_DATA"
 # 2.290.0 C (#3163): 900-1199 px (Fold 8 landscape): the panel folds with a task open, titles get the width, header in one row
 fresh; run p2290_c_fold_ui node p2290_c_fold_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 A2 (#3186): less text in the office parts - legends and rules behind (i), tile sublines, tax note once, meal ticks, status-link promise; freelancer-matrix: office
 fresh; run p2298_a2_lesstext_ui node p2298_a2_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.296.0 D (#3167, #3171, #3172, #3174): small office-PDF fixes: delivery closing, text encoding, 16-bit logo / light colour, reminders (no server)
+       run p2296_d_fixes "$PY" p2296_d_fixes_test.py
+# 2.296.0 E (#3166, #3170): long blocks break by lines, no empty pages, quantity / date columns, three-line company name, long address, headings and labels wrap (no server)
+       run p2296_e_layout "$PY" p2296_e_layout_test.py
+# 2.296.0 E (#3170): letters - every address line, a warning above nine, the sender line keeps the address; freelancer-matrix: office
+fresh; run p2296_e_letters "$PY" p2296_e_letters_test.py "$KALMIDO_TEST_DATA"
 # 2.298.0 A1 (#3186): office help behind the (i) (.shint, keep lines visible), building blocks only with the focus, the quiet tick instead of the toast "Saved"; freelancer-matrix: office
 fresh; run p2298_a1_lesstext_ui node p2298_a1_lesstext_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 C (#3187): a bare 404 says what happened, the fixed German texts; freelancer-matrix: settings
@@ -2144,6 +2196,14 @@ fresh; run p2298_c_lesstext_ui node p2298_c_lesstext_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2298_b_lesstext_ui node p2298_b_lesstext_ui.js "$KALMIDO_TEST_DATA"
 # 2.306.0 D1 (#2875): hardening core / accounts (queue key, shared rate limits, trips by id, hosted operator, sign-on password, savepoint context, free names); freelancer-matrix: core_hardening
 fresh; run p2306_d1_core_hardening "$PY" p2306_d1_core_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.223.7 D (#2941): small visibility leftovers of agents (freelancer-matrix: agents)
+fresh; run p22237_d_rest "$PY" p22237_d_rest_test.py "$KALMIDO_TEST_DATA"
+# 2.223.7 A (#2917, #2941): an agent sees only the people of its shared projects (groups, absences, mentions, attendees, shares), also without organisations; freelancer-matrix: agents
+fresh; run p22237_a_people "$PY" p22237_a_people_test.py "$KALMIDO_TEST_DATA"
+# 2.223.7 C (#2921 #2670): the agents' disposition masks unshared bookings, personal agents 404; offer_accepted only with offers; freelancer-matrix: agents
+now wed 10:00; fresh; run p22237_c_dispo "$PY" p22237_c_dispo_test.py "$KALMIDO_TEST_DATA"
+# 2.223.7 B (#2918 #2919): a participant sees no notepads / milestones / members / project files; agent proposals only to shared projects (freelancer-matrix: agents)
+fresh; run p22237_b_participant "$PY" p22237_b_participant_test.py "$KALMIDO_TEST_DATA"
 # 2.276.0 B: the knowledge editor in the normal font with a formatting bar (#3043)
 fresh; run p2276_c_ui node p2276_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.276.0 A (#3039): the office for the first day: Quotes & invoices first, Money folded until used, menu point Receipts
@@ -2175,6 +2235,110 @@ fresh; run p2312_b_health_note_ui node p2312_b_health_note_ui.js "$KALMIDO_TEST_
 fresh; run p2312_b_journal_period "$PY" p2312_b_journal_period_test.py "$KALMIDO_TEST_DATA"
 # 2.312.0 C (#3265): hardening rest of 2.306 (ntfy inbox in parallel, old http inboxes, known sign-in address for every process, long number schemes); freelancer-matrix: ntfy_inbox, office
 fresh; run p2312_c_hardening "$PY" p2312_c_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.223.2 A (#2859): a retired organisation cannot be entered again (open invitations go, old rows grant nothing, 409 on changes); freelancer-matrix: office
+fresh; run p22232_a_retire "$PY" p22232_a_retire_test.py "$KALMIDO_TEST_DATA"
+# 2.223.2 A (#2869): the creator of a closed team channel who left it does not open it again, the read mark goes; freelancer-matrix: team
+fresh; run p22232_a_teamchan "$PY" p22232_a_teamchan_test.py "$KALMIDO_TEST_DATA"
+# 2.223.2 B (#2860): "Previous access" only by an admin, office rights groups go with the organisation membership; freelancer-matrix: office
+fresh; run p22232_b_rights "$PY" p22232_b_rights_test.py "$KALMIDO_TEST_DATA"
+# 2.223.2 B (#2862): an agent acts only for a person who asked it, without an office group only the quotes' scope, no bank for members; freelancer-matrix: office
+fresh; run p22232_b_agent "$PY" p22232_b_agent_test.py "$KALMIDO_TEST_DATA"
+# 2.223.2 C (#2871): off-site target: credentials do not follow a new address, step-up, hosted only public https, restore keeps it; retention / own office download with a ticket; freelancer-matrix: office
+fresh; run p22232_c_offsite "$PY" p22232_c_offsite_test.py "$KALMIDO_TEST_DATA"
+# 2.278.0 A (#3093, #3095): the organisation export belongs to its starter; the organisation import invites existing accounts
+fresh; run p2278_a_owner "$PY" p2278_a_owner_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 D (#3051): small data-loss fixes (TickTick into archived lists, CSV apostrophe on re-import, bank purpose in full, office
+# document delete clears references, upload cleanup + client upload limit)
+fresh; run p2273_f_small_api "$PY" p2273_f_small_test.py "$KALMIDO_TEST_DATA"
+       run p2273_f_small_ui node p2273_f_small_ui.js "$KALMIDO_TEST_DATA"
+# 2.273.0 B (#3042, #3051): moving loses nothing silently (tasks, wiki, tables, files, office, sprints / sections / my order); freelancer-matrix: tasks
+fresh; run p2273_b_move "$PY" p2273_b_move_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2273_b_move_ui node p2273_b_move_ui.js "$KALMIDO_TEST_DATA"
+# 2.273.0 C (#3047): documents keep values set by hand (Recognise again, new version), archive number "next" without a race; freelancer-matrix: documents
+fresh; run p2273_c_docs "$PY" p2273_c_docs_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 C (#3048): contacts / ICS imports keep newer values and fields not in the file, CardDAV If-Match under a lock, bulk undo with expect; freelancer-matrix: pim
+fresh; run p2273_d_contacts "$PY" p2273_d_contacts_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 C (#3051 point 9): the DATEV undo leaves a supplier changed since the run (IBAN filled in later); freelancer-matrix: office
+fresh; run p2273_c_datev "$PY" p2273_c_datev_test.py "$KALMIDO_TEST_DATA"
+# 2.273.0 C (#3051 point 11): one date of a repeating event with expect (409 hint), the automatic reload sees every unsaved text, checklist -> subtasks waits for the save
+fresh; run p2273_c_ui node p2273_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.280.0 B (#3116): the helpers per list in the start state / time report in bulk (repositories, limits, groups, list_roles), same answers
+fresh; run p2280_b_api "$PY" p2280_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.280.0 C (#3114): knowledge pages: no offline-copy sync at the start, texts in pages, a search that writes nothing, big folder renames
+fresh; run p2280_c_api "$PY" p2280_c_api_test.py "$KALMIDO_TEST_DATA"
+shard 11  # Bundle 2.305: the last quarter of shard 16 (shard 11 took 16 min)
+fresh; run p2280_c_ui node p2280_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.280.0 A (#3109): a change of someone else (time entry, knowledge page, own settings, a list's sections / order) is no full state for every client; the brake; freelancer-matrix: tasks, time, wiki, settings
+fresh; run p2280_a_api "$PY" p2280_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.280.0 A (#3109): the open app takes deltas instead of the whole state for changes of others (also the bundled follow-up of comments)
+fresh; run p2280_a_ui node p2280_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.280.0 A (#3108): the start state without long notes (the detail, the delta and the API carry them), list progress as before, the change rows over a restart; freelancer-matrix: tasks
+fresh; run p2280_e_api "$PY" p2280_e_api_test.py "$KALMIDO_TEST_DATA"
+# 2.280.0 A (#3108): the detail loads a long note; offline no note field, an empty note is never saved
+fresh; run p2280_e_ui node p2280_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.237.0 A (#2861): office rights beside the gate - receipts, DATEV on send, report files, letters, bank, from-time, DATEV import, procedure doc (freelancer-matrix: office)
+fresh; run p2237_a_officerights "$PY" p2237_a_officerights_test.py "$KALMIDO_TEST_DATA"
+# 2.237.0 B (#2864): month lock on new versions, bulk restore, split / unsplit, test phase invoice deletion (freelancer-matrix: files, office)
+fresh; run p2237_b_periodlock "$PY" p2237_b_periodlock_test.py "$KALMIDO_TEST_DATA"
+# 2.237.0 D (#2870): organisation import: no other account as author, undo only by admins now and not over frozen rows (freelancer-matrix: admin)
+fresh; run p2237_d_orgimport "$PY" p2237_d_orgimport_test.py "$KALMIDO_TEST_DATA"
+# 2.237.0 C (#2865): an incoming e-invoice is a receipt suggestion (taken over by a person), scan keys run out and go with a password change; freelancer-matrix: office, files
+fresh; run p2237_c_einvoice "$PY" p2237_c_einvoice_test.py "$KALMIDO_TEST_DATA"
+# 2.296.0 C (#3165): templates / letters - empty variables left out cleanly, named, red in the draft (freelancer-matrix: office)
+fresh; run p2296_c_tpl "$PY" p2296_c_tpl_test.py "$KALMIDO_TEST_DATA"
+# 2.296.0 C (#3177): letterhead PDF/A check at the upload, stored office files against their SHA-256 (freelancer-matrix: office)
+fresh; run p2296_c_letterhead "$PY" p2296_c_letterhead_test.py "$KALMIDO_TEST_DATA"
+# 2.296.0 B (#3168, #3169, #3173, #3175): tax category per e-invoice line, O for not taxable, BT-26, money formats by language (no server)
+       run p2296_b_invoice "$PY" p2296_b_invoice_test.py
+# 2.296.0 B (#3168, #3169, #3173, #3175): exemption reason, reverse charge ids, country line, GiroCode open amount, invoice correction (own container); freelancer-matrix: office
+fresh; run p2296_b_api "$PY" p2296_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.250.0 C (#2995): a new account starts with the full sidebar (freelancer-matrix: settings)
+fresh; run p2250_c_newacct "$PY" p2250_c_newacct_test.py "$KALMIDO_TEST_DATA"
+# 2.250.0 C (#2994 #2995): settings search (titles first, synonyms, spaces, highlight) + "+ N more views" unfolds (freelancer-matrix: settings)
+fresh; run p2250_c_setsearch_ui node p2250_c_setsearch_ui.js "$KALMIDO_TEST_DATA"
+# 2.250.0 A (#2992): the web search finds the office - clients, quotations, invoices - visible like the office lists; freelancer-matrix: office
+fresh; run p2250_a_officesearch "$PY" p2250_a_officesearch_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2250_a_officesearch_ui node p2250_a_officesearch_ui.js "$KALMIDO_TEST_DATA"
+# 2.250.0 B (#2993 #2996): the command palette: every target once, the office bar's points, Enter an absence (freelancer-matrix: office)
+fresh; run p2250_b_palette_ui node p2250_b_palette_ui.js "$KALMIDO_TEST_DATA"
+# 2.233.0 part C: chat bubble colours of people / agents (#3196)
+fresh; run p2233_c_chatcolor_ui node p2233_c_chatcolor_ui.js "$KALMIDO_TEST_DATA"
+# 2.233.0 B (#3189): runtime "Interim summary" (session size, runs, pause; daily summary = nightly_reset), defaults, limits, team / personal agent; freelancer-matrix: agents
+fresh; run p2233_b_runtime_rotate "$PY" p2233_b_runtime_rotate_test.py "$KALMIDO_TEST_DATA"
+# 2.233.0 B (#3189): the section "Interim summary" in the agent dialog and the own agent's permissions, saved at once, 360 / 412 px; freelancer-matrix: agents
+fresh; run p2233_b_rotate_ui node p2233_b_rotate_ui.js "$KALMIDO_TEST_DATA"
+# 2.233.0 A (#2848): older chat suggestions collected above the message box (24 h, at most 10, dismiss), chat settings per agent; freelancer-matrix: agents
+fresh; run p2233_a_chatsugg "$PY" p2233_a_chatsugg_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2233_a_chatsugg_ui node p2233_a_chatsugg_ui.js "$KALMIDO_TEST_DATA"
+# 2.238.0 C (#2873): importer task limit while parsing, one ZIP budget, zipread discard budget
+fresh; run p2238_c_import_limits "$PY" p2238_c_import_limits_test.py "$KALMIDO_TEST_DATA"
+# 2.238.0 A (#2863): the folder way keeps the area's locks (content gate, role cap, passing on, expiry, restore); freelancer-matrix: office
+fresh; run p2238_a_fsref_gate "$PY" p2238_a_fsref_gate_test.py "$KALMIDO_TEST_DATA"
+# 2.238.0 B (#2872): the sign-in mark me.sgen (session, password, organisations); freelancer-matrix: wiki
+fresh; run p2238_b_sgen "$PY" p2238_b_sgen_api_test.py "$KALMIDO_TEST_DATA"
+# 2.238.0 B (#2872): the knowledge pages' offline copy and the outbox belong to one sign-in (401, other session, 14 days, organisation gone), service worker allow list; freelancer-matrix: wiki
+fresh; run p2238_b_wikioffline_ui node p2238_b_wikioffline_ui.js "$KALMIDO_TEST_DATA"
+# 2.236.0 C (#2906 #2907): the queue of an agent (order, max_parallel, priority rule, event assigned); freelancer-matrix: agents
+fresh; run p2236_c_queue "$PY" p2236_c_queue_test.py "$KALMIDO_TEST_DATA"
+# 2.236.0 C (#2905): the starters keep the work window of the work style (stub API, no server)
+       run p2236_c_launcher "$PY" p2236_c_launcher_test.py
+# 2.236.0 B (#2904 #2905 #2909 #2911): the server enforces an agent's work style: budget, push limits / results / never, quiet window summary, next_step; freelancer-matrix: agents
+fresh; run p2236_b_enforce "$PY" p2236_b_enforce_test.py "$KALMIDO_TEST_DATA"
+# 2.236.0 A (#2904-#2911): the dialog "Work style and notifications" (freelancer-matrix: agents)
+fresh; run p2236_a_workstyle_api "$PY" p2236_a_workstyle_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2236_a_workstyle_ui node p2236_a_workstyle_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2236_a_workstyle_ff_ui node p2236_a_workstyle_ff_ui.js "$KALMIDO_TEST_DATA"
+# 2.239.0 B (#2888): the server log without full addresses, names or database values (freelancer-matrix: account)
+fresh; run p2239_b_logs "$PY" p2239_b_logs_test.py "$KALMIDO_TEST_DATA"
+# 2.239.0 A (#2882): the account export holds own rows outside own lists, export.json filtered, people hashes keyed; freelancer-matrix: own
+fresh; run p2239_a_export "$PY" p2239_a_export_test.py "$KALMIDO_TEST_DATA"
+# 2.239.0 D (#2874 #2866): office records outlive what they point to, clean-up runs leave them alone (freelancer-matrix: office)
+fresh; run p2239_d_aufbewahrung "$PY" p2239_d_aufbewahrung_test.py "$KALMIDO_TEST_DATA"
+# 2.240.0 C (#2868): free / busy of a colleague only from the shared organisations, setting freebusy_share, per-person limit
+now wed 10:00; fresh; run p2240_c_freebusy "$PY" p2240_c_freebusy_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2240_a_mail "$PY" p2240_a_mail_test.py "$KALMIDO_TEST_DATA"  # 2.240.0 A (#2883)
+fresh; run p2240_a_assistant "$PY" p2240_a_assistant_test.py "$KALMIDO_TEST_DATA"  # 2.240.0 A (#2884)
+shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new suites go here, at the end
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

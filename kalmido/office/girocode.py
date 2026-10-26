@@ -73,7 +73,7 @@ def gcq_matrix(payload):
 
 
 def gcq_model(r, m, s, snd=None):
-    """Sets m["payment"]["girocode"] (the EPC text) when the document gets one: invoice = its gross, reminder = the open
+    """Sets m["payment"]["girocode"] (the EPC text) when the document gets one: invoice = its open amount, reminder = the open
     amounts plus the fee (its total); credit notes never. snd = the decrypted sender snapshot of a finalised document."""
     pay = m.get("payment")
     if not isinstance(pay, dict) or r["kind"] not in ("invoice", "reminder"):
@@ -86,7 +86,11 @@ def gcq_model(r, m, s, snd=None):
     if not on:
         return m
     tot = m.get("totals") or {}
-    code = gcq_payload((m.get("sender_fields") or {}).get("name") or "", pay.get("iban"), pay.get("bic"), tot.get("gross") or 0,
+    # 2.296.0 B (#3173): an invoice asks for what is still open (gross - paid - credit notes; with a cash discount the full
+    # open amount, the discount stays a line of the payment text); a reminder for its total
+    # open amount; a draft (no payments or credit notes yet) its gross
+    amount = tot.get("open") if r["kind"] == "invoice" and ofx_locked(r) and tot.get("open") not in (None, "") else tot.get("gross") or 0
+    code = gcq_payload((m.get("sender_fields") or {}).get("name") or "", pay.get("iban"), pay.get("bic"), amount,
                        r["number"] or "", r["currency"])
     if code:
         pay["girocode"] = code

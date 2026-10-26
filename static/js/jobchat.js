@@ -308,6 +308,11 @@ function jcd_cardHtml(no, list, row) {
 // the end result / an error under the card: 5 lines, "Show more" for longer ones
 function jcd_resHtml(m, row) {
   const long = jcf_long(m), more = S.jcd.more.has(m.id);
+  if (typeof acset_get === 'function' && acset_get('jobs') === 'line' && jcd_line(m.body) !== String(m.body || '').trim()) {  // 2.233.0 A (#2848): chat setting "folded to the first line"
+    const b = `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>`;
+    return more ? `<div class="jcdres${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${jcm_inBubble(row(m), b)}</div>`
+      : `<div class="jcdres acset-j1${jcd_kind(m) === 'error' ? ' jcdx' : ''}"><button type="button" class="acset-jl" data-jca="more" data-jm="${m.id}" aria-expanded="false" title="${esc(tr('Show more'))}">${esc(jcd_line(m.body))}</button></div>`;
+  }
   return `<div class="jcdres${long && !more ? ' jcdclamp' : ''}${jcd_kind(m) === 'error' ? ' jcdx' : ''}">${long ? jcm_inBubble(row(m), `<button type="button" class="linkbtn jcdmore" data-jca="more" data-jm="${m.id}" aria-expanded="${more}">${esc(tr(more ? 'Show less' : 'Show more'))}</button>`) : row(m)}</div>`;
 }
 // 2.144.0 B (#2417): "Fold long messages" for every message at once (a header icon, kept per device). Folded = the cut of the

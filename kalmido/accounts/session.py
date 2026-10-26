@@ -2,6 +2,8 @@
 import contextlib
 import hashlib
 import ipaddress
+import os
+import random
 import secrets
 import threading
 import time
@@ -54,6 +56,16 @@ OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", 
 
 def _token_hash(t):
     return hashlib.sha256(t.encode()).hexdigest()
+
+
+def session_gen(u, ws):
+    """2.238.0 B (#2872): a stable, non-secret mark of this sign-in: the session (or the proxy login), the password state and
+    the organisations with role (ws = workspaces_for). The client keeps its offline copies only while it stays the same."""
+    tok = request.cookies.get(COOKIE) if g.auth_via == "session" else None
+    who = _token_hash(tok) if tok else f"{g.auth_via}:{u['proxy_login'] or ''}"
+    orgs = ",".join(f"{w['id']}:{w['role']}" for w in sorted(ws, key=lambda w: w["id"]))
+    raw = "\x1f".join(("kalmido-sgen:v1", str(u["id"]), who, u["password_hash"] or "", orgs))
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
 def client_ip():
@@ -120,7 +132,8 @@ def proxy_mw(wsgi):
                 untrusted = parse_proxy_headers(environ, trusted_proxy_count=TRUSTED_PROXY_COUNT,
                                                 trusted_proxy_headers=TRUSTED_PROXY_HEADERS)
             except MalformedProxyHeader as ex:
-                print("malformed proxy header", ex.header, "from", environ["kalmido.peer"], flush=True)
+                from ..accounts.login import login_log_ip  # 2.239.0 B (#2888); local: login imports this module
+                print("malformed proxy header", ex.header, "from", login_log_ip(environ["kalmido.peer"]), flush=True)
                 start_response("400 Bad Request", [("Content-Type", "text/plain; charset=utf-8")])
                 return [b"Malformed proxy header\n"]
         clear_untrusted_headers(environ, untrusted)
@@ -357,6 +370,87 @@ def _rate_blocked(keys):
             if max(len(arr), shared.get(k, 0)) >= limit:
                 over.append(k)
     return any(not h6a_uall_exempt(k, now) for k in over)  # 2.312.0 C (#3265): outside the lock (it may ask the database)
+
+
+# 2.282.0 (#3111): sign-ins behind one shared address (office NAT). The address counter ("ip:", 20 failures) no longer
+# refuses sign-ins: above it each attempt still gets checked, after LOGIN_SLOW_S (before the check, so the time says
+# nothing about the result). A name that signed in from this address before (KNOWN_DAYS, _known) or the signed-in account
+# itself (re-authentication) skips the delay. The pair ("u:") and the name ceiling ("uall:") still refuse. At most
+# LOGIN_SLOW_PER_IP delayed requests per address and LOGIN_SLOW_MAX in all wait at once (each holds a server thread),
+# beyond that 429 with Retry-After. KALMIDO_LOGIN_SLOW_S sets the delay (tests: small).
+try:
+    LOGIN_SLOW_S = max(0.0, float(os.environ.get("KALMIDO_LOGIN_SLOW_S", "") or 2.5))
+except ValueError:  # bundle 2.305: a wrong value ("2,5", text) must not stop the server
+    print("KALMIDO_LOGIN_SLOW_S: not a number, 2.5 s used", flush=True)
+    LOGIN_SLOW_S = 2.5
+# bundle 2.305 (2.282 + 2.239 together): the address log line is shortened by default now (fail2ban cannot ban by it), so
+# far above the address counter an unknown name is refused again: one address cannot try names without end
+LOGIN_IP_HARD = 200
+LOGIN_SLOW_PER_IP = 2
+LOGIN_SLOW_MAX = 4
+_slow, _slow_lock = {}, threading.Lock()
+
+
+def login_known(username, pre=""):
+    """2.282.0 (#3111): this name signed in successfully from this address (IPv6: /64) in the last KNOWN_DAYS days, or the
+    request is signed in as this name already."""
+    if not username:
+        return False
+    if (time.time() - _known.get(pre + "uall:" + username, {}).get(rate_ip(), 0)) < KNOWN_DAYS * 86400:
+        return True
+    u = getattr(g, "user", None)
+    return bool(not pre and u is not None and (u["username"] or "") == username)
+
+
+def login_gate(keys, username, pre=""):
+    """2.282.0 (#3111): "ok", "slow" (only the address counter is full and the name is not known here) or "blocked"
+    (the pair or the name ceiling, as _rate_blocked). For the sign-in routes only; the other _rate_blocked callers keep
+    their address lock."""
+    now = time.time()
+    slow = False
+    with _fail_lock:
+        for k, limit in keys:
+            arr = [t for t in _fails.get(k, []) if now - t < FAIL_WINDOW]
+            if arr:
+                _fails[k] = arr
+            else:
+                _fails.pop(k, None)
+            if len(arr) < limit or h6a_uall_exempt(k, now):
+                continue
+            if k.startswith(pre + "ip:"):
+                if len(arr) >= LOGIN_IP_HARD and not login_known(username, pre):
+                    return "blocked"
+                slow = slow or not login_known(username, pre)
+                continue
+            return "blocked"
+    return "slow" if slow else "ok"
+
+
+def login_wait(keys, username, pre=""):
+    """2.282.0 (#3111): the gate of a sign-in step: None (go on, after the delay when "slow") or a 429 response."""
+    gate = login_gate(keys, username, pre)
+    if gate == "ok":
+        return None
+    if gate == "blocked":
+        return jsonify(error=tr("Too many failed logins, please wait a few minutes")), 429
+    ip = rate_ip()
+    with _slow_lock:
+        busy = _slow.get(ip, 0) >= LOGIN_SLOW_PER_IP or sum(_slow.values()) >= LOGIN_SLOW_MAX
+        if not busy:
+            _slow[ip] = _slow.get(ip, 0) + 1
+    if busy:
+        resp = jsonify(error=tr("Too many sign-ins at once from this address, please try again in a moment"))
+        resp.headers["Retry-After"] = str(int(LOGIN_SLOW_S) + 1)
+        return resp, 429
+    try:
+        time.sleep(LOGIN_SLOW_S + random.uniform(0, 0.25) * min(1.0, LOGIN_SLOW_S))
+    finally:
+        with _slow_lock:
+            if _slow.get(ip, 0) <= 1:
+                _slow.pop(ip, None)
+            else:
+                _slow[ip] -= 1
+    return None
 
 
 _FAILS_MAX, _FAILS_ARR = 20000, 500  # 2.126.0 C (#1976): idle keys are forgotten above this many; per key the newest 500

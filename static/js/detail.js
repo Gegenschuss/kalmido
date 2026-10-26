@@ -483,8 +483,42 @@ function renderDetail() {
   wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
   return r;
 }
+// 2.280.0 A (#3108): a long note is not in the start state (no content, content_n = its length): the detail loads it
+// (GET /api/tasks/<id>). Until it is there - or offline - the detail shows no note field at all, so an empty note is never
+// typed over or saved (the offline queue, the autosave). TKN_OFF: when loading failed (tried again after TKN_RETRY_MS).
+// 2.280.0 F (#3108): TKN_ERR = the server refused (not found, no access): its message instead of "Only available online."; back
+// online the open task tries again at once
+const TKN_OFF = new Map(), TKN_WAIT = new Map(), TKN_ERR = new Map(), TKN_RETRY_MS = 10000;
+window.addEventListener('online', () => { if (!TKN_OFF.size) return; TKN_OFF.clear(); TKN_ERR.clear(); if (S.sel && tkNoteMissing(taskById(S.sel))) renderDetail(); });
+const tkNoteMissing = t => !!t && t.id > 0 && !t.context && !('content' in t);
+function tkNoteLoad(id) {
+  const t = taskById(id); if (!tkNoteMissing(t)) return Promise.resolve(t?.content ?? '');
+  if (TKN_WAIT.has(id)) return TKN_WAIT.get(id);
+  const p = rawFetch('GET', `/api/tasks/${id}`).then(j => {
+    const x = taskById(id);
+    if (x && tkNoteMissing(x) && typeof j?.content === 'string' && !(String(x.updated_at || '') > String(j.updated_at || ''))) x.content = j.content;  // 2.280.0 F (#3108): not an answer older than the task (a full load came in between)
+    TKN_OFF.delete(id); TKN_ERR.delete(id);
+    return x && 'content' in x ? x.content : j?.content ?? '';
+  }, e => { TKN_OFF.set(id, Date.now()); if (e instanceof Offline) TKN_ERR.delete(id); else TKN_ERR.set(id, e?.message || ''); throw e; }).finally(() => TKN_WAIT.delete(id));
+  TKN_WAIT.set(id, p);
+  return p;
+}
+// 2.280.0 F (#3108): at most TKN_PAR requests at once (printing a big project asked for every note at the same time)
+const TKN_PAR = 6;
+async function tkNotesLoad(ids) {
+  const todo = ids.filter(id => tkNoteMissing(taskById(id)) && !(Date.now() - (TKN_OFF.get(id) || 0) < TKN_RETRY_MS)), out = [];
+  let i = 0;
+  const run = async () => { while (i < todo.length) { const k = i++; try { out[k] = {status: 'fulfilled', value: await tkNoteLoad(todo[k])}; } catch (e) { out[k] = {status: 'rejected', reason: e}; } } };
+  await Promise.all(Array.from({length: Math.min(TKN_PAR, todo.length)}, run));
+  return out;
+}
 function renderDetail0() {
   const t = taskById(S.sel); if (!t) return;
+  const noteOut = tkNoteMissing(t);
+  if (noteOut && !TKN_WAIT.has(t.id) && !(Date.now() - (TKN_OFF.get(t.id) || 0) < TKN_RETRY_MS)) {
+    const id = t.id, done = () => { if (S.sel === id) renderDetail(); };
+    tkNoteLoad(id).then(done, done);
+  }
   const l = listById(t.list_id);
   const kids = children(t.id);
   const parent = t.parent_id && S.tasks.get(t.parent_id);
@@ -575,7 +609,7 @@ function renderDetail0() {
       ${ck ? '' : approvalBar(t, ro)}
       ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}
       ${ck || ro ? '' : dupHintHtml(t)}
-      ${le2uLk ? '' : t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js) */}
+      ${le2uLk ? '' : t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : noteOut ? `<div class="muted" id="d-note-wait">${esc(TKN_ERR.has(t.id) ? TKN_ERR.get(t.id) || tr('Not found') : TKN_OFF.has(t.id) ? tr('Only available online.') : tr('Loading…'))}</div>` : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js); 2.280.0 A (#3108): a note still loading: no field */}
       ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<div class="mdbox"><button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}
       <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : td_mdPenOnly() ? '' : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? '</div>' : ''}
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
@@ -611,6 +645,7 @@ function renderDetail0() {
 }
 // U17: the open "- [ ]" lines of a description become real subtasks (one undo step); ticked lines stay in the text
 async function mdToSubtasks() {
+  if (typeof flushSaves === 'function') await flushSaves();  // 2.273.0 C (#3051): the typed description is saved first, then read (else it was lost)
   const t = taskById(S.sel); if (!t || !canEdit(t) || depthOf(t) >= maxDepth() - 1) return;
   const keep = [], items = [];
   // 2.40.0 (#1409): the lines indented below an item (up to the next line that is not) become the new subtask's description
@@ -628,7 +663,6 @@ async function mdToSubtasks() {
     i = j - 1;
   }
   if (!items.length) return;
-  flushSaves();
   await histGroup(async () => {
     for (const it of items) await createTask({title: it.title.slice(0, 500), ...(it.content ? {content: it.content} : {}), parent_id: t.id, list_id: t.list_id, section_id: t.section_id});
     await patchUndoable(t.id, {content: keep.join('\n').replace(/\n{3,}/g, '\n\n').trim(), _act: 'md_subtasks'});

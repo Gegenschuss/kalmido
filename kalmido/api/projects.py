@@ -103,7 +103,7 @@ def v1_ov_link_order(lid):
 def v1_ov_milestones(lid):
     v1_args(())
     c = db()
-    need_overview(c, lid)
+    need_overview(c, lid, full=True)  # 2.223.7 B (#2918): participants: 404
     return jsonify(data=[ms_compat(r) for r in ms_rows(c, [lid])], next_cursor=None)  # 2.18.0 (#430): ids = task ids
 
 
@@ -144,8 +144,9 @@ def v1_ov_ms_delete(lid, milestone_id):
 def v1_list_files(lid):
     v1_args(())
     c = db()
-    need_overview(c, lid)
-    rows = c.execute("SELECT * FROM list_files WHERE list_id=? AND deleted_at IS NULL ORDER BY id DESC", (lid,)).fetchall()  # 2.272.0 E2 (#3038)
+    role = need_overview(c, lid)
+    rows = [] if role == "participant" else c.execute(  # 2.223.7 B (#2918): project files are no files of their tasks
+        "SELECT * FROM list_files WHERE list_id=? AND deleted_at IS NULL ORDER BY id DESC", (lid,)).fetchall()  # 2.272.0 E2 (#3038)
     names = user_names(c, [r["user_id"] for r in rows])
     from ..files.scan import sc_up
     return jsonify(data=sc_up(c, "list", [ov_file_dict(r, names) for r in rows]), next_cursor=None)  # 2.61.0 (#1818): + up

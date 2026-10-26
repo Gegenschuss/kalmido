@@ -83,6 +83,10 @@ def zip_read(data, exts, file_max, total_max=ZIP_TOTAL_MAX, entries_max=ZIP_ENTR
         if info.flag_bits & 0x1:
             out.errors.append({"file": base, "error": tr("The file is encrypted; please pack it without a password")})
             continue
+        if info.file_size > file_max:  # 2.238.0 C (#2873): the header already says too large, nothing is unpacked for it (zipfile never
+            # returns more than the header size, so no entry is read only to be thrown away)
+            out.errors.append({"file": base, "error": tr("The file is too large (at most {0} MB)", max(1, file_max // (1024 * 1024)))})
+            continue
         try:  # the sizes in the ZIP's header are never trusted: reading stops one byte after the limit
             with zf.open(info) as f:
                 part = f.read(file_max + 1)

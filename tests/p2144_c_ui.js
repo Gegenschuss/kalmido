@@ -60,7 +60,8 @@ const heads = d => [...d.querySelectorAll('#view .group > .ghead')].map(h => h.t
   const PL = (await call('POST', '/api/lists', {name: 'Home stuff', org_id: null})).id;
   await call('POST', '/api/tasks', {title: 'Pay the rent', list_id: PL, due: day(-2)});
   await w.eval('load()'); w.eval('S.agents = []');  // 2.312.0 A (#3284): load() resets S.agents
-  check(w.eval(`[...S.tasks.values()].some(t => t.title === 'Pay the rent')`), 'the new task is loaded');
+  // 2.280.0 A/F (#3109): the second automatic reload within 8 s is braked and comes with a later poll: wait up to 15 s
+  check(await until(() => w.eval(`[...S.tasks.values()].some(t => t.title === 'Pay the rent')`), 100), 'the new task is loaded');
   w.eval(`S.settings.workspace = 'org:${ORG}'`);
   const sum = w.eval('hpSummary()').replace(/<[^>]+>/g, '');
   check(w.eval('wsCur()') === 'org:' + ORG && /1 overdue in Private/.test(sum) && !/, 1 overdue,/.test(sum), 'summary: overdue in another workspace named ' + w.eval('wsCur()') + ' ' + sum);

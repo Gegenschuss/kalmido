@@ -416,7 +416,7 @@ const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N
 const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
 const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
 function chn_state(ch) {
-  if (!ch.enabled) return `<span class="calerr" role="alert">${esc(ch.disabled_reason === 'failures' ? tr('turned off after {0} failed sends', ch.fails) : ch.disabled_reason === 'admin' ? tr('turned off: the person who set it up is no admin any more') : tr('off'))}</span>`;
+  if (!ch.enabled) return `<span class="calerr" role="alert">${esc(ch.disabled_reason === 'failures' ? tr('turned off after {0} failed sends', ch.fails) : ch.disabled_reason === 'admin' ? tr('turned off: the person who set it up is no admin any more') : ch.disabled_reason === 'disabled' ? tr('turned off: the account of the person who set it up is disabled') : tr('off'))}</span>`;
   if (ch.last_error) return `<span class="calerr" role="alert">${esc(tr('last send failed: {0}', ch.last_error))}</span>`;
   return esc(ch.last_at ? tr('last send ok {0}', relTime(ch.last_at)) : tr('nothing sent yet'));
 }
@@ -439,6 +439,7 @@ async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the b
   box._j = j;
   box.innerHTML = (j.enabled ? `<h4 id="s-chn-h">${tr('Forwardings|notify')}</h4>
     <div class="shint">${tr('Also send notifications to Slack, Matrix, Telegram or Signal: a short text with the link to the task. The address stays on the server; quiet hours apply.')}</div>
+    ${(S.me?.workspaces || []).length ? `<div class="shint">${tr('From an organisation’s projects only a short note with the link arrives, unless the organisation allows the content. Health, budget, an organisation’s trips and read later stay in the app.')}</div>` : ''}${''/* 2.240.0 B (#2867), B2: the person's organisations */}
     <div class="members chnrows">${chn_rowsHtml(j)}</div>
     <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add forwarding')}</button></div>` : '') + chn_mailHtml(j.mail);
   if (box._wired) return;
@@ -450,6 +451,35 @@ function chn_orgBoxHtml(o) {  // account.js: Settings > Workspaces > an organisa
     <div class="shint">${tr('Post what happens in the organisation’s projects that every member sees (new task, completed, assigned, comment) to Slack, Matrix, Telegram or Signal. Never projects shared only with some, never private areas.')}</div>
     <div class="members chnrows"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row"><button type="button" class="btn sm" data-chn="new">${ic('plus', 's')} ${tr('Add forwarding')}</button></div></div>`;
+}
+// 2.240.0 B (#2867): Settings > Workspaces: whether members' personal forwardings get the content of the organisation's projects
+// (before xl_paneDraw, which then lands above it; box._j = GET /api/orgs; its admins decide, every member sees it)
+function chn_contentPaneDraw(box) {
+  if (!box?.isConnected) return;
+  const orgs = (box._j || {}).orgs || [];
+  for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
+    const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.chnc-row') || o.chn_content === undefined) continue;
+    const adm = o.role === 'admin' && box._j.manage, id = `chnc-o${o.id}`;
+    const row = document.createElement('div');
+    row.className = 'row chnc-row';
+    row.innerHTML = `<label class="chkl"><input type="checkbox" id="${id}" ${o.chn_content ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${tr('Send the content of our projects to personal forwardings')}</label>`;
+    const hint = document.createElement('div');
+    hint.className = 'shint keep';
+    hint.textContent = tr('Members can forward their notifications to Slack, Matrix, Telegram or Signal. Off: from this organisation only a short note with the link arrives there, without title or comment.') + (adm ? '' : ' ' + tr('Only an admin of this organisation can change it.'));
+    const after = det.querySelector('.pmeta-row + .shint') || det.querySelector('summary');
+    after.after(row); row.after(hint);
+    if (!adm) continue;
+    const cb = $('#' + id, /** @type {any} */ (row));
+    cb.addEventListener('change', async () => {
+      const on = cb.checked, put = v => async () => {
+        await api('PATCH', `/api/orgs/${o.id}`, {chn_content: v});
+        o.chn_content = v; if (cb.isConnected) cb.checked = v; return {};
+      };
+      try { await put(on)(); } catch { cb.checked = !on; return; }
+      const label = tr('Forwarded content of {0}', qn(o.name));
+      offerUndo(label, histAdd({label, undo: put(!on), redo: put(on)}));
+    });
+  }
 }
 async function chn_orgLoad(box) {
   let j; try { j = await api('GET', `/api/orgs/${+box.dataset.chnorg}/channels`); } catch { return; }

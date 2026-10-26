@@ -16,6 +16,7 @@ never stand alone on a page (the last position comes along); no carry-over lines
 
 Nothing here reads the database: office.web / office.docs render the model and call office_pdf(model)."""
 import datetime
+import functools
 import hashlib
 import io
 import json
@@ -23,6 +24,7 @@ import logging
 import os
 import re
 import struct
+import unicodedata
 import zlib
 
 try:
@@ -67,6 +69,7 @@ PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the pa
 PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
 PDF_MARK_GREY = "0.85 0.86 0.88"  # 2.294.0 (#3155): the draft watermark (was 0.88 0.89 0.91, fill only)
 PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
+P3Q_MAX = 34 * MM        # 2.296.0 E (#3170): the widest quantity column (wider quantities: the unit on a second line)
 PDF_LOGO_MAX_W = 45 * MM  # 2.114.5 (#2300): smaller logo (was 60 x 22 mm)
 PDF_LOGO_MAX_H = 16 * MM
 PDF_LOGO_MAX_PX = 1600   # the upload route scales to this width; the writer accepts anything Pillow reads
@@ -227,9 +230,40 @@ _FALLBACK = str.maketrans({"→": "->", "←": "<-", "≤": "<=", "≥": ">=", "
                            "✓": "x", "✔": "x", "☐": "[ ]", "☑": "[x]", "\t": " "})
 
 
+# 2.296.0 D (#3171): letters without a decomposition that read as their base letter
+_TRANSLIT = {"ł": "l", "Ł": "L", "ı": "i", "İ": "I", "ẞ": "SS", "đ": "d", "Đ": "D", "ħ": "h", "Ħ": "H", "ŧ": "t", "Ŧ": "T", "ſ": "s"}
+
+
+def _clean_char(ch):
+    if ch in _TRANSLIT:
+        return _TRANSLIT[ch]
+    try:
+        ch.encode("cp1252")
+        return ch
+    except UnicodeEncodeError:
+        pass
+    base = "".join(c for c in unicodedata.normalize("NFKD", ch) if not unicodedata.combining(c))
+    try:
+        base.encode("cp1252")
+        return base or ch
+    except UnicodeEncodeError:
+        return ch
+
+
+@functools.lru_cache(maxsize=8192)
+def _pdf_text(s):
+    # NFC (a decomposed "u" + diaeresis becomes one WinAnsi letter), invisible format characters (soft hyphen, ZWSP,
+    # ZWJ, BOM ...) and control characters out, letters WinAnsi lacks as their base letter
+    s = unicodedata.normalize("NFC", s)
+    s = "".join(c for c in s if c == "\n" or unicodedata.category(c) not in ("Cf", "Cc", "Cs"))
+    return s if s.isascii() else "".join(_clean_char(c) for c in s)
+
+
 def pdf_encode(s):
-    """str -> WinAnsi bytes (cp1252; unknown characters become '?'; a code the font has no glyph for as well)."""
-    s = str(s or "").translate(_FALLBACK)
+    """str -> WinAnsi bytes (cp1252; unknown characters become '?'; a code the font has no glyph for as well).
+    2.296.0 D (#3171): NFC, invisible characters dropped, Latin letters outside WinAnsi transliterated (the width
+    and the drawing both come through here, so they see the same text)."""
+    s = _pdf_text(str(s or "").translate(_FALLBACK))
     b = s.encode("cp1252", errors="replace")
     miss = pdf_font(False).missing | pdf_font(True).missing
     if miss and any(ch in miss for ch in b):
@@ -310,6 +344,41 @@ def _rgb(hexcol):
     return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
 
 
+def pdf_text_color(hexcol, min_contrast=4.5):
+    """2.296.0 D (#3172): the colour for TEXT in the company colour: the colour itself when it reads on white (WCAG contrast
+    >= min_contrast), else the same hue darkened until it does (rules and fills keep the pure colour)."""
+    col = hexcol if isinstance(hexcol, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", hexcol.strip()) else "#2f5d8a"
+    rgb = [int(col[i:i + 2], 16) / 255.0 for i in (1, 3, 5)]
+
+    def contrast(c):
+        lin = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in c]
+        return 1.05 / (0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2] + 0.05)
+    if contrast(rgb) >= min_contrast:
+        return col
+    k = 1.0
+    while contrast([v * k for v in rgb]) < min_contrast and k > 0.02:
+        k -= 0.02
+    return "#" + "".join(f"{round(v * k * 255):02x}" for v in rgb)
+
+
+def pdf_to_8bit(im):
+    """2.296.0 D (#3172): a 16 / 32 bit grey picture (I;16, I) on 8 bit L by scaling the value range (65535 -> 255), not by
+    clipping (convert("RGB") would cut everything above 255 to white). Other modes come back as they are."""
+    from PIL import Image
+    if im.mode.startswith("I;16"):
+        raw = im.tobytes()
+        hi = raw[0::2] if im.mode == "I;16B" else raw[1::2]  # I;16 / I;16L / I;16N on little-endian: the high byte is the 2nd
+        if im.mode == "I;16N":
+            import sys
+            hi = raw[0::2] if sys.byteorder == "big" else raw[1::2]
+        return Image.frombytes("L", im.size, hi)
+    if im.mode in ("I", "F"):
+        lo, top = im.getextrema()
+        scale = 1.0 if (lo >= 0 and top <= 255) else (1 / 256.0 if top <= 65535 else 255.0 / max(top, 1))
+        return im.point(lambda i: i * scale).convert("L")
+    return im
+
+
 def _f(x):
     return f"{x:.2f}".rstrip("0").rstrip(".") if x != int(x) else str(int(x))
 
@@ -378,7 +447,7 @@ def qac_sig_block(p, y, rows, head, foot, accent):
     """2.99.0 C (#2195): the box of a simple electronic signature at y (the signed document of office.doctpl, the
     quotation accepted online): head in the accent colour, rows [(label, value)], a closing line."""
     p.rect(PDF_L, y, PDF_CW, qac_sig_block_h(rows), C_RULE, stroke=True, lw=0.6)
-    p.text(PDF_L + 10, y + 9, head.upper(), 7.4, True, accent, spacing=0.8)
+    p.text(PDF_L + 10, y + 9, head.upper(), 7.4, True, pdf_text_color(accent), spacing=0.8)  # 2.296.0 D (#3172)
     yy = y + 26
     for a, b in rows:
         p.text(PDF_L + 10, yy, a, 8.4, False, C_INK2)
@@ -399,6 +468,7 @@ def pdf_image_object(raw):
         if im.width * im.height > 30_000_000:
             return None
         im.load()
+        im = pdf_to_8bit(im)  # 2.296.0 D (#3172): 16 bit grey scaled, not clipped to white
         if im.mode in ("RGBA", "LA", "P", "PA"):
             im = im.convert("RGBA")
             bg = Image.new("RGB", im.size, (255, 255, 255))
@@ -502,11 +572,18 @@ def epdf_xmp(title, author, producer, creator, created, modified, xml_name=None,
     return xmp.encode("utf-8")
 
 
+def _meta_text(s):
+    """2.296.0 D (#3171): a metadata string (Info dictionary and XMP alike): NFC, no control / invisible characters, one line."""
+    s = unicodedata.normalize("NFC", str(s or "")).replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    return "".join(c for c in s if unicodedata.category(c) not in ("Cf", "Cc", "Cs")).strip()
+
+
 def pdf_write(pages, images, title="", author="", xml=None, meta=None):
     """Serialises pages ([_Page]) and images ({name: (w, h, data)}) into PDF/A-3b bytes (PDF 1.7: embedded TrueType fonts,
     XMP + Info, sRGB OutputIntent, trailer ID). xml: bytes of the e-invoice to embed as factur-x.xml (AFRelationship
     Alternative, fx: XMP schema). meta: {"when": aware datetime, "producer", "creator", "xml_name", "xml_profile", "doc_type"}."""
     meta = meta or {}
+    title, author = _meta_text(title), _meta_text(author)  # 2.296.0 D (#3171): Info and XMP carry the same text
     objs = []  # list of bytes bodies; object number = index + 1
 
     def add(body):
@@ -515,6 +592,13 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
 
     def pstr(s):
         return b"(" + pdf_encode(s).replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
+
+    def tstr(s):
+        # 2.296.0 D (#3171): a PDF text string (Info dictionary): plain ASCII as it is, else UTF-16BE with BOM (not cp1252)
+        s = _meta_text(s)
+        if s.isascii():
+            return b"(" + s.encode("ascii").replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
+        return b"<FEFF" + s.encode("utf-16-be", errors="replace").hex().upper().encode() + b">"
 
     def stream(dict_entries, data, compress=True):
         if compress:
@@ -592,7 +676,7 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
                    xml_profile=meta.get("xml_profile") or "EN 16931", doc_type=meta.get("doc_type") or "INVOICE")
     md = stream("/Type /Metadata /Subtype /XML", xmp, compress=False)
     catalog = add(f"<< /Type /Catalog /Pages {pages_id} 0 R /Metadata {md} 0 R /MarkInfo << /Marked false >>{extra} >>".encode())
-    info = add(b"<< /Producer " + pstr(producer) + b" /Creator " + pstr(creator) + b" /Title " + pstr(title) + b" /Author " + pstr(author) +
+    info = add(b"<< /Producer " + tstr(producer) + b" /Creator " + tstr(creator) + b" /Title " + tstr(title) + b" /Author " + tstr(author) +
                b" /CreationDate (" + d_pdf.encode() + b") /ModDate (" + d_pdf.encode() + b") >>")
     out = io.BytesIO()
     out.write(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
@@ -611,9 +695,12 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
 
 # ---- number and date formats in the document language -------------------------------------------------------------
 def pdf_money(v, lang, currency, fmt=None):
-    """1234.5 -> "1.234,50 €" (de) / "1,234.50 €" (en); USD is written as "USD"; fmt = the pack's formats (optional).
-    2.185.0 C (#2520): without fmt nl / fr / es / it write the decimal comma like de."""
+    """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en); fmt = the pack's formats (optional).
+    2.185.0 C (#2520): without fmt nl / fr / es / it write the decimal comma like de. 2.296.0 B (#3175): the one format of
+    calc.fmt_money (language table, "$" like the model's texts); the pack's formats only for German documents."""
     fmt = fmt or {}
+    if str(lang or "de").split("-")[0] != "de" or not fmt:
+        return _pdf_fmt_money(v, lang, currency or "EUR")
     comma = str(lang or "").split("-")[0] in PDF_COMMA
     dec = fmt.get("decimal") or ("," if comma else ".")
     tho = fmt.get("thousands") or ("." if comma else ",")
@@ -623,9 +710,30 @@ def pdf_money(v, lang, currency, fmt=None):
         v = 0.0
     neg = v < 0
     s = f"{abs(v):,.2f}".replace(",", "\x00").replace(".", dec).replace("\x00", tho)
-    sym = fmt.get("currency_symbol") or {"EUR": "€", "USD": "USD", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "")
+    sym = fmt.get("currency_symbol") or {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "")
     s = f"{sym} {s}" if (fmt.get("currency_pos") == "before") else f"{s} {sym}"
     return ("-" if neg else "") + s
+
+
+def _pdf_fmt_money(v, lang, currency):
+    """2.296.0 B (#3175): calc.fmt_money (the package's, or calc.py next to this file when loaded on its own)."""
+    global _PDF_CALC
+    if _PDF_CALC is None:  # loaded on its own (tests): calc.py next to this file
+        import importlib.util
+        sp = importlib.util.spec_from_file_location("office_calc_for_pdf", os.path.join(os.path.dirname(os.path.abspath(__file__)), "calc.py"))
+        _c = importlib.util.module_from_spec(sp)
+        sp.loader.exec_module(_c)
+        _PDF_CALC = _c
+    try:
+        return _PDF_CALC.fmt_money(v if v not in (None, "") else 0, lang, currency)
+    except (TypeError, ValueError, ArithmeticError):
+        return _PDF_CALC.fmt_money(0, lang, currency)
+
+
+try:
+    from . import calc as _PDF_CALC
+except ImportError:
+    _PDF_CALC = None
 
 
 def pdf_num(v, lang, fmt=None):
@@ -705,6 +813,7 @@ def pdf_phone_in(ln):
 
 class _FooterCols(list):
     n_name = 1
+    raw = None
 
 
 def pdf_footer_cols(co):
@@ -721,6 +830,8 @@ def pdf_footer_cols(co):
             [(str(x), False) for x in (co.get("register_lines") or [])], [(str(x), True) for x in (co.get("bank_lines") or [])]]
     out = _FooterCols(p3f_three(c, len(nl) if i == 0 else 0) for i, c in enumerate(cols) if any(ln.strip() for ln, _ in c))
     out.n_name = len(nl)  # 2.138.2 B (#2397): how many leading lines of column 1 are the (bold) name
+    # 2.296.0 A (#3164): the columns before the three-line joining, for p3f_fit to move a long entry below the columns
+    out.raw = [(c, len(nl) if i == 0 else 0) for i, c in enumerate(cols) if any(ln.strip() for ln, _ in c)]
     return out
 
 
@@ -739,41 +850,144 @@ def p3f_three(col, n_name=0):
     return col
 
 
+_P3W = {}
+
+
+def p3f_w(s, fs, bold=False):
+    """2.296.0 A (#3164): pdf_text_width remembered for the footer fitting (it tries many layouts)."""
+    k = (s, fs, bool(bold))
+    w = _P3W.get(k)
+    if w is None:
+        if len(_P3W) > 20000:
+            _P3W.clear()
+        w = _P3W[k] = pdf_text_width(s, fs, bold)
+    return w
+
+
 def bwa_half(ln, fs, bold=False):
     """2.114.4 A (#2271): the narrowest width at which ln takes at most two lines (the wider half of the best split)."""
     ws = ln.split(" ")
-    return min([max(pdf_text_width(" ".join(ws[:q]), fs, bold), pdf_text_width(" ".join(ws[q:]), fs, bold)) for q in range(1, len(ws))]
-               or [pdf_text_width(ln, fs, bold)])
+    return min([max(p3f_w(" ".join(ws[:q]), fs, bold), p3f_w(" ".join(ws[q:]), fs, bold)) for q in range(1, len(ws))]
+               or [p3f_w(ln, fs, bold)])
 
 
 def bwa_wrap(ln, keep, fs, width, bold=False):
     """2.114.4 A (#2271): a footer line within width: whole when it fits (an unbreakable line always tries so), a
-    "Label: value" line breaks after the label first, everything else wraps by words."""
-    if pdf_text_width(ln, fs, bold) <= width:
+    "Label: value" line breaks after the label first, everything else wraps by words. 2.296.0 A (#3164): an unbreakable
+    line only between its joined entries."""
+    if p3f_w(ln, fs, bold) <= width:
         return [ln]
     if not keep and ": " in ln:
         a, b = ln.split(": ", 1)
-        if pdf_text_width(a + ":", fs, bold) <= width and pdf_text_width(b, fs, bold) <= width:
+        if p3f_w(a + ":", fs, bold) <= width and p3f_w(b, fs, bold) <= width:
             return [a + ":", b]
+    if keep:  # 2.296.0 A (#3164): an unbreakable line breaks only between its joined entries (" · ", ", "), never inside one
+        sp = re.split(r"( · |, )", ln)
+        out, cur = [], sp[0]
+        for sep, t in zip(sp[1::2], sp[2::2]):
+            if p3f_w(cur + sep + t, fs, bold) <= width:
+                cur += sep + t
+            else:
+                out.append(cur + sep.rstrip(" ·"))  # "a," / "a" (the dot is left out)
+                cur = t
+        out.append(cur)
+        # an entry wider than the column (p3f_fit moves it below the columns first) wraps as before
+        return [x for o in out for x in (pdf_wrap(o, fs, width, bold=bold) if p3f_w(o, fs, bold) > width else [o])]
     return pdf_wrap(ln, fs, width, bold=bold)
 
 
-def p3f_fit(cols):
+def p3f_atoms(ln, keep):
+    """2.296.0 A (#3164): the parts of a footer line that never break: an unbreakable line's joined entries, else words."""
+    return [x for x in (re.split(r" · |, ", str(ln)) if keep else str(ln).split(" ")) if x] or [str(ln)]
+
+
+class _FootFit(tuple):
+    full = ()  # 2.296.0 A (#3164): the wrapped full-width lines below the columns
+
+
+P3F_MIN_FS = 6.5  # 2.296.0 A (#3164): the smallest footer font (was 6.0)
+
+
+def p3f_fit(cols, width=None):
     """2.114.4 A (#2271): the footer's font size, column widths and wrapped lines -> (fs, cws, shown). Widths follow the
     content: every column gets at least its longest unbreakable line (an IBAN, "E-Mail x"), the rest goes to the columns
-    that still wrap; when even that does not fit, the font shrinks a little. 2.114.5 (#2300): aims at three lines."""
+    that still wrap; when even that does not fit, the font shrinks a little. 2.114.5 (#2300): aims at three lines.
+    2.296.0 A (#3164): nothing is ever cut: a long entry (shareholders, a line over three lines) or an unbreakable line
+    that finds no room in its column moves to a full-width line below the columns (.full of the result); width = the
+    footer width (default PDF_CW, a letter on a letterhead passes its own)."""
+    width = PDF_CW if width is None else width
+    nn = max(1, getattr(cols, "n_name", 1))
+    # the entries before the three-line joining (pdf_footer_cols.raw); t = name lines of the column, None = no joining
+    raw = [(list(c), t) for c, t in getattr(cols, "raw", None) or [(c, None) for c in cols or []]]
+    bold = lambda i, j: i == 0 and j < nn  # noqa: E731
+
+    memo = {}
+
+    def lay(raw):  # -> columns, fit, column lines, cut lines (a part wider than its column), long lines (three and more / wide)
+        key = repr(raw)
+        if key not in memo:
+            memo[key] = lay1(raw)
+        return memo[key]
+
+    def lay1(raw):
+        cur = [c if t is None else p3f_three(list(c), t) for c, t in raw]
+        fs, cws, shown, _ok = p3f_core(cur, nn, width - 8 * (max(1, len(cur)) - 1))
+        cut = [ln for i, c in enumerate(cur) for j, (ln, k) in enumerate(c)
+               if not bold(i, j) and max(p3f_w(w, fs, bold(i, j)) for w in p3f_atoms(ln, k)) > cws[i] - 2]
+        long = [ln for i, c in enumerate(cur) for j, (ln, k) in enumerate(c) if not bold(i, j) and not k and
+                (len(bwa_wrap(ln, k, fs, cws[i] - 2, bold(i, j))) >= 3 or (cws[i] < p3f_w(ln, fs) and p3f_w(ln, fs) > width * 0.4))]
+        return cur, (fs, cws, shown), max([len(x) for x in shown] or [0]), cut, long
+
+    def without(raw, i, q):
+        out = [(list(c), t) for c, t in raw]
+        out[i][0].pop(q)
+        return [x for x in out if any(str(r).strip() for r, _k in x[0])]
+
+    full, nf = [], 0  # the moved entries, their line count at full width
+    for n in range(13):
+        cur, fit, h, cut, long = lay(raw)
+        fs = fit[0]
+        if n == 12 or (not cut and not long and h <= 3):  # the last round only lays out; three lines, nothing cut: done
+            break
+        opts = []  # (cut lines after the move, footer lines after it, -width, column, entry, the entry is in a long line)
+        for i, (c, t) in enumerate(raw):
+            for q, (r, _k) in enumerate(c):
+                if q < (t if t is not None else nn if i == 0 else 0) or not str(r).strip():
+                    continue
+                _c2, _f2, h2, cut2, _l2 = lay(without(raw, i, q))
+                opts.append((len(cut2), h2 + nf + len(pdf_wrap(str(r), fs, width - 2)), -p3f_w(str(r), fs), i, q,
+                             any(str(r) in x for x in long)))
+        if cut:  # a part would be cut inside (an IBAN, an e-mail address): the move that leaves the fewest cuts
+            pick = min(opts, default=None)
+        else:
+            pick = min([o for o in opts if not o[0]], default=None)
+            if pick and pick[1] >= h + nf:  # no lower footer: a long entry (shareholders) moves when the footer does not grow
+                pick = min([o for o in opts if not o[0] and o[5] and o[1] <= h + nf], default=None) or (pick if h > 6 else None)
+        if pick is None:
+            break
+        ln = str(raw[pick[3]][0][pick[4]][0])
+        full.append(ln)
+        nf += len(pdf_wrap(ln, fs, width - 2))
+        raw = without(raw, pick[3], pick[4])
+    out = _FootFit(fit)
+    out.full = [x for ln in full for x in pdf_wrap(ln, fs, width - 2)]
+    return out
+
+
+def p3f_core(cols, nn, free):
+    """p3f_fit for fixed columns -> (fs, cws, shown, ok); ok = every unbreakable line keeps its line (no width cut)."""
     fs, cws, shown = 6.9, [], []
     ok6 = None
-    nn = max(1, getattr(cols, "n_name", 1))  # 2.138.2 B (#2397): name lines of column 1 (bold)
     if cols:
-        free = PDF_CW - 8 * (len(cols) - 1)
         bold = lambda i, j: i == 0 and j < nn  # noqa: E731  2.138.2 B (#2397): every name line is bold
         # no break at all when a slightly smaller font allows it, else the narrowest font that keeps every unbreakable line
-        for fs, whole in ((6.9, 1), (6.6, 1), (6.3, 1), (6.9, 0), (6.6, 0), (6.3, 0), (6.0, 0)):
-            nat = [max(pdf_text_width(ln, fs, bold(i, j)) for j, (ln, _k) in enumerate(c)) + 3 for i, c in enumerate(cols)]
-            low = [max(pdf_text_width(ln, fs, bold(i, j)) if k else bwa_half(ln, fs, bold(i, j)) for j, (ln, k) in enumerate(c)) + 3
-                   for i, c in enumerate(cols)]
-            if whole and sum(nat) > free:
+        # 2.296.0 A (#3164): never below 6.5 pt; whole = -1: an unbreakable line may break between its entries (one line more)
+        for fs, whole in ((6.9, 1), (6.6, 1), (P3F_MIN_FS, 1), (6.9, 0), (6.6, 0), (P3F_MIN_FS, 0), (P3F_MIN_FS, -1)):
+            nat = [max(p3f_w(ln, fs, bold(i, j)) for j, (ln, _k) in enumerate(c)) + 3 for i, c in enumerate(cols)]
+            low = [max(p3f_w(ln, fs, bold(i, j)) if k and whole >= 0 else
+                       max(p3f_w(x, fs, bold(i, j)) for x in p3f_atoms(ln, k)) if k else bwa_half(ln, fs, bold(i, j))
+                       for j, (ln, k) in enumerate(c)) + 3 for i, c in enumerate(cols)]
+            if whole > 0 and sum(nat) > free:
                 continue
             if sum(nat) <= free:
                 cws = [w + (free - sum(nat)) / len(cols) for w in nat]
@@ -797,37 +1011,84 @@ def p3f_fit(cols):
                     cws[need] += 4
                 shown = [lay(i, w) for i, w in enumerate(cws)]
             if sum(low) <= free and max(len(x) for x in shown) <= 3:
-                return fs, cws, shown
-            if ok6 is None and sum(low) <= free and max(len(x) for x in shown) <= 6:
-                ok6 = (fs, cws, shown)  # three lines not reachable: the first layout of up to six lines, as before
-    return ok6 or (fs, cws, shown)
+                return fs, cws, shown, True
+            if ok6 is None and sum(low) <= free:
+                ok6 = (fs, cws, shown, True)  # three lines not reachable: the first layout that keeps every unbreakable line
+        return ok6 or (fs, cws, shown, False)
+    return fs, cws, shown, True
+
+
+def p3f_lines(fit):
+    """2.296.0 A (#3164): the number of footer text lines (tallest column + the full-width lines below)."""
+    return max([len(x) for x in fit[2]] or [0]) + len(getattr(fit, "full", ()) or ())
 
 
 def p3f_foot_h(fit):
     """2.114.5 (#2300): the height the footer needs (rule to the page bottom margin): three lines take less than the old
-    fixed 20 mm, so the body gets the rest; never more than the old room for six lines."""
-    fs, _cws, shown = fit
-    n = min(6, max([len(x) for x in shown] or [0]))
-    return max(12 * MM, min(PDF_FOOT_H + 2 * MM, n * fs * 1.39 + 5))
+    fixed 20 mm, so the body gets the rest. 2.296.0 A (#3164): from the real line count, no cap (nothing is cut)."""
+    return max(12 * MM, p3f_lines(fit) * fit[0] * 1.39 + 5)
 
 
-def pdf_draw_footer(p, cols, right="", fit=None, foot_h=PDF_FOOT_H):
+def pdf_body_bottom(foot_h):
+    """2.296.0 A (#3164): where the body ends above a footer of height foot_h (p3f_foot_h)."""
+    return A4_H - 12 * MM - foot_h
+
+
+def pdf_draw_footer(p, cols, right="", fit=None, foot_h=None, x0=None, width=None):
     """2.114.4 A (#2271): the footer of a page: a rule, the columns of pdf_footer_cols (laid out by p3f_fit) and the text
-    bottom right (number / page). 2.114.5 (#2300): foot_h = the reserved height (office_pdf passes p3f_foot_h)."""
-    top = A4_H - 12 * MM - foot_h
-    p.line(PDF_L, top, PDF_L + PDF_CW, top, 0.5, C_RULE)
+    bottom right (number / page). 2.114.5 (#2300): foot_h = the reserved height (office_pdf passes p3f_foot_h).
+    2.296.0 A (#3164): every line is drawn (no cut), the full-width lines below the columns; x0 / width = a letterhead's
+    margins (default PDF_L / PDF_CW). Shared by the office PDFs, the templates, the letters and the meal receipts."""
+    x0 = PDF_L if x0 is None else x0
+    width = PDF_CW if width is None else width
+    fit = fit or (p3f_fit(cols, width) if cols else None)
+    top = pdf_body_bottom(foot_h if foot_h is not None else p3f_foot_h(fit) if fit else PDF_FOOT_H)
+    p.line(x0, top, x0 + width, top, 0.5, C_RULE)
     if cols:
-        fs, cws, shown = fit or p3f_fit(cols)
-        x = PDF_L
+        fs, cws, shown = fit
+        x, yy = x0, top + 5
         for i, c in enumerate(shown):
             if i:
                 x += cws[i - 1] + 8
             yy = top + 5
-            for ln, first in c[:6]:  # 2.138.2 B (#2397): first = a name line (p3f_fit marks them)
+            for ln, first in c:  # 2.138.2 B (#2397): first = a name line (p3f_fit marks them)
                 p.text(x, yy, ln, fs, bold=(i == 0 and first), color=C_INK if (i == 0 and first) else C_INK2)
                 yy += fs * 1.39
+        yy = top + 5 + max([len(c) for c in shown] or [0]) * fs * 1.39
+        for ln in getattr(fit, "full", ()) or ():
+            p.text(x0, yy, ln, fs, color=C_INK2)
+            yy += fs * 1.39
     if right:
-        p.text(PDF_L + PDF_CW, A4_H - 9 * MM, right, 6.8, False, C_INK2, align="r")
+        p.text(x0 + width, A4_H - 9 * MM, right, 6.8, False, C_INK2, align="r")
+
+
+def pdf_sender_line(sender, name="", name1="", width=PDF_ADDR_W, size=7):
+    """2.296.0 E (#3170): the sender line above the address field fitted to width; the address has priority over the company
+    name: a long name gives way first (its first line name1; then only street and town; then the name shortened with "…"),
+    trailing parts only after that."""
+    s = str(sender or "")
+    if pdf_text_width(s, size) <= width:
+        return s
+    nm = str(name or "")
+    if nm and s.startswith(nm + " · "):
+        rest = s[len(nm):]
+        short = str(name1 or "").strip() or nm
+        if pdf_text_width(short + rest, size) <= width:
+            return short + rest
+        parts = rest.split(" · ")[1:]
+        if len(parts) > 2 and pdf_text_width(short + " · " + parts[0] + " · " + parts[-1], size) <= width:
+            return short + " · " + parts[0] + " · " + parts[-1]  # the street and the town before the lines between them
+        while len(short) > 8 and pdf_text_width(short.rstrip() + "…" + rest, size) > width:
+            short = short[:-1]
+        if pdf_text_width(short.rstrip() + "…" + rest, size) <= width:
+            return short.rstrip() + "…" + rest
+    while pdf_text_width(s, size) > width and " · " in s:  # still too long: drop trailing parts
+        s = s.rsplit(" · ", 1)[0]
+    if pdf_text_width(s, size) > width:  # one part alone too long: shortened
+        while len(s) > 1 and pdf_text_width(s + "…", size) > width:
+            s = s[:-1]
+        s = s.rstrip() + "…"
+    return s
 
 
 def office_pdf(model, logo_bytes=None, xml=None, meta=None):
@@ -938,10 +1199,23 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # whole closing fits on one page; sq = points of its top gap that may be given up so that a group still fits on the page
     # 2.294.0 (#3154): air = (top, bottom, min_top) extra points around a block (totals, intro) that the layout gives up first --
     # down to min_top before the old gaps (sq), below it only so that the page count never grows
-    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0, air=None, air_kind=""):  # 2.47.0 (#1215): brk = starts a new page
+    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0, air=None, air_kind="", pk=False):  # 2.47.0 (#1215): brk = starts a new page
         at, ab, am = air or (0.0, 0.0, 0.0)
         blocks.append({"h": h + at + ab, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk, "tail": tail, "sq": sq,
-                       "sq_used": 0.0, "air": at + ab, "air_top": at, "air_min": am, "air_cut": 0.0, "air_kind": air_kind})
+                       "sq_used": 0.0, "air": at + ab, "air_top": at, "air_min": am, "air_cut": 0.0, "air_kind": air_kind, "pk": pk})
+
+    # 2.296.0 E (#3166): a paragraph as one block per line, so that one longer than the room of a page breaks between its lines
+    # instead of running over the footer; its first two and last two lines stay together (no single line at a page end / start),
+    # soft: the whole paragraph stays together as long as it fits on an empty page. step = line height (a number or one per row);
+    # top / bottom = the paragraph's gaps; draw1(page, y, row, q) draws row q at y (the top of its line)
+    def para_blocks(rows, step, top, bottom, draw1, keep_next=False, soft=True, sq=0, air=None, air_kind="", **kw):
+        n = len(rows)
+        for q, r in enumerate(rows):
+            st = step[q] if isinstance(step, (list, tuple)) else step
+            off = top if q == 0 else 0
+            block(off + st + (bottom if q == n - 1 else 0), lambda p, y, r=r, q=q, off=off: draw1(p, y + off, r, q),
+                  keep_next=keep_next if q == n - 1 else q in (0, n - 2), pk=soft and q < n - 1, sq=sq if q == 0 else 0,
+                  air=air if q == n - 1 else None, air_kind=air_kind if q == n - 1 else "", **kw)
 
     body = 9.6
     lh = body * 1.42
@@ -977,14 +1251,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             addr_lines.append(str(rc["country"]))
     # 2.217.0 B (#2800): every address line (a long recipient name above all) wraps within the address field instead of
     # running into the key data on the right; the head grows with the wrapped lines (nothing is cut)
-    addr_lines = [w for ln in addr_lines[:8] for w in pdf_wrap(ln, body, PDF_ADDR_W)]
+    addr_lines = [w for ln in addr_lines for w in pdf_wrap(ln, body, PDF_ADDR_W)]  # 2.296.0 E (#3170): every line (was cut after 8)
 
     def draw_head(p, y):
         sender = str(co.get("sender_line") or "") or " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
-        sender_w = pdf_text_width(sender, 7)
-        while sender_w > PDF_ADDR_W and " · " in sender:  # too long: drop trailing parts
-            sender = sender.rsplit(" · ", 1)[0]
-            sender_w = pdf_text_width(sender, 7)
+        sender = pdf_sender_line(sender, co.get("name"), co_lines[0] if len(co_lines) > 1 else "")  # 2.296.0 E (#3170): the address first
         p.text(PDF_L, y, sender, 7, False, C_INK2)
         p.line(PDF_L, y + 11, PDF_L + PDF_ADDR_W, y + 11, 0.5, C_RULE2)
         yy = y + 16
@@ -992,14 +1263,25 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.text(PDF_L, yy, ln, body)
             yy += lh
         yy = y + 2
-        for k, v in info:
-            p.text(info_x, yy, k, 8.6, False, C_INK2)
-            vw = info_w - pdf_text_width(k, 8.6) - 10
-            vl = pdf_wrap(v, 8.6, max(vw, 40))
-            for vv in vl:
-                p.text(info_x, yy, vv, 8.6, True, C_INK, align="r", width=info_w)
-                yy += info_lh
-    head_h = max(PDF_ADDR_H, 16 + len(addr_lines) * lh + 4, 2 + sum(max(1, len(pdf_wrap(v, 8.6, max(info_w - pdf_text_width(k, 8.6) - 10, 40)))) for k, v in info) * info_lh + 4)
+        for kl, vl, below in info_rows:
+            for j, kk in enumerate(kl):
+                p.text(info_x, yy + j * info_lh, kk, 8.6, False, C_INK2)
+            if below:
+                yy += len(kl) * info_lh
+            for j, vv in enumerate(vl):
+                p.text(info_x, yy + j * info_lh, vv, 8.6, True, C_INK, align="r", width=info_w)
+            yy += (len(vl) if below else max(len(kl), len(vl))) * info_lh
+
+    # 2.296.0 E (#3170): a long label wraps (at most ~half the width), the value below it when too little room is left beside it
+    # (was: the label never wrapped and ran under the value / over the margin)
+    info_rows = []
+    for k, v in info:
+        kl = pdf_wrap(k, 8.6, info_w * 0.55) if pdf_text_width(k, 8.6) > info_w * 0.55 else [k]
+        vw = info_w - max(pdf_text_width(x, 8.6) for x in kl) - 10
+        below = vw < 60 and pdf_text_width(v, 8.6, True) > vw
+        info_rows.append((kl, pdf_wrap(v, 8.6, info_w if below else max(vw, 40)), below))
+    head_h = max(PDF_ADDR_H, 16 + len(addr_lines) * lh + 4,
+                 2 + sum(len(kl) + len(vl) if below else max(1, len(kl), len(vl)) for kl, vl, below in info_rows) * info_lh + 4)
     block(head_h, draw_head)
 
     # -- title line, project title, intro
@@ -1019,17 +1301,33 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         block(n * 10.4 * 1.42 + 8, lambda p, y, t=pt: p.para(PDF_L, y + 2, t, 10.4, PDF_CW, True), keep_next=True)
     if m.get("intro"):
         it = str(m["intro"])
-        n = len(pdf_wrap(it, body, PDF_CW))
         # 2.294.0 (#3154): the same air between the intro and the table as before the totals (today lh + 8 + 4 - body = ~5.7 mm
         # from the last line to the table head; never less than that, the wish only while it costs no page)
-        block(n * lh + 8, lambda p, y, t=it: p.para(PDF_L, y, t, body, PDF_CW), keep_next=True,
-              air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
+        # 2.296.0 E (#3166): line by line (a long intro breaks; the title keeps its first two lines, page 1 never stays empty)
+        para_blocks(pdf_wrap(it, body, PDF_CW), lh, 0, 8, lambda p, y, s_, q: p.text(PDF_L, y, s_, body), keep_next=True, soft=False,
+                    air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
     c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
     np_ = bool(m.get("noprice"))  # 2.120.0 D (#2089): delivery note / timesheet: no price, VAT or total columns
     if np_:
         c_pos, c_rate, c_vat, c_tot = int(m.get("pos_w") or 22), 0, 0, 0
+
+    def qty_two(ln):  # 2.296.0 E (#3170): (number, unit) of a row's quantity
+        unit = str(ln.get("unit_text") or ln.get("unit") or "")
+        if "unit_text" in ln and not ln.get("unit_text") and str(ln.get("unit") or "") in ("flat", "day", "hour", "piece", "minute"):
+            unit = str((ml.get("units") or {}).get(ln["unit"]) or "") if isinstance(ml.get("units"), dict) else ""  # 2.296.0 B (#3173): never the key "flat"
+        if "qty_text" in ln:
+            q = str(ln.get("qty_text") or "")
+            return (q, unit if q else "")
+        return (pdf_num(ln["qty"], lang, fmt), unit) if ln.get("qty") not in (None, "") else ("", "")
+    # 2.296.0 E (#3170): the quantity column as wide as its widest entry (up to P3Q_MAX; wider ones put the unit on a second line),
+    # the position column as wide as its widest entry (a timesheet's dates); was a fixed width the text ran over
+    p3q_rows = [x for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
+                if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "surcharge", "raw", "discount")]
+    p3q_w = [pdf_text_width(" ".join(x for x in qty_two(x) if x).strip(), 8.8) for x in p3q_rows]
+    c_qty = max(c_qty, min(P3Q_MAX, max(p3q_w or [0]) + 6))
+    c_pos = max(c_pos, max([pdf_text_width(str(x.get("pos") or ""), 8) + 6 for x in p3q_rows] or [0]))
     # 2.114.5 (#2300): a quotation whose positions (parts too) all carry the same rate prints no VAT column
     p3v = {str(x.get("tax_pct")) for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
            if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "raw", "discount") and x.get("tax_pct") not in (None, "")}
@@ -1057,6 +1355,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         p.line(PDF_L, y + thead_h - 1, PDF_L + PDF_CW, y + thead_h - 1, 1.1, C_INK)
 
     lines = [x for x in (m.get("lines") or []) if isinstance(x, dict)]
+    # 2.296.0 E (#3166): the room of a following page below a table head; a row / payment text higher than that is split by lines
+    p3s_cap = ((BP["bottom"][1] if BP["hide_footer"] else min(BP["bottom"][1], body_bottom)) if BP else body_bottom) - PDF_NEXT_TOP - thead_h - 8
     have_table = False
     last_item_idx = None
 
@@ -1066,14 +1366,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             k = ln.get("kind") or "item"
             if k == "heading":
                 t = str(ln.get("title") or "")
-                block(22, lambda p, y, t=t: p.text(x_title + 3, y + 11, t.upper(), 8, True, accent, spacing=0.8), keep_next=True, table=True)
+                hl = pb_wrap(t.upper(), 8, c_title + c_qty + c_rate + c_vat + c_tot - 6, True, 0.8)  # 2.296.0 E (#3170): a long heading wraps
+                block(22 + (len(hl) - 1) * 11, lambda p, y, hl=hl: [p.text(x_title + 3, y + 11 + j * 11, t_, 8, True, pdf_text_color(accent), spacing=0.8)
+                                                               for j, t_ in enumerate(hl)], keep_next=True, table=True)  # 2.296.0 D (#3172): readable text colour
                 have_table = True
             elif k == "text":
                 tw = c_title + c_qty + c_rate + c_vat + c_tot - 6
                 wrapped = pdf_wrap(str(ln.get("text") or ""), body, tw)
-                for part in (wrapped[q:q + 40] for q in range(0, max(1, len(wrapped)), 40)):  # a very long block may break (40 lines each)
-                    block(len(part) * lh + 10, lambda p, y, part=part: [p.text(x_title + 3, y + 4 + q * lh, s_, body) for q, s_ in enumerate(part)],
-                          table=True)
+                # 2.296.0 E (#3166): line by line (was 40 lines a block: too long for a letterhead with wide margins)
+                para_blocks(wrapped, lh, 4, 6, lambda p, y, s_, q: p.text(x_title + 3, y, s_, body), table=True)
             elif k in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
                 if k == "raw" and ln.get("optional"):
                     continue  # the option is printed below the totals
@@ -1081,13 +1382,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 if k == "discount" and ln.get("pct") not in (None, "", 0):
                     t = f"{t} {pdf_num(ln['pct'], lang, fmt)} %"
                 detail = str(ln.get("detail") or "") if k != "producing" else ""  # 2.114.4 A (#2276): the formula only in the app
-                qty = ln.get("qty")
-                unit = str(ln.get("unit") or "")
-                unit = str(ln.get("unit_text") or ln.get("unit") or "")
-                if "qty_text" in ln:
-                    qty_s = (str(ln.get("qty_text") or "") + (" " + unit if unit and ln.get("qty_text") else "")).strip()
-                else:
-                    qty_s = (pdf_num(qty, lang, fmt) + (" " + unit if unit else "")) if qty not in (None, "") else ""
+                qty_s = " ".join(x for x in qty_two(ln) if x).strip()
+                # 2.296.0 E (#3170): too wide for the column: number and unit on two lines (each wrapped to the column)
+                q_lines = [qty_s] if pdf_text_width(qty_s, 8.8) <= c_qty - 6 else [w for x in qty_two(ln) if x for w in pdf_wrap(x, 8.8, c_qty - 6)]
                 rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") and c_vat else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
@@ -1096,23 +1393,42 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 t_lines = pdf_wrap(t, body, c_title - 6)
                 d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
-                h = 8 + len(t_lines) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
+                h = 8 + max(len(t_lines), len(q_lines)) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
 
-                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, qty_s=qty_s, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h):
+                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h):
                     yy = y + 4
                     p.text(x_pos + 3, yy + 1, pos_s, 8, False, C_INK2)
                     for j, s in enumerate(t_lines):
                         p.text(x_title + 3, yy + j * lh, s, body)
-                    p.text(x_qty, yy, qty_s, 8.8, align="r", width=c_qty - 3)
+                    for j, s in enumerate(q_lines):
+                        p.text(x_qty, yy + j * lh, s, 8.8, align="r", width=c_qty - 3)
                     p.text(x_rate, yy, rate_s, 8.8, align="r", width=c_rate - 3)
                     p.text(x_vat, yy + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
                     p.text(x_tot, yy, tot_s, 8.8, align="r", width=c_tot - 3)
-                    dy = yy + len(t_lines) * lh
+                    dy = yy + max(len(t_lines), len(q_lines)) * lh
                     for s in d_lines:
                         p.text(x_title + 3, dy, s, 8.4, False, C_INK2)
                         dy += 8.4 * 1.42
                     p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.5, C_RULE2)
-                block(h, draw_row, table=True)
+                if h > p3s_cap:  # 2.296.0 E (#3166): a row higher than a page: its title and detail lines one by one (the amounts on the first)
+                    rr = [(s_, body, C_INK) for s_ in t_lines] + [("", body, C_INK)] * (len(q_lines) - len(t_lines)) + [(s_, 8.4, C_INK2) for s_ in d_lines]
+                    rs = [lh] * max(len(t_lines), len(q_lines)) + [8.4 * 1.42] * len(d_lines)
+                    rb = 4 + (2 if d_lines else 0)
+
+                    def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s):
+                        if q == 0:
+                            p.text(x_pos + 3, y + 1, pos_s, 8, False, C_INK2)
+                            for j, s_ in enumerate(q_lines):
+                                p.text(x_qty, y + j * lh, s_, 8.8, align="r", width=c_qty - 3)
+                            p.text(x_rate, y, rate_s, 8.8, align="r", width=c_rate - 3)
+                            p.text(x_vat, y + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
+                            p.text(x_tot, y, tot_s, 8.8, align="r", width=c_tot - 3)
+                        p.text(x_title + 3, y, r[0], r[1], False, r[2])
+                        if q == n - 1:
+                            p.line(PDF_L, y + rs[q] + rb - 0.5, PDF_L + PDF_CW, y + rs[q] + rb - 0.5, 0.5, C_RULE2)
+                    para_blocks(rr, rs, 4, rb, draw_row, table=True)
+                else:
+                    block(h, draw_row, table=True)
                 have_table = True
                 last_item_idx = len(blocks) - 1
     table_rows(lines)
@@ -1130,7 +1446,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             for j, (x, lab) in enumerate(zip(xs, rcols)):
                 p.text(x + 3, y + 4, lab.upper(), 7.4, True, C_INK2, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6, spacing=0.6)
             p.line(PDF_L, y + 19, PDF_L + PDF_CW, y + 19, 1.1, C_INK)
-        block(20, draw_rem_head, keep_next=True)
+        # 2.296.0 D (#3174): the head of the open invoices is the table head of the page layout (it comes back on every following
+        # page like the position table's); only when no position table is drawn (a reminder has none)
+        rem_table = not have_table
+        if rem_table:
+            draw_thead, have_table = draw_rem_head, True
+            thead_h = 20
+        else:
+            block(20, draw_rem_head, keep_next=True)
         for rr in rem["rows"]:
             if not isinstance(rr, dict):
                 continue
@@ -1140,7 +1463,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 for j, (x, v) in enumerate(zip(xs, cells)):
                     p.text(x + 3, y + 4, v, body, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6)
                 p.line(PDF_L, y + 8 + lh - 0.5, PDF_L + PDF_CW, y + 8 + lh - 0.5, 0.5, C_RULE2)
-            block(8 + lh, draw_rem_row)
+            block(8 + lh, draw_rem_row, table=rem_table)
         last_item_idx = len(blocks) - 1
     if not have_table:
         thead_h = 0
@@ -1182,7 +1505,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if raw_opt.get("detail"):
             p3o[o_l] = str(raw_opt["detail"])
     # 2.114.5 (#2300): no "valid until" sentence below the table when the head names the date
-    notes = [str(x) for x in (tot.get("vat_note"), m.get("vat_note_text"), tot.get("fx_line") or m.get("fx_note"),
+    notes = [str(x) for x in (tot.get("vat_note"), m.get("vat_note_text"), tot.get("exempt_note"), tot.get("fx_line") or m.get("fx_note"),  # 2.296.0 B (#3169): + exempt_note
                               m.get("valid_note") if not m.get("valid_until") else None) if x and str(x).strip()]
     notes = list(dict.fromkeys(notes))
     note = "\n".join(notes)
@@ -1246,7 +1569,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             for t_ in pb_lines:
                 p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
                 yy += 8.4 * 1.42
-        block(pay_h, draw_pay, keep_prev=True, tail=True)
+        if pay_h > p3s_cap:  # 2.296.0 E (#3166): a payment text higher than a page line by line (the GiroCode above it)
+            if gcq:
+                block(gcq_block_h() + 10, lambda p, y: gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 6, gcq, lang, C_INK, C_INK2), keep_prev=True, keep_next=True, tail=True)
+            para_blocks([(t_, body, C_INK) for t_ in pt_lines] + [(t_, 8.4, C_INK2) for t_ in pb_lines], [lh] * len(pt_lines) + [8.4 * 1.42] * len(pb_lines),
+                        4, 2 + (2 if pb_lines else 0), lambda p, y, r, q: p.text(PDF_L, y, r[0], r[1], False, r[2]), tail=True)
+            blocks[-len(pt_lines) - len(pb_lines)]["keep_prev"] = True
+        else:
+            block(pay_h, draw_pay, keep_prev=True, tail=True)
 
     # -- rights block (not torn); 2.114.1 C (#2258): printed as an appendix on its own last page, see below
     bfc_rights, bfc_seen = [], []
@@ -1257,21 +1587,16 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         lab_w = 112
         r_lines = [(a, pdf_wrap(b, 10, PDF_CW - lab_w - 12)) for a, b in r_rows]  # 2.138.2 B (#2388): rows 10 pt, label = value size
         rn_lines = pdf_wrap(str(rights.get("note") or ""), 8.5, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
-        r_h = 14 + sum(max(1, len(b)) * 10 * 1.6 + 10 for _, b in r_lines) + (len(rn_lines) * 8.5 * 1.42 + 14 if rn_lines else 0)
 
-        def draw_rights(p, y):  # 2.114.1 C (#2258): the title is the appendix heading, rows with more air
-            yy = y + 14
-            for a, b in r_lines:
-                p.text(PDF_L, yy, a, 10, False, C_INK2)
-                for j, s in enumerate(b):
-                    p.text(PDF_L + lab_w, yy + j * 10 * 1.6, s, 10)
-                yy += max(1, len(b)) * 10 * 1.6 + 10
+        def draw_rights():  # 2.114.1 C (#2258): the title is the appendix heading, rows with more air
+            # 2.296.0 E (#3166): every row line by line (was one block for all rows: ran over the footer and the page edge); the
+            # appendix heading keeps only the first row's first lines
+            for j, (a, b) in enumerate(r_lines):
+                para_blocks(b, 10 * 1.6, 14 if j == 0 else 0, 10, lambda p, y, s_, q, a=a: (p.text(PDF_L, y, a, 10, False, C_INK2) if q == 0 else None,
+                                                                                           p.text(PDF_L + lab_w, y, s_, 10)))
             if rn_lines:
-                yy += 12
-                for s in rn_lines:
-                    p.text(PDF_L, yy, s, 8.5, False, C_INK2)
-                    yy += 8.5 * 1.42
-        bfc_rights.append((r_h, draw_rights))
+                para_blocks(rn_lines, 8.5 * 1.42, 12 + (0 if r_lines else 14), 2, lambda p, y, s_, q: p.text(PDF_L, y, s_, 8.5, False, C_INK2))
+        bfc_rights.append(draw_rights)
 
     acc = m.get("accepted") if isinstance(m.get("accepted"), dict) else None
     # 2.114.4 B (#2270): the order confirmation can be switched off; 2.114.5 (#2300): with an appendix (rights) or printed
@@ -1299,13 +1624,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # -- closing text, signature, order confirmation; 2.114.5 (#2300): the greeting set closer
     if m.get("closing"):
         ct = str(m["closing"])
-        n = len(pdf_wrap(ct, body, PDF_CW))
-        block(n * lh + 10, lambda p, y, t=ct: p.para(PDF_L, y + 8, t, body, PDF_CW), keep_next=bool(m.get("signature")), tail=True, sq=4)
+        # 2.296.0 E (#3166): line by line; as part of the closing (tail) it still stays whole while the closing fits a page
+        para_blocks(pdf_wrap(ct, body, PDF_CW), lh, 8, 2, lambda p, y, s_, q: p.text(PDF_L, y, s_, body), keep_next=bool(m.get("signature")),
+                    tail=True, sq=4)
     if m.get("signature") or (m.get("kind") or "offer") == "offer":
         bfc_see_ref()
     if m.get("signature"):
         sg = str(m["signature"])
-        sl = [sg] + [str(x) for x in (m.get("signature_name"), co.get("name")) if x]
+        # 2.296.0 E (#3170): every line of a company name of several lines one under the other (was printed as one line)
+        sl = [sg] + [str(x) for x in [m.get("signature_name")] + (co_lines if len(co_lines) > 1 else [co.get("name")]) if x]
         block((len(sl) - 1) * lh + 0.6 * lh + lh + 10, lambda p, y, sl=sl: [p.text(PDF_L, y + 8 + i * lh + (0.6 * lh if i else 0), s, body, bold=(i == 1))
                                                                              for i, s in enumerate(sl)], tail=True, sq=4)
     if m.get("terms_line"):  # 2.113.2 (#2253): "our terms apply (as of ...), see attachment"
@@ -1380,13 +1707,18 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         rtitle = str(rights.get("title") or L["rights"])
         rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
 
-        def bfc_draw_rights_head(p, y, rtitle=rtitle, rsub=rsub):
+        # 2.296.0 E (#3170): a long number / project line wraps right of the heading, below the accent line when no room is left
+        rs_w = PDF_CW - pdf_text_width(rtitle.upper(), 14, True, 0.8) - 6 * MM
+        rs_low = bool(rsub) and rs_w < 100 and pdf_text_width(rsub, 8) > rs_w
+        rs_lines = pdf_wrap(rsub, 8, PDF_CW if rs_low else max(rs_w, 100)) if rsub else []
+
+        def bfc_draw_rights_head(p, y, rtitle=rtitle, rs_lines=rs_lines, rs_low=rs_low):
             p.text(PDF_L, y + 6, rtitle.upper(), 14, True, C_INK, spacing=0.8)
             p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
-            if rsub:
-                p.text(PDF_L + PDF_CW, y + 8, rsub, 8, False, C_INK2, align="r")  # 2.138.2 B (#2388): not larger than the body text
-        block(34 + 12, bfc_draw_rights_head, keep_next=True, brk=True)
-        block(*bfc_rights[0])
+            for j, s_ in enumerate(rs_lines):  # 2.138.2 B (#2388): not larger than the body text
+                p.text(PDF_L + PDF_CW, y + (34 if rs_low else 8) + j * 10, s_, 8, False, C_INK2, align="r")
+        block(34 + 12 + max(0, len(rs_lines) * 10 + 6 if rs_low else (len(rs_lines) - 2) * 10), bfc_draw_rights_head, keep_next=True, brk=True)
+        bfc_rights[0]()
     if p3a_end:  # 2.114.5 (#2300): the order confirmation behind the rights appendix (or the last part)
         agap = 32 if bfc_rights else 0  # 2.138.2 B (#2388)
         block(agap + 16 + 40 + 16 + (6 + 6 if agap else 0), lambda p, y, g=agap: draw_accept(p, y, g))
@@ -1396,7 +1728,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     def group_end(i, soft):
         j = i
-        while j + 1 < n_blocks and (blocks[j]["keep_next"] or blocks[j + 1]["keep_prev"] or (soft and blocks[j + 1]["tail"])):
+        # 2.296.0 E (#3166): never across a block that starts a new page (an appendix / part head); pk = the lines of a paragraph
+        while j + 1 < n_blocks and not blocks[j + 1]["brk"] and (blocks[j]["keep_next"] or blocks[j + 1]["keep_prev"]
+                                                                  or (soft and (blocks[j + 1]["tail"] or blocks[j]["pk"]))):
             j += 1
         return j
 
@@ -1455,6 +1789,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             if j > i and need(i, j, True) - room_sq(i, j) - room_air(i, j) > page_bottom(True) - PDF_NEXT_TOP:
                 j = group_end(i, False)
                 cut_air(i, j, float("inf"), True)  # 2.294.0 (#3154): the closing breaks anyway -> only the minimum air
+                if j > i and need(i, j, True) - room_sq(i, j) - room_air(i, j) > page_bottom(True) - PDF_NEXT_TOP:
+                    j = i  # 2.296.0 E (#3166): a group that fits no page is not held together (it would only leave a page empty)
             nd = need(i, j, first_on_page)
             sqa = room_sq(i, j)
             aira = room_air(i, j)

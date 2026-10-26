@@ -258,7 +258,7 @@ async function evEditor(o = {}) {
       if (typeof evi_on === 'function' && evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
       if (dvw_isSub(val('ev-cal'))) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
       if (scope === 'one') {
-        try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, body); } catch { return; }
+        try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, {...body, expect: ev.updated_at}); } catch { return; }  // 2.273.0 C (#3051): like the series
       } else {
         const rk = val('ev-rep');
         let rule = rk === 'custom' ? rrBase(st.rrule) : rk ? evRepRule(rk, body.start) : '';
@@ -464,7 +464,7 @@ function evImport(c, done, file) {  // 2.143.0 C (#2154): file = an .ics shared 
       const r = await fetch(`/api/evcals/${c.id}/import`, {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'});
       const j = await r.json();
       if (!r.ok) { toast(j.error || tr('Import failed')); return; }
-      toast(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : ''), null, 6000);
+      toast(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.kept_newer ? ' · ' + trn('{0} event not overwritten, it is newer here', '{0} events not overwritten, they are newer here', j.kept_newer) : ''), null, 6000);
       done();
     } catch { toast(tr('Import failed')); }
   };

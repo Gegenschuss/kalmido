@@ -239,8 +239,8 @@ pg = anon("/s/q/" + TOK)
 csp = pg.headers.get("Content-Security-Policy", "")
 check(pg.status_code == 200 and "frame-src https://player.vimeo.com https://www.youtube-nocookie.com" in csp and "script-src 'self'" in csp
       and "default-src 'none'" in csp and "frame-ancestors 'none'" in csp, f"the page's own CSP {csp}")
-check('src="https://www.youtube-nocookie.com/embed/AbCdEfGhI_9?enablejsapi=1&amp;rel=0&amp;playsinline=1&amp;origin=' in pg.text
-      and 'referrerpolicy="strict-origin-when-cross-origin"' in pg.text and '<script src="/static/js/pubvideo.js" defer></script>' in pg.text,
+check('data-src="https://www.youtube-nocookie.com/embed/AbCdEfGhI_9?enablejsapi=1&amp;rel=0&amp;playsinline=1&amp;origin=' in pg.text
+      and "<iframe" not in pg.text and 'data-vdr-load' in pg.text and '<script src="/static/js/pubvideo.js" defer></script>' in pg.text,
       "the player of the newest version, no script of the provider")
 check("Ton zu leise" not in pg.text, "the team's internal comment is not on the customer page")
 js = anon("/static/js/pubvideo.js")
@@ -301,7 +301,8 @@ check(A.post(B + f"{V}/{LV}/signoffs/{S4['id']}/revoke").ok and anon("/s/q/" + T
 S5 = A.post(B + f"{V}/{LV}/signoff", json={}).json()
 T5K = S5["url"].split("/s/q/")[1]
 pg = anon("/s/q/" + T5K)
-check(pg.status_code == 200 and '<video src="https://example.com/film.webm"' in pg.text, "a direct file: <video>")
+check(pg.status_code == 200 and 'data-prov="file" data-src="https://example.com/film.webm"' in pg.text and "<video" not in pg.text,
+      "a direct file: the placeholder, no <video> before the click")  # 2.240.0 (#2886)
 check(A.delete(B + f"{V}/{LV}").ok and anon("/s/q/" + T5K).text == UNKNOWN.text and A.get(B + f"{V}/{LV}").status_code == 404,
       "deleted: the link is gone, the review in the trash")
 check(A.post(B + f"{V}/{LV}/restore").ok and A.get(B + f"{V}/{LV}").ok and anon("/s/q/" + T5K).text == UNKNOWN.text,

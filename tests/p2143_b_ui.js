@@ -26,7 +26,7 @@ const SECRET = 'ui-test-secret-value-42', DAVPW = 'ui-test-dav-password-17';
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments', 'collab']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,wiki'});
   check((await call('PATCH', '/api/admin/backups', {encrypt: true, passphrase: 'a long backup passphrase'})).status === 200, 'setup: encrypted backups');
-  const s3 = await call('PATCH', '/api/admin/backups/offsite', {type: 's3', s3: {endpoint: 'https://s3.example.com', bucket: 'kbk', key: 'AKUITEST', secret: SECRET}});
+  const s3 = await call('PATCH', '/api/admin/backups/offsite', {type: 's3', s3: {endpoint: 'https://s3.example.com', bucket: 'kbk', key: 'AKUITEST', secret: SECRET}, password: 'password123'});  // 2.223.2 C (#2871): step-up
   check(s3.status === 200 && s3.s3?.secret_set, 'setup: an S3 target with credentials');
 
   // ---- the off-site section
@@ -42,6 +42,10 @@ const SECRET = 'ui-test-secret-value-42', DAVPW = 'ui-test-dav-password-17';
   check(!box.querySelector('#bko-on').disabled, 'the switch is usable with encrypted backups');
   check(!!box.querySelector('[data-bko="test"]') && !!box.querySelector('#bko-keep'), 'Test connection and the count to keep');
   change(w, box.querySelector('#bko-type'), 'webdav');
+  // 2.223.2 C (#2871): the first change of the target asks for the password once (the step-up then holds a few minutes)
+  const pp = await until(() => w.document.querySelector('.pwprompt #pp-pw'));
+  check(!!pp, 'step-up: changing the target asks for the password');
+  if (pp) { pp.value = 'password123'; pp.form.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); }
   check(await until(async () => (await call('GET', '/api/admin/backups/offsite')).type === 'webdav'), 'the type change is saved at once');
   await until(() => md.querySelector('#bko-webdav-url'));
   check(!!md.querySelector('#bko-webdav-url') && !md.querySelector('#bko-s3-endpoint'), 'WebDAV fields replace the S3 fields');

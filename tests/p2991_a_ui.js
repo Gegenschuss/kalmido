@@ -41,6 +41,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   form.querySelector('#vdr-ttl').value = 'Rohschnitt v1';
   form.querySelector('[type="submit"]').click();
   const dlg = await until(() => d.querySelector('.vdrdlg'));
+  // 2.240.0 (#2886): a file from another host is asked for first (placeholder), the player comes after "Load video"
+  check(dlg && dlg.querySelector('.vdrgate') && !dlg.querySelector('video'), 'the file player waits behind the placeholder');
+  dlg.querySelector('[data-vdr="gate"]').click();
   check(dlg && dlg.querySelector('.vdrplay video')?.getAttribute('src') === 'https://example.com/clip.mp4' && /Rohschnitt v1/.test(dlg.querySelector('#vdr-h')?.textContent || ''),
     'the review view with the player of the file');
   const rv = (await call('GET', '/api/videos?task_id=' + T.id)).reviews || [];

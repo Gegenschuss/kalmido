@@ -16,6 +16,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_collab
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
@@ -300,7 +301,7 @@ def sh_folder_owner():
             skipped.append({"id": r["id"], "name": r["name"], "reason": e.text()})
     bump(c)
     c.commit()
-    print("folder", repr(f), "ownership of", moved, "list(s) ->", new, "by", g.user["username"], flush=True)
+    print("folder", repr(f), "ownership of", moved, "list(s) ->", new, "by", login_log_who(g.user), flush=True)
     return jsonify(moved=moved, skipped=skipped)
 
 

@@ -55,7 +55,7 @@ async function dtPdfPreview(d) {
   typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
 }
 const dtVarBar = target => `<div class="dtp-vars" role="group" aria-label="${esc(tr('Insert a variable'))}">${(DT.data?.vars || []).map(v => `<button type="button" class="btn sm ghost" data-dt="var" data-k="${esc(v.key)}" data-t="${target}" title="{{${esc(v.key)}}}">${ic('plus', 's')}<span>${esc(v.label)}</span></button>`).join('')}</div>`;
-const dtHint = () => `<p class="muted ofchint">${esc(tr('# heading, - list, variables in {{ }}'))}</p>`;
+const dtHint = () => `<p class="muted ofchint">${esc(tr('# heading, - list, variables in {{ }}, [[ … ]] an optional part (left out when a variable in it has no value)'))}</p>`;  // 2.296.0 C (#3165)
 
 // ---- the tab
 function dtTabHtml() {
@@ -107,7 +107,7 @@ function dtDocHtml(d) {
         <div class="aerr" role="alert" id="dt-err"></div>
         <div class="foot dtp-acts"><button class="btn danger ghost" data-dt="arch" data-id="${d.id}">${ic('archive', 's')}<span>${tr('Archive')}</span></button><span class="spacer"></span>
           <button class="btn" data-dt="save" data-id="${d.id}">${tr('Save')}</button><button class="btn pri" data-dt="final" data-id="${d.id}">${ic('check', 's')}<span>${tr('Finish')}</span></button></div></div>
-      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(d.id)}${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `<p class="muted">${tr('Loading…')}</p>`}</section></div>`;
+      <section class="dtp-pv" aria-label="${esc(tr('Preview'))}"><h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(d.id)}${pv ? `${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Missing details (left out in the PDF): {0}', (pv.missing_labels || pv.missing).join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>` : `<p class="muted">${tr('Loading…')}</p>`}</section></div>`;
   }
   const sg = d.sign && d.status !== 'draft' ? dtSigHtml(d) : '';
   return head + `<div class="dtp-doc dtp-final">${dtBlocksHtml(dtBlocks(d.body))}</div>
@@ -133,7 +133,7 @@ async function dtPreview(id, bodyText) {
   const box = $('.dtp-pv');
   if (box && bodyText != null) {  // only the preview pane (the text field keeps focus and cursor)
     const pv = DT.pv;
-    box.innerHTML = `<h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(id)}${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Without a value (stays empty in the PDF): {0}', pv.missing.map(k => '{{' + k + '}}').join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>`;
+    box.innerHTML = `<h4 class="muted">${tr('Preview')}</h4>${dtPvBtn(id)}${pv.missing.length ? `<p class="dtp-warn" role="status">${esc(tr('Missing details (left out in the PDF): {0}', (pv.missing_labels || pv.missing).join(', ')))}</p>` : ''}<div class="dtp-doc">${dtBlocksHtml(pv.blocks)}</div>`;
   } else ofcDraw();
 }
 let dtPvTimer = null;
@@ -299,9 +299,9 @@ document.addEventListener('click', async e => {
   else if (a === 'final' && d) {
     if (!await dtSave(d, true)) return;
     // 2.114.4 C (#2281): empty variables are named before the text is frozen (the server preview of the saved draft)
-    let miss = [];
-    try { miss = (await api('POST', '/api/office/gen-docs/preview', {gen_doc_id: d.id})).missing || []; } catch {}
-    if (miss.length && !await askConfirm(tr('Finish this document?'), tr('Without a value (stays empty in the PDF): {0}', miss.map(k => '{{' + k + '}}').join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
+    let miss = [];  // 2.296.0 C (#3165): by name ("Quotation date")
+    try { const pv = await api('POST', '/api/office/gen-docs/preview', {gen_doc_id: d.id}); miss = pv.missing_labels || pv.missing || []; } catch {}
+    if (miss.length && !await askConfirm(tr('Finish this document?'), tr('Missing details (left out in the PDF): {0}', miss.join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
     if (!await askConfirm(tr('Finish this document?'), tr('The variables are filled in, the text is frozen and the PDF is filed with the client. Afterwards it can only be copied.'), {ok: tr('Finish')})) return;
     try { const j = await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); if (j?.node_id) dt_fileWhere(j.node_id, b); } catch (x) { toast(x.message || tr('unknown')); }
   } else if (a === 'arch' && d) {

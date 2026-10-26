@@ -40,7 +40,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs,files,budget"
 O = "/api/office"
 CBS = O + "/cashbooks"
@@ -184,7 +184,7 @@ r = A.delete(B + f"/api/users/{FID}", params={"retention": "exported"})
 check(r.status_code == 409 and r.json().get("code") == "retention", "exported claimed without a finished export: 409 " + r.text[:200])
 check(Fr.get(B + "/api/me").ok, "409: the account is still there")
 
-r = Fr.get(B + RX + "/me/export.zip")
+r = su_get(Fr, B + RX + "/me/export.zip")  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
 check(r.ok and r.headers.get("Content-Type", "").startswith("application/zip") and "attachment" in r.headers.get("Content-Disposition", "")
       and "no-store" in r.headers.get("Cache-Control", ""), f"freelancer: the ZIP {r.status_code} {r.headers}")
 z = unzip(r) if r.ok else zipfile.ZipFile(io.BytesIO(b"PK\x05\x06" + b"\0" * 18))
@@ -242,7 +242,7 @@ for who, s in (("member", Bo), ("another organisation's admin", Ca)):
     check(s.get(B + RX + f"/org/{ORG}").status_code == 404 and s.get(B + RX + f"/org/{ORG}/export.zip").status_code == 404, f"{who}: 404")
 r = requests.get(B + RX + f"/org/{ORG}/export.zip", headers=AGH)
 check(r.status_code in (401, 403, 404) and not r.content.startswith(b"PK"), f"agent: no organisation export {r.status_code}")
-z = unzip(A.get(B + RX + f"/org/{ORG}/export.zip"))
+z = unzip(su_get(A, B + RX + f"/org/{ORG}/export.zip"))  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
 check(any(n.startswith(f"receipts/{AREC}-") for n in z.namelist()) and not any("farbe" in n for n in z.namelist()), "org ZIP: its receipt, nothing of the person")
 check(Ca.get(B + RX + f"/org/{ORG2}").json().get("needed") is False, "Beta: no records yet")
 
@@ -257,7 +257,7 @@ for name, how in (("Gamma", "waived"), ("Delta", "exported")):
     check(A.delete(B + f"/api/admin/orgs/{G}").status_code == 409, f"{name}: 409 without the step")
     if how == "exported":
         check(A.delete(B + f"/api/admin/orgs/{G}", params={"retention": "exported"}).status_code == 409, f"{name}: exported without an export 409")
-        zz = unzip(A.get(B + RX + f"/org/{G}/export.zip"))
+        zz = unzip(su_get(A, B + RX + f"/org/{G}/export.zip"))  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
         check(any(n.startswith("cashbook/") for n in zz.namelist()), f"{name}: the cash book in its ZIP")
     r = A.delete(B + f"/api/admin/orgs/{G}", params={"retention": how})
     check(r.ok and not sql("SELECT 1 FROM orgs WHERE id=?", (G,)), f"{name}: deleted ({how}) " + r.text[:200])
@@ -287,7 +287,7 @@ r = A.get(B + f"/api/users/{RID}/delete-info")
 check(r.ok and r.json()["retention"]["needed"] is False and r.json()["retention"]["needed_along"] is True, "rosa: only the lists' receipts " + r.text[:300])
 r = A.delete(B + f"/api/users/{RID}", params={"lists": "delete", "confirm": "rosa", "retention": "waived"})
 check(r.status_code == 409 and r.json().get("lists") == [BL], "self-hosting: a list with receipts is not deleted along, also with a waiver " + r.text[:200])
-z = unzip(Ro.get(B + RX + "/me/export.zip"))
+z = unzip(su_get(Ro, B + RX + "/me/export.zip"))  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
 check(any(n.startswith("project-receipts/") and z.read(n) == b"paid" for n in z.namelist()), "rosa: the project receipt in her ZIP")
 
 # ---------------------------------------------------------------- 2.186.0 A (#2566): hosted (KALMIDO_HOSTED=1, the same data)
@@ -358,7 +358,7 @@ if not os.environ.get("P2146D_NOHOSTED"):
           "review M2: the custodian cannot restore a kept project " + r.text[:200])
     check(Bo.get(B + f"/api/trash/lists/{PL}/export.zip").status_code == 404, "bob gets no export (404)")
     check(requests.get(B + f"/api/trash/lists/{PL}/export.zip", headers=AGH).status_code in (401, 403, 404), "an API token gets no export")
-    r = A.get(B + f"/api/trash/lists/{PL}/export.zip")
+    r = su_get(A, B + f"/api/trash/lists/{PL}/export.zip")  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
     z = unzip(r) if r.ok else None
     names = z.namelist() if z else []
     rec = [n for n in names if n.startswith("project-receipts/") and n.endswith("receipt.txt")]

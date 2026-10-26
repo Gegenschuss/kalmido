@@ -16,14 +16,15 @@ recognised text of plain files, the scan state, receipts (a project of the sourc
 agents outside the target are dropped) and the Paperless origin (the source keeps a row without node: nothing comes in
 twice there). The storage quota counts per uploader (admin/hosting.py): a move changes nothing there.
 """
+import json
 import os
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 from flask import jsonify
 
 from ..core.config import app, ATT_DIR
-from ..core.db import body, bump, db
+from ..core.db import body, bump, db, now_utc, parse_iso
 from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.i18n import N_, short_day, tr, trn
 from ..core.access import Denied
@@ -133,6 +134,17 @@ def fsm_share_ends(c, s, to, uid):
     return True
 
 
+def fsm_share_gone(c, s):
+    """2.273.0 F1 (#3042): memo share s cannot / need not come back: its group, person or agent no longer exists, or the node
+    has that share already (fs_shares has no unique index)."""
+    with system_ctx(c):
+        for k, t in (("group_id", "groups"), ("user_id", "users"), ("agent_id", "users")):
+            if s[k] and not c.execute(f"SELECT 1 FROM {t} WHERE id=?", (s[k],)).fetchone():
+                return True
+    return c.execute("""SELECT 1 FROM fs_shares WHERE node_id=? AND user_id IS NOT DISTINCT FROM ? AND group_id IS NOT DISTINCT FROM ?
+                        AND agent_id IS NOT DISTINCT FROM ?""", (s["node_id"], s["user_id"], s["group_id"], s["agent_id"])).fetchone() is not None
+
+
 def fsm_list_ok(c, lid, to, uid):
     """Is list lid (a receipt's project) one of the target workspace?"""
     if not lid:
@@ -172,6 +184,7 @@ def fsm_plan(c, uid, b, to, dry):
     files = folders = size = shares = opened = 0
     for n, parent, name in roots:
         moved, stay = fsm_walk(c, c.execute("SELECT * FROM fs_nodes WHERE id=?", (n["id"],)).fetchone())
+        plan.setdefault("root_of", {}).update({r["id"]: n["id"] for r in moved + stay})  # 2.273.0 B (#3042): for the memo
         if not plan["block"] and src and not org_out_ok(c, src, to):  # 2.148.1 B (#2483): out of an organisation only by its admin
             plan["block"], plan["code"] = tr(OO_ADMIN_ONLY), 403
         if not plan["block"] and not admin and any(r["owner_id"] != uid and not (src and r["created_by"] == uid)
@@ -344,9 +357,9 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
                 from ..core.orgcrypt import _write_atomic
                 _write_atomic(dst, S.thumb_seal(c, new, jpg))
             c.execute("UPDATE doc_meta SET thumb=? WHERE node_id=?", (rel, nid))
+            old_paths.append(src)  # 2.273.0 B (#3051): the old preview goes only once the new one is written
         except (OSError, OrgCryptError):
             pass  # no preview: the documents view shows the placeholder (docs/thumbfill.py makes it again)
-        old_paths.append(src)
     S.doc_index(c, nid, new, S.index_text(c, dict(S.meta_row(c, nid)), name, text))
     for r in c.execute("SELECT * FROM rc_receipts WHERE node_id=?", (nid,)).fetchall():
         c.execute("UPDATE rc_receipts SET ws=?, org_id=?, list_id=? WHERE node_id=?",
@@ -395,6 +408,92 @@ def fsm_text(c, nid, to, owner):
         _index(c, r["id"], new, v or "")
 
 
+# 2.273.0 B (#3042): what a move into another workspace ends (shares, openings to the organisation, the project of a receipt)
+# and where the items that stay behind lay (the trash below a moved folder goes to the top of the source) are kept per moved
+# item (space_moves kind 'files', obj_id = the item); moving it back (the undo step) within FSM_KEEP_H hours brings that back
+# where it still fits the workspace.
+FSM_KEEP_H = 24
+
+
+def fsm_memo(c, plan, to, uid):
+    """Notes the memo of each moved item before the move writes (one space_moves row per item that loses something)."""
+    ends, src, per = set(plan.get("ends") or []), plan["src"], {}
+    rof = plan.get("root_of") or {}
+    ids = [r["id"] for r, _ in plan["moved"]]
+
+    def at(nid):
+        return per.setdefault(rof.get(nid, nid), {"access": {}, "shares": [], "receipts": {}, "under": []})
+    for r, _ in plan["moved"]:
+        if r["org_access"]:
+            at(r["id"])["access"][str(r["id"])] = r["org_access"]
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        for x in c.execute(f"SELECT * FROM fs_shares WHERE node_id IN ({q})", part).fetchall():
+            if x["id"] in ends:
+                at(x["node_id"])["shares"].append({k: x[k] for k in ("node_id", "user_id", "group_id", "agent_id", "role", "expires_at",
+                                                                      "created_by", "created_at")})
+        for x in c.execute(f"SELECT node_id, list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", part).fetchall():
+            if not fsm_list_ok(c, x["list_id"], to, uid):
+                at(x["node_id"])["receipts"][str(x["node_id"])] = x["list_id"]
+    for r in plan["stay"]:
+        at(r["id"])["under"].append([r["id"], r["parent_id"], r["name"]])
+    for rid, d in per.items():
+        if any(d.values()):
+            c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('files',?,?,?,?,?,?)",
+                      (rid, src, to, uid, _now(), json.dumps(d, separators=(",", ":"), default=str)))
+
+
+def fsm_memo_back(c, plan, to, uid):
+    """The memos of the items of this move that went from `to` to the source within FSM_KEEP_H hours: [(id, detail)]."""
+    out = []
+    for n, _, _, _ in plan["roots"]:
+        m = c.execute("SELECT id, at, from_org, to_org, detail FROM space_moves WHERE kind='files' AND obj_id=? ORDER BY id DESC LIMIT 1",
+                      (n["id"],)).fetchone()
+        if not m or (m["from_org"] or None) != (to or None) or (m["to_org"] or None) != (plan["src"] or None):
+            continue
+        try:
+            d = json.loads(m["detail"])
+            if d.get("restored") or parse_iso(m["at"]) < now_utc() - timedelta(hours=FSM_KEEP_H):
+                continue
+        except (TypeError, ValueError):
+            continue
+        out.append((m["id"], d))
+    return out
+
+
+def fsm_memo_apply(c, back, to, uid):
+    """After the move back: the memos' shares (that fit `to`), openings, receipt projects and items under the folders again.
+    -> how many came back."""
+    n = 0
+    for mid, d in back:
+        for nid, oa in (d.get("access") or {}).items():
+            if to:
+                n += c.execute("UPDATE fs_nodes SET org_access=? WHERE id=? AND org_id=? AND org_access=''", (oa, int(nid), to)).rowcount
+        for x in d.get("shares") or []:
+            node = c.execute("SELECT org_id FROM fs_nodes WHERE id=?", (x["node_id"],)).fetchone()
+            if node and (node["org_id"] or None) == (to or None) and not fsm_share_ends(c, x, to, uid):
+                if fsm_share_gone(c, x):  # 2.273.0 F1 (#3042): its group / person deleted since, or the same share is there again
+                    continue
+                c.execute("INSERT INTO fs_shares(node_id,user_id,group_id,agent_id,role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                          (x["node_id"], x["user_id"], x["group_id"], x["agent_id"], x["role"], x["expires_at"], x["created_by"], x["created_at"]))
+                n += 1
+        for nid, lid in (d.get("receipts") or {}).items():
+            if fsm_list_ok(c, lid, to, uid):
+                n += c.execute("UPDATE rc_receipts SET list_id=? WHERE node_id=? AND list_id IS NULL", (lid, int(nid))).rowcount
+        for nid, pid, name in d.get("under") or []:  # still at the top of the folder's workspace (and owner when private)
+            p = c.execute("SELECT org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (pid,)).fetchone() if pid else None
+            r = c.execute("SELECT parent_id, org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+            if p and r and not p["deleted_at"] and r["parent_id"] is None and (r["org_id"] or None) == (p["org_id"] or None) \
+                    and (p["org_id"] or r["owner_id"] == p["owner_id"]):
+                nm = name if r["deleted_at"] else _free_name(c, pid, r["owner_id"], p["org_id"], name, skip=nid)
+                c.execute("UPDATE fs_nodes SET parent_id=?, name=? WHERE id=?", (pid, nm, nid))
+                n += 1
+        d["restored"] = _now()
+        c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":"), default=str), mid))
+    return n
+
+
 def _rm(paths):
     for p in paths:
         try:
@@ -432,6 +531,8 @@ def files_move_space():
             if any(r[0] == "run" for r in c.execute(f"SELECT state FROM doc_meta WHERE node_id IN ({q}) FOR UPDATE", part).fetchall() +
                    c.execute(f"SELECT state FROM file_text WHERE kind='fs' AND node_id IN ({q}) FOR UPDATE", part).fetchall()):
                 raise Denied(409, tr("A file is being recognised right now. Please try again in a moment."))
+        back = fsm_memo_back(c, plan, to, uid)  # 2.273.0 B (#3042): a move back first takes the memo of the move out
+        fsm_memo(c, plan, to, uid)
         for s in plan.get("ends") or []:
             c.execute("DELETE FROM fs_shares WHERE id=?", (s,))
         for r in plan["stay"]:  # up to the top of the source workspace (in the trash: restored there)
@@ -459,6 +560,7 @@ def files_move_space():
             fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
         from .extlinks import xl_space_moved
         xl_space_moved(c, ids)  # 2.112.1 B (#2058): external links end with the move into another workspace
+        restored = fsm_memo_apply(c, back, to, uid)
         bump(c)
         c.commit()
     except BaseException:
@@ -466,7 +568,7 @@ def files_move_space():
         _rm(new_paths)
         raise
     _rm(old_paths)
-    return jsonify(moved=out, org_was=src, to=fsm_ws(to), count=len(plan["moved"]), shares=plan["shares"])
+    return jsonify(moved=out, org_was=src, to=fsm_ws(to), count=len(plan["moved"]), shares=plan["shares"], restored=restored)
 
 
 # 2.97.0 D (#2051): a move removes the old sealed versions only after its commit; a crash in between leaves files without a

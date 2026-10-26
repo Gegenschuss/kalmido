@@ -96,8 +96,9 @@ async function firefox(fn) {
   await until(() => !d.querySelector('#ag-model'));
   let a = await adm(ag.id);
   const srt = o => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
-  // 2.312.0 (#3266): runtime has perm_user (null = as set up on its computer)
-  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', perm_user: null, reset_seq: 0}), 'saved: ' + JSON.stringify(a.runtime));
+  // 2.312.0 (#3266): runtime has perm_user (null = as set up on its computer); 2.233.0 (#3189): + the interim-summary values (defaults)
+  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', perm_user: null, reset_seq: 0,
+    rotate_size: 'medium', rotate_runs: 60, rotate_idle_min: 45, rotate_mb: 0.8, rotate_tokens: 150000, rotate_idle_mb: 0.4}), 'saved: ' + JSON.stringify(a.runtime));
   check((await v1(ag.token, 'GET', '/agent')).runtime?.model === 'sonnet', 'the agent reads it');
   // reopen: values shown, Reset now
   w.eval(`agModal(${JSON.stringify(a)}, null)`);
@@ -205,7 +206,8 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`agModal(${JSON.stringify(await adm(ag.id))}, null)`);
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
-  check(/Laufzeit/.test(md.querySelector('#ag-rt-h').textContent) && /Jetzt zurücksetzen/.test(md.textContent) && /Nächtlicher Neustart/.test(md.textContent) && /Auto-Kompaktieren/.test(md.textContent), 'German: Laufzeit, Jetzt zurücksetzen');
+  // 2.233.0 (#3189): the nightly restart sits in the section "Zwischenstand" as "Tägliche Zusammenfassung" now
+  check(/Laufzeit/.test(md.querySelector('#ag-rt-h').textContent) && /Jetzt zurücksetzen/.test(md.textContent) && /Tägliche Zusammenfassung/.test(md.textContent) && /Zwischenstand/.test(md.textContent) && /Auto-Kompaktieren/.test(md.textContent), 'German: Laufzeit, Jetzt zurücksetzen');
   click(w, md.querySelector('[data-m="close"]'));
   w.eval(`shareModal(${L})`); await idle(w);
   check(/Aufräumen durch/.test(d.querySelector('#l-tidyrow')?.textContent || ''), 'German: Aufräumen durch');

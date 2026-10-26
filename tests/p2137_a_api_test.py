@@ -31,7 +31,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 O, D = "/api/office", "/api/office/docs"
 
 
@@ -97,7 +97,7 @@ def export(s, oid):
         if s.get(B + f"/api/orgs/{oid}/export").json().get("state") != "running":
             break
         time.sleep(0.25)
-    data = s.get(B + f"/api/orgs/{oid}/export/file").content
+    data = (su_get(s, B + f"/api/orgs/{oid}/export/file") if oid == 0 else s.get(B + f"/api/orgs/{oid}/export/file")).content  # 2.223.2 C (#2871): the own office: step-up
     rk = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     check(data[:13] == b"KALMIDO-ORGX\n" and rk, f"export + recovery key of {oid}")
     return data, rk

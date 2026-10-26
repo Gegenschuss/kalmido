@@ -69,7 +69,7 @@ OLD_CALC = {  # office/calc.py LABELS up to 2.167
     "producing_detail": ("{days} {day_word} = {qty} {prod_word} / {quot}, auf halbe Tage gerundet", "{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days"),
     "raw_optional": ("Optional: Bereitstellung der Rohdaten", "Optional: Delivery of raw data"), "raw_included": ("Bereitstellung der Rohdaten", "Delivery of raw data"),
     "share_detail": ("{amount} / {rate} x {factor} = {days} Tage, auf halbe Tage gerundet", "{amount} / {rate} x {factor} = {days} days, rounded to half days"),
-    "handling": ("Handlungskosten", "Handling costs"), "markup": ("Markup", "Markup"),
+    "handling": ("Handlungskosten", "Handling costs"), "markup": ("Aufschlag", "Markup"),  # 2.296.0 B (#3173): German "Aufschlag" (was "Markup")
     "surcharge_detail": ("{pct} % auf die markierten Positionen", "{pct} % on the marked positions"),
     "surcharge_detail_stacked": ("{pct} % auf die markierten Positionen und die Handlungskosten", "{pct} % on the marked positions and the handling costs"),
     "raw_detail": ("{pct} % der Positionen mit Rohdaten", "{pct} % of the positions with raw data"), "discount": ("Rabatt", "Discount"),
@@ -86,14 +86,17 @@ check(calc.label(None, "fr", "discount") == "Remise" and calc.label(None, "it", 
 check(calc.bwa_vat_note(calc.label(None, "de", "vat_note"), [19], "de") == "Alle Preise zuzüglich 19 % MwSt.", "calc: the German VAT note narrows as before")
 check(calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [19], "fr") == "Tous les prix s'entendent TVA de 19 % en sus." and
       calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [7, 19], "fr").count(" ou ") == 1, "calc: the French VAT note narrows to the rates of the document")
-check(calc.fmt_money(1234.5, "de") == "1.234,50 €" and calc.fmt_money(1234.5, "en") == "€1,234.50" and calc.fmt_money(1234.5, "fr") == "1.234,50 €",
-      "calc: money de / en as before, fr with the comma")
+# 2.296.0 B (#3175): fr groups with a no-break space, nl puts the sign first (was "1.234,50 €" for every comma language)
+check(calc.fmt_money(1234.5, "de") == "1.234,50 €" and calc.fmt_money(1234.5, "en") == "€1,234.50" and calc.fmt_money(1234.5, "fr") == "1\u00a0234,50 €"
+      and calc.fmt_money(1234.5, "nl") == "€ 1.234,50", "calc: money de / en as before, fr / nl by their language")
 check(calc.fmt_qty(4.5, "nl") == "4,5" and calc.fmt_qty(4.5, "en") == "4.5", "calc: quantities")
 check(calc.calc_lang("fr") == "fr" and calc.calc_lang("en-GB") == "en" and calc.calc_lang("xx") == "de" and calc.calc_lang(None) == "de", "calc: the document language")
 
-check(pdf.pdf_money(1234.5, "de", "EUR") == "1.234,50 €" and pdf.pdf_money(1234.5, "en", "EUR") == "1,234.50 €", "pdf: money de / en as before")
-check(pdf.pdf_money(1234.5, "fr", "EUR") == "1.234,50 €" and pdf.pdf_money(1234.5, "es", "EUR") == "1.234,50 €", "pdf: money fr / es with the comma")
-check(pdf.pdf_money(1234.5, "fr", "EUR", {"decimal": ".", "thousands": ","}) == "1,234.50 €", "pdf: a pack's own format still wins")
+# 2.296.0 B (#3175): pdf_money = calc.fmt_money ("€1,234.50" en like the model's texts); the pack's format only for German
+check(pdf.pdf_money(1234.5, "de", "EUR") == "1.234,50 €" and pdf.pdf_money(1234.5, "en", "EUR") == "€1,234.50", "pdf: money de / en like the model")
+check(pdf.pdf_money(1234.5, "fr", "EUR") == "1\u00a0234,50 €" and pdf.pdf_money(1234.5, "es", "EUR") == "1.234,50 €", "pdf: money fr / es with the comma")
+check(pdf.pdf_money(1234.5, "de", "EUR", {"decimal": ".", "thousands": ","}) == "1,234.50 €"
+      and pdf.pdf_money(1234.5, "fr", "EUR", {"decimal": ".", "thousands": ","}) == "1\u00a0234,50 €", "pdf: a pack's own format wins for German documents")
 check(pdf.pdf_num(4.5, "it") == "4,5" and pdf.pdf_num(4.5, "en") == "4.5", "pdf: quantities")
 check(pdf.pdf_date("2026-10-09", "de") == "09.10.2026" and pdf.pdf_date("2026-10-09", "en") == "9 October 2026", "pdf: dates de / en as before")
 check(pdf.pdf_date("2026-10-09", "fr") == "9 octobre 2026" and pdf.pdf_date("2026-10-09", "nl") == "9 oktober 2026", "pdf: dates fr / nl")
@@ -212,7 +215,7 @@ def lang_checks(s, client, tag):
     check(m.get("signature") == "Cordialement", f"{tag}: the closing word ({m.get('signature')!r})")
     rows = [a for a, b in (m.get("totals") or {}).get("rows") or []]
     check("Total HT" in rows, f"{tag}: the totals' words {rows}")
-    check(m["totals"].get("net_text") == "2.469,00 €", f"{tag}: money with the comma ({m['totals'].get('net_text')!r})")
+    check(m["totals"].get("net_text") == "2\u00a0469,00 €", f"{tag}: money with the comma (2.296.0 B #3175: fr groups with a no-break space) ({m['totals'].get('net_text')!r})")
     t = pdf_text(s, q["id"])
     check("Devis" in t and "Total HT" in t and "Cordialement" in t, f"{tag}: the quotation PDF in French ({t[-300:]!r})")
     # a language switch of a draft: the standard texts follow (doclang)

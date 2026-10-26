@@ -248,6 +248,11 @@ def marks(data, word):
 
 r = A.post(B + O + "/doc-templates", json={"starter": "confirmation", "lang": "de"})
 check(r.status_code == 201 and r.json()["name"] == "Auftragsbestätigung", f"#3155: the sample template Auftragsbestätigung ({r.status_code} {r.text[:120]})")
+# bundle 2.305 (26.10.2026): since 2.237.0 A (#2861) only letter templates fill a letter: the sample (an order
+# confirmation) gives 404, its text as a letter template makes the letter
+check(A.post(B + LT, json={"template_id": r.json().get("id"), "client_id": CL}).status_code == 404, "#2861: a letter from the order confirmation template 404")
+r = A.post(B + O + "/doc-templates", json={"kind": "letter", "name": r.json()["name"], "lang": "de", "body": r.json()["body"], "sign": 0})
+check(r.status_code == 201, f"#3155: Auftragsbestätigung as a letter template ({r.status_code} {r.text[:120]})")
 r = A.post(B + LT, json={"template_id": r.json().get("id"), "client_id": CL})
 AB = r.json()
 check(r.status_code == 201 and AB["subject"] == "Auftragsbestätigung" and "{{" not in AB["body"], f"#3155: a letter from Auftragsbestätigung ({r.text[:120]})")

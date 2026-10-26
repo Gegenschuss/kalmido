@@ -458,6 +458,30 @@ const obxMeta = (k, v) => { if (OBX.on) OBX.st.setMeta(k, v).catch(() => {}); };
 // logout / another user in this browser (clearLocal): the queue goes with the rest of the local data
 function obxClear() { if (!OBX.on) return Promise.resolve(); for (const o of OUT.q) o.done = true; OUT.q = []; return OBX.st.clear().then(() => { try { OBX.ch?.postMessage({clear: true}); } catch { /* closed */ } }, () => {}); }  // 2.143.0 C2 (#2153): a Promise (awaited before leaving the page)
 // Background Sync: the service worker sends the queue once the device is online again (it leaves it to an open tab)
+// 2.238.0 B (#2872): the offline copies belong to one sign-in. The knowledge pages' copy (wiki.js, IndexedDB "kalmido-wiki")
+// carries the server's sign-in mark (me.sgen: session, password state, organisations); LS "wko" = {g, at} = that mark and the last
+// online sync. Online with another mark, or 14 days without an online sync (also at an offline start), the copy goes. The outbox
+// (own changes not sent yet) stays at a new sign-in of the same account (the server checks every entry when it is sent); it goes
+// with the copy when the session is gone (401 / account disabled) and when an organisation of the account is gone.
+const WKO_MAX_AGE = 14 * 864e5;
+function wkoDrop() {
+  LS.del('wko');
+  if (typeof wko_reset === 'function') return wko_reset();
+  if (globalThis.__wkoStore) return globalThis.__wkoStore.clear().catch(() => {});  // tests: the stand-in for IndexedDB
+  return new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-wiki'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });
+}
+function outDrop() { LS.del('outbox'); if (OBX.on) return obxClear(); for (const o of OUT.q) o.done = true; OUT.q = []; return Promise.resolve(); }
+const wkoOld = m => !m || !(Date.now() - Date.parse(m.at) < WKO_MAX_AGE);
+function sessGuard(me) {
+  if (!me) return;
+  const m = LS.get('wko', null);
+  if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
+  const ids = (me.workspaces || []).map(w => w.id), was = LS.get('orgIds', null);
+  if (Array.isArray(was) && was.some(id => !ids.includes(id))) outDrop();  // removed from an organisation
+  LS.set('orgIds', ids);
+}
+// the session is gone (401 / account disabled at /api/state): both go before the sign-in page
+function sessGone() { return Promise.race([Promise.all([wkoDrop(), outDrop()]), new Promise(ok => setTimeout(ok, 3000))]); }
 function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
@@ -513,6 +537,7 @@ async function rawFetch0(method, url, body, key) {
     if (j.pin && S.me?.kid) { e.shown = true; kd_pinClosed(); }  // 2.49.0 (#1551): the PIN time ran out: ask again
     throw e; }
   if (method !== 'GET' && typeof oun_ok === 'function') oun_ok(method, url, j);  // 2.111.0 A (#2233)
+  if (method !== 'GET' && typeof lpOwnNote === 'function') lpOwnNote(r.headers.get('X-Kalmido-Lv'));  // 2.280.0 A (#3109): liveparts.js
   return j;
 }
 // 2.284.2: a job number read from a chat text / a job tag / the address: only a positive whole number is asked for (never 0,
@@ -844,7 +869,11 @@ function applyState(j) {
   o3c_ringsMigrate();  // 2.118.0 (#2297): old device switch for rings -> account setting, once
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   scl_sync();  // 2.156.0 C (#2073): folded sections too (listedit.js)
-  S.tasks = new Map(j.tasks.map(t => [t.id, t]));
+  // 2.280.0 A (#3108): a long note is not in the state (no content, content_n); one loaded already stays while the task is unchanged
+  // 2.280.0 F (#3108): ... and its length is the server's (a save that failed, two changes in one second: loaded again), unless
+  // it is being typed / waits to be saved
+  const was = S.tasks, tkNoteBusy = id => !!saveTimers[id + ':content'] || (S.sel === id && document.activeElement?.id === 'd-content');
+  S.tasks = new Map(j.tasks.map(t => { if (!('content' in t)) { const o = was?.get(t.id); if (o && 'content' in o && o.updated_at === t.updated_at && (String(o.content).length === t.content_n || tkNoteBusy(t.id))) t.content = o.content; } return [t.id, t]; }));
   S.filters = j.filters || [];
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
   S.ntfyInbox = j.ntfy_inbox || {enabled: false};
@@ -853,6 +882,7 @@ function applyState(j) {
   S.templates = j.templates || [];
   S.timer = j.timer || null; S.timeTotals = j.time_totals || {};
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
+  S.maxFileMb = +j.max_file_mb || 50;  // 2.273.0 D (#3051): server upload limit per file
   S.maxDepth = +j.max_depth || 3;  // 2.156.0 A (#1949): the levels of tasks (kalmido/core/schema.py MAX_DEPTH)
   S.fields = j.fields || [];
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
@@ -909,21 +939,26 @@ function optSet(get, vals) {
     return () => { const x = get(); if (x) Object.assign(x, old); };
   };
 }
-async function load() {
+// auto: 2.280.0 A (#3109) a reload of the live update (not after an own action): the server may hold it back ({brake}: it
+// loaded this person's whole state a moment ago); nothing changes then and the next poll asks again
+async function load(auto) {
   let j;
   try {
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = S.wseq || 0;
-      j = await api('GET', '/api/state');
+      j = await api('GET', auto && !i ? '/api/state?auto=1' : '/api/state');  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
       if ((S.wseq || 0) === w0) break;
     }
+    if (j?.brake) return 'brake';  // 2.280.0 F (#3109): the caller keeps the change pending
     OUT.me = j?.me?.id;  // 2.126.0 D (#1992 O5)
+    if (j?.me?.id === LS.get('uid', j?.me?.id)) sessGuard(j?.me);  // 2.238.0 B (#2872): before the outbox is sent (another account: applyState clears all)
     if (OUT.me && OBX.uid !== OUT.me) { OBX.uid = OUT.me; obxMeta('uid', OUT.me); }  // 2.143.0 C (#2153): the service worker sends only this user's entries
   }
   catch (e) {
     if (!(e instanceof Offline)) throw e;
     if (!S.tasks.size) {  // offline start: last cached state + still-queued edits
       const c = LS.get('cache', null); if (!c) throw e;
+      if (wkoOld(LS.get('wko', null))) wkoDrop();  // 2.238.0 B (#2872): 14 days without an online sync
       applyState(c); OUT.q.forEach(applyLocal);
     }
     return;
@@ -996,11 +1031,12 @@ setInterval(async () => {
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
     // 2.41.0 (#1376): only light areas: their parts, the rest bundled; 2.42.0 (#1376): the tasks area: only the changed tasks (delta)
     if (chg && v !== S.v && !editing() && (lpLive(v, lpCh, n) || await lpDelta(v, lpCh, n))) { /* drawn there */ }
-    else if (chg && !editing()) { S.viewStale = false; lpFull(); S.lpN.state++; await load(); td_renderSoon(); }  // 2.40.0 (#1430): bundled
+    else if (chg && !editing()) { S.viewStale = false; const lpBack = lpFull(); S.lpN.state++; if (await load(true) === 'brake') lpBack(); td_renderSoon(); }  // 2.40.0 (#1430): bundled; 2.280.0 F (#3109): braked: the follow-up stays
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
     else if (S.viewStale && !editing()) viewSafeRender();
     if (v !== S.v && editing() && S.route.mod === 'agents' && S.jobs.items !== null && S.jobsPollV !== v) { S.jobsPollV = v; loadJobs(); }  // 2.37.0 (#1161)
+    lpSettle(v);  // 2.280.0 F (#3109)
     S.syncOk = Date.now(); staleDraw();
   } catch { staleDraw(); /* offline */ } finally { td_polling = false; }
 }, 4000);
@@ -1036,7 +1072,11 @@ let verIdle = Date.now();
 for (const t of ['keydown', 'pointerdown', 'input']) document.addEventListener(t, () => { verIdle = Date.now(); }, true);
 function verStale() { return !!(APP_VER && S.serverVer && APP_VER !== S.serverVer); }
 // text typed but not sent / saved (a comment, a chat message, the quick add) also holds the automatic reload back
-const verDraft = () => ['#c-input', '#tc-in', '#chat-in', '#qinput', '#qsheet', '#d-sub'].some(s => ($(s)?.value || '').trim());
+// 2.273.0 C (#3051): + every other text field / text area whose typed value differs from what it was drawn with (also one
+// out of view: a collapsed panel, a background tab of a dialog); search fields do not count
+const VER_DRAFT_SEL = 'textarea, input:not([type]), input[type="text"], input[type="url"], input[type="email"], input[type="tel"]';
+const verDraft = () => ['#c-input', '#tc-in', '#chat-in', '#qinput', '#qsheet', '#d-sub'].some(s => ($(s)?.value || '').trim())
+  || [...document.querySelectorAll(VER_DRAFT_SEL)].some(e => !e.readOnly && !e.disabled && e.value !== e.defaultValue && e.value.trim() !== '');
 const verQuiet = () => !editing() && !editFocused() && !$('.modal') && !$('#pop:not(.hidden)') && !$('.qadd.sheet') && !OUT.q.length && !S.multiMode && !verDraft();
 let verBusy = false;
 async function verReload() {

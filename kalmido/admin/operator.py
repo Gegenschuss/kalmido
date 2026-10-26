@@ -28,6 +28,7 @@ from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL
 from ..core.db import body, bump, db, gsetting, iso, now_utc
 from ..core.i18n import tr
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, rate_ip
+from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 OP_TOKEN_MIN = 32
@@ -89,9 +90,9 @@ def op_gate(action):
         if _rate_blocked(keys):
             raise OpDenied(429)
         _rate_fail(keys)
-        print("operator: refused", action, "from", client_ip(), flush=True)
+        print("operator: refused", action, "from", login_log_ip(client_ip()), flush=True)
         raise OpDenied(401)
-    print("operator:", action, "from", client_ip(), "(address over the failure limit)" if _rate_blocked(keys) else "", flush=True)
+    print("operator:", action, "from", login_log_ip(client_ip()), "(address over the failure limit)" if _rate_blocked(keys) else "", flush=True)
 
 
 def _count(c, sql, args=()):

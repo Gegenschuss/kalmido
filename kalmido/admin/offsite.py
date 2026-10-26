@@ -11,38 +11,49 @@ No new library: S3 with Signature V4 over http.client + hmac, WebDAV with PUT / 
 program (openssh-client) with a key pair this app makes (ed25519; the admin puts the public key on the target). The SFTP
 server's host key is recorded at the first test and from then on required (a changed key stops the upload).
 Credentials (S3 keys, WebDAV password, the SFTP private key) are sealed with the server key (login.seal) and never leave
-the server: the API says only whether they are set. Error texts carry status codes, the target's error code or the kind
+the server: the API says only whether they are set (2.223.2 C, #2871: a new address of the target drops them unless new ones
+come with it, so they never follow the address to another host). Error texts carry status codes, the target's error code or the kind
 of network error -- never a credential. Restoring from the target is not built in: download the file there and upload it
 under Backups > Restore from a file.
+2.223.2 C (#2871): a hosted server (hosting.hosted()) reaches only public addresses over https (SFTP: a public host), checked
+when saving and again when connecting (the guard of the calendar subscriptions and webhooks); changing / testing / using
+the target needs the step-up (orgcrypt.stepup_need), switching the upload on / off and the count kept do not.
 """
 import base64
 import hashlib
 import hmac
 import http.client
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shutil
+import socket
 import ssl
 import subprocess
 import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, unquote, urlsplit
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from flask import jsonify
+from flask import g, jsonify, request
 
-from ..core.config import app
+from ..core.access import Denied
+from ..core.config import app, COOKIE
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, iso, now_utc
-from ..accounts.login import seal, unseal
+from ..accounts.login import pend_set, pend_take, seal, unseal, wa_auth_options
+from ..accounts.session import _token_hash
 from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
+from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
+from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
+from .hosting import hosted
 from ..notify.alerts import _env_int, aa_now
 from .backup import BK_DIR, BK_NAME_RE, bk_list, bk_passphrase, need_backups
 
@@ -60,7 +71,8 @@ BKO_ERR = {"conn": N_("The target could not be reached ({0})."),
            "hostkey": N_("The SFTP server's fingerprint has changed. If that is expected, forget the saved fingerprint and test again."),
            "not_encrypted": N_("Only encrypted backups are uploaded: switch on “Encrypt backups” with a passphrase."),
            "incomplete": N_("The target is not set up completely."),
-           "sftp": N_("SFTP failed ({0}).")}
+           "sftp": N_("SFTP failed ({0})."),
+           "blocked": N_("This server may only reach public addresses over https.")}  # 2.223.2 C (#2871): hosted
 _BKO = {"running": "", "for": "", "tries": 0, "next": 0.0}
 _BKO_LOCK = threading.Lock()
 
@@ -176,6 +188,28 @@ def _url(v, tls=False):
     return v.strip().rstrip("/")
 
 
+def _host_public(host):
+    """2.223.2 C (#2871): hosted: no localhost, no address of a private network (a DNS name is checked when connecting)."""
+    h = str(host or "").strip("[]").lower().rstrip(".")
+    if h in ("localhost", "localhost.localdomain") or h.endswith(".localhost"):
+        return False
+    try:
+        ipaddress.ip_address(h.split("%", 1)[0])
+    except ValueError:
+        return True
+    return cal_ip_public(h)
+
+
+def _hosted_refused(kind, v):
+    """2.223.2 C (#2871): a valid address a hosted server may not use (only public https; SFTP: a public host)."""
+    if not hosted() or not v or kind not in ("url", "url_tls", "host"):
+        return False
+    if kind == "host":
+        return not _host_public(v)
+    u = urlsplit(v)
+    return u.scheme != "https" or not _host_public(u.hostname)
+
+
 def _check(kind, v):
     """-> cleaned value or None (invalid)."""
     if kind == "url":
@@ -211,6 +245,17 @@ FIELDS = {"s3": {"endpoint": "url", "region": "region", "bucket": "bucket", "pre
 SECRETS = {"s3": {"key": "s3_key", "secret": "s3_secret"}, "webdav": {"password": "dav_pass"}}
 
 
+def _addr(t, x):
+    """2.223.2 C (#2871): where a target's credentials go (S3: the endpoint, with virtual-host style also the bucket, which
+    is then part of the host name; WebDAV: the address; SFTP: host + port -- the key pair is this server's own, it stays)."""
+    if t == "s3":
+        vh = x.get("path_style", True) is False
+        return x.get("endpoint") or "", vh, (x.get("bucket") or "") if vh else ""
+    if t == "webdav":
+        return x.get("url") or ""
+    return x.get("host") or "", x.get("port") or 22
+
+
 def bko_keypair():
     k = Ed25519PrivateKey.generate()
     priv = k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH, serialization.NoEncryption()).decode()
@@ -220,15 +265,21 @@ def bko_keypair():
 
 # ---- transports: put(name, path, size) -> size on the target; names() -> [file names]; delete(name); probe()
 def _http(scheme, netloc, method, target, headers, data=None):
+    if hosted() and scheme != "https":  # 2.223.2 C (#2871): also a target saved before the server became hosted
+        raise OffsiteError("blocked")
     cls = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
     kw = {"context": ssl.create_default_context()} if scheme == "https" else {}
     conn = cls(netloc, timeout=BKO_TIMEOUT, **kw)
+    if hosted():  # 2.223.2 C (#2871): every address the host resolves to is checked, the connection goes to a checked one
+        conn._create_connection = _cal_connector(frozenset())
     try:
         conn.request(method, target, body=data, headers=headers)
         r = conn.getresponse()
         return r.status, {k.lower(): v for k, v in r.getheaders()}, r.read(8 * 1024 * 1024)
+    except CalError as e:
+        raise OffsiteError("blocked" if e.code == "blocked" else "conn", "network") from None
     except (OSError, http.client.HTTPException) as e:
-        raise OffsiteError("conn", type(e).__name__) from None
+        raise OffsiteError("conn", "network" if hosted() else type(e).__name__) from None  # 2.223.2 C (#2871): hosted: one kind
     finally:
         conn.close()
 
@@ -385,17 +436,31 @@ class SFTP:
     def rp(self, name):
         return f"{self.dir}/{name}" if self.dir else name
 
-    def command(self, keyfile, khfile, accept_new=False):
+    def pin(self):
+        """2.223.2 C (#2871): hosted: ssh options for a checked public address of the host (sftp connects exactly there; the
+        host key stays filed under the name, as known_hosts writes it)."""
+        h, port = str(self.x["host"]).strip("[]"), int(self.x.get("port") or 22)
+        try:
+            infos = socket.getaddrinfo(h, port, 0, socket.SOCK_STREAM)
+        except (socket.gaierror, UnicodeError):
+            raise OffsiteError("conn", "network") from None
+        ip = next((sa[0] for *_, sa in infos if cal_ip_public(sa[0])), None)
+        if not ip:
+            raise OffsiteError("blocked")
+        return ["-o", f"HostName={ip}", "-o", "HostKeyAlias=" + (h if port == 22 else f"[{h}]:{port}")]
+
+    def command(self, keyfile, khfile, accept_new=False, pin=()):
         """The sftp command line (no shell; batch commands on stdin)."""
         return ["sftp", "-b", "-", "-F", "/dev/null", "-i", keyfile, "-P", str(int(self.x.get("port") or 22)),
                 "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", f"UserKnownHostsFile={khfile}",
                 "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HashKnownHosts=no", "-o", "LogLevel=ERROR",
                 "-o", "StrictHostKeyChecking=" + ("accept-new" if accept_new else "yes"),
-                "-o", f"ConnectTimeout={min(BKO_TIMEOUT, 60)}", "-o", "ServerAliveInterval=15",
+                "-o", f"ConnectTimeout={min(BKO_TIMEOUT, 60)}", "-o", "ServerAliveInterval=15", *pin,
                 "--", f"{self.x['user']}@{self.x['host']}"]
 
     def run(self, lines, accept_new=False):
         """-> (stdout, the known_hosts text after the run). OffsiteError on failure."""
+        pin = self.pin() if hosted() else ()  # 2.223.2 C (#2871)
         if not shutil.which("sftp"):
             raise OffsiteError("tool")
         tmp = tempfile.mkdtemp(prefix="kalmido-sftp-")
@@ -407,10 +472,10 @@ class SFTP:
             with open(kh, "w") as f:
                 f.write((self.x.get("hostkey") or "") + "\n")
             try:
-                r = subprocess.run(self.command(kf, kh, accept_new), input="\n".join(lines) + "\n", capture_output=True, text=True,
+                r = subprocess.run(self.command(kf, kh, accept_new, pin), input="\n".join(lines) + "\n", capture_output=True, text=True,
                                    timeout=BKO_TIMEOUT * 30, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": tmp})
             except subprocess.TimeoutExpired:
-                raise OffsiteError("conn", "timeout") from None
+                raise OffsiteError("conn", "network" if hosted() else "timeout") from None
             with open(kh) as f:
                 known = f.read().strip()
             if r.returncode != 0:
@@ -461,6 +526,8 @@ def sftp_error(stderr, known=""):
     elif any(x in low for x in ("connection refused", "timed out", "could not resolve", "no route to host", "network is unreachable")):
         e = OffsiteError("conn", next(x for x in ("connection refused", "timed out", "could not resolve", "no route to host",
                                                     "network is unreachable") if x in low))
+        if hosted():  # 2.223.2 C (#2871): no telling a closed port from a silent one (no port scan of the hoster's network)
+            e = OffsiteError("conn", "network")
     else:
         last = [ln.strip() for ln in stderr.splitlines() if ln.strip()]
         e = OffsiteError("sftp", (last[-1] if last else "exit")[:160])
@@ -566,6 +633,66 @@ def bko_tick(c):
     threading.Thread(target=bko_upload, daemon=True, name="kalmido-offsite").start()
 
 
+# ---- 2.223.2 C (#2871): the step-up (also for the export downloads of retexport.py / orgexport.py)
+def stepup_need(c, b):
+    """2.223.2 C (#2871): the step-up of orgcrypt.rck_stepup before the off-site target is changed / tested / used and before an
+    export download; an error response or None. A login-provider account: its step-up sign-in there for the own office
+    (oidc.py knows no other purpose yet); signed in by the login proxy without a password: refused. A confirmed step-up
+    holds for this session RCK_FRESH_MIN minutes (sessions.stepup_for "su", never a recovery key's purpose), so filling in
+    the target field by field asks once."""
+    u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
+    step = rck_step(c, u)
+    if step == "proxy":
+        return jsonify(error=tr("You are signed in through the server’s login proxy. This step needs a sign-in with a password."),
+                       need="proxy"), 403
+    tok = request.cookies.get(COOKIE) if g.auth_via == "session" else None
+    if tok and step != "fresh":
+        r = c.execute("SELECT stepup_at, stepup_for FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
+        if r and r[1] == "su" and str(r[0] or "") >= iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN)):
+            return None
+    if step != "fresh" and not (isinstance(b.get("password"), str) and b["password"]):  # the client asks, then sends it again
+        return jsonify(error=tr("Confirm with your password"), need=step), 403
+    # 2.223.2 (#2871, review): a login-provider account confirms with its own purpose "0:su" (oidc.py ?stepup=su), also
+    # without a personal office, and never with a recovery key's step-up
+    e = rck_stepup(c, u, b, "0:su")
+    if e is None:
+        if tok and step != "fresh":
+            c.execute("UPDATE sessions SET stepup_at=?, stepup_for='su' WHERE token_hash=? AND user_id=?",
+                      (iso(now_utc()), _token_hash(tok), u["id"]))
+        c.commit()  # also the used code's step (totp_step), whatever the route does next
+    return e
+
+
+def stepup_download(c):
+    """2.223.2 C (#2871): a download behind the step-up (the caller checked the right first): POST with the step-up ->
+    {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this address) -> None = send the file; else the response."""
+    if request.method == "POST":
+        e = stepup_need(c, body())
+        if e is not None:
+            return e
+        tok = secrets.token_urlsafe(32)
+        pend_set("sudl:" + hashlib.sha256(tok.encode()).hexdigest(), uid=g.user["id"], path=request.path)
+        return jsonify(ticket=tok)
+    p = pend_take("sudl:" + hashlib.sha256((request.args.get("t") or "").encode()).hexdigest())
+    if p and p.get("uid") == g.user["id"] and p.get("path") == request.path:
+        return None
+    u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
+    return jsonify(error=tr("Confirm the download again."), need=rck_step(c, u)), 403
+
+
+@app.post("/api/stepup/passkey")
+def stepup_passkey():
+    """2.223.2 C (#2871): the passkey challenge of stepup_need (the same one rck_stepup takes)."""
+    if g.user is None:
+        raise Denied(401)
+    c = db()
+    if not c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=?", (g.user["id"],)).fetchone():
+        return err(tr("No passkey is set up"), 409)
+    chal, rp, opts = wa_auth_options(c, g.user["id"], uv=True)
+    pend_set(f"rck:{g.user['id']}", chal=chal, rp=rp)
+    return jsonify(opts)
+
+
 # ---- routes (instance admins; the backups switch KALMIDO_BACKUPS as for the backups themselves)
 @app.get("/api/admin/backups/offsite")
 def offsite_get():
@@ -577,9 +704,15 @@ def offsite_get():
 def offsite_set():
     """{type?, on?, keep?, s3?: {endpoint, region, bucket, prefix, path_style, key, secret}, webdav?: {url, user, password},
     sftp?: {host, port, user, path, new_key, forget_host}} -- credentials: a non-empty value replaces the saved one, an empty
-    or missing one keeps it."""
+    or missing one keeps it (2.223.2 C, #2871: unless the address changes: then they go, see _addr). The target (type, s3,
+    webdav, sftp) needs the step-up (password / code / credential in the body); on, keep and remove do not (they send
+    nothing anywhere new: the upload goes only to a target set up and tested with the step-up)."""
     need_backups()
     c, b = db(), body()
+    if any(k in b for k in ("type", *BKO_TYPES)):  # 2.223.2 C (#2871)
+        e = stepup_need(c, b)
+        if e is not None:
+            return e
     conf, sec = bko_conf(c), bko_secrets(c)
     if b.get("remove") is True:  # "Remove target": the addresses, the sealed credentials and the SFTP key pair go
         _save(c, {}, {})
@@ -602,11 +735,14 @@ def offsite_set():
             return err(tr("Invalid value: {0}", t))
         cur = conf[t]
         old_addr = (cur.get("host"), cur.get("port"))
+        was = _addr(t, cur)  # 2.223.2 C (#2871)
         for k, kind in FIELDS[t].items():
             if k in x:
                 v = "" if x[k] in ("", None) else _check(kind, x[k])
                 if v is None:
                     return err(tr("Invalid value: {0}", f"{t}.{k}"))
+                if _hosted_refused(kind, v):  # 2.223.2 C (#2871)
+                    return err(BKO_ERR_TEXT("blocked"))
                 cur[k] = v
         if t == "s3" and "path_style" in x:
             if not isinstance(x["path_style"], bool):
@@ -618,6 +754,10 @@ def offsite_set():
                 if v is None:
                     return err(tr("Invalid value: {0}", f"{t}.{k}"))
                 sec[sk] = v
+        if _addr(t, cur) != was:  # 2.223.2 C (#2871): another host: the saved credentials do not follow it
+            for k, sk in SECRETS.get(t, {}).items():
+                if x.get(k) in (None, ""):
+                    sec.pop(sk, None)
         if t == "sftp":
             if "port" in x:
                 if isinstance(x["port"], bool) or not isinstance(x["port"], int) or not 1 <= x["port"] <= 65535:
@@ -657,6 +797,9 @@ def offsite_test():
     fingerprint is in the answer); later tests require that key. -> {ok, error?, fingerprint?}"""
     need_backups()
     c = db()
+    e = stepup_need(c, body())  # 2.223.2 C (#2871)
+    if e is not None:
+        return e
     conf, sec = bko_conf(c), bko_secrets(c)
     if not conf["type"]:
         return err(BKO_ERR_TEXT("incomplete"))
@@ -703,6 +846,9 @@ def offsite_upload_now():
     """Uploads the newest backup now (in the background; GET shows the result)."""
     need_backups()
     c = db()
+    e = stepup_need(c, body())  # 2.223.2 C (#2871)
+    if e is not None:
+        return e
     if not bko_conf(c)["on"]:
         return err(BKO_ERR_TEXT("incomplete"))
     if _BKO_LOCK.locked() or bgj_pending(c, "offsite"):  # an upload runs already: nothing new starts

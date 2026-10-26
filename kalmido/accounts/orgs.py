@@ -3,14 +3,15 @@ workspace (private / an organisation) a list and an agent belong to, the organis
 import os
 import re
 
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop
+from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .orgretain import odl_former  # 2.186.0 A (#2599)
@@ -141,8 +142,13 @@ def user_orgs(c, uid):
     m = instance_mode(c)
     if m == "shared":
         return []
+    if has_request_context() and request.method in ("GET", "HEAD"):  # 2.280.0 B (#3116): a read asks once per person, not per call
+        from .orgroles import org_roles_of
+        return sorted(org_roles_of(c, uid))  # the same org ids (request cache, forgotten by acx_drop)
     with system_ctx(c):  # 2.37.0 (#1150): memberships are structure the access rules need (also of other people)
-        return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+        # 2.223.2 A (#2859): a retired organisation grants no access (a membership row left from before is ignored)
+        return [r[0] for r in c.execute("SELECT m.org_id FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? "
+                                        "AND o.retired_at IS NULL ORDER BY m.org_id", (uid,))]
 
 
 def org_member_add(c, oid, uid, role="member"):
@@ -194,10 +200,34 @@ def visible_people(c, uid):
         return _visible_people(c, uid)
 
 
+def _agent_visible_people(c, uid):
+    """2.223.7 A (#2917): the people an agent account may see -- itself, its owner (a personal / freelancer agent) or the
+    admins of its organisation (a team agent), and the owners / members of the projects shared with it. Never the whole
+    organisation (agents are org_members) and never "everyone" (an instance without organisations, #2941)."""
+    a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+    ids = {uid}
+    if a and a["owner_id"] is not None:
+        ids.add(a["owner_id"])
+    elif a and a["org_id"] is not None:
+        ids |= {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin'", (a["org_id"],))}
+    lq = acx_lists_sql(req=False, ov=False)
+    pl = set(plists(c, uid))  # 2.223.7 (#2918): as a participant only the owner + (with a task of its own) the full members, like h6r_shared_people
+    ids |= {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN {lq}", (uid, uid))}
+    mine = {}
+    for lid, p, role in c.execute(f"SELECT list_id, user_id, role FROM list_members WHERE list_id IN {lq}", (uid, uid)).fetchall():
+        if lid in pl and lid not in mine:
+            mine[lid] = bool(pvis(c, uid, lid)[1])
+        if lid not in pl or (role != "participant" and mine[lid]):
+            ids.add(p)
+    return ids
+
+
 def _visible_people(c, uid):
-    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    u = c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return None
+    if (u["kind"] or "user") == "agent":
+        return _agent_visible_people(c, uid)  # 2.223.7 A (#2917, #2941)
     m = instance_mode(c)
     if m == "workspaces":  # 2.28.0 (#935): the members of my organisations + my connections; admins are no exception
         orgs = user_orgs(c, uid)
@@ -731,7 +761,7 @@ def org_create():
         org_member_add(c, oid, adm, "admin")
         bump(c)
         c.commit()
-        print("organisation", name, "(id", oid, ") created by", g.user["username"], flush=True)
+        print("organisation", oid, "created by", login_log_who(g.user), flush=True)
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
 
 
@@ -804,7 +834,7 @@ def org_delete(oid):
     retirement) answer 409 with the numbers until ?confirm=1; a retired one goes only after its period."""
     _need_admin()
     c = db()
-    from .orgretain import odl_dismantle, odl_retire
+    from .orgretain import odl_dismantle, odl_retire, odl_retired
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()
@@ -814,6 +844,9 @@ def org_delete(oid):
         if n:
             return err(tr("This organisation still has {0} projects: their owners move or delete them first", n), 409)
         info = odl_delete_info(c, oid)
+        if info["kept_until"] and info["kept_until"] > (odl_retired(c, oid) or ""):  # 2.239.0 C (#2874): the newer period is noted
+            c.execute("UPDATE orgs SET retain_until=? WHERE id=?", (info["kept_until"], oid))
+            c.commit()
         if info["kept_until"] and info["kept_until"] >= iso(now_utc())[:10]:
             return err(tr("This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that", info["kept_until"]), 409)
         confirm = request.args.get("confirm") == "1"
@@ -855,15 +888,19 @@ def org_delete(oid):
 def odl_delete_info(c, oid):
     """2.152.0 A (#2167): what deleting organisation oid means (the caller is an instance admin, system context): content
     that goes along, office data kept by law (retain_until), kept_until of an organisation retired already, whether the
-    caller may export it (an admin of it; any instance admin for a retired one, review A4: not a retired personal office)."""
+    caller may export it (an admin of it; its former admins for a retired one, review A4: not a retired personal office;
+    2.239.0 C (#2943): can_retention = the retention export of a retired one, for the instance admins when no former admin is left)."""
     from .orgretain import odl_admin_export, odl_content, odl_more, odl_more_text, odl_retention, odl_retired
     kept = odl_retired(c, oid)
     ret = odl_retention(c, oid) if kept is None else {"counts": {}, "until": None}
+    if kept is not None:  # 2.239.0 C (#2874): the period anew, as the watchdog does (odl_retired_prune): newer data keeps it longer
+        kept = max(kept, odl_retention(c, oid)["until"] or "")
     from ..files.store import fs_org_live
     more = odl_more(c, oid)  # 2.272.0 D (#3029): the rest that goes along (catalogue), for the dialog only
     return {"content": odl_content(c, oid), "more": more, "more_text": odl_more_text(more), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
             "retired": kept is not None, "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0],
-            "files": fs_org_live(c, oid), "can_export": odl_admin_export(c, oid) or org_role(c, me(), oid) == "admin"}
+            "files": fs_org_live(c, oid), "can_export": odl_admin_export(c, oid) or org_role(c, me(), oid) == "admin",
+            "can_retention": kept is not None and odl_admin_export(c, oid, retention=True)}  # 2.239.0 C (#2943): the retention export only
 
 
 ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "tables": ("{0} table", "{0} tables"),
@@ -874,7 +911,11 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              # 2.152.0 (#2167, review A6)
              "cash": ("{0} cash book entry", "{0} cash book entries"), "bank": ("{0} bank transaction", "{0} bank transactions"),
              "meals": ("{0} entertainment receipt", "{0} entertainment receipts"),
-             "letters": ("{0} sent letter", "{0} sent letters")}  # 2.184.0 A (#2628)
+             "letters": ("{0} sent letter", "{0} sent letters"),  # 2.184.0 A (#2628)
+             # 2.239.0 C (#2874)
+             "open_receipts": ("{0} receipt", "{0} receipts"), "einvoices": ("{0} invoice", "{0} invoices"),
+             "payments": ("{0} payment", "{0} payments"), "signoffs": ("{0} confirmed sign-off", "{0} confirmed sign-offs"),
+             "procdocs": ("{0} version of the procedure documentation", "{0} versions of the procedure documentation")}
 
 
 def odl_text(counts):
@@ -919,6 +960,10 @@ def _need_org_admin(c, oid):
     from ..agents.core import is_agent
     if is_agent(g.user):
         raise Denied(403, tr("Agents cannot use this endpoint"))
+    with system_ctx(c):  # 2.223.2 A (#2859): a membership row left in a retired organisation = read only (409 as org_update)
+        if c.execute("SELECT 1 FROM orgs o JOIN org_members m ON m.org_id=o.id AND m.user_id=? WHERE o.id=? AND o.retired_at IS NOT NULL",
+                     (me(), oid)).fetchone():
+            raise Denied(409, tr("This organisation is retired: its data is kept by law and can only be exported"))
     role = org_role(c, me(), oid)
     if not role:
         raise Denied(404)
@@ -938,6 +983,8 @@ def org_mine_dict(c, r, uid):
     return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
+            "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
+            "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -985,6 +1032,14 @@ def org_mine_update(oid):
         if not isinstance(b["ext_links"], bool):
             return err(tr("Invalid value: {0}", "ext_links"))
         c.execute("UPDATE orgs SET ext_links=? WHERE id=?", (int(b["ext_links"]), oid))
+    for k in ("asst_comments", "chn_content"):  # 2.240.0 (#2884, #2867): privacy switches of the organisation (admins only)
+        if k in b:
+            if not isinstance(b[k], bool):
+                return err(tr("Invalid value: {0}", k))
+            if k == "asst_comments" and b[k]:  # 2.240.0 A (#2884): the members learn it when it goes on
+                from ..assistant.web import asst_comments_notice
+                asst_comments_notice(c, oid, me())
+            c.execute(f"UPDATE orgs SET {k}=? WHERE id=?", (int(b[k]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()
@@ -1022,7 +1077,7 @@ def org_icon_upload(oid):
     bump(c)
     c.commit()
     org_icon_drop_file(oid, old)
-    print("organisation", oid, "symbol picture set by", g.user["username"], flush=True)
+    print("organisation", oid, "symbol picture set by", login_log_who(g.user), flush=True)
     return jsonify(org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
 
 
@@ -1166,6 +1221,8 @@ def org_leave(c, oid, uid, heir):
     c.execute("DELETE FROM event_attendees WHERE user_id IN (%s) AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k "
               "ON k.id=e.cal_id WHERE k.org_id=?)" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
+    with system_ctx(c):  # 2.223.2 B (#2860): their office rights groups go too (coming back = no old groups)
+        c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
@@ -1225,5 +1282,5 @@ def org_member_remove(oid, uid):
         news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {})})
     bump(c)
     c.commit()
-    print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", g.user["username"], "lists transferred:", n, flush=True)
+    print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", login_log_who(g.user), "lists transferred:", n, flush=True)
     return jsonify(ok=True, transferred=n)

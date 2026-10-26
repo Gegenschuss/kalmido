@@ -45,12 +45,12 @@ def _content(mark):
 
 
 def mk_pdf(marks, size=A4, encrypt=False):
-    """A plain PDF 1.4: one page per mark (Helvetica, a coloured bar), classic xref table, Flate content."""
+    """A plain PDF 1.4: one page per mark (a Type 3 font, a coloured bar), classic xref table, Flate content."""
     w, h = size
     n = len(marks)
     objs = [b"<< /Type /Catalog /Pages 2 0 R >>",
             ("<< /Type /Pages /Kids [" + " ".join(f"{4 + 2 * i} 0 R" for i in range(n)) + f"] /Count {n} >>").encode(),
-            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]
+            b"<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 700] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << >> /Encoding << /Type /Encoding /Differences [] >> /FirstChar 32 /LastChar 32 /Widths [600] >>"]  # 2.296.0 (#3177): a Type 3 font (glyphs in the file); a named Helvetica without its program is refused (PDF/A)
     for i, m in enumerate(marks):
         data = zlib.compress(_content(m))
         objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w} {h}] /Resources << /Font << /F1 3 0 R >> >> /Contents {5 + 2 * i} 0 R >>".encode())

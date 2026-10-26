@@ -42,6 +42,8 @@ async function wsSet(ws) {
   if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)
+  // 2.305 (bundle): the disposition too -- it followed only the state reload of the live update, which 2.280.0 (#3109) may brake for 8 s
+  if (typeof DPV !== 'undefined') { DPV.org = null; if (S.route?.mod === 'workload' && WLV.tab === 'dispo') dp_reload(); else { DPV.data = null; DPV.free = null; } }
   if (typeof pb_wsChanged === 'function') pb_wsChanged(false);
   p61b_wsRun(true);  // 2.66.1 (#1945)
 }

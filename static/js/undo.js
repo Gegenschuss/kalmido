@@ -38,6 +38,7 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
       continue;
     }
     if (!(k in before) && !(k in after)) continue;
+    if (k === 'content' && !(k in before && k in after)) continue;  // 2.280.0 F (#3108): a long note not loaded on one side (start state without it) is no change
     const arr = k === 'tags' || k === 'ltags';  // 2.26.0 (#936): list tags too (the multi panel adds / removes them)
     const a = arr ? [...(before[k] || [])].sort().join('\u0001') : nv(before[k]), b = arr ? [...(after[k] || [])].sort().join('\u0001') : nv(after[k]);
     if (a !== b) { back[k] = arr ? [...(before[k] || [])] : nv(before[k]); prev[k] = arr ? [...(after[k] || [])] : nv(after[k]); }
@@ -287,6 +288,16 @@ function histLabel(b, a) {
   if (has('reminders') || has('remind_at')) return tr('Reminder of {0}', n);  // 2.111.0 C (#2057): + remind_at
   return tr('Edited {0}', n);
 }
+// 2.273.0 B (#3042): what a move ended (people coming along, further projects, subtasks left behind, ...); the server keeps
+// it, so Undo or moving the task back within a day brings it back
+function tmm_msg(msg, r) {
+  const x = r?.move_ended; if (!x) return msg;
+  const p = [x.people && trn('{0} person coming along', '{0} people coming along', x.people), x.links && trn('{0} further project', '{0} further projects', x.links),
+    x.subtasks && trn('{0} subtask stays in its project', '{0} subtasks stay in their projects', x.subtasks), x.assignee && tr('Assignee'), x.group && tr('Group'),
+    x.milestone && tr('Milestone'), x.sprint && tr('Sprint'), x.ltags && trn('{0} project tag', '{0} project tags', x.ltags),
+    x.client && tr('Client'), x.visibility && tr('Everyone in the organisation'), x.assignees && trn('{0} assignment of a reader', '{0} assignments of readers', x.assignees)].filter(Boolean);  // a list's workspace (dialogs.js)
+  return p.length ? `${msg || tr('Moved')} · ${tr('Not carried over: {0}. Undo brings it back.', p.join(', '))}` : msg;
+}
 // the few older callers: a toast with "Undo" for a step built above
 function offerUndo(msg, e) { histToast(msg, e); }
 async function patchUndoable(id, body, msg) {
@@ -294,6 +305,7 @@ async function patchUndoable(id, body, msg) {
   if (body?.list_id && typeof ln_moveHint === 'function') ln_moveHint(id, body.list_id);  // 2.48.0 (#1642): a locked note stays locked
   if (body?.list_id) msg = wsc_moveMsg(taskById(id)?.list_id, body.list_id, msg);  // 2.53.0 (#1474): Private -> organisation: who sees it now
   const t = await patchTask(id, body, true);
+  msg = tmm_msg(msg, t);  // 2.273.0 B (#3042)
   if (t?.shifted?.length || t?.chain?.skipped?.length) { shiftUndo(before, t, msg); return t; }  // 2.67.0 B (#1865)
   const after = snapTask(S.tasks.get(id) || t);
   const e = before && after && histFields(histLabel(before, after), [[before, after]], {res: t});

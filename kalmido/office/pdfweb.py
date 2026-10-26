@@ -23,7 +23,7 @@ import io
 import os
 import re
 
-from flask import jsonify, request, Response, send_file
+from flask import g, jsonify, request, Response, send_file
 
 from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.i18n import tr
@@ -31,7 +31,7 @@ from ..core.db import db, err
 from ..core.access import Denied
 from .model import office_feature, office_gate, office_logo_set, office_need_feature, office_org, office_settings
 from ..core.orgcrypt import oc_read_file, oc_write_file
-from .pdf import office_pdf
+from .pdf import office_pdf, pdf_to_8bit  # 2.296.0 D (#3172): + pdf_to_8bit
 from .einvoice import ein_build
 
 LOGO_MAX_MB = 4
@@ -79,6 +79,7 @@ def opdf_logo_process(raw):
             raise ValueError(tr("This picture cannot be read"))
         im.load()
         im = ImageOps.exif_transpose(im)
+        im = pdf_to_8bit(im)  # 2.296.0 D (#3172): 16 bit grey scaled, not clipped to white
         im = im.convert("RGBA") if im.mode in ("RGBA", "LA", "P", "PA") else im.convert("RGB")
         if im.width > LOGO_MAX_PX:
             im = im.resize((LOGO_MAX_PX, max(1, round(im.height * LOGO_MAX_PX / im.width))), Image.Resampling.LANCZOS)
@@ -110,7 +111,7 @@ def _stored(oid, r, ext):
     return p if os.path.isfile(p) else None
 
 
-def _stored_or_missing(c, oid, r, ext):
+def _stored_or_missing(c, oid, r, ext, commit=True):
     """2.38.0 review: the stored file of r; None for a draft or an older finalised document that never had one (rendered
     from its snapshot). A finalised document whose stored file has gone (sha noted, file missing) answers 409 and logs
     store_missing instead of a silent new rendering that could differ from the original."""
@@ -120,8 +121,31 @@ def _stored_or_missing(c, oid, r, ext):
     if p or not ofx_locked(r) or not sha:
         return p
     ofx_log(c, oid, "store_missing", doc_id=r["id"], detail={"file": ext, "sha256": sha})
-    c.commit()
+    if commit:  # 2.296.0 F (#3177): commit=False inside a larger transaction (office move): the log rides with it
+        c.commit()
     raise Denied(409, tr("The stored file of this document is missing"))
+
+
+def epdf_stored(c, oid, r, ext, commit=True):
+    """2.296.0 C (#3177, GoBD): the plain bytes of the stored file of finalised row r (None: none stored, render it; 409 as
+    _stored_or_missing when it has gone). A file whose SHA-256 differs from the one noted at storing (pdf_sha256 /
+    xml_sha256) is never delivered: 409 + log store_mismatch. Rows stored before the hashes were noted are served as before."""
+    from .ledger import ofx_locked
+    if not ofx_locked(r):  # 2.296.0 F (#3177): a draft (e.g. a quotation taken back) always renders anew
+        return None
+    p = _stored_or_missing(c, oid, r, ext, commit)
+    if not p:
+        return None
+    data = oc_read_file(c, p)
+    sha = r[ext + "_sha256"] if (ext + "_sha256") in r.keys() else ""
+    got = hashlib.sha256(data).hexdigest()
+    if sha and got != sha:
+        from .ledger import ofx_log
+        ofx_log(c, oid, "store_mismatch", doc_id=r["id"], detail={"file": ext, "sha256": sha, "found": got})
+        if commit:
+            c.commit()
+        raise Denied(409, tr("The stored file of this document does not match its checksum and is not delivered. Please tell the administrator."))
+    return data
 
 
 def _model(c, oid, did):
@@ -230,11 +254,11 @@ def epdf_doc_files(c, oid, did):
     r = doc_row(c, oid, did)
     name = epdf_name(r)
     out = []
-    p, x = _stored_or_missing(c, oid, r, "pdf"), _stored_or_missing(c, oid, r, "xml")
-    if p:
-        out.append((name + ".pdf", oc_read_file(c, p), "application/pdf"))  # 2.42.0 (#828): decrypted
-        if x:
-            out.append((name + ".xml", oc_read_file(c, x), "application/xml"))
+    p, x = epdf_stored(c, oid, r, "pdf"), epdf_stored(c, oid, r, "xml")  # 2.296.0 C (#3177): checked against the hashes
+    if p is not None:
+        out.append((name + ".pdf", p, "application/pdf"))  # 2.42.0 (#828): decrypted
+        if x is not None:
+            out.append((name + ".xml", x, "application/xml"))
         return out
     pdf, xml, _fmt = _render(c, oid, r)
     out.append((name + ".pdf", pdf, "application/pdf"))
@@ -304,13 +328,11 @@ def opdf_doc_pdf(did):
     r = doc_row(c, oid, did)
     ofx_log(c, oid, "pdf", doc_id=did, dedupe_min=10)
     c.commit()
-    acc = qac_signoff(c, oid, r) if request.args.get("original") != "1" else None
+    acc = qac_signoff(c, oid, r) if request.args.get("original") != "1" and not g.get("ofd_original") else None  # 2.238.0 A (#2863)
     if acc:  # 2.99.0 C (#2195): a quotation accepted online opens as accepted (?original=1 the original as sent)
         return _file_response(qac_pdf(c, oid, r, acc), epdf_name(r) + "-accepted.pdf", "application/pdf", inline=request.args.get("inline") == "1")
-    p = _stored_or_missing(c, oid, r, "pdf")
-    if p:
-        data = oc_read_file(c, p)  # 2.42.0 (#828): the stored PDF/A-3 is sealed at rest, served as the original
-    else:
+    data = epdf_stored(c, oid, r, "pdf")  # 2.42.0 (#828): the stored PDF/A-3 is sealed at rest, served as the original (2.296.0 C #3177: hash checked)
+    if data is None:
         data = _render(c, oid, r)[0]
     return _file_response(data, epdf_name(r) + ".pdf", "application/pdf", inline=request.args.get("inline") == "1")
 
@@ -327,15 +349,12 @@ def opdf_doc_xml(did):
         raise Denied(409, tr("The e-invoice XML exists for finalised invoices and credit notes only."))
     if r["trial"]:  # 2.144.10 A (#2576)
         raise Denied(409, tr("A trial document has no e-invoice"))
-    x = _stored_or_missing(c, oid, r, "xml")
-    if not x:  # 2.147.0 (#2460): a stored XML stays reachable (it is part of the document); a new one only while e-invoices are on
+    x = epdf_stored(c, oid, r, "xml")  # 2.296.0 C (#3177): hash checked
+    if x is None:  # 2.147.0 (#2460): a stored XML stays reachable (it is part of the document); a new one only while e-invoices are on
         office_need_feature(c, oid, "docs.einvoice")
     ofx_log(c, oid, "xml", doc_id=did, dedupe_min=10)
     c.commit()
-    if x:
-        data = oc_read_file(c, x)  # 2.42.0 (#828)
-    else:
-        data = _render(c, oid, r)[1]
+    data = x if x is not None else _render(c, oid, r)[1]  # 2.42.0 (#828)
     return _file_response(data, epdf_name(r) + ".xml", "application/xml")
 
 

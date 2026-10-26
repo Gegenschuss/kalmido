@@ -109,7 +109,7 @@ function wk_treeHtml(n, cur, many, depth = 0, sp = wk_cur(), kept = new Set(LS.g
     const name = k.page ? `<a href="#wiki/${k.page.id}" class="wkitem ${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} role="treeitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>`
       : `<span class="wkitem wkdir">${ic('folder', 's')}<span>${esc(k.name)}</span></span>`;
     const more = wk_rowMore(sp, k.fid && !k.page ? k.fid : k.page?.node_id, k.page && !k.fid ? k.page.updated_at : '');  // 2.200.0 A (#2747): the row's "…"
-    return wk_isDir(k) ? `<li class="wkrow"><details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary>${name}${more}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li class="wkrow">${name}${more}</li>`;
+    return wk_isDir(k) ? `<li class="wkrow"><details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary><span class="wktog" aria-hidden="true">${ic('chev', 's')}</span>${name}${more}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li class="wkrow">${name}${more}</li>`;
   }).join('')}</ul>`;
 }
 document.addEventListener('click', e => {
@@ -128,6 +128,8 @@ function wk_scrollAfter(id, ready) {
   const y = id ? 0 : WK.listTop; if (id) WK.pgTop = false; else WK.listTop = null;
   requestAnimationFrame(() => { const v = $('#view'); if (v && S.route.mod === 'wiki') v.scrollTop = y; });
 }
+// 2.210 A (#2755): more pages than the index carries (WIKI_INDEX_MAX on the server): said, not silently cut
+const wk_moreHtml = d => d?.more ? `<div class="muted mhint wkcapped" role="status">${ic('info', 's')}${esc(tr('Only the first {0} pages of this space are shown here.', 5000))}</div>` : '';
 // ---- the view
 function viewWiki() {
   const all = wk_all(), op = wk_open(), sp = op || wk_cur(), d = WK.idx[sp];
@@ -145,7 +147,7 @@ function viewWiki() {
     ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}">${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
       <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() : ''}</div>
-    ${op && d?.off ? wko_offHtml(d.off, d.more) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
+    ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
       : vis.length ? (q ? `<ul class="wktree">${vis.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : wk_treeHtml(wk_treeOf(sp), cur, vis.length > 30))  // 2.200.0 A (#2747): with the folders
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : symEmpty('book', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>`}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js)
   const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article>` : '';
@@ -229,10 +231,15 @@ async function wk_fRename(sp, f) {
   const name = await askPrompt(tr('Rename folder'), f.name, {ok: tr('Rename'), input: {max: 150}});
   if (!name || !name.trim() || name.trim() === f.name) return;
   await wk_flush();
-  const ren = async nm => { await rawFetch('PATCH', `/api/files/nodes/${f.id}`, {name: nm}); wk_after(sp); };
-  try { await ren(name.trim()); } catch (e) { toast(e.message); return; }
+  const up = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/') + 1) : '';
+  const follow = (a, b) => {  // 2.210 B (#2757) on the 2.200 menu: the open folder (or one below it) follows its new name
+    const dir = S.route.mod === 'wiki' && S.route.wdir, l = (up + a).toLowerCase(); if (!dir || wk_open() !== sp) return;
+    if (dir.toLowerCase() === l || dir.toLowerCase().startsWith(l + '/')) go(wk_dirGo(up + b + dir.slice(l.length), sp));
+  };
+  const ren = async (nm, was) => { const r = await rawFetch('PATCH', `/api/files/nodes/${f.id}`, {name: nm}); follow(was, r?.name || nm); wk_after(sp); };
+  try { await ren(name.trim(), f.name); } catch (e) { toast(e.message); return; }
   histToast(tr('Renamed'), histAdd({label: tr('Renamed {0}', qn(f.name)), ids: [], snaps: [], lids: [], wsp: sp,
-    undo: async () => { await ren(f.name); return {skipped: []}; }, redo: async () => { await ren(name.trim()); return {skipped: []}; }}));
+    undo: async () => { await ren(f.name, name.trim()); return {skipped: []}; }, redo: async () => { await ren(name.trim(), f.name); return {skipped: []}; }}));
 }
 async function wk_fTrash(sp, f) {
   await wk_flush();
@@ -259,7 +266,7 @@ function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row'
   const share = t => typeof wkfs_share === 'function' && WK.idx[x.sp]?.mayWrite !== false && !S.me?.kid ? [{label: tr('Share…|wiki'), icon: 'users', fn: () => wkfs_share(nid, t)}] : [];
   if (x.folder) {
     const f = x.folder;
-    return [{label: tr('New page'), icon: 'plus', fn: () => wk_new(f.path + '/')}, {label: tr('New folder…'), icon: 'folder', fn: () => wk_newFolder(x.sp, f.id)},
+    return [{label: tr('New page'), icon: 'plus', fn: () => wk_new('', f.path + '/', x.sp)}, {label: tr('New folder…'), icon: 'folder', fn: () => wk_newFolder(x.sp, f.id)},
       {label: tr('Rename…'), icon: 'edit', fn: () => wk_fRename(x.sp, f)}, {label: tr('Move to…'), icon: 'arrow', fn: () => wk_moveTo(nid, anchor)},
       ...share({space: x.sp, path: f.path, folder: true}), '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'flag-5', fn: () => wk_fTrash(x.sp, f)}];
   }
@@ -282,13 +289,13 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
   const bar = `<div class="wkbar">${sel}<div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() : ''}
-    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : ''}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark
+    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
   const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
   if (all && !op && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder" aria-label="${esc(tr('Workspaces'))}"><div class="nthead"><div class="wktitle"><h2>${esc(tr('All workspaces'))}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</section></div>`;  // 2.200.0 B (#2747): + Shared with me (a guest's start)
   const dir = S.route.wdir || '', parts = dir.split('/').filter(Boolean), n = d?.pages ? wk_node(wk_treeOf(sp), dir) : null;
   const crumbs = `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}">${parts.length ? `<a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a>` : ''}${parts.slice(0, -1).map((x, i) => `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(x)}</a>`).join('')}</nav>`;
-  const head = `<div class="nthead"><div class="wktitle">${crumbs}<h2>${esc(parts.length ? (n?.name || parts[parts.length - 1]) : wk_rootName(sp))}</h2></div></div>`;
+  const head = `<div class="nthead"><div class="wktitle">${crumbs}<h2>${esc(parts.length ? (n?.name || parts[parts.length - 1]) : wk_rootName(sp))}</h2></div>${n?.fid && parts.length ? wk_rowMore(sp, n.fid, '') : ''}</div>`;  // 2.210 B (#2757): the open folder's "…" (2.200 menu)
   let body;
   if (hits) body = hits;
   else if (typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp)) body = wkeLockHtml(sp);
@@ -374,7 +381,7 @@ function wk_render(p) {
   let h = mdTaskRefs(renderMd(src, true));
   // [[links]] only in text: every tag is passed whole (no match inside an attribute), nothing inside code / pre / links
   let skip = 0;
-  h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\[\[([^\[\]|#\n<>]{1,250})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, path, _a, label) => {
+  h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\[\[([^\[\]|#\n<>]{1,500})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, path, _a, label) => {
     if (tag) { if (/^(code|pre|a)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
     const t = path.trim(), pg = wk_byPath(p.space, wk_unesc(t)), lb = label ? label : t;  // t is HTML already
@@ -430,12 +437,14 @@ async function wka_del(p, f) {
 }
 // the import report: pages, files, what was skipped and why (at most 200 lines from the server)
 const wka_sum = r => [tr('{0} pages imported', (r.created || []).length), ...(r.files_n ? [tr('{0} files', r.files_n)] : []),
+  ...(r.shortened_n ? [tr('{0} names shortened', r.shortened_n)] : []),  // 2.210 A (#2755)
   ...((r.skipped_n || r.skipped?.length) ? [tr('{0} skipped', r.skipped_n || r.skipped.length)] : [])].join(' · ');
 function wka_report(r) {
-  const sk = r.skipped_detail || (r.skipped || []).map(n => ({name: n, reason: ''}));
-  if (!sk.length) return;
+  const sk = r.skipped_detail || (r.skipped || []).map(n => ({name: n, reason: ''})), sh = r.shortened || [];
+  if (!sk.length && !sh.length) return;
   const md = modal(`<h3>${esc(tr('Import'))}</h3><p>${esc(wka_sum(r))}</p>
-    <details class="wkrep"><summary>${esc(tr('{0} skipped', r.skipped_n || sk.length))}</summary><ul>${sk.map(s => `<li><b>${esc(s.name)}</b>${s.reason ? ' · ' + esc(s.reason) : ''}</li>`).join('')}</ul></details>
+    ${sh.length ? `<details class="wkrep wkrep-short"><summary>${esc(tr('{0} names shortened', r.shortened_n || sh.length))}</summary><p class="muted">${esc(tr('Too long or too many folder levels: the page is there under a shorter name.'))}</p><ul>${sh.map(s => `<li><b>${esc(s.name)}</b> · ${esc(s.path)}</li>`).join('')}</ul></details>` : ''}
+    ${sk.length ? `<details class="wkrep"><summary>${esc(tr('{0} skipped', r.skipped_n || sk.length))}</summary><ul>${sk.map(s => `<li><b>${esc(s.name)}</b>${s.reason ? ' · ' + esc(s.reason) : ''}</li>`).join('')}</ul></details>` : ''}
     <div class="foot"><button type="button" class="btn" data-m="close">${esc(tr('OK'))}</button></div>`);
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) modalClose(md); });
 }
@@ -480,17 +489,17 @@ async function wk_conflict(mine, theirs, patch) {
 }
 // ---- actions (each one Undo step)
 const wk_tplOpts = sp => `<option value="0">${tr('Empty page')}</option>${wk_pages(sp).filter(p => wk_isTpl(p.path)).map(t => `<option value="${t.id}">${esc(wk_base(t.path))}</option>`).join('')}`;
-async function wk_new(path0 = '') {
-  const ask = !wk_open() && !path0;  // 2.198.0 A (#2743): under "All" into the open space; none open = the dialog asks, the space used last first
+async function wk_new(path0 = '', dir = '', spx = '') {  // 2.210 B (#2757): dir = the folder the dialog starts in, spx = its space
+  const ask = !spx && !wk_open() && !path0;  // 2.198.0 A (#2743): under "All" into the open space; none open = the dialog asks, the space used last first
   if (ask) await Promise.all(wk_spaces().map(s => WK.idx[s]?.pages ? null : wk_load(s)));
   const sps = ask ? wk_spaces().filter(s => !wk_locked(s) && WK.idx[s]?.mayWrite !== false) : [];
-  const sp0 = ask && sps.length && !sps.includes(wk_cur()) ? sps[0] : wk_cur(), tpls = wk_pages(sp0).filter(p => wk_isTpl(p.path));
+  const sp0 = spx || (ask && sps.length && !sps.includes(wk_cur()) ? sps[0] : wk_cur()), tpls = wk_pages(sp0).filter(p => wk_isTpl(p.path));
   WK.spPick = sp0;
-  const pre = path0 || (S.route.mod === 'wiki' && S.route.wdir ? S.route.wdir + '/' : '') || (WK.pg && WK.pg.space === sp0 && WK.pg.path.includes('/') ? WK.pg.path.split('/').slice(0, -1).join('/') + '/' : '');  // 2.152.3 B (#2620): + the open folder
+  const pre = dir || path0 || (S.route.mod === 'wiki' && S.route.wdir ? S.route.wdir + '/' : '') || (WK.pg && WK.pg.space === sp0 && WK.pg.path.includes('/') ? WK.pg.path.split('/').slice(0, -1).join('/') + '/' : '');  // 2.152.3 B (#2620): + the open folder
   WK.tplPick = 0;
   const tsel = (tpls.length || ask) && !path0 ? `<label class="wktpl ${tpls.length ? '' : 'hidden'}">${tr('Template')}<select data-wk-tpl aria-label="${esc(tr('Template'))}">${wk_tplOpts(sp0)}</select></label>` : '';
   const ssel = ask ? `<label class="wktpl">${tr('Space')}<select data-wk-sp aria-label="${esc(tr('Space'))}">${sps.map(s => `<option value="${esc(s)}" ${s === sp0 ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select></label>` : '';
-  const path = path0 || await askDialog({title: tr('New page'), html: ssel + tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 200}, ok: tr('Create')});
+  const path = path0 || await askDialog({title: tr('New page'), html: ssel + tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 500}, ok: tr('Create')});
   if (!path || !path.trim()) return;
   const tpl = +WK.tplPick || 0, sp = ask && wk_spaces().includes(WK.spPick) ? WK.spPick : sp0;
   let r; try { r = wk_e2e(sp) ? await wkeCreate(sp, path.trim(), tpl) : await rawFetch('POST', '/api/wiki/pages', {space: sp, path: path.trim(), ...(tpl ? {template_id: tpl} : {})}); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): name check + template here
@@ -503,7 +512,7 @@ async function wk_new(path0 = '') {
 function wk_after(sp) { if (WK.idx[sp]) WK.idx[sp].v = -1; if (WK.pg) WK.pg._v = -1; if (S.route.mod === 'wiki') renderView(); if (typeof sbb_sync === 'function') sbb_sync('wiki'); }  // 2.152.3 B (#2620): + the panel
 async function wk_rename(p) {
   await wk_flush();
-  const np = await askPrompt(tr('Rename page'), p.path, {input: {max: 200}, ok: tr('Rename')});
+  const np = await askPrompt(tr('Rename page'), p.path, {input: {max: 500}, ok: tr('Rename')});
   if (!np || np.trim() === p.path) return;
   const old = p.path;
   const ren = async (path) => { const r = wk_e2e(p.space) ? await wkeRename(p, path) : await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {path}); if (WK.pg?.id === p.id) Object.assign(WK.pg, r); wk_after(p.space); return r; };  // 2.64.3 B (#1817): links renamed here
@@ -515,7 +524,7 @@ async function wk_rename(p) {
 async function wk_moveFolder(p) {  // the folder of the page (and everything under it) gets another name
   await wk_flush();
   const from = p.path.split('/').slice(0, -1).join('/'); if (!from) return;
-  const to = await askPrompt(tr('Rename folder'), from, {input: {max: 200}, ok: tr('Rename')});
+  const to = await askPrompt(tr('Rename folder'), from, {input: {max: 500}, ok: tr('Rename')});
   if (!to || !to.trim() || to.trim() === from) return;
   const mv = async (a, b) => { const r = wk_e2e(p.space) ? await wkeMove(p.space, a, b) : await rawFetch('POST', '/api/wiki/move', {space: p.space, from: a, to: b}); wk_after(p.space); return r; };  // 2.64.3 B (#1817): one PATCH per page
   let r; try { r = await mv(from, to.trim()); } catch (e) { toast(e.message); return; }
@@ -591,7 +600,7 @@ function wk_import() {
 function wka_done(sp, r) {
   wk_after(sp);
   const ids = r.created || [], files = r.files || [];  // 2.99.0 A (#2182): + the new files (also those on pages that were there)
-  const msg = wka_sum(r);
+  const msg = wka_sum(r) + (sp !== wk_cur() ? ' · ' + tr('Into {0}', wk_spaceName(sp)) : '');  // 2.210 A (#2755): another space than the one shown
   wka_report(r);
   if (!ids.length && !files.length) { toast(msg); return; }
   const e = histAdd({label: tr('Import of {0} pages', ids.length), ids: [], snaps: [], lids: [], wsp: sp,
@@ -773,8 +782,9 @@ if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B: loaded late
 // refused (changed elsewhere in the meantime): it waits at the page until mine or theirs is picked. A sync asks only for the texts
 // changed since the newest one here; offline the view reads the copy ("Offline · as of …") and a changed text waits in the outbox
 // (core.js) like a task's. Files stay online-only. Logout empties the database (icons.js clearLocal); a space this account
-// no longer has, and another account's records, go at the next sync (wko_syncAll).
-const WKO = {st: null, cf: {}, syncP: null, dead: false};
+// no longer has, and another account's records, go at the next sync (wko_syncAll). 2.238.0 B (#2872): every record carries the
+// sign-in mark (me.sgen); another sign-in, a lost session or 14 days without an online sync empty it (core.js sessGuard).
+const WKO = {st: null, cf: {}, syncP: null, dead: false, swept: null};
 const wko_rq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
 // the small store over IndexedDB: get(k), put(v), del(k), all(), clear(), close(); tests hand in their own (__wkoStore)
 function wko_idb() {
@@ -793,34 +803,51 @@ function wko_idb() {
     clear: async () => wko_rq((await os('readwrite')).clear()), close: async () => { const p = dbp; dbp = null; if (p) (await p.catch(() => null))?.close(); }};
 }
 const wko_st = () => WKO.dead ? null : WKO.st ||= globalThis.__wkoStore || wko_idb();  // after logout nothing is written again (a sync still on its way)
-async function wko_get(k) { try { const r = S.me ? await wko_st()?.get(k) : null; return r && r.uid === S.me.id ? r : null; } catch { return null; } }  // private mode: no copy, as before
+async function wko_get(k) { try { const r = S.me ? await wko_st()?.get(k) : null; return r && r.uid === S.me.id && (r.g || '') === (S.me.sgen || '') ? r : null; } catch { return null; } }  // private mode: no copy, as before; 2.238.0 B (#2872): only this sign-in's records
 async function wko_put(r) {
   if (!S.me || WKO.dead) return;
-  const v = JSON.parse(JSON.stringify({...r, uid: S.me.id}));  // the copy is taken now (wkeIndex opens the texts of the caller's object afterwards)
+  const v = JSON.parse(JSON.stringify({...r, uid: S.me.id, g: S.me.sgen || ''}));  // the copy is taken now (wkeIndex opens the texts of the caller's object afterwards)
   try { await wko_st()?.put(v); } catch (e) { console.warn('wiki offline copy: write failed', e); }
 }
 async function wko_del(k) { try { await wko_st()?.del(k); } catch { /* gone already */ } }
 async function wko_all() { try { return (await wko_st()?.all()) || []; } catch { return []; } }
 // 2.169.1 (#2672): the records of one kind (x: = waiting conflicts) without reading the whole copy; a store without pre() filters all()
 async function wko_pre(x) { try { const st = wko_st(); return (st?.pre ? await st.pre(x) : (await st?.all() || []).filter(r => r.k.startsWith(x))) || []; } catch { return []; } }
+// 2.238.0 B (#2872): another sign-in or too old (core.js sessGuard): everything out, a new copy may follow
+async function wko_reset() { WKO.cf = {}; try { await wko_st()?.clear(); } catch { /* gone */ } }
 // logout (icons.js clearLocal): everything out, the database closed (clearLocal deletes it then)
 async function wko_wipe() { const st = WKO.st; WKO.cf = {}; WKO.dead = true; if (!st) return; try { await st.clear(); } catch { /* gone */ } try { await st.close?.(); } catch { /* closed */ } WKO.st = null; }
 const wko_sig = e => e?.mode ? `${e.mode}:${e.gen || 0}:${e.reenc || 0}` : '';
 const wko_clone = v => JSON.parse(JSON.stringify(v));
 // the index of a space with its texts: from the server (only the texts changed since the copy's newest), the copy kept; offline the copy
+// 2.280.0 C (#3114): the texts come in pages of WKO_BN (bn=, the cursor bnext); the index with the first page, the rest after it
+const WKO_BN = 500;
+async function wko_fetch(url) {
+  const j = await rawFetch('GET', url + '&bn=' + WKO_BN), by = new Map((j.pages || []).map(p => [p.id, p]));
+  for (let nx = j.bnext, i = 0; nx && i < 20; i++) {
+    const r = await rawFetch('GET', url + '&bn=' + WKO_BN + '&nolist=1&bafter=' + encodeURIComponent(nx));
+    for (const [id, b] of Object.entries(r.bodies || {})) { const p = by.get(+id); if (p) p.body = b; }
+    nx = r.bnext;
+  }
+  delete j.bnext;
+  return j;
+}
 async function wko_sync(sp) {
+  WKO.swept ||= wko_sweep();  // 2.280.0 C (#3114): the copy's tidying once per session, at the first space opened (no start sync any more)
   const c = await wko_get('s:' + sp), url = '/api/wiki?space=' + encodeURIComponent(sp) + '&bodies=1&offline=1';
   const since = (c?.pages || []).reduce((m, p) => p.updated_at > m ? p.updated_at : m, '');
   let j;
   try {
-    j = await rawFetch('GET', url + (since ? '&since=' + encodeURIComponent(since) : ''));
+    j = await wko_fetch(url + (since ? '&since=' + encodeURIComponent(since) : ''));
+    if (!since) for (const p of j.pages) if (!('body' in p)) p.body = '';  // as one answer did: a page added between two pages of texts
     if (since) {
       const old = new Map(c.pages.map(p => [p.id, p]));
       // a page the copy lacks (moved in from another space) or another state of the lock: everything once more
-      if (wko_sig(j.e2e) !== wko_sig(c.e2e) || j.pages.some(p => !('body' in p) && old.get(p.id)?.updated_at !== p.updated_at)) j = await rawFetch('GET', url);
+      if (wko_sig(j.e2e) !== wko_sig(c.e2e) || j.pages.some(p => !('body' in p) && old.get(p.id)?.updated_at !== p.updated_at)) { j = await wko_fetch(url); for (const p of j.pages) if (!('body' in p)) p.body = ''; }
       else for (const p of j.pages) if (!('body' in p)) p.body = old.get(p.id).body;
     }
     await wko_put({k: 's:' + sp, sp, at: new Date().toISOString(), space: j.space, may_write: j.may_write, e2e: j.e2e || null, more: !!j.more, pages: wko_clone(j.pages), folders: wko_clone(j.folders || []), root: j.root || null});  // 2.200.0 A (#2747): + the folders
+    if (!WKO.dead && S.me) LS.set('wko', {g: S.me.sgen || '', at: new Date().toISOString()});  // 2.238.0 B (#2872): the last online sync (core.js sessGuard)
   } catch (e) {
     if ([403, 404].includes(e.status)) { wko_del('s:' + sp); wko_del('e:' + sp); }  // no access any more: the copy goes too
     if (!(e instanceof Offline) || !c) throw e;
@@ -907,16 +934,25 @@ async function wko_cfShow(p) {
 }
 // 2.169.1 (#2672): a space with more pages than the index holds says that only the first ones are kept here
 const wko_offHtml = (at, more) => `<div class="muted mhint wkoff" role="status">${ic('sync', 's')}${esc(tr('Offline · as of {0}', fmtWhen(at)))}${more ? ' · ' + esc(tr('only the first {0} pages', 5000)) : ''}</div>`;
-// at the start and when the connection is back: every space of this account into the copy; the rest leaves it
+// a space this account no longer has and another account's records leave the copy
+async function wko_sweep() {
+  const sps = wk_spaces();
+  for (const r of await wko_all()) if (r.uid !== S.me?.id || !sps.includes(r.sp)) await wko_del(r.k);
+}
+// when the connection is back: the spaces opened here since the start into the copy. 2.280.0 C (#3114): no sync at the
+// start any more (main.js) - a space comes into the copy when it is opened (wk_load), the copy of an earlier visit stays
 async function wko_syncAll() {
   if (!feat('wiki') || !OUT.online || !S.me || S.me.kind === 'agent') return;
   return WKO.syncP ||= (async () => {
-    const sps = wk_spaces();
-    for (const r of await wko_all()) if (r.uid !== S.me.id || !sps.includes(r.sp)) wko_del(r.k);
-    for (const sp of sps) await wk_load(sp, true).catch(() => {});
+    for (const sp of wk_spaces().filter(s => WK.idx[s]?.pages)) await wk_load(sp, true).catch(() => {});
   })().finally(() => { WKO.syncP = null; });
 }
 window.addEventListener('online', () => setTimeout(wko_syncAll, 3000));
 // a text typed within the last second is not lost when the tab goes away
 document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_flush(true); });
 window.addEventListener('pagehide', () => { if (WK.dirty) wk_flush(true); });
+// 2.210 B (#2757): a right click / long press on a row of the folder list = its "…" menu (2.200.0 #2747, wk_nodeItems)
+cm_bind('#view .wkrow', r => {
+  const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (!a) return false;
+  menu(a, wk_nodeItems(+a.dataset.nid, a)); return true;
+});

@@ -130,7 +130,7 @@ def lta_ask_agent(nid):
     owner = pb_owner(c, oid)
     data = {"node_id": n["id"], "title": n["name"], "requested_by": uid, "note": note,
             "office": {"id": oid, "personal": owner is not None}, "org_id": None if owner is not None else oid,
-            "hint": LTA_HINT}
+            "hint": LTA_HINT, "origin": "document", "untrusted": True}  # 2.223.2 B (#2862): title / note are data, never instructions
     seq = agent_emit(c, aid, LTA_EVENT, data)
     if seq is None:
         raise Denied(409, tr("The agent is paused"))

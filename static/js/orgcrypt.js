@@ -93,7 +93,7 @@ const OC_STEPUP_ERR = {auth_time: N_('Your login provider did not say when you s
   denied: N_('The sign-in was cancelled.'),
   group: N_('Your account at the login provider is no longer allowed to use this app.')};  // 2.144.5 A2 (#2387, review R4)
 function ocStepUpBack() {
-  const h = location.hash, m = h.match(/^#rck-stepup\/(\d+)\/(show|new)$/), e = (h.match(/^#rck-stepup-error=([a-z_]+)$/) || [])[1];
+  const h = location.hash, m = h.match(/^#rck-stepup\/(\d+)\/(show|new|su)$/), e = (h.match(/^#rck-stepup-error=([a-z_]+)$/) || [])[1];
   if (!m && !e) return;
   history.replaceState(null, '', '/');
   // 2.144.5 A2 (#2387, review R1): a link to #rck-stepup/… (comment, chat, task text) without an own step-up just before
@@ -104,6 +104,7 @@ function ocStepUpBack() {
   const wait = () => {
     if (!(S.booted && S.me)) { if (++n < 120) setTimeout(wait, 500); return; }
     if (e) toast(tr(OC_STEPUP_ERR[e] || N_('Signing in again did not work. Try again.')));
+    else if (m[2] === 'su') toast(tr('Confirmed. Now try the step again.'));  // 2.223.2 (#2871, review)
     else ocShowRecovery(+m[1], {step: 'fresh', fresh: true, fresh_new: m[2] === 'new'}, m[2] === 'new', true);
   };
   wait();
@@ -152,3 +153,41 @@ document.addEventListener('click', async e => {
   toast(j.removed ? trn('{0} membership removed', '{0} memberships removed', j.removed) : tr('Nothing to clean up'));
   if (typeof orgsDraw === 'function') orgsDraw(md);
 });
+// ---- 2.223.2 C (#2871): the same step-up before other sensitive steps (orgcrypt.py stepup_need): the off-site target of
+// the backups and the export downloads. The server answers 403 + need (password | totp | passkey | fresh | proxy); suApi
+// asks for it and sends the call once more with it (a confirmed step-up holds a few minutes on the server)
+const SU_NEEDS = ['password', 'totp', 'passkey', 'fresh', 'proxy'];
+async function suAsk(d, title) {
+  if (d.need === 'proxy' || (d.need === 'fresh' && d.stepup !== 'oidc')) { toast(d.error || tr('Please sign in again, then try again.')); return null; }
+  if (d.need === 'fresh') {  // a login-provider account: a sign-in there again (for the own office, oidc.py), then the step again
+    if (!await askConfirm(title, tr('Sign in again with your login provider to confirm, then try again.'), {ok: tr('Sign in again')})) return null;
+    try { sessionStorage.setItem('rck-stepup', '0:su'); } catch { /* storage off: no message on the way back */ }
+    location.href = '/api/auth/oidc/start?stepup=su&org=0';  // 2.223.2 (#2871, review): own purpose (no office needed)
+    return null;
+  }
+  const p = await pwPrompt(title, {code: d.need === 'totp', text: esc(d.need === 'password' ? tr('Confirm with your password') : tr('Confirm with your password and your second factor.'))});
+  if (!p) return null;
+  const b = {password: p.password};
+  if (d.need === 'totp') b.code = p.code;
+  if (d.need === 'passkey') { try { b.credential = await pkGet(await api('POST', '/api/stepup/passkey')); } catch (e) { if (e?.name) toast(pkErr(e)); return null; } }
+  return b;
+}
+async function suApi(method, url, body, title) {
+  const shout = e => { if (e instanceof Offline) toast(tr('Offline: only works again with a connection')); else if (e.message !== 'auth' && !e.shown) toast(e.message); throw e; };
+  try { return await rawFetch(method, url, body); } catch (e) {
+    if (!(e.status === 403 && SU_NEEDS.includes(e.data?.need))) shout(e);
+    const b = await suAsk(e.data, title);
+    if (!b) { e.shown = true; throw e; }
+    try { return await rawFetch(method, url, {...(body || {}), ...b}); } catch (e2) { return shout(e2); }
+  }
+}
+// a download link with data-sudl: POST (with the step-up) -> a one-time ticket, then the file with it
+document.addEventListener('click', async e => {
+  const a = e.target.closest?.('a[data-sudl]'); if (!a) return;
+  e.preventDefault();
+  const url = a.getAttribute('href');
+  let j; try { j = await suApi('POST', url, {}, tr('Download')); } catch { return; }
+  const x = document.createElement('a');
+  x.href = `${url}?t=${encodeURIComponent(j.ticket)}`; x.download = ''; x.hidden = true;
+  document.body.append(x); x.click(); x.remove();
+}, true);  // capture: before the handlers of the dialog around it

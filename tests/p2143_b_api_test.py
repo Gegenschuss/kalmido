@@ -75,6 +75,7 @@ ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).j
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"}).ok
 SP = f"org:{ORG}"
 OFF = B + "/api/admin/backups/offsite"
+PW = "password123"  # 2.223.2 C (#2871): the target, Test and Upload now ask for the step-up (the password)
 
 # ============================================================== #2152 off-site target
 for mode, port, user, secret in (("s3", 8093, S3KEY, S3SECRET), ("webdav", 8094, "kbk", DAVPASS)):
@@ -99,7 +100,7 @@ j = A.get(OFF).json()
 check(j.get("type") == "" and j.get("on") is False and j.get("keep") == 14, f"#2152 the start: no target, off, keep = local daily count {j}")
 
 # ---- S3: set up, credentials only as "set"
-r = A.patch(OFF, json={"type": "s3", "s3": {"endpoint": "http://127.0.0.1:8093", "region": "eu-central-1", "bucket": "kbk",
+r = A.patch(OFF, json={"password": PW, "type": "s3", "s3": {"endpoint": "http://127.0.0.1:8093", "region": "eu-central-1", "bucket": "kbk",
                                              "prefix": "/srv1/", "key": S3KEY, "secret": S3SECRET}})
 check(r.ok, f"#2152 S3 target saved {r.status_code} {r.text[:200]}")
 j = r.json()
@@ -107,22 +108,22 @@ check(j["s3"]["key_set"] and j["s3"]["secret_set"] and j["s3"]["prefix"] == "srv
       f"#2152 S3: key + secret set, the folder cleaned, path style by default {j['s3']}")
 no_secret(r.text, "#2152 PATCH S3")
 no_secret(A.get(OFF).text, "#2152 GET after S3")
-check(A.patch(OFF, json={"s3": {"endpoint": "ftp://example.com"}}).status_code == 400, "#2152 an endpoint must be http(s)")
-check(A.patch(OFF, json={"s3": {"endpoint": "https://user:pw@example.com"}}).status_code == 400, "#2152 no credentials in the address")
-check(A.patch(OFF, json={"s3": {"prefix": "a/../b"}}).status_code == 400, "#2152 no .. in the folder")
-check(A.patch(OFF, json={"keep": 0}).status_code == 400, "#2152 keep at least 1")
+check(A.patch(OFF, json={"password": PW, "s3": {"endpoint": "ftp://example.com"}}).status_code == 400, "#2152 an endpoint must be http(s)")
+check(A.patch(OFF, json={"password": PW, "s3": {"endpoint": "https://user:pw@example.com"}}).status_code == 400, "#2152 no credentials in the address")
+check(A.patch(OFF, json={"password": PW, "s3": {"prefix": "a/../b"}}).status_code == 400, "#2152 no .. in the folder")
+check(A.patch(OFF, json={"password": PW, "keep": 0}).status_code == 400, "#2152 keep at least 1")
 db_raw = json.dumps([list(x) for x in dbx.connect(DATA).execute("SELECT key, value FROM settings WHERE key LIKE 'bko_%'").fetchall()])
 check(S3SECRET not in db_raw and S3KEY not in db_raw, "#2152 the credentials are sealed in the settings table (not plain)")
 
 # ---- not without encryption
-r = A.patch(OFF, json={"on": True})
+r = A.patch(OFF, json={"password": PW, "on": True})
 check(r.status_code == 400 and "encrypt" in r.text.lower(), f"#2152 on without encrypted backups: refused {r.status_code} {r.text[:160]}")
 check(A.get(OFF).json()["encrypt_ready"] is False, "#2152 encrypt_ready false")
 assert A.patch(B + "/api/admin/backups", json={"encrypt": True, "passphrase": PASS}).ok
 check(A.get(OFF).json()["encrypt_ready"] is True, "#2152 encrypt_ready after the passphrase")
 
 # ---- test connection (probe written + deleted, signature checked by the fake)
-r = A.post(OFF + "/test")
+r = A.post(OFF + "/test", json={"password": PW})
 j = r.json()
 check(r.ok and j.get("ok") is True, f"#2152 S3 test works {r.status_code} {r.text[:300]}")
 lg = remote_log("s3")
@@ -130,15 +131,15 @@ check(any(x["method"] == "PUT" and "kalmido-probe-" in x["path"] and x["status"]
       and any(x["method"] == "DELETE" and "kalmido-probe-" in x["path"] for x in lg), f"#2152 S3 probe written with a valid signature and deleted {lg[-4:]}")
 check(not glob.glob(os.path.join(REM, "s3", "kbk", "srv1", "kalmido-probe-*")), "#2152 no probe file left on the target")
 # a wrong secret: auth with the target's code, never the secret
-A.patch(OFF, json={"s3": {"secret": "a-wrong-secret-value"}})
-j = A.post(OFF + "/test").json()
+A.patch(OFF, json={"password": PW, "s3": {"secret": "a-wrong-secret-value"}})
+j = A.post(OFF + "/test", json={"password": PW}).json()
 check(j.get("ok") is False and j.get("code") == "auth" and "SignatureDoesNotMatch" in j.get("error", ""), f"#2152 wrong secret = auth error {j.get('error')}")
 check("a-wrong-secret-value" not in json.dumps(j), "#2152 the wrong secret is not in the answer")
-A.patch(OFF, json={"s3": {"secret": S3SECRET}})
-check(A.post(OFF + "/test").json().get("ok") is True, "#2152 the right secret again")
+A.patch(OFF, json={"password": PW, "s3": {"secret": S3SECRET}})
+check(A.post(OFF + "/test", json={"password": PW}).json().get("ok") is True, "#2152 the right secret again")
 
 # ---- switch on, back up, the tick uploads
-r = A.patch(OFF, json={"on": True, "keep": 2})
+r = A.patch(OFF, json={"password": PW, "on": True, "keep": 2})
 check(r.ok and r.json()["on"] is True and r.json()["keep"] == 2, f"#2152 on with keep 2 {r.text[:200]}")
 
 
@@ -205,14 +206,14 @@ assert A.patch(B + "/api/admin/backups", json={"encrypt": True}).ok
 
 # ---- WebDAV
 # 2.143.0 B (#2152, review): the password goes in Basic auth: https only, plain http only to this machine
-check(A.patch(OFF, json={"webdav": {"url": "http://dav.example.com/bk"}}).status_code == 400, "#2152 review: WebDAV over http to another host is refused")
-check(A.patch(OFF, json={"webdav": {"url": "https://dav.example.com/bk"}}).ok, "#2152 review: WebDAV over https is accepted")
-check(A.patch(OFF, json={"s3": {"endpoint": "http://127.0.0.1:8093"}}).ok, "#2152 review: S3 http stays possible (signed, no password)")
-r = A.patch(OFF, json={"type": "webdav", "webdav": {"url": "http://127.0.0.1:8094/dav/bk", "user": "kbk", "password": DAVPASS}})
+check(A.patch(OFF, json={"password": PW, "webdav": {"url": "http://dav.example.com/bk"}}).status_code == 400, "#2152 review: WebDAV over http to another host is refused")
+check(A.patch(OFF, json={"password": PW, "webdav": {"url": "https://dav.example.com/bk"}}).ok, "#2152 review: WebDAV over https is accepted")
+check(A.patch(OFF, json={"password": PW, "s3": {"endpoint": "http://127.0.0.1:8093"}}).ok, "#2152 review: S3 http stays possible (signed, no password)")
+r = A.patch(OFF, json={"password": PW, "type": "webdav", "webdav": {"url": "http://127.0.0.1:8094/dav/bk", "user": "kbk", "password": DAVPASS}})
 check(r.ok and r.json()["webdav"]["password_set"] and r.json()["webdav"]["user"] == "kbk", f"#2152 WebDAV saved {r.text[:200]}")
 no_secret(r.text, "#2152 PATCH WebDAV")
 os.makedirs(os.path.join(REM, "webdav", "dav", "bk"), exist_ok=True)
-j = A.post(OFF + "/test").json()
+j = A.post(OFF + "/test", json={"password": PW}).json()
 check(j.get("ok") is True, f"#2152 WebDAV test works {j.get('error')}")
 newest = backup_now()  # encrypted again: the tick uploads it to the new target
 dav_file = os.path.join(REM, "webdav", "dav", "bk", newest)
@@ -220,7 +221,7 @@ check(until(lambda: os.path.isfile(dav_file) and A.get(OFF).json().get("last_nam
       f"#2152 WebDAV: the new backup uploaded {A.get(OFF).json()}")
 check(os.path.isfile(dav_file) and os.path.getsize(dav_file) == os.path.getsize(os.path.join(DATA, "backups", newest)), "#2152 WebDAV: same size")
 os.remove(dav_file)
-r = A.post(OFF + "/upload")
+r = A.post(OFF + "/upload", json={"password": PW})
 check(r.status_code == 202, f"#2152 upload now 202 {r.status_code}")
 check(until(lambda: os.path.isfile(dav_file) and not A.get(OFF).json()["running"], 40), "#2152 upload now sends the newest backup again")
 check(any(x["method"] == "PROPFIND" for x in remote_log("webdav")), "#2152 WebDAV: the size is checked with PROPFIND")
@@ -230,7 +231,7 @@ os.makedirs(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc"), ex
 open(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt"), "w").write("keep me")
 for d in ("20010101", "20020101"):
     open(os.path.join(DAV, f"kalmido-backup-{d}-000000-auto.zip.enc"), "wb").write(b"old")
-check(A.post(OFF + "/upload").status_code == 202, "#2152 review: upload now")
+check(A.post(OFF + "/upload", json={"password": PW}).status_code == 202, "#2152 review: upload now")
 until(lambda: not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc")) and not A.get(OFF).json()["running"], 40)
 check(os.path.isfile(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt")), "#2152 review: WebDAV: a folder with a backup name stays")
 check(not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc"))
@@ -240,7 +241,7 @@ check(not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.
 open(os.path.join(REM, "webdav.slow"), "w").write("10")
 slow = backup_now()
 check(until(lambda: A.get(OFF).json()["running"] == slow, 20, 0.2), f"#2152 review: the slow upload runs {A.get(OFF).json()}")
-r = A.post(OFF + "/upload")
+r = A.post(OFF + "/upload", json={"password": PW})
 check(r.status_code == 409 and "running" in r.text, f"#2152 review: upload now while one runs = 409 {r.status_code} {r.text[:120]}")
 assert A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"}).ok
 _x = dbx.connect(DATA)  # switched on after today's time = the first one tomorrow: make today's due
@@ -252,31 +253,31 @@ assert A.patch(B + "/api/admin/backups", json={"on": False}).ok
 os.remove(os.path.join(REM, "webdav.slow"))
 check(until(lambda: not A.get(OFF).json()["running"] and A.get(OFF).json()["last_name"] == (auto or [""])[0], 60),
       f"#2152 review: afterwards the newest (scheduled) backup is uploaded {A.get(OFF).json()}")
-A.patch(OFF, json={"webdav": {"password": "wrong-dav-password"}})
-j = A.post(OFF + "/test").json()
+A.patch(OFF, json={"password": PW, "webdav": {"password": "wrong-dav-password"}})
+j = A.post(OFF + "/test", json={"password": PW}).json()
 check(j.get("ok") is False and j.get("code") == "auth" and "401" in j.get("error", ""), f"#2152 WebDAV wrong password = 401 {j}")
 check("wrong-dav-password" not in json.dumps(j), "#2152 the wrong password is not in the answer")
 
 # ---- SFTP: key pair, fingerprint required before switching on, a closed port fails cleanly
-r = A.patch(OFF, json={"type": "sftp", "on": False, "sftp": {"host": "127.0.0.1", "port": 1, "user": "backup", "path": "bk"}})
+r = A.patch(OFF, json={"password": PW, "type": "sftp", "on": False, "sftp": {"host": "127.0.0.1", "port": 1, "user": "backup", "path": "bk"}})
 j = r.json()
 pub = j["sftp"]["public_key"]
 check(r.ok and pub.startswith("ssh-ed25519 ") and j["sftp"]["fingerprint"] == "", f"#2152 SFTP: a public key, no fingerprint yet {r.text[:200]}")
 no_secret(r.text, "#2152 PATCH SFTP")
 check("hostkey" in j["missing"], f"#2152 SFTP: the host key is still missing {j['missing']}")
-r = A.patch(OFF, json={"on": True})
+r = A.patch(OFF, json={"password": PW, "on": True})
 check(r.status_code == 400, f"#2152 SFTP cannot be switched on before a test recorded the host key {r.status_code}")
-j = A.post(OFF + "/test").json()
+j = A.post(OFF + "/test", json={"password": PW}).json()
 check(j.get("ok") is False and j.get("code") in ("conn", "tool", "sftp"), f"#2152 SFTP to a closed port fails with a reason {j.get('code')} {j.get('error')}")
 no_secret(json.dumps(j), "#2152 SFTP test answer")
 check("kalmido-sftp-" not in json.dumps(j), "#2152 SFTP: no temp path in the error")
-r = A.patch(OFF, json={"sftp": {"new_key": True}})
+r = A.patch(OFF, json={"password": PW, "sftp": {"new_key": True}})
 check(r.ok and r.json()["sftp"]["public_key"].startswith("ssh-ed25519 ") and r.json()["sftp"]["public_key"] != pub, "#2152 SFTP: a new key pair")
-check(A.patch(OFF, json={"sftp": {"host": "-oProxyCommand=x"}}).status_code == 400, "#2152 SFTP: a host cannot be an option")
-check(A.patch(OFF, json={"sftp": {"path": 'a"b'}}).status_code == 400, "#2152 SFTP: no quote in the folder")
-check(A.patch(OFF, json={"sftp": {"port": 70000}}).status_code == 400, "#2152 SFTP: port range")
+check(A.patch(OFF, json={"password": PW, "sftp": {"host": "-oProxyCommand=x"}}).status_code == 400, "#2152 SFTP: a host cannot be an option")
+check(A.patch(OFF, json={"password": PW, "sftp": {"path": 'a"b'}}).status_code == 400, "#2152 SFTP: no quote in the folder")
+check(A.patch(OFF, json={"password": PW, "sftp": {"port": 70000}}).status_code == 400, "#2152 SFTP: port range")
 for bad in ("bk*", "b?k", "bk[1]", "bk/{a,b}"):  # 2.143.0 B (#2152, review): sftp expands these even in quotes
-    check(A.patch(OFF, json={"sftp": {"path": bad}}).status_code == 400, f"#2152 review: SFTP folder {bad!r} refused")
+    check(A.patch(OFF, json={"password": PW, "sftp": {"path": bad}}).status_code == 400, f"#2152 review: SFTP folder {bad!r} refused")
 # the upload is renamed over the old file; the old file goes only once the complete .part is confirmed (no SFTP server
 # here: the batches are recorded inside the container)
 code = r"""import json, app
@@ -311,8 +312,8 @@ check(ok5["got"] == 5 and len(ok5["calls"]) == 3 and ok5["calls"][2][0] == '-rm 
       f"#2152 review: a refused rename: the old file goes after the .part is confirmed {ok5}")
 check(bad3["got"] == "sftp" and len(bad3["calls"]) == 2, f"#2152 review: an incomplete .part: the old file stays {bad3}")
 # "Remove target": addresses, sealed credentials and the key pair go
-A.patch(OFF, json={"type": "s3"})
-r = A.patch(OFF, json={"remove": True})
+A.patch(OFF, json={"password": PW, "type": "s3"})
+r = A.patch(OFF, json={"password": PW, "remove": True})
 j = r.json()
 check(r.ok and j["type"] == "" and j["on"] is False and not j["s3"]["key_set"] and not j["s3"]["secret_set"] and not j["webdav"]["password_set"]
       and j["sftp"]["public_key"] == "" and j["s3"]["endpoint"] == "", f"#2152 review: remove target clears everything {r.text[:300]}")

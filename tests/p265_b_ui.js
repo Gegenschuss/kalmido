@@ -24,7 +24,7 @@ const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = aw
 const get = async u => (await fetch(B + u)).text();
 // 2.94.1 (#1929): apptbook.js (booking settings) loads with the calendar module
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
-const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
+const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
   mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan'],  // 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
@@ -114,7 +114,9 @@ const NEW = {agentchat: ['agentchat', 'agentsetup'], pdf: ['pdfview', 'docprevie
   await until(() => d.querySelector('#view .wkspace, #view .wkside, #view .wk-view') || !/Loading…/.test(d.querySelector('#view').textContent || ''), 80);
   check(cssOn('wiki') && cssOn('mindmap') && !/^\s*Loading…\s*$/.test(d.querySelector('#view').textContent || ''), 'knowledge pages: wiki.css + mindmap.css, the view drawn' + why());
   // timeline / roadmap: the command bar's "Timeline" (rmSet loads the module, then shows the roadmap)
-  w.eval(`rmSet({v: 'timeline'}, 'none'); go('all')`);
+  // as the command bar does: go('all') after rmSet's module load (2.280.0 A: an own settings write no longer reloads the state,
+  // which used to redraw the list as the roadmap later)
+  w.eval(`Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all'))`);
   await until(() => lazyTags().includes('roadmap') && d.querySelector('#view #tlscroll, #view .rm-empty'), 80);
   check(['timeline', 'roadmap'].every(f => lazyTags().includes(f)) && cssOn('timeline') && !!d.querySelector('#view #tlscroll, #view .rm-empty') && w.eval('isRoadmap()'), 'timeline: timeline.js + roadmap.js + timeline.css, the roadmap drawn' + why());
   w.eval(`rmSet({v: 'list'}, 'none')`);

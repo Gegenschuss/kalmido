@@ -222,6 +222,7 @@ ROUTES = {
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
     "GET /api/agents/{}/perm-users": "agent",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
+    "GET /api/agents/{}/chat-prefs": "agent", "PUT /api/agents/{}/chat-prefs": "agent", "POST /api/agents/{}/chat/{}/dismiss": "agent",  # 2.233.0 A (#2848)
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
     "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
@@ -302,6 +303,7 @@ ROUTES = {
     # members only), by id the same 404 for every other list (p2102_a_api_test.py)
     "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",
     "GET /api/trash/lists/{}/export.zip": "list",  # 2.186.1 (#2732)
+    "POST /api/trash/lists/{}/export.zip": "list",  # 2.223.2 C (#2871): its step-up
     # ---- attachment (16)
     "GET /api/v1/tasks/{}/attachments": "attachment", "GET /api/v1/attachments/{}": "attachment",
     "GET /api/v1/lists/{}/files": "attachment", "POST /api/v1/lists/{}/files": "attachment",
@@ -318,6 +320,7 @@ ROUTES = {
     "POST /api/auth/enrol/totp": "auth", "POST /api/auth/enrol/totp/confirm": "auth",
     "POST /api/auth/enrol/passkey/options": "auth", "POST /api/auth/enrol/passkey": "auth",
     "POST /api/auth/passkey/options": "auth", "POST /api/auth/passkey": "auth", "GET /api/me/2fa": "auth",
+    "POST /api/stepup/passkey": "auth",  # 2.223.2 C (#2871): the passkey challenge of the step-up (own account)
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/2fa/recovery": "auth", "POST /api/me/passkeys/options": "auth", "POST /api/me/passkeys": "auth",
     "PATCH /api/me/passkeys/{}": "auth", "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/oidc/start": "auth",
@@ -375,6 +378,10 @@ ROUTES = {
     "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/import": "office", "GET /api/office/bank/imports": "office",
     "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/imports/{}/restore": "office", "GET /api/office/bank/tx": "office",
     "GET /api/office/bank/tx/{}/candidates": "office", "POST /api/office/bank/tx/{}/match": "office", "POST /api/office/bank/tx/{}/unmatch": "office",
+    # 2.299.0 B (#3191): bank rules (p2299_b_bankrules_test.py, also as a person without an organisation)
+    "GET /api/office/bank/rules": "office", "POST /api/office/bank/rules": "office", "PUT /api/office/bank/rules/{}": "office",
+    "DELETE /api/office/bank/rules/{}": "office", "POST /api/office/bank/rules/{}/restore": "office", "POST /api/office/bank/rules/{}/apply": "office",
+    "POST /api/office/bank/rules/{}/revert": "office", "POST /api/office/bank/rules/decline": "office",
     # 2.47.3 (#1022, #1652): travel expenses and the cash flow, admins of the office area only (p2473_b_api_test.py: other org 404, member 403)
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
@@ -704,6 +711,8 @@ ROUTES = {
     "GET /api/orgs/{}/export": "org", "GET /api/retention/org/{}": "org", "GET /api/retention/org/{}/export.zip": "org",
     "GET /api/retention/me": "own", "GET /api/retention/me/export.zip": "own",
     "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
+    # 2.223.2 C (#2871): the step-up before the download (POST -> a one-time ticket, after the same checks as the GET)
+    "POST /api/orgs/{}/export/file": "org", "POST /api/retention/org/{}/export.zip": "org", "POST /api/retention/me/export.zip": "own",
     # ---- own (119)
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
@@ -1145,6 +1154,9 @@ ROUTES = {
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
     # 2.144.0 A (#2412): Stop in the agent chat (who may write the agent) and the agent's confirmation (p2144_a_api_test.py)
     "POST /api/agents/{}/abort": "agent", "POST /api/v1/agent/aborted": "agent",
+    # 2.236.0 (#2904-#2911): the work style of an agent (owner / instance admin, else 404); C (#2906): its queue (p2236_c_queue_test.py)
+    "GET /api/agents/{}/work-style": "agent", "PATCH /api/agents/{}/work-style": "agent", "GET /api/agents/{}/queue": "agent",
+    "GET /api/v1/agent/queue": "agent", "PUT /api/v1/agent/queue": "agent",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
@@ -1164,6 +1176,11 @@ ROUTES = {
     # 2.168.0 A (#2665): a document's project (only projects one sees, of the office's workspace), a project's documents only
     # with office rights in its area (p2168_a_docproject_test.py)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
+    # 2.299.0 D (#3193): hide / show the hints of the receipt check (people with edit on the document; p2299_d_api_test.py)
+    "POST /api/docs/{}/checks": "document",
+    # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
+    "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
+    "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

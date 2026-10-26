@@ -11,6 +11,7 @@
 'use strict';
 const LT_HOOKS = {tools: [], actions: [], sections: []};
 const LT = {data: null, cur: null, loading: false, err: null, oid: undefined, fStatus: '', fClient: '', q: '', rc: [], rcSeq: 0, undo: null, making: '', pend: null, hid: false};  // 2.269.0 C (#3017): pend = the typed form not saved yet
+LT.miss = {};  // 2.296.0 C (#3165): letter id -> the details its template could not fill (named in the editor and before sending)
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['letters', 'mail', N_('Correspondence'), 1, () => ltTabHtml(), 'sell']));  // admins only; group "sell" like the documents
 const LT_ST = {draft: N_('Draft'), sent: N_('Sent'), delivered: N_('Delivered')};
 const LT_CH = {post: N_('Post'), email: N_('E-mail'), registered: N_('Registered mail'), fax: N_('Fax')};
@@ -101,11 +102,13 @@ function ltEditHtml(d) {
       <input type="hidden" id="lt-client_id" name="client_id" value="${esc(d.client_id || '')}"><input type="hidden" id="lt-contact_id" name="contact_id" value="${esc(d.contact_id || '')}">
       ${ltRow('rcpt_name', tr('Name'), ltIn('rcpt_name', d.rcpt_name))}
       ${ltRow('rcpt_address', tr('Address'), `<textarea id="lt-rcpt_address" name="rcpt_address" rows="4" maxlength="600" class="lt-addr">${esc(d.rcpt_address || '')}</textarea>`)}
+      ${(d.warnings || []).map(w => `<p class="muted ofchint" role="status">${ic('alert', 's')} ${esc(w)}</p>`).join('')}
       ${ltRow('rcpt_email', tr('E-mail'), ltIn('rcpt_email', d.rcpt_email, {max: 254, type: 'email'}))}
     </section>
     <div class="lt-two">${ofcRowF('lt-letter_date', tr('Date'), dateIn('lt-letter_date', d.letter_date, {label: tr('Date'), clear: false, attrs: 'name="letter_date"'}))}
       ${ltRow('ref_line', tr('Reference line'), ltIn('ref_line', d.ref_line, {ph: tr('e.g. Your letter of 01.10.2026')}))}</div>
     ${ltRow('subject', tr('Subject'), ltIn('subject', d.subject))}
+    ${LT.miss[d.id] ? `<p class="dtp-warn" role="status">${esc(tr('Missing details (left out in the PDF): {0}', LT.miss[d.id].join(', ')))}</p>` : ''}
     <label for="lt-body" class="dtp-lab">${tr('Text')}</label>${ltHooks('tools', d)}<textarea id="lt-body" name="body" class="dtp-ta" rows="14" maxlength="60000" spellcheck="true">${esc(d.body || '')}</textarea>
     <p class="muted ofchint">${esc(tr('Paragraphs are separated by an empty line, list items start with -.'))}</p>
     <div class="lt-two">${ltRow('greeting', tr('Greeting'), ltIn('greeting', d.greeting, {max: 120}))}${ltRow('sign_name', tr('Name under the letter'), ltIn('sign_name', d.sign_name, {max: 120}))}</div>
@@ -246,6 +249,7 @@ function ltNewModal() {
 async function ltCreate(b) {
   try {
     const j = await api('POST', '/api/office/letters', b);
+    if (j.unfilled_labels?.length) LT.miss[j.id] = j.unfilled_labels;
     LT.data = null; LT.cur = j; LT.undo = null; go(`office/letters/${j.id}`);
     toast(tr('Created'), async () => { await api('DELETE', `/api/office/letters/${j.id}`); ltReload(); go('office/letters'); });
     return '';
@@ -362,7 +366,13 @@ document.addEventListener('click', async e => {
   else if (a === 'back') { if (d && d.status === 'draft') { clearTimeout(ltSaveTimer); await ltSave(d, true); } LT.data = null; go('office/letters'); }
   else if (a === 'rc') { const x = LT.rc[+b.dataset.i]; if (x) ltRcPick(x); }
   else if (a === 'save' && d) ltSave(d);
-  else if (a === 'sent' && d) { clearTimeout(ltSaveTimer); if (await ltSave(d, true)) ltSentModal(d); }
+  else if (a === 'sent' && d) {
+    clearTimeout(ltSaveTimer);
+    if (!await ltSave(d, true)) return;
+    // 2.296.0 C (#3165): what the template could not fill is named once more before the letter is fixed
+    if (LT.miss[d.id] && !await askConfirm(tr('Mark as sent'), tr('Missing details (left out in the PDF): {0}', LT.miss[d.id].join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
+    ltSentModal(d);
+  }
   else if (a === 'delivered' && d) {
     try { LT.cur = await api('POST', `/api/office/letters/${d.id}/delivered`); LT.data = null; ofcDraw(); toast(tr('Marked as delivered'), async () => { LT.cur = await api('DELETE', `/api/office/letters/${d.id}/delivered`); LT.data = null; ofcDraw(); }); }
     catch (x) { toast(x.message || tr('unknown')); }

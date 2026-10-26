@@ -381,8 +381,10 @@ def dav_login():
     username = a.username.strip().lower()[:64]
     pw = apppw_norm(a.password)[:100]
     keys = _rate_keys(username, "dav:", (10, 30, 150))
-    # 2.126.0 C (#1977): the per-name ceiling ("dav:uall:") only raises an alert; the lock is per name + address and per address
-    if _rate_blocked([k for k in keys if not k[0].startswith("dav:uall:")]):
+    # 2.126.0 C (#1977): the per-name ceiling ("dav:uall:") only raises an alert; the lock is per name + address.
+    # 2.282.0 (#3111): the address counter ("dav:ip:") only raises an alert too: DAV takes app passwords only (20 characters,
+    # guessing is hopeless) and one old phone behind an office address locked out every colleague there
+    if _rate_blocked([k for k in keys if k[0].startswith("dav:u:")]):
         raise DavError(429, "Too many failed logins, please wait a few minutes")
     c = db()
     u = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
@@ -407,9 +409,9 @@ def dav_login():
             if k.startswith("dav:uall:"):
                 aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV logins for user {0} from different addresses."),
                        [username])
-            elif k.startswith("dav:ip:"):
-                aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
-                       [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
+            elif k.startswith("dav:ip:"):  # 2.282.0 (#3111): nothing refused per address any more
+                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV logins from IP {0}. Only the accounts with the wrong app password are refused there; behind a shared address (office, NAT) look for an old device."),
+                       [fx2_mask_ip(client_ip())])
             elif u:
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])

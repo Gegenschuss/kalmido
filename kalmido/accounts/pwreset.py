@@ -16,6 +16,7 @@ from ..core.config import app, APP_DIR, APP_NAME
 from ..core.i18n import tr
 from ..core.db import body, connect, db, err, iso, now_utc, parse_iso, write_lock
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _rate_keys, client_ip
+from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from .bgjobs import bgj_add, bgj_fn
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 
@@ -102,6 +103,6 @@ def pw_forgot():
             print("password reset failed:", type(e).__name__, flush=True)
     for m in mails:
         bgj_add("mail:pwreset", *m, user_id=m[0])  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
-    print("password reset asked from", client_ip(), "(blocked)" if blocked else "", flush=True)
+    print("password reset asked from", login_log_ip(client_ip()), "(blocked)" if blocked else "", flush=True)
     time.sleep(max(0.0, PW_PAD + random.uniform(0, 0.05) - (time.monotonic() - t0)))
     return jsonify(ok=True)

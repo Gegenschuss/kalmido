@@ -23,6 +23,7 @@ import xml.etree.ElementTree as ET
 from datetime import date, timedelta
 from decimal import Decimal
 
+from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.errors import BadInput
@@ -148,12 +149,25 @@ def cfb_guess(header):
     return out
 
 
+def cfb_mt940_balances(text, home):
+    """2.299.0 A (#3190): MT940 / MT942 text -> the balances like cfb_camt_balances (core/mt940.mt_parse); other currency
+    than home left out; an unreadable file gives []."""
+    try:
+        bals = mt.mt_parse(text)[1]
+    except BadInput:
+        return []
+    return [{"account": x["account"] or tr("Main account"), "day": x["day"], "amount": x["amount"], "kind": x["kind"]}
+            for x in bals if (x["currency"] or home) == home]
+
+
 def cfb_read(c, oid, fmt, b):
     """The balances of the statement in body b (fmt camt | csv)."""
     from .bank import _home
     text = b.get("text") or ""
     if fmt == "camt":
         return cfb_camt_balances(text, _home(c, oid))
+    if fmt == "mt940":  # 2.299.0 A (#3190): :60F: / :62F: of the statement, account from :25:
+        return cfb_mt940_balances(text, _home(c, oid))
     if b.get("mapping") is None:
         return []
     return cfb_csv_balance(text, b["mapping"], b.get("account"))

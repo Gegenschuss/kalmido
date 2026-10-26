@@ -572,8 +572,9 @@ function bkRestore(md, src) {
       try {
         const r = await rawFetch('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || ''});
         m.remove(); md.remove();
-        toast(tr('Backup restored. Safety backup: {0}', r.safety));
         clearLocal();
+        if (r.notes?.length) await askConfirm(tr('Backup restored. Safety backup: {0}', r.safety), r.notes.join('\n\n'), {ok: tr('Reload')});  // 2.273.0 A (#3051)
+        else toast(tr('Backup restored. Safety backup: {0}', r.safety));
         setTimeout(() => location.replace('/'), 1200);
         done(true);
       } catch (x) { $('#bkr-err', m).textContent = x.message; go.disabled = false; go.textContent = tr('Restore'); }
@@ -585,7 +586,8 @@ function bkRestore(md, src) {
 function bkoWire(md) {
   // 2.147.2 B (#2501): Android: bring the tapped field above the keyboard once it has opened
   md.addEventListener('focusin', e => { if (e.target.closest?.('#s-bko') && e.target.matches('input,select')) setTimeout(() => e.target.scrollIntoView?.({block: 'center'}), 300); });
-  const put = async v => { const box = $('#s-bko', md); try { await bkoDraw(md, await api('PATCH', '/api/admin/backups/offsite', v)); setSaved(null); } catch { await bkoDraw(md); } return box; };
+  // 2.223.2 C (#2871): the target, Test and Upload now ask for the step-up (suApi, orgcrypt.js); on / off and the count do not
+  const put = async v => { const box = $('#s-bko', md); try { await bkoDraw(md, await suApi('PATCH', '/api/admin/backups/offsite', v, tr('Off-site backup'))); setSaved(null); } catch { await bkoDraw(md); } return box; };
   md.addEventListener('change', async e => {
     const el = e.target; if (!el.closest?.('#s-bko')) return;
     const j = $('#s-bko', md)._j || {}, t = j.type;
@@ -609,10 +611,10 @@ function bkoWire(md) {
       if (k === 'newkey') await put({sftp: {new_key: true}});
       if (k === 'forget') await put({sftp: {forget_host: true}});
       if (k === 'remove') await put({remove: true});
-      if (k === 'upload') { await bkoDraw(md, await api('POST', '/api/admin/backups/offsite/upload')); toast(tr('Upload started')); }
+      if (k === 'upload') { await bkoDraw(md, await suApi('POST', '/api/admin/backups/offsite/upload', {}, tr('Off-site backup'))); toast(tr('Upload started')); }
       if (k === 'test') {
         b.textContent = tr('Testing…');
-        const r = await api('POST', '/api/admin/backups/offsite/test');
+        const r = await suApi('POST', '/api/admin/backups/offsite/test', {}, tr('Off-site backup'));
         await bkoDraw(md, r.state);
         toast(r.ok ? (r.fingerprint ? tr('Connection works. Server fingerprint: {0}', r.fingerprint) : tr('Connection works.')) : r.error);
       }
@@ -659,7 +661,8 @@ function bkWire(md) {
         const pass = item.encrypted && !j.passphrase_set ? await askPrompt(tr('Passphrase of this backup'), '', {input: {type: 'password'}}) : '';
         if (pass === null) return;
         const r = await api('POST', `/api/admin/backups/${encodeURIComponent(name)}/verify`, {passphrase: pass || ''});
-        toast(tr('Backup is complete and readable ({0}, {1}).', trn('{0} task', '{0} tasks', r.counts?.tasks || 0), trn('{0} file', '{0} files', r.attachment_files || 0)));
+        toast(tr('Backup is complete and readable ({0}, {1}).', trn('{0} task', '{0} tasks', r.counts?.tasks || 0), trn('{0} file', '{0} files', r.attachment_files || 0))
+          + (r.missing_files ? ' ' + trn('{0} file was missing when it was written (deleted or moved meanwhile).', '{0} files were missing when it was written (deleted or moved meanwhile).', r.missing_files) : ''));  // 2.273.0 A (#3050)
       }
       if (b.dataset.bk === 'restore' && item) await bkRestore(md, {name, encrypted: item.encrypted, created_at: item.created_at, counts: item.counts, attachment_files: item.attachment_files, word: j.confirm_word || 'RESTORE'});
     } catch { /* api() showed it */ } finally { b.disabled = false; }
@@ -835,14 +838,20 @@ const ODL_WORDS = {
   // 2.152.0 (#2167, review A6)
   cash: n => trn('{0} cash book entry', '{0} cash book entries', n), bank: n => trn('{0} bank transaction', '{0} bank transactions', n),
   meals: n => trn('{0} entertainment receipt', '{0} entertainment receipts', n),
-  letters: n => trn('{0} sent letter', '{0} sent letters', n)};  // 2.184.0 A (#2628)
+  letters: n => trn('{0} sent letter', '{0} sent letters', n),  // 2.184.0 A (#2628)
+  // 2.239.0 C (#2874)
+  open_receipts: n => trn('{0} receipt', '{0} receipts', n), einvoices: n => trn('{0} invoice', '{0} invoices', n),
+  payments: n => trn('{0} payment', '{0} payments', n), signoffs: n => trn('{0} confirmed sign-off', '{0} confirmed sign-offs', n),
+  procdocs: n => trn('{0} version of the procedure documentation', '{0} versions of the procedure documentation', n)};
 const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
 // the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation
 // shows its period and the export; content going along or a retirement asks with the numbers and the export first
 async function odlDelete(o) {
   let j; try { j = await api('GET', `/api/admin/orgs/${o.id}/delete-info`); } catch { return false; }
   // 2.186.0 A (#2599): a retired organisation: only its former admins export it
-  const day0 = today(), exp = j.can_export ? oxBoxHtml(o) : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
+  // 2.239.0 C (#2943): an instance admin (no former admin left) gets the retention export only, never the whole organisation
+  const day0 = today(), exp = j.can_export ? oxBoxHtml(o) : j.can_retention ? `<div class="shint">${esc(tr('Only its former admins can export the whole organisation. Nobody of them is left: you can download the records it keeps by law.'))}</div>${rxBoxHtml('org', o.id)}`
+    : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
   if (j.kept_until && j.kept_until >= day0) {
     await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {ok: tr('Close'), after: md => oxDraw(md),
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});

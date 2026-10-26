@@ -51,7 +51,8 @@ ENV = ["-e", "KALMIDO_INSTANCE_MODE=workspaces", "-e", "KALMIDO_ORGCRYPT_DELAY=0
        "-e", "KALMIDO_IMAP_SSL=0", "-e", "KALMIDO_IMAP_USER=kalmido", "-e", "KALMIDO_IMAP_PASSWORD=secret", "-e", "KALMIDO_IMAP_INTERVAL=10",
        "-e", "KALMIDO_SMTP_HOST=127.0.0.1", "-e", "KALMIDO_SMTP_PORT=1025", "-e", "KALMIDO_SMTP_TLS=none", "-e", "KALMIDO_MAIL_FROM=kalmido@example.test"]
 VARS = {"client.name", "client.address", "client.contact", "project.title", "offer.number", "offer.date", "offer.total", "company.name",
-        "company.address", "today"}
+        "company.address", "today",
+        "offer.net", "offer.gross", "payment.days"}  # 2.296.0 (#3165): net / gross / payment term
 PDF = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n"
 
 
@@ -228,6 +229,8 @@ tok = re.search(r"/s/q/([A-Za-z0-9_-]{20,})", body_of(msg)) if msg else None
 check(msg is not None and str(msg["Subject"]).startswith("Unser AVV") and f"[DS-{code}]" in str(msg["Subject"]), f"#2192: own subject keeps the code {msg and msg['Subject']}")
 check(msg is not None and str(msg["Reply-To"]) == f"tasks+ds-{code}@example.test", f"#2192: the reply address with the code {msg and msg['Reply-To']}")
 check(tok is not None and "[Link]" not in body_of(msg), "#2192: [Link] became the signature link")
+exp = sql("SELECT expires_at FROM office_signoffs WHERE gen_doc_id=? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1", (sheet(A, S_DPA["id"])["gen_doc_id"],))
+check(exp and exp[0][0], f"2.239.0 (#2874): the mailed signature link has an end {exp}")
 
 # ================================================================== the way back: the customer signs through the link
 pg = requests.get(B + "/s/q/" + tok.group(1)) if tok else None
@@ -293,6 +296,15 @@ check(A.post(B + PS + f"/{S_INFO['id']}/confirm").status_code == 409, "#2192: co
 r = A.post(B + PS + f"/{S_CONS['id']}/confirm")
 check(r.ok and r.json()["status"] == "signed" and not r.json()["review"], "#2192: confirmed")
 
+# 2.239.0 (#2874): a signed PDF from another address than the one the sheet went to is a reply to check, never "signed"
+S_C9 = A.post(B + PS, json={"client_id": CL, "kind": "consent", "template_id": T_CONS}).json()["sheet"]
+check(A.post(B + PS + f"/{S_C9['id']}/send", json={"to": "kunde@example.com"}).ok, "#2874: (setup) a consent sent")
+c9 = re.search(r"\[DS-([A-Z2-9]{12})\]", A.get(B + PS + f"/{S_C9['id']}/mail").json()["subject"]).group(1)
+drop(f"Re: Einwilligung [DS-{c9}]", files=[("fremd.pdf", PDF, "application/pdf")], frm="Jemand <andere@example.com>")
+poll()
+x = until(lambda: (sheet(A, S_C9["id"]) or {}).get("review") == 2 and sheet(A, S_C9["id"]), 40)
+check(x and x["status"] == "sent" and not x["signed_node_id"], f"#2874: a signature from another sender is not taken {x}")
+
 # the plus address alone (the subject changed by the customer) finds the sheet too
 S_C2 = A.post(B + PS, json={"client_id": CL, "kind": "consent", "template_id": T_CONS}).json()["sheet"]
 A.post(B + PS + f"/{S_C2['id']}/send", json={"to": "kunde@example.com"})
@@ -323,7 +335,7 @@ check(r.ok and r.json()["status"] == "declined", "#2192: declined by hand")
 check(A.delete(B + PS + f"/{S_D2['id']}").ok and all(x["id"] != S_D2["id"] for x in A.get(B + PS + "?brief=1").json()["sheets"]), "#2192: archived")
 check(A.post(B + PS + f"/{S_D2['id']}/restore").ok and any(x["id"] == S_D2["id"] for x in A.get(B + PS + "?brief=1").json()["sheets"]), "#2192: restored")
 al = A.get(B + PS + "?brief=1").json()
-check("kinds" not in al and {x["client_id"] for x in al["sheets"]} == {CL} and len(al["sheets"]) == 5, f"#2192: brief = the sheets of the area {len(al['sheets'])}")
+check("kinds" not in al and {x["client_id"] for x in al["sheets"]} == {CL} and len(al["sheets"]) == 6, f"#2192: brief = the sheets of the area {len(al['sheets'])}")  # 2.239.0 (#2874): + the consent of the sender check
 
 # ================================================================== rights + tenant boundary
 check(Bo.get(B + PS).status_code == 403 and Bo.post(B + PS, json={"client_id": CL, "kind": "info"}).status_code == 403, "#2192: a member 403")
@@ -338,7 +350,7 @@ TB = Ca.post(B + TP, json={"kind": "other", "name": "AVV Beta", "lang": "de", "s
 SB = Ca.post(B + PS, json={"client_id": CL2, "kind": "dpa", "template_id": TB}).json()["sheet"]
 Ca.post(B + PS + f"/{SB['id']}/send", json={"to": "fremd@example.com"})
 cb = re.search(r"\[DS-([A-Z2-9]{12})\]", Ca.get(B + PS + f"/{SB['id']}/mail").json()["subject"]).group(1)
-drop(f"Re: AVV [DS-{cb}]", files=[("b.pdf", PDF, "application/pdf")])
+drop(f"Re: AVV [DS-{cb}]", files=[("b.pdf", PDF, "application/pdf")], frm="fremd@example.com")  # 2.239.0 (#2874): signed only by the recipient
 poll()
 x = until(lambda: (sheet(Ca, SB["id"]) or {}).get("review") and sheet(Ca, SB["id"]), 40)
 nd = sql("SELECT org_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []
@@ -364,7 +376,7 @@ FT2 = Fr.post(B + TP, json={"kind": "other", "name": "AVV", "lang": "de", "sign"
 FS2 = Fr.post(B + PS, json={"client_id": FCL, "kind": "dpa", "template_id": FT2}).json()["sheet"]["id"]
 check(Fr.post(B + PS + f"/{FS2}/send", json={"to": "privat@example.com"}).ok, "freelancer: the DPA sent")
 fc = re.search(r"\[DS-([A-Z2-9]{12})\]", Fr.get(B + PS + f"/{FS2}/mail").json()["subject"]).group(1)
-drop(f"Re: AVV [DS-{fc}]", files=[("f.pdf", PDF, "application/pdf")])
+drop(f"Re: AVV [DS-{fc}]", files=[("f.pdf", PDF, "application/pdf")], frm="privat@example.com")  # 2.239.0 (#2874): signed only by the recipient
 poll()
 x = until(lambda: (sheet(Fr, FS2) or {}).get("review") and sheet(Fr, FS2), 40)
 nd = sql("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (x["signed_node_id"],)) if x else []

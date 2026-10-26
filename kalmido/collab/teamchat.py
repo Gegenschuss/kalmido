@@ -707,7 +707,8 @@ def tchat_notify(c, r, m, mentions, replied=None):
             tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] != "dm" else \
             tr("Replied to your message: {0}", text, lg=lg) if uid == replied else (text or tr("Sent a file", lg=lg))  # 2.113.1 (#2059): only files
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#msg/t/{r['id']}/{m['id']}" if root else f"{PUBLIC_URL}/#team/{r['id']}",
-                         push_prio(s)))  # 2.139.0 A (#2127): a thread answer opens its thread
+                         push_prio(s),  # 2.139.0 A (#2127): a thread answer opens its thread
+                         {"scope": f"l:{r['list_id']}" if r["list_id"] else f"o:{r['org_id']}" if r["org_id"] else f"dm:{sender}"}))  # 2.240.0 B2 (#2867)
 
 
 def need_tmsg(c, mid, edit=False):

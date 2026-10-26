@@ -36,7 +36,8 @@ O = "/api/office"
 TP = O + "/doc-templates"
 GD = O + "/gen-docs"
 VARS = {"client.name", "client.address", "client.contact", "project.title", "offer.number", "offer.date", "offer.total",
-        "company.name", "company.address", "today"}
+        "company.name", "company.address", "today",
+        "offer.net", "offer.gross", "payment.days"}  # 2.296.0 (#3165): net / gross / payment term
 LETTERS = ["letter", "reminder", "dunning", "termination", "authority", "handover", "credit"]
 
 

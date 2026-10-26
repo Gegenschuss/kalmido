@@ -526,7 +526,8 @@ document.addEventListener('click', async e => {
     case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); break;  // 2.65.0 (#1823): rmSet may load the timeline first
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
-    case 'side-more': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
+    case 'side-more': sb_moreOpen = !sb_moreOpen; renderSide(); break;  // 2.250.0 C (#2995): unfolds in place (was: the settings)
+    case 'side-customize': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
     case 'sb-people': closeSide(); sbp_dialog(); break;  // 2.99.0 E (#2187): "All people …" (sbnav.js)
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
@@ -780,6 +781,12 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.dataset?.sideShow) {  // 2.250.0 C (#2995): the tick of an unfolded "+ N more views" = the same setting as Settings > Appearance > Sidebar
+    const p = sidePref(), h = new Set(p.hidden);
+    for (const y of t.dataset.sideShow.split(',')) h.delete('e:' + y);
+    await setApply({sidebar: JSON.stringify({order: p.order, hidden: [...h]})}, tr('Sidebar'));
+    renderSide(); return;
+  }
   if (t.id === 'd-file') { uploadFiles(S.sel, t.files); t.value = ''; return; }
   if (t.id === 'c-file') { addCommentFiles(t.files); t.value = ''; return; }
   if (t.id === 'd-url') { saveLink(t.value); return; }

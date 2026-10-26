@@ -26,6 +26,7 @@ from ..core.config import app, ATT_DIR, PUBLIC_URL
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, my_inbox, need_list
 from ..tasks.validation import TITLE_MAX, as_int, log_act
 from ..core.errors import BadInput, UnknownFields
@@ -222,5 +223,5 @@ def chat_save():
         c.rollback()
         unlink_files(g.chat_save_new)
         raise
-    print("chat-save", kind, mid, "->", tid, "by", g.user["username"], flush=True)
+    print("chat-save", kind, mid, "->", tid, "by", login_log_who(g.user), flush=True)
     return jsonify(task=one_task(c, tid), skipped_files=skipped), 201

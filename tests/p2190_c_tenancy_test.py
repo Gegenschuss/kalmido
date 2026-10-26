@@ -201,7 +201,10 @@ r1 = requests.post(V + "/agent/proposals", headers=CLH, json={**body, "list_id":
 r2 = requests.post(V + "/agent/proposals", headers=CLH, json={**body, "list_id": 999999})
 check(r1.status_code == 404 and r2.status_code == 404, f"a private list of the owner answers like a missing one ({r1.status_code} {r2.status_code})")
 r = requests.post(V + "/agent/proposals", headers=CLH, json={**body, "list_id": ORGL})
-check(r.status_code == 201, f"a list of the agent's organisation still gets it ({r.status_code} {r.text[:150]})")
+# 2.223.7 (#2919): a list of the organisation NOT shared with the agent answers 404 too; shared with it, it takes the proposal
+check(r.status_code == 404, f"a list of the agent's organisation not shared with it: 404 ({r.status_code} {r.text[:150]})")
+r = requests.post(V + "/agent/proposals", headers=CLH, json={**body, "list_id": W})
+check(r.status_code == 201, f"a shared list of the agent's organisation still gets it ({r.status_code} {r.text[:150]})")
 
 # ================================================================ #2496 git over http only for allowed hosts
 GP = A.post(B + "/api/lists", json={"name": "App", "kind": "project"}).json()["id"]

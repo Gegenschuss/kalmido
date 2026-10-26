@@ -308,5 +308,21 @@ check(rc == 1 and "not finished" in out, f"F7: in a test run the switch stops af
 rc, out, err_ = cli("rotate", "--org", str(ORG), env=("KALMIDO_ORGCRYPT_ROT_SETTLE=0",))
 check(rc == 0, f"F7: the next run finishes {rc} {out[-200:]}")
 
+# ================================================================== 2.223.2 (#2871, review): the step-up before an admin step
+# (offsite.stepup_need: off-site target, export downloads) has its own purpose "0:su" -- a login-provider account without a
+# personal office gets through it, and a recovery key's step-up does not count for it (nor the other way round)
+U = "/api/retention/me/export.zip"
+dbx("UPDATE sessions SET stepup_at=?, stepup_for=? WHERE user_id=?", (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()), f"{ORG}:show", ids["sven"]))
+r = Sv.post(B + U, json={})
+check(r.status_code == 403 and r.json().get("need") == "fresh" and r.json().get("stepup") == "oidc",
+      f"#2871: a recovery key's step-up does not count for the download {r.status_code} {r.text[:150]}")
+q, loc = stepup(Sv, 0, {"sub": "sub-sven", "preferred_username": "sven", "auth_time": int(time.time())}, "su")
+check(loc == "/#rck-stepup/0/su", f"#2871: the step-up 'su' needs no office of its own {loc}")
+check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at<>''", (ids["sven"],)) == "0:su", "#2871: the session notes 0:su")
+r = Sv.post(B + U, json={})
+check(r.ok and r.json().get("ticket"), f"#2871: after the step-up 'su' the download ticket {r.status_code} {r.text[:150]}")
+check(Sv.get(B + U, params={"t": r.json().get("ticket", "") if r.ok else ""}).ok, "#2871: the ticket fetches the file")
+check(show(Sv, ORG).status_code == 403, "#2871: the step-up 'su' does not show a recovery key")
+
 print(f"p21445_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

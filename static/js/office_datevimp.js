@@ -60,7 +60,10 @@ function dimp_dialog() {
     const j = await api('POST', '/api/office/datev/import', fd);
     DIMP.sup = null; DIMP.ob = {};
     if (typeof ofcDraw === 'function') ofcDraw();
-    toast(dimp_doneText(j), async () => { await api('POST', `/api/office/datev/import/${j.run_id}/undo`); DIMP.sup = null; DIMP.ob = {}; dimp_supLoad(); if (typeof ofcDraw === 'function') ofcDraw(); }, 12000);
+    toast(dimp_doneText(j), async () => { const u = await api('POST', `/api/office/datev/import/${j.run_id}/undo`); DIMP.sup = null;
+      DIMP.ob = {}; dimp_supLoad(); if (typeof ofcDraw === 'function') ofcDraw();
+      if (u?.kept?.suppliers) toast(trn('{0} supplier changed since the import stays', '{0} suppliers changed since the import stay', u.kept.suppliers));  // 2.273.0 C (#3051)
+    }, 12000);
   });
   const ok = /** @type {any} */ ($('[data-m="ok"]', /** @type {any} */ (md))); if (ok) ok.disabled = true;
   return md;

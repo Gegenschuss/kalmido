@@ -100,7 +100,8 @@ const FEAT = 'cal,collab,comments,time,events,dispo';
   const m2 = await until(() => d.querySelector('.ppm .ppi.apri') && d.querySelector('.ppm'));
   const r2 = m2 ? [...m2.querySelectorAll('.ppi.apri')] : [];
   check(r2.length === 3 && r2[0].querySelector('[data-f="location"]').value === 'Studio' && !r2[1].querySelector('[data-f="start"]'), '#1355: day rows (time / place; all day without time)');
-  check(r2[2] && r2[2].classList.contains('sub') && /Already booked: Other film/.test(r2[2].querySelector('.apwarn')?.textContent || ''), '#1355: the crew row with its warning');
+  // 2.223.7 (#2921): the warning holds what the agent may see -- the other booking has no project it reads: "Booked"
+  check(r2[2] && r2[2].classList.contains('sub') && /Already booked: Booked/.test(r2[2].querySelector('.apwarn')?.textContent || ''), '#1355: the crew row with its warning');
   check(/never firm/.test(m2?.querySelector('.shint')?.textContent || ''), '#1355: the hint says: options, never firm');
   w.close();
 

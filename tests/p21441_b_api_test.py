@@ -5,7 +5,7 @@ encryption on). Invented companies, accounts and figures only (statements made h
    one preview sorted by day, entries with a path show only their name, .exe / .pdf / a nested ZIP skipped, the packing
    system's hidden files ignored, nothing written anywhere; the import is one row (one undo step), undo takes every booking
    back, restore brings them back; several files without a ZIP; a booking in two files counts once, two equal bookings of one
-   file stay two; CSV files with different columns refused, equal ones share the mapping (CAMT + CSV mixed); MT940 refused
+   file stay two; CSV files with different columns refused, equal ones share the mapping (CAMT + CSV mixed); MT940 read (2.299.0)
    with a clear message; a DOCTYPE in a ZIP refused (the other files go), an encrypted entry named; limits: an entry
    unpacked beyond 2 MB, too many entries, too many files -> 400, the server keeps answering; the JSON way {text} unchanged
  - an organisation: bookings encrypted at rest; a member without the admin role 403, an agent 403, another organisation 404
@@ -196,9 +196,10 @@ check(r.status_code == 400 and "different columns" in r.text, "CSV files with di
 # MT940, DOCTYPE, an encrypted entry
 MT = ":20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,00\n:61:2610011001CR10,00NTRFNONREF\n:62F:C261001EUR110,00\n"
 r = up(Fr, "/import/preview", [("konto.sta", MT)])
-check(r.status_code == 400 and "MT940" in r.text and "CAMT.053" in r.text, "MT940: a clear message " + r.text[:200])
+# 2.299.0 (#3190): MT940 is read now (was refused with a message); the full cases are in p2299_a_mt940_test.py
+check(r.status_code == 200 and r.json().get("fmt") == "mt940" and r.json().get("count") == 1, "MT940: read as a statement " + r.text[:200])
 r = Fr.post(B + K + "/import/preview", json={"text": MT, "filename": "konto.txt"})
-check(r.status_code == 400 and "MT940" in r.text, "MT940 on the JSON way too " + r.text[:200])
+check(r.status_code == 200 and r.json().get("fmt") == "mt940", "MT940 on the JSON way too " + r.text[:200])
 EVIL = '<?xml version="1.0"?><!DOCTYPE d [<!ENTITY x "y">]>' + X1.split("?>", 1)[1]
 r = up(Fr, "/import/preview", [("e.zip", zipped([("evil.xml", EVIL)]))])
 check(r.status_code == 400 and "DOCTYPE" in r.text, "a DOCTYPE in a zip is refused " + r.text[:200])

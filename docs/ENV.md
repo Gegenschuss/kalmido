@@ -76,7 +76,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_LOG_FULL_IP` | `1` | Switch: failed sign-ins in the server log keep the full address (fail2ban bans by it); 0 shortens it like the alerts (IPv4 /24, IPv6 /48). |
+| `KALMIDO_LOGIN_SLOW_S` | `2.5` | Seconds a sign-in waits when its address had many failed logins (2.282.0: a delay instead of a lock; names known at that address are not delayed). |
+| `KALMIDO_LOG_FULL_IP` | `0` | Switch: addresses in the server log are shortened like the alerts (IPv4 /24, IPv6 /48); 1 keeps them in full (for fail2ban, which bans by the address). |
 | `KALMIDO_NO_SECRET_KEY` | `0` | Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only. |
 | `KALMIDO_ORGCRYPT_DELAY` | `(empty)` | Seconds before the background encryption pass starts after a start (default: 300). |
 | `KALMIDO_ORGCRYPT_PAUSE` | `0.2` | Seconds between two portions of the background encryption pass. |
@@ -130,6 +131,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMAP_FOLDER` | `INBOX` | IMAP folder that is read. |
 | `KALMIDO_IMAP_HOST` | `(empty)` | IMAP server of that mailbox. |
 | `KALMIDO_IMAP_INTERVAL` | `60` | Seconds between two looks into the mailbox (at least 10). |
+| `KALMIDO_IMAP_KEEP` | `0` | Switch: keep imported mails in the mailbox (only marked read) instead of deleting them. Mails not taken in whole (too large, refused, an attachment not stored) always stay, marked read. |
 | `KALMIDO_IMAP_PASSWORD` | `(empty)` | IMAP password. |
 | `KALMIDO_IMAP_PORT` | `0` | IMAP port (0 = the default of the TLS mode). |
 | `KALMIDO_IMAP_SSL` | `1` | Switch: IMAP over TLS. |
@@ -141,6 +143,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | Office documents sent by mail per organisation and day. |
 | `KALMIDO_OFFICE_MAILS_DAY_PERSON` | `150` | Office documents sent by mail per person and day. |
 | `KALMIDO_SMTP_HOST` | `(empty)` | SMTP server for outgoing mail (empty = no mail). |
+| `KALMIDO_SMTP_INSECURE` | `0` | Switch: do not check the certificate of the admin mail server (SMTP and IMAP; warned at start). |
 | `KALMIDO_SMTP_PASSWORD` | `(empty)` | SMTP password. |
 | `KALMIDO_SMTP_PORT` | `0` | SMTP port (0 = the port of the TLS mode). |
 | `KALMIDO_SMTP_TLS` | `starttls` | SMTP encryption: starttls, ssl or none. |
@@ -269,6 +272,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_EMBED_BUSY` | `2` | Seconds between two batches of a backlog. |
 | `KALMIDO_EMBED_CLEAN` | `60` | Seconds between two clean-ups of the embeddings. |
 | `KALMIDO_EMBED_DOWN` | `60` | Seconds of pause after the embedding service failed. |
+| `KALMIDO_EMBED_EXTERNAL` | `0` | Switch: allow an embedding service on another host (task titles and descriptions go there). |
 | `KALMIDO_EMBED_IDLE` | `15` | Seconds between two looks of the embedding pass when nothing waits. |
 | `KALMIDO_EMBED_URL` | `(empty)` | Address of the optional embedding service (related tasks, meaning search; empty = off); task titles and descriptions are sent to it. |
 | `KALMIDO_RELATED_DUP` | `0.96` | Similarity from which two tasks count as probable duplicates. |

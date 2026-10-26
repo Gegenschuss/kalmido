@@ -95,7 +95,8 @@ check("fällig" not in d["closing"] and d["closing"].startswith("Bitte überweis
 fin(d["id"])
 r = A.post(B + f"{D}/{d['id']}/credit")
 cr = r.json()
-check(r.status_code == 201 and cr["closing"].startswith("Den Gutschriftsbetrag") and cr["closing"] != d["closing"], "#1368 2: credit note has its own closing: " + cr.get("closing", "")[:80])
+# 2.296.0 B (#3175): the credit note prints as "Rechnungskorrektur" (was "Gutschrift")
+check(r.status_code == 201 and cr["closing"].startswith("Den Korrekturbetrag") and cr["closing"] != d["closing"], "#1368 2: credit note has its own closing: " + cr.get("closing", "")[:80])
 fin(cr["id"])
 x = A.get(B + f"{D}/{cr['id']}/xml").text
 check("Zahlbar sofort" not in x and "<ram:TypeCode>381</ram:TypeCode>" in x and "erstattet oder verrechnet" in x, "#1368 2: credit note XML without 'Zahlbar sofort ohne Abzug'")

@@ -25,7 +25,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,files,docs,office,clients"
 O = "/api/office"
 KEYENV = " -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="
@@ -111,7 +111,7 @@ r = Do.get(B + f"/api/orgs/{DEL}/export/file")
 check(r.ok and r.content[:8] == b"KALMIDO-", f"dora: downloads the archive {r.status_code} {r.content[:60]}")
 r = Do.get(B + f"/api/retention/org/{DEL}")
 check(r.ok and r.json().get("can_export") is True and r.json().get("counts", {}).get("documents") == 1, "dora: the retention info " + r.text[:300])
-r = Do.get(B + f"/api/retention/org/{DEL}/export.zip")
+r = su_get(Do, B + f"/api/retention/org/{DEL}/export.zip")  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
 check(r.ok and r.content[:2] == b"PK", f"dora: the retention export {r.status_code}")
 
 # nobody else: not the instance admins (they were not its admins), not the former member
@@ -126,14 +126,20 @@ for who, s in (("alice", A), ("erik", Er)):
 check(Bo.get(B + f"/api/orgs/{DEL}/export").status_code in (403, 404) and Bo.get(B + f"/api/retention/org/{DEL}/export.zip").status_code == 404,
       "bob (former member): no export")
 # an organisation retired before 2.186 (no noted admins): the instance admins as before
+# 2.239.0 (#2943): ... but only its retention export (the records kept by law), never the whole organisation's export
 sql("UPDATE orgs SET retired_admins=NULL WHERE id=?", (DEL,), write=True)
-check(A.get(B + f"/api/orgs/{DEL}/export").ok and Do.get(B + f"/api/orgs/{DEL}/export").status_code in (403, 404),
-      "retired before 2.186: the instance admin exports it as before")
+check(A.get(B + f"/api/orgs/{DEL}/export").status_code in (403, 404) and su_get(A, B + f"/api/retention/org/{DEL}/export.zip").ok
+      and Do.get(B + f"/api/orgs/{DEL}/export").status_code in (403, 404),
+      "retired before 2.186: the instance admin gets the retention export only")
+di = A.get(B + f"/api/admin/orgs/{DEL}/delete-info").json()
+check(di.get("can_export") is False and di.get("can_retention") is True, f"retired before 2.186: delete-info offers the retention export only {di}")
 sql("UPDATE orgs SET retired_admins=? WHERE id=?", (str(DORA), DEL), write=True)
 # review M3: none of the noted admins left = the instance admins export it (else nobody could for years)
+# 2.239.0 (#2943): the retention export only
 for v in ("", "999999"):
     sql("UPDATE orgs SET retired_admins=? WHERE id=?", (v, DEL), write=True)
-    check(A.get(B + f"/api/orgs/{DEL}/export").ok, f"retired_admins {v!r}: the instance admin exports it")
+    check(su_get(A, B + f"/api/retention/org/{DEL}/export.zip").ok and A.post(B + f"/api/orgs/{DEL}/export").status_code in (403, 404),
+          f"retired_admins {v!r}: the instance admin gets the retention export, not the organisation export")
 sql("UPDATE orgs SET retired_admins=? WHERE id=?", (str(DORA), DEL), write=True)
 
 # still within the period: not deleted
@@ -141,6 +147,8 @@ r = A.delete(B + f"/api/admin/orgs/{DEL}")
 check(r.status_code == 409 and "2035-12-31" in r.text, "Delta: not deleted before the period ends " + r.text[:160])
 # after the period: no export step, noted as expired (never as a waiver)
 sql("UPDATE orgs SET retain_until='2020-12-31' WHERE id=?", (DEL,), write=True)
+# 2.239.0 (#2874): the manual delete computes the period anew (like the watchdog): the invoice must be old enough, too
+sql("UPDATE office_docs SET date='2013-03-02' WHERE id=?", (DDOC,), write=True)
 r = A.get(B + f"/api/retention/org/{DEL}")
 check(r.ok and r.json().get("state") == "expired", "after the period: retention state expired " + r.text[:200])
 r = A.delete(B + f"/api/admin/orgs/{DEL}")

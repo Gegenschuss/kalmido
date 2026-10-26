@@ -18,6 +18,7 @@ from flask import jsonify, request
 
 from ..core.config import SECRET_KEY, app
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
+from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core import stmtfiles as sf  # 2.146.0 C (#2455): uploads, several files / a ZIP
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -27,11 +28,15 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
+from .rights import ofr_allows, ofr_need_area  # 2.237.0 A (#2861)
 
-BNK_KINDS = ("invoice", "receipt", "private", "ignored")
+# 2.299.0 C (#3192): noreceipt = a business booking that needs no receipt (bank fees, tax payments), set and undone like
+# private / ignored. A version before 2.299 reads it as "matched" with an unknown kind (shown, undone as before), never breaks.
+BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt")
 BNK_STATES = ("open", "matched", "all")
 BNK_LIST_MAX = 2000
 BNK_TEXT_MAX = 300
+BNK_PURPOSE_FULL_MAX = 2000  # 2.273.0 D (#3051)
 BNK_WINDOW = 14  # days around a booking for receipts
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 IBAN_RE = re.compile(r"^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$")
@@ -43,7 +48,7 @@ BNK_FILES_MAX = 400  # statements of one import (after unpacking)
 BNK_UNPACKED_MAX = 60 * 1024 * 1024  # all statements together, unpacked
 BNK_ROWS_MAX = 20000  # rows of one import
 BNK_ZIP_ENTRIES_MAX = 2000  # entries in a ZIP's central directory, checked before anything is read
-BNK_EXTS = (".xml", ".csv", ".txt")
+BNK_EXTS = (".xml", ".csv", ".txt", ".sta", ".mt940", ".mt942", ".swi")  # 2.299.0 A (#3190): + MT940 files
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -99,6 +104,11 @@ def bnk_camt(text):
     return cx.camt_rows(text, BNK_TEXT_MAX)
 
 
+def bnk_mt940(text):
+    """2.299.0 A (#3190): MT940 / MT942 -> rows like bnk_camt (core/mt940; MT942 bookings are pending)."""
+    return mt.mt_parse(text, BNK_TEXT_MAX)[0]
+
+
 _iban_col = cx.csv_iban_col  # 2.146.0 C (#2455): the counterpart's IBAN column (an own-account IBAN column only when alone)
 
 
@@ -117,9 +127,11 @@ def bnk_csv(text, mapping):
             amt = money(dec(x["amount"]))
             amt = amt if x["kind"] == "in" else -amt
         cp = _clean(x["counterpart"], 200)
-        purpose = _clean(r[m["title"]] if m.get("title") is not None and m["title"] < len(r) else "")
+        raw = r[m["title"]] if m.get("title") is not None and m["title"] < len(r) else ""
+        purpose = _clean(raw)
+        pfull = _clean(raw, BNK_PURPOSE_FULL_MAX)  # 2.273.0 D (#3051): stored in full; only the fingerprint uses `purpose` (cut)
         iban = (r[ic] if ic is not None and ic < len(r) else "").replace(" ", "").upper()
-        out.append({"day": x["day"], "amount": amt, "currency": "", "counterpart": cp, "purpose": purpose,
+        out.append({"day": x["day"], "amount": amt, "currency": "", "counterpart": cp, "purpose": purpose, "purpose_full": pfull,
                     "iban": iban if IBAN_RE.match(iban) else None, "ref": None, "error": x["error"], "pending": False})
     return out
 
@@ -133,7 +145,7 @@ def _hashes(c, oid):
 _LIMITS = {"file_max": BNK_FILE_MAX, "upload_max": BNK_UPLOAD_MAX, "files_max": BNK_FILES_MAX, "unpacked_max": BNK_UNPACKED_MAX,
            "entries_max": BNK_ZIP_ENTRIES_MAX, "exts": BNK_EXTS}
 _fname, _decode = sf.stmt_fname, sf.stmt_decode
-bnk_is_mt940 = sf.is_mt940  # a SWIFT MT940 / MT942 statement -- not read; the dialog asks for CAMT.053
+bnk_is_mt940 = sf.is_mt940  # a SWIFT MT940 / MT942 statement (2.299.0 A #3190: read by core/mt940)
 
 
 def _uploads(b):
@@ -161,7 +173,7 @@ def bnk_parse(c, oid, b, fs=None):
         if bnk_is_camt(f["text"]):
             parts.append({**f, "fmt": "camt"})
         elif bnk_is_mt940(f["text"]):
-            fs.errors.append({"file": f["name"], "error": tr("MT940 / MT942 is not read; please export CAMT.053 (XML) from your online banking")})
+            parts.append({**f, "fmt": "mt940"})  # 2.299.0 A (#3190)
         else:
             parts.append({**f, "fmt": "csv"})
     info = {"files": n_files, "file_errors": fs.errors, "skipped_files": fs.skipped, "label": ", ".join(fs.labels)}
@@ -193,7 +205,7 @@ def bnk_parse(c, oid, b, fs=None):
             fs.errors.append({"file": p["name"], "error": p["error"]})
             continue
         try:
-            got = bnk_camt(p["text"]) if p["fmt"] == "camt" else bnk_csv(p["text"], mapping)
+            got = bnk_camt(p["text"]) if p["fmt"] == "camt" else bnk_mt940(p["text"]) if p["fmt"] == "mt940" else bnk_csv(p["text"], mapping)
             if len(got) > BNK_FILE_ROWS:
                 raise BadInput(tr("At most {0} rows per import", BNK_FILE_ROWS))
         except BadInput as x:
@@ -291,18 +303,20 @@ def bnk_import():
                     (oid, fname, fmt, len(new), dup, uid, ts))
     for r in new:
         row = {"org_id": oid, "import_id": iid, "day": r["day"], "amount": dstr(r["amount"]), "currency": r["currency"],
-               "counterpart": r["counterpart"], "purpose": r["purpose"], "iban": r["iban"], "ref": r["ref"], "hash": r["hash"],
+               "counterpart": r["counterpart"], "purpose": r.get("purpose_full") or r["purpose"], "iban": r["iban"], "ref": r["ref"], "hash": r["hash"],
                "rkeys": " ".join(r["rkeys"]), "created_at": ts}
         row = oc_enc_fields(c, oid, "office_bank_tx", row)
         c.execute(f"INSERT INTO office_bank_tx({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     from .cfbank import cfb_store
     bal_n = cfb_store(c, oid, iid, fmt, b, ts, parts)  # 2.124.0 D (#2342): the statement's balances, counted while the import is active
+    ruled = _br.br_apply(c, oid, import_id=iid)  # 2.299.0 B (#3191): the bank rules mark what they decide
     bump(c)
     c.commit()
     imp = c.execute("SELECT * FROM office_bank_imports WHERE id=?", (iid,)).fetchone()
     return jsonify({"import": _import_public(imp), "count": len(new), "dup_count": dup,
                     "pending_count": sum(1 for r in rows if not r["error"] and r["pending"]),
-                    "skipped": sum(1 for r in rows if r["error"]), "balances": bal_n, **_info_out(info)}), 201
+                    "skipped": sum(1 for r in rows if r["error"]), "balances": bal_n, "ruled": ruled["applied"], "ruled_locked": ruled["locked"],
+                    **_info_out(info)}), 201
 
 
 @app.get("/api/office/bank/imports")
@@ -324,9 +338,11 @@ def bnk_import_undo(iid):
     """Takes an import back: its bookings go (deleted_at; the client's undo restores them). 409 while one is matched."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_bank_import_{oid}")
+    write_lock(c, f"office_bank_rules_{oid}")  # 2.299.0 (#3191 review): no rule marks bookings of this import meanwhile (order as bnk_import)
     r = _import_row(c, oid, iid)
     if r["undone_at"]:
         raise Denied(409, tr("This import was already taken back"))
+    _br.br_release(c, oid, import_id=iid)  # 2.299.0 B (#3191): marks of a rule do not hold the take-back up (locked months stay)
     if c.execute("SELECT 1 FROM office_bank_tx WHERE org_id=? AND import_id=? AND deleted_at IS NULL AND match_kind IS NOT NULL LIMIT 1",
                  (oid, iid)).fetchone():
         raise Denied(409, tr("Bookings of this import are matched; undo the matches first"))
@@ -354,6 +370,7 @@ def bnk_import_restore(iid):
         c.execute("UPDATE office_bank_tx SET deleted_at=NULL WHERE id=? AND org_id=?", (t["id"], oid))
         back += 1
     c.execute("UPDATE office_bank_imports SET undone_at=NULL, count=? WHERE id=? AND org_id=?", (back, iid, oid))
+    _br.br_apply(c, oid, import_id=iid)  # 2.299.0 B (#3191)
     bump(c)
     c.commit()
     return jsonify(ok=True, item=_import_public(_import_row(c, oid, iid)))
@@ -450,10 +467,12 @@ def _tx_dec(c, oid, r):
     return d
 
 
-def _tx_public(t, inv_by_id, rc_by_id):
+def _tx_public(t, inv_by_id, rc_by_id, rule_names=None):
     m = None
     if t["match_kind"]:
         m = {"kind": t["match_kind"], "id": t["match_id"], "label": "", "at": t["matched_at"]}
+        if t.get("rule_id"):  # 2.299.0 B (#3191): marked by a bank rule ("by rule <name>"; unmatch lifts it)
+            m["by_rule"] = {"id": t["rule_id"], "name": (rule_names or {}).get(t["rule_id"], "")}
         if t["match_kind"] == "invoice":
             i = inv_by_id.get(t["match_id"])
             m["label"] = " · ".join(x for x in (i["number"], i["client"]) if x) if i else ""
@@ -501,16 +520,20 @@ def bnk_tx_list():
     receipts, invoices = [], []
     if rows:
         receipts = _receipts(c, oid, _shift(min(t["day"] for t in rows), -BNK_WINDOW), _shift(max(t["day"] for t in rows), BNK_WINDOW), uid)
-        if any(t["match_kind"] is None and t["amount"] > 0 for t in rows):
+        if any(t["match_kind"] is None and t["amount"] > 0 for t in rows) and ofr_allows(c, uid, oid, "offers", "view"):  # 2.237.0 A (#2861)
             invoices = bnk_open_invoices(c, oid)
     taken = {r[0] for r in c.execute("SELECT match_id FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt'", (oid,))}
     inv_lbl = _inv_labels(c, oid, {t["match_id"] for t in rows if t["match_kind"] == "invoice"})
     rc_by_id = {r["node_id"]: r for r in receipts}
+    rules, names = _br.br_rules(c, oid), _br.br_names(c, oid, {t["rule_id"] for t in rows if t["match_kind"]})  # 2.299.0 B (#3191)
     items = []
     for t in rows:
-        p = _tx_public(t, inv_lbl, rc_by_id)
+        p = _tx_public(t, inv_lbl, rc_by_id, names)
         if t["match_kind"] is None:
             p["suggestions"] = bnk_suggest(t, invoices, receipts, taken)
+            r, best = _br.br_pick(rules, t)
+            if best:  # 2.299.0 B (#3191): a category rule, a tie of rules or a rule that could not mark (locked month)
+                p["rule_hint"] = {**_br.br_hint(r or best[0]), "tie": r is None}
         items.append(p)
     return jsonify(items=items, currency=_home(c, oid), counts=counts)
 
@@ -524,7 +547,7 @@ def bnk_candidates(tid):
     q = _norm(request.args.get("q") or "")[:100]
     out = []
     if t["amount"] > 0:
-        for i in bnk_open_invoices(c, oid):
+        for i in (bnk_open_invoices(c, oid) if ofr_allows(c, uid, oid, "offers", "view") else []):  # 2.237.0 A (#2861)
             if i["currency"] != t["currency"]:
                 continue
             lbl = " · ".join(x for x in (i["number"], i["client"] or i["title"]) if x)
@@ -556,12 +579,12 @@ def _tx_answer(c, oid, uid, tid):
     rc = {}
     if t["match_kind"] == "receipt":
         rc = {r["node_id"]: r for r in _receipts(c, oid, t["day"], t["day"], uid)}
-    return _tx_public(t, inv, rc)
+    return _tx_public(t, inv, rc, _br.br_names(c, oid, {t.get("rule_id")}))
 
 
 @app.post("/api/office/bank/tx/<int:tid>/match")
 def bnk_match(tid):
-    """{kind: invoice|receipt|private|ignored, id?} -> the booking. invoice: a payment (day, amount of the booking, transfer)
+    """{kind: invoice|receipt|private|ignored|noreceipt, id?} -> the booking. invoice: a payment (day, amount of the booking, transfer)
     on that open invoice (a smaller amount = partly paid); receipt: its payment day = the booking's day. 409 when the booking
     is matched already, the direction or currency does not fit or the amount exceeds the open rest; foreign ids 404."""
     from .invoices import inv_pay_add
@@ -586,6 +609,7 @@ def bnk_match(tid):
             raise BadInput(tr("Invalid value: {0}", "id")) from None
     if kind == "invoice":
         from .docs import doc_row
+        ofr_need_area(c, uid, oid, "offers", "edit")  # 2.237.0 A (#2861): like the invoice's own payments (+ pay: the gate)
         r = doc_row(c, oid, mid)  # 404 outside the area
         if r["trial"]:  # 2.144.10 B (#2576)
             raise Denied(409, tr("Trial documents do not go to the accounting"))
@@ -608,11 +632,13 @@ def bnk_match(tid):
         if not fs_role(c, mid, uid):  # as bk_receipts: only documents the person sees
             raise Denied(404)
         bk_receipt_set_paid(c, oid, mid, t["day"])  # 404 outside the area
-    c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, payment_id=?, matched_by=?, matched_at=? WHERE id=? AND org_id=?",
+    c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, payment_id=?, matched_by=?, matched_at=?, rule_id=NULL WHERE id=? AND org_id=?",
               (kind, mid, pid, uid, iso(now_utc()), tid, oid))
+    rcat = _br.br_on_receipt(c, oid, t, mid) if kind == "receipt" else None  # 2.299.0 B (#3191): a category rule names the receipt's category
+    learn = _br.br_learn(c, oid, t, kind, mid)  # 2.299.0 B (#3191): the second time the same way -> "Always like this?"
     bump(c)
     c.commit()
-    return jsonify(_tx_answer(c, oid, uid, tid))
+    return jsonify({**_tx_answer(c, oid, uid, tid), "rule_category": rcat, "rule_suggestion": learn})
 
 
 @app.post("/api/office/bank/tx/<int:tid>/unmatch")
@@ -641,8 +667,11 @@ def bnk_unmatch(tid):
         except Denied as e:  # the receipt is gone
             if e.code != 404:
                 raise
-    c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL WHERE id=? AND org_id=?",
-              (tid, oid))
+    c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL, rule_id=NULL "
+              "WHERE id=? AND org_id=?", (tid, oid))  # 2.299.0 B (#3191): + rule_id
     bump(c)
     c.commit()
     return jsonify(item=_tx_answer(c, oid, uid, tid), was=was)
+
+
+from . import bankrules as _br  # noqa: E402  2.299.0 B (#3191): at the end (bankrules reads this module's helpers)

@@ -142,6 +142,8 @@ r = A.post(B + "/api/my/agents", json={"username": "officebot", "display_name": 
 check(r.status_code == 201, "setup: a personal agent " + r.text[:200])
 AG, AH = r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok, "setup: the agent may draft office documents")
+# 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (payment suggestions need one)
+check(A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects", "tpl:bookkeeping"]}).ok, "setup: the agent in Project management + Bookkeeping")
 
 
 def ag(m, path, hd=AH, **kw):

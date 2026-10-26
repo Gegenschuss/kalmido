@@ -420,6 +420,8 @@ def collab_user(c, uid, lid=None):
 
 def burst_gate(c, uid, tid, mentioned=False, event=False):
     """True = push now (time remembered); False = counted for the watchdog's summary."""
+    if any(f(c, uid) for f in PUSH_BURST_SKIP):  # 2.236.0 (#2909 #2905): an agent's work style drops / holds it
+        return False
     now = time.time()
     st = c.execute("SELECT sent_at FROM task_push WHERE user_id=? AND task_id=?", (uid, tid)).fetchone()
     if st and now - st["sent_at"] < TASK_PUSH_GAP:
@@ -628,11 +630,29 @@ def assignment_events(c, tid, old_assignee, new_assignee):
 
 def send_pushes(pushes):
     from ..notify.push import notify
+    if pushes and has_request_context():
+        pushes = push_filtered(pushes)
     if pushes:
         # (uid, title, msg, click, prio[, extra]): extra = notify() keywords (2.0.8: actions + task of comment pushes)
         # 2.142.0 A (#2145): kind "other" for the notification channels unless the push names its own
         threading.Thread(target=lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
                                          for x in pushes], daemon=True).start()
+
+
+PUSH_BURST_SKIP = []  # 2.236.0 (#2909): f(c, uid) -> True = no push and no burst count (agents/workstyle.py ws_burst_skip)
+PUSH_FILTERS = []  # 2.236.0 B (#2909): f(c, actor, pushes) -> the pushes that may go out (registered by agents/workstyle.py)
+
+
+def push_filtered(p):
+    """2.236.0 B (#2909, #2905): the pushes of a request (sent after its commit) through PUSH_FILTERS: an agent's pushes
+    follow its work style (push mode, quiet window; agents/workstyle.py)."""
+    try:
+        for f in PUSH_FILTERS:
+            p = f(db(), g.get("user"), p)
+        return p
+    except Exception as e:  # noqa: BLE001
+        print("agent push filter failed:", type(e).__name__, str(e)[:200], flush=True)
+        return [(*x[:5], {k: v for k, v in x[5].items() if k != "ws"}) if len(x) > 5 and isinstance(x[5], dict) else x for x in p]
 
 
 @app.after_request

@@ -3,7 +3,7 @@
 // - a person without organisation (personal office): "Import bank statement" opens the dialog with the format hint (CAMT.053
 //   recommended, CSV, not pending / MT940) and "Choose files"; 360 px wide without sideways scrolling; two CAMT files handed
 //   over at once -> one preview naming the two files and their rows; import -> the undo offer in the toast, the undo takes
-//   the import back; an MT940 file -> the clear message in the dialog; the cash flow has a button that opens the same dialog
+//   the import back; an MT940 file -> its preview in the dialog (2.299.0); the cash flow has a button that opens the same dialog
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -52,10 +52,10 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     check(await ready(ev, `typeof bnkImpModal === 'function' && !!document.querySelector('[data-bnk="imp"]')`, 80), 'the bank tab');
     // #2446: the dialog first, with the hint and "Choose files"
     await ev(`(() => { document.querySelector('[data-bnk="imp"]').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 3 && !!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`, 40), 'the dialog opens with the hint and "Choose files"');
+    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 4 && !!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`, 40), 'the dialog opens with the hint and "Choose files"');
     const hint = await ev(`document.querySelector('.modal.bnkdlg .bnk-hint')?.textContent || ''`);
     check(/CAMT\.053/.test(hint) && !/V2 or V8/.test(hint) /* 2.298.0 A2 (#3186): the version note is gone */ && /balance column/.test(hint) && /MT940/.test(hint) && /pending/.test(hint), 'the hint names CAMT.053, CSV and what not to take ' + hint.slice(0, 200));
-    check(await ev(`document.querySelector('.modal.bnkdlg .bnk-hint').querySelectorAll('svg.i').length === 3 && !/[\\u{1F300}-\\u{1FAFF}]/u.test(document.querySelector('.modal.bnkdlg .bnk-hint').textContent)`), 'app icons, no emoji');
+    check(await ev(`document.querySelector('.modal.bnkdlg .bnk-hint').querySelectorAll('svg.i').length === 4 && !/[\\u{1F300}-\\u{1FAFF}]/u.test(document.querySelector('.modal.bnkdlg .bnk-hint').textContent)`), 'app icons, no emoji');
     check(await ev(noSide), '360 px: no sideways scrolling in the start step');
     await shot('p21441-b-start.png');
     // #2450: two files at once -> one preview
@@ -75,11 +75,11 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     let back = false;
     for (let i = 0; i < 40 && !back; i++) { back = !!(await call(CF, 'GET', '/api/office/bank/imports')).items?.[0]?.undone_at; if (!back) await sleep(250); }
     check(back, 'the undo takes the import back');
-    // MT940: a clear message instead of the columns
+    // MT940 (2.299.0 #3190: read now): the preview of its bookings at once, no column step
     await ev(`(() => { document.querySelector('[data-bnk="imp"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`);
     await ev(give([['konto.sta', MT]]));
-    check(await ready(ev, `/MT940/.test(document.querySelector('.modal.bnkdlg .aerr')?.textContent || '') && !document.querySelector('.modal.bnkdlg #bi-date')`, 40), 'MT940: the message in the dialog, no column step');
+    check(await ready(ev, `!!document.querySelector('.modal.bnkdlg .bnkprev .ofcrow') && !document.querySelector('.modal.bnkdlg #bi-date')`, 40), 'MT940: the preview in the dialog, no column step');
     await ev(`(() => { document.querySelector('.modal.bnkdlg [data-bi="close"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal')`, 40), 'the dialog closes');
     // the cash flow opens the same dialog
@@ -88,7 +88,7 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     if (!await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 40)) await ev(tab('#office/cashflow'));
     check(await ready(ev, `!!document.querySelector('[data-cfb-imp]')`, 80), 'the cash flow offers "Import bank statement" ' + await ev(`location.hash + ' ' + document.querySelectorAll('.modal').length`));
     await ev(`(() => { document.querySelector('[data-cfb-imp]').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 3`, 40), 'the same dialog with the hint');
+    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 4`, 40), 'the same dialog with the hint');
     await ev(give([['tag3.xml', C2]]));
     check(await ready(ev, `!!document.querySelector('.modal.bnkdlg [data-bi="next"]')`, 60), 'the preview from the cash flow');
     await ev(`(() => { document.querySelector('.modal.bnkdlg [data-bi="next"]').click(); return 1; })()`);

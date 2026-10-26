@@ -16,7 +16,7 @@ import uuid
 
 from ..core.config import OFFICE_DIR
 from ..core.i18n import N_
-from .orgimport import OiFix, OiT  # noqa: F401
+from .orgimport import OiFix, OiT, _txt  # noqa: F401
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..office.calc import dec  # 2.188.0 A (#2498)
@@ -204,9 +204,21 @@ def _p_doc(c, run, src, d, ctx):
     return d
 
 
+def _oi_mark(c, run, ctx, target, doc_id=None, detail=None):
+    """2.237.0 D (#2870): an office log entry "imported" by the importing person: what the file says (finalised, number,
+    an approval, a day closing, locked months) came from the file, not from this office. Removed again by the undo."""
+    if not isinstance(ctx.space, int):
+        return
+    det = {"source": "file", **{k: v for k, v in (detail or {}).items() if v not in (None, "")}}
+    lid = insert_id(c, "INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) VALUES(?,?,?,?,?,?,?)",
+                    (ctx.space, doc_id, ctx.uid, iso(now_utc()), "import", target, oc_log_detail(c, ctx.space, json.dumps(det, ensure_ascii=False))))
+    run.created["oi"].append(["office_doc_log", lid, ctx.space])
+
+
 def _a_doc(c, run, src, nid, ctx):
     """The stored files of a finalised document (PDF / XML under the new id) and the snapshots its sender names."""
     from ..office.pdfweb import epdf_name
+    _oi_mark(c, run, ctx, "doc", nid, {k: src.get(k) for k in ("number", "status", "locked_at")})  # 2.237.0 D (#2870)
     old = src.get("id")
     if not isinstance(old, int) or not src.get("kind"):
         return
@@ -257,6 +269,9 @@ def _p_signoff(c, run, src, d, ctx):
 def _a_signoff(c, run, src, nid, ctx):
     """The accepted version of a quotation (its own PDF, named by document and approval)."""
     from ..office.pdfweb import epdf_name
+    if (src.get("state") or "open") != "open":  # 2.237.0 D (#2870): an answer of the file is noted as imported, not as given here
+        _oi_mark(c, run, ctx, "gen_doc" if src.get("gen_doc_id") else "doc", run.m("office_docs", src.get("doc_id")),
+                 {"signoff": nid, "state": _txt(src.get("state"), 20), "signed_at": _txt(src.get("signed_at"), 40)})
     if src.get("kind") != "offer" or src.get("state") != "accepted":
         return
     dsrc = next((x for x in (ctx.data.get("oi") or {}).get("office/documents.json") or [] if x.get("id") == src.get("doc_id")), None)
@@ -407,9 +422,14 @@ def _p_rights_log(c, run, src, d, ctx):
 
 
 def _p_tx(c, run, src, d, ctx):
-    for k in ("match_kind", "matched_at"):  # set again by the finish pass once the match is known
+    for k in ("match_kind", "matched_at", "rule_id"):  # set again by the finish pass once the match is known (2.299.0 B (#3191): + rule_id)
         d.pop(k, None)
     return d
+
+
+def _p_rule_no(c, run, src, d, ctx):
+    """2.299.0 B (#3191): a declined rule suggestion is keyed by its office area (bankrules.br_key) -- it does not carry over."""
+    return False
 
 
 def _p_letter(c, run, src, d, ctx):
@@ -488,11 +508,13 @@ SPECS = [
     OiT("office/cash_entries.json", "office_cash_entries", refs={"book_id": "office_cashbooks", "invoice_id": "office_docs"}, need=("book_id",),
         late={"storno_of": "office_cash_entries", "node_id": "fs_nodes"}, people=_P, private="office"),
     OiT("office/cash_closings.json", "office_cash_closings", refs={"book_id": "office_cashbooks"}, need=("book_id",),
-        people={"closed_by": "null"}, private="office"),
+        people={"closed_by": "null"}, private="office",
+        after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "cashbook", None, {"closing": nid, "day": _txt(src.get("day"), 10)})),  # 2.237.0 D (#2870)
     OiT("office/cash_log.json", "office_cash_log", refs={"book_id": "office_cashbooks", "entry_id": "office_cash_entries"}, need=("book_id",),
         people={"by_user": "null"}, private="office"),
     OiT("office/period_locks.json", "office_period_locks", people={"locked_by": "null"}, private="office", rid=False,
-        key=("org_id", "period")),  # 2.148.0 A (#2471): locked accounting periods
+        key=("org_id", "period"),  # 2.148.0 A (#2471): locked accounting periods
+        after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "period", None, {"period": _txt(src.get("period"), 7)})),  # 2.237.0 D (#2870)
     OiT("office/procdocs.json", "office_procdocs", people=_P, private="office", prep=_p_procdoc,
         label=N_("Procedure documentation")),  # 2.148.0 C (#2472): procedure documentation
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
@@ -524,6 +546,8 @@ SPECS = [
     OiT("office/cashflow_adjust.json", "office_cf_adjust", people=_P, private="office"),
     OiT("office/cashflow_actual.json", "office_cf_actual", people={"updated_by": "null"}, private="office"),
     OiT("office/bank_imports.json", "office_bank_imports", people=_P, private="office"),
+    OiT("office/bank_rules.json", "office_bank_rules", people={"created_by": "null"}, private="office"),  # 2.299.0 B (#3191)
+    OiT("office/bank_rule_nos.json", "office_bank_rule_nos", people={"created_by": "null"}, private="office", prep=_p_rule_no),
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),

@@ -13,6 +13,7 @@ import threading
 import time
 
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
+from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from ..core.db import connect, gset, gsetting  # 2.149.0 G (#2517): pulled up from functions
 from ..core.i18n import tr  # 2.149.0 G (#2517): pulled up from functions
 
@@ -108,13 +109,13 @@ def sh_code_check(c, code):
         except ValueError:
             until = 0
         if until < time.time():
-            print("first setup: an expired operator setup code from", client_ip(), flush=True)
+            print("first setup: an expired operator setup code from", login_log_ip(client_ip()), flush=True)
             return tr("This setup code has expired. Ask your hoster for a new one."), 403
         c.execute("DELETE FROM settings WHERE key IN (?,?)", (SH_OP_HASH, SH_OP_UNTIL))  # used once: goes with the commit
         return None
     if not got or not any(w and hmac.compare_digest(got, w) for w in wants):
         _rate_fail(keys)
-        print("first setup: wrong or missing setup code from", client_ip(), flush=True)
+        print("first setup: wrong or missing setup code from", login_log_ip(client_ip()), flush=True)
         return tr("Wrong setup code. It is in the server log (docker compose logs kalmido)."), 403
     return None
 

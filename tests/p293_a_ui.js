@@ -56,7 +56,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await ev(`(() => { document.querySelector('.modal [data-m="take"][data-k="contract"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.dtp-list .ofcrow').length === 1`), 'use sample: the contract is an own template');
     await ev(`(() => { document.querySelector('[data-dt="tnew"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.modal #dt-tbody') && document.querySelectorAll('.modal .dtp-vars .btn').length === 10`), 'the template dialog with the variable bar');
+    check(await ready(ev, `!!document.querySelector('.modal #dt-tbody') && document.querySelectorAll('.modal .dtp-vars .btn').length === 13`), 'the template dialog with the variable bar');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#dt-tname').value = 'Kurzvertrag'; const t = m.querySelector('#dt-tbody'); t.value = '# Kurzvertrag\\n\\nFür  und {{unbekannt}}.'; t.focus(); t.setSelectionRange(19, 19); m.querySelector('[data-dt="var"][data-k="client.name"]').click(); return 1; })()`);
     check(await ev(`document.querySelector('.modal #dt-tbody').value === '# Kurzvertrag\\n\\nFür {{client.name}} und {{unbekannt}}.'`), 'a variable inserted at the cursor ' + await ev(`JSON.stringify(document.querySelector('.modal #dt-tbody')?.value)`));
     await shot('p293-a-template.png');
@@ -80,7 +80,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     check(await ready(ev, `!!document.querySelector('.modal [data-cd="yes"]')`), 'finish asks first');
     await ev(`(() => { document.querySelector('.modal [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.dtp-final') && !document.querySelector('#dt-body')`, 60), 'finished: the frozen text, no editor');
-    check(await ev(`/Für Kunde Eins GmbH und \\./.test(document.querySelector('.dtp-final').textContent) && !!document.querySelector('a[href$="/pdf"]')`), 'finished: the unknown variable is empty, the PDF is there');
+    // 2.296.0 (#3165): the gap of the empty variable closes up (no " .")
+    check(await ev(`/Für Kunde Eins GmbH und\\./.test(document.querySelector('.dtp-final').textContent) && !!document.querySelector('a[href$="/pdf"]')`), 'finished: the unknown variable is empty, the PDF is there');
     const docs = await ev(api('GET', '/api/office/gen-docs?brief=1'));
     check(docs.docs?.length === 1 && docs.docs[0].status === 'final' && docs.docs[0].node_id, 'the document is final and filed');
     await ev(`(() => { document.querySelector('[data-dt="sgnew"]').click(); return 1; })()`);

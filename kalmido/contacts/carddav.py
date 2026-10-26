@@ -12,6 +12,7 @@ from flask import request, Response
 
 from ..core.config import APP_NAME
 from ..core.db import gsetting, parse_iso
+from ..core.pg import write_lock  # 2.273.0 C (#3048)
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, CR_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
@@ -172,8 +173,12 @@ def _want_version(root):
     return None
 
 
-def card_now(c, book, name):
-    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL", (book["id"], name)).fetchone()
+def card_now(c, book, name, lock=False):
+    """lock (2.273.0 C, #3048): PUT / DELETE check If-Match and write under one lock (the book's card name + the row), so two
+    writers with the same ETag cannot both pass -- the second one gets 412."""
+    if lock:
+        write_lock(c, f"carddav:{book['id']}:{name}")
+    r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL" + (" FOR UPDATE" if lock else ""), (book["id"], name)).fetchone()
     if not r:
         return None
     text = render_vcard(r)
@@ -293,7 +298,7 @@ def ab_put(c, u, book, name):
         raise DavError(400, "The contact could not be read", "<CR:valid-address-data/>") from None
     if not v["uid"]:
         raise DavError(400, "UID missing", "<CR:valid-address-data/>")
-    have = card_now(c, book, name)
+    have = card_now(c, book, name, lock=True)
     inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
     if have and inm == "*":
         raise DavError(412, "The resource exists already")
@@ -394,7 +399,7 @@ def abdav(m, c, u, p):
             raise DavError(403, "Address books are deleted in the app")
         if book["role"] not in ("owner", "edit"):
             raise DavError(403, "Read only", "<D:need-privileges/>")
-        have = card_now(c, book, name)
+        have = card_now(c, book, name, lock=True)
         if not have:
             raise DavError(404, "Not found")
         im = request.headers.get("If-Match", "").strip()

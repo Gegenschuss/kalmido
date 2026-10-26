@@ -228,7 +228,8 @@ function ofm_startHtml() {
   const more = g => g === 'money' && ofm_hidden().length ? `<button type="button" class="oflr ofmmore" data-act="ofm-more">${ic('dots')}<span>${esc(tr('Show more'))}</span></button>` : '';
   const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
-  return `<div class="ofmstart">${fig}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}${more(g[0])}</div>`}</section>` : ''; }).join('')}</div></div>`;
+  const norc = typeof bnr_startHtml === 'function' && ofm_adm() ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
+  return `<div class="ofmstart">${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}${more(g[0])}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
 // so an arrangement from before 2.44.0 that hid both still hides the area, and 2.43.1 reads what this one writes)

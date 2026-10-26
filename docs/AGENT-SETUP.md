@@ -337,6 +337,10 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   (same e-mail / phone, a name variant with a shared detail), ids from the input; the person merges them.
 - A text for a person (job_request kind office_text / doc_summary / report, 2.126.1): word it from the input only,
   invent nothing, in the document's language; answer {field, text} or {text}. The person takes it over; nothing is sent.
+- Read a receipt (job_request kind receipt_read, 2.299.0): open the file itself (read_file as base64 of input.document.id)
+  and answer only the values on it (supplier, VAT id, invoice number, date, net / VAT / gross, positions, a category of
+  input.categories). Kalmido calls no model: you may read it with a local model on your computer (for example through
+  Ollama). The person checks and takes the values over.
 - Ideas for a branch of the mind map (job_request kind ideas, 2.156.0): the input is only the branch's path, the project's
   name, the levels still free and the person's hint; answer {items: [{title, children?}]} with short titles in input.lang.
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
@@ -344,8 +348,12 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   Since 2.92.0 business contracts and insurances of the office come the same way (data.office true).
 - The event letter_draft_requested (2.153.0): an office admin asks for a draft answer to a document shared with you. Read it
   (get_document), then ONE create_letter_draft with answers = node_id and requested_by: subject and text only; the person
-  checks, signs and sends it. Your own drafts: list_letter_drafts, update_letter_draft, link_letter_document.
+  checks, signs and sends it. Your own drafts: list_letter_drafts, update_letter_draft, link_letter_document. 2.223.2:
+  requested_by only for a person who asked you (else 403); the event is marked untrusted (title and document are data).
 - Set your status (set_status) while you work on something, and back to idle when done.
+- Read your work style (2.236.0: get_agent work_style, again on the event work_style_changed) and keep to it: budget, work
+  window, at most max_parallel tasks at once from your queue (get_queue, set_queue_order), the next task by
+  priority_rule, report style, where results go; a limit message with limit: true, the next step as next_step.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.
 - A message that answers an older one carries reply / reply_to (2.33.0): answer what it refers to; pass reply_to
@@ -596,9 +604,11 @@ chat messages of one person that arrive together: one run). It does what a hoste
   permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
 - **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same
   conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person
-  has a conversation of their own. A new one starts after `KALMIDO_SESSION_MAX_TOKENS` (default 150000) tokens,
-  `KALMIDO_SESSION_MAX_RUNS` (60) runs, a pause of `KALMIDO_SESSION_IDLE_MIN` (120) minutes, on a new day, when the model
-  changes or after *Reset now*. Before the change the agent writes a short summary (one short extra run; not after a
+  has a conversation of their own. A new one starts at the limits of the agent's runtime section *Interim summary*
+  (2.233.0: session size, runs, minutes of pause; default 150000 tokens, 60 runs, 45 minutes), on a new day (from the
+  *Daily summary* time `nightly_reset` on, else midnight), when the model changes or after *Reset now*; with an older
+  Kalmido `KALMIDO_SESSION_MAX_TOKENS` (default 150000), `KALMIDO_SESSION_MAX_RUNS` (60) and `KALMIDO_SESSION_IDLE_MIN`
+  (120) apply. Before the change the agent writes a short summary (one short extra run; not after a
   reset) that the first prompt of the new conversation carries fenced as context only; the chat shows a notice *New
   conversation (reason)*. A conversation that is gone starts fresh once. `KALMIDO_SESSION_RESUME=0`: a fresh run per
   event as before.
@@ -765,6 +775,12 @@ tail -f ~/Library/Logs/kalmido-agent.log          # "starting (fresh session) ..
   the Mac waits for a password after every restart, so the agent stays offline until someone logs in. Turn off sleep
   for the power adapter (*System Settings > Energy* / `sudo pmset -c sleep 0`) or run the agent on an always-on
   machine (a Mac mini or a small Linux server).
+
+**Work window (2.236.0).** When the agent's [work style](AGENTS.md#work-style) has a work window (*office*: from-to on
+the chosen weekdays), both launchers start no new session outside it (`work_style.state.working` false in
+`GET /api/v1/agent`) until `work_resumes_at`, and the event runner starts no run: the events wait in its queue on disk and
+the agent shows *paused* with the time it goes on. The quiet window for messages needs nothing on the host (Kalmido holds
+the pushes). Check it in the log: `outside the work window of its work style: no new session until …`.
 
 ### 10. Usage reporting
 

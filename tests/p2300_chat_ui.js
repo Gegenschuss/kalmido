@@ -48,6 +48,9 @@ const V = B + 'api/v1';
   const status = b => fetch(V + '/agent/status', {method: 'PUT', headers: AGH, body: JSON.stringify(b)});
   const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
 
+  // 2.233.0 (#2848): older suggestions are collected by default now; the chat setting "only the newest" keeps the expiry
+  // these checks are about (the shelf: p2233_a_chatsugg_ui.js)
+  check((await call('PUT', `/api/agents/${AG}/chat-prefs`, {sugg: 'latest'})).status === 200, '#2848: chat setting only the newest');
   // ================= #1037 only the newest buttons are live
   const q1 = await say('Shall I plan 2.30 now?', {choices: [{id: 'yes', label: 'Plan 2.30', style: 'primary'}, {id: 'no', label: 'Later'}]});
   let w = await boot({user: 'alice', hash: 'l/' + SW}), d = w.document;

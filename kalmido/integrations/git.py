@@ -788,9 +788,11 @@ def git_repos_of_lists(c, ids):
     out = {}
     if not ids:
         return out
+    from ..integrations.gitfolder import gf_conns_of_lists
+    conns, pub = gf_conns_of_lists(c, ids), {}  # 2.280.0 B (#3116): all lists at once (was: git_conns_of_list per list)
     for lid in ids:  # 2.33.0 (#934): own repositories, else the folder's
-        for r in git_conns_of_list(c, lid):
-            d = git_public(c, r)
+        for r in conns.get(lid, ()):
+            d = pub.get(r["id"]) or pub.setdefault(r["id"], git_public(c, r))  # a folder repository: once, not per list
             out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder")})
     return out
 

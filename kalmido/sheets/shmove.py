@@ -102,7 +102,7 @@ def sheets_move_space(sid):
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))
     ts = iso_ms(now_utc())
-    back, revived = None, []
+    back, revived, sback = None, [], 0
     if b.get("undo") not in (None, "", 0):
         u = b.get("undo")
         if isinstance(u, bool) or not isinstance(u, int):
@@ -121,9 +121,18 @@ def sheets_move_space(sid):
             list_id = back["list_id"]
     org_out(c, r["org_id"], to, "sheet", r["title"])  # 2.148.1 B (#2483): logged, the organisation's other admins told
     c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=? WHERE id=?", (to, None if to else uid, list_id, sid))
+    ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]  # 2.273.0 B (#3042)
     if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)
         from .shshare import shs_end
         shs_end(c, sid)
+    if back and back.get("shares"):  # 2.273.0 B (#3042): the undo brings back the shares the move ended (if they still fit)
+        from .shshare import _agent_row, shs_drop_cache, shs_fits
+        r2 = sh_reload(c, sid)
+        for x in c.execute("SELECT id, org_id, user_id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NOT NULL", (sid,)).fetchall():
+            if x["id"] in back["shares"] and (x["org_id"] or None) == (to or None) and shs_fits(c, x["user_id"], r2, _agent_row(c, x["user_id"])):
+                c.execute("UPDATE sheet_shares SET revoked_at=NULL WHERE id=?", (x["id"],))
+                sback += 1
+        shs_drop_cache()
     from .shfolder import shf_after_move
     shf_after_move(c, sid)  # 2.199.0 C (#2742): its folder belongs to the old workspace
     from .shkinds import shk_move_files
@@ -141,14 +150,14 @@ def sheets_move_space(sid):
             out = [i for i in ids if i not in revived]
             if out:  # a task moved on in between: its link stays ended
                 c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(out))})", [ts, *out])
-    detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts}
+    detail = {"list_id": r["list_id"] if unbind else None, "links": links, "at": ts, "shares": ended}
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,?,?,?,?)",
                     (sid, r["org_id"], to, uid, ts, json.dumps(detail)))
     sh_touch(c, sid, uid)
     c.commit()
     d = sh_dict(c, sh_reload(c, sid))
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=sh_space_key(r["org_id"]), space=sh_space_key(to),
-                              sheet=d, revived=len(revived)))
+                              sheet=d, revived=len(revived), shares_back=sback))
 
 
 def shm_last(c, sid):

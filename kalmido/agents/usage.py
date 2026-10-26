@@ -34,6 +34,8 @@ from ..collab.reactions import clean_emoji, ltag_create, ltag_delete, ltag_updat
 from ..agents.chat import CHAT_FILES_MAX
 from ..agents.safety import access_cleanup
 from ..agents.admin import need_agent_admin
+from ..agents.workstyle import ws_get
+from ..agents.workqueue import wq_spec
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
 
 
@@ -151,13 +153,51 @@ def usage_fmt(v, metric, lg=None):
     return tr("{0} tokens", fmt_int(v, lg), lg=lg)
 
 
-def usage_block(c, aid):
-    """The limit state when agent aid's hard limit is reached (its calls are refused), else None."""
-    a = c.execute("SELECT user_id, usage_limits FROM agents WHERE user_id=?", (aid,)).fetchone()
-    if not a or not a["usage_limits"]:
+def budget_period(period, now=None):
+    """2.236.0 B (#2904): (key, first local day, end as an aware local datetime) of the owner's budget period: day | week
+    (Monday 00:00 local time of the instance)."""
+    if period != "week":
+        return usage_period("day", now)
+    d = (now or local_now()).date()
+    first = d - timedelta(days=d.weekday())
+    y, w, _ = first.isocalendar()
+    return f"{y}-W{w:02d}", first.isoformat(), datetime.combine(first + timedelta(days=7), datetime.min.time(), TZ)
+
+
+def budget_state(c, a, now=None):
+    """2.236.0 B (#2904): where agent a stands against the budget of its owner (work_style budget_*), None without one:
+    {period, metric, used, limit, pct, warn, paused, resets_at}. Counted from the same usage rows as the admin limits; it
+    holds IN ADDITION to them (the stricter one pauses the agent)."""
+    if not a or "work_style" not in a.keys() or not a["work_style"]:
         return None
-    st = usage_state(c, a)
-    return st if st and st["reached"] else None
+    ws = ws_get(a)
+    lim = ws["budget_limit"]
+    if ws["budget_period"] not in ("day", "week") or not lim:
+        return None
+    _, first, end = budget_period(ws["budget_period"], now)
+    r = c.execute(f"SELECT {USAGE_SUM} FROM agent_usage WHERE agent_id=? AND day>=?", (a["user_id"], first)).fetchone()
+    t = usage_totals(r)
+    used = round(t["cost"] or 0, 6) if ws["budget_metric"] == "cost" else t["tokens"]
+    wp = ws["budget_warn_pct"]
+    return {"period": ws["budget_period"], "metric": ws["budget_metric"], "used": used, "limit": lim,
+            "pct": round(100 * used / lim, 1), "warn": bool(wp) and used >= lim * wp / 100, "paused": used >= lim,
+            "resets_at": iso(end.astimezone(timezone.utc))}
+
+
+def usage_block(c, aid):
+    """The limit state when agent aid's hard limit is reached (its calls are refused), else None.
+    2.236.0 B (#2904): also when its owner's budget is used up (then with "budget": True, hard = the budget)."""
+    a = c.execute("SELECT user_id, usage_limits, work_style FROM agents WHERE user_id=?", (aid,)).fetchone()
+    if not a:
+        return None
+    st = usage_state(c, a) if a["usage_limits"] else None
+    if st and st["reached"]:
+        return st
+    bs = budget_state(c, a)
+    if bs and bs["paused"]:
+        return {"period": bs["period"], "metric": bs["metric"], "used": bs["used"], "hard": bs["limit"], "reached": True,
+                "resets_at": bs["resets_at"], "budget": True}
+    return None
 
 
 def usage_refused(c, aid):
@@ -171,6 +211,11 @@ def usage_refused(c, aid):
     wait = max(60, int((end - now_utc()).total_seconds()))
     until = end.astimezone(TZ).strftime("%Y-%m-%d %H:%M")
     used, lim = usage_fmt(st["used"], st["metric"]), usage_fmt(st["hard"], st["metric"])
+    if st.get("budget"):  # 2.236.0 B (#2904): the owner's budget
+        msg = (tr("Budget reached: {0} of {1} today. The agent pauses until {2} or until its owner raises the budget; reporting usage and the status still work.", used, lim, until)  # noqa: E501
+               if st["period"] == "day" else
+               tr("Budget reached: {0} of {1} this week. The agent pauses until {2} or until its owner raises the budget; reporting usage and the status still work.", used, lim, until))  # noqa: E501
+        return v1_err(429, msg, {"Retry-After": str(wait)})
     msg = (tr("Usage limit reached: {0} of {1} today. Calls are refused until {2} or until an admin raises the limit; reporting usage and the status still work.", used, lim, until)  # noqa: E501
            if st["period"] == "day" else
            tr("Usage limit reached: {0} of {1} this month. Calls are refused until {2} or until an admin raises the limit; reporting usage and the status still work.", used, lim, until))  # noqa: E501
@@ -190,7 +235,7 @@ def usage_alerts(c, aid):
     except ValueError:
         done = {}
     if not isinstance(done, dict) or done.get("period") != st["key"]:
-        done = {"period": st["key"], "levels": []}
+        done = {"period": st["key"], "levels": [], **({"budget": done["budget"]} if isinstance(done, dict) and "budget" in done else {})}  # 2.236.0 B (#2904)
     levels = []
     if st["soft"] is not None:
         levels += [x for x, f in (("soft80", .8), ("soft100", 1.0)) if st["used"] >= st["soft"] * f]
@@ -219,7 +264,49 @@ def usage_alerts(c, aid):
         title = (tr("{0}: usage limit reached, calls blocked", name, lg=lg) if level == "hard" else
                  tr("{0}: soft usage limit reached", name, lg=lg) if level == "soft100" else
                  tr("{0}: 80 % of the usage limit", name, lg=lg))
-        g.pushes.append((uid, title, f"{used} / {lims} · {per}", f"{PUBLIC_URL}/#agents", push_prio(s)))
+        g.pushes.append((uid, title, f"{used} / {lims} · {per}", f"{PUBLIC_URL}/#agents", push_prio(s), {"ws": "system"}))  # 2.236.0 B (#2909): never held
+
+
+def budget_alerts(c, aid):
+    """2.236.0 B (#2904): after a report: News + push to the owner of a personal agent (the instance admins for a team
+    agent) once its budget reaches budget_warn_pct and once it is used up -- each once per period (agents.usage_alerted
+    key "budget": {key, levels})."""
+    a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
+                  (aid,)).fetchone()
+    bs = budget_state(c, a) if a else None
+    if not bs:
+        return
+    key = budget_period(bs["period"])[0]
+    try:
+        done = json.loads(a["usage_alerted"] or "{}")
+    except ValueError:
+        done = {}
+    done = done if isinstance(done, dict) else {}
+    b = done.get("budget") if isinstance(done.get("budget"), dict) and done["budget"].get("key") == key else {"key": key, "levels": []}
+    new = [x for x, hit in (("warn", bs["warn"]), ("paused", bs["paused"])) if hit and x not in b["levels"]]
+    if not new:
+        return
+    b["levels"] = sorted(set(b["levels"]) | set(new))
+    done["budget"] = b
+    c.execute("UPDATE agents SET usage_alerted=? WHERE user_id=?", (json.dumps(done, separators=(",", ":")), aid))
+    level = "budget" if "paused" in new else "budget_warn"
+    name = a["display_name"] or a["username"]
+    data = {"agent_id": aid, "name": name, "level": level, "used": bs["used"], "limit": bs["limit"], "metric": bs["metric"],
+            "period": bs["period"], "budget": True, "warn_pct": ws_get(a)["budget_warn_pct"]}
+    print("agent", aid, "budget", level, bs["used"], "/", bs["limit"], bs["metric"], bs["period"], flush=True)
+    rcpt = [a["owner_id"]] if a["owner_id"] else [r["id"] for r in c.execute(
+        "SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+    for uid in rcpt:
+        s = usettings(c, uid)
+        news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
+        if not notif_ok(c, uid, s, "usage", "push") or not push_reachable(c, uid, s):
+            continue
+        lg = lang_of(s)
+        used, lims = usage_fmt(bs["used"], bs["metric"], lg), usage_fmt(bs["limit"], bs["metric"], lg)
+        per = tr("today", lg=lg) if bs["period"] == "day" else tr("this week", lg=lg)
+        title = (tr("{0}: budget reached, paused", name, lg=lg) if level == "budget" else
+                 tr("{0}: {1} % of the budget", name, data["warn_pct"], lg=lg))
+        g.pushes.append((uid, title, f"{used} / {lims} · {per}", f"{PUBLIC_URL}/#agents/{aid}", push_prio(s), {"ws": "system"}))
 
 
 def usage_cleanup(c, force=False):
@@ -289,6 +376,7 @@ def v1_agent_usage_post():
                     (aid, model.strip(), f["input_tokens"], f["output_tokens"], f["cache_read_tokens"], f["cache_write_tokens"],
                      None if cost is None else float(cost), tid, lid, jid, note.strip(), day, ts))
     usage_alerts(c, aid)
+    budget_alerts(c, aid)  # 2.236.0 B (#2904)
     if tid:
         bump(c)  # the task panel's "AI usage" line
     c.commit()
@@ -745,6 +833,7 @@ def v1_list_tag_delete(lid, tag_id):
 
 def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     """2.0.0 additions to the OpenAPI document."""
+    wq_spec(paths, schemas, op, ok, errs, ref)  # 2.236.0 C (#2906 #2907): the agent queue (here, not in api/openapi: no upward import)
     ev = {"type": "object", "properties": {"id": {"type": "string"}, "seq": {"type": "integer"}, "event": {"type": "string", "enum": list(AGENT_EVENTS)},
                                            "created_at": {"type": "string", "format": "date-time"}, "agent_id": {"type": "integer"},
                                            "actor": {"oneOf": [{"type": "null"}, {"type": "object"}]}, "via": {"type": "string"},
@@ -778,11 +867,13 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}; "
                                                           "2.30.0 permission, expires_at; 2.35.0 (#1103) approval {title, what} (an approval request, buttons yes / no)"),
                                             "choice": nul("object", description="2.28.0 (#1005): the person's answer {ids, at, user_id}; null while open. The agent gets the event chat_choice"),
-                                            "choice_state": nul("string", enum=["open", "answered", "expired", "withdrawn", None],
+                                            "choice_state": nul("string", enum=["open", "answered", "expired", "withdrawn", "collected", None],
                                                                 description="2.30.0 (#1037): open = the buttons can be pressed; expired = a newer message came (2.212.0 #2787: of the person, or "
                                                                             "of the same source: the agent itself / the same job_id; a permission "
                                                                             "question: its expires_at passed); withdrawn = the agent took them back. choices.permission: a "
-                                                                            "permission question (#1041), choices.expires_at, choices.outcome"),
+                                                                            "permission question (#1041), choices.expires_at, choices.outcome. 2.233.0 (#2848): collected = ended by a newer "
+                                                                            "message but still answerable (the person keeps older suggestions, up to 24 h, at most 10; a press "
+                                                                            "sends chat_choice with collected: true); choices.dismissed_at = the person put it away"),
                                             "attachments": {"type": "array", "description": "2.13.1 (#465): images / files of the message; download with GET /chat-attachments/{id}",
                                                             "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"},
                                                                                                        "mime": {"type": "string"}, "size": {"type": "integer"},
@@ -962,6 +1053,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  # 2.126.1 A (#2123 #2124): texts worded by the agent, only data of input, nothing invented
                                  f"office_text (2.126.1): {{field (= input.field: intro | closing), text}}; doc_summary: {{text}} (at most 4000 characters); "
                                  f"report: {{text}} (Markdown). "
+                                 # 2.299.0 E (#3194): the values read off a receipt (the agent opens the file itself), only what is on it
+                                 f"receipt_read (2.299.0): {{supplier?, vat_id?, tax_no?, invoice_no?, date?, net?, vat?, gross?, vat_pct?, vat_rates?[{{pct, net, vat}}], "
+                                 f"currency?, positions?[{{text, qty?, net?, vat_pct?}}] (at most 100), category?, account?, bank_tx? (an id of input.bank)}}. "
                                  f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
@@ -1018,6 +1112,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"}, "reply_to": {"type": "integer"},
                                                  "job_id": {"type": "integer"}, "job_parent": {"type": "integer"},  # 2.59.0 (#1827)
                                                  "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
+                                                 "limit": {"type": "string", "description": "2.236.0 B (#2909): true / false"}, "next_step": {"type": "string", "maxLength": 80},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,

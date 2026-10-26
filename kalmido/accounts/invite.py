@@ -13,6 +13,7 @@ from ..core.config import app, APP_DIR, APP_NAME, MIN_PASSWORD, PUBLIC_URL
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, gsetting, iso, now_utc, parse_iso, usettings, write_lock
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, client_ip
+from ..accounts.login import login_log_ip, login_log_who  # 2.239.0 B (#2888)
 from ..accounts.login import finish_login, pend_cookie, pend_new
 from ..core.access import Denied
 from ..integrations.mail import MAIL_OUT_ON, mail_send
@@ -62,7 +63,7 @@ def invite_new(c, uid, by, send=True, kind=None):
     if send and MAIL_OUT_ON and u["email"] and kind != "login":
         from ..admin.hosting import mail_budget
         if not mail_budget(c, by, u["email"]):  # 2.24.0 (#899): mails per account / address and day
-            print("invitation mail not sent: daily limit (sender", by, ")", flush=True)
+            print("invitation mail not sent: daily limit (sender", login_log_who(by), ")", flush=True)
             out["error"] = tr("Today's e-mail limit is reached: copy the link instead")
             return out
         try:
@@ -217,6 +218,8 @@ def invite_accept():
     ses_end(c, u["id"])
     # 2.190.0 A (#2496): a reset also revokes the app passwords (CalDAV/CardDAV); API tokens stay (agents keep working)
     c.execute("DELETE FROM app_passwords WHERE user_id=?", (u["id"],))
+    from ..docs.scankeys import sk_revoke_all  # 2.237.0 C (#2865): and the scan inbox keys
+    sk_revoke_all(c, u["id"])
     if r["kind"] == "signup":  # 2.23.0 (#711): the address is confirmed; with "admin approval" the account waits now
         from ..accounts.signup import signup_confirmed
         if signup_confirmed(c, u):
@@ -229,7 +232,7 @@ def invite_accept():
         from .secmail import sec_mail
         sec_mail(c, u["id"], "password_reset")
     u = c.execute("SELECT * FROM users WHERE id=?", (u["id"],)).fetchone()
-    print("account set up with an invitation link:", u["username"], "from", client_ip(), flush=True)
+    print("account set up with an invitation link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
     from ..accounts.login import twofa_methods
     methods = twofa_methods(c, u)
     if methods:  # 2.49.0 (#1531): a reset link is no way around two-factor sign-in: the second step follows as at the login

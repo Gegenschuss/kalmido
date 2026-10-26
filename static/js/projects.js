@@ -246,12 +246,12 @@ function viewProjOv() {
     const body = `${hist.length ? `<div class="sthist povst">${hist.map(x => `<div class="shi"><span class="stdot st-${esc(x.status || 'none')}"></span><div><div><b>${esc(x.status ? statusLabel(x.status) : tr('Status cleared'))}</b> <span class="muted">${esc(x.name || tr('Someone'))} · ${esc(fmtWhen(x.created_at))}</span></div>${x.note ? `<div class="shn">${esc(x.note)}</div>` : ''}</div></div>`).join('')}</div>` : ''}`;
     P.status = x => povSec('status', tr('Status updates'), body, `${l.status ? statusPill(l) : ''}${canEditList(l.id) && !l.archived ? `<button class="btn sm" data-act="status" data-id="${l.id}">${ic('pulse', 's')}<span>${tr('Set status')}</span></button>` : ''}` + x, emp(!hist.length, tr('No status updates yet.')));
   }
-  // milestones
+  // milestones (2.223.7 B, #2918: not for a participant)
   const ms = j.milestones.map(m => `<div class="povm ${m.done ? 'done' : m.day < t0 ? 'over' : ''}">
       <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
       <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
-  P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet.')));
+  if (j.role !== 'participant') P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet.')));
   // files
   const files = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf')).join('');  // 2.48.0 (#1207): + "Show in the file store"
   const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents') + (isTouch() ? '' : '. ' + tr('Or drop files here')))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';

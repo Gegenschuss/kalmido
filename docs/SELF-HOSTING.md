@@ -201,7 +201,7 @@ and the Docker bridge gateway). Two setups go wrong:
 
 - *The proxy runs in a container on its own Docker network.* Its requests arrive from that network's gateway (for
   example `172.18.0.1`), which is not trusted by default. Symptom: every client has the same address in the logs, and a
-  few failed logins **lock out everyone** at once. Fix: add that gateway to `KALMIDO_TRUSTED_PROXIES`, or run the proxy
+  few failed logins **slow down everyone's sign-in** at once and a person's own failed logins lock that person out from every device (before 2.282.0 even everyone). Fix: add that gateway to `KALMIDO_TRUSTED_PROXIES`, or run the proxy
   with host networking.
 - *The proxy itself only sees the Docker gateway.* When client connections reach a containerised proxy through Docker's
   userland proxy (for example over IPv6 without IPv6 NAT, or from the host itself), the proxy never learns the client's
@@ -564,6 +564,11 @@ docker compose up -d kalmido
   - The credentials (keys, password, the SFTP private key) are sealed with the server key and never shown again; the
     page only says whether they are set. *Test connection* writes a small file to the target and deletes it.
     *Remove target* deletes the address, the credentials and the SFTP key pair (the backups on the target stay).
+  - Since 2.223.2: a new address (WebDAV URL, S3 endpoint / bucket host, SFTP server or port) drops the stored
+    credentials unless new ones come along, so they never go to another host. Changing the target, *Test connection*
+    and *Upload now* ask for the password (and second factor) once more; a sign-in through a login provider confirms
+    there. A restore keeps the current off-site settings. On a hosted instance the target must be a public `https://`
+    address (no private, loopback or link-local addresses; checked on saving and on every connection).
   - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
@@ -616,11 +621,11 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
 **Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and projects, the file store's log, the log of organisation
 lists and the change log of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
 agent jobs after 180 days. The office logs (documents, logbook, archive) belong to the bookkeeping and stay as long as
-their document.
+their document; so does the file store's log of an office record (a receipt, a filed letter, a cash book or DATEV receipt).
 
 **Files (`KALMIDO_ORPHAN_DAYS`).** Once a week: stored attachment and agent chat files that no row names any more (older
-than the period), and file store versions beyond the newest 20 per file. A file that could not be removed is logged and
-tried again by this run.
+than the period, and never younger than an hour, also with `0`), and file store versions beyond the newest 20 per file
+(an office record keeps every version). A file that could not be removed is logged and tried again by this run.
 
 **One rule for every trash (2.272).** Every run that deletes because a period ran out asks the switch of its kind and
 reports its numbers, also in the dry run: projects (`lists`), tasks (`tasks`), wiki pages (`wiki`) and wiki files
@@ -881,7 +886,10 @@ offline tool that opens it; the keys exist only in the members' browsers.
 Since 2.42 an admin of an organisation can export it as one encrypted archive: *Settings > Organisation > Export the
 organisation*. The server builds it in the background (one at a time per organisation) and keeps the file for 24 hours
 in the data folder (`exports/`, not part of the backups); after that, or with *Delete now*, it is removed. Every export
-and download is written to the office log (who, when, size).
+and download is written to the office log (who, when, size). Since 2.278 only the admin who started the export can
+download or delete the archive: it is filtered by that admin's rights (filed mails they may not see stay out). Other
+admins see only that an export of that person exists; they can replace it once that person no longer administers the
+organisation.
 
 - **What is in it.** A zip with `manifest.json` (format version, Kalmido version, counts, SHA-256 of every entry), one
   JSON file per area and the files: the organisation's projects (sections, members and roles, fields, tags, status
@@ -904,7 +912,9 @@ and download is written to the office log (who, when, size).
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
-  and files) stays ciphertext; the manifest lists it under `client_encrypted`.
+  and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
+  organisation archive: a person's encrypted notes and files open after a move only with the keys from their own account
+  export, and projects encrypted in the browser are not taken over by the import.
 - **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
   recovery key that was valid when the archive was made (*Settings > Organisation > Encryption*; the archive carries
   the copy of the key that this recovery key unlocks, a later *New recovery key* does not open it) and the tool `tools/kalmido_export_decrypt.py` from the
@@ -962,8 +972,12 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
 **What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files), their tasks with
 subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
-work hours, display options, the folder order). Browser-encrypted content (locked notes, encrypted files) stays
-encrypted and opens with your passwords as before.
+work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
+encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. Into an account
+that has no encryption keys yet, the bundle is taken over and that content opens with the same passphrase. Into an
+account that already has its own keys, those keys stay and the content from the file arrives unreadable (you may delete
+it). Projects encrypted in the browser are not taken over at all: switch their encryption off before the export or
+export their content.
 
 **What does not move:** passwords, passkeys, two-factor settings, sessions, API tokens, webhooks, push subscriptions,
 access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, other Kalmido servers:
@@ -1004,10 +1018,19 @@ private space nobody joins an organisation: ticked people only get the projects 
 books become your own ones. Lists with sections, fields, tags, status updates, links,
 milestones and project files, tasks with subtasks, dependencies and field values, comments, attachments (sealed with the
 new organisation's key), the organisation's calendars with events and its address books with contacts move along; the
-projects belong to you as the importing admin. Members are matched by e-mail address: a ticked person joins the
-organisation and gets their projects shared again. Not yet taken over (the preview names them with their counts): the
+projects belong to you as the importing admin. Members are matched by e-mail address. Since 2.278 a ticked person
+with an account here does not join directly: they get an invitation to the organisation (with the role of the file,
+admin or member, which you confirm in the preview) and join only when they accept it. Until then their content stays
+with you as the importing admin (names as text) and no project is shared with them; a ticked person who is already a
+member gets their projects shared again. Not yet taken over (the preview names them with their counts): the
 office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
 playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
+
+2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
+you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
+invoice that comes along point at the new invoice; without it they stay billed but not billable, never open again (the same
+for an account import, which carries no invoices). Rows that cannot be taken over are named in the report with their number
+per area.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
@@ -1034,11 +1057,16 @@ A short checklist for a new server:
 - **Docker ports bypass ufw.** A published port (`3040:3040`) is reachable from outside even when ufw blocks it,
   because Docker writes its own firewall rules. Publish ports only on `127.0.0.1` (as the shipped `docker-compose.yml`
   does) and write the reason as a comment next to the line, so nobody "fixes" it later.
+- **Server log.** The log holds no names and no full addresses: accounts appear by number (`user #12`), a failed
+  sign-in by a short keyed hash of the typed name, addresses shortened like the alerts (IPv4 `203.0.113.x`, IPv6 `/48`),
+  database errors without the values of the row. `KALMIDO_LOG_FULL_IP=1` keeps the addresses in full (for fail2ban,
+  below). The shipped `docker-compose.yml` rotates every container log (`driver: local`, 3 files of 10 MB), so old lines
+  are gone after a while; keep that (or set your own limit) when you change the logging driver.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
-  2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field)
-  and keeps the full address, which fail2ban needs. Without fail2ban, `KALMIDO_LOG_FULL_IP=0` shortens it like the alerts
-  (IPv4 `203.0.113.x`, IPv6 `/48`). To block repeat offenders at the firewall, send the container log to journald
-  (`logging: {driver: journald}`) and add a filter and a jail:
+  2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field).
+  fail2ban needs the full address: set `KALMIDO_LOG_FULL_IP=1` in `.env` (2.239: shortened by default). To block repeat
+  offenders at the firewall, send the container log to journald (`logging: {driver: journald}` instead of the shipped
+  `local` driver; journald keeps it by its own size limits) and add a filter and a jail:
 
   ```ini
   # /etc/fail2ban/filter.d/kalmido.conf
@@ -1509,6 +1537,8 @@ itself never calls a language model or an outside service for this.
 1. Build and start it: `docker compose --profile embed up -d --build` (downloads the model once while building, about
    120 MB; the container needs about 0.6 GB RAM, one CPU thread).
 2. Set `KALMIDO_EMBED_URL=http://embed:8090` in `.env` and restart Kalmido (`docker compose up -d`).
+   A service on another host (https) is only used with `KALMIDO_EMBED_EXTERNAL=1`: task titles and descriptions then
+   leave this server, and *Administration > Server* names the host.
 3. *Settings > Administration > Server > Related tasks* shows whether the service answers, the model and how many tasks
    are computed. The first start computes every task in the background, throttled (a few minutes per thousand tasks on a
    small 4-core server); then only new or changed tasks.

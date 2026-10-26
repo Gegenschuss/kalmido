@@ -25,7 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
@@ -247,7 +247,8 @@ def sig_notify(c, r, st, name):
     msg, url = f"{name}: {r['title'] or ''}", f"{PUBLIC_URL}/{click}"
     if not sends:
         return None
-    return lambda: [notify(u, t, msg, prio="4", click=url, s=s) for u, t, s in sends]
+    scope = f"l:{lid}" if lid and not (r["doc_id"] or r["gen_doc_id"]) else f"o:{r['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the office / the list
+    return lambda: [notify(u, t, msg, prio="4", click=url, s=s, scope=scope) for u, t, s in sends]
 
 
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)
@@ -591,7 +592,7 @@ def h6c_sig_pdf_ok(c, r):
 
 @app.get("/s/q/<token>/pdf")
 def sig_pdf_get(token):
-    from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
+    from .pdfweb import _file_response, _render, epdf_name, epdf_stored
     from .docs import doc_row
     c = db()
     if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
@@ -619,10 +620,10 @@ def sig_pdf_get(token):
         resp.headers["Referrer-Policy"] = "no-referrer"
         return resp
     try:
-        p = _stored_or_missing(c, r["org_id"], d, "pdf")
+        data = epdf_stored(c, r["org_id"], d, "pdf")  # 2.296.0 C (#3177): a file that fails its hash is gone as well
     except Denied:
         return pub_gone()
-    data = oc_read_file(c, p) if p else _render(c, r["org_id"], d)[0]
+    data = data if data is not None else _render(c, r["org_id"], d)[0]
     resp = _file_response(data, epdf_name(d) + ".pdf", "application/pdf")
     resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     resp.headers["Referrer-Policy"] = "no-referrer"

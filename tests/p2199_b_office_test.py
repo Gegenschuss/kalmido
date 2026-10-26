@@ -220,6 +220,16 @@ AG, AH = r.json().get("id"), {**H, "Authorization": "Bearer " + r.json().get("to
 QN = A.get(B + f"/api/files/refs/office_doc/{Q}").json()["node"]["id"]
 check(requests.get(B + f"/api/v1/files/{QN}", headers=AH).status_code == 404, "(e) the agent without a share: nothing")
 share(A, CL, agent_id=AG, role="edit")
+# 2.238.0 A (#2863): the folder way needs what the office's agent routes need (scope office, the office switches)
+check(requests.get(B + f"/api/v1/files/{QN}", headers=AH).status_code == 404
+      and requests.get(B + f"/api/v1/files/{QN}/content", headers=AH).status_code == 404,
+      "(e) with its share but without the scope office: the node stays hidden (2.238.0 A)")
+r = A.post(B + "/api/my/agents", json={"username": "officebot2", "display_name": "Office Bot Two", "scopes": ["read", "files:read", "office"], "org_id": ORG})
+check(r.ok, "(e) setup: an agent with the scope office " + r.text[:160])
+AG, AH = r.json().get("id"), {**H, "Authorization": "Bearer " + r.json().get("token", "")}
+share(A, CL, agent_id=AG, role="edit")
+check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok and A.put(B + O + "/settings", json={"agents_read": 1}).ok,
+      "(e) setup: its office switch and the area's agents switch on")
 r = requests.get(B + f"/api/v1/files/{QN}", headers=AH)
 check(r.ok and r.json().get("ref_kind") == "office_doc" and r.json().get("open") == f"office/offers/{Q}", f"(e) with its share: the agent sees the node ({r.status_code})")
 r = requests.get(B + f"/api/v1/files/{QN}/content", headers=AH)
@@ -243,6 +253,14 @@ check(r.ok, "(f) setup: her agent " + r.text[:160])
 FH = {**H, "Authorization": "Bearer " + r.json().get("token", "")}
 check(requests.get(B + f"/api/v1/files/{fn['id']}", headers=FH).status_code == 404, "(f) her agent without a share: nothing")
 share(Fr, FF, agent_id=r.json()["id"], role="view")
+# 2.238.0 A (#2863): without the scope office hidden; with it and her office's switches it sees the node
+check(requests.get(B + f"/api/v1/files/{fn['id']}", headers=FH).status_code == 404, "(f) her agent without the scope office: still nothing")
+r = Fr.post(B + "/api/my/agents", json={"username": "fridabot2", "display_name": "Frida Bot Two", "scopes": ["read", "files:read", "office"]})
+check(r.ok, "(f) setup: her agent with the scope office " + r.text[:160])
+FH = {**H, "Authorization": "Bearer " + r.json().get("token", "")}
+share(Fr, FF, agent_id=r.json()["id"], role="view")
+check(Fr.patch(B + f"{O}/agents/{r.json()['id']}", json={"office_drafts": True}).ok and Fr.put(B + O + "/settings", json={"agents_read": 1}).ok,
+      "(f) setup: the switches of her personal office")
 check(requests.get(B + f"/api/v1/files/{fn['id']}", headers=FH).ok, "(f) her agent with its share: sees the node")
 
 # ---------------------------------------------------------------- (g) another organisation

@@ -229,6 +229,7 @@ def op_contact_edit(c, uid, cid, b):
     write_lock(c, f"contact-{int(cid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
+    r = c.execute("SELECT * FROM contacts WHERE id=? FOR UPDATE", (cid,)).fetchone() or r  # 2.273.0 C (#3048): expect checked under the row lock
     if b.get("expect") and b["expect"] != r["updated_at"]:
         raise Denied(409, tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
@@ -364,6 +365,8 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
             c = None
             for k in res:
                 res[k] += part[k]
+            if part.get("kept_newer"):       # 2.273.0 C (#3048)
+                res["kept_newer"] = res.get("kept_newer", 0) + part["kept_newer"]
             with _IMP_LOCK:
                 st.update(done=min(i + IMPORT_BATCH, len(cards)), **res)
         if since is not None:  # 2.119.1 A (#2084): the new contacts that look like one already there

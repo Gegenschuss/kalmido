@@ -143,10 +143,11 @@ def mg_undo_cascade(c, groups):
         for r in g["rows"]:
             if g["rule"] == "c":
                 mg_reinsert(c, g["t"], r)
-            else:
-                pk = {k: v for k, v in r.items() if k == "id"}
+            else:  # 2.273.0 C (#3048): a row without an id column by its primary key
+                pk = {k: r[k] for k in (["id"] if "id" in r else _pk_cols(c, g["t"])) if k in r and k != g["col"]}
                 if pk:
-                    c.execute(f"UPDATE {g['t']} SET {g['col']}=? WHERE id=? AND {g['col']} IS NULL", (r[g["col"]], pk["id"]))
+                    c.execute(f"UPDATE {g['t']} SET {g['col']}=? WHERE {' AND '.join(k + '=?' for k in pk)} AND {g['col']} IS NULL",
+                              (r[g["col"]], *pk.values()))
 
 
 def mg_run_create(c, kind, target_id, merged_ids, uid, snapshot, summary, org_id=None, book_id=None):

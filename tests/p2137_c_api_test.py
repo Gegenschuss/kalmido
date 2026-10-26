@@ -140,6 +140,11 @@ SKIP_IN = {"newsletter/connection.json": ("auto", "error"),  # on purpose: no au
            "hub/mailbox.json": ("error",),  # 2.144.5 B (#2410): the mailbox asks for its passwords again
            "comments.json": ("ext_name",)}  # 2.148.1 (#2492): comments of others come by name only (ext_name), never as their account
 DEPENDS = {"hub/bookings.json": "office/equipment.json"}  # bookings of equipment come with part A (office)
+# 2.237.0 (#2870): entries that differ by design after a round trip: rows of other people are no longer put under their
+# account (reactions, encrypted notes, timesheets, signatures left out; time entries go to the importing person with the
+# name in the note) and the office log gains its "imported" entries
+BY_DESIGN = ("chat/reactions.json", "comments/reactions.json", "tasks/encrypted_notes.json", "tasks/locked_notes.json", "time_sheets.json",
+             "time_entries.json", "office/letter_profiles.json", "office/log.json")
 SKIP_ENTRIES = {"manifest.json", "organisation.json", "members.json"}
 
 
@@ -244,6 +249,8 @@ for u in ("bob", "dora"):
 r = A.post(B + "/api/admin/orgs", json={"name": "Gamma Leer", "admin_id": ALICE})
 assert r.status_code == 201, r.text
 ORG3 = r.json()["id"]
+# 2.278.0 (#3095): an org import only maps people who are members of the target organisation (others get an invitation)
+assert A.put(B + f"/api/orgs/{ORG3}/members", json={"email": "bob@example.com", "role": "member"}).ok
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 NOW = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
 
@@ -382,20 +389,23 @@ NR = one("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (NL,))
 msgs = dbx("SELECT id, user_id, body, reply_to FROM tchat_msgs WHERE room_id=? ORDER BY id", (NR,))
 check(len(msgs) == 3, f"the three messages came along {len(msgs)}")
 by = {x["body"]: dict(x) for x in msgs}
-check(by.get("Start um neun", {}).get("user_id") == ALICE and by.get("Passt", {}).get("user_id") == BOB, "authors: alice + bob (ticked)")
+# 2.237.0 (#2870): a ticked person is no author any more (like #2492): only the importing person's own messages keep an account
+check(by.get("Start um neun", {}).get("user_id") == ALICE and by.get("Passt", {}).get("user_id") is None, "authors: alice, bob (ticked) without account")
 check(by.get("Ich komme später", {}).get("user_id") is None, "dora (not ticked): the message stays without author")
 check(by.get("Passt", {}).get("reply_to") == by.get("Start um neun", {}).get("id"), "the answer points at the new message")
-check(T("SELECT user_id FROM tchat_rx WHERE message_id=?", (by.get("Start um neun", {}).get("id"),)) == [(BOB,)], "the chat reaction came along")
+check(T("SELECT user_id FROM tchat_rx WHERE message_id=?", (by.get("Start um neun", {}).get("id"),)) == [], "2.237.0 (#2870): bob's chat reaction not under his account")
 # persons' rows: bob yes, dora no
 check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=?", (ORG3, BOB)) == 1, "bob's absence came along")
 check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=?", (ORG3, DORA)) == 0, "dora's absence not")
 check(one("SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=? AND days=28", (ORG3, BOB)) == 1, "bob's vacation account")
 check(one("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (NL,)) == 2, "time entries of alice + bob, not dora's")
+# 2.237.0 (#2870): bob's time entry goes to the importing person, his name in front of the note
+check(T("SELECT user_id FROM time_entries WHERE list_id=? AND note LIKE 'Bob Mitglied: %'", (NL,)) == [(ALICE,)], "bob's time entry under alice, named")
 check(one("SELECT COUNT(*) FROM time_sheets WHERE org_id=?", (ORG3,)) == 0 or
       one("SELECT COUNT(*) FROM time_sheets WHERE org_id=? AND user_id=?", (ORG3, DORA)) == 0, "dora's timesheet not")
 check("not chosen were not taken over" in W, f"the warning names the left-out rows {W[:300]}")
-check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 1 and
-      one("SELECT body FROM task_enc_notes WHERE task_id=? AND user_id=?", (NT, BOB)) == CT, "bob's encrypted note, unchanged")
+# 2.237.0 (#2870): rows of one other person (encrypted notes, timesheets) are not put under their account
+check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob comes along to the new task")
 NC2 = one("SELECT id FROM comments WHERE task_id=?", (NT,))
 check(one("SELECT user_id FROM comment_reactions WHERE comment_id=?", (NC2,)) == ALICE, "the comment reaction came along")
@@ -468,6 +478,8 @@ check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=?", (ORG,)) == 2, "the
 dbx("DELETE FROM time_sheets WHERE org_id=?", (ORG,))
 r = A.post(B + "/api/admin/orgs", json={"name": "Delta Leer", "admin_id": ALICE})
 ORG4 = r.json().get("id") if r.status_code == 201 else 0
+for u in ("bob", "dora"):  # 2.278.0 (#3095): members of the target, so their rows map (others get an invitation)
+    A.put(B + f"/api/orgs/{ORG4}/members", json={"email": f"{u}@example.com", "role": "member"})
 iid4, _pv = opened(A, OX1, RK1)
 j = run(A, iid4, ORG4, people={EH("bob@example.com"): {"share": True}, EH("dora@example.com"): {"share": True}})
 check(j.get("state") == "done", f"import with everyone ticked done {j.get('error')}")
@@ -477,6 +489,9 @@ Z1, Z4 = open_archive(OX1, RK1), open_archive(OX4, RK4)
 diffs = compare(Z1, Z4)
 bad, other = [], []
 for n, t in diffs:
+    if n in BY_DESIGN:
+        print("round trip: differs by design (2.237.0 #2870): " + f"{n}: {t}"[:300], flush=True)
+        continue
     dep = DEPENDS.get(n)
     later = dep and norm_archive_count(Z1, dep) and not norm_archive_count(Z4, dep)  # its rows point at a part not merged yet
     (bad if n.startswith(MINE) and not later or strict else other).append(f"{n}: {t}")

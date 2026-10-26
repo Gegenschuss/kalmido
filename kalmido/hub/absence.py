@@ -25,6 +25,7 @@ from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..accounts.session import me, user_public
+from ..accounts.orgs import visible_people
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
 
@@ -474,6 +475,9 @@ def v1_absences():
     if not oid:
         return jsonify(org_id=None, people=[], items=[], holidays=[])
     people = abs_people(c, oid)
+    if (u["kind"] or "user") == "agent":  # 2.223.7 A (#2917): an agent sees only the people it may see, not the whole organisation
+        vis = visible_people(c, u["id"])
+        people = [p for p in people if p["id"] in vis]
     pids = {p["id"] for p in people}
     rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? "
                      "AND status='approved' ORDER BY start_date, id",  # 2.125.0 A (#2117): never a request
@@ -486,7 +490,8 @@ def v1_absences():
 def abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/absences"] = {"get": op(
         "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) -- only \"away\" and the period, "
-        "never the kind or the note; an agent sees its own workspace only (a private agent: 404); plus the public holidays of the "
+        "never the kind or the note; an agent sees its own workspace only (a private agent: 404), 2.223.7 (#2917): only the people "
+        "of the projects shared with it and who manages it; plus the public holidays of the "
         "organisation's state; 2.125.0 (#2117): approved absences only, never an open or rejected vacation request", "Workload",
         ok({"type": "object", "properties": {
             "org_id": nul("integer"),

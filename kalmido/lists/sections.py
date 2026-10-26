@@ -284,6 +284,7 @@ def sections_order(lid):
     need_list(c, lid)
     b = body()
     ids, prev = b.get("ids"), b.get("_prev")
+    write_lock(c, f"sections:{lid}")  # 2.273.0 B (#3051): _prev checked and the order written as one step (two drags at once)
     cur = [r[0] for r in c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
     bad = not isinstance(ids, list) or any(isinstance(i, bool) or not isinstance(i, int) for i in ids)
     if prev is not None and (bad or not isinstance(prev, list) or prev != cur or sorted(ids) != sorted(cur)):

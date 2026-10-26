@@ -553,7 +553,7 @@ def ofr_get():
     caps = _caps(c, uid, oid, mg)
     out["templates"] = [{"ref": f"tpl:{k}", "key": k, "name": tr(TEMPLATES[k][0]), "hint": tr(TEMPLATES[k][1]),
                          "levels": TEMPLATES[k][2], "specials": list(TEMPLATES[k][3]),
-                         "can_give": k == TPL_LEGACY or k == TPL_NONE or _within(TEMPLATES[k][2], TEMPLATES[k][3], caps)}
+                         "can_give": mg == "admin" if k == TPL_LEGACY else (k == TPL_NONE or _within(TEMPLATES[k][2], TEMPLATES[k][3], caps))}
                         for k in TPL_ORDER]
     out["groups"] = []
     for gr in _group_rows(c, oid):
@@ -723,6 +723,8 @@ def ofr_person_put(pid):
         refs = [r for r in refs if r != f"tpl:{TPL_LEGACY}"]
     if len(refs) > 1 and f"tpl:{TPL_NONE}" in refs:
         refs = [r for r in refs if r != f"tpl:{TPL_NONE}"]
+    if f"tpl:{TPL_LEGACY}" in refs and mg != "admin":  # 2.223.2 B (#2860): previous access carries the role's old specials (release, export)
+        raise Denied(403, tr(N_("Only an admin of this organisation can do this")))
     prole = org_role(c, pid, oid) or ""
     for ref in refs:
         d = _ref_def(c, oid, ref, prole)

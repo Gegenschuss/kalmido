@@ -55,14 +55,15 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("This quotation is valid until {date}.|pack"),
              N_("regarding the project referenced above, we are pleased to submit the following charges for our services:|pack"),
              N_("Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply.|pack"),
+             N_("the following goods or services have been delivered:|pack"), N_("Goods or services received in full and in good condition.|pack"),  # 2.296.0 D (#3167)
              N_("regarding the invoice referenced below we issue the following credit note:|pack"),
              N_("We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions.|pack"),
              N_("it may have escaped your attention that the following invoices are still outstanding:|pack"),
-             N_("Please transfer the full amount within {days} working days to the bank account above.|pack"),
+             N_("Please transfer the outstanding amount within {days} days to the bank account above.|pack"),
              N_("despite our payment reminder, we have not yet received payment for the following invoices:|pack"),
-             N_("Please transfer the total amount outstanding within {days} working days to the bank account above. If you have already arranged payment, please disregard this letter.|pack"),
+             N_("Please transfer the total amount outstanding within {days} days to the bank account above. If you have already arranged payment, please disregard this letter.|pack"),
              N_("despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack"),
-             N_("This is our final request to transfer the total amount outstanding within {days} working days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you.|pack"),
+             N_("This is our final request to transfer the total amount outstanding within {days} days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you.|pack"),
              N_("Payable by {date} without deduction.|pack"), N_("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|pack"),
              N_("VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC).|pack"),
              N_("Not taxable in Germany.|pack"), N_("No VAT is charged (small business, section 19 German VAT Act).|pack"),
@@ -72,7 +73,12 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("1 year from first publication|pack"), N_("2 years from first publication|pack"), N_("worldwide|pack"),
              N_("Germany, Austria, Switzerland|pack"), N_("Germany|pack"), N_("worldwide except music on trade shows / live events (DE)|pack"),
              N_("internal use|pack"), N_("internal use, web, unpaid media|pack"), N_("all media|pack"), N_("web, social media, paid media|pack"),
-             N_("the client's country|pack"), N_("the client's region|pack"))
+             N_("the client's country|pack"), N_("the client's region|pack"),
+             # 2.296.0 B (#3168, #3175): invoice correction, client VAT id, buyer reference, the two reverse charge texts
+             N_("Invoice correction|pack"), N_("Invoice correction No.|pack"), N_("Correction of invoice No.|pack"), N_("Correction total|pack"),
+             N_("regarding the invoice referenced above we issue the following invoice correction:|pack"), N_("Client VAT ID|pack"),
+             N_("Leitweg ID|pack"), N_("Buyer reference|pack"),
+             N_("Reverse charge: VAT to be accounted for by the recipient (section 13b German VAT Act).|pack"))
 
 def _dpk(w, lang):
     # 2.185.0 (#2520): looked up directly, not via tr(): an own text with a "|" must come back whole

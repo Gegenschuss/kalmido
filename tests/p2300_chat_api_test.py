@@ -85,6 +85,9 @@ def msgs():
     return {m["id"]: m for m in A.get(B + f"/api/agents/{CL}/chat").json()["messages"]}
 
 
+# 2.233.0 (#2848): older suggestions are collected by default now (choice_state collected, still answerable); the chat
+# setting "only the newest" keeps the expiry these checks are about (the collecting: p2233_a_chatsugg_test.py)
+check(A.put(B + f"/api/agents/{CL}/chat-prefs", json={"sugg": "latest"}).ok, "#2848: chat setting only the newest")
 # ================================================================== #1037 answer buttons expire
 m1 = agent_say("Shall I plan 2.30 now?", choices=[{"id": "yes", "label": "Plan 2.30"}, {"id": "no", "label": "Later"}])
 check(m1["choice_state"] == "open", "#1037: a new question's buttons are open " + str(m1.get("choice_state")))

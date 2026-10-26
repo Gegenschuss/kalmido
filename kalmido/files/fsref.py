@@ -24,7 +24,8 @@ Rules:
   fs_ref_drop).
 
 Interface (signatures fixed; B / C and 2.200-2.202 use them):
-  fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None)
+  fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None,
+                  content_gate=None, cap=None)
       kind      str, a new ref_kind ([a-z][a-z0-9_]*, not 'att' / 'list_file'), at most 20 characters
       label     the kind's name for people, marked with N_() (translated when sent), e.g. N_("Invoice")
       open_url  f(ref_id) -> the app route that opens the object (for go(), without '#'), e.g. "office/doc/12"
@@ -37,6 +38,10 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
       title     f(c, ref_id) -> the object's title: the node's name when fs_ref_place gets none (else the label)
       content   f(c, uid, ref_id) -> (bytes, file name, mime) | None: the object as a file (its PDF ...) for the content
                 routes of the file store (web and /api/v1, + text); called only with fs_ref_role >= 'view'
+      content_gate  f(c, uid, ref_id) -> None: 2.238.0 A (#2863) the area's own locks before content (a kid's account, the
+                area turned off, a token's or agent's scope); raises Denied
+      cap       f(c, uid, ref_id) -> None | 'view' | 'edit': 2.238.0 A (#2863) the most a folder share gives uid (the area's
+                cap by the organisation role, e.g. the office: guests nothing, read-only / accounting read); a result None = nothing, cap=None = no cap
   fs_ref_role(c, uid, ref_kind, ref_id) -> None | 'view' | 'edit'
   fs_ref_node(c, ref_kind, ref_id) -> the fs_nodes row of the object (also in the trash) or None
   fs_ref_content(c, uid, n) -> (bytes, name, mime) of reference node n (a row); Denied(404) without a role, 409 without content
@@ -46,10 +51,10 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
       the target folder and -- for a node that lies in a folder -- 'edit' there. Raises Denied. The caller commits.
       The node's name is always the area's title (title hook); name only counts for a kind without one.
   fs_ref_may_file(c, uid, ref_kind, ref_id) -> bool   'edit' from the area: file / move / trash the object's node
-  fs_ref_need_move(c, uid, n)                moving node n into another folder: Denied(403) unless fs_ref_may_file on every
+  fs_ref_need_move(c, uid, n, restore=False) moving node n into another folder: Denied(403) unless fs_ref_may_file on every
                                              object filed in its subtree
-  fs_ref_need_share(c, uid, n, role)         sharing node n with role: Denied(403) unless uid has that role (fs_ref_role) on
-                                             every object filed in its subtree
+  fs_ref_need_share(c, uid, n, role)         sharing node n with role: Denied(403) unless uid has 'edit' (fs_ref_role) on
+                                             every object filed in its subtree (2.238.0 A, #2863: also for a 'view' share)
   fs_ref_rename(c, ref_kind, ref_id, name)   the object's new title on its node (no rights check)
   fs_ref_drop(c, ref_kind, ref_id)           the object was deleted for good: its node goes (no rights check)
   fs_protect(c, n) -> reason | None          a node (row) that may not go into the trash: fs_protect_hooks + protect
@@ -60,6 +65,8 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
 import re
 
 from ..accounts.orgroles import org_role_key
+from flask import g, has_request_context
+
 from ..core.access import Denied, acx_of
 from ..core.db import insert_id
 from ..core.i18n import tr
@@ -72,12 +79,26 @@ FSR_RESERVED = ("att", "list_file")  # the kinds of link nodes (files/store.py f
 fs_protect_hooks = []
 
 
-def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None):
+def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None,
+                    content_gate=None, cap=None):
     """Register a kind of reference node (module docstring). Registering the same kind again replaces it (a module reload)."""
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,19}", kind or "") or kind in FSR_RESERVED:
         raise ValueError(f"fs_ref_register: invalid kind {kind!r}")
     FSR[kind] = {"label": label, "open_url": open_url, "base_role": base_role, "space": space, "protect": protect,
-                 "hidden": hidden, "on_trash": on_trash, "title": title, "content": content}
+                 "hidden": hidden, "on_trash": on_trash, "title": title, "content": content, "content_gate": content_gate, "cap": cap}
+
+
+def fs_ref_token_lacks(uid, scope):
+    """2.238.0 A (#2863): the request's own token (a person's or an agent's; uid = its account) lacks scope (False for the
+    app's session) -- the area's scope on the folder way, like its own v1 routes."""
+    if not has_request_context() or g.get("auth_via") != "token" or not g.get("user") or g.user["id"] != uid:
+        return False
+    return scope not in (g.get("scopes") or set())
+
+
+def fs_ref_all_sql(kind):
+    """2.238.0 A (#2863): a hidden subquery naming every filed object of kind (a token without the area's scope)."""
+    return f"(SELECT ref_id FROM fs_nodes WHERE kind = 'ref' AND ref_kind = '{kind}')"
 
 
 def fs_protect_hook(fn):
@@ -147,6 +168,9 @@ def fs_ref_node_role(c, uid, n, chain=None):
     if r and org and not agent:
         if org_role_key(c, uid, org) == "readonly":
             r = "view"
+    if r and reg["cap"]:  # 2.238.0 A (#2863): a folder share gives at most what the area allows the role
+        top = _role_of(reg["cap"](c, uid, n["ref_id"]))
+        r = r if ROLE_RANK[r] <= ROLE_RANK[top] else top
     return r
 
 
@@ -271,6 +295,8 @@ def fs_ref_content(c, uid, n):
     reg = FSR.get(n["ref_kind"] or "")
     if reg is None or not fs_ref_role(c, uid, n["ref_kind"], n["ref_id"]):
         raise Denied(404)
+    if reg["content_gate"]:
+        reg["content_gate"](c, uid, n["ref_id"])  # 2.238.0 A (#2863): the area's own locks, like its own routes
     out = reg["content"](c, uid, n["ref_id"]) if reg["content"] else None
     if not out:
         raise Denied(409, tr("Not a file"))
@@ -342,21 +368,32 @@ def fs_ref_subtree(c, n):
     return [r for r in _live_below(c, n["id"]) if r["kind"] == "ref"]
 
 
-def fs_ref_need_move(c, uid, n):
+def _reg_space_none(c, r):
+    reg = FSR.get(r["ref_kind"] or "")
+    return reg is not None and not reg["space"](c, r["ref_id"])
+
+
+def fs_ref_need_move(c, uid, n, restore=False):
     """2.199.0 F (#2742, review): moving node n (a row) into another folder changes who reaches the objects filed in it (the
     shares above): uid needs 'edit' on every one of them (fs_ref_role), else Denied(403). Sorting among the same siblings
-    does not ask."""
+    does not ask. restore (bundle 2.305: 2.238.0 A on top of 2.200.0): a folder coming back out of the trash skips the objects
+    that give nothing through their node now (space None: e.g. a page its trash took into the knowledge trash) -- the area's
+    on_trash brings them back only with its own edit right."""
     for r in fs_ref_subtree(c, n):
+        if restore and _reg_space_none(c, r):
+            continue
         if not fs_ref_may_file(c, uid, r["ref_kind"], r["ref_id"]):
             raise Denied(403, tr("The folder holds documents you may not edit") if n["kind"] == "folder" else None)
 
 
 def fs_ref_need_share(c, uid, n, role):
-    """2.199.0 F (#2742, review): sharing node n (a row) with role passes the objects filed below it on: uid needs at least
-    that role on every one of them through the area (base_role) or an explicit share of their own (fs_ref_role) -- owning
-    the folder is not enough. Else Denied(403)."""
+    """2.199.0 F (#2742, review): sharing node n (a row) with role passes the objects filed below it on: uid needs that role
+    on every one of them through the area (base_role) or an explicit share of their own (fs_ref_role) -- owning the folder
+    is not enough. Else Denied(403). 2.238.0 A (#2863): 'edit' for every share -- a reader has no way to share in the area
+    itself, so a folder does not give one either."""
+    need = max(ROLE_RANK[role], ROLE_RANK["edit"])
     for r in fs_ref_subtree(c, n):
-        if ROLE_RANK[fs_ref_role(c, uid, r["ref_kind"], r["ref_id"])] < ROLE_RANK[role]:
+        if ROLE_RANK[fs_ref_role(c, uid, r["ref_kind"], r["ref_id"])] < need:
             raise Denied(403, tr("The folder holds documents you may not share with this role"))
 
 

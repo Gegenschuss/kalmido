@@ -3,7 +3,7 @@ import re
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -53,6 +53,33 @@ def grp_shares_of_list(c, lid):
             if folder_under(lr["folder"], r["folder"]):
                 out.append((r["group_id"], r["role"], r["folder"]))
     return out
+
+
+def grp_shares_of_lists(c, rows):
+    """2.280.0 B (#3116): grp_shares_of_list for many lists (rows with id, owner_id, folder, is_inbox) and the groups' names, in
+    three queries for all -> ({list id: [(group_id, role, via)]}, {group id: name})."""
+    rows = [r for r in rows if not r["is_inbox"]]
+    out, names = {}, {}
+    if not rows:
+        return out, names
+    for r in c.execute("SELECT list_id, group_id, role FROM group_shares WHERE list_id = ANY(CAST(? AS BIGINT[])) ORDER BY id",
+                       (st_ids(sorted({r["id"] for r in rows})),)).fetchall():
+        out.setdefault(r["list_id"], []).append((r["group_id"], r["role"], "list"))
+    owners = sorted({r["owner_id"] for r in rows if r["folder"] and r["owner_id"]})
+    fs = {}
+    if owners:
+        for r in c.execute("SELECT owner_id, group_id, role, folder FROM group_shares WHERE list_id IS NULL AND owner_id = ANY(CAST(? AS BIGINT[])) "
+                           "ORDER BY id", (st_ids(owners),)).fetchall():
+            fs.setdefault(r["owner_id"], []).append(r)
+    for lr in rows:
+        if lr["folder"]:
+            for r in fs.get(lr["owner_id"], ()):
+                if folder_under(lr["folder"], r["folder"]):
+                    out.setdefault(lr["id"], []).append((r["group_id"], r["role"], r["folder"]))
+    gids = sorted({x[0] for v in out.values() for x in v if x[0]})
+    if gids:
+        names = {r[0]: r[1] for r in c.execute("SELECT id, name FROM groups WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(gids),))}
+    return out, names
 
 
 def grp_list_ids(c, gid=None, owner=None):
@@ -171,7 +198,8 @@ def groups_for(c, uid=None, full=False):
     workspaces only the members one may see."""
     from ..accounts.orgs import instance_mode, visible_people
     out = [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY lower(name), id")]
-    if instance_mode(c) == "workspaces" and has_request_context() and getattr(g, "user", None) is not None:
+    if has_request_context() and getattr(g, "user", None) is not None and (
+            instance_mode(c) == "workspaces" or (g.user["kind"] or "user") == "agent"):  # 2.223.7 A (#2917): agents always
         vis = visible_people(c, me())
         if vis is not None:
             # 2.30.0 (#1036, B1): a group is known only to its creator, its members and the people of an organisation one of
@@ -228,7 +256,8 @@ def grp_visible(c, r):
     """2.30.0 (#1036, B1): in the mode workspaces a group is visible to its creator, its members and the members of the
     organisations its members belong to -- not to somebody who only knows one member privately."""
     from ..accounts.orgs import instance_mode
-    if instance_mode(c) != "workspaces" or not has_request_context() or getattr(g, "user", None) is None:
+    agent = has_request_context() and getattr(g, "user", None) is not None and (g.user["kind"] or "user") == "agent"
+    if not agent and (instance_mode(c) != "workspaces" or not has_request_context() or getattr(g, "user", None) is None):
         return True
     uid = me()
     if c.execute("SELECT created_by FROM groups WHERE id=?", (r["id"],)).fetchone()[0] == uid:
@@ -236,6 +265,8 @@ def grp_visible(c, r):
     mem = grp_members(c, r["id"])
     if uid in mem:
         return True
+    if agent:
+        return False  # 2.223.7 A (#2917): an agent knows only the groups it is in, not those of its whole organisation
     from ..accounts.orgroles import user_orgs_full
     mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151, review): not through an organisation where uid is guest / accounting
     if not mine or not mem:

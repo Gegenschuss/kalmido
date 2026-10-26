@@ -309,10 +309,11 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind")), files))  # approval: see request_chat_approval
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind", "next_step", "limit")), files))  # approval: see request_chat_approval; 2.236.0 (#2909 #2911): next_step / limit
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind",
+                                                                              "next_step", "limit")))  # 2.236.0 (#2909 #2911)
 
 
 def t_request_chat_approval(api, a):
@@ -416,8 +417,19 @@ def t_tidy(api, a):
 TOOLS = [
     ("get_agent", "Who am I: the agent's user, enabled state, status, job counts, the latest event cursor and runtime (the "
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
-                  "timezone, reset_seq raised by 'Reset now').",
+                  "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
+                  "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
+                  "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed.",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
+    ("get_queue", "2.236.0 (#2906 #2907): your queue -- the open tasks assigned to you that you see: {max_parallel, priority_rule, "
+                  "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "
+                  "due}]}. Your order (set_queue_order) first, the rest by priority, due date, creation. Work on the active ones only "
+                  "(max_parallel 0 = no limit) and choose the next task from it by priority_rule, the owner's rule in their words.",
+     _obj({}), lambda api, a: api.call("GET", "/agent/queue")),
+    ("set_queue_order", "2.236.0 (#2906): set the order of your queue: order = task ids (only your own open tasks you see, at most "
+                        "500; an unknown / foreign id = 400). The tasks not named follow in the default order. Returns the queue.",
+     _obj({"order": {"type": "array", "maxItems": 500, "items": {"type": "integer"}}}, ["order"]),
+     lambda api, a: api.call("PUT", "/agent/queue", body={"order": a.get("order") or []})),
     ("list_lists", "Projects the agent can see (shared with it), with role, sections [{id, name}], project tags, the agent tidy mode "
                    "(off/suggest/auto) and tidy_agent_id (the one agent that tidies the project up; only that agent gets tidy events). "
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the project "
@@ -482,7 +494,7 @@ TOOLS = [
     # 2.10.0 (#441): groups (read) and the groups a list is shared with
     ("list_groups", "Groups of people (an admin creates them): id, name, members [{user_id, name}], synced (members follow a "
                     "sign-in group), mine. Projects and folders can be shared with a group; a task can be assigned to a group "
-                    "(assignee_group_id) until one member takes it.",
+                    "(assignee_group_id) until one member takes it. An agent sees only the groups it is in.",
      _obj({}), lambda api, a: api.call("GET", "/groups")),
     ("list_list_groups", "The groups one project is shared with: group_id, name, role, via (list = directly, else the folder).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/groups")),
@@ -536,7 +548,9 @@ TOOLS = [
                     "on it (the whole chain, same number of days) when the project has \"Move dependent tasks along\" on; the answer's chain "
                     "names them (chain_note); shift_chain false leaves them where they are. 2.270.0: send expect_updated_at (the "
                     "task's updated_at from get_task): 409 = someone changed the task since, read it again and decide; _prev "
-                    "{field: value read} instead keeps only the fields changed since (listed in conflicts).",
+                    "{field: value read} instead keeps only the fields changed since (listed in conflicts). 2.273.0: a move to "
+                    "another project answers move_ended (what ended: people, assignee, links, subtasks ...) - tell the person; "
+                    "moving it back within a day restores it (move_restored).",
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
            "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"},
            "expect_updated_at": {"type": "string", "description": "updated_at of the task as you read it (recommended)"},
@@ -613,9 +627,9 @@ TOOLS = [
      _obj({"task_id": S_ID, "integrations": {"type": "array", "items": {"type": "integer"}, "maxItems": 50},
            "summary": {"type": "string", "maxLength": 4000}, "evidence": {"type": "string", "minLength": 1, "maxLength": 4000}},
           ["task_id", "evidence"]), t_request_gate("deploy")),
-    ("propose_to_other_topic", "Propose tasks for a project you cannot see (another topic, e.g. a change to a shared file). It lands "
-                               "as a proposal with that project's owner -- never with the agent working there; only when a person applies "
-                               "it do tasks exist. You learn the outcome as a job event.",
+    ("propose_to_other_topic", "Propose tasks for a project shared with you that belongs to another topic (e.g. a change to a shared file). "
+                               "It lands as a proposal with that project's owner -- never with the agent working there; only when a person "
+                               "applies it do tasks exist. A project not shared with you answers 404. You learn the outcome as a job event.",
      _obj({"list_id": S_ID, "title": {"type": "string", "minLength": 1, "maxLength": 300}, "reason": {"type": "string", "minLength": 1, "maxLength": 5000},
            "tasks": {"type": "array", "minItems": 1, "maxItems": 50, "items": _obj({"title": {"type": "string", "minLength": 1, "maxLength": 300},
                                                                                      "notes": {"type": "string", "maxLength": 5000},
@@ -698,7 +712,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report | ideas), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report | ideas | receipt_read), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the projects / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -730,6 +744,11 @@ TOOLS = [
                         "input.report and its fixed input.report.markdown): {text} (Markdown). For these three: word the text from "
                         "the input only (and input.wish), invent nothing, no placeholders for unknown facts, in the language of the "
                         "document (input.doc.lang) / input.lang; the person edits and takes it over, nothing is sent. "
+                        "receipt_read (2.299.0, read a receipt: open the file itself with read_file (as base64) of input.document.id, "
+                        "a local model is fine): {supplier?, vat_id?, tax_no?, invoice_no?, date?, net?, vat?, gross? (\"12.34\"), "
+                        "vat_pct?, vat_rates? [{pct, net, vat}], currency?, positions? [{text, qty?, net?, vat_pct?}] (at most 100), "
+                        "category? (input.categories), account?, bank_tx? (only an id of input.bank)} -- only what is on the receipt, "
+                        "at least one value, unknown fields 400; the person takes the values over. "
                         "ideas (2.156.0, sub-branches for a branch of a mind map; input: list, path, levels, hint, lang only): "
                         "{items: [{title, children?: [{title}] (only when input.levels is 2)}]} -- short titles in input.lang, at "
                         "most 50 entries in all; the person takes single ideas or all over. "
@@ -768,7 +787,12 @@ TOOLS = [
                   "the person decides and saves it -- you never save a message yourself. kind (2.41.0): notice = one small grey "
                   "line in the middle of the chat instead of a message (no push, never unread, at most 200 characters, no buttons; "
                   "at most one file, which a tap on the line opens), e.g. 'New session, summary taken over (22:10)' after your "
-                  "host started a fresh session; older servers answer 400 -- then send nothing.",
+                  "host started a fresh session; older servers answer 400 -- then send nothing. "
+                  "next_step (2.236.0, #2911): the next step you suggest, at most 80 characters -- shown as ONE button at the end of the "
+                  "message (when your work style has next_step on; the answer tells next_step_dropped: off | repeat | conflict | full). "
+                  "limit (2.236.0, #2909): true = this message reports a limit (a one-way step, a refusal, a stop, an error); with work "
+                  "style push 'limits' only such messages (and approvals / permission questions) send a push. Older servers answer 400 "
+                  "-- then send it without. Both only without files.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
            "reply_to": {**S_ID, "description": "2.33.0: the id of a message of this conversation you answer (a message's reply / reply_to "
                                                "show what the person answered)"},
@@ -786,6 +810,8 @@ TOOLS = [
            "multi": {"type": "boolean"},
            "offer_save": {"type": "boolean", "description": "2.37.0: offer the person the button 'Save as task' under this message"},
            "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0: notice = a small grey line (session / summary notes)"},
+           "next_step": {"type": "string", "minLength": 1, "maxLength": 80, "description": "2.236.0: the next step as one button at the end"},
+           "limit": {"type": "boolean", "description": "2.236.0: this message reports a limit (may push with work style push 'limits')"},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),
@@ -923,7 +949,8 @@ TOOLS += [
      lambda api, a: api.call("PUT", f"/event-calendars/{int(a['calendar_id'])}/members/{int(a['user_id'])}", body=_pick(a, ("role",)))),
     ("unshare_event_calendar", "2.21.0: stop sharing a calendar (owner) or leave one shared with you.", _obj({"calendar_id": S_ID, "user_id": S_ID}, ["calendar_id", "user_id"]),
      lambda api, a: api.call("DELETE", f"/event-calendars/{int(a['calendar_id'])}/members/{int(a['user_id'])}")),
-    ("import_ics", "2.21.0: import the text of an .ics file into a calendar (the same UID is updated: no doubles); dry_run only counts.",
+    ("import_ics", "2.21.0: import the text of an .ics file into a calendar (the same UID is updated: no doubles); dry_run only counts. "
+     "2.273.0: an event changed here after the file's LAST-MODIFIED stays (kept_newer); an event without ATTENDEE keeps its attendees.",
      _obj({"calendar_id": S_ID, "ics": {"type": "string"}, "dry_run": {"type": "boolean"}}, ["calendar_id", "ics"]),
      lambda api, a: api.call("POST", f"/event-calendars/{int(a['calendar_id'])}/import", body=_pick(a, ("ics", "dry_run")))),
     ("export_ics", "2.21.0: a calendar as ICS text.", _obj({"calendar_id": S_ID}, ["calendar_id"]),
@@ -967,7 +994,8 @@ TOOLS += [
      lambda api, a: api.call("PUT", f"/address-books/{int(a['book_id'])}/members/{int(a['user_id'])}", body=_pick(a, ("role",)))),
     ("unshare_address_book", "2.21.0: stop sharing an address book (owner) or leave one.", _obj({"book_id": S_ID, "user_id": S_ID}, ["book_id", "user_id"]),
      lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}/members/{int(a['user_id'])}")),
-    ("import_vcards", "2.21.0: import the text of a .vcf file into an address book (the same UID is updated).",
+    ("import_vcards", "2.21.0: import the text of a .vcf file into an address book (the same UID is updated). 2.273.0: only the "
+     "fields the card carries change; a contact changed here after the card's REV stays and is counted in kept_newer.",
      _obj({"book_id": S_ID, "vcf": {"type": "string"}}, ["book_id", "vcf"]),
      lambda api, a: api.call("POST", f"/address-books/{int(a['book_id'])}/import", body={"vcf": a["vcf"]})),
     ("export_vcards", "2.21.0: an address book as vCard text.", _obj({"book_id": S_ID}, ["book_id"]),
@@ -1495,7 +1523,7 @@ TOOLS += [
     ("mark_news_read", "Mark News read: ids, or all=true.", _obj({"ids": {"type": "array", "items": {"type": "integer"}}, "all": {"type": "boolean"}}),
      lambda api, a: api.call("POST", "/news/read", body=a)),
     ("list_agents", "The agents in your projects with their state and running jobs.", _obj({}), lambda api, a: api.call("GET", "/agents")),
-    ("export_data", "Everything the token's user owns as JSON (projects, tasks, comments, time, habits ...). Large. A personal token needs the scopes export and account.", _obj({}),
+    ("export_data", "The token's user's own projects as JSON (projects, tasks, comments, time, habits, settings ...; 2.239.0: no webhook addresses, not the complete account export of the app). Large. A personal token needs the scopes export and account.", _obj({}),
      lambda api, a: api.call("GET", "/export", timeout=120)),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
@@ -1729,7 +1757,7 @@ TOOLS += [
                                                                "org": {"type": "integer"}}),
      lambda api, a: api.call("GET", "/workload", _pick(a, ("start", "weeks", "org")))),
     ("get_absences", "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) - only 'away' and the "
-                     "period, never the reason; your own workspace only; plus the public holidays of its state.",
+                     "period, never the reason; your own workspace only, only the people you share a project with; plus the public holidays of its state.",
      _obj({"start": D, "end": D, "org": {"type": "integer"}}),
      lambda api, a: api.call("GET", "/absences", _pick(a, ("start", "end", "org")))),
     ("request_approval", "2.23.0: ask a person of the task's project to approve it (action request + approver_id; the task is assigned to "
@@ -1890,7 +1918,7 @@ TOOLS += [
 # 2.51.0 (#1348, #1350): the office (Office & finance) -- drafts only, a person confirms. Needs the scope office, the agent's
 # switch "May draft office documents" and the area's privacy switch "Agents may read office data" (else 403); 2.187.0
 # (#2476): the office rights groups of the agent and of requested_by decide per area (an agent without a group: none)
-_RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one)"}}
+_RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one who asked it, 2.223.2)"}}
 # 2.269.0 D (#3046): the agent's own id of a request that makes a draft; sent again with it = the draft made the first time (200)
 _CREF = {"client_ref": {"type": "string", "maxLength": 64, "description": "Optional: your own id of this request (e.g. a UUID); sent again with "
                                                                           "the same value = the draft made the first time (200), never a second one"}}
@@ -2035,7 +2063,8 @@ TOOLS += [
      _obj({"user_id": S_ID, "title": {"type": "string"}, "summary": {"type": "string"},
            "items": {"type": "array", "items": {"type": "object"}, "maxItems": 60}}, ["items"]),
      lambda api, a: api.call("POST", "/agent/proposals/time", body=_pick(a, ("user_id", "title", "summary", "items")))),
-    ("get_dispo", "2.51.0 (scope calendar): the disposition of your workspace: bookings (option / firm) with double bookings, the "
+    ("get_dispo", "2.51.0 (scope calendar): the disposition of your organisation (not for personal agents): bookings (option / firm; "
+                  "of projects you do not read only as Booked) with double bookings, the "
                   "resources (people, contacts, equipment, sets), who is away (never why), public holidays. start, days 1-62.",
      _obj({"start": D, "days": {"type": "integer", "minimum": 1, "maximum": 62}, "org": {"type": "integer"}}),
      lambda api, a: api.call("GET", "/dispo", _pick(a, ("start", "days", "org")))),
@@ -2150,7 +2179,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
 TOOL_SCOPES = {
-    "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
+    "agent": ("get_agent", "get_queue", "set_queue_order", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",

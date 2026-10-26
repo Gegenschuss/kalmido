@@ -28,12 +28,12 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
-from ..core.errors import BadInput
+from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
 from ..accounts.session import me
-from ..files.fsref import fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register
+from ..files.fsref import fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register, fs_ref_token_lacks
 from ..files.fsroots import fs_area_folder_name, fs_area_root
 from ..files.store import _now, _place, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
 from .core import sh_is_agent, sh_may, sh_space, sh_touch
@@ -110,6 +110,8 @@ def _hidden(c, uid):
            and g.user["id"] == uid)  # 2.199.0 F (#2742, review G5): a person's API token keeps its limits on the folder way too
     if not agent and not tok:
         return ""
+    if fs_ref_token_lacks(uid, "sheets:read"):
+        return fs_ref_all_sql(SHF_KIND)  # 2.238.0 A (#2863): a token without sheets:read reaches no table through a folder
     key = ("shf_hidden", int(uid))
     if has_request_context() and key in g.setdefault("shf_cache", {}):
         return g.shf_cache[key]
@@ -141,8 +143,15 @@ def _content(c, uid, rid):
     return shx_csv(c, r).encode("utf-8"), shx_file_name(r["title"], "csv"), "text/csv"
 
 
+def _gate(c, uid, rid):
+    """2.238.0 A (#2863): the file store's content routes read a table only with the token's sheets:read, like
+    /api/v1/sheets."""
+    if fs_ref_token_lacks(uid, "sheets:read"):
+        raise Denied(403, tr("This token lacks the permission “{0}”", "sheets:read"))
+
+
 fs_ref_register(SHF_KIND, label=N_("Table"), open_url=lambda rid: f"sheets/{int(rid)}", base_role=_base, space=_space,
-                protect=_protect, hidden=_hidden, on_trash=_on_trash, title=_title, content=_content)
+                protect=_protect, hidden=_hidden, on_trash=_on_trash, title=_title, content=_content, content_gate=_gate)
 
 
 def shf_folder_may(c, uid, r, write=False):

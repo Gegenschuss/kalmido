@@ -23,13 +23,15 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
-from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
+from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
-from .rights import ofr_admin_or
+from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
+from .countries import fk_reverse_case  # 2.296.0 F (#3168)
+from .pdfweb import epdf_format  # 2.296.0 F (#3173)
 
 INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
@@ -45,6 +47,7 @@ TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|d
                   "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
 # 2.185.0 C (#2520): the standard mail text of a document in its language (English names "the document" for every kind)
 INV_MAIL_TEXT = N_("Dear Sir or Madam,\n\nplease find attached {0} {1}.\n\nKind regards\n{2}|document mail")
+INV_TAX_ON = N_("{0} on {1}|tax line with its taxable amount")  # 2.296.0 B (#3175): "MwSt. 19 % auf 9.570,00 €"
 INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
                  "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
                  "delivery": N_("the document|mail, delivery note")}
@@ -246,6 +249,19 @@ def inv_missing(c, oid, r, s, pack, items):
         miss.append(tr("due date or payment days"))
     if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
         miss.append(tr("VAT note (reverse charge / not taxable / small business)"))
+    if r["vat_mode"] == "novat" and _col(r, "vat_note") == "reverse":  # 2.296.0 B (#3168): both VAT ids (section 14a (1) UStG, BR-AE-02)
+        # 2.296.0 F (#3168): a stale note of a taxed invoice counts no more; at home (section 13b) the tax number will do and
+        # the client needs a VAT id only for the EU case or when the e-invoice is built (BR-AE-02 asks for BT-48)
+        case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
+        if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
+            miss.append(tr("your VAT ID (reverse charge)"))
+        if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (
+                cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
+            miss.append(tr("the client's VAT ID (reverse charge)"))
+    # 2.296.0 B (#3169): a 0 % position of a taxed invoice needs the reason of its exemption (section 14 (4) no. 8 UStG, BT-120)
+    if r["vat_mode"] != "novat" and not str(s.get("exempt_reason") or "").strip() and any(
+            it.get("kind") in ("service", "discount") and pack_tax(pack, it.get("tax") if it.get("tax") in TAX_KEYS else "standard") == 0 for it in items):
+        miss.append(tr("reason for the tax exemption of the 0 % positions (office settings, invoices)"))
     return miss
 
 
@@ -414,12 +430,16 @@ def inv_default_texts(c, oid, s, kind, lang, level=1):
     sal = (texts.get("salutation") or {}).get(lang) or ""
     sfx = f"_{level}" if kind == "reminder" and level in (2, 3) else ""
     intro = (texts.get(kind + "_intro" + sfx) or texts.get(kind + "_intro") or {}).get(lang) or ""
+    if kind == "delivery":  # 2.296.0 D (#3167): no "we charge you" intro on a delivery note / proof of service
+        intro = (texts.get("delivery_intro") or {}).get(lang) or ""
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
         closing = s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
     elif kind == "credit":
         closing = (texts.get("credit_closing") or {}).get(lang) or ""
+    elif kind == "delivery":  # 2.296.0 D (#3167): a receipt line, not "please transfer"
+        closing = s.get("delivery_closing_" + plg) or (texts.get("delivery_closing") or {}).get(lang) or ""
     else:
         closing = s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
@@ -606,6 +626,18 @@ def inv_check_reminder(c, oid, ids, rows):
         raise BadInput(tr("A reminder covers invoices of one client in one currency only"))
 
 
+def inv_reminder_default_fee(s, level):
+    """2.296.0 D (#3174): the fee of a new reminder when none is given: the office's fee from level 2 on (level 1 is the friendly
+    payment reminder, no fee); a given fee always counts."""
+    return (s.get("reminder_fee") or 0) if int(level or 1) >= 2 else 0
+
+
+def inv_reminder_no_label(L, lang, title, level):
+    """2.296.0 D (#3174): the number's label of a reminder follows its level's title ("Zahlungserinnerung Nr.", "Mahnung Nr.",
+    "Letzte Mahnung Nr."); level 2 keeps the pack's own word."""
+    return L.get("reminder_no") if int(level or 1) == 2 and L.get("reminder_no") else tr("{0} No.|document", title, lg=lang)
+
+
 def inv_make_reminder(c, oid, uid, b):
     ids = b.get("doc_ids")
     if not isinstance(ids, list) or not ids or len(ids) > 50:
@@ -624,7 +656,7 @@ def inv_make_reminder(c, oid, uid, b):
     level = b.get("level", 1)
     if level not in REMINDER_LEVELS:
         raise BadInput(tr("Invalid value: {0}", "level"))
-    fee = dec(b.get("fee") if b.get("fee") not in (None, "") else (s.get("reminder_fee") or 0))
+    fee = dec(b.get("fee") if b.get("fee") not in (None, "") else inv_reminder_default_fee(s, level))
     if fee < 0 or fee > 1000000:
         raise BadInput(tr("Invalid value: {0}", "fee"))
     try:
@@ -679,7 +711,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["due_date_text"] = fmt_date(m["due_date"], pack)
     m["payment_days"] = _col(r, "payment_days")
     m["einvoice_format"] = _col(r, "einvoice_format") or ""
-    m["vat_note_key"] = _col(r, "vat_note") or ""
+    m["vat_note_key"] = (_col(r, "vat_note") or "") if r["vat_mode"] == "novat" else ""  # 2.296.0 F (#3168): a stale note of a taxed invoice
     m["vat_note_text"] = ((texts.get("vat_note_" + m["vat_note_key"]) or {}).get(lang) or "") if m["vat_note_key"] else ""
     sf, st = m.get("service_from") or "", m.get("service_to") or ""
     m["service_period_text"] = (fmt_date(sf, pack) if sf == st or not st else (fmt_date(st, pack) if not sf else f"{fmt_date(sf, pack)} – {fmt_date(st, pack)}")) if (sf or st) else ""
@@ -696,6 +728,11 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             rec["email_invoice"] = rec["email_invoice"] or cl["email"] or ""  # 2.99.0 D (#2188): BT-49 falls back to the client's e-mail
     for k in ("street", "extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
         m["recipient"][k] = rec.get(k) or ""
+    if m["vat_note_key"] == "reverse":  # 2.296.0 B (#3168): section 13b UStG at home, Art. 196 VAT Directive for a client abroad
+        # 2.296.0 F (#3168): CH / GB / US keep the generic vat_note_reverse
+        case = fk_reverse_case(m["recipient"]["country"], m["sender_fields"].get("country") or "DE")
+        own = (texts.get("vat_note_reverse_" + case) or {}).get(lang) if case != "other" else None
+        m["vat_note_text"] = own or m["vat_note_text"]  # a pack without the two keys keeps vat_note_reverse
     # 2.40.0 (#1380): the buyer's contact person (e-invoice BT-56) -- the snapshot's, else the chosen / default one
     if ofx_locked(r) and r["recipient_snapshot"]:
         m["recipient"]["contact"] = rec.get("contact") or None
@@ -703,13 +740,15 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         from .docs import fk_doc_contact
         k = fk_doc_contact(c, r["client_id"], _col(r, "contact_id"))
         m["recipient"]["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None
+    if kind == "reminder":
+        L = dict(L, reminder_no=inv_reminder_no_label(L, lang, m["title"], level))
     num_label = L.get(kind + "_no") or (L.get("invoice_no", tr("Invoice no.|document", lg=lang)) if kind == "invoice" else tr("{0} No.|document", m["title"], lg=lang))
     meta = [[num_label, r["number"] or tr("Draft|document number", lg=lang)]]
     cancels = None
     if kind == "credit" and _col(r, "cancels_id"):
         ci = c.execute("SELECT id, number, date FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone()
         if ci is not None:
-            cancels = {"id": ci["id"], "number": ci["number"], "date_text": fmt_date(ci["date"], pack)}
+            cancels = {"id": ci["id"], "number": ci["number"], "date": ci["date"] or "", "date_text": fmt_date(ci["date"], pack)}  # 2.296.0 B (#3173): date = BT-26
             meta.append([L.get("to_invoice", tr("Credit note for invoice no.|document", lg=lang)), f"{ci['number']} ({cancels['date_text']})"])
     m["cancels"] = cancels
     # 2.144.9 (#2575): an invoice made from a quotation names it in the head ("zu Angebot Nr. KV02-M (21.10.2026)")
@@ -725,6 +764,12 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         meta.append([L.get("project", tr("Project title|document", lg=lang)), r["project_title"]])
     if m["recipient"].get("customer_no"):
         meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), m["recipient"]["customer_no"]])
+    if kind in ("invoice", "credit") and m["recipient"].get("vat_id"):  # 2.296.0 B (#3168): section 14a (1) UStG
+        meta.append([L.get("customer_vat_id", tr("Client VAT ID|document", lg=lang)), m["recipient"]["vat_id"]])
+    if kind in ("invoice", "credit") and m["recipient"].get("buyer_reference"):  # 2.296.0 B (#3173): BT-10 visible as well
+        xr = epdf_format(c, oid, r) == "xrechnung"  # 2.296.0 F (#3173): the office default counts too (the format the XML is built in)
+        meta.append([L.get("leitweg_id", tr("Leitweg ID|document", lg=lang)) if xr else L.get("buyer_reference", tr("Buyer reference|document", lg=lang)),
+                     m["recipient"]["buyer_reference"]])
     meta.append([L.get("date", tr("Date|document", lg=lang)), m["date_text"]])
     if m["service_period_text"]:
         meta.append([L.get("service_period", tr("Service period|document", lg=lang)), m["service_period_text"]])
@@ -750,6 +795,11 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["paid"], tot["open"] = mf["paid"], mf["open"]
     tot["open_text"] = fmt_money(mf["open"], lang, cur)
     tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
+    # 2.296.0 B (#3169): tax-exempt positions of a taxed invoice name their reason (PDF note beside the sums, e-invoice BT-120)
+    if kind in ("invoice", "credit") and r["vat_mode"] != "novat" and any(  # 2.296.0 F (#3169): from the lines, a 0 EUR one has no tax line
+            ln.get("kind") in ("item", "discount") and dec(ln.get("tax_pct") or 0) == 0 for ln in t.get("lines") or []):
+        m["exempt_reason"] = str((snd.get("exempt_reason") if ofx_locked(r) else office_settings(c, oid).get("exempt_reason")) or "").strip()
+        tot["exempt_note"] = m["exempt_reason"]
     tot["fx_line"] = ""
     if cur != home and t.get("tax_eur") is not None:  # 2.189.0 (#2475): the tax in the home currency (EUR / USD: the words of before)
         if (home, cur) == ("EUR", "USD"):
@@ -782,7 +832,10 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     else:
         rows = [[L.get("subtotal", tr("Subtotal|document", lg=lang)), tot["net_text"]]]
         for tl in tot["tax_lines"]:
-            rows.append([tl.get("label") or "", tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
+            lab = tl.get("label") or ""
+            if lab and tl.get("base") not in (None, ""):  # 2.296.0 B (#3175): the taxable amount per rate (section 14 (4) no. 8 UStG)
+                lab = tr(INV_TAX_ON, lab, tl.get("base_text") or fmt_money(tl.get("base") or 0, lang, cur), lg=lang)
+            rows.append([lab, tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
         rows.append([L.get("credit_total" if kind == "credit" else "invoice_total", tr("Total|credit note" if kind == "credit" else "Total|invoice", lg=lang)), tot["gross_text"]])
         if kind == "invoice" and dec(mf["paid"]) > 0:
             rows.append([L.get("paid", tr("Already paid|document", lg=lang)), fmt_money(mf["paid"], lang, cur)])
@@ -1129,6 +1182,7 @@ def inv_from_time_post():
     """{client_id, from, to, project_id?, trial?} -> 201 an invoice draft from the client's time entries (one position per list)."""
     from .docs import recalc
     c, uid, oid = _ctx()
+    ofr_need_area(c, uid, oid, "time", "view")  # 2.237.0 A (#2861): the times area too (the path checks offers)
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
@@ -1306,6 +1360,10 @@ def inv_send_post(did):
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    dv_skip = None
+    if not ofr_allows(c, uid, oid, "offers", "edit", "export"):  # 2.237.0 A (#2861): the DATEV copy needs the special export
+        dv_skip = b.get("datev") in (1, True, "1", "true") or (b.get("datev") is None and bool(office_settings(c, oid).get("datev_auto")))
+        b = {**b, "datev": False}
     files, datev, m = inv_send(c, oid, uid, r, b, later=True)
     bump(c)
     c.commit()  # 2.269.0 D (#3046): checks and the day's counters first, the mail only after the commit
@@ -1323,6 +1381,9 @@ def inv_send_post(did):
             c.rollback()
             dv_err = tr("Sent to the recipient; the copy to the DATEV inbox failed: {0}", e.text())
     d = doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin")
+    if dv_skip and r["kind"] in ("invoice", "credit"):  # 2.237.0 A (#2861): sent without the DATEV copy
+        dv_err = tr("Sent to the recipient; the copy to the DATEV inbox failed: {0}", tr(NO_SPECIAL))
+        d["datev_skipped"] = True
     if dv_err:
         d["datev_error"] = dv_err
     return jsonify(d)

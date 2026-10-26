@@ -105,6 +105,9 @@ const today = TC.today();
     await call(CA, 'PATCH', `/api/office/docs/${inv.doc.id}`, {recipient: {name: 'Musterfirma GmbH', lines: ['Weg 2', '10115 Berlin']}, service_from: today, service_to: today});
     const fin = await call(CA, 'POST', `/api/office/docs/${inv.doc.id}/finalize`);
     check(fin.http === 200, 'the invoice is finalised ' + fin.http);
+    // 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (payment suggestions need one)
+    const grp = await call(CA, 'PUT', `/api/office/rights/people/${ag.id}`, {groups: ['tpl:projects', 'tpl:bookkeeping']});
+    check(grp.http === 200, 'setup: the agent in Project management + Bookkeeping ' + grp.http);
     const pp = await agent(ag.token, 'POST', '/payment-suggestions', {invoice_id: inv.doc.id, amount: '200.00', date: today, reference: 'Musterfirma Abschlag', confidence: 'high'});
     check(pp.http === 201, '#1350: a payment suggestion ' + pp.http);
     await nav(B + 'static/icon.svg');

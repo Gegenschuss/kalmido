@@ -119,3 +119,12 @@ def container_env(name):
     """The value of an environment variable inside the running test container ('' when unset)."""
     r = subprocess.run(["docker", "exec", CT, "printenv", name], capture_output=True, text=True)
     return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def su_get(s, url, pw=PASSWORD, **kw):
+    """2.223.2 C (#2871): a download behind the step-up (retention exports, the own office's export): POST with the password
+    -> a one-time ticket, then GET with it. -> the GET response (or the refused POST's one)."""
+    r = s.post(url, json={"password": pw})
+    if not r.ok:
+        return r
+    return s.get(url, params={"t": r.json().get("ticket", "")}, **kw)

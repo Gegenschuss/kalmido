@@ -207,8 +207,9 @@ TCX_MEMBERS_ONLY = N_("Only members of the channel can do this. Organisation adm
 
 
 def tcx_insider(c, r, uid):
-    """2.148.1 B (#2491): uid is a member or the creator of channel / group r (an organisation admin alone is not)."""
-    return uid in tcx_members(c, r) or (r["created_by"] or None) == uid
+    """2.148.1 B (#2491): uid is a member of channel / group r (an organisation admin alone is not). 2.223.2 A (#2869): the
+    creator only while a member (left / removed = no longer opens it or adds anybody to it)."""
+    return uid in tcx_members(c, r)
 
 
 def tcx_may_add(c, r, actor, uid):
@@ -448,6 +449,7 @@ def tcx_member_del(rid, uid):
     if uid not in tcx_member_ids(c, rid):
         raise Denied(404)
     c.execute("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (rid, uid))
+    c.execute("DELETE FROM tchat_reads WHERE room_id=? AND user_id=?", (rid, uid))  # 2.223.2 A (#2869): tchat_sig_q counts read rooms
     tcx_agents_out(c, rid, uid)
     c.commit()
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()

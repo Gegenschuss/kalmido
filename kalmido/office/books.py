@@ -29,6 +29,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr, lang
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
 
@@ -138,6 +139,37 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid"):
         out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
                     "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
                     "unrated": cur if rate is None else None})  # 2.189.0 B (#2475): a foreign receipt without office rate
+    return out
+
+
+BK_OFFER_MAX = 100  # 2.237.0 C (#2865): e-invoices waiting to be taken over as receipts, newest first
+
+
+def bk_einv_offers(c, oid, uid=None):
+    """2.237.0 C (#2865): the e-invoices in the documents space of office area oid that are no receipt yet (an incoming one
+    becomes a receipt only once a person takes it over, office/einvoice_in.py ei_take) -> [{node_id, title, date, amount,
+    supplier, vat_pct}]; not those a person took out of the receipts (_eirc) or the office issued itself (ei_rc_offer)."""
+    from ..docs.store import doc_open, meta_json, meta_row
+    from ..files.store import fs_chain, fs_deleted, fs_role
+    uid = _uid_filter(uid)
+    rows = c.execute("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.ws=? AND d.method='e-invoice' "
+                     "AND n.kind='file' AND n.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id) "
+                     "ORDER BY d.node_id DESC LIMIT ?", (bk_ws(c, oid), BK_OFFER_MAX * 2)).fetchall()
+    out = []
+    for r in rows:
+        if fs_deleted(fs_chain(c, r["node_id"])) or (uid and not fs_role(c, r["node_id"], uid)):
+            continue
+        m = meta_row(c, r["node_id"])
+        inv = ei_rc_offer(c, m) if m else None
+        if inv is None or meta_json(c, m, "extracted", {}).get("_eirc"):
+            continue
+        n = c.execute("SELECT name FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
+        out.append({"node_id": r["node_id"], "title": n["name"] if n else "", "date": m["doc_date"] or inv.get("date") or "",
+                    "amount": str(ei_amount(inv) or doc_open(c, m["ws"], "doc_meta.amount", m["amount"]) or ""),
+                    "currency": inv.get("currency") or m["currency"] or "",
+                    "supplier": (inv.get("seller") or {}).get("name") or "", "vat_pct": ei_details(inv).get("vat_pct")})
+        if len(out) >= BK_OFFER_MAX:
+            break
     return out
 
 
@@ -411,10 +443,11 @@ def bk_get():
         x["dup"] = x["node_id"] in dups
     from .catacct import ca_accounts
     cats = rc_categories(c, ws)
+    einv = bk_einv_offers(c, oid, uid)  # 2.237.0 C (#2865): e-invoices to take over as receipts
     return jsonify(upload_ws="private" if ws[0] == "u" else f"org:{oid}", categories=cats, currency=_home(s),
                    # 2.121.0 (#2093): SKR03 / SKR04 account per category (None: no DATEV input side; 2.147.0 (#2460): or DATEV off)
                    accounts=ca_accounts(c, oid, cats) if office_feature(c, oid, "books.datev", s) else None,
-                   small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year,
+                   small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year, einvoices=einv,
                    missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE))
 
 

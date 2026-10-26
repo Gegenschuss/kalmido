@@ -13,8 +13,10 @@ const LD_MODS = {
   office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook
     'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
+    'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
+    'office_bankrules',  // 2.299.0 B (#3191): bank rules
     'office_docproject',  // 2.168.0 A (#2665): documents bound to a project
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts
@@ -23,10 +25,10 @@ const LD_MODS = {
     'office_letters', 'office_letterlinks', 'office_lettermail',  // 2.153.0 (#2028-#2030)
     'office_rights'],  // 2.187.0 A (#2476): the page "Rights" of the office's settings
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
-  agentchat: ['agentchat', 'agentsetup'],
+  agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork'],  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
-  wiki: ['wiki', 'wkshare', 'wkhist', 'wkembed', 'wkimport'],  // 2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
+  wiki: ['wkshare', 'wkhist', 'wkembed', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
@@ -82,7 +84,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'], fsshare: ['fs_shareDialog'],  // 2.199.0 A (#2742): fsshare
   // 2.65.0 (#1823)
   agentchat: ['acdDeleteMsg', 'chatOpen', 'ac_modOff', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
-    'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal'],
+    'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal', 'awOpen'],
   pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
@@ -311,6 +313,7 @@ function lexCsv(lid) {
   a.href = `/api/lists/${lid}/export.csv?done=${LS.get('lexDone', true) ? 1 : 0}`;
   a.download = ''; a.hidden = true;
   document.body.appendChild(a); a.click(); a.remove();
+  toast(tr('The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.'), null, 9000);  // 2.273.0 D (#3051)
 }
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:

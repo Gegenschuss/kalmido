@@ -65,7 +65,13 @@ def tags_for(c, ids=None, uid=None):
     return out
 
 
-def load_tasks(c, where, args=(), full_snips=False):
+ST_NOTE_MAX = 200  # 2.280.0 A (#3108): a longer note is not in the start state (lean_notes)
+
+
+def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
+    """lean_notes: 2.280.0 A (#3108) the start state (GET /api/state): a note longer than ST_NOTE_MAX goes without its text
+    (no "content" key, content_n = its length); the detail loads it (GET /api/tasks/<id>), the delta and every other answer
+    carry it. A list's ciphertext (the lock: the browser decrypts and searches it) stays."""
     from ..personal.timetrack import vis_ids
     from ..collab.reactions import ltags_for
     from ..integrations.git import git_code_for
@@ -89,7 +95,7 @@ def load_tasks(c, where, args=(), full_snips=False):
     ltags = ltags_for(c, ids) if ids else {}
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
     # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
-    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by, a.e2e_gen
+    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by, a.e2e_gen, a.legacy_aad
                           FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL AND a.deleted_at IS NULL
                           AND a.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY a.id""", (idl,)):
         if a["task_id"] in ids:
@@ -98,6 +104,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                 d.update(enc=2, e2e_gen=a["e2e_gen"])
             elif a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
                 d.update(enc=True, enc_mine=bool(viewer) and a["enc_by"] == viewer)
+                if d["enc_mine"] and a["legacy_aad"]:  # 2.278.0 C (#3091): the AAD of the old server, only for the uploader
+                    d["legacy_aad"] = a["legacy_aad"]
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
@@ -204,6 +212,8 @@ def load_tasks(c, where, args=(), full_snips=False):
             d.pop("approvals_open", None)
             d.pop("snippets", None)  # 2.35.0 (#1095)
             d.pop("snippets_n", None)
+        if lean_notes and len(d.get("content") or "") > ST_NOTE_MAX and not d["content"].startswith("e2e1:"):
+            d["content_n"] = len(d.pop("content").encode("utf-16-le")) // 2  # 2.280.0 F (#3108): as the client counts (JS length)
         out.append(d)
     from ..tasks.multilist import ml_fill
     ml_fill(c, out, viewer)  # 2.71.0 B (#1459): "also" = the further lists the viewer sees
@@ -265,3 +275,11 @@ def csv_cell(s):
     """2.122.4 B (#2317): free text for a CSV cell, no formulas in spreadsheet programs (= + - @ TAB CR LF at the start)."""
     s = str(s or "")
     return "'" + s if s.lstrip(" \t\r\n\u00a0")[:1] in ("=", "+", "-", "@") or s[:1] in ("\t", "\r", "\n") else s  # 2.148.1 E (#2496): also after leading blanks
+
+
+def csv_uncell(s):
+    """2.273.0 D (#3051): inverse of csv_cell for a Kalmido CSV coming back in: drop the guard "'" it put before = + - @ (so "- x" lists survive)."""
+    s = str(s or "")
+    if s[:1] == "'" and (s[1:].lstrip(" \t\r\n\u00a0")[:1] in ("=", "+", "-", "@") or s[1:2] in ("\t", "\r", "\n")):
+        return s[1:]
+    return s

@@ -6,7 +6,8 @@ container (start.sh, org encryption on). Invented companies and people only. fre
    encrypted at rest; an old version reads as it was (own text + the prefilled text of that moment); the versions list;
    Markdown has all five sections, the version and the company; the PDF starts with %PDF; unknown fields / wrong types 400;
    unknown version 404; every save is in the office log
- - a member without the admin role and an accounting member: read (also the exports), never save (403)
+ - an accounting member: reads (also the exports), never saves (403); 2.237.0 (#2861): a member without the admin role
+   (no office groups) reads it no more, like the other bookkeeping pages (403)
  - another organisation: sees none of it (own empty state), a foreign version number is simply unknown (404)
  - a person without organisation (personal office, its own admin): everything works
 usage: p2148_c_api_test.py <datadir>"""
@@ -134,7 +135,10 @@ log = sql("SELECT action, target FROM office_doc_log WHERE org_id=? AND target='
 check(sum(1 for x in log if x[0] == "procdoc") == 2 and any(x[0] == "export" for x in log), f"saves and exports in the office log {log}")
 
 # ---------------------------------------------------------------- rights
-for who, s in (("member", Bo), ("accounting", Da)):
+# 2.237.0 (#2861): a plain member reads the bookkeeping's procedure documentation no more (admins / books view only)
+check(all(Bo.get(B + P + x).status_code == 403 for x in ("", "/versions", ".md", ".pdf?version=1")), "member: no procedure documentation (403)")
+check(Bo.put(B + P, json={"own": {"company": "not allowed"}}).status_code == 403, "member may not save: 403")
+for who, s in (("accounting", Da),):
     r = s.get(B + P)
     check(r.ok and r.json()["version"] == 2 and r.json()["can_edit"] == 0, f"{who} reads (can_edit 0) " + r.text[:200])
     check(s.get(B + P + "/versions").ok and s.get(B + P + ".md").ok and s.get(B + P + ".pdf?version=1").ok, f"{who} reads versions and exports")
@@ -156,7 +160,7 @@ check(Fr.put(B + P, json={"own": {"company": "Sole trader (test 2)"}}).json()["v
 check("test)" in Fr.get(B + P + "?version=1").text and Fr.get(B + P + "/versions").json()["items"][0]["version"] == 2, "freelancer: old version + list")
 check("Sole trader (test 2)" in Fr.get(B + P + ".md").text and Fr.get(B + P + ".pdf").content[:4] == b"%PDF", "freelancer: Markdown + PDF")
 check(A.get(B + P).json()["version"] == 2 and "Sole trader" not in A.get(B + P + ".md").text, "the organisation does not see the personal office")
-check(Bo.get(B + P + "?version=1").json()["viewing"] == 1 and "Sole trader" not in Bo.get(B + P + "?version=1").text, "versions stay per office area")
+check(Da.get(B + P + "?version=1").json()["viewing"] == 1 and "Sole trader" not in Da.get(B + P + "?version=1").text, "versions stay per office area")  # 2.237.0 (#2861): Da (Bo 403)
 
 # German document language
 r = A.get(B + P + "?lang=de")

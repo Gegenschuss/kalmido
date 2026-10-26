@@ -2,8 +2,8 @@
 """2.153.0 API tests, part C (#2055): an incoming e-invoice in the documents of an office area becomes a receipt (on the
 reader of 2.146, #2451). Invented companies and figures only; every e-invoice is written here as XML text.
 freelancer-matrix: office  tenant-matrix: office
- - a person without an organisation (personal office): an XRechnung UBL .xml uploaded -> a receipt with the invoice's VAT
-   rate; it shows in the receipts list with the mark e-invoice and its number, the CSV names number and VAT id
+ - a person without an organisation (personal office): an XRechnung UBL .xml uploaded -> taken over (2.237.0, #2865: no
+   receipt by itself any more) a receipt with the invoice's VAT rate; it shows in the receipts list with the mark e-invoice and its number, the CSV names number and VAT id
  - a UBL credit note: a receipt with a negative amount
  - an invoice whose seller is the own company (same VAT id): no receipt
  - a person without an office: the e-invoice stays a document, no receipt
@@ -94,6 +94,9 @@ check(r.ok, "the personal office: own company " + r.text[:160])
 n1 = upload(Fr, "rechnung.xml", ubl("ER-2026-17", "Beispiel Papier GmbH", "DE123456789"))
 d1 = done(Fr, n1)
 check(d1 and d1["method"] == "e-invoice" and d1["amount"] == "119.00", f"e-invoice read {d1 and (d1['method'], d1['amount'])}")
+# 2.237.0 (#2865): an incoming e-invoice is an offer until a person takes it over
+check(not rc(Fr, n1)["is_receipt"], "e-invoice in the office's documents: no receipt by itself (#2865)")
+check(Fr.post(B + f"/api/docs/{n1}/receipt/einvoice").ok, "taken over as receipt")
 r1 = rc(Fr, n1)
 check(r1["is_receipt"] and r1["vat_pct"] == "19", f"e-invoice in the office's documents: a receipt with 19 % {r1}")
 j = Fr.get(B + RL + "?" + ALL).json()
@@ -110,6 +113,7 @@ check(b.get("Invoice number") == "ER-2026-17" and b.get("VAT ID") == "DE12345678
 n2 = upload(Fr, "gutschrift.xml", ubl("GS-2026-3", "Beispiel Papier GmbH", "DE123456789", credit=True))
 d2 = done(Fr, n2)
 check(d2 and d2["amount"] == "-119.00", f"credit note: amount negative {d2 and d2['amount']}")
+check(Fr.post(B + f"/api/docs/{n2}/receipt/einvoice").ok, "credit note taken over")  # 2.237.0 (#2865)
 check(rc(Fr, n2)["is_receipt"], "credit note: a receipt")
 j = Fr.get(B + RL + "?" + ALL).json()
 check(j["total"]["gross"] == "0.00" and j["total"]["count"] == 2, f"receipts list: invoice and credit note add up to 0 {j['total']}")

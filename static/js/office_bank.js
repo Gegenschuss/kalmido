@@ -1,11 +1,11 @@
 // 2.90.0 B (#1921): bank reconciliation in the office (tab "Bank", admins of the office area only): import a statement
-// (CSV export of the bank with a column mapping like the household budget, or CAMT.052 / .053 XML), then match every booking
+// (CSV export of the bank with a column mapping like the household budget, CAMT.052 / .053 XML or MT940), then match every booking
 // with one tap: money in -> an open invoice (a payment is recorded; less than open = partly paid), money out -> a receipt
 // (its payment day), or private / ignore. Every step has its undo; an import can be taken back while none of it is matched.
 // Server: kalmido/office/bank.py. No bank access.
 const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
-const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored')};
+const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed')};  // 2.299.0 C (#3192): noreceipt
 
 async function bnkLoad() {
   const q = 'state=' + BNK.state; BNK.q = q;
@@ -33,16 +33,19 @@ function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null});  // another office area
   if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
-  if (!BNK.data || BNK.q !== 'state=' + BNK.state) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const d = BNK.data, n = d.counts || {};
+  const norc = typeof BNR === 'object' && bnr_route() && BNK.state === 'norc';  // 2.299.0 C (#3192): #office/bank/norc (the reminder task's link)
+  if (!norc && (!BNK.data || BNK.q !== 'state=' + BNK.state)) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  const d = BNK.data || {}, n = d.counts || {};
   const segs = [['open', tr('Open|payment state'), n.open], ['matched', tr('Matched'), n.matched], ['all', tr('All'), null]];
+  if (typeof BNR === 'object') segs.splice(1, 0, ['norc', tr('Without receipt'), BNR.data?.counts?.out]);  // 2.299.0 C (#3192)
   const bar = `<div class="ofcbar bnkbar"><button class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button><span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${segs.map(([k, t, c]) => `<button type="button" data-bnk="state" data-v="${k}" class="${BNK.state === k ? 'on' : ''}" aria-pressed="${BNK.state === k}">${esc(t)}${c ? ` <small>${c}</small>` : ''}</button>`).join('')}</div>
     <button class="btn ghost" data-bnk="imps" aria-expanded="${BNK.showImp}">${ic('list', 's')}<span>${tr('Imports')}</span></button></div>`;
+  if (norc) return bar + (BNK.showImp ? bnkImpHtml() : '') + bnr_html();
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
-    : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV or CAMT).')}</span></div>`;
-  return bar + (BNK.showImp ? bnkImpHtml() : '') + list + `<div class="muted ofchint">${tr('No bank access: only the file you download yourself.')}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
+    : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).')}</span></div>`;
+  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + list + `<div class="muted ofchint">${tr('No bank access: only the file you download yourself.')}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
 }
 function bnkRow(t) {
   const inn = +t.amount > 0;
@@ -50,15 +53,15 @@ function bnkRow(t) {
     <span class="bnkamt ${inn ? 'in' : 'out'}">${esc(bnkAmt(t.amount))}</span></div>`;
   let act;
   if (t.match) {
-    act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}</span><span class="spacer"></span>
+    act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}</span>${typeof brl_byRule === 'function' ? brl_byRule(t.match) : ''}<span class="spacer"></span>
       ${t.match.kind === 'invoice' ? `<a class="btn sm ghost" href="#office/offers/${t.match.id}">${tr('Open')}</a>` : ''}<button class="btn sm ghost" data-bnk="unmatch" data-id="${t.id}">${ic('undo', 's')}<span>${tr('Undo match')}</span></button></div>`;
   } else {
     const s = (t.suggestions || [])[0];
     const sug = s ? `<div class="bnksug"><span class="bnksn"><small class="muted">${tr('Suggestion')}</small><b>${esc(tr(BNK_KIND[s.kind]))} · ${esc(s.label)}</b><small class="muted">${esc(s.reason)}</small></span>
       <button class="btn sm pri" data-bnk="match" data-id="${t.id}" data-kind="${s.kind}" data-mid="${s.id}">${tr('Assign match')}</button></div>`
       : !inn ? `<p class="muted bnkmiss">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
-    act = `${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
-      <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button></div>
+    act = `${typeof brl_rowHint === 'function' ? brl_rowHint(t) : ''}${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
+      <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="noreceipt">${tr('No receipt needed')}</button></div>
       ${BNK.other === t.id ? bnkOtherHtml(t) : ''}`;
   }
   return `<li class="bnkrow ${t.match ? 'done' : ''}" data-tx="${t.id}">${head}${act}</li>`;
@@ -79,9 +82,11 @@ function bnkImpHtml() {
 // ---- actions (one undo step each)
 async function bnkMatch(tid, kind, mid) {
   const req = {kind, ...(mid ? {id: +mid} : {})};
-  try { await api('POST', `/api/office/bank/tx/${tid}/match`, req); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let j;
+  try { j = await api('POST', `/api/office/bank/tx/${tid}/match`, req); } catch (x) { toast(x.message || tr('unknown')); return; }
+  if (typeof brl_learned === 'function') brl_learned(j);  // 2.299.0 B (#3191): "Always like this?" after the second time
   bnkReload();
-  offerUndo(tr('Matched'), histAdd({label: tr('Bank booking matched'),
+  offerUndo(j?.rule_category ? tr('Matched · category {0} by rule', j.rule_category.category || '') : tr('Matched'), histAdd({label: tr('Bank booking matched'),
     undo: async () => { await api('POST', `/api/office/bank/tx/${tid}/unmatch`); bnkReload(); },
     redo: async () => { await api('POST', `/api/office/bank/tx/${tid}/match`, req); bnkReload(); }}));
 }
@@ -115,13 +120,14 @@ async function bnkCand(tid) {
 // cash flow loads again).
 // 2.146.0 C (#2455): the date formats of core/csvimport.DATE_FORMATS (the household import offers the same)
 const BNK_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];
-const BNK_ACCEPT = '.xml,.csv,.txt,.zip,text/csv,text/plain,application/xml,text/xml,application/zip,application/x-zip-compressed';
+const BNK_ACCEPT = '.xml,.csv,.txt,.sta,.mt940,.mt942,.zip,text/csv,text/plain,application/xml,text/xml,application/zip,application/x-zip-compressed';
 function bnkPick(after) { return bnkImpModal(null, null, after); }
 function bnkHintHtml() {
   return `<ul class="bnk-hint" role="list">
     <li class="ok">${ic('check', 's')}<span>${tr('Recommended: account statement as XML (CAMT.053), booked transactions. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
     <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.')}</span></li>
-    <li class="no">${ic('ban', 's')}<span>${tr('Better not: CAMT.052 (day reports – pending transactions are only shown, never imported) and MT940 / MT942 (not read).')}</span></li></ul>`;
+    <li>${ic('info', 's')}<span>${tr('Also works: MT940 / MT942 (.sta, .mt940) – with the account balance.')}</span></li>
+    <li class="no">${ic('ban', 's')}<span>${tr('Better not: CAMT.052 (day reports – pending transactions are only shown, never imported).')}</span></li></ul>`;
 }
 // 2.146.0 C (#2469): CAMT.052 read -- pending entries stay out, the booked version comes with a later report
 function bnk052Html() {
@@ -202,7 +208,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     try {
       const j = await api('POST', '/api/office/bank/import', form(st.mapping)), iid = j.import.id;
       md.remove(); BNK.state = 'open'; BNK.imports = null; bnkReload(); if (after) after();
-      offerUndo(trn('{0} booking imported', '{0} bookings imported', j.count), histAdd({label: tr('Bank statement imported'),
+      offerUndo(trn('{0} booking imported', '{0} bookings imported', j.count) + (j.ruled ? ` · ${trn('{0} marked by rule', '{0} marked by rule', j.ruled)}` : ''), histAdd({label: tr('Bank statement imported'),
         undo: async () => { await api('POST', `/api/office/bank/imports/${iid}/undo`); BNK.imports = null; bnkReload(); },
         redo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); }}));
     } catch (x) { b.disabled = false; err(x.message); }

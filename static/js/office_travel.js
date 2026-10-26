@@ -98,7 +98,7 @@ function rk_reportHtml() {
   const lab = g => RK.by === 'month' ? rk_month(g.label) : RK.by === 'category' ? rk_cat(g.key) : g.label;
   const rows = RK.rep.rows.map(g => `<tr><td>${esc(lab(g))}</td><td class="num muted">${g.count}</td><td class="num">${ofcMoney(g.amount)}</td></tr>`).join('');
   if (!RK.rep.count) return rk_vmaRepHtml();  // 2.114.4 D (#2286): no receipts in the period -> no receipts block
-  return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span><a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a></div>`
+  return rk_vmaRepHtml() + `<div class="ofcbar">${by}<span class="spacer"></span>${ofr_noSp('travel', 'export') ? '' : `<a class="btn sm" href="/api/office/trips/report?${esc(q)}&format=csv" download>${ic('download', 's')} CSV</a>`}</div>`
     + (RK.rep.rows.length ? `<table class="rktab"><thead><tr><th>${tr(RK_BY.find(x => x[0] === RK.by)[1])}</th><th class="num">${tr('Receipts')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}</tbody>
       <tfoot><tr><th>${tr('Total')}</th><th class="num">${RK.rep.count}</th><th class="num">${ofcMoney(RK.rep.total)}</th></tr></tfoot></table>${RK.by === 'person' || RK.person ? `<div class="shint">${tr('A receipt is shared equally between the participants of its trip.')}</div>` : ''}`
       : `<div class="empty nempty">${tr('No receipts in this period.')}</div>`);

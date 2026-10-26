@@ -187,6 +187,7 @@ ROUTES = {
     "PATCH /api/agents/{}/color": "agents", "PATCH /api/my/agents/{}": "agents", "PATCH /api/v1/agent/jobs/{}": "agents",
     "POST /api/agent-schedules/{}/run": "agents", "POST /api/agents/jobs/{}/action": "agents",
     "POST /api/agents/{}/chat": "agents", "POST /api/agents/{}/chat/{}/choice": "agents",
+    "GET /api/agents/{}/chat-prefs": "agents", "PUT /api/agents/{}/chat-prefs": "agents", "POST /api/agents/{}/chat/{}/dismiss": "agents",  # 2.233.0 A (#2848)
     "DELETE /api/agents/{}/chat": "agents", "DELETE /api/agents/{}/chat/{}": "agents",  # 2.152.0 D (#2175): p2103_d_api_test.py
     "POST /api/agents/{}/chat/{}/pin": "agents", "POST /api/agents/{}/chat/{}/reactions": "agents",
     "POST /api/agents/{}/meeting-images": "agents", "POST /api/agents/{}/schedules": "agents",
@@ -214,6 +215,7 @@ ROUTES = {
     "POST /api/auth/enrol/totp/confirm": "auth", "POST /api/auth/forgot": "auth", "POST /api/auth/invite/accept": "auth",
     "POST /api/auth/invite/check": "auth", "POST /api/auth/link": "auth", "POST /api/auth/login": "auth",
     "POST /api/auth/logout": "auth", "POST /api/auth/passkey": "auth", "POST /api/auth/passkey/options": "auth",
+    "POST /api/stepup/passkey": "auth",  # 2.223.2 C (#2871): the passkey challenge of the step-up (stepup_need)
     "POST /api/auth/setup": "auth", "POST /api/auth/signup": "auth", "POST /api/me/2fa/recovery": "auth",
     "POST /api/me/2fa/totp": "auth", "POST /api/me/2fa/totp/confirm": "auth", "POST /api/me/2fa/totp/disable": "auth",
     "POST /api/me/passkeys": "auth", "POST /api/me/passkeys/options": "auth",
@@ -501,6 +503,8 @@ ROUTES = {
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",
     "GET /api/orgs/{}/export/file": "office", "GET /api/orgs/{}/lists": "orgadmin",
+    # 2.223.2 C (#2871): the step-up before a download (POST -> a one-time ticket; p22232_c_offsite_test.py, freelancer too)
+    "POST /api/orgs/{}/export/file": "office", "POST /api/retention/me/export.zip": "office", "POST /api/retention/org/{}/export.zip": "orgadmin",
     "PATCH /api/admin/orgs/{}": "orgadmin", "PATCH /api/orgs/{}": "orgadmin", "PATCH /api/orgs/{}/lists/{}": "orgadmin",
     "POST /api/admin/orgs": "orgadmin", "POST /api/admin/orgs/boundary/repair": "orgadmin",
     "POST /api/orgs/{}/encryption/recovery": "orgcrypt", "POST /api/orgs/{}/encryption/recovery/passkey": "orgcrypt",  # 2.138.0 (#1972)
@@ -651,6 +655,7 @@ ROUTES = {
     # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
     "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
     "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)
+    "POST /api/trash/lists/{}/export.zip": "office",  # 2.223.2 C (#2871): its step-up (a one-time ticket)
     "DELETE /api/v1/attachments/{}": "tasks",
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
@@ -870,6 +875,10 @@ ROUTES = {
     "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/imports/{}/restore": "office",
     "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/tx/{}/match": "office",
     "POST /api/office/bank/tx/{}/unmatch": "office", "POST /api/office/series": "office",
+    # 2.299.0 B (#3191): bank rules (p2299_b_bankrules_test.py, also as a person without an organisation)
+    "GET /api/office/bank/rules": "office", "POST /api/office/bank/rules": "office", "PUT /api/office/bank/rules/{}": "office",
+    "DELETE /api/office/bank/rules/{}": "office", "POST /api/office/bank/rules/{}/restore": "office", "POST /api/office/bank/rules/{}/apply": "office",
+    "POST /api/office/bank/rules/{}/revert": "office", "POST /api/office/bank/rules/decline": "office",
     "POST /api/office/series/{}/restore": "office", "POST /api/office/series/{}/run": "office",
     "PUT /api/office/tax-dates": "office",
     # 2.93.0 A (#1927): document templates and documents with signature, the personal office of a freelancer in p293_a_api_test.py
@@ -927,6 +936,9 @@ ROUTES = {
     "GET /api/office/number-ranges": "office", "POST /api/office/number-ranges/{}": "office",
     # 2.144.0 A (#2412): Stop in the agent chat and the agent's confirmation (p2144_a_api_test.py)
     "POST /api/agents/{}/abort": "agents", "POST /api/v1/agent/aborted": "agents",
+    # 2.236.0 (#2904-#2911): the work style of an agent (owner / instance admin, else 404); C (#2906): its queue (p2236_c_queue_test.py)
+    "GET /api/agents/{}/work-style": "agents", "PATCH /api/agents/{}/work-style": "agents", "GET /api/agents/{}/queue": "agents",
+    "GET /api/v1/agent/queue": "agents", "PUT /api/v1/agent/queue": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
@@ -943,6 +955,11 @@ ROUTES = {
     "GET /api/office/datev/zip": "office",
     # 2.168.0 A (#2665): a document's project, a project's documents (p2168_a_docproject_test.py as a person without an organisation)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
+    # 2.299.0 D (#3193): hide / show the hints of the receipt check (p2299_d_api_test.py as a person without an organisation)
+    "POST /api/docs/{}/checks": "files",
+    # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
+    "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
+    "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
 }
 
 

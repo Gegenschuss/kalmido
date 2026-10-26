@@ -667,7 +667,7 @@ async function propOpen(jid) {
   if (v?.kind === 'ideas') { await loadModule('mindmap').catch(() => {}); if (typeof mm_ideasOpen === 'function') mm_ideasOpen(v); return; }  // 2.156.0 A (#1201): ideas show in the mind map
   if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   if (ctr_is(v) && typeof noticeWord !== 'function') await loadModule('life').catch(() => {});  // 2.70.0 C (#1359): the card uses life.js (loaded on demand since 2.65.0)
-  if (['office_text', 'doc_summary', 'report', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
+  if (['office_text', 'doc_summary', 'report', 'receipt_read', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
   if (v?.input?.assistant) v.agent = {...(v.agent || {}), name: tr('Assistant')};  // 2.75.0 (#1411): the built-in assistant, not an agent
   $('.ppm')?.remove();
   const md = modal('');

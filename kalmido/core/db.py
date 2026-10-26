@@ -1,6 +1,5 @@
 """Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage.
 2.37.0 (#1150): Postgres only; the driver layer is core/pg.py (placeholders, rows, pool, request context)."""
-import json
 import os
 import re
 import secrets
@@ -129,6 +128,38 @@ def _no_url():
     return 3
 
 
+def db_log_err(e):
+    """2.239.0 B (#2888): an exception as a log line without the values in it. A database error keeps its class, the
+    SQLSTATE and the table / column / constraint names; its text loses the DETAIL line (it shows the row, e.g. an e-mail)
+    and anything in double quotes (a rejected value). Other errors: their class and text as before."""
+    if not isinstance(e, DbError):
+        return f"{type(e).__name__}: {e}"
+    d = getattr(e, "diag", None)
+    msg = getattr(d, "message_primary", None) or str(e).split("\n", 1)[0]
+    msg = re.sub(r'"[^"]*"', '"?"', msg)
+    where = [f"{k} {v}" for k, v in (("sqlstate", getattr(e, "sqlstate", None)), ("table", getattr(d, "table_name", None)),
+                                     ("column", getattr(d, "column_name", None)), ("constraint", getattr(d, "constraint_name", None))) if v]
+    return f"{type(e).__name__}: {msg}" + (f" ({', '.join(where)})" if where else "")
+
+
+_FLASK_LOG_EXC = app.log_exception
+
+
+def _db_log_exception(exc_info):
+    """2.239.0 B (#2888): a database error nobody caught (500) is logged as Flask does (same logger, same first line), but
+    with its frames and db_log_err instead of the message with its values."""
+    e = exc_info[1] if exc_info else None
+    if not isinstance(e, DbError) or not has_request_context():
+        return _FLASK_LOG_EXC(exc_info)
+    import logging
+    import traceback
+    logging.getLogger(app.name).error(f"Exception on {request.path} [{request.method}]\nTraceback (most recent call last):\n"
+                                      + "".join(traceback.format_tb(e.__traceback__)) + db_log_err(e))
+
+
+app.log_exception = _db_log_exception
+
+
 @app.errorhandler(DbError)
 def db_error(e):
     """2.37.0 (#1150): a database error nobody caught. Postgres is strict where SQLite stored anything: a value of the wrong
@@ -147,7 +178,8 @@ def db_error(e):
     import traceback
     code = 403 if denied else 400
     path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/)[^/]+", r"\1***", request.path)  # 2.148.1 E (#2496): + inbound hooks;  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
-    print(f"database error ({code}) {request.method} {path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
+    print(f"database error ({code}) {request.method} {path}:\nTraceback (most recent call last):\n"  # 2.239.0 B (#2888): frames, no values
+          + "".join(traceback.format_tb(e.__traceback__)) + db_log_err(e), flush=True)
     if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
         from ..notify.alerts import aa_count
         try:
@@ -257,8 +289,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         vals["ntfy_topic"] = ntfy_topic
     if onboard and ONBOARDING_ENV:  # new account (setup / user admin): sample list + welcome tour on first start
         vals["tour"] = vals["onboard"] = "pending"
-    if onboard and not seed_global and not is_admin:  # 2.25.0 (UX-26): people who are added start with a lean sidebar
-        vals["sidebar"] = json.dumps({"order": [], "hidden": ["e:tomorrow", "e:week", "e:doable"]})
+    # 2.250.0 C (#2995): no lean sidebar for added accounts any more (2.25.0 UX-26 hid Tomorrow / Next 7 days / Now doable):
+    # a new account starts like the self-set-up one. Existing accounts keep their choice.
     if not vals["ntfy_topic"]:
         vals["ntfy_topic"] = random_topic()
     for k, v in vals.items():
@@ -999,6 +1031,10 @@ def init_db(guard=True, load=None):
             from ..accounts.orgretain import upg_fk_once
             upg_fk_once(c)
             gset(c, "migr_upg2103", "1")
+        if gsetting(c, "migr_drt2239") != "1":  # 2.239.0 D (#2874): closed logbook months outlive their vehicle
+            from ..admin.dataretention import drt_fk_once
+            drt_fk_once(c)
+            gset(c, "migr_drt2239", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         from ..collab.msgsearch import msg_index_init
@@ -1180,8 +1216,16 @@ def bump(c):
     # 2.41.0 (#1376): a change counter per area besides the old total v (GET /api/version a): the app reloads and redraws only
     # what an area needs. The area comes from the request's route; outside a request (watchdog, imports in the background)
     # it is "other" (= everything, as before)
-    c.execute("INSERT INTO settings(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS BIGINT)+1 AS TEXT)",
-              ("version:" + lv_area(),))
+    # 2.280.0 A (#3109): "self" (a change only the writer's own state shows: their settings, habits, layouts) counts per
+    # account: other people's clients see no area move (a lean delta instead of the full state)
+    a = lv_area()
+    u = getattr(g, "user", None) if has_request_context() else None
+    if a == "self":
+        a = f"self:{int(u['id'])}" if u is not None and u["id"] is not None else "other"
+    n = c.execute("INSERT INTO settings(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS BIGINT)+1 AS TEXT) "
+                  "RETURNING value", ("version:" + a,)).fetchone()
+    if a.startswith("self:") and n and not lv_state_setting():  # the window that wrote learns its own counter (X-Kalmido-Lv): no full reload for it
+        g.lv_self = int(n[0])
 
 
 # 2.41.0 (#1376): route -> area (first match wins). Reactions / apply / decide on comments may change the task: not "comments".
@@ -1195,15 +1239,49 @@ LV_AREAS = (
     ("tasks", re.compile(r"^/api/(v1/)?(tasks|lists|sections|folders|batch|projects|tags)")),
     ("budget", re.compile(r"^/api/budget")),  # 2.72.0 (#1333): the household budget (the open budget view reloads)
     ("sheets", re.compile(r"^/api/(v1/)?sheets")),  # 2.89.0 (#1916): tables (the open sheet reloads)
+    # 2.280.0 A (#3109): were "other" (= the full state for every client): time entries / the timer change tasks (the
+    # delta has them) and the writer's own timer; the knowledge pages are not in /api/state at all
+    ("time", re.compile(r"^/api/(v1/)?time(/|$)")),
+    ("wiki", re.compile(r"^/api/(v1/)?wiki(/|$)")),
+    # only the writer's own state (counted per account, see bump); not the agent API (an agent may write for a person)
+    # 2.280.0 F (#3109): not layouts/std (an admin's standard of a view for everyone: "other")
+    ("self", re.compile(r"^/api/(settings$|habits(/|$)|layouts/saved(/|$)|favorites/suggestion$)")),
 )
 LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("other",)
+LV_SHARED_SETTINGS = ("folders",)  # 2.280.0 A (#3109): settings others see (folder_orders of mirrored lists): not "self"
+# 2.280.0 F (#3109): own settings the server evaluates for /api/state (the lists' progress, the notification matrix, the day
+# plan, the question about old shares, texts in the language): the window that wrote reloads like another device of the person
+# (no X-Kalmido-Lv); features / nav_order reload in the client already (settings.js setAfter)
+LV_STATE_SETTINGS = ("progress_subtasks", "news_kinds", "notify", "work_start", "work_end", "review_time", "notif_tpl_ask", "lang")
 
 
 def lv_area():
     if not has_request_context():
         return "other"
     p = request.path
-    return next((k for k, rx in LV_AREAS if rx.match(p)), "other")
+    a = next((k for k, rx in LV_AREAS if rx.match(p)), "other")
+    if a == "self" and p == "/api/settings":
+        b = body()
+        if not isinstance(b, dict) or any(k in b for k in LV_SHARED_SETTINGS):
+            return "other"
+    return a
+
+
+def lv_state_setting():
+    """2.280.0 F (#3109): PATCH /api/settings with a setting of LV_STATE_SETTINGS."""
+    if not has_request_context() or request.path != "/api/settings":
+        return False
+    b = body()
+    return isinstance(b, dict) and any(k in b for k in LV_STATE_SETTINGS)
+
+
+@app.after_request
+def lv_self_header(resp):
+    """2.280.0 A (#3109): the own "self" counter of a write (the window that wrote does not reload for it)."""
+    n = g.get("lv_self")
+    if n is not None and resp.status_code < 400:
+        resp.headers["X-Kalmido-Lv"] = f"self:{n}"
+    return resp
 
 
 def lv_versions(c):
@@ -1213,7 +1291,10 @@ def lv_versions(c):
 
 def lv_versions_q():
     """2.149.0 C (#2507): the query of lv_versions (one row: the keys, the values; /api/version runs it inside one statement)."""
-    keys = ["version:" + k for k in LV_AREA_KEYS]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
+    keys = ["version:" + k for k in LV_AREA_KEYS if k != "self"]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
+    u = getattr(g, "user", None) if has_request_context() else None
+    if u is not None and u["id"] is not None:  # 2.280.0 A (#3109): "self" = the own account's counter
+        keys.append(f"version:self:{int(u['id'])}")
     return f"SELECT array_agg(key), array_agg(value) FROM settings WHERE key IN ({','.join('?' * len(keys))})", tuple(keys)
 
 
@@ -1221,6 +1302,8 @@ def lv_versions_fmt(r):
     out = dict.fromkeys(LV_AREA_KEYS, 0)
     for key, value in zip((r[0] or []) if r else [], (r[1] or []) if r else []):
         k = key[8:]
+        if k.startswith("self:"):  # 2.280.0 A (#3109)
+            k = "self"
         if k in out:
             out[k] = int(value)
     return out

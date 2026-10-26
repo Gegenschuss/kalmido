@@ -22,6 +22,7 @@ from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso,
 from ..accounts.session import me
 from ..lists.lists import list_created
 from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES, token_lists
+from ..core.serializers import csv_uncell
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
 from ..tasks.validation import (
@@ -78,7 +79,9 @@ def import_ticktick(c, text, uid):
     rows = list(csv.DictReader(io.StringIO(text[i:])))
     if len(rows) > IMPORT_MAX_TASKS:  # 2.148.1 E (#2496)
         raise ValueError(tr("Too many rows (more than {0} tasks)", IMPORT_MAX_TASKS, lg=lang(c, uid)))
-    lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL", (uid,))}
+    # 2.273.0 D (#3051): never match archived / deleted lists (tasks would be invisible, gone after the keep period)
+    lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL "
+                                 "AND archived=0 AND deleted_at IS NULL", (uid,))}
     inbox = my_inbox(c, uid)
     sections = {}
     stats = dict(tasks=0, skipped=0, lists=0)
@@ -285,7 +288,7 @@ def imp_csv(text):
         for r in rd:
             if not any(x.strip() for x in r):
                 continue
-            rows.append({k: (r[i] if i < len(r) else "") for i, k in enumerate(keys) if k})
+            rows.append({k: (csv_uncell(r[i]) if i < len(r) else "") for i, k in enumerate(keys) if k})  # 2.273.0 D (#3051)
             if len(rows) > IMPORT_MAX_TASKS * 3:
                 imp_fail(N_("Too many rows (more than {0} tasks)"), IMPORT_MAX_TASKS)
     except csv.Error:
@@ -319,7 +322,7 @@ def imp_json(text):
         imp_fail(N_("The JSON file could not be read"))
 
 
-def imp_zip(data, exts, full=False):
+def imp_zip(data, exts, full=False, shared=None):
     """Members of a ZIP (read in memory, never extracted to disk) with the given extensions: [(name, bytes)].
     Guards: member count, total and per-member size (declared AND actually read), compression ratio."""
     try:
@@ -329,22 +332,24 @@ def imp_zip(data, exts, full=False):
         imp_fail(N_("The ZIP file could not be read"))
     if len(infos) > IMPORT_ZIP_MEMBERS:
         imp_fail(N_("The ZIP file contains too many files"))
-    budget, out = IMPORT_MAX_MB * 1048576 * 3, []
+    # 2.238.0 C (#2873): shared = [bytes left] of the caller, so a ZIP inside a ZIP draws on the same budget
+    shared = shared if shared is not None else [IMPORT_MAX_MB * 1048576 * 3]
+    out = []
     for i in infos:
         base = i.filename.replace("\\", "/").rsplit("/", 1)[-1]
         if i.is_dir() or not base or i.filename.startswith("__MACOSX/") or base.startswith("._") \
                 or not base.lower().endswith(exts):
             continue
-        if i.file_size > budget or (i.file_size > 1048576 and i.file_size > max(1, i.compress_size) * IMPORT_ZIP_RATIO):
+        if i.file_size > shared[0] or (i.file_size > 1048576 and i.file_size > max(1, i.compress_size) * IMPORT_ZIP_RATIO):
             imp_fail(N_("The ZIP file unpacks to too much data"))
         try:
             with zf.open(i) as f:
-                b = f.read(min(budget, i.file_size) + 1)
+                b = f.read(min(shared[0], i.file_size) + 1)
         except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, EOFError):
             imp_fail(N_("The ZIP file could not be read"))
-        if len(b) > i.file_size or len(b) > budget:
+        if len(b) > i.file_size or len(b) > shared[0]:
             imp_fail(N_("The ZIP file unpacks to too much data"))
-        budget -= len(b)
+        shared[0] -= len(b)
         out.append((i.filename.replace("\\", "/") if full else base, b))  # 2.142.0 B (#2147): full = the path inside the ZIP
     return out
 
@@ -361,12 +366,12 @@ def imp_hash(*parts):
 
 # ---- the neutral plan
 def imp_plan(source):
-    return {"source": source, "lists": [], "warn": {}}
+    return {"source": source, "lists": [], "warn": {}, "cnt": [0]}
 
 
 def imp_list(plan, name, folder="", inbox=False):
     L = {"name": imp_line(name, LIST_NAME_MAX), "folder": folder_seg(imp_line(folder, FOLDER_MAX)), "view": "list", "inbox": inbox,
-         "tasks": [], "sections": []}
+         "tasks": [], "sections": [], "cnt": plan["cnt"]}
     plan["lists"].append(L)
     return L
 
@@ -390,6 +395,10 @@ def imp_task(L, ext, title, **k):
         if t["section"] and t["section"] not in L["sections"]:
             L["sections"].append(t["section"])
     L["tasks"].append(t)
+    # 2.238.0 C (#2873): the task limit holds while parsing, not only after the whole file is in memory
+    L["cnt"][0] += 1
+    if L["cnt"][0] > IMPORT_MAX_TASKS:
+        imp_fail(N_("Too many tasks: {0} (at most {1} per import)"), L["cnt"][0], IMPORT_MAX_TASKS)
     return t
 
 
@@ -1259,7 +1268,7 @@ def imp_csv_multi(text):
             row = {}
             for i, k in enumerate(keys):
                 if k and i < len(r) and r[i].strip():
-                    row.setdefault(k, []).append(r[i])
+                    row.setdefault(k, []).append(csv_uncell(r[i]))  # 2.273.0 D (#3051)
             rows.append(row)
             if len(rows) > IMPORT_MAX_TASKS * 3:
                 imp_fail(N_("Too many rows (more than {0} tasks)"), IMPORT_MAX_TASKS)
@@ -1615,21 +1624,21 @@ def _notion_name(path):
 def _notion_files(data):
     """(path, bytes) of every CSV / Markdown file of a Notion export ZIP, also inside ZIPs in it (one level, IMPORT_NEST_ZIPS,
     one budget for everything)."""
-    out, budget, nested = [], IMPORT_MAX_MB * 1048576 * 3, 0
-    for path, b in imp_zip(data, (".csv", ".md", ".markdown", ".zip"), full=True):
+    out, nested = [], 0
+    shared = [IMPORT_MAX_MB * 1048576 * 3]  # 2.238.0 C (#2873): one budget for the outer and the inner ZIPs
+    for path, b in imp_zip(data, (".csv", ".md", ".markdown", ".zip"), full=True, shared=shared):
         if path.lower().endswith(".zip"):
             nested += 1
             if nested > IMPORT_NEST_ZIPS:
                 imp_fail(N_("The ZIP file contains too many files"))
-            for p2, b2 in imp_zip(b, (".csv", ".md", ".markdown", ".zip"), full=True):
+            shared[0] += len(b)  # the packed inner ZIP itself is not content
+            for p2, b2 in imp_zip(b, (".csv", ".md", ".markdown", ".zip"), full=True, shared=shared):
                 if p2.lower().endswith(".zip"):
                     imp_fail(N_("The ZIP file is nested too deeply"))
-                budget -= len(b2)
                 out.append((path[:-4] + "/" + p2, b2))
         else:
-            budget -= len(b)
             out.append((path, b))
-        if budget < 0:
+        if shared[0] < 0:
             imp_fail(N_("The ZIP file unpacks to too much data"))
     return out
 
@@ -1740,6 +1749,7 @@ def parse_notion(data, fname, opts, plan):
         if row:  # the page of a database row: its text into the task's notes, its checkboxes become subtasks
             body = _notion_page_body(text)
             sub = imp_plan("notion")
+            sub["cnt"] = L["cnt"]  # 2.238.0 (#2873, review): one counter with the import, imp_task stops at the limit
             if _md_parse(body, sub, row["title"], "notion:" + row["ext"], heads_as_lists=False):
                 for t in sub["lists"][0]["tasks"]:
                     t["section"] = row["section"]
@@ -2304,6 +2314,8 @@ def imp_undo(c, uid, iid):
         raise Denied(409, tr("An import can only be undone within {0} hours", IMPORT_UNDO_HOURS))
     if r["source"] == "Kalmido":  # 2.73.0 B (#1473): an account import undoes everything it created
         from ..admin.acctimport import umz_undo
+        from ..admin.orgimport import oi_undo_check
+        oi_undo_check(c, uid, json.loads(r["created"] or "{}"), r["created_at"])  # 2.237.0 D (#2870): admins now, nothing frozen
         return umz_undo(c, uid, r)
     cr = json.loads(r["created"] or "{}")
     ids = [int(x) for x in cr.get("tasks") or []]

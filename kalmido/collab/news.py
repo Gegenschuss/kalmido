@@ -107,6 +107,16 @@ def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
     return mentioned or uid == prev or uid == replied
 
 
+def ws_budget_news_mine(c, uid, r):
+    """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent."""
+    try:
+        d = json.loads(r["data"] or "{}")
+    except ValueError:
+        return False
+    return bool(isinstance(d, dict) and d.get("budget") and c.execute(
+        "SELECT 1 FROM agents WHERE user_id=? AND owner_id=?", (r["actor_id"], uid)).fetchone())
+
+
 def news_wanted(s, kind):
     on = set((s.get("news_kinds") if s else USER_DEFAULTS["news_kinds"]).split(","))
     return any(kind in NEWS_GROUPS[g] for g in on if g in NEWS_GROUPS)
@@ -327,7 +337,7 @@ def list_push(c, uid, row, lid, title_fn, msg_fn, click=None):
     if not s or not notif_ok(c, uid, s, row, "push", lid) or not push_reachable(c, uid, s) or not agent_push_ok(c, uid, s, me()):
         return
     lg = lang_of(s)
-    g.pushes.append((uid, title_fn(lg), msg_fn(lg), click or f"{PUBLIC_URL}/#l/{lid}", push_prio(s)))
+    g.pushes.append((uid, title_fn(lg), msg_fn(lg), click or f"{PUBLIC_URL}/#l/{lid}", push_prio(s), {"scope": f"l:{lid}"}))  # 2.240.0 B2 (#2867)
 
 
 def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=None, actor=None, row=None, s=None):
@@ -426,7 +436,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)
-            if not is_admin_id(c, uid):
+            if not is_admin_id(c, uid) and not ws_budget_news_mine(c, uid, r):  # 2.236.0 B (#2904): + the owner's budget
                 continue
         elif kind == "signup":  # 2.23.0 (#711): for admins, while the registration still waits
             try:

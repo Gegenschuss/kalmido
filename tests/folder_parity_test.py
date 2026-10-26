@@ -280,6 +280,10 @@ def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id
 AG, AGH = agent(A, "orgshelf", ORG)
 FID, Fr = freelancer(B, A)
 FAG, FAGH = agent(Fr, "fridashelf")
+# 2.238.0 A (#2863): a filed office document opens to an agent only with the office's agent switches (like /api/v1/office)
+for s_, ag_ in ((A, AG), (Fr, FAG)):
+    check(s_.patch(B + f"/api/office/agents/{ag_}", json={"office_drafts": True}).ok and s_.put(B + "/api/office/settings", json={"agents_read": 1}).ok,
+          "office: the agent's switch and the area's agents switch on")
 for area, f in AREAS.items():
     oo, ooid = f.get("org_other", (Bo, BOB))  # 2.200.0 B (#2747): the knowledge area: a guest (members read every page)
     parity(area, f, f"org:{ORG}", A, oo, ooid, AGH, AG, tag="organisation")

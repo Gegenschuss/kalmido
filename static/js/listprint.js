@@ -59,6 +59,11 @@ function lexPrint(lid) {
   let head = l.kind === 'project' ? S.povD?.[lid]?.j || null : null;  // 2.145.0 C (#2432): the project page's data, fresh below
   const draw = () => {
     const done = LS.get('lexDone', true), notes = LS.get('lexNotes', false);
+    if (notes) {  // 2.280.0 A (#3108): long notes are not in the state: loaded first (detail.js), then drawn again
+      const miss = [...S.tasks.values()].filter(t => t.list_id === lid && tkNoteMissing(t)).map(t => t.id);
+      const pb = $('[data-ts="print"]', el);  // 2.280.0 F (#3108): printing waits for the notes; one that failed is said
+      if (miss.length) { if (pb) pb.disabled = true; tkNotesLoad(miss).then(r => { if (pb) pb.disabled = false; if (!el.isConnected) return; if (r.some(x => x.status === 'rejected')) toast(tr('Only available online.')); if (r.some(x => x.status === 'fulfilled')) draw(); }); }
+    }
     $('.tspage', el).innerHTML = lexDoc(lid, done, notes, head);
     $('#lex-done', el).checked = done; $('#lex-notes', el).checked = notes;
   };

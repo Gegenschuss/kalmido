@@ -6,12 +6,8 @@
 // taken only from the player's own frame and origin. Without this script the page works as well (timecode typed by hand).
 (() => {
   const box = document.querySelector('.vdr-player'); if (!box) return;
-  const prov = box.dataset.prov, origin = box.dataset.origin || '', fr = box.querySelector('iframe'), vid = box.querySelector('video');
-  // 2.122.4 A (#2215 L7): the page opened under another host than the configured address: YouTube talks only to the origin
-  // named in the player URL, so name this page's own (reloads the frame once, only then; never a host header of the request)
-  if (fr && prov === 'youtube') {
-    try { const u = new URL(fr.src); if (u.searchParams.get('origin') !== location.origin) { u.searchParams.set('origin', location.origin); fr.src = u.href; } } catch { /* keep the frame */ }
-  }
+  const prov = box.dataset.prov, origin = box.dataset.origin || '';
+  let fr = box.querySelector('iframe'), vid = box.querySelector('video');
   let cur = 0, dur = 0;
   const p2 =n => String(n).padStart(2, '0');
   const tc = s => { s = Math.floor(s || 0); const h = Math.floor(s / 3600); return h ? `${h}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}` : `${p2(Math.floor(s / 60))}:${p2(s % 60)}`; };
@@ -27,7 +23,9 @@
   if (vid) {
     vid.addEventListener('timeupdate', () => { cur = vid.currentTime; });
     vid.addEventListener('loadedmetadata', () => setDur(vid.duration));
-  } else if (fr && origin) {
+  }
+  const wireFrame = () => {
+    if (!(fr && origin)) return;
     window.addEventListener('message', e => {
       if (e.origin !== origin || e.source !== fr.contentWindow) return;
       let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
@@ -44,7 +42,25 @@
     const hello = () => prov === 'vimeo' ? (send({method: 'addEventListener', value: 'timeupdate'}), send({method: 'getDuration'}))
       : send({event: 'listening', id: 'vdr', channel: 'widget'});
     fr.addEventListener('load', () => { hello(); setTimeout(hello, 1000); });
-  }
+  };
+  wireFrame();
+  // 2.240.0 D (#2886): two clicks -- the placeholder first, the player (and the request to its host) only after "Load video"
+  const gate = box.querySelector('[data-vdr-load]');
+  if (gate) gate.addEventListener('click', () => {
+    const el = document.createElement(prov === 'file' ? 'video' : 'iframe');
+    let src = box.dataset.src || '';
+    // 2.122.4 A (#2215 L7): the page opened under another host than the configured address: YouTube talks only to the origin
+    // named in the player URL, so name this page's own (never a host header of the request)
+    if (prov === 'youtube') { try { const u = new URL(src); u.searchParams.set('origin', location.origin); src = u.href; } catch { /* keep the URL */ } }
+    el.setAttribute('src', src);
+    if (prov === 'file') { el.controls = true; el.setAttribute('playsinline', ''); el.preload = 'none'; vid = el; }
+    else { el.title = box.dataset.title || ''; el.allowFullscreen = true; el.allow = 'fullscreen; picture-in-picture'; el.referrerPolicy = 'strict-origin-when-cross-origin'; fr = el; }
+    box.textContent = ''; box.appendChild(el);
+    if (vid) {
+      vid.addEventListener('timeupdate', () => { cur = vid.currentTime; });
+      vid.addEventListener('loadedmetadata', () => setDur(vid.duration));
+    } else wireFrame();
+  });
   const at = document.getElementById('vd-at'), text = document.getElementById('vd-text'), name = document.getElementById('vd-name');
   if (text && at) text.addEventListener('focus', () => { pause(); if (!at.dataset.manual) at.value = tc(cur); });
   if (at) at.addEventListener('input', () => { at.dataset.manual = at.value ? '1' : ''; });

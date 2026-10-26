@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.7.1 API (#410), own container (start.sh):
 the overview of a project list: GET /api/lists/<id>/overview (only project lists: 409 otherwise; who may read it per role,
-participants see only the files of their own tasks), the description (Markdown, owner / list admin / member, never a viewer
+participants see only the files of their own tasks, 2.223.7: no project files, milestones, members), the description (Markdown, owner / list admin / member, never a viewer
 or participant, length limit), key links (http / https only, title from the address, order, limit), milestones (date, done,
 in /api/state with the list for the timeline), project files (upload with the attachment rules: size limit, safe file
 names, html / svg never inline, sandbox CSP; download per role; delete; removed with the list), task files gathered read-only, members + status history + time; the token API
@@ -119,11 +119,13 @@ g = Vi.get(B + f"/api/list-files/{fh}")
 check(g.ok and g.headers["Content-Type"].startswith("application/octet-stream") and "attachment" in g.headers.get("Content-Disposition", "")
       and "sandbox" in g.headers.get("Content-Security-Policy", "") and g.headers.get("X-Content-Type-Options") == "nosniff",
       f"html is a download with a sandbox CSP: {g.headers}")
-g = Pa.get(B + f"/api/list-files/{fp}")
-check(g.ok and g.headers["Content-Type"] == "application/pdf" and g.content.startswith(b"%PDF"), "pdf inline (participant may read)")
+g = Vi.get(B + f"/api/list-files/{fp}")
+check(g.ok and g.headers["Content-Type"] == "application/pdf" and g.content.startswith(b"%PDF"), "pdf inline (viewer may read)")
+# 2.223.7 (#2918): a participant sees project files no more (only the files of their own tasks)
+check(Pa.get(B + f"/api/list-files/{fp}").status_code == 404, "participant: a project file 404")
 check(Zo.get(B + f"/api/list-files/{fp}").status_code == 404, "stranger: 404")
 check(Vi.post(B + f"/api/lists/{P}/files", files={"file": ("a.txt", b"x")}).status_code == 403, "viewer cannot upload")
-check(Pa.delete(B + f"/api/list-files/{fp}").status_code == 403, "participant cannot delete")
+check(Pa.delete(B + f"/api/list-files/{fp}").status_code == 404, "participant cannot delete (2.223.7 #2918: 404, it is not theirs to see)")
 big = A.post(B + f"/api/lists/{P}/files", files={"file": ("big.bin", b"0" * (1024 * 1024 + 10))})
 check(big.status_code in (400, 413), f"over the size limit (1 MB in the tests): {big.status_code}")
 check(not any(f["name"] == "big.bin" for f in A.get(B + f"/api/lists/{P}/overview").json()["files"]), "too large: nothing stored")

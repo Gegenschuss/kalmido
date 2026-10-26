@@ -12,44 +12,61 @@ of the calendars the person sees and did not hide, events they accepted, timed e
 reminder), as in the day plan. away = an approved absence (half days: the morning or the afternoon) or a public holiday
 of the person's state (hub/abscal.py). skip = the event being edited (it should not collide with itself).
 The colleagues' calendars are read as "system" (core/pg.py system_ctx) because they lie outside one's own rights; only
-the merged spans leave this module. Agents get 403 (not opened for them yet)."""
+the merged spans leave this module. Agents get 403 (not opened for them yet).
+2.240.0 C (#2868): a colleague sees only the sources of the organisations both share (that organisation's calendars, invitations
+to its events, its absences) -- private calendars, other organisations and subscriptions only if the person chose "all"
+(setting freebusy_share), nothing at all with "off". Asking about oneself still sees everything. Counted per person (EFB_RATE)."""
 import re
 from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
 
+from ..api.common import hit_limit
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, parse_iso
+from ..core.db import db, parse_iso, usettings
 from ..core.pg import system_ctx
 from ..core.access import Denied, need_feat
 from ..personal.timetrack import BadInput
 
 EFB_USERS_MAX = 20
+EFB_RATE = 120  # 2.240.0 C (#2868): answers per person and minute (the editor asks once per change of day / people, cached 60 s)
 
 
 def efb_allowed(c, uid, ids):
     """The ids of `ids` uid may ask about: uid, and the full members of the organisations uid is a full member of (no
     agents, children or disabled accounts)."""
+    return list(efb_scopes(c, uid, ids))
+
+
+def efb_scopes(c, uid, ids):
+    """2.240.0 C (#2868): {id: the organisations whose sources uid sees of that person (None = all of them)} for the ids of
+    `ids` uid may ask about (efb_allowed). None for oneself and for a person sharing "all"; a person sharing "off" is left out."""
     from ..accounts.orgs import user_orgs
     from ..accounts.orgroles import user_orgs_full
     with system_ctx(c):  # memberships of other people (structure, ids only)
         mine = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))
-        out = []
+        out = {}
         for t in ids:
             if t == uid:
-                out.append(t)
+                out[t] = None
                 continue
             u = c.execute("SELECT disabled, kid, kind FROM users WHERE id=?", (t,)).fetchone()
             if not u or u["disabled"] or u["kid"] or (u["kind"] or "user") == "agent" or not mine:
                 continue
-            if mine & set(user_orgs(c, t)) & set(user_orgs_full(c, t)):
-                out.append(t)
+            both = mine & set(user_orgs(c, t)) & set(user_orgs_full(c, t))
+            if not both:
+                continue
+            share = usettings(c, t).get("freebusy_share") or "org"
+            if share == "off":
+                continue
+            out[t] = None if share == "all" else both
     return out
 
 
-def efb_spans(c, uid, day, zone, skip=None):
-    """[(start minute, end minute, kind)] of person uid on day (0..1440 in zone), merged per kind. Run as system."""
+def efb_spans(c, uid, day, zone, skip=None, orgs=None):
+    """[(start minute, end minute, kind)] of person uid on day (0..1440 in zone), merged per kind. Run as system.
+    orgs: only the sources of these organisations (2.240.0 C, #2868: a colleague's view); None = all of them."""
     from ..events.model import ev_att_ok, ev_expand, my_cal_ids
     from ..hub.absence import abs_holidays_year
     from ..hub.abscal import abc_state
@@ -64,6 +81,9 @@ def efb_spans(c, uid, day, zone, skip=None):
             a, b = a.astimezone(zone), b.astimezone(zone)
             out.append((a.hour * 60 + a.minute, 1440 if b >= d1 else b.hour * 60 + b.minute))
     cals = list(my_cal_ids(c, uid, hidden=False))
+    if orgs is not None and cals:  # 2.240.0 C (#2868): only the calendars of the shared organisations
+        q = ",".join("?" * len(cals))
+        cals = [r[0] for r in c.execute(f"SELECT id, org_id FROM ev_cals WHERE id IN ({q})", cals) if r[1] in orgs]
     rows = []
     if cals:
         q = ",".join("?" * len(cals))
@@ -73,7 +93,7 @@ def efb_spans(c, uid, day, zone, skip=None):
                          JOIN ev_cals k ON k.id=e.cal_id WHERE a.partstat='accepted'
                          AND e.deleted_at IS NULL AND e.busy=1 AND e.status<>'cancelled' AND e.all_day=0 AND e.first_day<=?
                          AND (e.last_day='' OR e.last_day>=?)""", (uid, hi.isoformat(), lo.isoformat())).fetchall()
-             if ev_att_ok(c, uid, r["efb_org"])]  # review 2.155.0: not the invitations of an organisation the person left
+             if ev_att_ok(c, uid, r["efb_org"]) and (orgs is None or r["efb_org"] in orgs)]  # review 2.155.0: not the invitations of an organisation the person left
     seen = set()
     for r in rows:
         if r["id"] in seen or (skip and r["id"] == skip):
@@ -83,14 +103,16 @@ def efb_spans(c, uid, day, zone, skip=None):
             if not o["all_day"]:  # an occurrence moved to a whole day does not block either
                 clip(o["s"], o["e"], busy)
     from ..calendars.subscriptions import CAL_ON
-    if CAL_ON:
+    if CAL_ON and orgs is None:  # 2.240.0 C (#2868): subscriptions are private sources
         for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible=1
                               AND e.all_day=0 AND e.d1>=? AND e.d0<=?""", (uid, lo.isoformat(), hi.isoformat())):
             s, e = parse_iso(r[0]), parse_iso(r[1])
             if s and e:
                 clip(s, e, busy)
-    for r in c.execute("SELECT half_day FROM hub_absences WHERE user_id=? AND deleted_at IS NULL AND status='approved' "
+    for r in c.execute("SELECT half_day, org_id FROM hub_absences WHERE user_id=? AND deleted_at IS NULL AND status='approved' "
                        "AND start_date<=? AND end_date>=?", (uid, day.isoformat(), day.isoformat())):
+        if orgs is not None and r[1] not in orgs:  # 2.240.0 C (#2868): only the absences of the shared organisations
+            continue
         away.append((720, 1440) if r[0] == "pm" else (0, 720) if r[0] == "am" else (0, 1440))
     if abs_holidays_year(day.year, abc_state(c, uid)).get(day.isoformat()):
         away.append((0, 1440))
@@ -119,6 +141,8 @@ def efb_get():
     if (u["kind"] or "user") == "agent" or u["kid"]:
         raise Denied(403, tr("Agents cannot use this endpoint"))
     need_feat("events")
+    if hit_limit(f"efb:{u['id']}", EFB_RATE):  # 2.240.0 C (#2868)
+        raise Denied(429, tr("Too many requests, please slow down"))
     a = request.args
     try:
         day = date.fromisoformat((a.get("day") or "").strip())
@@ -143,9 +167,9 @@ def efb_get():
     tz = (a.get("tz") or "").strip()
     zone = ev_zone(tz if tz_ok(tz) else "")
     people = []
-    allowed = efb_allowed(c, uid, ids)
+    allowed = efb_scopes(c, uid, ids)
     with system_ctx(c):  # the colleagues' calendars lie outside my rights; only merged spans leave this block
-        for t in allowed:
+        for t, orgs in allowed.items():
             people.append({"user_id": t, "slots": [{"start": efb_hm(s), "end": efb_hm(e), "kind": k}
-                                                   for s, e, k in efb_spans(c, t, day, zone, skip)]})
+                                                   for s, e, k in efb_spans(c, t, day, zone, skip, orgs)]})
     return jsonify(day=day.isoformat(), tz=getattr(zone, "key", ""), people=people)

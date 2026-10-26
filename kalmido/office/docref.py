@@ -19,22 +19,22 @@ the rows (a share of a personal office's folder reaches a person outside that of
 """
 import json
 
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.ctx import me
 from ..core.db import body, db
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
-from ..core.orgcrypt import oc_read_file
 from ..core.pg import system_ctx
-from ..files.fsref import fs_protect_hook, fs_ref_drop, fs_ref_node, fs_ref_register, fs_ref_rename, fs_ref_role
+from ..files.fsref import (fs_protect_hook, fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_register, fs_ref_rename, fs_ref_role,
+                           fs_ref_token_lacks)
 from ..accounts.orgroles import office_allowed
 from ..accounts.orgs import org_role
 from .docs import doc_public, doc_row, odoc_items_put, odoc_update
 from .ledger import ofx_locked, ofx_log
 from .model import OFFICE_OFF, office_on, pb_owner
-from .pdfweb import _render, _stored_or_missing, epdf_name, opdf_doc_pdf
+from .pdfweb import _render, epdf_name, epdf_stored, opdf_doc_pdf
 from .rights import _is_agent, office_can
 
 OFD_KIND = "office_doc"
@@ -106,13 +106,82 @@ def ofd_content(c, uid, did):
     oid = r["org_id"]
     with system_ctx(c):
         d = doc_row(c, oid, did)
-        p = _stored_or_missing(c, oid, d, "pdf")
-        data = oc_read_file(c, p) if p else _render(c, oid, d)[0]
+        data = epdf_stored(c, oid, d, "pdf")  # 2.296.0 C (#3177): hash checked
+        data = data if data is not None else _render(c, oid, d)[0]
+        ofx_log(c, oid, "open", doc_id=did, dedupe_min=10)  # 2.238.0 A (#2863): reading through a folder is in the office log too
+    c.commit()
     return data, epdf_name(d) + ".pdf", "application/pdf"
 
 
+def _agent_reads(c, uid, oid):
+    """2.238.0 A (#2863): agent uid may read documents of office oid like through the office's agent routes: scope office,
+    oid its office area, its office switch / groups and the area's switch "Agents may read office data" (ofa_agent_ok)."""
+    from .agentdocs import ofa_agent_ok
+    if fs_ref_token_lacks(uid, "office"):
+        return False
+    with system_ctx(c):  # the area's switches (yes / no), whichever workspace the agent's row-level security reaches
+        return bool(ofa_agent_ok(c, uid, oid, "offers", "view"))
+
+
+def ofd_gate(c, uid, did):
+    """2.238.0 A (#2863): the office's locks on the file store's content routes (like _need and the office's agent routes):
+    a token needs the scope office (agents only), an agent the office's agent switches, a kid's account nothing, the office
+    turned off 403."""
+    r = _row(c, did)
+    if not r:
+        raise Denied(404)
+    if _agent(c, uid):
+        if not _agent_reads(c, uid, r["org_id"]):
+            raise Denied(403)
+        return
+    if fs_ref_token_lacks(uid, "office"):
+        raise Denied(403, tr("This token lacks the permission “{0}”", "office"))
+    u = g.get("user")
+    if u is not None and u["id"] == uid and "kid" in u.keys() and u["kid"]:
+        raise Denied(403)
+    if not office_on(c, uid):
+        raise Denied(403, tr(OFFICE_OFF))
+
+
+def ofd_hidden(c, uid):
+    """2.238.0 A (#2863): what a folder never opens, like sheets' hidden: for a token without the scope office every filed
+    document (a person's token never has it), for an agent the documents of every office it may not read (_agent_reads)."""
+    if fs_ref_token_lacks(uid, "office"):
+        return fs_ref_all_sql(OFD_KIND)
+    if not _agent(c, uid):
+        return ""
+    key = ("ofd_hidden", int(uid))
+    if has_request_context() and key in g.setdefault("ofd_cache", {}):
+        return g.ofd_cache[key]
+    with system_ctx(c):  # the offices of the filed documents (structure: ids only)
+        rows = c.execute("SELECT n.ref_id, d.org_id FROM fs_nodes n JOIN office_docs d ON d.id=n.ref_id "
+                         "WHERE n.kind='ref' AND n.ref_kind=?", (OFD_KIND,)).fetchall()
+    ok = {}
+    for x in rows:
+        if x[1] not in ok:
+            ok[x[1]] = _agent_reads(c, uid, x[1])
+    bad = [int(x[0]) for x in rows if not ok[x[1]]]
+    out = f"({','.join(str(i) for i in bad)})" if bad else ""
+    if has_request_context():
+        g.ofd_cache[key] = out
+    return out
+
+
+def ofd_cap(c, uid, did):
+    """2.238.0 A (#2863): the most a folder share gives uid -- what the organisation role allows in the office (ofd_base_role,
+    office_allowed): guests nothing, read-only / accounting read; people outside the organisation (a personal office's
+    folder) the share as it is."""
+    r = _row(c, did)
+    if not r:
+        return None
+    if office_allowed(c, uid, r["org_id"], write=False):
+        return None
+    return "view" if office_allowed(c, uid, r["org_id"], write=True) else "edit"
+
+
 fs_ref_register(OFD_KIND, label=N_("Quotation or invoice"), open_url=lambda did: f"office/offers/{int(did)}",
-                base_role=ofd_base_role, space=ofd_space, protect=ofd_protect, title=ofd_title, content=ofd_content)
+                base_role=ofd_base_role, space=ofd_space, protect=ofd_protect, title=ofd_title, content=ofd_content,
+                content_gate=ofd_gate, hidden=ofd_hidden, cap=ofd_cap)
 
 
 @fs_protect_hook
@@ -323,7 +392,13 @@ def ofd_pdf(did):
     """The document's PDF (?inline=1): the stored file of a finalised document, a draft rendered."""
     c = db()
     uid, oid, _role = _need(c, did, False)
-    return _run(c, uid, oid, opdf_doc_pdf, did)
+    # 2.238.0 A (#2863): the accepted version with the signer's record needs the office's own read (area "offers") like the
+    # office route; through a folder alone the document as sent
+    g.ofd_original = ofd_base_role(c, uid, did) is None
+    try:
+        return _run(c, uid, oid, opdf_doc_pdf, did)
+    finally:
+        g.ofd_original = False
 
 
 @app.patch("/api/fsref/office_doc/<int:did>")

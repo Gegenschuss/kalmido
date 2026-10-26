@@ -188,7 +188,9 @@ const secPut = (lid, ids) => () => {
 async function saveSectionOrder(lid, ids, msg) {
   if (!canEditList(lid)) { roToast(); return; }
   let j;
-  try { j = await optWrite(secPut(lid, ids), () => api('POST', `/api/lists/${lid}/sections/order`, {ids})); } catch { return; }  // 2.41.2 (#1501): at once
+  const was = S.sections.filter(s => s.list_id === lid).map(s => secId(s.id));  // 2.273.0 B (#3051): the order the drag started from
+  try { j = await optWrite(secPut(lid, ids), () => api('POST', `/api/lists/${lid}/sections/order`, {ids, _prev: was})); } catch { return; }  // 2.41.2 (#1501): at once
+  if (!j.ok) { toast(tr('Changed in the meantime')); await load(); render(); return; }  // someone else reordered meanwhile: their order stays
   const ord = (ids2, prev) => async () => {
     const r = await api('POST', `/api/lists/${lid}/sections/order`, {ids: ids2.map(secId), _prev: prev.map(secId)});
     return {skipped: r.ok ? [] : [tr('Section order')], none: !r.ok};

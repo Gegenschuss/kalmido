@@ -19,6 +19,7 @@ from ..core.i18n import N_, tr
 from ..core.db import bump, db, err, iso, now_utc
 from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import collab_all, Denied, health_hidden, token_lists
 
 OTR_TRASH_DAYS = max(1, ret_days("trash"))  # 2.272.0 A (#3026): floor 1 like ret_trash_days; 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
@@ -171,7 +172,7 @@ def otr_delete(lid):
     if early:  # 2.186.1 (#2732): the security log (like the account deletion, useradmin.ua8_audit)
         rx_alert(N_("{0} deleted the kept project {1} for good before the end of its retention period ({2})."),
                  [g.user["username"], r["name"], r["retain_until"]])
-    print("list", lid, "deleted for good from the trash by", g.user["username"], flush=True)
+    print("list", lid, "deleted for good from the trash by", login_log_who(g.user), flush=True)
     return jsonify(ok=True)
 
 

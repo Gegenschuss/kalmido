@@ -388,6 +388,7 @@ function ofcSettingsHtml() {
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><div class="shint keep">${tr('PNG, JPEG or WebP, at least 600 px wide, up to 4 MB')}</div></div>
     ${typeof agbSettingsHtml === 'function' ? agbSettingsHtml() : ''}${/* 2.113.2 (#2253): the terms and conditions (PDF) */ ''}
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
+    <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
@@ -408,6 +409,7 @@ function ofcSettingsHtml() {
     ${typeof onumHtml === 'function' ? onumHtml() : ''}
     ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('paydays')}
     ${ofcRowF('os-skonto', tr('Cash discount'), `<span class="lacts"><input id="os-skonto" value="${esc(+s.skonto_pct ? fmtNum(s.skonto_pct, 2) : '')}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span><input id="os-skonto-days" aria-label="${esc(tr('days'))}" value="${esc(+s.skonto_days ? String(s.skonto_days) : '')}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('default for new invoices; empty = none'))}
+    ${ofcRowF('os-exempt', tr('Reason for tax exemption'), `<input id="os-exempt" value="${esc(s.exempt_reason || '')}" maxlength="300" ${dis}>`, tr('printed on invoices with tax-exempt positions (0 %), required for them'))/* 2.296.0 B (#3169) */}
     ${ofcRowF('os-rmfee', tr('Reminder fee'), `<span class="lacts"><input id="os-rmfee" value="${esc(fmtNum(s.reminder_fee ?? 0, 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}${ofcII('rmfee')}
     ${ofcRowF('os-rmdays', tr('Payment deadline in reminders'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('rmdays')}
     ${typeof dun_settingsHtml === 'function' ? dun_settingsHtml(s, dis) : '' /* 2.147.1 B (#2054) */}
@@ -419,9 +421,13 @@ function ofcSettingsHtml() {
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}
     ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="shint">${tr('You send the access at the client via “Send portal link”.')}</p>
     ${typeof dx_settingsHtml === 'function' && ofcFeat('books.datev') ? dx_settingsHtml(s, dis) : ''}
+    ${typeof brl_settingsHtml === 'function' ? brl_settingsHtml() : '' /* 2.299.0 B (#3191): bank rules */}
+    ${typeof bnr_settingsHtml === 'function' ? bnr_settingsHtml(dis) : '' /* 2.299.0 C (#3192): the reminder of the bank bookings without a receipt */}
     </fieldset>${ost_p('docs', dis)}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
     ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
+    ${ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`)}
+    ${ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-de', tr('Reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-en', tr('Reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
     <h3>${tr('Calculation rules')}</h3>
@@ -684,13 +690,14 @@ function ofcSettingsBody(form) {
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
     invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), delivery_scheme: v('#os-ls-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
     ...($('#os-skonto', form) ? {skonto_pct: ofcNum(v('#os-skonto')) || 0, skonto_days: ofcNum(v('#os-skonto-days')) || 0} : {}),  // 2.120.0 A (#2087)
+    ...($('#os-exempt', form) ? {exempt_reason: v('#os-exempt').trim()} : {}),  // 2.296.0 B (#3169)
     reminder_deadline_days: ofcNum(v('#os-rmdays')), small_business: $('#os-small', form)?.checked ? 1 : 0,
     // 2.147.0 (#2460): a function that is off has no fields on the page -- its saved values are never sent (never emptied)
     ...($('#os-einv', form) ? {einvoice_format: v('#os-einv')} : {}),
     ...($('#os-datev', form) ? {datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0} : {}),
     ...($('#os-tax-std', form) ? {tax_rates: Object.fromEntries([['standard', ofcNum(v('#os-tax-std'))], ['reduced', ofcNum(v('#os-tax-red'))]].filter(x => x[1] != null))} : {}),
     ...($('#os-ret', form) ? {retention_years: ofcNum(v('#os-ret'))} : {}),
-    invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
+    invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), delivery_closing_de: v('#os-dl-close-de'), delivery_closing_en: v('#os-dl-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   if (typeof dun_settingsBody === 'function') Object.assign(body, dun_settingsBody(form));  // 2.147.1 B (#2054)
   if (typeof dx_settingsBody === 'function' && $('.dxset', form)) Object.assign(body, dx_settingsBody(form));  // 2.47.3 (#1460); 2.147.0 (#2460): only while DATEV is on
@@ -719,7 +726,7 @@ function ost_show(want, save) {
 const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-home': 'home_currency', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
   'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-rm-scheme': 'reminder_scheme',
   'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
-  'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-rm-text-de': 'reminder_text_de',
+  'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-dl-close-de': 'delivery_closing_de', 'os-dl-close-en': 'delivery_closing_en', 'os-rm-text-de': 'reminder_text_de',
   'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
   'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
   'os-dun-on': 'dunning_suggest', 'os-dun-days': 'dunning_grace_days', 'os-girocode': 'girocode',  // 2.147.1 B (#2054): each saves alone
@@ -879,11 +886,18 @@ function ofcGrow(ta, max = 3) {
   ta.rows = Math.min(max, n);
   while (ta.rows < max && ta.scrollHeight > ta.clientHeight + 1) ta.rows++;
 }
+// 2.296.0 D (#3172): true when a brand colour is too light for text on white (contrast < 4.5, as the PDF writer judges it)
+function ofcColorLight(c) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(String(c || '').trim());
+  if (!m) return false;
+  const l = [0, 2, 4].map(i => { const v = parseInt(m[1].slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 1.05 / (0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] + 0.05) < 4.5;
+}
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset?.grow) ofcGrow(t, +t.dataset.grow || 3);
   if (t.id === 'ofc-q') { OFC.q = t.value; const w = $('#view .ofclistw'); if (w && !OFCP.stale) fl_set(w, ofcListBody(w.dataset.kind)); else ofcDraw(); }  // 2.144.2 B (#1644)
-  else if (t.id === 'os-color') { const sw = $('.ofcsw'); if (sw) sw.style.background = /^#[0-9a-fA-F]{6}$/.test(t.value.trim()) ? t.value.trim() : 'var(--accent)'; }
+  else if (t.id === 'os-color') { const nt = $('#os-color-note'); if (nt) nt.hidden = !ofcColorLight(t.value); const sw = $('.ofcsw'); if (sw) sw.style.background = /^#[0-9a-fA-F]{6}$/.test(t.value.trim()) ? t.value.trim() : 'var(--accent)'; }
   else if (t.dataset?.scheme) ofcSchemePv(t);  // 2.40.0 (#1382): every number scheme with its preview
 });
 document.addEventListener('change', e => {

@@ -224,14 +224,15 @@ def wg_pinboard(c, lid, role):
         st = json.loads(r["page_style"] or "{}") if r else {}
     except ValueError:
         st = {}
-    pads = [wg_pad_dict(x) for x in c.execute("SELECT * FROM list_notepads WHERE list_id=? ORDER BY id", (lid,))]
+    pads = [] if role == "participant" else [  # 2.223.7 B (#2918): participants see no notepads
+        wg_pad_dict(x) for x in c.execute("SELECT * FROM list_notepads WHERE list_id=? ORDER BY id", (lid,))]
     return {"style": st if isinstance(st, dict) else {}, "pads": pads, "can_style": role in WRITE_ROLES}
 
 
 def _wg_role(c, lid, write):
     need_person()
     from ..lists.projects import need_overview
-    return need_overview(c, lid, write=write)
+    return need_overview(c, lid, write=write, full=True)  # 2.223.7 B (#2918): participants: 404
 
 
 def _wg_pad_text(b, partial):

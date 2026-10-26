@@ -113,6 +113,52 @@ def e2e_has_keys(c, uid):
     return c.execute("SELECT 1 FROM e2e_keys WHERE user_id=?", (uid,)).fetchone() is not None
 
 
+E2E_LEGACY_RE = re.compile(r"kalmido-e2e:v1:[0-9]{1,19}")
+
+
+def e2e_legacy_list(v):
+    """2.278.0 C (#3091): e2e_keys.legacy_aad (JSON list of "kalmido-e2e:v1:<old user id>") -> the valid entries."""
+    try:
+        v = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return []
+    return [x for x in v if isinstance(x, str) and E2E_LEGACY_RE.fullmatch(x)][:20] if isinstance(v, list) else []
+
+
+def e2e_same_keys(c, uid, r):
+    """2.278.0 review M1: the key bundle of row r is the pair person uid already has (same public key, e.g. after an undone
+    import): taking it over replaces nothing."""
+    pub = _pub(r.get("pub")) if isinstance(r, dict) else None
+    have = c.execute("SELECT pub FROM e2e_keys WHERE user_id=?", (uid,)).fetchone()
+    return bool(pub and have and have[0] == pub)
+
+
+def e2e_import_keys(c, uid, r, old_uid):
+    """2.278.0 C (#3091): the key bundle of an account export (row r of the old server, person old_uid) for person uid.
+    Taken only while uid has no keys (own keys are never replaced). The bundle's wrap AAD binds the old user id: it is kept
+    in legacy_aad (with what the file already had from an earlier move). -> "taken" | "kept" | None (broken / no row)."""
+    if e2e_has_keys(c, uid) and not e2e_same_keys(c, uid, r):
+        return "kept"
+    def obj(v):
+        try:
+            return json.loads(v) if isinstance(v, str) else v
+        except ValueError:
+            return None
+    pub, bp, br = _pub(r.get("pub")), _bundle(obj(r.get("bundle_pass"))), _bundle(obj(r.get("bundle_rec")))
+    if not pub or not bp or not br or not old_uid:
+        return None
+    legacy = [f"kalmido-e2e:v1:{int(old_uid)}"] + [x for x in e2e_legacy_list(r.get("legacy_aad")) if x != f"kalmido-e2e:v1:{int(old_uid)}"]
+    ts = iso(now_utc())
+    have = c.execute("SELECT legacy_aad FROM e2e_keys WHERE user_id=?", (uid,)).fetchone()
+    if have:  # review M1: the same key pair is here already (an undone import, a second import): only add the old ids
+        legacy += [x for x in e2e_legacy_list(have[0]) if x not in legacy]
+        c.execute("UPDATE e2e_keys SET legacy_aad=? WHERE user_id=?", (json.dumps(legacy[:20]), uid))
+        return "taken"
+    c.execute("INSERT INTO e2e_keys(user_id,pub,bundle_pass,bundle_rec,created_at,updated_at,legacy_aad) VALUES(?,?,?,?,?,?,?) "
+              "ON CONFLICT(user_id) DO NOTHING", (uid, pub, bp, br, ts, ts, json.dumps(legacy[:20])))
+    return "taken"
+
+
 # ---------------------------------------------------------------- the person's keys
 @app.get("/api/e2e/keys")
 def e2e_keys_get():
@@ -125,7 +171,8 @@ def e2e_keys_get():
     if not r:
         return jsonify(set=False, password=pw)
     return jsonify(set=True, pub=json.loads(r["pub"]), bundle_pass=json.loads(r["bundle_pass"]), bundle_rec=json.loads(r["bundle_rec"]),
-                   created_at=r["created_at"], updated_at=r["updated_at"], password=pw)
+                   created_at=r["created_at"], updated_at=r["updated_at"], password=pw,
+                   legacy_aad=e2e_legacy_list(r["legacy_aad"]) if "legacy_aad" in r.keys() else [])  # 2.278.0 C (#3091)
 
 
 @app.put("/api/e2e/keys")

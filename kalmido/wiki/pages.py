@@ -10,6 +10,7 @@ with the pages' PDFs and pictures (wikiatt.py).
 Nothing here is tied to the wiki view: a page is found by its id and space alone (a file tree can show it later).
 The session routes are for people only (session.py refuses agents); agents and tokens reach pages through the API v1 (wkv1.py).
 """
+import hashlib
 import json
 import re
 import time
@@ -30,11 +31,11 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 
-WIKI_PATH_MAX, WIKI_BODY_MAX, WIKI_DEPTH = 200, 500_000, 12
+WIKI_PATH_MAX, WIKI_BODY_MAX, WIKI_DEPTH = 500, 500_000, 32  # 2.210 A (#2755): was 200 characters / 12 levels (path TEXT, no column limit)
 WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, WIKI_ZIP_TOTAL = 2000, 1_000_000, 30_000_000
 WIKI_TEMPLATES = ("templates/", "vorlagen/")  # lower case; "Templates/…" (SilverBullet) and the German folder name
 # 2.123.0 C (#2107): [[datei:…]] / [[tabelle:…]] link the file store / a table (wkembed.py), not a page
-WIKI_LINK_RE = re.compile(r"\[\[(?!\s*(?i:datei|tabelle)\s*:)([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]")
+WIKI_LINK_RE = re.compile(r"\[\[(?!\s*(?i:datei|tabelle)\s*:)([^\[\]|#\n]{1,500})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]")
 WIKI_TASK_RE = re.compile(r"(?<![\w&/#])#(\d{1,12})\b")
 WIKI_BAD_CHARS = re.compile(r"[\x00-\x1f\x7f\[\]|#^\\]")
 
@@ -57,6 +58,92 @@ def wiki_clean_path(v):
         raise BadInput(tr("Invalid value: {0}", "path"))
     if len(out) > WIKI_PATH_MAX:
         raise BadInput(tr("The name is too long (at most {0} characters)", WIKI_PATH_MAX))
+    return out
+
+
+def wiki_path_parts(v):
+    """2.210 A (#2755): the cleaned parts of a path as wiki_clean_path takes them, without its limits (the import shortens)."""
+    v = unicodedata.normalize("NFC", str(v)).strip()
+    if v.lower().endswith(".md"):
+        v = v[:-3]
+    parts = [re.sub(r"\s+", " ", WIKI_BAD_CHARS.sub("", p)).strip() for p in v.replace("\\", "/").split("/")]
+    return [p for p in parts if p]
+
+
+def _wiki_cut(part, n):
+    """A part shortened to n characters: its start and end kept, a short hash of the whole in the middle (unique, stable)."""
+    if len(part) <= n:
+        return part
+    h = hashlib.sha1(part.encode()).hexdigest()[:6]
+    if n < 10:  # 2.210 (#2755, review): too little room for start + hash + end: the hash alone, never longer than n
+        return h[:max(1, n)]
+    keep = max(2, n - len(h) - 2)
+    head, tail = keep - keep // 3, keep // 3
+    return (part[:head].rstrip() + "~" + h + "~" + (part[-tail:].lstrip() if tail else "")).strip()
+
+
+def wiki_fit_paths(names):
+    """2.210 A (#2755): import names -> {name: (path, shortened)} or {name: (None, reason)}. A path deeper than WIKI_DEPTH
+    keeps its first folders, the deeper ones join the page's name ("a - b - Page"); a path longer than WIKI_PATH_MAX gets its
+    long folder names shortened (the same folder the same way for every page in it, so a folder stays one folder), then
+    its page name. Two names that end up the same get " (2)", " (3)" ... (first come first served)."""
+    raw = {}
+    for nm in names:
+        parts = wiki_path_parts(nm)
+        if not parts or any(p in (".", "..") or p.startswith(".") for p in parts):
+            raw[nm] = None
+            continue
+        if len(parts) > WIKI_DEPTH:
+            parts = parts[:WIKI_DEPTH - 1] + [" - ".join(parts[WIKI_DEPTH - 1:])]
+        raw[nm] = parts
+    # folders to shorten: every folder (by its full lower-case prefix) of a path that is too long, longest names first
+    cut = {}
+
+    def apply(parts):
+        out, pre = [], ""
+        for p in parts[:-1]:
+            pre = (pre + "/" + p.lower()) if pre else p.lower()
+            out.append(cut.get(pre, p))
+        return out + parts[-1:]
+    def fits(parts):  # the page's own name can still be cut to 48 characters
+        cur = apply(parts)
+        return len("/".join(cur[:-1])) + 1 + min(len(cur[-1]), 48) <= WIKI_PATH_MAX
+    for fn in (48, 24, 12):
+        for nm, parts in raw.items():
+            if not parts or fits(parts):
+                continue
+            pres, pre = [], ""
+            for p in parts[:-1]:
+                pre = (pre + "/" + p.lower()) if pre else p.lower()
+                pres.append((pre, p))
+            for pre, p in reversed(pres):  # the deepest folders first: the top ones are shared by more pages
+                if len(cut.get(pre, p)) > fn:
+                    cut[pre] = _wiki_cut(p, fn)
+                    if fits(parts):
+                        break
+    out, seen = {}, set()
+    for nm, parts in raw.items():
+        if not parts:
+            out[nm] = (None, tr("Invalid value: {0}", "path"))
+            continue
+        cur = apply(parts)
+        folder = "/".join(cur[:-1])
+        room = WIKI_PATH_MAX - len(folder) - (1 if folder else 0)
+        if room < 8:
+            out[nm] = (None, tr("The name is too long (at most {0} characters)", WIKI_PATH_MAX))
+            continue
+        page = _wiki_cut(cur[-1], room)
+        path = f"{folder}/{page}" if folder else page
+        if path.lower().startswith("e2e1:"):
+            out[nm] = (None, tr("Invalid value: {0}", "path"))
+            continue
+        n = 2
+        while path.lower() in seen:
+            suf = f" ({n})"
+            path = (f"{folder}/" if folder else "") + _wiki_cut(page, room - len(suf)) + suf
+            n += 1
+        seen.add(path.lower())
+        out[nm] = (path, path != "/".join(parts) or len(wiki_path_parts(nm)) != len(parts))
     return out
 
 
@@ -223,6 +310,8 @@ def wiki_index():
     uid = me()
     oid = wiki_space(c, uid, request.args.get("space"))
     w, a = wiki_space_sql(oid, uid)
+    if request.args.get("nolist") == "1" and request.args.get("bodies") == "1" and request.args.get("bn"):  # 2.280.0 C (#3114)
+        return jsonify(wiki_body_page(c, oid, uid, w, a, None))
     rows = c.execute(f"SELECT id, org_id, owner_id, path, attrs, created_by, updated_by, created_at, updated_at FROM wiki_pages "
                      f"WHERE deleted_at IS NULL AND {w} ORDER BY lower(path) LIMIT {WIKI_INDEX_MAX + 1}", a).fetchall()
     more = len(rows) > WIKI_INDEX_MAX  # 2.169.1 (#2672): the index says so instead of ending silently
@@ -236,7 +325,9 @@ def wiki_index():
     # with since=<updated_at> only those of pages changed at or after it (the others it has; deleted ones are missing here)
     off = request.args.get("offline") == "1"
     since = str(request.args.get("since") or "")[:40] if off else ""
-    if (e2e or off) and request.args.get("bodies") == "1":
+    if (e2e or off) and request.args.get("bodies") == "1" and request.args.get("bn"):  # 2.280.0 C (#3114): the texts in pages
+        nxt = wiki_body_page(c, oid, uid, w, a, {d["id"]: d for d in pages})
+    elif (e2e or off) and request.args.get("bodies") == "1":
         ws, wa = (f"{w} AND updated_at>=?", [*a, since]) if since else (w, a)
         bodies = {r["id"]: wsb_body_or(c, r)  # 2.123.0 A (#2105): a page not converted yet may still be sealed at rest; 2.139.0 C (#2386): unreadable = ""
                   for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws} "
@@ -250,8 +341,55 @@ def wiki_index():
     tree = wkf_tree(c, uid, oid, wkf_sync(c, uid, oid), pages)
     c.commit()
     from ..accounts.orgroles import org_writes
-    return jsonify(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
-                   root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more
+    out = dict(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
+               root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more
+    if request.args.get("bn") and request.args.get("bodies") == "1" and (e2e or off):
+        out["bnext"] = nxt["bnext"]
+    return jsonify(out)
+
+
+WIKI_BODY_PAGE = 500  # 2.280.0 C (#3114): texts per answer at most (bn=) -- a big space's copy comes in several answers
+
+
+def wiki_body_page(c, oid, uid, w, a, pages):
+    """2.280.0 C (#3114): one page of the texts of a space for the browser's copy: ?bn=<n> texts in the index's order
+    (lower(path), id) after the cursor ?bafter=<id>:<lower path> (empty = from the start); with since=<updated_at> only
+    those changed at or after it. pages = the index's dicts of this answer (each gets its body, as without bn), else the
+    texts come as bodies={id: text} (pages None = ?nolist=1: the next answers without the index). bnext = the cursor of the next answer
+    ("" = the last one). Never more texts than pages the index lists (WIKI_INDEX_MAX)."""
+    from .wkhist import wsb_body_or
+    from .wikie2e import wke_index_info
+    off = request.args.get("offline") == "1"
+    if not off and not wke_index_info(c, oid, uid):
+        raise BadInput(tr("Invalid value: {0}", "bodies"))  # the texts only for the copy or a locked space, as without bn
+    try:
+        n = max(1, min(int(request.args.get("bn") or WIKI_BODY_PAGE), WIKI_BODY_PAGE))
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "bn"))
+    since = str(request.args.get("since") or "")[:40] if off else ""
+    cur = str(request.args.get("bafter") or "")
+    q, qa = f"SELECT id, org_id, owner_id, body, lower(path) AS lp FROM wiki_pages WHERE deleted_at IS NULL AND {w}", [*a]
+    if since:
+        q, qa = q + " AND updated_at>=?", [*qa, since]
+    if cur:
+        ci, _, cp = cur.partition(":")
+        if not ci.isdigit():
+            raise BadInput(tr("Invalid value: {0}", "bafter"))
+        q, qa = q + " AND (lower(path), id) > (?, ?)", [*qa, cp, int(ci)]
+    if cur or since:  # the index ends at WIKI_INDEX_MAX pages: no texts past its last page (as without bn)
+        last = c.execute(f"SELECT lower(path) AS lp, id FROM wiki_pages WHERE deleted_at IS NULL AND {w} "
+                         f"ORDER BY lower(path), id OFFSET {WIKI_INDEX_MAX - 1} LIMIT 1", a).fetchone()
+        if last:
+            q, qa = q + " AND (lower(path), id) <= (?, ?)", [*qa, last["lp"], last["id"]]
+    rows = c.execute(q + f" ORDER BY lower(path), id LIMIT {n + 1}", qa).fetchall()
+    nxt = f"{rows[n - 1]['id']}:{rows[n - 1]['lp']}" if len(rows) > n else ""
+    bodies = {r["id"]: wsb_body_or(c, r) for r in rows[:n]}  # 2.126.2 B (#2358): unreadable = ""
+    if pages is None:
+        return {"space": wiki_space_key(oid), "bodies": {str(k): v for k, v in bodies.items()}, "bnext": nxt}
+    for pid, d in pages.items():
+        if pid in bodies:
+            d["body"] = bodies[pid]
+    return {"bnext": nxt}
 
 
 @app.get("/api/wiki/pages/<int:pid>")
@@ -337,6 +475,37 @@ def wiki_relink(c, r, old, new, uid, ts, only_edit=False):
                       (wkh_seal(c, p["org_id"], p["owner_id"], nb), uid, ts, p["id"]))
             wiki_set_links(c, p["id"], nb)
             n += 1
+    return n
+
+
+def wiki_relink_many(c, oid, uid, renames, ts):
+    """2.280.0 C (#3114): wiki_relink for many renames (old, new) of one space at once: the linking pages found in one query
+    per 500 names, each page's text changed once (the renames applied in their order, as the calls one by one did); the
+    number counted as before (a page per rename that changed it)."""
+    from .wkhist import WikiUnreadable, wkh_open, wkh_seal
+    w, a = wiki_space_sql(oid, uid)
+    by, n = {}, 0
+    for i in range(0, len(renames), 500):
+        part = [o.lower() for o, _ in renames[i:i + 500]]
+        for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body, k.to_path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id "
+                           f"WHERE k.to_path IN ({','.join('?' * len(part))}) AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}",
+                           [*part, *a]).fetchall():
+            by.setdefault(p["id"], [p, set()])[1].add(p["to_path"])
+    for p, linked in by.values():
+        try:
+            ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])
+        except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable page keeps its text (and its old link)
+            continue
+        nb = ob
+        for old, new in renames:
+            if old.lower() in linked:
+                t = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(?=[\]|#])", re.I).sub(lambda m, new=new: "[[" + new, nb)
+                n += t != nb
+                nb = t
+        if nb != ob:
+            c.execute("UPDATE wiki_pages SET body=?, updated_by=?, updated_at=? WHERE id=?",
+                      (wkh_seal(c, p["org_id"], p["owner_id"], nb), uid, ts, p["id"]))
+            wiki_set_links(c, p["id"], nb)
     return n
 
 
@@ -439,16 +608,26 @@ def wiki_move():
         raise Denied(404)
     moves = [(r, wiki_clean_path(dst + r["path"][len(src):])) for r in rows]
     mine = {r["id"] for r in rows}
-    taken = [n for _, n in moves if (x := c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, n.lower()]).fetchone()) and x["id"] not in mine]
+    # 2.280.0 C (#3114): the names taken, the two renames and the relink in a few statements per 500 pages, not per page
+    held = {}
+    for i in range(0, len(moves), 500):
+        part = [nw.lower() for _, nw in moves[i:i + 500]]
+        held.update({x["lp"]: x["id"] for x in c.execute(f"SELECT id, lower(path) AS lp FROM wiki_pages WHERE deleted_at IS NULL AND {w} "
+                                                         f"AND lower(path) IN ({','.join('?' * len(part))})", [*a, *part])})
+    taken = [nw for _, nw in moves if nw.lower() in held and held[nw.lower()] not in mine]
     if taken:
         return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
-    ts, n = iso_ms(now_utc()), 0
-    for r, new in moves:  # first to a free name, then to the target (pages of the folder may swap names among themselves)
-        c.execute("UPDATE wiki_pages SET path=? WHERE id=?", (f".moving/{r['id']}", r["id"]))
-    for r, new in moves:
-        c.execute("UPDATE wiki_pages SET path=?, updated_by=?, updated_at=? WHERE id=?", (new, uid, ts, r["id"]))
-    for r, new in moves:
-        n += wiki_relink(c, r, r["path"], new, uid, ts)
+    ts = iso_ms(now_utc())
+    ids = [r["id"] for r, _ in moves]
+    for i in range(0, len(ids), 500):  # first to a free name, then to the target (pages of the folder may swap names among themselves)
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE wiki_pages SET path='.moving/' || id WHERE id IN ({','.join('?' * len(part))})", part)
+    for i in range(0, len(moves), 500):
+        part = moves[i:i + 500]
+        c.execute("UPDATE wiki_pages SET path=v.p, updated_by=?, updated_at=? FROM (VALUES "
+                  + ",".join(["(CAST(? AS bigint), CAST(? AS text))"] * len(part)) + ") AS v(id, p) WHERE wiki_pages.id=v.id",
+                  [uid, ts, *[x for r, nw in part for x in (r["id"], nw)]])
+    n = wiki_relink_many(c, oid, uid, [(r["path"], nw) for r, nw in moves], ts)
     from .wkshare import wsh_repath  # 2.123.0 B (#2104): the shares of the folder and of its pages follow
     wsh_repath(c, oid, None if oid else uid, src, dst, True)
     from .wkfolder import wkf_folder_move, wkf_sync

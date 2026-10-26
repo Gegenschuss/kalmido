@@ -33,7 +33,8 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
-from ..core.access import Denied, ov_open, task_visible
+from ..accounts.orgs import org_role  # 2.240.0 B2 (#2867): pulled up from functions
+from ..core.access import Denied, org_trip_sql, ov_open, reading_sql, task_visible
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int
 from ..core.env import env_bool
@@ -191,7 +192,10 @@ def chn_tick():
         c = connect()
         try:
             with system_ctx(c):  # background loop: every person's and organisation's channels
-                c.execute("DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT id FROM notify_channels WHERE enabled=0)")
+                c.execute("""UPDATE notify_channels SET enabled=0, disabled_reason='disabled', updated_at=? WHERE enabled=1 AND org_id IS NOT NULL
+                             AND user_id IN (SELECT id FROM users WHERE disabled<>0)""", (iso(now_utc()),))  # 2.240.0 B2 (#2867): visible to its admins
+                c.execute("""DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT n.id FROM notify_channels n JOIN users u ON u.id=n.user_id
+                             WHERE n.enabled=0 OR u.disabled<>0)""")  # 2.240.0 B (#2867): nor what waits for a disabled account
                 rows = [dict(r) for r in c.execute("""SELECT q.id, q.channel_id, q.text, n.kind, n.target FROM notify_channel_queue q
                                                       JOIN notify_channels n ON n.id=q.channel_id
                                                       ORDER BY q.id LIMIT ?""", (CH_BATCH,))]
@@ -258,8 +262,88 @@ def chn_kind(kind, tag):
     return "reminder" if getattr(_CH_TL, "wd", False) else "other"
 
 
-def chn_push(uid, title, msg, prio, click, kind, s):
-    """Queues one push of uid for their channels that want this kind. Never raises; True when one took it."""
+# 2.240.0 B (#2867): what a push links to -> the list / organisation it belongs to
+CH_REF = re.compile(r"#(t|l|ev|client|office/offers|office/gendocs)/(\d+)")
+CH_REF_SQL = {
+    "t": "SELECT list_id, NULL AS org_id FROM tasks WHERE id=?",
+    "l": "SELECT id AS list_id, NULL AS org_id FROM lists WHERE id=?",
+    "ev": "SELECT NULL AS list_id, k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?",
+    "client": "SELECT NULL AS list_id, org_id FROM clients WHERE id=?",
+    "office/offers": "SELECT NULL AS list_id, org_id FROM office_docs WHERE id=?",
+    "office/gendocs": "SELECT NULL AS list_id, org_id FROM office_gen_docs WHERE id=?",
+}
+
+
+def chn_scope(c, uid, click=None, task=None, scope=None):
+    """2.240.0 B (#2867): what a push of uid may carry to their channels (third-party services), with the same rules as
+    the list events: None = nothing (a disabled account; health, budget, an organisation's trip, read later);
+    a string = only a neutral line naming that organisation (its content stays in the app unless the organisation
+    allows it, orgs.chn_content); "" = the full text (private content: the person chose the channel).
+    2.240.0 B2 (#2867): scope = what the caller knows the push belongs to ("private", "t:<task>", "l:<list>", "o:<org>" (none =
+    private), "a:<agent>", "dm:<other person>"); else the task / the link; a push without a known reference is neutral."""
+    u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["disabled"]:
+        return None
+    sk, _, sv = (scope or "").partition(":")
+    if sk == "private":
+        return ""
+    if sk in ("o", "a", "dm"):
+        n = int(sv) if sv.isdigit() else None
+        if sk == "dm":
+            return chn_dm_scope(c, uid, n)
+        if sk == "a":
+            r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (n,)).fetchone() if n else None
+            if not r:
+                return APP_NAME
+            n = r["org_id"]
+        return chn_org_scope(c, uid, n)
+    if sk in ("t", "l") and sv.isdigit():
+        ref = c.execute(CH_REF_SQL[sk], (int(sv),)).fetchone()
+    else:
+        m = None if task else CH_REF.search(click or "")
+        ref = c.execute(CH_REF_SQL["t"], (int(task),)).fetchone() if task else \
+            c.execute(CH_REF_SQL[m.group(1)], (int(m.group(2)),)).fetchone() if m else None
+    if not ref:
+        return APP_NAME  # 2.240.0 B2 (#2867): no known reference: neutral
+    oid = ref["org_id"]
+    if ref["list_id"]:
+        lr = c.execute(f"""SELECT l.org_id, (COALESCE(l.life, '') IN ('health', 'budget') OR {org_trip_sql()} OR {reading_sql()}) AS hide
+                           FROM lists l WHERE l.id=?""", (ref["list_id"],)).fetchone()
+        if lr and lr["hide"]:
+            return None
+        oid = lr["org_id"] if lr else None
+    return chn_org_scope(c, uid, oid)
+
+
+def chn_org_scope(c, uid, oid):
+    """2.240.0 B2 (#2867): no organisation or uid's own personal office (no organisation, P4) = the full text; an organisation that
+    allows it = the full text; else neutral, naming the organisation only to its members."""
+    if not oid:
+        return ""
+    o = c.execute("SELECT name, chn_content, personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
+    if not o:
+        return APP_NAME
+    if o["personal_of"] is not None:
+        return "" if o["personal_of"] == uid else APP_NAME
+    if o["chn_content"]:
+        return ""
+    return (o["name"] or APP_NAME) if org_role(c, uid, oid) else APP_NAME
+
+
+def chn_dm_scope(c, uid, other):
+    """2.240.0 B2 (#2867): a direct message is neutral while both share an organisation that keeps its content in the app
+    (it is likely about its work); between people without such an organisation the full text."""
+    if not other:
+        return APP_NAME
+    r = c.execute("""SELECT o.name FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id
+                     WHERE a.user_id=? AND b.user_id=? AND o.personal_of IS NULL AND COALESCE(o.chn_content, 0)=0
+                     ORDER BY o.id LIMIT 1""", (uid, other)).fetchone()
+    return (r["name"] or APP_NAME) if r else ""
+
+
+def chn_push(uid, title, msg, prio, click, kind, s, task=None, scope=None, chn_msg=None):
+    """Queues one push of uid for their channels that want this kind. Never raises; True when one took it.
+    2.240.0 B2 (#2867): scope -> chn_scope; chn_msg = the text the channels get instead of msg (the summary: numbers only)."""
     if not CH_ON or not kind:
         return False
     try:
@@ -271,7 +355,12 @@ def chn_push(uid, title, msg, prio, click, kind, s):
             with system_ctx(c):  # the recipient's own channels (a push thread has no request context)
                 rows = [r for r in c.execute("""SELECT id, events FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled=1""",
                                              (uid,)) if kind in r["events"].split(",")]
-                n = sum(1 for r in rows if chn_enqueue(c, r["id"], chn_text(title, msg, click)))
+                sc = chn_scope(c, uid, click, task, scope) if rows else None  # 2.240.0 B (#2867)
+                msg = msg if chn_msg is None else chn_msg
+                if sc:
+                    lg = (s or {}).get("lang") if (s or {}).get("lang") in LANGS else "en"
+                    title, msg = APP_NAME, tr("New notification in {0}", sc, lg=lg)
+                n = 0 if sc is None else sum(1 for r in rows if chn_enqueue(c, r["id"], chn_text(title, msg, click)))
             c.commit()
         finally:
             c.close()
@@ -288,7 +377,8 @@ def chn_reachable(c, uid):
     if not CH_ON:
         return False
     with system_ctx(c):  # the person's own channels, asked for other people too (pushes to them)
-        return bool(c.execute("SELECT 1 FROM notify_channels WHERE user_id=? AND org_id IS NULL AND enabled=1 LIMIT 1", (uid,)).fetchone())
+        return bool(c.execute("""SELECT 1 FROM notify_channels n JOIN users u ON u.id=n.user_id WHERE n.user_id=? AND n.org_id IS NULL
+                                 AND n.enabled=1 AND u.disabled=0 LIMIT 1""", (uid,)).fetchone())  # 2.240.0 B (#2867)
 
 
 # ---------------------------------------------------------------- events of lists -> organisation channels / own list channels
@@ -330,9 +420,9 @@ def chn_flush(resp):
 
 
 def chn_list_events(c, n):
-    from ..accounts.orgs import org_role
-    chans = c.execute("""SELECT id, user_id, org_id, events FROM notify_channels WHERE enabled=1
-                         AND (org_id IS NOT NULL OR events ILIKE '%lists%') ORDER BY id""").fetchall()
+    chans = c.execute("""SELECT n.id, n.user_id, n.org_id, n.events FROM notify_channels n JOIN users u ON u.id=n.user_id
+                         WHERE n.enabled=1 AND u.disabled=0
+                         AND (n.org_id IS NOT NULL OR n.events ILIKE '%lists%') ORDER BY n.id""").fetchall()  # 2.240.0 B (#2867): not of a disabled account
     if not chans:
         return
     actor = g.user["id"] if g.get("user") and g.get("auth_via") != "public" else None
@@ -345,6 +435,8 @@ def chn_list_events(c, n):
             continue
         if t["life"] == "travel" and t["org_id"]:
             continue  # 2.173.1 A (#2714): an organisation's trip stays in the app (as with the webhooks)
+        if c.execute(f"SELECT 1 FROM lists l WHERE l.id=? AND {reading_sql()}", (t["list_id"],)).fetchone():
+            continue  # 2.240.0 B (#2867): read later is for people in the app only (as with the webhooks)
         if ev == "complete" and t["status"] != 2:
             continue  # completed (2) only, not "won't do" or reopened again within the request
         for ch in chans:
@@ -730,7 +822,7 @@ def evm_user(c, uid, s, lg, now):
         mail_send(to, *m)
         aa_ok("smtp")
     except Exception as e:  # noqa: BLE001
-        print("mail: event mail for user", uid, "failed:", type(e).__name__, e, flush=True)
+        print("mail: event mail for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses
         aa_fail("smtp", aa_err(e))
 
 

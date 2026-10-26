@@ -20,12 +20,19 @@ from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
 from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
 
+# 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
+# DATEV receipts, a kept lock): their file log and their versions stay while the node exists (it goes after its period)
+DRT_OFFICE_NODES = ("SELECT node_id FROM rc_receipts UNION SELECT node_id FROM office_letter_links "
+                    "UNION SELECT node_id FROM office_cash_entries WHERE node_id IS NOT NULL "
+                    "UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IS NOT NULL "
+                    "UNION SELECT node_id FROM office_datev_guids WHERE node_id IS NOT NULL "
+                    "UNION SELECT node_id FROM doc_meta WHERE kept_until IS NOT NULL")
 LGC_RUN = {"at": 0.0}
 # (table, time column, extra condition, age in days or None = ret_days("logs"))
 LGC_LOGS = (
     ("activity", "created_at", "", None),
     ("list_activity", "created_at", "", None),
-    ("fs_log", "at", "", None),
+    ("fs_log", "at", f"node_id NOT IN ({DRT_OFFICE_NODES})", None),  # 2.239.0 D (#2874): not the office records' log
     ("org_list_log", "created_at", "", None),
     ("sheet_changes", "created_at", "", None),
     ("admin_alerts", "created_at", "", 365),
@@ -62,7 +69,10 @@ def lgc_expired(c, now):
             ("push_subs", "DELETE FROM push_subs WHERE session_hash<>'' AND session_hash NOT IN (SELECT token_hash FROM sessions)", ()),
             ("api_tokens", "DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at<?", (old,)),
             ("invites", "DELETE FROM user_invites WHERE (used_at IS NULL AND expires_at<?) OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
-            ("setup_codes", "DELETE FROM agent_setup_codes WHERE expires_at<? OR (used_at IS NOT NULL AND used_at<?)", (old, old))):
+            ("setup_codes", "DELETE FROM agent_setup_codes WHERE expires_at<? OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
+            # 2.273.0 F1 (#3042): the move memos of tasks / lists / files (people, tag and file names) once their day for the
+            # move back is over (TMM_KEEP_H / FSM_KEEP_H = 24 h; two days to be safe)
+            ("move_memos", "DELETE FROM space_moves WHERE kind IN ('task','list','files') AND at<?", (iso(now - timedelta(days=2)),))):
         with c.savepoint():
             out[name] = c.execute(sql, args).rowcount or 0
     return out
@@ -160,6 +170,7 @@ ORF_EVERY = 7 * 86400
 ORF_AT_KEY = "orphan_sweep_at"    # gsetting: epoch seconds of the last finished sweep
 ORF_POS_KEY = "orphan_sweep_pos"  # gsetting: JSON {"sub": last finished folder, "orphans": n} of a sweep under way
 ORF_BATCH = 500
+ORF_MIN_AGE_S = 3600  # 2.239.0 D (#2874): an upload younger than this is never an orphan (KALMIDO_ORPHAN_DAYS=0: not before its commit)
 
 
 def orf_queue(paths):
@@ -278,7 +289,13 @@ def orf_prune_versions(c, nid=None, kill=None):
                      f"FROM fs_versions{one}) v WHERE rn>?", ((nid,) if nid is not None else ()) + (FS_VERSIONS_KEEP,)).fetchall()
     if rows:  # 2.186.0 B (#2600): a booked receipt keeps every version (which one was booked is not known)
         from ..receipts.suggest import olk_fs_locked
-        kept = {n for n in {r["node_id"] for r in rows} if olk_fs_locked(c, n)}
+        ids = sorted({r["node_id"] for r in rows})
+        # 2.239.0 D (#2874): so does every office record (an incoming invoice not booked yet, a filed letter)
+        office = set()
+        for i in range(0, len(ids), ORF_BATCH):
+            part = ids[i:i + ORF_BATCH]
+            office.update(x[0] for x in c.execute(f"SELECT node_id FROM ({DRT_OFFICE_NODES}) o WHERE node_id IN ({','.join('?' * len(part))})", part))
+        kept = office | {n for n in ids if n not in office and olk_fs_locked(c, n)}
         rows = [r for r in rows if r["node_id"] not in kept]
     if rows and kill:
         c.execute(f"DELETE FROM fs_versions WHERE id IN ({','.join('?' * len(rows))})", [r["id"] for r in rows])
@@ -315,7 +332,7 @@ def orf_tick(c, force=False):
         counts["retry_failed"] = orf_retry(c)
         cols = orf_path_columns(c)
         base, found = counts["orphans"], []
-        cands = orf_candidates(ret_days("files") * 86400, str(pos.get("sub") or ""))
+        cands = orf_candidates(max(ret_days("files") * 86400, ORF_MIN_AGE_S), str(pos.get("sub") or ""))
         for i in range(0, len(cands), ORF_BATCH):
             part = cands[i:i + ORF_BATCH]
             known = orf_known_set(c, cols, [p[0] for p in part])
@@ -350,3 +367,30 @@ def orf_tick(c, force=False):
                 except OSError:
                     pass
     return counts["orphans"] + counts["versions"]
+
+
+# ---- 2.239.0 D (#2874): office records outlive what they point to ------------------------------------------------------
+# (table, column, referenced table, ON DELETE now): a closed month of the logbook stays when its vehicle would go (nothing
+# deletes a vehicle on its own; an organisation's deletion still takes both in one statement, NO ACTION checks at its end)
+DRT_FK = (("office_drive_closed", "vehicle_id", "office_vehicles", "NO ACTION"),)
+DRT_FK_TYPE = {"NO ACTION": "a", "RESTRICT": "r", "CASCADE": "c", "SET NULL": "n"}
+
+
+def drt_fk_once(c):
+    """At the start (core/db.py init, idempotent): the foreign keys of DRT_FK get their new rule. 2.236 runs on with them
+    (it never deletes a vehicle). Returns how many changed."""
+    n = 0
+    for table, col, ref, rule in DRT_FK:
+        rows = c.execute("SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "  # pg-ok: catalog oid (Postgres only)
+                         "JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(con.conkey) "  # pg-ok: catalog oid (Postgres only)
+                         "WHERE con.contype='f' AND t.relname=? AND a.attname=? AND t.relnamespace=to_regnamespace(current_schema())",
+                         (table, col)).fetchall()
+        if not rows or any(r[1] == DRT_FK_TYPE[rule] for r in rows):
+            continue
+        for r in rows:
+            c.execute(f'ALTER TABLE {table} DROP CONSTRAINT "{r[0]}"')
+        c.execute(f"ALTER TABLE {table} ADD CONSTRAINT {table}_{col}_fkey FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE {rule}")
+        n += 1
+    if n:
+        print(f"retention (#2874): {n} foreign key(s) keep office records", flush=True)
+    return n

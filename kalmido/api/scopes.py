@@ -14,6 +14,7 @@ from ..core.pg import insert_id
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
@@ -454,7 +455,7 @@ def approval_run(c, j):
     news_read_job(c, j2)  # 2.138.3 A (#2406)
     bump(c)
     c.commit()
-    print("approval job", j["id"], "of agent", j["agent_id"], "approved by", g.user["username"], "->", res["status"], flush=True)
+    print("approval job", j["id"], "of agent", j["agent_id"], "approved by", login_log_who(g.user), "->", res["status"], flush=True)
     return jsonify(job_dict(c, j2))
 
 
@@ -465,7 +466,7 @@ def agent_scopes_set(c, aid, b):
         sc = ",".join(scopes_clean(b["scopes"], {"is_admin": 0}, agent=True))
         c.execute("UPDATE agents SET scopes=? WHERE user_id=?", (sc, aid))
         c.execute("UPDATE api_tokens SET scopes=? WHERE user_id=?", (sc, aid))
-        print("agent", aid, "scopes", sc, "by", g.user["username"], flush=True)
+        print("agent", aid, "scopes", sc, "by", login_log_who(g.user), flush=True)
     if "allowed_ips" in b:
         ips = ips_clean(b["allowed_ips"])
         c.execute("UPDATE agents SET allowed_ips=? WHERE user_id=?", (ips, aid))
@@ -1225,7 +1226,8 @@ def v1_list_status(lid):
 @app.get("/api/v1/export")
 @v1_view
 def v1_export():
-    """Everything you own as JSON (the same as Settings > Data > Export)."""
+    """My lists, tasks, habits, time entries and settings as JSON (the same as GET /api/export.json; 2.239.0 A (#2882): not
+    the complete account export, which stays in the app for people)."""
     v1_args(())
     if token_lists() is not None:  # 2.30.0 (#919): the export holds every list and personal data: not for a limited token
         raise Denied(403, tr("A token limited to selected projects cannot export everything"))
@@ -1453,7 +1455,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                             "billable": {"type": "boolean"}}},
                         desc="2.144.6: an entry an invoice billed (billed: true) keeps everything but its note (409)."),
             "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
-        "/export": {"get": op("Export everything you own as JSON (a personal token needs the scope account as well; 2.148.1)", "Account", ok(obj) | errs("403"), scope="export")},
+        "/export": {"get": op("Export your lists, tasks, habits, time entries and settings as JSON, without webhook addresses and server-side settings "
+                             "(the complete account export is in the app under Settings > Data; a personal token needs the scope account as well; 2.148.1, 2.239.0)", "Account", ok(obj) | errs("403"), scope="export")},
         "/lists/{id}/status": {"put": op("Post a status update of a project with progress and status", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},
                                                                                 "note": {"type": "string"}}},

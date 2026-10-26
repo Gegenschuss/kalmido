@@ -177,6 +177,10 @@ A = sess("alice")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "helper", "display_name": "Helper"})
 AGT, AGH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"], **H}
 check(A.patch(B + f"/api/admin/agents/{AGT}", json={"org_id": ORG}).ok, "setup: an agent of Alpha")
+# 2.223.7 (#2917): an agent sees only the people of its shared projects -- carol shares one with it
+_LS = Bo.post(B + "/api/lists", json={"name": "Helper shared", "org_id": ORG}).json()["id"]
+check(Bo.put(B + f"/api/lists/{_LS}/members", json={"user_id": CAROL, "role": "edit"}).ok
+      and Bo.put(B + f"/api/lists/{_LS}/members", json={"user_id": AGT, "role": "view"}).ok, "setup: carol + the agent share a project")
 r = requests.get(B + "/api/v1/absences", params={"start": "2026-11-01", "end": "2026-11-30"}, headers=AGH)
 j = r.json() if r.ok else {}
 check(r.ok and j.get("org_id") == ORG and any(x["user_id"] == CAROL for x in j["items"]), f"agent: Alpha's absences ({r.status_code} {r.text[:200]})")

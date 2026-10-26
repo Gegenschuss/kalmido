@@ -1,3 +1,11 @@
+# 2.239.0 B (#2888): container logs rotate (3 files of 10 MB per service) instead of growing forever; the server log holds
+# shortened addresses and account numbers only. For fail2ban use driver journald here (docs/SELF-HOSTING.md "fail2ban").
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   kalmido:
     build: .
@@ -5,6 +13,7 @@ services:
     # uses the prebuilt image instead (docker compose pull && docker compose up -d)
     image: ${KALMIDO_IMAGE:-kalmido:local}
     container_name: kalmido
+    logging: *logging
     restart: unless-stopped
     user: "1000:1000"
     security_opt:
@@ -63,6 +72,7 @@ services:
     # database server: DATABASE_URL in .env and "localdb" left out of COMPOSE_PROFILES. Updates never bring it back.
     image: postgres:17
     container_name: kalmido-db
+    logging: *logging
     profiles: ["localdb"]
     restart: unless-stopped
     security_opt:
@@ -97,6 +107,7 @@ services:
     build: ./embed
     image: kalmido-embed:local
     container_name: kalmido-embed
+    logging: *logging
     profiles: ["embed"]
     restart: unless-stopped
     security_opt:
@@ -113,6 +124,7 @@ services:
     # (2.149.0 D, #2510: a profile instead of deleting this block - updates replace this file and kept bringing it back).
     image: clamav/clamav:1.4
     container_name: kalmido-clamav
+    logging: *logging
     profiles: ["clamav"]
     restart: unless-stopped
     security_opt:

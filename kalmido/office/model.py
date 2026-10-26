@@ -75,7 +75,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
                      "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "delivery_scheme": "", "payment_days": 14, "reminder_fee": 0,
                      "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
-                     "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
+                     "invoice_closing_de": "", "invoice_closing_en": "", "delivery_closing_de": "", "delivery_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
@@ -104,6 +104,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "tax_reserve_pct": 0, "vat_basis": "ist",
                      # 2.90.0 C (#1922): tax dates as tasks (set only by its own route, office/taxdates.py)
                      "tax_dates": {},
+                     # 2.299.0 C (#3192): the reminder of the bank bookings without a receipt (set only by its own route, office/banknorc.py)
+                     "bank_norc": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",
@@ -111,6 +113,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "km_rates": {},
                      # 2.120.0 A (#2087): the default cash discount of new invoices (0 = none; office/abschlag.py)
                      "skonto_pct": 0, "skonto_days": 0,
+                     # 2.296.0 B (#3169): the reason printed with tax-exempt positions (0 %) of a taxed invoice; mandatory for them
+                     "exempt_reason": "",
                      # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
                      "letterhead": {},
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
@@ -425,6 +429,8 @@ def office_settings_clean(c, oid, b, cur):
         elif k in ("skonto_pct", "skonto_days"):  # 2.120.0 A (#2087)
             from .abschlag import abs_settings_clean
             abs_settings_clean(k, v, out)
+        elif k == "exempt_reason":  # 2.296.0 B (#3169): one line of text
+            out[k] = " ".join(v.split())[:300] if isinstance(v, str) else ""
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
             out[k] = int(_num(v, k, 0, 365))
         elif k == "reminder_fee":
@@ -447,7 +453,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = int(_num(v, k, 0, 90))
         elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
-        elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
+        elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
         elif k == "parts_invoice_mode":  # 2.47.0 (#1215)
             if v not in ("full", "title", "summary"):

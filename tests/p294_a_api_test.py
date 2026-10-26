@@ -229,6 +229,9 @@ def ag(m, path, h=None, **kw):
 
 check(ag("GET", "/leads").status_code == 403, "#1930: agent: its office switch off: 403")
 A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True})
+# 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (leads need a group)
+check(ag("GET", "/leads").status_code == 403, "#2862: agent without an office group: leads 403")
+check(A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects"]}).ok, "setup: the agent in Project management")
 check(ag("GET", "/leads").status_code == 403, "#1930: agent: the area's privacy switch off: 403")
 A.put(B + O + "/settings", json={"agents_read": 1})
 r = ag("GET", "/leads")
@@ -249,8 +252,15 @@ lid = A.post(B + "/api/lists", json={"name": "Shared with the team bot", "org_id
 for u, role in ((BOB, "admin"), (TB, "edit")):  # Bob a list admin: the list is open to his agents
     r = A.put(B + f"/api/lists/{lid}/members", json={"user_id": u, "role": role})
     assert r.ok, r.text
+# 2.223.2 B (#2862): the team agent needs an office group for leads and acts only for a person who asked it
+check(A.put(B + f"{O}/rights/people/{TB}", json={"groups": ["tpl:projects"]}).ok, "setup: the team agent in Project management")
+r = ag("GET", "/leads", h=TH, params={"requested_by": ALICE})
+check(r.status_code == 403 and "asked" in r.text, f"#2862: the team agent for the admin who did not ask it: 403 ({r.status_code} {r.text[:200]})")
+for s, text in ((Bo, "Welche Leads sind offen?"), (A, "Bitte die Leads pruefen")):
+    check(s.post(B + f"/api/agents/{TB}/chat", json={"body": text}).ok, "setup: a chat message to the team agent")
 r = ag("GET", "/leads", h=TH, params={"requested_by": BOB})
-check(r.status_code == 403 and "admins" in r.text, f"#1930: a team agent acting for a member of the office: 403 (leads are for admins) {r.status_code} {r.text[:200]}")
+# 2.223.2 B (#2862): the member's own rights (previous access: no pipeline) refuse it first now, the text is the general one
+check(r.status_code == 403, f"#1930: a team agent acting for a member of the office: 403 (leads are for admins) {r.status_code} {r.text[:200]}")
 r = ag("GET", "/leads", h=TH, params={"requested_by": ALICE})
 check(r.ok, f"#1930: the team agent acting for the admin: 200 ({r.status_code} {r.text[:200]})")
 r = ag("POST", "/leads", json={"contact": "Hanna Hinweis", "company": "Hinweis GmbH", "email": "hanna@example.com", "next_step": "Ask for a date"})

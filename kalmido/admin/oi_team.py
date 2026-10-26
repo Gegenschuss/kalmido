@@ -14,6 +14,8 @@ import secrets
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT, _oid, _txt, tr  # noqa: F401
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import iso, now_utc  # 2.278.0 B (#3094)
+from .acctimport import umz_billed  # 2.278.0 B (#3094)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -30,16 +32,35 @@ def _who(ctx, v, own=False):
     return n
 
 
-def _person(col, own=True):
-    """prep part: the row belongs to the person in col -- left out (with a warning) when that person does not map."""
+_W_OTHERS = N_("Entries that belong to other people were not taken over: {0}")
+
+
+def _person(col, own=True, member=False):
+    """prep part: the row belongs to the person in col -- left out (with a warning) when that person does not map.
+    2.237.0 D (#2870): only the importing person, unless member (rows an admin of the area enters for others in the app too)."""
     def fn(c, run, src, d, ctx):
         n = _who(ctx, src.get(col), own)
+        if n and n != ctx.uid and not member:
+            run.warning(_W_OTHERS, tr(ctx.spec.label) if ctx.spec.label else ctx.spec.path)
+            return False
         if not n:
             run.warning(_W_PEOPLE, tr(ctx.spec.label) if ctx.spec.label else ctx.spec.path)
             return False
         d[col] = n
         return d
     return fn
+
+
+def _time_person(c, run, src, d, ctx):
+    """2.237.0 D (#2870): a time entry of another ticked person goes to the importing person, the name in front of the note."""
+    n = _who(ctx, src.get("user_id"), True)
+    if n and n != ctx.uid:
+        name = next((_txt(p.get("name"), 100) for p in ctx.data.get("people") or []
+                     if isinstance(p, dict) and _oid(p.get("user_id")) == _oid(src.get("user_id"))), "") or tr("Unknown")
+        d["note"] = f"{name}: {_txt(src.get('note'), 500)}".strip().rstrip(":")[:600]
+        d["user_id"] = ctx.uid
+        return d
+    return _person("user_id")(c, run, src, d, ctx)
 
 
 def _chain(*fns):
@@ -85,12 +106,14 @@ def _booking(c, run, src, d, ctx):
 
 
 def _mail(c, run, src, d, ctx):
-    """A filed e-mail: the owner (ticked person, else the importing person); one without client and project was the owner's
+    """A filed e-mail: the owner (the importing person); one without client and project was the owner's
     alone and only comes with them. The workspace and the filed files follow the target."""
     from ..docs.store import doc_ws
     own = _who(ctx, src.get("owner_id"), own=True)
+    other = bool(own and own != ctx.uid)
+    own = None if other else own  # 2.237.0 D (#2870): the owner only the importing person
     if not own and not (d.get("client_id") or d.get("list_id")):
-        run.warning(_W_PEOPLE, tr(ctx.spec.label))
+        run.warning(_W_OTHERS if other else _W_PEOPLE, tr(ctx.spec.label))
         return False
     d["owner_id"] = own or ctx.uid
     d["message_id"] = _txt(src.get("message_id"), 1000) or f"<{secrets.token_hex(12)}@import.invalid>"
@@ -263,6 +286,11 @@ def _time(c, run, src, d, ctx):
     return d
 
 
+def _billed(c, run, src, d, ctx):
+    """2.278.0 B (#3094): a billed entry stays on its invoice (refs: the new document) or, without it, not billable."""
+    return umz_billed(run, src, d, iso(now_utc()))
+
+
 def _not_me(c, run, src, d, ctx):
     """A share with a person, never with the owner of the calendar / address book (the importing person)."""
     if d.get("user_id") == ctx.uid:
@@ -328,7 +356,7 @@ SPECS = [
     OiT("portal/tickets.json", "portal_tickets", refs={"task_id": "tasks", "list_id": "lists", "form_id": "forms", "client_id": "clients"},
         need=("task_id", "list_id"), fixed=_NEW_TOKEN, label=N_("Customer reports"), prep=_ticket),
     # tasks
-    OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "need"}, space=(), rid=False,
+    OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
         label=N_("People")),
     OiT("tasks/links.json", "task_links", refs={"task_id": "tasks", "list_id": "lists", "section_id": "sections"},
         need=("task_id", "list_id"), people={"added_by": "null"}, rid=False, label=N_("Tasks")),
@@ -338,23 +366,25 @@ SPECS = [
         people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_person("user_id")),
     OiT("tasks/locked_notes.json", "task_note_locks", refs={"task_id": "tasks"}, need=("task_id",), space=(), rid=False, enc=False,
         people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_person("user_id")),
-    OiT("time_entries.json", "time_entries", refs={"task_id": "tasks", "list_id": "lists"}, people={"user_id": "null"}, space=(), label=N_("Time entries"),
-        prep=_chain(_time, _person("user_id"))),
+    # 2.278.0 B (#3094): billed_doc_id -> the new invoice (office_docs come first, oi_office); billed_at kept
+    OiT("time_entries.json", "time_entries", refs={"task_id": "tasks", "list_id": "lists", "billed_doc_id": "office_docs"}, people={"user_id": "null"},
+        space=(), label=N_("Time entries"), prep=_chain(_time, _time_person, _billed)),
     OiT("time_sheets.json", "time_sheets", people={"user_id": "null", "decided_by": "null"}, label=N_("Time entries"),
         prep=_person("user_id")),
     OiT("comments/reactions.json", "comment_reactions", refs={"comment_id": "comments"}, need=("comment_id",),
         people={"user_id": "need"}, space=(), rid=False, label=N_("Reactions")),
     # chat
     OiT("chat/channels.json", "tchat_rooms", refs={"list_id": "lists"}, need=("list_id",), space=(), prep=_room),
+    # 2.278.0 B (#3094): thread_of (the thread's first message) mapped like reply_to, never the old id
     OiT("chat/messages.json", "tchat_msgs", refs={"room_id": "tchat_rooms", "task_id": "tasks"}, need=("room_id",),
-        people={"user_id": "null", "pinned_by": "null"}, late={"reply_to": "tchat_msgs"}, space=(), enc=False, label=N_("Team chat"),
+        people={"user_id": "null", "pinned_by": "null"}, late={"reply_to": "tchat_msgs", "thread_of": "tchat_msgs"}, space=(), enc=False, label=N_("Team chat"),
         prep=_msg),
     OiT("chat/reactions.json", "tchat_rx", refs={"message_id": "tchat_msgs"}, need=("message_id",), people={"user_id": "need"},
         space=(), rid=False, label=N_("Team chat")),
     # shares of calendars and address books (only with ticked people)
-    OiT("calendars/members.json", "ev_cal_members", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "need"}, space=(),
+    OiT("calendars/members.json", "ev_cal_members", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
         rid=False, prep=_not_me),
-    OiT("books/members.json", "book_members", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "need"}, space=(),
+    OiT("books/members.json", "book_members", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
         rid=False, prep=_not_me),
     # newsletter
     OiT("newsletter/connection.json", "nl_conns", people={"created_by": "null"}, label=N_("Newsletter"), prep=_nl_conn),
@@ -363,11 +393,11 @@ SPECS = [
     OiT("newsletter/runs.json", "nl_runs", refs={"conn_id": "nl_conns"}, need=("conn_id",), people={"by_id": "null"}, label=N_("Newsletter")),
     # absences, bookings, vacation accounts, filed e-mails
     OiT("hub/absences.json", "hub_absences", people={"user_id": "null", "created_by": "null", "decided_by": "null"}, private="office",
-        label=N_("Absences and bookings"), prep=_person("user_id")),
+        label=N_("Absences and bookings"), prep=_person("user_id", member=True)),
     OiT("hub/bookings.json", "hub_bookings", refs={"list_id": "lists", "event_id": "events"}, people={"created_by": "null"},
         fixed={"resource_id": 0}, private="office", label=N_("Absences and bookings"), prep=_booking),
     OiT("hub/leave_quota.json", "hub_leave_quota", people={"user_id": "null", "updated_by": "null"}, private="office", label=N_("Absences and bookings"),
-        prep=_person("user_id")),
+        prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
         people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("Absences and bookings"), prep=_mail, after=_mail_index),
     # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)

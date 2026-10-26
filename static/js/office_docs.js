@@ -920,7 +920,7 @@ async function ofdReminderDialog() {
   const s = OFC.info?.settings || {};
   const list = `<ul class="ofdpick" role="list">${rows.map(r => `<li><label class="chkl"><input type="checkbox" data-rid="${r.id}" data-cid="${r.client_id || ''}" ${r.state === 'overdue' ? 'checked' : ''}> <span class="ofcn"><b>${esc(r.number)}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.due_date ? tr('due {0}', fmtDateLoc(r.due_date)) : '', r.status_text, tr('open: {0}', r.open_text || r.open)].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>`;
   const md0 = ofdDlg(tr('Create reminder'), `<p class="muted ofchint">${tr('Pick the open invoices of one client.')}</p>${list}<p class="ofdwarn" id="ofd-r-warn" hidden></p>` + ofdF('r-level', tr('Reminder level'), ofcSel('ofd-r-level', 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))
-    + ofdF('r-fee', tr('Reminder fee'), `<input id="ofd-r-fee" inputmode="decimal" class="numin" value="${esc(ofdNumIn(s.reminder_fee ?? 0))}" maxlength="10">`) + ofdF('r-days', tr('Payment deadline'), `<span class="lacts"><input id="ofd-r-days" inputmode="numeric" class="numin" value="${esc(String(s.reminder_deadline_days ?? 10))}" maxlength="3"><span class="muted">${tr('days')}</span></span>`),
+    + ofdF('r-fee', tr('Reminder fee'), `<input id="ofd-r-fee" inputmode="decimal" class="numin" value="${esc(ofdNumIn(0))}" maxlength="10">`) + ofdF('r-days', tr('Payment deadline'), `<span class="lacts"><input id="ofd-r-days" inputmode="numeric" class="numin" value="${esc(String(s.reminder_deadline_days ?? 10))}" maxlength="3"><span class="muted">${tr('days')}</span></span>`),
     tr('Create'), async md => {
       const picked = [...md.querySelectorAll('[data-rid]:checked')];
       if (!picked.length) throw new Error(tr('Pick at least one invoice'));
@@ -936,6 +936,10 @@ async function ofdReminderDialog() {
     const msg = [fee > 5 ? tr('Private clients may only be charged the actual costs of a reminder (usually 2 to 5 €).') : '', notDue.length ? tr('Not yet due: {0}. A reminder usually follows the due date.', notDue.map(r => r.number).join(', ')) : ''].filter(Boolean);
     w.innerHTML = msg.map(esc).join('<br>'); w.hidden = !msg.length;
   };
+  // 2.296.0 D (#3174): the office's fee is the default from level 2 on (level 1 is the friendly payment reminder, no fee); a typed fee stays
+  const feeIn = $('#ofd-r-fee', md0);
+  feeIn.addEventListener('input', e => { if (e.isTrusted) feeIn.dataset.typed = '1'; });
+  $('#ofd-r-level', md0).addEventListener('change', e => { if (!feeIn.dataset.typed) { feeIn.value = ofdNumIn(+e.target.value >= 2 ? (s.reminder_fee ?? 0) : 0); warn(); } });
   md0.addEventListener('input', warn); md0.addEventListener('change', warn); warn();
 }
 // the service picker: search the catalogue, tap = a new position with the service's name (document language), rate and flags

@@ -194,8 +194,13 @@ AGT = r.json().get("token", "") if r.status_code in (200, 201) else ""
 A.patch(B + f"/api/admin/agents/{AG}", json={"org_id": ORG})
 A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True})
 A.put(B + O + "/settings", json={"agents_read": 1})
+# 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (payment suggestions
+# need a group), and acts for Alice (requested_by) only after she asked it (below, once they share Projekt X)
+check(A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects", "tpl:bookkeeping"]}).ok, "setup: the agent in Project management + Bookkeeping")
 LX = A.post(B + "/api/lists", json={"name": "Projekt X", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/lists/{LX}/members", json={"user_id": AG, "role": "edit"}).ok, "setup: the agent works with alice in Projekt X")
+r = A.post(B + f"/api/agents/{AG}/chat", json={"body": "Bitte Mahnungen und Zahlungen vorbereiten"})
+check(r.ok, f"setup: alice asks the agent ({r.status_code} {r.text[:200]})")
 sql("UPDATE office_docs SET list_id=? WHERE id=?", (LX, INV), write=True)
 sql("UPDATE agents SET list_ids=? WHERE user_id=?", (str(LX + 1000), AG), write=True)
 out = in_app(f"from kalmido.office.agentdocs import ofa_doc_in_lists\nrm = {{'list_id': None, 'kind': 'reminder', 'org_id': {ORG}}}\n"

@@ -30,7 +30,6 @@ from ..lists.public import PUB_ACTOR, pub_gone, pub_limited, public_links_on
 from ..team.portal import (PT_LOGIN_ADDR, PT_LOGIN_SPACE, PT_LOGIN_TTL, PT_LOGIN_WIN, PT_VIEW_RATE, _pt_mail_html, pt_cookie_read,
                            pt_day, pt_email_hash, pt_email_norm)
 from .model import office_settings, pb_cl_sql, pb_owner
-from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 KP_KINDS = ("offer", "invoice", "credit")
@@ -165,7 +164,7 @@ def kp_portal_html(c, who, lg):
 @app.get("/portal/docs/<int:did>/pdf")
 def kp_pdf(did):
     """The PDF of one visible document of the signed-in address (404 for anything else, also without cookie / switched off)."""
-    from .pdfweb import _file_response, _render, _stored_or_missing, epdf_name
+    from .pdfweb import _file_response, _render, epdf_name, epdf_stored
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -177,10 +176,10 @@ def kp_pdf(did):
         return pub_gone(lg)
     d = rows[0]
     try:
-        p = _stored_or_missing(c, oid, d, "pdf")
-    except Denied:  # the stored file of a finalised document is gone (logged): no new rendering that could differ
+        data = epdf_stored(c, oid, d, "pdf")  # 2.296.0 C (#3177): hash checked
+    except Denied:  # the stored file of a finalised document is gone or changed (logged): no new rendering that could differ
         return pub_gone(lg)
-    data = oc_read_file(c, p) if p else _render(c, oid, d)[0]
+    data = data if data is not None else _render(c, oid, d)[0]
     resp = _file_response(data, epdf_name(d) + ".pdf", "application/pdf", inline=True)
     resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     resp.headers["Referrer-Policy"] = "no-referrer"

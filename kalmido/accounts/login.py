@@ -27,15 +27,16 @@ from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr, LANGS
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
-    _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
-    client_ip, FAIL_WINDOW, proxy_login_value, rate_ip, set_cookie, start_session, user_public,
+    _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
+    client_ip, FAIL_WINDOW, login_wait, proxy_login_value, rate_ip, set_cookie, start_session, user_public,
 )
 
 
 # 2.148.1 C (#2494): failed sign-ins in the server log name neither the typed name (it may be a password typed into the
-# wrong field): "user#<8 hex of its SHA-256>" (2.190.0 A, #2561: of an HMAC with a server key). The address stays in full by default (fail2ban bans by it);
-# KALMIDO_LOG_FULL_IP=0 shortens it like the alerts (IPv4 /24, IPv6 /48), docs/SELF-HOSTING.md
-LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "1") != "0"
+# wrong field): "user#<8 hex of its SHA-256>" (2.190.0 A, #2561: of an HMAC with a server key).
+# 2.239.0 B (#2888): every address in the server log is shortened by default like the alerts (IPv4 /24, IPv6 /48);
+# KALMIDO_LOG_FULL_IP=1 keeps it in full (fail2ban bans by it), docs/SELF-HOSTING.md
+LOG_FULL_IP = os.environ.get("KALMIDO_LOG_FULL_IP", "0") == "1"
 
 
 def login_log_name(name, c=None):
@@ -49,8 +50,28 @@ def login_log_name(name, c=None):
 
 
 def login_log_ip(ip):
+    """2.239.0 B (#2888): the address for a log line; shortened unless KALMIDO_LOG_FULL_IP=1. Nothing -> "-", text that is
+    no address -> "?" (never logged as it came)."""
+    import ipaddress
     from ..notify.alerts import fx2_mask_ip
+    ip = str(ip or "").strip()
+    if not ip:
+        return "-"
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return "?"
     return ip if LOG_FULL_IP else fx2_mask_ip(ip)
+
+
+def login_log_who(u):
+    """2.239.0 B (#2888): an account in a log line by its number only ("user #12"), never its name or e-mail: log lines
+    outlive a deleted account. Takes a user row / dict or the id."""
+    try:
+        uid = u["id"] if u is not None and not isinstance(u, (int, str)) else u
+        return f"user #{int(uid)}"
+    except (KeyError, IndexError, TypeError, ValueError):
+        return "user #?"
 
 
 @app.get("/api/auth/info")
@@ -121,8 +142,9 @@ def auth_login():
     b = body()
     username = (b.get("username") or "").strip().lower()
     keys = _rate_keys(username)
-    if _rate_blocked(keys):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(keys, username)  # 2.282.0 (#3111): a full address counter delays, only pair / name ceiling refuse
+    if e:
+        return e
     c = db()
     u = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     pw = b.get("password") if isinstance(b.get("password"), str) else ""
@@ -135,8 +157,8 @@ def auth_login():
     if not ok:
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
-            if k.startswith("ip:"):
-                aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
+            if k.startswith("ip:"):  # 2.282.0 (#3111): delayed, not refused
+                aa_now("security", "ratelimit:" + k, N_("Many failed logins from IP {0}: logins from there are slowed down for {1} min, right passwords still work. Behind a shared address (office, NAT) everyone there is affected."),
                        [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
@@ -454,8 +476,9 @@ def _ticket(kinds):
     if not u or u["disabled"] or not u["password_hash"]:
         pend_drop()
         return None, None, (jsonify(error=tr("The login has expired, please log in again"), expired=True), 401)
-    if _rate_blocked(_rate_keys(u["username"])):
-        return None, None, err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(_rate_keys(u["username"]), u["username"])  # 2.282.0 (#3111)
+    if e:
+        return None, None, e
     return p, u, None
 
 
@@ -725,8 +748,7 @@ def auth_pk_options():
     c = db()
     if gsetting(c, "passkey_login") == "0":
         return err(tr("Logging in with a passkey is turned off on this server"), 403)
-    if _rate_blocked([("ip:" + rate_ip(), 20)]):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    # 2.282.0 (#3111): no address lock here any more; POST /api/auth/passkey delays above the address limit
     chal, rp, opts = wa_auth_options(c, None, uv=True)
     tok = pend_new("pk", None, chal=chal, rp=rp, remember=bool(body().get("remember", True)))
     return pend_cookie(jsonify(opts), tok)
@@ -739,8 +761,9 @@ def auth_pk():
     keys = [("ip:" + rate_ip(), 20)]
     if gsetting(c, "passkey_login") == "0":
         return err(tr("Logging in with a passkey is turned off on this server"), 403)
-    if _rate_blocked(keys):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(keys, "")  # 2.282.0 (#3111): no name, so never "known": delayed above the address limit
+    if e:
+        return e
     p = pend_get(("pk",))
     chal = p.pop("chal", None) if p else None
     uid = wa_auth_verify(c, body().get("credential"), chal, p.get("rp"), uv=True) if chal else None
@@ -758,8 +781,9 @@ def auth_pk():
 def _reauth(u, b):
     """Current password for security-relevant changes (rate-limited like a login); an error response or None."""
     keys = _rate_keys(u["username"])
-    if _rate_blocked(keys):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(keys, u["username"])  # 2.282.0 (#3111): signed in as this name: the address counter does not stop it
+    if e:
+        return e
     if not u["password_hash"]:
         return err(tr("Two-factor authentication is only for logins with a password"), 409)
     pw = b.get("password") if isinstance(b.get("password"), str) else ""
@@ -824,8 +848,9 @@ def me_totp_confirm():
     from ..notify.alerts import aa_now
     u, c = g.user, db()
     keys = _rate_keys(u["username"])
-    if _rate_blocked(keys):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+    e = login_wait(keys, u["username"])  # 2.282.0 (#3111): signed in as this name
+    if e:
+        return e
     with _PEND_LOCK:
         p = _PEND.get(f"totp:{u['id']}")
     if not p or p["exp"] < time.time():

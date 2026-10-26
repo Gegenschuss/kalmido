@@ -10,12 +10,13 @@ import base64
 import json
 import os
 import secrets
+from datetime import timedelta
 
 from flask import g, jsonify, request, send_file
 
 from ..core.access import acx_of
 from ..core.config import MAX_FILE_MB, PUBLIC_URL, PUBLIC_URL_SET, app
-from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
+from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, uset, usettings
 from ..core.errors import BadInput, Denied, UnknownFields
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_active_for, oc_user_space
@@ -29,6 +30,14 @@ from .ingest import docs_ingest, docs_kick
 from .web import _no_agent, ws_param
 
 SK_NAME_MAX = 60
+SK_DAYS = 365  # 2.237.0 C (#2865): a scan inbox key runs out after a year (a new one is made in the settings)
+
+
+def sk_expires(r):
+    """2.237.0 (#2865): the end of a scan inbox key; one made before 2.237 (no expires_at) runs out a year after its creation."""
+    if r["expires_at"] or not r["created_at"]:
+        return r["expires_at"]
+    return iso(parse_iso(r["created_at"]) + timedelta(days=SK_DAYS))
 SK_CODE_PREFIX = "kalmido-scan:1:"
 FW_DIR = os.environ.get("KALMIDO_FOLDERWATCH_DIR", "/app/folderwatch")
 # id, file name, label (common contract with the folder watcher build in the Dockerfile)
@@ -155,7 +164,8 @@ def _sk_rows(c, uid, oid):
         except Denied as e:
             place, ok = e.text(), False
         out.append({"id": r["id"], "name": r["name"], "prefix": r["prefix"], "target": place, "parent_id": t["parent_id"], "ok": ok,
-                    "created_at": r["created_at"], "last_used_at": r["last_used_at"]})
+                    "created_at": r["created_at"], "last_used_at": r["last_used_at"], "expires_at": sk_expires(r),  # 2.237.0 C (#2865)
+                    "expired": bool(sk_expires(r) and parse_iso(sk_expires(r)) <= now_utc())})
     return out
 
 
@@ -211,13 +221,20 @@ def docs_scan_key_new():
     tok = "abk_" + secrets.token_urlsafe(32)
     kid = insert_id(c, "INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids,upload_target) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (uid, name, V.UPLOAD_HASH_PREFIX + _token_hash(tok), tok[:12], "docs:upload", None, iso(now_utc()), "", "", json.dumps(t)))
+                    (uid, name, V.UPLOAD_HASH_PREFIX + _token_hash(tok), tok[:12], "docs:upload", iso(now_utc() + timedelta(days=SK_DAYS)),
+                     iso(now_utc()), "", "", json.dumps(t)))
     c.commit()
     print("scan inbox", kid, "created for user", uid, "org", oid, flush=True)
     url = (PUBLIC_URL if PUBLIC_URL_SET else request.host_url).rstrip("/")
     raw = json.dumps({"url": url, "key": tok, "name": name}, ensure_ascii=False, separators=(",", ":")).encode()
     code = SK_CODE_PREFIX + base64.urlsafe_b64encode(raw).decode().rstrip("=")
     return jsonify(id=kid, name=name, target=place, code=code), 201
+
+
+def sk_revoke_all(c, uid):
+    """2.237.0 C (#2865): a password reset / change revokes the person's scan inbox keys (like the app passwords, #2496);
+    a folder watcher needs a new setup code then. Other API tokens stay."""
+    c.execute("DELETE FROM api_tokens WHERE user_id=? AND token_hash ILIKE ?", (uid, _v1().UPLOAD_HASH_PREFIX + "%"))
 
 
 @app.delete("/api/docs/scan-keys/<int:kid>")

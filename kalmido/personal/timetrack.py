@@ -661,7 +661,7 @@ def time_list():
 def time_report(c, uid, a, own=None):
     s = usettings(c, uid)
     rm, ref, vis = time_rounding(s), now_utc(), vis_ids(c, uid)
-    lists = {l["id"]: l for l in visible_lists(c, uid)}
+    lists = {l["id"]: l for l in visible_lists(c, uid, light=True)}  # 2.280.0 B (#3116): only names / colours / rates
     crates = {r[0]: r[1] for r in c.execute("SELECT id, rate FROM clients WHERE rate IS NOT NULL")}  # 2.23.0 (#463)
     rows, f, t, wanted = time_rows(c, uid, a, own)
     from .timesheet import tsl_mark, tz_of_s, tz_split, tz_split_on
@@ -819,6 +819,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
     from ..collab.liste2e import le2e_show
     label = le2e_show(label, lg)  # 2.64.1 B (#1817): never a ciphertext in a push (2.64.2 D: in the recipient's language)
     fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
+    sc = f"l:{r['list_id']}" if r["list_id"] else None if r["task_title"] else "private"  # 2.240.0 B2 (#2867): the channels follow the list
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)
         n = c.execute("UPDATE time_entries SET \"end\"=?, seconds=?, auto_stopped=1, updated_at=? WHERE id=? AND \"end\" IS NULL",
@@ -828,9 +829,9 @@ def _time_watch_one(c, r, users, S, LG, ref):
         if n:
             notify(uid, tr("Timer stopped automatically", lg=lg),
                    tr("{0} ran {1} h and was stopped at {2}. Correct the end time if needed.", label, fnum(stop_h),
-                      end.astimezone(tz_zone(s.get("tz") or "")).strftime("%H:%M"), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s)
+                      end.astimezone(tz_zone(s.get("tz") or "")).strftime("%H:%M"), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s, scope=sc)
     elif rem_h > 0 and hrs >= rem_h and not r["reminded"]:
         c.execute("UPDATE time_entries SET reminded=1 WHERE id=?", (r["id"],))
         c.commit()
         notify(uid, tr("Timer still running", lg=lg), tr("{0} has been running for {1} h. Still on it?", label, fnum(hrs), lg=lg),
-               push_prio(s), f"{PUBLIC_URL}/#time", s=s)
+               push_prio(s), f"{PUBLIC_URL}/#time", s=s, scope=sc)

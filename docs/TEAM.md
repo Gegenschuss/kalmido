@@ -872,6 +872,13 @@ Notifications can also go to a chat service, as a short text with the link to th
   there: reminders, assignments, mentions and comments, the daily digest and briefing, other notifications, and *changes in my
   own projects* (new, completed, assigned, commented in your private projects - the channel of your private area, also without an
   organisation). *Send test* posts a test message at once.
+- **What stays in the app** (since 2.240.0): nothing of a health, budget or read-later project, nor of an organisation's trip,
+  reaches your own channels. From an organisation's projects only a short note with the link arrives ("New notification in
+  …", no title, no comment), unless an admin of the organisation switches on *Send the content of our projects to personal
+  forwardings* (*Settings > Workspaces > the organisation*, off by default). Private projects, your own office without an
+  organisation, habits and family: the full text as before. A notification that belongs to nothing known (and a direct message
+  between members of an organisation) arrives as the short note too; the daily summary only with its numbers, no titles. The
+  channels of a disabled account stay quiet; an organisation's forwarding set up by a disabled account shows it as the reason it is off.
 - **The organisation's channels:** *Settings > Workspaces > the organisation > Channels* (its admins). They get what happens in
   the organisation's projects that **every member sees** (*Everyone in the organisation*): new task, completed, assigned, comment.
   Never a project shared only with some people, never a private area, never another organisation; a project with end-to-end

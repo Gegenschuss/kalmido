@@ -107,13 +107,30 @@ function vdr_new(k, id) {
 }
 
 // ---- the player (iframe of the built URL or <video>), driven by postMessage
-function vdr_playerHtml(v, title) {
-  if (!v) return '';
+// 2.240.0 D (#2886): two clicks -- a plain placeholder first (no request to the provider, no thumbnail), the player only after "Load video";
+// setting video_ext_ok = "1" (own switch in Settings) loads it straight away. A direct file from another host gets the same question.
+const VDR_PROV = {youtube: 'YouTube', vimeo: 'Vimeo'};
+const vdr_extHost = v => { try { const h = new URL(v.url).hostname; return h && h !== location.hostname ? h : ''; } catch { return ''; } };
+function vdr_gateName(v) { return v.provider === 'file' ? vdr_extHost(v) : VDR_PROV[v.provider] || ''; }
+function vdr_playerInner(v, title) {
   if (v.provider === 'youtube' || v.provider === 'vimeo') {
     const src = v.embed + (v.provider === 'youtube' ? '&origin=' + encodeURIComponent(location.origin) : '');
-    return `<div class="vdrplay" data-prov="${v.provider}"><iframe src="${esc(src)}" title="${esc(title)}" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+    return `<iframe src="${esc(src)}" title="${esc(title)}" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
   }
-  if (v.provider === 'file') return `<div class="vdrplay" data-prov="file"><video src="${esc(v.embed)}" controls playsinline preload="none"></video></div>`;
+  return `<video src="${esc(v.embed)}" controls playsinline preload="none"></video>`;
+}
+function vdr_playerHtml(v, title) {
+  if (!v) return '';
+  const ext = v.provider === 'youtube' || v.provider === 'vimeo' || v.provider === 'file';
+  // 2.240.0 D2 (#2886): video_ext_ok only covers YouTube/Vimeo; a direct file from another host always asks
+  if (ext && (v.provider === 'file' || S.settings?.video_ext_ok !== '1') && vdr_gateName(v)) {
+    const n = vdr_gateName(v);
+    return `<div class="vdrplay vdrgate" data-prov="${v.provider}"><div class="vdrgate-in">${ic('play', 'l')}
+      <p>${esc(tr('Loading the video sends data (such as your IP address) to {0}.', n))}</p>
+      <button type="button" class="btn pri sm" data-vdr="gate">${tr('Load video')}</button>
+      ${v.provider === 'file' ? '' : `<label class="chkl"><input type="checkbox" class="vdrgate-ok"> ${tr('Do not ask again')}</label>`}</div></div>`;
+  }
+  if (ext) return `<div class="vdrplay" data-prov="${v.provider}">${vdr_playerInner(v, title)}</div>`;
   return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('This link has no time control: it opens in a new tab, comments get no timecode.'))}</p>
     <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open the video')}</a></div>`;
 }
@@ -269,10 +286,19 @@ async function vdr_after(rid, method, url, body) {  // an undo / redo step: the 
   if (r && r.versions) { vdr_cache(r); const st = VDR.cur; if (st && st.r.id === rid) { st.r = r; if (!r.versions.some(v => v.id === st.ver)) st.ver = r.versions[r.versions.length - 1].id; vdr_draw(st, !r.versions.some(v => v.id === st.ver)); } }
   return r;
 }
+// 2.240.0 D (#2886): the click on "Load video": build the player now; "Do not ask again" saves video_ext_ok
+function vdr_gateLoad(st, b) {
+  const v = vdr_v(st), box = b.closest('.vdrgate'); if (!v || !box) return;
+  if ($('.vdrgate-ok', box)?.checked) { S.settings.video_ext_ok = '1'; api('PATCH', '/api/settings', {video_ext_ok: '1'}).catch(() => {}); }
+  box.classList.remove('vdrgate'); box.innerHTML = vdr_playerInner(v, st.r.title);
+  st.ctl?.stop();
+  st.ctl = v.timed ? vdr_ctl(box, v.provider, w => { if (w === 'dur') vdr_tlDraw(st); else if (st.frozen == null) vdr_atDraw(st); }) : null;
+}
 async function vdr_click(e, st) {
   const b = e.target.closest('[data-vdr],[data-m="close"]'); if (!b) return;
   if (b.dataset.m === 'close') { st.md.remove(); return; }
   const a = b.dataset.vdr, r = st.r, rid = r.id, id = +b.dataset.id || 0;
+  if (a === 'gate') { vdr_gateLoad(st, b); return; }
   if (a === 'seek') { st.ctl?.seek(+b.dataset.at || 0); st.frozen = null; return; }
   if (a === 'at') { st.at = !st.at; vdr_atDraw(st); return; }
   if (a === 'send') { vdr_send(st); return; }

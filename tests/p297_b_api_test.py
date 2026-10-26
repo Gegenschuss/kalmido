@@ -146,7 +146,8 @@ A.patch(B + f"/api/clients/{F1['id']}", json={"contacts": [{"name": "Erika Beisp
 r = A.post(B + D, json={"project_title": "Imagefilm", "client_id": F1["id"]})
 check(r.status_code == 201, "a quotation with a client " + r.text[:160])
 OFF = r.json()
-check(OFF["recipient"]["name"] == "Foo AG" and OFF["recipient"]["lines"] == ["Foo AG", "Erika Beispiel", "Steinenring 1", "Postfach 12", "4051 Basel", "CH"],
+# 2.296.0 B (#3168): the country line is the name in capitals (DIN 5008 / UPU), was the code "CH"
+check(OFF["recipient"]["name"] == "Foo AG" and OFF["recipient"]["lines"] == ["Foo AG", "Erika Beispiel", "Steinenring 1", "Postfach 12", "4051 Basel", "SCHWEIZ"],
       f"the recipient from the client (foreign: the country line): {OFF['recipient']}")
 check(OFF["recipient"].get("street") == "Steinenring 1" and OFF["recipient"].get("extra") == "Postfach 12" and OFF["recipient"].get("country") == "CH",
       "the recipient carries the fixed fields")

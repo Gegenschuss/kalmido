@@ -17,6 +17,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc
 from ..core.i18n import tr
+from ..core.pg import system_ctx
 from ..core.access import Denied, list_role
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
@@ -35,6 +36,7 @@ _KEEP = object()
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..office.rights import NO_RIGHT, ofr_allows, ofr_rights  # 2.237.0
 
 
 def _is_agent():
@@ -49,6 +51,25 @@ def rc_doc(c, nid, write=False):
     if not m or n["kind"] != "file":
         raise Denied(404)
     return n, m
+
+
+def rc_office_ok(c, m, uid, level="edit", own_uid=None):
+    """2.237.0 A (#2861): the receipts area of an organisation's office for a person ruled by office groups (level; "own"
+    reads the receipts own_uid = the person uploaded); the private space and everybody not ruled by groups as before."""
+    ws = m["ws"] or ""
+    if not ws.startswith("o") or not ws[1:].isdigit():
+        return True
+    oid = int(ws[1:])
+    if ofr_allows(c, uid, oid, "receipts", level):
+        return True
+    return (level == "view" and own_uid == uid and ofr_rights(c, uid, oid) is not None
+            and ofr_rights(c, uid, oid)["levels"].get("receipts") == "own")
+
+
+def rc_office_need(c, m, uid, level="edit", own_uid=None):
+    """403 unless rc_office_ok (the office's text for a missing right)."""
+    if not rc_office_ok(c, m, uid, level, own_uid):
+        raise Denied(403, tr(NO_RIGHT))
 
 
 def rc_project_ok(c, lid, node, uid, agent=False):
@@ -190,7 +211,7 @@ def rc_state(c, node, m, uid):
         "SELECT id, name FROM lists WHERE kind='project' AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
         (node["org_id"],)) if list_role(c, x["id"], uid)][:300]
     return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects,
-            "can_edit": node["role"] in ("owner", "edit"), "confirmed": rc_confirmed(c, node["id"], r),
+            "can_edit": node["role"] in ("owner", "edit") and rc_office_ok(c, m, uid), "confirmed": rc_confirmed(c, node["id"], r),
             "einvoice_offer": not r and ei_rc_offer(c, m) is not None}  # 2.185.0 A (#2583): "Take over as receipt"
 
 
@@ -218,6 +239,7 @@ def rc_get(nid):
     _person()
     c = db()
     n, m = rc_doc(c, nid)
+    rc_office_need(c, m, me(), "view", own_uid=n.get("created_by") or n.get("owner_id"))  # 2.237.0 A (#2861): "own" = uploaded (receiptlist)
     return jsonify(rc_state(c, n, m, me()))
 
 
@@ -229,6 +251,7 @@ def rc_put(nid):
     c = db()
     uid = me()
     n, m = rc_doc(c, nid, write=True)
+    rc_office_need(c, m, uid)  # 2.237.0 A (#2861)
     b = body()
     extra = sorted(set(b) - {"project_id", "category", "vat_pct", "keep"})
     if extra:
@@ -257,6 +280,7 @@ def rc_einv_take(nid):
     c = db()
     uid = me()
     n, m = rc_doc(c, nid, write=True)
+    rc_office_need(c, m, uid)  # 2.237.0 A (#2861)
     c.execute("SELECT node_id FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,))  # two taps: one receipt
     if c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (nid,)).fetchone():
         raise Denied(409, tr("This document is a receipt already"))
@@ -273,6 +297,8 @@ def _need_sug(c, sid, write=True):
     if not s:
         raise Denied(404)
     n, m = rc_doc(c, s["node_id"], write=write)
+    if write:
+        rc_office_need(c, m, me())  # 2.237.0 A (#2861): accept / reject / reopen
     return s, n, m
 
 
@@ -532,6 +558,18 @@ def olk_fs_locked(c, node_id):
         ends.append(olk_until(str(max(year, this_year) if not a["archived"] else year), "receipt"))
     until = max((e for e in ends if e), default=None)
     return until.isoformat() if olk_active(until) else None
+
+def olk_keep_project(c, lid):
+    """2.239.0 D (#2874): before project lid is deleted for good (lists/lists.py list_purge, lists/projects.py list_row_purge): its booked
+    receipts keep the project's name (rc_receipts.list_name; list_id is emptied by its foreign key), so the assignment of
+    a receipt kept by law is not lost without a trace. Returns how many."""
+    with system_ctx(c):  # the receipts of this project only, whatever workspace context the caller runs in
+        r = c.execute("SELECT name FROM lists WHERE id=?", (int(lid),)).fetchone()
+        ids = [x[0] for x in c.execute("SELECT node_id FROM rc_receipts WHERE list_id=?", (int(lid),))] if r else []
+        keep = [n for n in ids if olk_fs_locked(c, n)]
+        for n in keep:
+            c.execute("UPDATE rc_receipts SET list_name=? WHERE node_id=?", (r["name"] or "", n))
+    return len(keep)
 
 
 def olk_day(v):

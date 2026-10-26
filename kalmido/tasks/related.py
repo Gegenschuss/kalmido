@@ -4,7 +4,8 @@ while adding, "also similar meaning" in the search, the related tasks in agent e
 Kalmido calls no language model. The optional service kalmido-embed (embed/ in the repository, docker compose --profile
 embed, KALMIDO_EMBED_URL) turns a text into numbers (a vector) with a small embedding model on the own CPU. 2.148.1 D (#2489):
 the texts go to that address: https, or http only to this server / a container (emb_url_kind); with encryption at rest,
-organisation tasks only go to a service on this server. Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
+organisation tasks only go to a service on this server. 2.240.0 A (#2884): another host
+only with KALMIDO_EMBED_EXTERNAL=1 (Administration > Server names it). Without the service, or with the instance switch "Related tasks" off (Administration > Server), everything works
 as before and the new parts are hidden (enabled: false, empty lists, never an error).
 
 - task_vectors: one row per task (task_id, org_id + list_id like the task's list, model, dim, vec, text_hash, updated_at).
@@ -38,7 +39,7 @@ from operator import mul
 
 from flask import g, jsonify, request
 
-from ..core.config import app, SECRET_KEY
+from ..core.config import app, PUBLIC_URL, SECRET_KEY, safe_urlopen
 from ..core.db import body, connect, db, err, gset, gsetting, iso_ms, now_utc
 from ..accounts.session import bg_here
 from ..core.i18n import tr
@@ -53,6 +54,11 @@ from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from f
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
 
 
+def _emb_container_name(host):
+    """2.240.0 A (#2884): a container name has a letter and is no number form of an address (134744072, 0x08080808)."""
+    return bool(re.fullmatch(r"[a-z0-9_-]+", host)) and not re.fullmatch(r"0x[0-9a-f]+|[0-9]+", host)
+
+
 def emb_url_kind(url):
     """2.148.1 D (#2489): "internal" (http(s) to localhost / 127.0.0.1 / ::1 or a host name without a dot = a container of the
     same compose file), "https" (another host over https), "" (anything else: not used)."""
@@ -63,7 +69,7 @@ def emb_url_kind(url):
         return ""
     if u.scheme not in ("http", "https") or not host:
         return ""
-    if host in ("localhost", "127.0.0.1", "::1") or "." not in host and ":" not in host:
+    if host in ("localhost", "127.0.0.1", "::1") or "." not in host and ":" not in host and _emb_container_name(host):
         return "internal"
     return "https" if u.scheme == "https" else ""
 
@@ -72,6 +78,22 @@ EMB_KIND = emb_url_kind(EMBED_URL) if EMBED_URL else ""
 if EMBED_URL and not EMB_KIND:
     print("embed: KALMIDO_EMBED_URL must use https (or point to this server / a container); related tasks stay off", flush=True)
     EMBED_URL = ""
+
+
+def emb_external_host(url):
+    """2.240.0 A (#2884): the host name when url leaves this server (https to another host than localhost, a container or
+    PUBLIC_URL), else ""."""
+    if emb_url_kind(url) != "https":
+        return ""
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    return "" if host == (urllib.parse.urlsplit(PUBLIC_URL).hostname or "").lower() else host
+
+
+EMB_EXTERNAL = emb_external_host(EMBED_URL) if EMBED_URL else ""  # 2.240.0 A (#2884): titles and descriptions go there
+EMB_BLOCKED = bool(EMB_EXTERNAL and not env_bool("KALMIDO_EMBED_EXTERNAL", False))
+if EMB_BLOCKED:
+    print("embed: KALMIDO_EMBED_URL points to another host, allowed only with KALMIDO_EMBED_EXTERNAL=1; related tasks stay off", flush=True)
+    EMBED_URL, EMB_EXTERNAL = "", ""
 # 2.59.0 part M (measurement on the dev lists, 16.10.2026): multilingual-e5-small int8, cosine thresholds of that model
 EMB_DUP = float(os.environ.get("KALMIDO_RELATED_DUP") or 0.96)     # cosine from which two tasks are "probably duplicates"
 EMB_REL = float(os.environ.get("KALMIDO_RELATED_MIN") or 0.90)     # lowest cosine of a related task
@@ -116,7 +138,7 @@ def emb_call(texts, kind="passage", timeout=30):
     req = urllib.request.Request(EMBED_URL + "/embed", data=json.dumps({"texts": texts, "kind": kind}).encode(),
                                  headers={"Content-Type": "application/json"}, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 -- the admin's own service address (environment)
+        with safe_urlopen(req, timeout) as r:  # 2.240.0 A (#2884): no proxy from the environment, same-origin redirects only
             j = json.loads(r.read(16 * 1024 * 1024))
         vecs, model = j["vectors"], str(j.get("model") or "")[:200]
         if not isinstance(vecs, list) or len(vecs) != len(texts) or not model:
@@ -133,7 +155,7 @@ def emb_health(timeout=2):
     if not EMBED_URL:
         return None
     try:
-        with urllib.request.urlopen(EMBED_URL + "/health", timeout=timeout) as r:  # noqa: S310 -- the admin's own service address
+        with safe_urlopen(EMBED_URL + "/health", timeout) as r:  # 2.240.0 A (#2884)
             j = json.loads(r.read(65536))
         return {"ok": bool(j.get("ok")), "model": str(j.get("model") or "")[:200], "dim": int(j.get("dim") or 0)}
     except (OSError, ValueError, TypeError, urllib.error.URLError):
@@ -747,7 +769,7 @@ def rt9_admin_get():
         total = c.execute("SELECT COUNT(*) FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL "
                           "AND COALESCE(l.life, '')!='health' AND l.e2e IS NULL").fetchone()[0]
     h = emb_health(2) if EMBED_URL else None
-    return jsonify(configured=bool(EMBED_URL), on=on, reachable=bool(h and h["ok"]), model=(h or {}).get("model") or None,
+    return jsonify(configured=bool(EMBED_URL), external=EMB_EXTERNAL or None, blocked=EMB_BLOCKED, on=on, reachable=bool(h and h["ok"]), model=(h or {}).get("model") or None,
                    dim=(h or {}).get("dim") or None, done=done, open=max(0, total - done))
 
 

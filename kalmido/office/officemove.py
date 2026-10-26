@@ -345,6 +345,10 @@ def ofm_notes(c, what, p, copy):
     if p["docs"]:
         notes.append(trn("{0} draft moves", "{0} drafts move", len(p["docs"])))
         notes.append(tr("Drafts get their number in the target when they are issued"))
+        refs = sum(1 for d in p["docs"] if any(d[k] for k in ("contract_id", "list_id", "source_doc_id", "version_of") if k in d.keys()))
+        if refs:  # 2.273.0 B (#3051): what ofm_move_doc clears is named before
+            notes.append(trn("{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)",
+                             "{0} drafts lose their links in the old workspace (project, framework contract, earlier version or source document)", refs))
     if what == "drafts" and p["unclient"]:
         notes.append(trn("{0} draft loses its client (the address stays in it)", "{0} drafts lose their client (the address stays in them)", p["unclient"]))
     if p["trips"]:
@@ -413,10 +417,10 @@ def ofm_archive_copy(c, uid, made, files, src, dst, cid, r, frm, kind="doc"):
     """A read-only copy of an issued document (kind doc: office_docs row r) or of an archive entry (kind archive) of office
     src in office dst's archive: the PDF (stored or rendered from the snapshot) sealed for dst, no number."""
     if kind == "doc":
-        from .pdfweb import _render, _stored, epdf_name
-        p = _stored(src, r, "pdf")
-        try:
-            data = oc_read_file(c, p) if p else _render(c, src, r)[0]
+        from .pdfweb import _render, epdf_name, epdf_stored
+        try:  # 2.296.0 F (#3177): the stored PDF only when its checksum fits (409 -> no copy; the log rides with the move)
+            data = epdf_stored(c, src, r, "pdf", commit=False)
+            data = data if data is not None else _render(c, src, r)[0]
         except (BadInput, Denied, OSError):
             return  # cannot be printed (e.g. an e-invoice without the buyer reference): no copy, the original stays
 
@@ -518,6 +522,12 @@ def ofm_move_space():
         raise BadInput(tr("Invalid value: {0}", "what"))
     ids = ofm_ids(b.get("ids"))
     src, rows = ofm_need(c, uid, what, ids)
+    if not b.get("dry"):  # 2.273.0 B (#3042): the plan and every row it writes are read under the lock (a colleague's draft
+        # saved meanwhile is not overwritten); rows changed while waiting for it (a parallel move that copied / archived them) = 409
+        write_lock(c, f"office_move_{int(src)}")
+        src2, rows2 = ofm_need(c, uid, what, ids)
+        if src2 != src or [dict(r) for r in rows2] != [dict(r) for r in rows]:
+            raise Denied(409, tr("Changed in the meantime"))
     frm_ws = ofm_ws(c, src)
     to = smv_target(c, uid, b.get("to"))
     smv_same(frm_ws, to)
@@ -540,7 +550,6 @@ def ofm_move_space():
         return jsonify(smv_answer(notes, block, count=counts))
     if block:
         raise Denied(409, block)
-    write_lock(c, f"office_move_{int(src)}")
     ts = iso(now_utc())
     org_name = ""
     if frm_ws:
@@ -683,6 +692,13 @@ def rmv_undo_run(c, uid, mid, files):
             old["updated_at"] = ts
         ofm_set(c, t, rid, old)
         back += 1
+        if t == "office_docs":  # 2.273.0 B (#3042): positions / parts added in the target since go back with the draft
+            seen = {(x["t"], x["id"]) for x in d.get("rows") or []}
+            for kt in ("office_doc_items", "office_doc_parts"):
+                for k in c.execute(f"SELECT * FROM {kt} WHERE doc_id=? AND org_id=? ORDER BY id", (rid, dst)).fetchall():
+                    if (kt, k["id"]) not in seen:  # 2.273.0 F1 (#3042): + the target's service / list end, as on the way there
+                        clr = {"service_id": None, "list_id": None} if kt == "office_doc_items" else {}
+                        ofm_set(c, kt, k["id"], {"org_id": src, **clr, **ofm_reseal(c, kt, k, dst, src)})
         if t == "office_contracts" and not r.get("src"):
             # 2.119.1 review F8 (#2298): PDFs added in the target since go back with the contract (copied into the source's
             # folder with its key); the deleted ones stay in the target's trash, where its purge removes them

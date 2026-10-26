@@ -224,6 +224,8 @@ def chat_newest(c, aid, uid):
             out["user"] = max(out["user"], r["mx"] or 0)
         else:
             out["src"][r["src"]] = r["mx"] or 0
+    from ..agents.chatprefs import cp_collected
+    out["coll"] = cp_collected(c, aid, uid, out)  # 2.233.0 A (#2848): the collected suggestions (ids, newest first)
     return out
 
 
@@ -236,7 +238,7 @@ def _newer_than(newest, r):
 
 
 def choice_state(r, ch, ans, newest=None):
-    """open | answered | expired | withdrawn of an agent message with buttons (None without)."""
+    """open | answered | expired | withdrawn | collected (2.233.0 A #2848) of an agent message with buttons (None without)."""
     if not ch or r["sender"] != "agent":
         return None
     if ans:
@@ -245,7 +247,9 @@ def choice_state(r, ch, ans, newest=None):
         return "withdrawn" if not ch.get("outcome") else ("answered" if ch["outcome"] in ("allowed", "denied") else "expired")
     if ch.get("permission") or ch.get("approval"):  # 2.35.0 (#1103): approval requests too
         return "expired" if ch.get("expires_at") and ch["expires_at"] <= iso_ms(now_utc()) else "open"
-    return "expired" if _newer_than(newest, r) else "open"
+    if _newer_than(newest, r):  # 2.233.0 A (#2848): ended by a newer message, still answerable while collected (chatprefs.py)
+        return "collected" if r["id"] in newest.get("coll", ()) else "expired"
+    return "open"
 
 
 # ---- 2.13.1 (#465): images / files in the chat between a person and an agent. Same limits and checks as task attachments
@@ -506,7 +510,7 @@ def _approval_of(ids):
     return "approved" if ids in (["allow"], ["yes"]) else "rejected" if ids in (["deny"], ["no"]) else None
 
 
-def chat_choice_answer(c, m, ch, ids, uid, via):
+def chat_choice_answer(c, m, ch, ids, uid, via, collected=False):
     """Stores the person's answer on agent message m (open buttons) and sends the agent 'chat_choice'. 2.30.0 (#1041): on a
     permission question also the 'reaction' event a 👍 / 👎 sends (approval approved / rejected, via button), so hosts
     that listen for reactions keep working; a 👍 / 👎 answers it the other way round (via reaction). One answer per message:
@@ -517,6 +521,8 @@ def chat_choice_answer(c, m, ch, ids, uid, via):
     labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
     who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
     data = {"message_id": m["id"], "choice_ids": ids, "labels": labels, "message": chat_one(c, m2, api=True), "user": who}
+    if collected:  # 2.233.0 A (#2848): a press on an older, collected suggestion (newer messages came after it)
+        data["collected"] = True
     if ch.get("permission"):
         data.update(permission=True, approval=_approval_of(ids), via=via)
     elif ch.get("approval"):  # 2.35.0 (#1103): an approval request
@@ -541,13 +547,14 @@ def chat_choice_set(c, m, uid, ids):
         raise Denied(404)
     if m["choice"]:
         raise Denied(409, tr("This question was answered already"))
-    if choice_state(m, ch, None, chat_newest(c, m["agent_id"], m["user_id"])) != "open":  # 2.30.0 (#1037): an old tab, an offline outbox
+    st = choice_state(m, ch, None, chat_newest(c, m["agent_id"], m["user_id"]))
+    if st not in ("open", "collected"):  # 2.30.0 (#1037): an old tab, an offline outbox; 2.233.0 A (#2848): collected ones count
         raise Denied(409, tr("This suggestion is no longer current"))
     valid = [x["id"] for x in ch["choices"]]
     if not isinstance(ids, list) or not ids or not all(isinstance(x, str) and x in valid for x in ids) or len(set(ids)) != len(ids) \
             or (len(ids) > 1 and not ch.get("multi")):
         raise BadInput(tr("Invalid value: {0}", "choice_ids"))
-    m2 = chat_choice_answer(c, m, ch, [x for x in valid if x in ids], uid, "button")
+    m2 = chat_choice_answer(c, m, ch, [x for x in valid if x in ids], uid, "button", collected=st == "collected")
     bump(c)
     return m2
 
@@ -870,11 +877,16 @@ def agent_chat_get(aid):
     from ..agents.jobchat import jcd_jobs
     apo = jn9_chat_jobs(c, [chat_dict(r, None, None, newest=nw) for r in ap], me())
     pins = cpin_agent_list(c, aid, me())
+    from ..agents.chatprefs import cp_get
+    sug = [chat_dict(r, None, None, newest=nw) for r in (c.execute(  # 2.233.0 A (#2848): the collected suggestions, newest first
+        f"SELECT * FROM agent_chat WHERE id IN ({','.join('?' * len(nw['coll']))}) ORDER BY id DESC", nw["coll"]).fetchall() if nw["coll"] else [])]
+    jn9_chat_jobs(c, sug, me())
     return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
+                   suggestions=sug, chat_prefs=cp_get(c, aid, me()),  # 2.233.0 A (#2848)
                    steps_live=steps_live(c, aid, me()), approvals_open=apo,
                    pins=pins,  # 2.62.0 (#1848): the pinned messages, also older than this page
                    # 2.96.0 C (#2015): the jobs of these messages (name, version, state), for the job cards
-                   jobs=jcd_jobs(c, aid, msgs + apo + pins, me()),
+                   jobs=jcd_jobs(c, aid, msgs + apo + pins + sug, me()),
                    **({"progress": prog} if request.args.get("job") else {}))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 

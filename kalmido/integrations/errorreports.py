@@ -15,7 +15,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible, list_role
+from ..core.access import acx_anon_bind, is_project, list_people, MANAGE_ROLES, need_list, task_visible, list_role, tvis
 from ..core.pages import valid_url
 from ..tasks.validation import CONTENT_MAX, log_act, ticket_template
 from ..collab.comments import collab_user, lang_of
@@ -273,7 +273,7 @@ def errhook_public(c, lid, manage):
     r = c.execute("SELECT * FROM issue_hooks WHERE list_id=?", (lid,)).fetchone()
     d = {"on": bool(r), "last_at": r["last_at"] if r else None, "received": r["received"] if r else 0,
          "open": c.execute("""SELECT COUNT(*) FROM issue_reports e JOIN tasks t ON t.id=e.task_id WHERE e.list_id=?
-                              AND t.status=0 AND t.deleted_at IS NULL""", (lid,)).fetchone()[0] if r else 0,
+                              AND t.status=0 AND t.deleted_at IS NULL AND """ + tvis(c, me(), "t."), (lid,)).fetchone()[0] if r else 0,  # 2.223.7 D (#2941): only what the viewer sees
          "may": bool(manage), "per_hour": ERR_NEW_PER_HOUR}
     if r and manage:
         d["created_at"] = r["created_at"]

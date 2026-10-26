@@ -128,6 +128,11 @@ def _events(c, pid, viewer, frm, to):
     return out
 
 
+def _at_is_agent(c, uid):
+    r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(r) and r["kind"] == "agent"
+
+
 def _bookings(c, pid, viewer, frm, to):
     """The person's firm bookings (disposition) in the period -- only those the token's context reaches (its workspace).
     2.51.0 (#1353): title and list only for a list the viewer sees, otherwise just "busy"."""
@@ -139,7 +144,8 @@ def _bookings(c, pid, viewer, frm, to):
     for r in rows:
         lid = r["list_id"]
         if lid and lid not in seen:
-            seen[lid] = bool(list_role(c, lid, viewer)) and (viewer == pid or bool(list_role(c, lid, pid)))
+            vr = list_role(c, lid, viewer)  # 2.223.7 (#2921): an agent as participant sees no booking titles (as in the dispo)
+            seen[lid] = bool(vr) and not (vr == "participant" and _at_is_agent(c, viewer)) and (viewer == pid or bool(list_role(c, lid, pid)))
         show = bool(lid) and seen[lid]
         d0, d1 = date.fromisoformat(r["start"][:10]), date.fromisoformat(r["end"][:10])
         d = max(d0, frm)

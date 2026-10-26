@@ -58,6 +58,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "followup_due",  # 2.1.0 (#335): the follow-up day of a task waiting on external
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
                 "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
+                "work_style_changed",  # 2.236.0 (#2904-#2911): its owner changed how it works and reports (work_style)
                 "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
                 "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
                 "chat_choice",  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
@@ -368,7 +369,11 @@ def agent_assign_event(c, tid, kind, uid):
     if not uid or uid not in agent_ids(c):
         return
     if task_visible(c, tid, uid, full=True):
-        agent_emit(c, uid, kind, agent_task_data(c, tid, uid))
+        extra = {}
+        if kind == "assigned":  # 2.236.0 C (#2906 #2907): its place in the queue + the priority rule for choosing the next task
+            from .workqueue import wq_event_extra
+            extra = wq_event_extra(c, uid, tid)
+        agent_emit(c, uid, kind, agent_task_data(c, tid, uid, **extra))
     elif kind == "unassigned":  # 2.36.2 (#1142): out of sight -> only the ids (the agent can drop the task), no content
         r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
         if r:
@@ -697,7 +702,13 @@ def agent_runtime(a):
         d = {}
     out = {k: d.get(k, v) for k, v in RUNTIME_DEFAULTS.items()}
     out["reset_seq"] = int(a["reset_seq"] or 0)
-    return out
+    return {**out, **runtime_derived(out)}
+
+
+def runtime_derived(rt):
+    """2.233.0 B (#3189): the values a host needs without knowing the size names (always filled in)."""
+    mb, tok = ROTATE_SIZES.get(rt.get("rotate_size"), ROTATE_SIZES["medium"])
+    return {"rotate_mb": mb, "rotate_tokens": tok, "rotate_idle_mb": ROTATE_SIZES["small"][0]}
 
 
 def runtime_clean(cur, b):
@@ -864,6 +875,31 @@ def agent_shares(c, aid, uid):
                               (SELECT list_id FROM list_members WHERE user_id=?)) LIMIT 1""", (aid, aid, uid, aid, uid, uid, uid)).fetchone())
 
 
+# 2.223.2 B (#2862): the events in which a person asks the agent for something (chat, @mention, assignment, a job, a draft)
+AGENT_ASK_EVENTS = ("chat", "mention", "assigned", "chat_choice", "job_request", "scheduled_job", "team_message",
+                    "review_requested", "letter_draft_requested")
+
+
+def agent_asked_by(c, aid, uid):
+    """2.223.2 B (#2862): did person uid ask agent aid for something lately -- an event of its queue (made by the server,
+    never by the agent) with uid as the actor or the requested_by, within AGENT_EVENTS_STALE_H hours (else the kept 30 days)?
+    An agent acts for another person than its owner (requested_by) only then."""
+    since = now_utc() - (timedelta(hours=AGENT_EVENTS_STALE_H) if AGENT_EVENTS_STALE_H else timedelta(days=AGENT_EVENTS_KEEP_DAYS))
+    rows = c.execute(f"SELECT payload FROM agent_events WHERE agent_id=? AND event IN ({','.join('?' * len(AGENT_ASK_EVENTS))}) "
+                     "AND created_at>=? ORDER BY id DESC LIMIT 500", (aid, *AGENT_ASK_EVENTS, iso(since))).fetchall()
+    for (p,) in rows:
+        try:
+            env = json.loads(p or "{}")
+        except ValueError:
+            continue
+        actor = env.get("actor") if isinstance(env.get("actor"), dict) else {}
+        rb = (env.get("data") or {}).get("requested_by") if isinstance(env.get("data"), dict) else None
+        rb = rb.get("id") if isinstance(rb, dict) else rb
+        if (actor.get("id") == uid and actor.get("kind") == "person") or (rb == uid and not isinstance(rb, bool)):
+            return True
+    return False
+
+
 def need_chat_agent(c, aid):
     a = agent_row(c, aid)
     if not a or is_agent(g.user) or not agent_shares(c, aid, me()):
@@ -906,6 +942,16 @@ def jc_job_name(title, name=None):
         return name
     m = JC_NAME_RE.match(title or "")
     return m.group(1) if m and m.group(1).split(" ")[0].lower() not in F8F_NOT_NAMES else None
+
+
+def _jd_sees(c, tid, lid, aid):
+    """2.223.7 (#2941): task_visible for job_dict, one list_role per list and request (a job list of 200 jobs polled by agents);
+    only participant / unknown lists check the single task."""
+    memo = g.__dict__.setdefault("_jd_roles", {})
+    if (aid, lid) not in memo:
+        memo[(aid, lid)] = list_role(c, lid, aid)
+    role = memo[(aid, lid)]
+    return True if role and role != "participant" else task_visible(c, tid, aid)
 
 
 def job_dict(c, j, names=None):

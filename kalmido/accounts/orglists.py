@@ -15,6 +15,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, my_inbox
 from ..accounts.orgs import _need_org_admin, user_orgs
 from ..accounts.pictures import list_icon_url
@@ -152,7 +153,7 @@ def oadm_archive(oid, lid):
     _ol_news(c, oid, lr, "archive" if on else "restore")
     bump(c)
     c.commit()
-    print("organisation", oid, "list", lid, "archived" if on else "restored", "by admin", g.user["username"], flush=True)
+    print("organisation", oid, "list", lid, "archived" if on else "restored", "by admin", login_log_who(g.user), flush=True)
     return jsonify(ok=True, **_ol_out(c, oid))
 
 
@@ -179,7 +180,7 @@ def oadm_delete(oid, lid):
         otr_trash(c, lid, me())
         bump(c)
         c.commit()
-        print("organisation", oid, "list", lid, "moved to the trash by admin", g.user["username"], flush=True)
+        print("organisation", oid, "list", lid, "moved to the trash by admin", login_log_who(g.user), flush=True)
         return jsonify(ok=True, trash=True, **_ol_out(c, oid))
     _ol_news(c, oid, lr, "delete", gone=True)
     _ol_log(c, oid, lr, "delete")
@@ -188,7 +189,7 @@ def oadm_delete(oid, lid):
     c.commit()
     list_icon_drop_file(lid, icon)
     list_files_drop(lfiles)
-    print("organisation", oid, "list", lid, "deleted for good by admin", g.user["username"], "owner", lr["owner_id"], flush=True)
+    print("organisation", oid, "list", lid, "deleted for good by admin", login_log_who(g.user), "owner", lr["owner_id"], flush=True)
     return jsonify(ok=True, **_ol_out(c, oid))
 
 
@@ -217,7 +218,7 @@ def oadm_owner(oid, lid):
     _ol_news(c, oid, {"id": lid, "name": lr["name"], "owner_id": old}, "owner", to_name=nname)
     bump(c)
     c.commit()
-    print("organisation", oid, "list", lid, "handed", old, "->", new, "by admin", g.user["username"], flush=True)
+    print("organisation", oid, "list", lid, "handed", old, "->", new, "by admin", login_log_who(g.user), flush=True)
     return jsonify(ok=True, **_ol_out(c, oid))
 
 
@@ -277,7 +278,7 @@ def ole_patch(oid, lid):
             _ol_news(c, oid, lr, "restyle")
         bump(c)
         c.commit()
-        print("organisation", oid, "list", lid, "changed", ",".join(det), "by admin", g.user["username"], flush=True)
+        print("organisation", oid, "list", lid, "changed", ",".join(det), "by admin", login_log_who(g.user), flush=True)
     return jsonify(ok=True, **_ol_out(c, oid))
 
 
@@ -291,7 +292,7 @@ def _ole_icon_set(c, oid, lr, value):
         bump(c)
         c.commit()
         list_icon_drop_file(lr["id"], old)
-        print("organisation", oid, "list", lr["id"], "icon changed by admin", g.user["username"], flush=True)
+        print("organisation", oid, "list", lr["id"], "icon changed by admin", login_log_who(g.user), flush=True)
     return jsonify(ok=True, icon=list_icon_url({"id": lr["id"], "icon": value}), **_ol_out(c, oid))
 
 

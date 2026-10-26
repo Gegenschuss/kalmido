@@ -19,8 +19,16 @@ import uuid
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.i18n import N_
 from .acctimport import UmzStop, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
+from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
 from ..core.orgcrypt import oc_enc_fields, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import Denied  # 2.237.0 D (#2870)
+from ..accounts.orgs import org_role  # 2.237.0 D (#2870)
+from ..office.periodlock import pl_month  # 2.237.0 D (#2870)
+
+
+# 2.237.0 D (#2870): person columns with a name column beside them: a person not taken over as an account keeps the name
+OI_NAME_COLS = {("video_comments", "author_id"): "ext_name", ("office_meal_log", "user_id"): "user_name"}
 
 
 class OiT:
@@ -31,7 +39,9 @@ class OiT:
     refs     {column: kind} references mapped while inserting (unmapped -> NULL)
     need     columns of refs that must map, else the row is skipped (default: none)
     late     {column: kind} references set after all areas are in (self references, forward references)
-    people   {column: "need" | "null" | "me"}: unmapped person -> skip the row / NULL / the importing person
+    people   {column: "need" | "null" | "me" | "member"}: unmapped person -> skip the row / NULL / the importing person;
+             2.237.0 D (#2870): a ticked person only maps in "member" columns (membership, sharing, assignment), every other
+             column maps the importing person alone ("member" skips the row like "need")
     space    columns that get the target space (organisation id, personal office id or NULL)
     private  where the rows go on an import into the private space: "office", "user" or False (not taken over)
     label    what the preview / report names (N_ text)
@@ -200,11 +210,24 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
     return rel, len(raw)
 
 
+# 2.278.0 B (#3094): what a dropped row's warning names for tables without a label of their own
+_OI_AREA = {"office_payments": N_("Payments"), "office_pay_props": N_("Payments"), "office_trip_items": N_("Travel expenses"),
+            "office_cash_entries": N_("Cash book"), "office_cash_closings": N_("Cash book"), "office_cash_log": N_("Cash book"),
+            "ev_cal_members": N_("Calendars"), "book_members": N_("Address books")}
+
+
+def oi_area(spec):
+    """2.278.0 B (#3094): the translated area of a spec for a warning (by table, else its label or archive folder)."""
+    k = _OI_AREA.get(spec.table) or spec.label or next((t for pre, t in UMZ_ORG_SKIP if spec.path.startswith(pre)), None)
+    return tr(k) if k else spec.path
+
+
 def oi_write(c, run, uid, man, zf, files, data, who):
     """Creates the rows of every area (inside the run's transaction; the caller commits)."""
     oi = data.get("oi") or {}
     ts = iso(now_utc())
     run.created.setdefault("oi", [])
+    names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people") or [] if isinstance(p, dict)}
     lates = []
     for spec in oi_specs():
         rows = oi.get(spec.path) or []
@@ -226,21 +249,29 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 v = src.get(col)
                 new = run.m(kind, v) if v is not None else None
                 if new is None and v is not None and col in spec.need:
-                    skip = True
+                    skip = "left" if kind in ("tasks", "comments") and run.m(kind + "_left", v) else True
                     break
                 fixed[col] = new
-            if skip:
+            if skip:  # 2.278.0 B (#3094): counted, one warning per area with the number (never silently; the trash stays behind)
+                if skip is True:
+                    run.warning(N_("Not taken over because the entry it belongs to is missing: {0}"), oi_area(spec))
                 continue
             for col, mode in spec.people.items():
                 v = src.get(col)
                 new = who(v) if v is not None else None
+                if new is not None and new != uid and mode != "member":
+                    new = None  # 2.237.0 D (#2870): authors / deciders / owners: the importing person alone (like #2492)
+                ncol = OI_NAME_COLS.get((spec.table, col)) if new is None and v is not None else None
+                if ncol and (_txt(src.get(ncol), 100) or names.get(_oid(v))):
+                    fixed[ncol] = _txt(src.get(ncol), 100) or names.get(_oid(v))
                 if new is None and v is not None:
-                    if mode == "need":
+                    if mode in ("need", "member"):
                         skip = True
                         break
                     new = uid if mode == "me" else None
                 fixed[col] = new
-            if skip:
+            if skip:  # 2.278.0 B (#3094)
+                run.warning(N_("Entries of people who were not chosen were not taken over: {0}"), oi_area(spec))
                 continue
             for col in spec.space:
                 fixed[col] = space
@@ -328,6 +359,57 @@ def oi_undo(c, cr):
     return n
 
 
+# 2.237.0 D (#2870): rows frozen in the target (finalised, a day closing, a locked month) are never removed by an undo
+OI_UNDO_LOCKED = N_("The import can no longer be undone: some of its office entries are finalised or lie in a locked month.")
+_OI_DATED = {"office_docs": "date", "office_payments": "date", "office_bank_tx": "day", "office_cash_entries": "day",
+             "office_trips": "date_from"}  # office/periodlock.py _DATED
+
+
+def oi_undo_check(c, uid, cr, since):
+    """2.237.0 D (#2870): before an undo removes anything (Denied, nothing removed): every organisation the rows went into is
+    administered by uid now (a personal office: uid's own); no row was finalised after the import (since = its created_at),
+    lies in a month locked by a lock not of this import, or (cash entries) up to a day closing not of this import."""
+    items = [x for x in cr.get("oi") or [] if isinstance(x, list) and len(x) == 3]
+    for sp in {x[2] for x in items if isinstance(x[2], int)}:
+        r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (sp,)).fetchone()
+        if not (r and r["personal_of"] == uid) and org_role(c, uid, sp) != "admin":
+            raise Denied(403, tr("Only an admin of this organisation can do this"))
+    # bundle 2.305 (2.237 + 2.239 D): a closed logbook month keeps its vehicle (vehicle_id has no cascade any more) - the
+    # undo says so instead of failing in the database
+    veh = [x[1] for x in items if x[0] == "office_vehicles" and isinstance(x[1], int)]
+    if veh and c.execute(f"SELECT 1 FROM office_drive_closed WHERE vehicle_id IN ({','.join('?' * len(veh))}) LIMIT 1", veh).fetchone():
+        raise Denied(409, tr(OI_UNDO_LOCKED))
+    own_locks = {(x[1].get("org_id"), x[1].get("period")) for x in items if x[0] == "office_period_locks" and isinstance(x[1], dict)}
+    own_closings = {x[1] for x in items if x[0] == "office_cash_closings" and isinstance(x[1], int)}
+    locked, closed = {}, {}
+    for table, rid, sp in items:
+        if not isinstance(rid, int) or not isinstance(sp, int) or table not in oi_tables():
+            continue
+        cols = umz_cols(c, table)[0]
+        want = [k for k in ("locked_at", _OI_DATED.get(table), "book_id") if k and k in cols]
+        if not want:
+            continue
+        r = c.execute(f"SELECT {', '.join(want)} FROM {table} WHERE id=?", (rid,)).fetchone()
+        if r is None:
+            continue
+        if "locked_at" in want and r["locked_at"] and str(r["locked_at"]) > str(since or ""):
+            raise Denied(409, tr(OI_UNDO_LOCKED))
+        day = r[_OI_DATED[table]] if table in _OI_DATED else None
+        if not day:
+            continue
+        if sp not in locked:
+            locked[sp] = {p["period"] for p in c.execute("SELECT period FROM office_period_locks WHERE org_id=?", (sp,))
+                          if (sp, p["period"]) not in own_locks}
+        if pl_month(day) in locked[sp]:
+            raise Denied(409, tr(OI_UNDO_LOCKED))
+        if table == "office_cash_entries" and r["book_id"]:
+            if r["book_id"] not in closed:
+                closed[r["book_id"]] = max((x["day"] for x in c.execute("SELECT id, day FROM office_cash_closings WHERE book_id=?",
+                                            (r["book_id"],)) if x["id"] not in own_closings), default="")
+            if closed[r["book_id"]] and str(day) <= closed[r["book_id"]]:
+                raise Denied(409, tr(OI_UNDO_LOCKED))
+
+
 def _oi_undo_key(c, table, key, vals, space, col):
     """2.137.0 A (#2344): removes one row recorded by its key (only the spec's key columns, only in its space)."""
     cols = umz_cols(c, table)[0]
@@ -354,5 +436,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_files",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

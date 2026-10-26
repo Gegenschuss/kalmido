@@ -20,7 +20,7 @@ function rclPeriod(k) {  // a quick choice -> [from, to] (ISO days, local time)
   if (k === 'lastmonth') return span(new Date(y, m - 1, 1), new Date(y, m, 0));
   return span(new Date(y, 0, 1), new Date(y, 11, 31));
 }
-const rclDefault = () => { const [from, to] = rclPeriod('year'); return {per: 'year', from, to, by: 'doc', status: 'all', category: '', supplier: '', project: '', novat: false, q: ''}; };
+const rclDefault = () => { const [from, to] = rclPeriod('year'); return {per: 'year', from, to, by: 'doc', status: 'all', category: '', supplier: '', project: '', novat: false, hints: false, q: ''}; };
 const rclStoreKey = () => `kalmido.rcl.${OFC.info?.org_id || 0}`;
 function rclRestore() {
   let f = null;
@@ -34,8 +34,10 @@ function rclQuery() {
   const f = RCL.f, p = new URLSearchParams({from: f.from, to: f.to, by: f.by, status: f.status});
   for (const k of ['category', 'supplier', 'project', 'q']) if (f[k]) p.set(k, f[k]);
   if (f.novat) p.set('novat', '1');
+  if (f.hints) p.set('hints', '1');  // 2.299.0 D (#3193)
   return p.toString();
 }
+let rclPend = Infinity;  // 2.299.0 D (#3193): receipts the last request left unchecked
 async function rclLoad(more) {
   const seq = ++RCL.seq, q = rclQuery();
   RCL.loading = true;
@@ -44,6 +46,8 @@ async function rclLoad(more) {
     if (seq !== RCL.seq) return;
     RCL.rows = more ? RCL.rows.concat(j.rows) : j.rows;
     Object.assign(RCL, {data: j, err: null, key: q});
+    // 2.299.0 D (#3193): receipts not checked yet -> the next request checks the next ones (only while the number goes down)
+    if (!more && j.hints_pending && j.hints_pending < rclPend) { rclPend = j.hints_pending; RCL.key = ''; } else rclPend = Infinity;
   } catch (x) { if (seq === RCL.seq) { RCL.err = x.message || tr('unknown'); RCL.key = q; } }
   if (seq === RCL.seq) RCL.loading = false;
   ofcDraw();
@@ -65,7 +69,7 @@ function rclHtml(own) {  // 2.276.0 A (#3039): own = the page Office > Receipts 
 function rclFiltersHtml() {
   const f = RCL.f, d = RCL.data || {}, all = tr('All');
   const opt = (list, cur, name) => { const o = list.map(x => [String(x.id ?? x), x.name ?? x]); if (cur && !o.some(([v]) => v === String(cur))) o.push([String(cur), name ?? String(cur)]); return o; };
-  const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.status !== 'all' ? 1 : 0);
+  const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0);
   const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : 'Day'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
   return `<details class="rcl-filters" ${RCL.open ? 'open' : ''}><summary>${ic('filter', 's')}<span>${tr('Filters')}</span>${n ? `<span class="rotag">${n}</span>` : ''}</summary>
     <div class="rcl-grid">
@@ -78,6 +82,7 @@ function rclFiltersHtml() {
       <label class="rcl-f"><span class="muted">${tr('Project')}</span>${ofcSel('rcl-pro', f.project, opt(d.projects || [], f.project, tr('(none in this period)')), all)}</label>
       <label class="rcl-f rcl-q"><span class="muted">${tr('Search')}</span><input id="rcl-q" type="search" value="${esc(f.q)}" maxlength="200" placeholder="${esc(tr('Title, supplier, invoice number'))}"></label>
       <label class="chkl rcl-novat"><input type="checkbox" id="rcl-novat" ${f.novat ? 'checked' : ''}><span>${tr('Only without VAT rate')}</span></label>
+      <label class="chkl rcl-hints"><input type="checkbox" id="rcl-hints" ${f.hints ? 'checked' : ''}><span>${tr('Only with hints')}${d.hints ? ` <span class="rotag">${d.hints}</span>` : ''}</span></label>
       ${n ? `<button type="button" class="btn sm ghost rcl-reset" data-rcl="reset">${tr('Reset filters')}</button>` : ''}
     </div></details>`;
 }
@@ -86,7 +91,7 @@ function rclRow(r) {
   const sub = [fmtDateLoc(r.date), r.supplier, r.number, r.category, r.project?.name, bkVatLabel(r.vat_pct)].filter(Boolean).join(' · ');
   const orig = r.orig_currency ? ` <small class="muted">(${esc(fmtNum(+r.orig_amount, 2))} ${esc(r.orig_currency)})</small>` : '';
   return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
-    <small class="muted">${esc(sub)}</small></span>${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}
+    <small class="muted">${esc(sub)}</small></span>${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}
     <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('chev', 's')}</button></li>`;
 }
 function rclListHtml() {
@@ -127,7 +132,8 @@ document.addEventListener('change', e => {
   if (t.id === 'rcl-cat') { rclSet({category: t.value}); return; }
   if (t.id === 'rcl-sup') { rclSet({supplier: t.value}); return; }
   if (t.id === 'rcl-pro') { rclSet({project: t.value}); return; }
-  if (t.id === 'rcl-novat') { rclSet({novat: t.checked}); }
+  if (t.id === 'rcl-novat') { rclSet({novat: t.checked}); return; }
+  if (t.id === 'rcl-hints') { rclSet({hints: t.checked}); }  // 2.299.0 D (#3193)
 });
 document.addEventListener('toggle', e => { const t = /** @type {any} */ (e.target); if (t.classList?.contains('rcl-filters')) RCL.open = t.open; }, true);
 document.addEventListener('click', e => {
@@ -135,7 +141,7 @@ document.addEventListener('click', e => {
   const k = b.dataset.rcl;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
   if (k === 'more') { b.disabled = true; rclLoad(true); return; }
-  if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, q: '', status: d.status}); return; }
+  if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status}); return; }
   if ((k === 'status' || k === 'by') && RCL.f[k] !== b.dataset.v) rclSet({[k]: b.dataset.v});
 });
 

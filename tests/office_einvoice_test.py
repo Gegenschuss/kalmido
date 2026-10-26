@@ -11,6 +11,7 @@
  - USD: BT-5 USD, BT-6 EUR, BT-111 tax in EUR (2.189.0 #2475: BT-6 / BT-111 = the home currency, e.g. GBP; CHF in a EUR office); reverse charge: category AE with reason, tax 0; a discount line as a
    negative quantity with a positive price
  - ein_check sees a broken sum and a missing mandatory term
+ - 2.296.0 B (#3169, #3173): a tax-exempt position = category E with the reason; vat note "abroad" = category O without VAT ids
  - writes the files to tests/.data/einvoice/ for the validators (tools/einvoice_validate.sh: veraPDF + KoSIT in CI)
 usage: office_einvoice_test.py            (KALMIDO_SRC = the source tree, default ../ next to tests/)"""
 import importlib.util
@@ -272,6 +273,27 @@ check(b"<ram:ChargeAmount>422.90</ram:ChargeAmount>" in xq and b'<ram:BilledQuan
 mp = fixture(paid="10000.00")
 xp = ein.ein_build(mp, "zugferd")
 check(t(xp, MS + "ram:TotalPrepaidAmount") == "10000.00" and t(xp, MS + "ram:DuePayableAmount") == "30963.25" and ein.ein_check(xp) == [], "part payment: BT-113 / BT-115")
+
+# 2.296.0 B (#3169): a taxed invoice with a tax-exempt position (0 %): the line is category E with the invoice's reason
+me = fixture()
+me["lines"][-1].update(tax="exempt", tax_pct=0, tax_amount="0.00")
+me["exempt_reason"] = "Steuerfreie Leistung nach § 4 Nr. 21 UStG"
+me["totals"].update({"tax_lines": [{"pct": "19", "base": "34317.90", "amount": "6520.40"}, {"pct": "0", "base": "105.00", "amount": "0.00"}],
+                     "tax": "6520.40", "gross": "40943.30", "open": "40943.30"})
+xe = ein.ein_build(me, "zugferd")
+check(b"<ram:CategoryCode>E</ram:CategoryCode>" in xe and b"<ram:ExemptionReason>Steuerfreie Leistung" in xe and ein.ein_check(xe) == [],
+      f"exempt position: category E with the reason, check clean {ein.ein_check(xe)}")
+with open(os.path.join(OUT, "invoice-exempt-RE-2026-663.xml"), "wb") as fh:
+    fh.write(xe)
+with open(os.path.join(OUT, "xrechnung-exempt-RE-2026-663.xml"), "wb") as fh:
+    fh.write(ein.ein_build(me, "xrechnung"))
+# 2.296.0 B (#3173): not taxable domestically (client abroad) = category O without VAT ids
+mo = fixture(vat_note_key="abroad")
+mo["recipient"].update(country="CH", vat_id="CHE-123.456.789", city="Zürich", zip="8001", street="Bahnhofstrasse 3")
+xo = ein.ein_build(mo, "zugferd")
+check(b"<ram:CategoryCode>O</ram:CategoryCode>" in xo and b'schemeID="VA"' not in xo and ein.ein_check(xo) == [], f"abroad: category O, no VAT ids {ein.ein_check(xo)}")
+with open(os.path.join(OUT, "invoice-abroad-RE-2026-663.xml"), "wb") as fh:
+    fh.write(xo)
 
 # ---------------------------------------------------------------- 6. ein_check sees broken files
 broken = xml.replace(b"<ram:GrandTotalAmount>40963.25</ram:GrandTotalAmount>", b"<ram:GrandTotalAmount>40963.26</ram:GrandTotalAmount>")

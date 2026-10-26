@@ -19,6 +19,7 @@ Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspa
 usage: p273_b_api_test.py <datadir>"""
 import base64
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -42,7 +43,9 @@ SECRET = {"password_hash", "password", "token", "token_hash", "secret", "hook_se
           "api_key", "access_token", "refresh_token", "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "code_hash", "webauthn_handle", "oidc_subject", "token_enc"}  # 2.138.0 (#1907): + hashes
 
 
-def EH(email):  # review M1: other people's addresses only as this hash
+def EH(email, salt=None):  # review M1: other people's addresses only as this hash
+    if salt:  # 2.239.0 (#2882): an account export keys it with its people_salt (HMAC-SHA256)
+        return hmac.new(salt.encode(), ("kalmido-people|" + email.strip().lower()).encode(), hashlib.sha256).hexdigest()
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
 
 
@@ -258,11 +261,11 @@ check({"Umzugskartons packen", "Kartons beschriften", "Moebelwagen buchen", "Org
 check("Bob Geheimaufgabe" not in titles and not any(L["name"] in ("Bob Geheimliste", "Carol Geheimliste", "Erin Privatsache") for L in D["lists"]),
       "no lists / tasks of other people")
 # 2.73.0 (#1473) review M1: the owner's address only as a hash
-check(any(x["name"] == "Bob Geheimliste" and x["owner_email_hash"] == EH("bob@example.com") and "owner_email" not in x for x in D["shared_lists"]),
+check(any(x["name"] == "Bob Geheimliste" and x["owner_email_hash"] == EH("bob@example.com", man["people_salt"]) and "owner_email" not in x for x in D["shared_lists"]),
       "bob's list as a reference")
 check([x["body"] for x in D["shared_comments"]] == ["Alice schreibt bei Bob"], "my comment on bob's list (Art. 15)")
 check({"Kommentar von Alice", "Kommentar von Bob"} <= {x["body"] for x in D["comments"]}, "comments of my lists")
-check(any(p["email_hash"] == EH("Bob@Example.com ") and "email" not in p and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
+check(any(p["email_hash"] == EH("Bob@Example.com ", man["people_salt"]) and "email" not in p and str(LP) in p["lists"] for p in D["people"]), "bob among the people (mapping)")
 check(not any(b"bob@example.com" in z.read(n) or b"carol@example.com" in z.read(n) for n in names if not n.startswith("files/")),
       "no address of another person anywhere in the file (review M1)")
 check(D["event_calendars"] and D["events"] and D["contacts"] and D["habits"], "calendar, event, contact, habit")
@@ -278,10 +281,11 @@ check(any(x.get("url_hint") == "https://hooks.example.com/…" and "url" not in 
       not any(b"Geheimpfad0815" in z.read(n) for n in names if not n.startswith("files/")), "N5: the webhook only as url_hint")
 EJ = A.get(B + "/api/export.json").json()
 check({"lists", "tasks", "comments", "attachments", "settings", "events", "contacts", "user"} <= set(EJ) and
-      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ and any(x.get("url") == WHU for x in EJ.get("webhooks", [])),
-      "GET /api/export.json unchanged")
+      len(EJ["tasks"]) == len(D["tasks"]) and "shared_lists" not in EJ and any(x.get("url_hint") and "url" not in x for x in EJ.get("webhooks", [])),
+      "GET /api/export.json unchanged (2.239.0 (#2882): the webhook only as url_hint, like the account export)")
 check(A.delete(B + P).ok and A.get(B + P).json()["state"] == "none" and not os.path.isdir(ad), "delete the export now")
 EXP = export_of(A)  # again for the imports
+SALT = json.loads(zipfile.ZipFile(io.BytesIO(EXP)).read("manifest.json"))["people_salt"]  # 2.239.0 (#2882): the new file's key
 
 # ---------------------------------------------------------------- import into dave (private)
 r = Da.post(B + "/api/account/import", json={"size": len(EXP), "name": "alice.zip"})
@@ -301,14 +305,14 @@ check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
 check(pv.get("counts", {}).get("tasks") == len(D["tasks"]) and pv.get("user", {}).get("email") == "alice@example.com" and not pv.get("again"),
       f"preview counts + source {pv.get('counts')}")
-pb = [p for p in pv.get("people", []) if p["key"] == EH("bob@example.com")]
+pb = [p for p in pv.get("people", []) if p["key"] == EH("bob@example.com", SALT)]
 check(pb and pb[0]["found"] and pb[0]["found_name"] and "email" not in pb[0], f"bob found by the hash, no address in the preview {pb}")
 check(not pv.get("can_invite"), "dave may not invite")
 check({t["id"] for t in pv.get("targets", [])} == {"private"}, f"dave: only private (member, not admin of Alpha) {pv.get('targets')}")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG}).status_code == 403, "target: organisation without admin rights 403")
 check(Da.post(B + f"/api/account/import/{iid}/run", json={"target": ORG2}).status_code == 404, "target: foreign organisation 404")
 DAVE = ids["dave"]
-j = run(Da, iid, people={EH("bob@example.com"): {"share": True}})
+j = run(Da, iid, people={EH("bob@example.com", SALT): {"share": True}})
 check(j.get("state") == "done", f"import done {j.get('state')} {j.get('error')}")
 res = j.get("result") or {}
 check(res.get("import_id") and res.get("created", {}).get("tasks") == len([t for t in D["tasks"] if not t.get("deleted_at")]),
@@ -402,7 +406,10 @@ check(gl and gl[0]["owner_id"] == ALICE, "the list is in the target organisation
 ga = dbx("SELECT a.id, a.path FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.name='org.txt'", (gl[0]["id"] if gl else 0,))
 check(ga and open(os.path.join(DATA, "attachments", ga[0]["path"]), "rb").read(6) == b"KENC1\n" and
       A.get(B + f"/api/attachments/{ga[0]['id']}").content == OATT, "the file: sealed with the new organisation's key, readable")
-check(dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, ids["bob"])), "bob (ticked) joined the organisation")
+# 2.278.0 (#3095): an existing account joins only by accepting an invitation (#2480) -- the import invites it
+check(not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, ids["bob"])) and
+      dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, ids["bob"])) and
+      {p.get("state") for p in (j.get("result") or {}).get("people", [])} == {"org_invited"}, "bob (ticked) is invited, not added")
 check(not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, DAVE)), "dave (not ticked) did not")
 A.delete(B + f"/api/account/import/{iid}")
 

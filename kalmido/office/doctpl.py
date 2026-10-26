@@ -41,10 +41,16 @@ DT_NOTE = N_("Sample text, no legal advice.")
 # the variables (one source: the editor's buttons, the preview and the finishing use this list)
 DT_VARS = (("client.name", N_("Client name")), ("client.address", N_("Client address")), ("client.contact", N_("Contact person")),
            ("project.title", N_("Project")), ("offer.number", N_("Quotation number")), ("offer.date", N_("Quotation date")),
-           ("offer.total", N_("Quotation total")), ("company.name", N_("Company name")), ("company.address", N_("Company address")),
-           ("today", N_("Today")))
+           ("offer.total", N_("Quotation total (gross, incl. VAT)")), ("company.name", N_("Company name")), ("company.address", N_("Company address")),
+           ("today", N_("Today")),
+           # 2.296.0 C (#3165): net / gross named (offer.total stays the gross alias), the payment term of the office settings
+           ("offer.net", N_("Quotation net (excl. VAT)")), ("offer.gross", N_("Quotation gross (incl. VAT)")),
+           ("payment.days", N_("Payment term in days")))
 DT_VAR_KEYS = tuple(k for k, _ in DT_VARS)
 DT_VAR_RE = re.compile(r"\{\{\s*([A-Za-z0-9_.]{1,40})\s*\}\}")
+# 2.296.0 C (#3165): [[ ... ]] = an optional part of a line, left out as a whole when a variable in it has no value
+DT_OPT_RE = re.compile(r"\[\[(.*?)\]\]")
+DT_GAP = "\x00"  # where an empty variable was taken out (closing up the spaces / punctuation around it)
 CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 NAME_MAX, TITLE_MAX, BODY_MAX = 200, 300, 60000
 LIST_MAX = 500
@@ -54,17 +60,17 @@ DT_STARTERS = {
     "contract": {
         "de": ("Vertrag über Leistungen", """# Vertrag über Leistungen
 
-Zwischen {{company.name}}, {{company.address}} (Auftragnehmer)
-und {{client.name}}, {{client.address}} (Auftraggeber)
+Zwischen {{company.name}}[[, {{company.address}}]] (Auftragnehmer)
+und {{client.name}}[[, {{client.address}}]] (Auftraggeber)
 
 ## 1. Gegenstand
-Der Auftragnehmer erbringt für den Auftraggeber Leistungen im Projekt {{project.title}} nach dem Angebot {{offer.number}} vom {{offer.date}}.
+Der Auftragnehmer erbringt für den Auftraggeber Leistungen[[ im Projekt {{project.title}}]][[ nach dem Angebot {{offer.number}}]][[ vom {{offer.date}}]].
 
 ## 2. Vergütung
-Die Vergütung beträgt {{offer.total}} laut Angebot. Rechnungen sind innerhalb von 14 Tagen ohne Abzug zahlbar.
+Die Vergütung richtet sich nach dem Angebot[[ und beträgt {{offer.net}} zzgl. USt]]. Rechnungen sind innerhalb von {{payment.days}} Tagen ohne Abzug zahlbar.
 
 ## 3. Mitwirkung
-Der Auftraggeber stellt die nötigen Unterlagen und Informationen rechtzeitig bereit. Ansprechpartner beim Auftraggeber: {{client.contact}}.
+Der Auftraggeber stellt die nötigen Unterlagen und Informationen rechtzeitig bereit.[[ Ansprechpartner beim Auftraggeber: {{client.contact}}.]]
 
 ## 4. Nutzungsrechte
 Die Nutzungsrechte gehen im vereinbarten Umfang mit der vollständigen Zahlung über.
@@ -75,17 +81,17 @@ Die Nutzungsrechte gehen im vereinbarten Umfang mit der vollständigen Zahlung �
 Datum: {{today}}"""),
         "en": ("Service agreement", """# Service agreement
 
-Between {{company.name}}, {{company.address}} (contractor)
-and {{client.name}}, {{client.address}} (client)
+Between {{company.name}}[[, {{company.address}}]] (contractor)
+and {{client.name}}[[, {{client.address}}]] (client)
 
 ## 1. Subject
-The contractor provides services to the client in the project {{project.title}} according to quotation {{offer.number}} of {{offer.date}}.
+The contractor provides services to the client[[ in the project {{project.title}}]][[ according to quotation {{offer.number}}]][[ of {{offer.date}}]].
 
 ## 2. Fee
-The fee is {{offer.total}} as quoted. Invoices are payable within 14 days without deduction.
+The fee follows the quotation[[ and amounts to {{offer.net}} plus VAT]]. Invoices are payable within {{payment.days}} days without deduction.
 
 ## 3. Cooperation
-The client provides the documents and information needed in good time. Contact person at the client: {{client.contact}}.
+The client provides the documents and information needed in good time.[[ Contact person at the client: {{client.contact}}.]]
 
 ## 4. Rights of use
 The rights of use pass in the agreed scope upon full payment.
@@ -100,11 +106,11 @@ Date: {{today}}"""),
 
 Sehr geehrte Damen und Herren,
 
-vielen Dank für Ihren Auftrag. Wir bestätigen den Auftrag nach unserem Angebot {{offer.number}} vom {{offer.date}} für das Projekt {{project.title}}.
+vielen Dank für Ihren Auftrag. Wir bestätigen den Auftrag[[ nach unserem Angebot {{offer.number}}]][[ vom {{offer.date}}]][[ für das Projekt {{project.title}}]].
 
 - Auftraggeber: {{client.name}}
 - Ansprechpartner: {{client.contact}}
-- Auftragssumme: {{offer.total}}
+- Auftragssumme: {{offer.net}} zzgl. USt
 
 Es gelten die Bedingungen des Angebots. Bitte prüfen Sie die Angaben und melden Sie sich, wenn etwas nicht stimmt.
 
@@ -114,11 +120,11 @@ Mit freundlichen Grüßen
 
 Dear Sir or Madam,
 
-thank you for your order. We confirm the order according to our quotation {{offer.number}} of {{offer.date}} for the project {{project.title}}.
+thank you for your order. We confirm the order[[ according to our quotation {{offer.number}}]][[ of {{offer.date}}]][[ for the project {{project.title}}]].
 
 - Client: {{client.name}}
 - Contact person: {{client.contact}}
-- Order total: {{offer.total}}
+- Order total: {{offer.net}} plus VAT
 
 The terms of the quotation apply. Please check the details and let us know if anything is not right.
 
@@ -128,11 +134,11 @@ Kind regards
     "nda": {
         "de": ("Geheimhaltungsvereinbarung", """# Geheimhaltungsvereinbarung
 
-Zwischen {{company.name}}, {{company.address}}
-und {{client.name}}, {{client.address}}
+Zwischen {{company.name}}[[, {{company.address}}]]
+und {{client.name}}[[, {{client.address}}]]
 
 ## 1. Vertrauliche Informationen
-Vertraulich sind alle Informationen, die eine Partei der anderen im Rahmen des Projekts {{project.title}} mitteilt und die als vertraulich bezeichnet oder erkennbar vertraulich sind.
+Vertraulich sind alle Informationen, die eine Partei der anderen im Rahmen der Zusammenarbeit[[ im Projekt {{project.title}}]] mitteilt und die als vertraulich bezeichnet oder erkennbar vertraulich sind.
 
 ## 2. Pflichten
 Die Parteien nutzen vertrauliche Informationen nur für das Projekt, geben sie nicht an Dritte weiter und schützen sie mit angemessener Sorgfalt.
@@ -144,11 +150,11 @@ Die Pflichten gelten nicht für Informationen, die öffentlich bekannt sind, die
 Die Vereinbarung gilt ab {{today}} und endet drei Jahre nach dem Ende der Zusammenarbeit."""),
         "en": ("Non-disclosure agreement", """# Non-disclosure agreement
 
-Between {{company.name}}, {{company.address}}
-and {{client.name}}, {{client.address}}
+Between {{company.name}}[[, {{company.address}}]]
+and {{client.name}}[[, {{client.address}}]]
 
 ## 1. Confidential information
-Confidential is all information one party shares with the other in the project {{project.title}} that is marked as confidential or is recognisably confidential.
+Confidential is all information one party shares with the other in the cooperation[[ in the project {{project.title}}]] that is marked as confidential or is recognisably confidential.
 
 ## 2. Obligations
 The parties use confidential information only for the project, do not pass it on to third parties and protect it with reasonable care.
@@ -282,12 +288,15 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
     v["company.name"] = co.get("name") or ""
     v["company.address"] = ", ".join(str(x) for x in co.get("lines") or [] if str(x).strip())
     v["today"] = _fmt_date(local_now().date().isoformat(), pack)
+    v["payment.days"] = str(int(office_settings(c, oid).get("payment_days") or 14))  # 2.296.0 C (#3165): was a fixed 14 in the samples
     if client_id:
         cl = dt_client(c, oid, client_id)
         k = fk_contact(c, cl["id"])
         v["client.name"] = cl["name"] or ""
         v["client.address"] = _addr(cl, "\n")  # 2.114.4 C (#2280): street / zip city on own lines
         v["client.contact"] = (k["name"] if k else "") or cl.get("contact") or ""
+        if cl.get("payment_terms_days"):  # 2.296.0 F (#3165): the client's own term, as its invoices use it
+            v["payment.days"] = str(int(cl["payment_terms_days"]))
         if doc_id:
             r = dt_offer(c, oid, doc_id, cl["id"])
             m = odoc_render(c, r["id"], oid)
@@ -296,6 +305,8 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
             v["offer.number"] = r["number"] or ""
             v["offer.date"] = _fmt_date(r["date"], pack) if r["date"] else ""
             v["offer.total"] = fmt_money(tot, lang, r["currency"] or "EUR") if tot is not None else ""
+            v["offer.gross"] = v["offer.total"]  # 2.296.0 C (#3165)
+            v["offer.net"] = fmt_money(t["net"], lang, r["currency"] or "EUR") if t.get("net") is not None else ""
             if not list_id:
                 v["project.title"] = r["project_title"] or ""
     if list_id:
@@ -308,19 +319,59 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
 
 
 def dt_fill(text, values, mark=False):
-    """(text with the variables replaced, [keys unknown or empty]). mark=True: an unknown / empty variable stays as
-    {{key}} (the preview marks it), else it becomes empty (the PDF)."""
-    miss = []
+    """(text with the variables replaced, [keys unknown or empty]). mark=True (preview, draft PDF): an unknown / empty
+    variable stays as {{key}} (marked there), else it is left out (the PDF).
+    2.296.0 C (#3165): left out = the text closes up around it (no double space, no " ." / " ,"); a line that held only
+    empty variables (or a list line all of whose variables are empty) goes as a whole; [[ ... ]] is an optional part that
+    goes as a whole when one of its variables is empty (mark=True keeps it, without the brackets, the empty ones marked).
+    A multi-line value (client.address) keeps its lines only alone on its line, in running text it becomes "a, b"."""
+    miss, got = [], [0]
 
-    def rep(m):
+    def var(m, alone):
         k = m.group(1)
         val = values.get(k) if k in DT_VAR_KEYS else None
         if val:
-            return val
+            got[0] += 1
+            return val if alone else ", ".join(x.strip() for x in str(val).split("\n") if x.strip())
         if k not in miss:
             miss.append(k)
-        return "{{" + k + "}}" if mark else ""
-    return DT_VAR_RE.sub(rep, text or ""), miss
+        return "{{" + k + "}}" if mark else DT_GAP
+
+    def opt(m):
+        part = m.group(1)
+        if not DT_VAR_RE.search(part):
+            return m.group(0)  # 2.296.0 F (#3165): [[ ... ]] without a variable is the person's own text ([[1]], [[Name]])
+        if mark or all(values.get(k) and k in DT_VAR_KEYS for k in DT_VAR_RE.findall(part)):
+            return DT_VAR_RE.sub(lambda x: var(x, False), part)
+        return DT_GAP  # an optional part without its values: its keys are no missing details (it is left out by design)
+
+    out = []
+    for ln in (text or "").split("\n"):
+        got[0] = 0
+        alone = bool(DT_VAR_RE.fullmatch(ln.strip()))
+        filled = DT_VAR_RE.sub(lambda m: var(m, alone), DT_OPT_RE.sub(opt, ln))
+        if DT_GAP not in filled:
+            out.append(filled)
+            continue
+        s = filled.lstrip()
+        if not s.replace(DT_GAP, "").strip() or (s[:2] in ("- ", "* ") and not got[0]):
+            continue  # nothing but empty variables, or a list line none of whose variables has a value
+        ind = filled[:len(filled) - len(s)]
+        s = re.sub(r"[ \t]*\x00+[ \t]*", " ", s)
+        s = re.sub(r" {2,}", " ", s)
+        s = re.sub(r" +([.,;:!?)\]])", r"\1", s)
+        s = re.sub(r"([(\[]) +", r"\1", s)
+        s = re.sub(r",([.;:!?])", r"\1", s)
+        s = re.sub(r"([,;:])\1+", r"\1", s)
+        s = re.sub(r", \(", " (", s).strip().lstrip(",;").rstrip(",;").strip()
+        out.append(ind + s)
+    return "\n".join(out), miss
+
+
+def dt_miss_labels(miss):
+    """2.296.0 C (#3165): the missing details by name ("Quotation date"), an unknown variable as {{key}}."""
+    names = dict(DT_VARS)
+    return [tr(names[k]) if k in names else "{{" + k + "}}" for k in miss]
 
 
 def dt_blocks(text):
@@ -356,6 +407,9 @@ def dt_hash(text):
 
 
 # ---------------------------------------------------------------- the PDF (office/pdf.py's parts: fonts, page, writer)
+DT_MISS_COLOR = "#c62828"  # 2.296.0 C (#3165)
+
+
 def dt_pdf(c, oid, d, signed=None, client=None):
     """The PDF (bytes, PDF/A-3b) of document d (a decrypted office_gen_docs row of a finished document): letterhead,
     the client's address, title, the text, signature lines (signable documents); signed = {name, at, hash} adds the
@@ -385,7 +439,25 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     if d.get("trial"):  # 2.144.10 A (#2576): a trial document says SAMPLE / MUSTER instead (one mark) and carries it diagonally
         draft = tr("SAMPLE", lg=lang)  # the watermark word (de MUSTER)
     body_sz, lh = 9.6, 9.6 * 1.42
+    mk = d.get("status") == "draft"  # 2.296.0 C (#3165): a draft shows the variables without a value in red
     pages = []
+    foot = P.pdf_footer_cols(co)  # 2.114.4 A (#2284): the same columns as a quotation (address, contact, register, bank)
+    foot_fit = P.p3f_fit(foot)  # 2.296.0 A (#3164): laid out once; the body ends above the real footer height
+    foot_h = P.p3f_foot_h(foot_fit)
+    body_bottom = P.pdf_body_bottom(foot_h)
+
+    def dt_line(page, x, y, s, size, bold, mark):
+        """2.296.0 C (#3165): one line of the text; mark=True (a draft) draws a left {{key}} in red (the final PDF leaves it out)."""
+        if not mark or "{{" not in s:
+            page.text(x, y, s, size, bold)
+            return
+        pos = 0
+        for m in list(DT_VAR_RE.finditer(s)) + [None]:
+            for seg, col in ((s[pos:m.start() if m else len(s)], P.C_INK), (m.group(0) if m else "", DT_MISS_COLOR)):
+                if seg:
+                    page.text(x, y, seg, size, bold, col)
+                    x += P.pdf_text_width(seg, size, bold)
+            pos = m.end() if m else pos
 
     def new_page(first):
         p = P._Page()
@@ -410,8 +482,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     page = new_page(True)
     # the address field (sender line + recipient) and the date on the right
     sender = " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
-    while P.pdf_text_width(sender, 7) > P.PDF_ADDR_W and " · " in sender:
-        sender = sender.rsplit(" · ", 1)[0]
+    sender = P.pdf_sender_line(sender, co.get("name"), (co.get("name_lines") or [""])[0])  # 2.296.0 E (#3170): the address has priority
     y = P.PDF_ADDR_TOP
     page.text(P.PDF_L, y, sender, 7, False, P.C_INK2)
     page.line(P.PDF_L, y + 11, P.PDF_L + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
@@ -432,7 +503,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
 
     def room(h):
         nonlocal page, y
-        if y + h > P.PDF_BODY_BOTTOM:
+        if y + h > body_bottom:
             page = new_page(False)
             y = P.PDF_NEXT_TOP
     blocks = dt_blocks(d.get("body") or "")
@@ -448,7 +519,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
             room(22 + lh * 2)  # a heading never stays alone at the end of a page
             y += 6
             for s in P.pdf_wrap(t, 10.4, P.PDF_CW, True):
-                page.text(P.PDF_L, y, s, 10.4, True, P.C_INK)
+                dt_line(page, P.PDF_L, y, s, 10.4, True, mk)
                 y += 10.4 * 1.42
             y += 2
         elif k == "li":
@@ -456,14 +527,14 @@ def dt_pdf(c, oid, d, signed=None, client=None):
             for j, s in enumerate(ls):
                 room(lh)
                 if j == 0:
-                    page.text(P.PDF_L + 3, y, "•", body_sz, False, accent)
-                page.text(P.PDF_L + 14, y, s, body_sz)
+                    page.text(P.PDF_L + 3, y, "•", body_sz, False, P.pdf_text_color(accent))  # 2.296.0 D (#3172)
+                dt_line(page, P.PDF_L + 14, y, s, body_sz, False, mk)
                 y += lh
             y += 2
         else:
             for s in P.pdf_wrap(t, body_sz, P.PDF_CW):
                 room(lh)
-                page.text(P.PDF_L, y, s, body_sz)
+                dt_line(page, P.PDF_L, y, s, body_sz, False, mk)
                 y += lh
             y += lh * 0.6
     if d.get("sign"):  # the lines for a signature on paper (both parties)
@@ -485,10 +556,9 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         P.qac_sig_block(page, y, rows, tr("Simple electronic signature", lg=lang), tr("Signed through a customer link of {0}.", co.get("name") or "", lg=lang), accent)  # 2.99.0 C (#2195): shared with accepted quotations
         y += bh
     total = len(pages)
-    foot = P.pdf_footer_cols(co)  # 2.114.4 A (#2284): the same columns as a quotation (address, contact, register, bank)
     for n, p in enumerate(pages, 1):
         # 2.114.4 A (#2282): the page count only from two pages on
-        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "")
+        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "", foot_fit, foot_h)
     meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}
     if draft:  # 2.294.0 (#3155): a draft too (was a head line), not only a trial document
         for p in pages:
@@ -912,7 +982,7 @@ def dt_preview():
     cid = b.get("client_id") if b.get("client_id") not in ("", 0) else None
     v = dt_values(c, oid, lang, cid, b.get("list_id") or None, (b.get("doc_id") or None) if cid else None)
     text, miss = dt_fill(src or "", v, mark=True)
-    return jsonify(text=text, missing=miss, blocks=[list(x) for x in dt_blocks(text)], values=v)
+    return jsonify(text=text, missing=miss, missing_labels=dt_miss_labels(miss), blocks=[list(x) for x in dt_blocks(text)], values=v)
 
 
 @app.post("/api/office/gen-docs/<int:gid>/final")
@@ -980,7 +1050,8 @@ def dt_pdf_get(gid):
     if data is None:
         if d["status"] == "draft":
             lang = dt_lang(c, oid, d.get("lang") or None)
-            d["body"] = dt_fill(d["body"], dt_values(c, oid, lang, d["client_id"], d["list_id"], d["doc_id"] if d["client_id"] else None))[0]
+            # 2.296.0 C (#3165): the draft keeps a variable without a value as {{key}} (dt_pdf draws it red)
+            d["body"] = dt_fill(d["body"], dt_values(c, oid, lang, d["client_id"], d["list_id"], d["doc_id"] if d["client_id"] else None), mark=True)[0]
         sg = None
         if signed:
             s = c.execute("SELECT * FROM office_signoffs WHERE gen_doc_id=? AND org_id=? AND state='accepted' ORDER BY id DESC LIMIT 1", (gid, oid)).fetchone()

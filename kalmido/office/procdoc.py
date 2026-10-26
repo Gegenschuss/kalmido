@@ -357,7 +357,7 @@ def _version_arg():
 @app.get("/api/office/procdoc")
 def pd_get():
     """?version=N (default: the current state) &lang=de|en -> pd_state."""
-    c, uid, oid = _ctx()
+    c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861): like the other bookkeeping pages (members before the groups: admins only)
     return jsonify(pd_state(c, uid, oid, _version_arg(), request.args.get("lang")))
 
 
@@ -390,7 +390,7 @@ def pd_put():
 @app.get("/api/office/procdoc/versions")
 def pd_versions():
     """The saved versions, newest first: [{version, created_at, created_by}] (names only)."""
-    c, uid, oid = _ctx()
+    c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     rows = c.execute("SELECT version, created_by, created_at FROM office_procdocs WHERE org_id=? ORDER BY version DESC, id DESC LIMIT ?",
                      (oid, PD_VERSIONS_MAX)).fetchall()
     names = {}
@@ -485,7 +485,7 @@ def _fname(d, ext):
 def pd_md():
     """?version=N&lang=de|en -> the document as Markdown (head: company, version, date, Kalmido version)."""
     from .ledger import ofx_log
-    c, uid, oid = _ctx()
+    c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     d = pd_state(c, uid, oid, _version_arg(), request.args.get("lang"))
     ofx_log(c, oid, "export", target="procdoc", detail={"what": "md", "version": d["viewing"] or d["version"]}, dedupe_min=5)
     c.commit()
@@ -497,7 +497,7 @@ def pd_md():
 def pd_pdf_get():
     """?version=N&lang=de|en -> the document as PDF."""
     from .ledger import ofx_log
-    c, uid, oid = _ctx()
+    c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     d = pd_state(c, uid, oid, _version_arg(), request.args.get("lang"))
     data = pd_pdf(d)
     ofx_log(c, oid, "export", target="procdoc", detail={"what": "pdf", "version": d["viewing"] or d["version"]}, dedupe_min=5)

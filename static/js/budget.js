@@ -372,7 +372,7 @@ async function bg_contractsModal() {
 // 2.146.0 C (#2455 #2469): several files or one ZIP (multipart, field files, like the office's bank import; the server reads
 // UTF-8, else windows-1252, and opens a ZIP in memory), the debit / credit mark (S/H), pending CAMT.052 entries shown apart
 // and never taken over, long imports taken over in parts under one import run, and the last runs can be taken back.
-const BG_ACCEPT = '.csv,.txt,.xml,.zip,text/csv,text/plain,text/xml,application/xml,application/zip,application/x-zip-compressed';
+const BG_ACCEPT = '.csv,.txt,.xml,.sta,.mt940,.mt942,.zip,text/csv,text/plain,text/xml,application/xml,application/zip,application/x-zip-compressed';
 const BG_SHOW = 300, BG_PART = 3000, BG_UPLOAD_MAX = 20 * 1024 * 1024;
 const BG_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];  // core/csvimport.DATE_FORMATS
 function bg_runsHtml(items) {
@@ -404,7 +404,7 @@ function bg_csvModal() {
   const step1 = () => {  // 2.140.0 B (#2134): CSV or CAMT; 2.146.0 C (#2455): several files / a ZIP, the last imports
     area.innerHTML = `<div class="shint lhint keep">${ic('lock', 's')} ${tr('No bank access – only the file you download from your bank yourself (CSV export of your account statement).')}</div>
       <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose files')}</span><input type="file" multiple accept="${BG_ACCEPT}" data-cs-file hidden></label>
-      <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) like in the office’s bank import. Several files or one ZIP work too.')}</p><div class="bgrunsw"></div>`;
+      <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) or MT940 like in the office’s bank import. Several files or one ZIP work too.')}</p><div class="bgrunsw"></div>`;
     foot.innerHTML = footHtml(''); err();
     api('GET', `/api/budget/${lid}/import/runs`).then(j => { const w = $('.bgrunsw', md); if (w && !st.p) w.innerHTML = bg_runsHtml(j.items); }).catch(() => {});
   };

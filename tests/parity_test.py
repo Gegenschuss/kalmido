@@ -270,7 +270,7 @@ APP_ONLY = [
      "a list admin's or the organisation admins' decision (the routes answer 404 to agents); an agent's delete lands there too",
      ("=GET /api/trash/lists", "=POST /api/trash/lists/{}/restore", "=DELETE /api/trash/lists/{}")),
     ("2.186.1 (#2732): the download of a kept project of a deleted account stays with its custodian, people only (like the "
-     "retention export; an API token / agent 404)", ("=GET /api/trash/lists/{}/export.zip",)),
+     "retention export; an API token / agent 404)", ("=GET /api/trash/lists/{}/export.zip", "=POST /api/trash/lists/{}/export.zip")),
     ("2.99.1 C (#1959): a video sign-off itself stays with people -- creating, renaming, trash / restore, new versions, the "
      "customer link and moving it; deleting comments and editing their text; an agent reads it, comments and marks comments done",
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
@@ -390,7 +390,8 @@ APP_ONLY = [
      ("=POST /api/client-errors",)),
     ("2.92.0 C (#1926): which agents a person may ask for a summary of a file (the preview's button); the request is a comment that mentions the agent",
      ("=GET /api/attachments/{}/agents",)),
-    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me")),
+    ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me",
+                                                                     "=POST /api/stepup/passkey")),  # 2.223.2 C (#2871)
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
@@ -527,6 +528,12 @@ APP_ONLY = [
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),
+    ("2.233.0 A (#2848): a person's own chat settings for one agent and putting a collected suggestion away stay in the app -- "
+     "the agent sees their effect as choice_state (collected / expired) and never answers buttons",
+     ("GET /api/agents/{}/chat-prefs", "PUT /api/agents/{}/chat-prefs", "POST /api/agents/{}/chat/{}/dismiss")),
+    ("2.236.0 (#2904-#2911): the owner / an instance admin sets an agent's work style and looks at its queue in the app; the "
+     "agent reads the work style in GET /agent (work_style, event work_style_changed) and its queue with GET/PUT /agent/queue",
+     ("* /api/agents/{}/work-style", "GET /api/agents/{}/queue")),
     ("2.32.0 (#1081): an agent's steps are read only by the person they are for, in the app (the agent sends them with "
      "POST /agent/progress; no token reads them back)", ("GET /api/agents/jobs/{}/steps",)),
     ("2.34.0 (#272): people plan jobs for an agent in the app (for themselves; admins / owners manage them); the agent only "
@@ -566,6 +573,9 @@ APP_ONLY = [
     # 2.121.0 (#2092): the recognised receipt values are taken over / discarded by people; agents read them with GET /documents/{id}
     ("2.121.0 (#2092): the values the recognition read off a receipt (supplier, VAT, net / gross, invoice number) are taken over or "
      "discarded by people only; agents read them as `extracted` of GET /documents/{id}", ("=POST /api/docs/{}/extracted",)),
+    # 2.299.0 D (#3193): the hints of the receipt check are hidden / shown again by people; agents read them with GET /documents/{id}
+    ("2.299.0 D (#3193): the hints of the fixed receipt check are hidden or shown again by people only; agents read them as "
+     "`checks` of GET /documents/{id}", ("=POST /api/docs/{}/checks",)),
     ("2.146.0 A (#2451): the readable HTML view of a received e-invoice is for people in the browser; agents read the same values "
      "as `extracted` of GET /documents/{id} and the file itself", ("=GET /api/docs/{}/einvoice",)),
     # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only

@@ -57,7 +57,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     // ---- finish with an empty variable
     await ev(`(() => { const t = document.querySelector('#dt-body'); t.value = 'Vertrag mit {{client.name}} über {{project.title}}.'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     await click(ev, '[data-dt="final"]');
-    check(await ready(ev, `/project\\.title/.test(document.querySelector('.modal')?.textContent || '')`, 60), 'finish names the empty field');
+    // 2.296.0 (#3165): named by its label ("Missing details (left out in the PDF): Project") instead of {{project.title}}
+    check(await ready(ev, `/Missing details.*Project/.test(document.querySelector('.modal')?.textContent || '')`, 60), 'finish names the empty field');
     await click(ev, '.modal [data-cd="no"]');
     await sleep(400);
     check(await ev(`!document.querySelector('.modal') && !!document.querySelector('#dt-body')`), 'Back keeps the draft');

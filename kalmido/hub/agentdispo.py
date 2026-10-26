@@ -25,7 +25,8 @@ from ..core.config import app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc, usettings
-from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists
+from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists, vis_sql
+from ..accounts.orgs import visible_people
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
@@ -51,9 +52,10 @@ def adz_event_draft(c, uid, title, start, end, all_day=False, location="", task_
 
 
 # ---------------------------------------------------------------- the area of a token
-def adz_area(c, want=None):
+def adz_area(c, want=None, read=False):
     """(area id, personal) the token reads: an agent its organisation (agents.org_id) or, as a personal agent, its owner's
-    personal area; a person like the web app (?org=). 404 when there is none."""
+    personal area; a person like the web app (?org=). 404 when there is none. read=True (GET /dispo, /dispo/free): a
+    personal agent gets 404 (2.223.7 C, #2921: its owner's private disposition is not shared with it, as /absences)."""
     from ..agents.core import is_agent
     from ..office.model import pb_personal
     u = g.user
@@ -61,8 +63,8 @@ def adz_area(c, want=None):
         r = c.execute("SELECT org_id, owner_id FROM agents WHERE user_id=?", (u["id"],)).fetchone()
         if r and r["org_id"]:
             oid, personal = r["org_id"], False
-        elif r and r["owner_id"]:
-            oid, personal = pb_personal(c, r["owner_id"]), True
+        elif r and r["owner_id"] and not read:
+            oid, personal = pb_personal(c, r["owner_id"]), True  # 2.223.7 C (#2921): the shoot proposal only, never a read
         else:
             oid, personal = None, False
         if not oid or (want is not None and want != oid):
@@ -89,16 +91,52 @@ def _adz_feat(c, oid, owner):
         raise Denied(409, tr(FEAT_OFF["dispo"]))
 
 
-def adz_hidden(lid):
-    """2.51.0 (#1355): a booking of a list outside the token's list limit (agents.list_ids) is shown only as "booked"."""
+def adz_hidden(lid, c=None):
+    """2.51.0 (#1355): a booking of a list outside the token's list limit (agents.list_ids) is shown only as "booked".
+    2.223.7 C (#2921): for an agent (c given) also a booking of a project it may not read, and one without a project
+    (bookings are made by people only; their titles are not the agent's)."""
     tl = token_lists()
-    return tl is not None and lid not in tl
+    if tl is not None and lid not in tl:
+        return True
+    return c is not None and _adz_is_agent() and not (lid and _adz_reads(c, lid))
 
 
-def adz_mask(d):
-    if adz_hidden(d.get("list_id")):
+def _adz_is_agent():
+    return getattr(g, "user", None) is not None and (g.user["kind"] or "user") == "agent"
+
+
+def _adz_reads(c, lid):
+    """2.223.7 C (#2921): may the agent read project lid (list_role, cached per request; a participant sees only its own
+    tasks, not the project's bookings)? A look for masking only: it does not count as a list access in the access log."""
+    seen = g.setdefault("adz_reads", {})
+    if lid not in seen:
+        had, log = "agent_access" in g, dict(g.get("agent_access") or {})
+        seen[lid] = list_role(c, lid, g.user["id"]) not in (None, "participant")
+        if had:
+            g.agent_access = log
+        else:
+            g.pop("agent_access", None)  # 2.223.7 (#2921): list_role started the log: no access entry from masking
+    return seen[lid]
+
+
+def adz_mask(d, c=None, known=None):
+    if adz_hidden(d.get("list_id"), c):
         d.update(job="", title=tr("Booked"), list_id=None, event_id=None, hidden=True)
+    if known is not None and (d.get("kind"), d.get("rid")) not in known:
+        d.update(rid=None, label="")  # 2.223.7 C (#2921): a person / contact / item the agent does not see stays nameless
     return d
+
+
+def _adz_people(c, res):
+    """2.223.7 C (#2921): an agent knows only the people who share a project with it (as /workload, 2.86.0 N34) and whom
+    visible_people lets it see; a person's token is unchanged."""
+    if not _adz_is_agent():
+        return res
+    uid = g.user["id"]
+    sh = {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN {vis_sql()} UNION "
+                                  f"SELECT user_id FROM list_members WHERE list_id IN {vis_sql()}", (uid, uid, uid, uid))}
+    vis = visible_people(c, uid)
+    return dict(res, people=[p for p in res["people"] if p["id"] in sh and (vis is None or p["id"] in vis)])
 
 
 def _Ctx(c, personal):
@@ -111,7 +149,8 @@ def _Ctx(c, personal):
 def _resources(c, viewer, oid, personal):
     """The area's resources as the viewer may know them (contacts: address books the viewer reads)."""
     with _Ctx(c, personal):
-        return dsp_resources(c, viewer, oid)
+        res = dsp_resources(c, viewer, oid)
+    return _adz_people(c, res)
 
 
 # ---------------------------------------------------------------- REST API v1: reading the disposition
@@ -127,7 +166,7 @@ def v1_adz_dispo():
         n = max(1, min(DSP_DAYS_MAX, int(a.get("days") or 7)))
     except ValueError:
         raise BadInput(tr("Invalid data")) from None
-    oid, personal = adz_area(c, want)
+    oid, personal = adz_area(c, want, read=True)
     last = first + timedelta(days=n - 1)
     res = _resources(c, me(), oid, personal)
     with _Ctx(c, personal):
@@ -136,8 +175,9 @@ def v1_adz_dispo():
         conf = dsp_conflicts(c, oid, rows, first, last)
         gone = abs_days(c, [p["id"] for p in res["people"]], first, last, oid)
         hol = abs_holidays(abs_state(c, oid), first, last)
+    known = set(_res_index(res)) if _adz_is_agent() else None
     return jsonify(org_id=oid, start=first.isoformat(), end=last.isoformat(), resources=res,
-                   bookings=[adz_mask({k: v for k, v in dsp_public(r, conf.get(r["id"])).items() if k != "note"}) for r in rows],
+                   bookings=[adz_mask({k: v for k, v in dsp_public(r, conf.get(r["id"])).items() if k != "note"}, c, known) for r in rows],
                    away={str(k): sorted(v) if isinstance(v, (set, dict, list)) else v for k, v in gone.items()},
                    holidays=[{"date": k, "name": v} for k, v in sorted(hol.items())])
 
@@ -169,7 +209,7 @@ def v1_adz_free():
         day = date.fromisoformat(a.get("date") or "")
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "date")) from None
-    oid, personal = adz_area(c, want)
+    oid, personal = adz_area(c, want, read=True)
     return jsonify(adz_free(c, me(), oid, personal, day))
 
 
@@ -193,7 +233,7 @@ def adz_warnings(c, oid, personal, lid, days, crew):
             s, e = _span(d)
             other = c.execute("SELECT title, list_id FROM hub_bookings WHERE org_id=? AND deleted_at IS NULL AND start<=? AND \"end\">=? "
                               "AND (list_id IS NULL OR list_id!=?) ORDER BY title", (oid, e[:10] + "T99", s[:10], lid or 0)).fetchall()
-            other = sorted({tr("Booked") if adz_hidden(r[1]) else r[0] for r in other})[:5]  # 2.51.0 (#1355): the list limit
+            other = sorted({tr("Booked") if adz_hidden(r[1], c) else r[0] for r in other})[:5]  # 2.223.7 C (#2921): list_role  # 2.51.0 (#1355): the list limit
             d["warnings"] = [{"kind": "other_projects", "titles": other}] if other else []
         if crew:
             rows = []
@@ -208,7 +248,7 @@ def adz_warnings(c, oid, personal, lid, days, crew):
                 w = []
                 if cf.get("double"):
                     q = ",".join("?" * len(cf["double"]))
-                    w.append({"kind": "double", "titles": sorted({tr("Booked") if adz_hidden(r[1]) else r[0] for r in c.execute(
+                    w.append({"kind": "double", "titles": sorted({tr("Booked") if adz_hidden(r[1], c) else r[0] for r in c.execute(
                         f"SELECT title, list_id FROM hub_bookings WHERE id IN ({q})", cf["double"])})[:5]})
                 if cf.get("away"):
                     w.append({"kind": "away"})
@@ -438,8 +478,8 @@ def adz_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "2.51.0 (#1355): the disposition of your workspace: bookings with conflicts, resources, who is away (never why), holidays", T,
         ok({"type": "object"}) | errs("400", "403", "404"),
         [q("start", "First day (YYYY-MM-DD, default today)"), q("days", f"1-{DSP_DAYS_MAX} (default 7)", {"type": "integer"}), org],
-        scope="calendar", desc="An agent of an organisation reads that organisation, a personal agent its owner's personal area; "
-                               "booking notes are left out.")}
+        scope="calendar", desc="An agent of an organisation reads that organisation (2.223.7, #2921: a personal agent gets 404); "
+                               "booking notes are left out, bookings of projects the agent does not read only as Booked.")}
     paths["/dispo/free"] = {"get": op(
         "2.51.0 (#1355): who and what of your workspace is free on a day", T, ok({"type": "object"}) | errs("400", "403", "404"),
         [q("date", "YYYY-MM-DD"), org], scope="calendar")}

@@ -113,9 +113,9 @@ def briefing_data(c, uid, *, agent_id=None, since=None):
     # blocked: mine and waiting on someone outside, or on an open task (dependencies count between project lists)
     rows = c.execute(f"""SELECT {cols}, t.waiting_at, t.wait_note, t.wait_until,
                            (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project')) AS open_blockers
+                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project') AND {tvis(c, uid, 'b.')}) AS open_blockers
                          {base} AND {mine} AND (t.waiting_at IS NOT NULL OR EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
-                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project')))
+                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project') AND {tvis(c, uid, 'b.')}))
                          ORDER BY t.due IS NULL, t.due, t.id""", (uid, uid, uid)).fetchall()
     rows = [r for r in rows if r["waiting_at"] or r["open_blockers"]]
     out["counts"]["blocked"] = len(rows)

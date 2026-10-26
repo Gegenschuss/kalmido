@@ -46,7 +46,7 @@ def _apin_list(c, lid, write):
     r = c.execute("SELECT life, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["life"] == "health":
         raise Denied(404)
-    role = need_overview(c, lid, write=write)
+    role = need_overview(c, lid, write=write, full=True)  # 2.223.7 B (#2918): a participant sees no notepads / weekly status
     if write and r["archived"]:
         raise Denied(409, tr("This project is archived"))
     return role

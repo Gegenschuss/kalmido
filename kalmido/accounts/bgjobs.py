@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..core.config import app, SECRET_KEY
 from ..core.db import connect, iso
+from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.pg import system_ctx
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -124,7 +125,7 @@ def _unseal(c, kind, s):
 
 def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False):
     """Queues kind(*args) (own connection, committed at once; delay = not before so many seconds, e.g. after the request's
-    commit). once: nothing new while a row of this kind waits. Returns the row id (None: ran in a thread / not needed)."""
+    commit). once: nothing new while a row of this kind (and org_id / user_id) waits. Returns the row id (None: ran in a thread / not needed)."""
     if kind not in BGJ_FNS:
         raise KeyError(kind)
     c = None
@@ -133,7 +134,9 @@ def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False):
         with system_ctx(c):  # the queue's own rows: the caller checked the rights, the row hands nothing to a person
             if once:  # review 2.193.0: check + add as one step (two clicks at once give one row)
                 c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("bgjobs:" + kind,)).fetchone()
-            if once and c.execute("SELECT 1 FROM bg_jobs WHERE kind=? AND state='wait' LIMIT 1", (kind,)).fetchone():
+            # 2.280.0 (#3114): once per kind AND org / person (a waiting index job of space A must not swallow space B's)
+            if once and c.execute("""SELECT 1 FROM bg_jobs WHERE kind=? AND state='wait' AND org_id IS NOT DISTINCT FROM ?
+                                     AND user_id IS NOT DISTINCT FROM ? LIMIT 1""", (kind, org_id, user_id)).fetchone():
                 c.commit()
                 return None
             now = _now()
@@ -186,7 +189,7 @@ def _loop():
                 with GATE.bg():  # only the taking: the work itself runs outside the gate, as the threads before
                     n = bgj_run_once()
         except Exception as e:  # noqa: BLE001 -- the loop never dies
-            print("bgjobs: loop", type(e).__name__, e, flush=True)
+            print("bgjobs: loop", db_log_err(e), flush=True)
             time.sleep(BGJ_IDLE)
         if not n:
             _WAKE.wait(BGJ_IDLE)
@@ -270,7 +273,7 @@ def _run(rid, kind, args, run):
         else:
             fn(*args)
     except Exception as e:  # noqa: BLE001 -- the kinds log their own errors as before
-        print("bgjobs:", kind, "failed:", type(e).__name__, e, flush=True)
+        print("bgjobs:", kind, "failed:", db_log_err(e), flush=True)
         state, error = "failed", type(e).__name__
     finally:
         stop.set()

@@ -103,8 +103,8 @@
         "minute": "Min.",
         "flat": "pauschal"
       },
-      "credit": "Gutschrift",
-      "credit_no": "Gutschrift Nr.",
+      "credit": "Rechnungskorrektur",
+      "credit_no": "Rechnungskorrektur Nr.",
       "reminder_1": "Zahlungserinnerung",
       "reminder_2": "Mahnung",
       "reminder_3": "Letzte Mahnung",
@@ -112,13 +112,16 @@
       "to_invoice": "zu Rechnung Nr.",
       "to_offer": "zu Angebot Nr.",
       "customer_no": "Kunden-Nr.",
+      "customer_vat_id": "USt-IdNr. Kunde",
+      "leitweg_id": "Leitweg-ID",
+      "buyer_reference": "Käuferreferenz",
       "service_period": "Leistungszeitraum",
       "due": "Fällig am",
       "fx": "Wechselkurs 1 €",
       "subtotal": "Zwischensumme",
       "invoice_total": "Rechnungsbetrag",
       "reminder_total": "Gesamtbetrag",
-      "credit_total": "Gutschriftsbetrag",
+      "credit_total": "Korrekturbetrag",
       "paid": "Bereits bezahlt",
       "open": "Offener Betrag",
       "open_total": "Offener Betrag",
@@ -183,22 +186,25 @@
         "minute": "min",
         "flat": "flat"
       },
-      "credit": "Credit note",
-      "credit_no": "Credit note No.",
+      "credit": "Invoice correction",
+      "credit_no": "Invoice correction No.",
       "reminder_1": "Payment reminder",
       "reminder_2": "Reminder",
       "reminder_3": "Final reminder",
       "reminder_no": "Reminder No.",
-      "to_invoice": "Credit note for invoice No.",
+      "to_invoice": "Correction of invoice No.",
       "to_offer": "Re quotation No.",
       "customer_no": "Customer No.",
+      "customer_vat_id": "Client VAT ID",
+      "leitweg_id": "Leitweg ID",
+      "buyer_reference": "Buyer reference",
       "service_period": "Service period",
       "due": "Due on",
       "fx": "Exchange rate €1",
       "subtotal": "Subtotal",
       "invoice_total": "Total",
       "reminder_total": "Total amount due",
-      "credit_total": "Credit total",
+      "credit_total": "Correction total",
       "paid": "Already paid",
       "open": "Amount outstanding",
       "open_total": "Amount outstanding",
@@ -307,12 +313,20 @@
       "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere allgemeinen Geschäftsbedingungen.",
       "en": "Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply."
     },
+    "delivery_intro": {
+      "de": "folgende Waren bzw. Leistungen wurden geliefert bzw. erbracht:",
+      "en": "the following goods or services have been delivered:"
+    },
+    "delivery_closing": {
+      "de": "Ware bzw. Leistung vollständig und in einwandfreiem Zustand erhalten.",
+      "en": "Goods or services received in full and in good condition."
+    },
     "credit_intro": {
-      "de": "zu der unten genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
-      "en": "regarding the invoice referenced below we issue the following credit note:"
+      "de": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Rechnungskorrektur:",
+      "en": "regarding the invoice referenced above we issue the following invoice correction:"
     },
     "credit_closing": {
-      "de": "Den Gutschriftsbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
+      "de": "Den Korrekturbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
       "en": "We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions."
     },
     "reminder_intro": {
@@ -320,24 +334,24 @@
       "en": "it may have escaped your attention that the following invoices are still outstanding:"
     },
     "reminder_closing": {
-      "de": "Wir bitten Sie darum, den kompletten Rechnungsbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen.",
-      "en": "Please transfer the full amount within {days} working days to the bank account above."
+      "de": "Wir bitten Sie darum, den offenen Betrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen.",
+      "en": "Please transfer the outstanding amount within {days} days to the bank account above."
     },
     "reminder_intro_2": {
       "de": "leider konnten wir trotz unserer Zahlungserinnerung bis heute keinen Zahlungseingang für folgende Rechnungen feststellen:",
       "en": "despite our payment reminder, we have not yet received payment for the following invoices:"
     },
     "reminder_closing_2": {
-      "de": "Wir bitten Sie, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Sollten Sie die Zahlung inzwischen veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
-      "en": "Please transfer the total amount outstanding within {days} working days to the bank account above. If you have already arranged payment, please disregard this letter."
+      "de": "Wir bitten Sie, den offenen Gesamtbetrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen. Sollten Sie die Zahlung inzwischen veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
+      "en": "Please transfer the total amount outstanding within {days} days to the bank account above. If you have already arranged payment, please disregard this letter."
     },
     "reminder_intro_3": {
       "de": "trotz unserer Zahlungserinnerung und Mahnung sind folgende Rechnungen weiterhin unbezahlt:",
       "en": "despite our payment reminder and our reminder notice, the following invoices remain unpaid:"
     },
     "reminder_closing_3": {
-      "de": "Wir fordern Sie hiermit letztmalig auf, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Geht die Zahlung bis dahin nicht ein, werden wir ohne weitere Ankündigung rechtliche Schritte einleiten; die dadurch entstehenden Kosten gehen zu Ihren Lasten.",
-      "en": "This is our final request to transfer the total amount outstanding within {days} working days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you."
+      "de": "Wir fordern Sie hiermit letztmalig auf, den offenen Gesamtbetrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen. Geht die Zahlung bis dahin nicht ein, werden wir ohne weitere Ankündigung rechtliche Schritte einleiten; die dadurch entstehenden Kosten gehen zu Ihren Lasten.",
+      "en": "This is our final request to transfer the total amount outstanding within {days} days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you."
     },
     "payment_note": {
       "de": "Zahlbar bis {date} ohne Abzug.",
@@ -354,6 +368,14 @@
     "vat_note_abroad": {
       "de": "Nicht im Inland steuerbar.",
       "en": "Not taxable in Germany."
+    },
+    "vat_note_reverse_domestic": {
+      "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren, § 13b UStG).",
+      "en": "Reverse charge: VAT to be accounted for by the recipient (section 13b German VAT Act)."
+    },
+    "vat_note_reverse_eu": {
+      "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren, Art. 196 MwStSystRL).",
+      "en": "VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC)."
     },
     "vat_note_small": {
       "de": "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.",

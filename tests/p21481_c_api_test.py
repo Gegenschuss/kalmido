@@ -457,6 +457,7 @@ check(line and "MySecretPassword99" not in tail and re.search(r"login failed for
       and "user#" + hashlib.sha256(b"mysecretpassword99").hexdigest()[:8] not in line[-1]
       and re.search(r"from \S+$", line[-1].strip()), f"#2494: a failed sign-in is logged with a hash of the name {line[-1:]}")
 # 2.148.1 (#2494): the address stays in full by default (fail2ban bans by it); KALMIDO_LOG_FULL_IP=0 shortens it
+# 2.239.0 B (#2888): shortened by default now, full only with KALMIDO_LOG_FULL_IP=1 (tests/p2239_b_logs_test.py)
 
 # ================================================================== a person without an organisation
 # freelancer-matrix: own

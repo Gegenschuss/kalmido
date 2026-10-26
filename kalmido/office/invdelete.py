@@ -23,6 +23,7 @@ from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields
 from .ledger import ofx_locked, ofx_log
 from ..files.fsref import fs_ref_drop  # 2.199.0 B (#2742)
+from .periodlock import period_need_open  # 2.237.0
 
 IDT_FINAL = N_("The final invoice {0} deducts this invoice; delete it first")
 IDT_REMINDER = N_("The reminder {0} lists other invoices too; delete it first")
@@ -173,6 +174,22 @@ def _archive_copies(c, oid, uid, ids):
     return out
 
 
+def odoc_unlink_refs(c, oid, ids):
+    """2.273.0 D (#3051): other documents of the area that point at a document that is going (source, cancelled invoice, quotation chain)
+    lose the reference instead of pointing into the void.
+    2.273.0 F2 (#3051): a quotation chain keeps together (version_of = its first quotation: the oldest remaining one becomes
+    the first, the others point at it); a locked (final) document keeps its source / cancelled reference as it is."""
+    for i in ids:
+        rest = [x[0] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND version_of=? ORDER BY id", (oid, i)).fetchall()
+                if x[0] not in ids]
+        if rest:
+            c.execute("UPDATE office_docs SET version_of=NULL WHERE org_id=? AND id=?", (oid, rest[0]))
+            c.execute("UPDATE office_docs SET version_of=? WHERE org_id=? AND version_of=? AND id<>?", (rest[0], oid, i, rest[0]))
+    for col in ("source_doc_id", "cancels_id"):
+        for i in ids:
+            c.execute(f"UPDATE office_docs SET {col}=NULL WHERE org_id=? AND {col}=? AND locked_at IS NULL", (oid, i))
+
+
 def idt_delete(c, oid, uid, r):
     """The test phase branch of odoc_delete (role checked, locks held): -> (response, file paths) or raises / answers 409."""
     from ..core.access import Denied
@@ -180,6 +197,7 @@ def idt_delete(c, oid, uid, r):
     p = idt_plan(c, oid, r)
     if p["block"]:
         raise Denied(409, p["block"])
+    _period_need(c, oid, p["ids"])  # 2.237.0 B (#2864): nothing of a locked month goes (asked before the number)
     typed = str(request.args.get("confirm_number") or b.get("confirm_number") or "").strip()
     if not r["number"] or typed != str(r["number"]).strip():
         return (jsonify(error=tr("Type the number {0} to delete this invoice", r["number"] or ""), code="confirm_number", info=idt_info(c, oid, r)), 409), []
@@ -202,6 +220,18 @@ def idt_delete(c, oid, uid, r):
         _cash_drop(c, oid, uid, open_)
     paths = _drop(c, oid, uid, r, p)
     return (jsonify(ok=True, deleted=len(ids), cash_deleted=len(open_) if cash in ("1", "true") else 0, cash_kept=closed), 200), paths
+
+
+def _period_need(c, oid, ids):
+    """2.237.0 B (#2864): 409 when a day of what the deletion changes lies in a locked month (periodlock.py): the documents,
+    their payments, the bank bookings matched on them, their cash book entries (deleted or unlinked)."""
+    q = ",".join("?" * len(ids))
+    days = [x[0] for x in c.execute(f"SELECT date FROM office_docs WHERE org_id=? AND id IN ({q})", [oid, *ids]).fetchall()]
+    days += [x[0] for x in c.execute(f"SELECT date FROM office_payments WHERE org_id=? AND doc_id IN ({q})", [oid, *ids]).fetchall()]
+    days += [x[0] for x in c.execute(f"SELECT day FROM office_bank_tx WHERE org_id=? AND match_kind='invoice' AND match_id IN ({q})",
+                                     [oid, *ids]).fetchall()]
+    days += [x[0] for x in c.execute(f"SELECT day FROM office_cash_entries WHERE org_id=? AND invoice_id IN ({q})", [oid, *ids]).fetchall()]
+    period_need_open(c, oid, *sorted({d for d in days if d}))
 
 
 def _cash_drop(c, oid, uid, rows):
@@ -245,6 +275,7 @@ def _drop(c, oid, uid, r, p):
                                                       "testphase": True, **({"locked": True} if d["locked_at"] else {}),
                                                       **({"with": r["number"]} if did != r["id"] else {})})
         paths += glob.glob(os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(did)}-*"))
+    odoc_unlink_refs(c, oid, ids)  # 2.273.0 D (#3051): documents outside the deleted set lose their reference to it
     c.execute(f"DELETE FROM office_docs WHERE org_id=? AND id IN ({q})", [oid, *ids])
     for i in ids:
         fs_ref_drop(c, "office_doc", i)  # 2.199.0 B (#2742): their folder entries go along (office/docref.py)

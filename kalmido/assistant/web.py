@@ -16,13 +16,14 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..core.access import Denied, list_people, list_role, my_inbox, need_task, org_trip_sql, vis_sql, WRITE_ROLES
 from ..accounts.session import me
 from ..core.errors import BadInput
 from . import core as A
 from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.news import news_add
 
 ASST_OFF_MSG = N_("Switch the assistant on in Settings first")
 ASST_SHARE_MSG = N_("Share this project with the assistant first")
@@ -129,10 +130,13 @@ def asst_put_lists():
                                            (*sorted(ok), uid))} if ok else set()
         if foreign:
             raise Denied(403, tr("Only your own projects can be shared with the assistant"))
+    before = {r[0] for r in c.execute("SELECT list_id FROM assistant_access WHERE user_id=?", (uid,))}
     c.execute("DELETE FROM assistant_access WHERE user_id=?", (uid,))
     ts = iso(now_utc())
     for lid in sorted(ok):
         c.execute("INSERT INTO assistant_access(user_id,list_id,created_at) VALUES(?,?,?)", (uid, lid, ts))
+        if lid not in before:
+            asst_joined_notice(c, lid, uid)
     asst_log(c, uid, "lists", "ok", chars_in=len(ok))
     bump(c)
     c.commit()
@@ -197,8 +201,47 @@ def asst_task_ok(c, uid, tid, shared):
     raise Denied(403, tr(ASST_SHARE_MSG))
 
 
+def asst_joined_notice(c, lid, actor):
+    """2.240.0 A (#2884): the members of a list learn in their News that its owner shared it with the assistant and where
+    the assistant runs (like agent_joined_notice in admin/hosting.py: same News kind)."""
+    l = c.execute("SELECT name, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not l:
+        return
+    people = {l["owner_id"]} | {r[0] for r in c.execute("""SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id
+                                                          WHERE m.list_id=? AND u.kind!='agent' AND u.disabled=0""", (lid,))}
+    info = A.asst_info() or {}
+    for uid in people:
+        if uid and uid != actor:
+            news_add(c, uid, "agentjoin", list_id=lid, data={"name": l["name"], "agent": tr("Assistant", lg=lang(c, uid)),
+                                                             "provider": (info.get("host") or info.get("provider") or "")[:80]},
+                     actor=actor, row="share")
+
+
+def asst_comments_notice(c, oid, actor):
+    """2.240.0 A (#2884): an organisation switches asst_comments on (accounts/orgs.py, before the change): its members learn
+    in their News that the assistant now also reads their comments in projects shared with it (like agent_joined_notice)."""
+    r = c.execute("SELECT name, asst_comments FROM orgs WHERE id=?", (oid,)).fetchone()
+    if not r or r["asst_comments"] or not A.asst_on():
+        return
+    for (uid,) in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
+                               WHERE m.org_id=? AND u.kind!='agent' AND u.disabled=0""", (oid,)).fetchall():
+        if uid != actor:
+            news_add(c, uid, "orglist", data={"action": "asstcomments", "name": "", "org": r["name"]}, actor=actor)
+
+
+def asst_others_comments(c, t):
+    """2.240.0 A (#2884): may the comments of other people of this task go to the provider? A private list (no
+    organisation): yes, its owner shared it and is the admin of the own space; a list of an organisation: only when the
+    organisation allows it (orgs.asst_comments, Organisation settings)."""
+    if not t["l_org"]:
+        return True
+    r = c.execute("SELECT asst_comments FROM orgs WHERE id=?", (t["l_org"],)).fetchone()
+    return bool(r and r[0])
+
+
 def asst_task_text(c, t, comments=True):
-    """Title, list, due, tags, note (never a locked one) and comments (mentions without names) of a task as plain text."""
+    """Title, list, due, tags, note (never a locked one) and comments (mentions without names) of a task as plain text.
+    2.240.0 A (#2884): in a list of an organisation without asst_comments only the asking person's own comments."""
     from ..collab.notelock import ln_is_locked
     from ..tasks.tasks import my_tags
     out = [f"Task {t['id']}: {t['title']}", f"List: {tr('Basket') if t['l_inbox'] else t['l_name']}"]
@@ -210,8 +253,9 @@ def asst_task_text(c, t, comments=True):
     if not ln_is_locked(c, t["id"]) and (t["content"] or "").strip():
         out.append("Notes:\n" + t["content"].strip())
     if comments:
-        rows = c.execute("SELECT body, created_at FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id LIMIT 200",
-                         (t["id"],)).fetchall()
+        mine = "" if asst_others_comments(c, t) else " AND user_id=?"
+        rows = c.execute("SELECT body, created_at FROM comments WHERE task_id=? AND deleted_at IS NULL" + mine + " ORDER BY id LIMIT 200",
+                         (t["id"], me()) if mine else (t["id"],)).fetchall()
         if rows:
             out.append("Comments:")
             out += [f"- [{(r['created_at'] or '')[:10]}] {_asst_mentions(r['body'])}" for r in rows if (r["body"] or "").strip()]

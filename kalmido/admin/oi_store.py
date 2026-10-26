@@ -293,6 +293,9 @@ def _wiki_version(c, run, src, d, ctx):
 
 def _receipt(c, run, src, d, ctx):
     d["ws"] = _ws(ctx)
+    if (src.get("billed_doc_id") or src.get("billed_at")) and not d.get("billed_doc_id"):  # 2.278.0 B (#3094): never silently open
+        d["billed_at"] = None
+        run.warning(N_("Billed receipts whose invoice did not come along are open again: check them before billing"))
     return d
 
 
@@ -482,7 +485,7 @@ SPECS = [
     OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes"},
         label=N_("File store"), prep=_node),
     OiT("store/versions.json", "fs_versions", refs={"node_id": "fs_nodes"}, need=("node_id",), people=_P, space=(), prep=_version),
-    OiT("store/shares.json", "fs_shares", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "need", **_P}, space=(),
+    OiT("store/shares.json", "fs_shares", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "member", **_P}, space=(),
         prep=_share),
     OiT("store/history.json", "fs_log", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"}, space=()),
     # documents: labels first (found by name in the target), then the links of the tags, rules, settings, the documents
@@ -493,9 +496,12 @@ SPECS = [
         space=(), rid=False),
     OiT("documents/rules.json", "doc_rules", people=_P, prep=_rule),
     OiT("documents/settings.json", "doc_cfg", rid=False, key=("ws",), prep=_cfg),  # 2.137.1 (#2399): undone by its workspace
-    OiT("documents/meta.json", "doc_meta", refs={"node_id": "fs_nodes", "sender_id": "doc_senders", "type_id": "doc_types", "task_id": "tasks"},
+    # 2.278.0 B (#3094): dup_of (an older document's node) mapped, never the old id
+    OiT("documents/meta.json", "doc_meta", refs={"node_id": "fs_nodes", "sender_id": "doc_senders", "type_id": "doc_types", "task_id": "tasks",
+                                                 "dup_of": "fs_nodes"},
         need=("node_id",), people=_P, rid=False, label=N_("Documents"), prep=_meta),
-    OiT("documents/receipts.json", "rc_receipts", refs={"node_id": "fs_nodes", "list_id": "lists"}, need=("node_id",),
+    # 2.278.0 B (#3094): billed_doc_id -> the new invoice (office_docs come first), like the trip items
+    OiT("documents/receipts.json", "rc_receipts", refs={"node_id": "fs_nodes", "list_id": "lists", "billed_doc_id": "office_docs"}, need=("node_id",),
         people={"set_by": "null"}, rid=False, prep=_receipt),
     # 2.184.0 A (#2579): custom fields + their values (undone with the run like every created row), the letters' documents
     OiT("documents/fields.json", "doc_fields", people=_P, prep=_field),
@@ -519,7 +525,7 @@ SPECS = [
     OiT("sheets/files.json", "sheet_files", refs={"sheet_id": "sheets"}, need=("sheet_id",), people=_P, prep=_sheet_file),
     OiT("sheets/links.json", "sheet_links", refs={"sheet_id": "sheets", "row_id": "sheet_rows", "list_id": "lists"}, need=("sheet_id",),
         people=_P, space=(), prep=_sheet_link),
-    OiT("sheets/shares.json", "sheet_shares", refs={"sheet_id": "sheets"}, need=("sheet_id",), people={"user_id": "need", **_P},
+    OiT("sheets/shares.json", "sheet_shares", refs={"sheet_id": "sheets"}, need=("sheet_id",), people={"user_id": "member", **_P},
         prep=_sheet_share),
     OiT("sheets/history.json", "sheet_hist", refs={"sheet_id": "sheets", "cell_id": "sheet_cells", "row_id": "sheet_rows",
                                                   "col_id": "sheet_columns"}, need=("sheet_id",), people={"user_id": "null"}, space=()),

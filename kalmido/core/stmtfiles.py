@@ -14,13 +14,13 @@ import re
 from flask import request
 
 from . import zipread as zr
+from . import mt940 as mt
 from .csvimport import csv_clean
 from .db import body
 from .i18n import tr
 
 STMT_LIMITS = {"file_max": 2 * 1024 * 1024, "upload_max": 20 * 1024 * 1024, "files_max": 400, "unpacked_max": 60 * 1024 * 1024,
-               "entries_max": 2000, "exts": (".xml", ".csv", ".txt")}
-MT940_RE = re.compile(r"^:(20|25|28C|60[FM]|61|62[FM]):", re.M)
+               "entries_max": 2000, "exts": (".xml", ".csv", ".txt", ".sta", ".mt940", ".mt942", ".swi")}  # 2.299.0 A (#3190): + MT940 files
 
 
 def _bad(msg):
@@ -29,8 +29,8 @@ def _bad(msg):
 
 
 def is_mt940(text):
-    """A SWIFT MT940 / MT942 statement (its :20: / :60F: / :61: fields) -- not read; the dialogs ask for CAMT."""
-    return len(MT940_RE.findall((text or "")[:20000])) >= 2
+    """A SWIFT MT940 / MT942 statement (its :20: / :60F: / :61: fields; 2.299.0 A #3190: read by core/mt940)."""
+    return mt.mt_is(text)
 
 
 def stmt_fname(v):
@@ -40,11 +40,15 @@ def stmt_fname(v):
 
 
 def stmt_decode(data):
-    """Bytes of a statement -> text: UTF-8 (a BOM dropped), else windows-1252 (as the clients did before)."""
+    """Bytes of a statement -> text: UTF-8 (a BOM dropped), else windows-1252 (as the clients did before), else Latin-1
+    (2.299.0 A #3190: MT940 files are often Latin-1; a byte cp1252 leaves undefined is still a character)."""
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return data.decode("cp1252", "replace")
+        try:
+            return data.decode("cp1252")
+        except UnicodeDecodeError:
+            return data.decode("latin-1")
 
 
 class StmtFiles:

@@ -931,9 +931,12 @@ booking list with invoices, payments and travel expenses stays the export of the
 `status=all|paid|open`, `category`, `supplier`, `project`, `novat=1`, `q`; the list also `limit`, `offset`); people only,
 agents get 403.
 
-An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area becomes a receipt the first
-time it is read, with the VAT rate of the invoice; an invoice the office issued itself (same VAT ID, tax number or company
-name) does not. The amount of a credit note is negative.
+An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area is recognised with its values
+(supplier, amount, date, VAT rate), but becomes a receipt only once you take it over (since 2.237): under **Receipts this
+month** the list *e-invoices to check* shows it with **Take over** (one tap, the VAT rate of the invoice); the receipt sheet
+and the document's receipt section offer **Take over as receipt** too. Until then it is an ordinary document you can delete. An
+invoice the office issued itself (same VAT ID, tax number or company name) is never offered. The amount of a credit note is
+negative.
 ## Bank reconciliation
 
 *Since 2.90.*
@@ -970,8 +973,8 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   taken back. Amount and account are encrypted at rest.
 - **Which file** (2.144.1): **Import bank statement** first opens the dialog with a short hint: take the XML export
   **CAMT.053, booked transactions** (version V2 or V8 does not matter; only it brings the balance along); a CSV export works
-  too (columns chosen by hand, a balance only with a balance column); better not CAMT.052 (day reports, see below) and
-  not MT940 / MT942 (not read: such a file gets a clear message). The cash flow has the same button next to the balance
+  too (columns chosen by hand, a balance only with a balance column); MT940 / MT942 files (.sta, .mt940) work
+  too (2.299.0, with the balance); better not CAMT.052 (day reports, see below). The cash flow has the same button next to the balance
   according to the bank; it opens this dialog and loads the cash flow again.
 - **CAMT.052 day reports** (2.146): an entry's status (`Sts`, in camt.052.001.08 `Sts/Cd`) is read. Pending entries (PDNG,
   anything not BOOK) are shown in the preview as "pending – not imported" and are never imported; the booked version comes
@@ -2309,7 +2312,9 @@ their files after that. On your own server they are still only handed over (rece
 
 Routes (people only, an API token 403): `GET /api/retention/me`, `GET /api/retention/me/export.zip`,
 `GET /api/retention/org/<id>` (the organisation's admins; an instance admin sees only whether records exist),
-`GET /api/retention/org/<id>/export.zip`.
+`GET /api/retention/org/<id>/export.zip`. Since 2.223.2 the ZIP downloads ask for the password (and second factor) first:
+`POST` the same address with `password` (and `code` / `credential`) for a one-time ticket (5 minutes, this person and
+address only), then `GET ...?t=<ticket>`; a `GET` without a ticket answers 403.
 
 ## Database
 

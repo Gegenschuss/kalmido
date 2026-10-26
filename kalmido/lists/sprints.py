@@ -461,6 +461,10 @@ def sprint_update(sid):
     b = body()
     c = db()
     s = need_sprint(c, sid, write=True)
+    write_lock(c, f"sprints:{s['list_id']}")  # 2.273.0 B (#3051): checked and written under the list's sprint lock (start / close)
+    s = spr_row(c, sid)
+    if not s:
+        raise Denied(404)
     if s["state"] == "closed" and ("start" in b or "end" in b):
         return err(tr("A closed sprint keeps its dates"), 409)
     f = spr_clean_fields(b, s)
@@ -477,6 +481,10 @@ def sprint_delete(sid):
     again with them (POST /api/lists/<id>/sprints with tasks)."""
     c = db()
     s = need_sprint(c, sid, write=True)
+    write_lock(c, f"sprints:{s['list_id']}")  # 2.273.0 B (#3051): a sprint started meanwhile is not removed
+    s = spr_row(c, sid)
+    if not s:
+        raise Denied(404)
     if s["state"] != "planned":
         return err(tr("Only a planned sprint can be removed"), 409)
     d = spr_dict(c, s, me())

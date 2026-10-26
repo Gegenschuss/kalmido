@@ -43,7 +43,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import g, jsonify, send_file
+from flask import g, jsonify, request, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
@@ -53,6 +53,8 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
+from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
+from ..accounts.orgretain import odl_ids  # 2.278.0 A (#3093)
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
@@ -158,6 +160,7 @@ def _ox_dec_row(c, oid, table, row):
 
 def _clean(c, oid, table, r):
     row = {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS}
+    row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
     return _ox_dec_row(c, oid, table, row)
 
 
@@ -296,6 +299,8 @@ OX_AREAS = (
     # templates and documents made from them, the logbook)
     ("office/bank_imports.json", "office_bank_imports", "org_id=?"),
     ("office/bank_tx.json", "office_bank_tx", "org_id=?"),
+    ("office/bank_rules.json", "office_bank_rules", "org_id=?"),  # 2.299.0 B (#3191): bank rules, declined rule suggestions
+    ("office/bank_rule_nos.json", "office_bank_rule_nos", "org_id=?"),
     ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
     ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client
@@ -613,6 +618,9 @@ def ox_build(c, oid, out, by=None):
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
         if "tasks/locked_notes.json" in man.counts:
             man.client_enc["locked_notes"] = man.counts["tasks/locked_notes.json"]
+        # 2.278.0 C (#3091): the key bundles are personal: never in this archive (each person moves them with the account export)
+        man.client_enc["keys_note"] = ("Personal encryption keys are not in the organisation export: browser-encrypted notes and "
+                                       "files of a person open after a move only via that person's own account export.")
         if "e2e" in _table_cols(c, "lists"):  # 2.64.1 B (#1817): lists with the lock: texts are browser ciphertexts ("e2e1:...")
             lk = [r[0] for r in c.execute(vis(f"SELECT id FROM lists WHERE e2e IS NOT NULL AND id IN ({LSQ})"), (oid,))]
             if lk:
@@ -621,6 +629,7 @@ def ox_build(c, oid, out, by=None):
                 man.client_enc["locked_list_tasks"] = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN ({q}) AND deleted_at IS NULL", lk).fetchone()[0]
                 man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
                                                       "read in Kalmido with a member's own passphrase; no offline tool opens them.")
+                man.client_enc["locked_list_import"] = "The import does not take these lists over (no list keys move along)."  # 2.278.0 C (#3091)
         if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
             man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "
@@ -857,13 +866,42 @@ def _ox_area(c, oid):
     return _org_admin(c, 0), True
 
 
+def ox_foreign(c, oid, own, st):
+    """2.278.0 A (#3093): the archive is filtered by its starter's rights (#2561, ox_hidden_mails), so only the starter loads
+    or deletes it. -> None (mine, none, own office) or (starter's name, holds): holds = the starter still administers the
+    organisation (a former admin of a retired one counts); when not (left, disabled, deleted), a current admin may replace it."""
+    by = st.get("by")
+    if own or not by or by == me() or st.get("state") not in ("running", "done"):
+        return None
+    from ..accounts.orgs import org_role
+    with system_ctx(c):  # another person's account and role in this organisation (structure, no content)
+        u = c.execute("SELECT display_name, username, disabled FROM users WHERE id=?", (by,)).fetchone()
+        o = c.execute("SELECT retired_at, retired_admins FROM orgs WHERE id=?", (oid,)).fetchone()
+    if not u or u["disabled"]:
+        return (u and (u["display_name"] or u["username"])) or tr("a former admin"), False
+    holds = by in odl_ids(o["retired_admins"]) if o and o["retired_at"] else org_role(c, by, oid) == "admin"
+    return u["display_name"] or u["username"], holds
+
+
+def _ox_foreign_msg(st, name):
+    """2.278.0 A (#3093): the hint for the other admins."""
+    if st.get("state") == "running":
+        return tr("The export of {0} is running. Only {0} can download or delete it (it is filtered by their rights).", name)
+    return tr("The export of {0} is available. Only {0} can download or delete it (it is filtered by their rights).", name)
+
+
 @app.get("/api/orgs/<int:oid>/export")
 def ox_get(oid):
     """The state of the organisation's export: none | running | done (file, bytes, expires_at) | failed (error)."""
     c = db()
     oid, own = _ox_area(c, oid)
     on = _need(c, oid, own)
-    return jsonify(enabled=on, keep_hours=OX_KEEP_H, **ox_status(oid))
+    out = ox_status(oid)
+    fx = ox_foreign(c, oid, own, {**(_state(oid) or {}), "state": out.get("state")})
+    if fx:  # 2.278.0 A (#3093): another admin's archive: only that it exists, by whom, no file name / download
+        out = {k: out[k] for k in ("state", "started_at", "done_at", "expires_at") if k in out}
+        out.update(foreign=True, by_name=fx[0], may_replace=not fx[1], hint=_ox_foreign_msg(out, fx[0]))
+    return jsonify(enabled=on, keep_hours=OX_KEEP_H, **out)
 
 
 @app.post("/api/orgs/<int:oid>/export")
@@ -878,6 +916,10 @@ def ox_start(oid):
     with _OX_LOCK:
         if _running(oid):
             return err(tr("An export of this organisation is already running"), 409)
+        st = _state(oid) or {}
+        fx = ox_foreign(c, oid, own, {**st, "state": ox_status(oid).get("state")})
+        if fx and fx[1]:  # 2.278.0 A (#3093): never replace the archive of another admin who still holds the organisation
+            return err(_ox_foreign_msg(st, fx[0]), 403)
         _state_set(oid, {"state": "running", "by": me(), "started_at": iso(now_utc())})
         t = threading.Thread(target=ox_run, args=(int(oid), me()), daemon=True)
         _OX[int(oid)] = t
@@ -886,12 +928,22 @@ def ox_start(oid):
 
 
 @app.get("/api/orgs/<int:oid>/export/file")
+@app.post("/api/orgs/<int:oid>/export/file")  # 2.223.2 C (#2871): POST = the step-up (own office)
 def ox_download(oid):
     c = db()
     oid, own = _ox_area(c, oid)
     _need(c, oid, own)
     st = ox_status(oid)
     if st.get("state") != "done":
+        raise Denied(404)
+    fx = ox_foreign(c, oid, own, {**(_state(oid) or {}), "state": "done"})
+    if fx:  # 2.278.0 A (#3093): only the starter (the archive is filtered by their rights)
+        raise Denied(403, _ox_foreign_msg(st, fx[0]))
+    if own:  # 2.223.2 C (#2871): the own office (0): POST with the step-up -> a ticket, GET with it -> the archive
+        e = stepup_download(c)
+        if e is not None:
+            return e
+    elif request.method == "POST":
         raise Denied(404)
     from ..office.ledger import ofx_log
     with system_ctx(c):  # 2.152.0 (#2167, review A4): an instance admin of a retired organisation is no member of it
@@ -909,5 +961,9 @@ def ox_delete(oid):
     _need(c, oid, own)
     if _running(oid):
         return err(tr("An export of this organisation is already running"), 409)
+    st = ox_status(oid)
+    fx = ox_foreign(c, oid, own, {**(_state(oid) or {}), "state": st.get("state")})
+    if fx and fx[1]:  # 2.278.0 A (#3093): only the starter (a current admin clears the archive of one who left)
+        raise Denied(403, _ox_foreign_msg(st, fx[0]))
     shutil.rmtree(_odir(oid), ignore_errors=True)
     return jsonify(ok=True)

@@ -84,6 +84,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-favq': ['fav_quiet', N_('Quieter pushes from projects without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
   's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
+  's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
@@ -355,7 +356,7 @@ async function agSetupDraw(md) {
   for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} project', '{0} projects', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
-    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
@@ -397,12 +398,14 @@ function agSetupWire(md) {
       if (!a) { agSetupDraw(md); return; }
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
+      if (k === 'work') { awOpen(a); return; }  // 2.236.0 A (#2904-#2911)
       if (k === 'ws') { av_wsMenu(b, a, () => agSetupDraw(md)); return; }  // 2.46.6 (#1708): its workspace
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
           await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
         }, `<div class="row"><label>${tr('Projects')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects, folders and sharing always wait for your approval.')}</div><div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the projects shared with it.', esc(a.name))}</div>${typeof oa_switchRowHtml === 'function' ? oa_switchRowHtml(a.id) : ''}`);
         if (typeof oa_switchLoad === 'function') oa_switchLoad(pmd);  // 2.51.0 A (#1348): the office switch of my agent (saved at once)
+        if (typeof agz_wire === 'function') { pmd.querySelector('.foot')?.insertAdjacentHTML('beforebegin', agz_html(a, true)); agz_wire(pmd, a, `/api/my/agents/${a.id}`); }  // 2.233.0 B (#3189): the interim summary (saved at once)
         return;
       }
       if (k === 'pause') {
@@ -672,6 +675,8 @@ function settingsModal(focus) {
       ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
+      <h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
+      ${hint(tr('Off: a video sign-off first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
@@ -859,30 +864,23 @@ function settingsModal(focus) {
   $('#s-search', md).addEventListener('input', e => {
     const q = e.target.value.trim().toLowerCase(), sb = $('.sbody', md);
     if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; sb.classList.remove('snores'); return; }
-    const hits = [], seen = new Set();
-    const add = (el, k) => { if (!el || seen.has(el) || hits.length >= 14) return; const t = (el.matches('input,textarea') ? el.getAttribute('placeholder') || el.getAttribute('aria-label') || '' : el.textContent).replace(/\s+/g, ' ').trim(); if (!t) return; seen.add(el); hits.push({el, t, k}); };
-    for (const [ws, sel] of SYN) if (ws.some(w => w.startsWith(q) || (q.length > 3 && q.includes(w)))) { const el = $(sel, md); if (el) add(el, el.closest('.spane')?.dataset.pane); }
-    for (const p of $$('.spane', md)) for (const el of $$('h4, .row > label, label.chkl, .featgrid label > span, .modrow b, .modrow small, summary, button:not(.iconbtn), .shint, option, th', p)) {
-      if (!shown(el) || el.closest('.ssres')) continue;
-      const own = el.matches('.featgrid label > span') ? (el.firstChild?.textContent || '') + ' ' + (el.querySelector('small')?.textContent || '') : el.textContent;
-      if (own.toLowerCase().includes(q)) add(el.matches('option') ? el.closest('select') : el, p.dataset.pane);
-      if (hits.length >= 14) break;
-    }
+    const hits = ss_hits(md, q, shown, SYN);  // 2.250.0 C (#2994): titles / field names first, one explanation per section, synonyms
     const tab = k => $(`.snav [data-sec="${k}"] span`, md)?.textContent || k;
-    const lab = h => (h.el.matches('select') ? (h.el.closest('.row')?.querySelector('label')?.textContent || h.t) : h.t).slice(0, 80);
-    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}"><span class="muted">${esc(tab(h.k))} ›</span> ${esc(lab(h))}</button>`).join('') : `<div class="muted mhint">${esc(tr('Nothing found for “{0}”', e.target.value.trim()))}</div>`;
+    const lab = h => ss_cut(h.el?.matches('select') ? (h.el.closest('.row')?.querySelector('label')?.textContent || h.t) : h.t, 80);
+    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}">${h.act ? '' : `<span class="muted">${esc(tab(h.k))} ›</span> `}${esc(lab(h))}</button>`).join('') : `<div class="muted mhint">${esc(tr('Nothing found for “{0}”', e.target.value.trim()))}</div>`;
     sb.classList.toggle('snores', !hits.length); sb.dataset.nores = hits.length ? '' : tr('Nothing found for “{0}”', e.target.value.trim());
     sres._hits = hits; sres.classList.remove('hidden');
   });
   sres.addEventListener('click', e => {
     const b = e.target.closest('[data-hit]'); if (!b) return;
     const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = ''; $('.sbody', md).classList.remove('snores');
+    if (h.act === 'absence') { $('[data-m="close"]', md)?.click(); Promise.resolve(AB2.data || ab2_load()).then(() => ab2_sheet(null)); return; }  // 2.250.0 C (#2994): no setting for it: the sheet itself
     show(h.k); idx(false);
     const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
     const ai = h.el.closest('[data-aisp]'); if (ai) aiSubShow(md, ai.dataset.aisp, true);
     for (let det = h.el.closest('details'); det; det = det.parentElement?.closest('details')) if (!(det === h.el.closest('details') && h.el.matches('summary'))) det.open = true;  // 2.25.0: also the folded module group around it
     const r = h.el.closest('.row, .modrow, details, h4, label') || h.el;
-    setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
+    setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600); }, 30);  // 2.250.0 C (#2994): the soft ring (prefers-reduced-motion: a still ring)
   });
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
@@ -978,7 +976,7 @@ function settingsModal(focus) {
     if (b.dataset.vmode) { vpSet(md, b.dataset.vmode); return; }  // 2.310.0 (#3270)
     if (b.dataset.look === 'pack') { o3c_packPick(md, b.dataset.v); return; }  // 2.83.0 C (#1427): theme + scheme in one step
     if (b.dataset.look) {
-      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color')}[k];
+      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color'), chatHuman: N_('Messages from people'), chatAgent: N_('Messages from agents')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;
     }
     if (b.dataset.m === 'look-reset') {
@@ -1414,4 +1412,60 @@ function tabAddSheet(onPick) {
     if (b.dataset.tabadd) { md.remove(); onPick(b.dataset.tabadd); }
   });
   return md;
+}
+
+// 2.250.0 C (#2994): the settings search. Titles and field names first, the explanation lines after them (at most one per
+// section), the same wording once, a few synonyms (the words people search for that the labels do not use).
+const SS_SYN = [  // [the words in every language, the label(s) to look for instead | 'absence']
+  [['logo', 'signet', 'emblem', 'emblema', 'emblème'], () => [tr('Symbol')]],
+  [['mitglieder', 'mitglied', 'members', 'member', 'miembros', 'membres', 'membri', 'leden'], () => [tr('People|admin'), tr('People')]],
+  [['urlaub', 'abwesenheit', 'krank', 'frei', 'vacation', 'absence', 'holiday', 'sick', 'leave', 'vacaciones', 'ausencia', 'congé', 'ferie', 'assenza', 'vakantie', 'afwezig'], 'absence']];
+// the text of an element with a blank between its parts (textContent glues "Title" + "explanation" together)
+function ss_text(el) {
+  if (el.matches('input,textarea')) return (el.getAttribute('placeholder') || el.getAttribute('aria-label') || '').trim();
+  const out = [], walk = n => { for (const c of n.childNodes) { if (c.nodeType === 3) out.push(c.nodeValue); else if (c.nodeType === 1 && !/^(SCRIPT|STYLE)$/.test(c.tagName)) { out.push(' '); walk(c); out.push(' '); } } };
+  walk(el);
+  return out.join('').replace(/\s+/g, ' ').trim();
+}
+// cut at a word boundary, never in the middle of a word
+function ss_cut(t, n) {
+  if (t.length <= n) return t;
+  const c = t.slice(0, n), i = c.lastIndexOf(' ');
+  return (i > n * 0.5 ? c.slice(0, i) : c).replace(/[\s,;:.\-–]+$/, '') + '…';
+}
+function ss_hits(md, q, shown, SYN) {
+  const hits = [], seen = new Set(), said = new Set(), MAX = 14;
+  const add = (el, k, extra) => {
+    if (hits.length >= MAX) return false;
+    if (el && seen.has(el)) return false;
+    const t = extra?.t || ss_text(el); if (!t) return false;
+    const key = (k || '') + '|' + t.toLowerCase();
+    if (said.has(key)) return false;  // the same words in the same tab are one hit
+    if (el) seen.add(el); said.add(key); hits.push({el, t, k, ...extra}); return true;
+  };
+  // synonyms: an exact word beats a word that merely starts with the query ("logo" is not "logout")
+  const grp = SS_SYN.filter(([ws]) => ws.includes(q)), pre = SS_SYN.filter(([ws]) => q.length >= 3 && ws.some(w => w.startsWith(q)));
+  const targets = [];
+  for (const [, to] of (grp.length ? grp : pre)) {
+    if (to === 'absence') { if (typeof workloadOn === 'function' && workloadOn() && typeof ab2_sheet === 'function') add(null, '', {act: 'absence', t: tr('Enter an absence')}); }
+    else targets.push(...to().map(x => x.toLowerCase()));
+  }
+  if (!grp.length) for (const [ws, sel] of SYN) if (ws.some(w => w === q || (q.length >= 3 && w.startsWith(q)) || (q.length > 3 && q.includes(w)))) { const el = $(sel, md); if (el) add(el, el.closest('.spane')?.dataset.pane); }
+  const heads = p => $$('h4', p);
+  const secOf = (el, p) => { let last = null; for (const h of heads(p)) { if (h === el || (h.compareDocumentPosition(el) & 4)) last = h; else break; } return last; };
+  const TITLES = 'h4, .row > label, label.chkl, .featgrid label > span, .modrow b, summary, button:not(.iconbtn), th, option', HINTS = '.shint, .modrow small';
+  const own = el => el.matches('.featgrid label > span') ? (el.firstChild?.textContent || '') + ' ' + (el.querySelector('small')?.textContent || '') : ss_text(el);
+  const okEl = el => shown(el) && !el.closest('.ssres');
+  const terms = [q, ...targets];
+  const hit = t => terms.some(x => t.toLowerCase().includes(x));
+  for (const pass of [TITLES, HINTS]) {
+    const perSec = new Set();
+    for (const p of $$('.spane', md)) for (const el of $$(pass, p)) {
+      if (hits.length >= MAX) break;
+      if (!okEl(el) || !hit(own(el))) continue;
+      if (pass === HINTS) { const sec = secOf(el, p) || p; if (perSec.has(sec)) continue; perSec.add(sec); }
+      add(el.matches('option') ? el.closest('select') : el, p.dataset.pane);
+    }
+  }
+  return hits;
 }

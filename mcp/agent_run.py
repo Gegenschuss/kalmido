@@ -42,6 +42,9 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_STATE_DIR             event cursor, state.json, queue, lock, permission files (default ~/.cache/kalmido-agent)
   KALMIDO_PERM_RELAY / _TIMEOUT / _USER   permission questions in the chat (default on / 540 s / the agent's owner)
   KALMIDO_SESSION_RESUME        0 = a fresh run per event (default 1); KALMIDO_SESSION_MAX_TOKENS / _MAX_RUNS / _IDLE_MIN
+                                only when Kalmido does not send them (2.233.0, #3189: runtime rotate_tokens / rotate_runs /
+                                rotate_idle_min, set in the agent's runtime section "Interim summary"; a new day starts at
+                                runtime nightly_reset)
   KALMIDO_RUN_TIMEOUT           seconds per run (default 3600, 0 = none); KALMIDO_APPROVAL_REMIND / KALMIDO_APPROVAL_TTL
   KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
@@ -84,6 +87,27 @@ SESSION_MAX_RUNS = int(os.environ.get("KALMIDO_SESSION_MAX_RUNS") or 60)
 SESSION_IDLE_S = int(os.environ.get("KALMIDO_SESSION_IDLE_MIN") or 120) * 60
 CHAT_RUN_EVENTS = ("chat", "chat_choice", "scheduled_job", "job_wake")  # 2.46.6 (#1445): job_wake = the launcher's own
 SKIP_EVENTS = ("runtime_changed", "reset", "ping", "typing")  # the launcher restarts on runtime changes itself
+
+
+def rotate_limits(rt):
+    """2.233.0 (#3189): (max context tokens, max runs, pause in s; 0 = no pause limit) of a conversation: Kalmido's runtime
+    (rotate_tokens / rotate_runs / rotate_idle_min), the KALMIDO_SESSION_* values only when an older Kalmido sends none."""
+    def num(k, dflt):
+        v = (rt or {}).get(k)
+        return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else dflt
+    return num("rotate_tokens", SESSION_MAX_TOKENS), num("rotate_runs", SESSION_MAX_RUNS), num("rotate_idle_min", SESSION_IDLE_S // 60) * 60
+
+
+def session_day(rt):
+    """2.233.0 (#3189): the conversation's day; it begins at runtime nightly_reset (HH:MM in runtime timezone), else at midnight."""
+    m = re.fullmatch(r"([01]\d|2[0-3]):([0-5]\d)", str((rt or {}).get("nightly_reset") or ""))
+    t = time.time() - (int(m[1]) * 3600 + int(m[2]) * 60 if m else 0)
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        return datetime.fromtimestamp(t, ZoneInfo(str((rt or {}).get("timezone") or ""))).strftime("%Y-%m-%d")
+    except Exception:  # no / unknown time zone: the host's local time
+        return time.strftime("%Y-%m-%d", time.localtime(t))
 REDACTED = "[redacted]"
 SECRET_RES = [
     re.compile(r"-----BEGIN [A-Z0-9 ]*(?:PRIVATE KEY|KEY|CERTIFICATE)-----.*?(?:-----END [A-Z0-9 ]*-----|\Z)", re.S),
@@ -677,10 +701,15 @@ def build_prompt(evs, chat_uid, extra=None):
                 out += text_hint(x)
             if (x.get("kind") or j.get("kind")) == "ideas":  # kalmido-capability: ideas_proposal (2.156.0, #1201)
                 out += ideas_hint(x)
+            if (x.get("kind") or j.get("kind")) == "receipt_read":  # kalmido-capability: receipt_read (2.299.0, #3194)
+                out += receipt_hint(x)
         elif kind == "message_edited":  # kalmido-capability: message_edited (2.39.0, #1179)
             out += edit_hint(x)
         elif kind == "chat_choice":
             out.append("The person pressed: " + " / ".join(str(l) for l in (x.get("labels") or x.get("choice_ids") or [])))
+            if x.get("collected"):  # 2.233.0 (#2848): an older suggestion the person kept, newer messages came after it
+                q = ((x.get("message") or {}).get("body") or "").strip().split("\n")[0][:200]
+                out.append("(an earlier suggestion, answered after newer messages" + (": " + q if q else "") + ")")
         elif kind == "comment" and isinstance(x.get("answer"), dict):  # kalmido-capability: comment_answer (2.41.0, #1383)
             out += comment_answer_hint(x)
         elif kind in ("comment", "mention") and (x.get("comment") or {}).get("portal"):  # kalmido-capability: customer_comment (2.63.0, #1513)
@@ -713,6 +742,20 @@ def text_hint(x):
             "no dates, prices, names or promises that are not in the input, no placeholders for unknown facts; write in the "
             "language of the document (input.doc.lang) or input.lang. Answer " + shape + " with submit_proposal. Kalmido sends "
             "nothing: the person edits it and takes it over."]
+
+
+def receipt_hint(x):
+    """2.299.0 (#3194): a person asks the agent to read a receipt. The agent reads the file itself (input.document.id with
+    read_file as base64, or input.document.content_url with its token) where it runs -- a local model is fine -- and answers
+    only what is on the receipt; Kalmido calls no model and sends nothing out."""
+    inp = x.get("input") or {}
+    bank = " bank_tx only an id of input.bank (an open booking with the receipt's amount) when it clearly fits;" if inp.get("bank") else ""
+    return ["Read a receipt (kind receipt_read): open the file itself (read_file with file_id = input.document.id and as "
+            "\"base64\" for an image / PDF, or the text of input.document) and read only what is on it -- nothing invented, a value "
+            "you cannot read stays out. Answer {supplier?, vat_id?, tax_no?, invoice_no?, date? (YYYY-MM-DD), net?, vat?, gross? "
+            "(\"12.34\"), vat_pct? (19 | 7 | 0 ...), vat_rates? [{pct, net, vat}], currency? (EUR), positions? [{text, qty?, net?, "
+            "vat_pct?}] (at most 100), category? (one of input.categories when one fits), account?} with submit_proposal;" + bank +
+            " unknown fields are refused. The person checks the values and takes them over; you never change the receipt."]
 
 
 def ideas_hint(x):
@@ -1098,6 +1141,26 @@ def match_approval(line, approvals):
 
 
 # kalmido-capability: approval_lifecycle, perm_relay, session_resume, robust_runs (2.44.0, #1444 / #1442 / #1446 / #1448)
+# kalmido-capability: work_window (2.236.0, #2905): outside the work window of the agent's work style no run starts; the
+# events stay in the queue on disk until the window opens (nothing is lost), work_style_changed is read at once
+def work_window_open(ws, now=None):
+    """The work window of the work style (GET /api/v1/agent work_style; work_mode office = only from-to on work_days, 1 =
+    Monday, in the instance's time zone): True = a run may start. Without zoneinfo: the server's state of the last read."""
+    if not isinstance(ws, dict) or ws.get("work_mode") != "office":
+        return True
+    st = ws.get("state") or {}
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        t = datetime.fromtimestamp(now if now is not None else time.time(), ZoneInfo(st.get("timezone") or "UTC"))
+        a, b = (int(x[:2]) * 60 + int(x[3:5]) for x in (ws.get("work_from") or "00:00", ws.get("work_to") or "00:00"))
+    except Exception:
+        return st.get("working") is not False
+    m = t.hour * 60 + t.minute
+    inside = a == b or (a <= m < b if a < b else (m >= a or m < b))
+    return t.isoweekday() in (ws.get("work_days") or [1, 2, 3, 4, 5]) and inside
+
+
 class RunnerState:
     """Everything the runner must not forget across a restart, in ONE file of the state folder (state.json, written
     atomically: a .new file, then os.replace): open approval cards, closed / expired ones, notes for the next prompt,
@@ -1460,6 +1523,10 @@ class Runner:
             self.mark_approval(ev)
             if ev.get("_drop"):
                 continue
+            if ev.get("event") == "work_style_changed":  # 2.236.0 (#2905): information, no run
+                self.agent["work_style"] = (ev.get("data") or {}).get("work_style") or self.agent.get("work_style")
+                log("work style changed")
+                continue
             if ev.get("event") in ("reset", "runtime_changed"):
                 self.refresh_due = True  # 2.44.0 (#1446): the next run reads the runtime again (reset / model)
             if ev.get("event") in SKIP_EVENTS:
@@ -1648,13 +1715,14 @@ class Runner:
             return "reset"
         if rt.get("model") and s.get("model") and rt["model"] != s["model"]:
             return "model changed"
-        if s.get("day") != time.strftime("%Y-%m-%d"):
+        if s.get("day") != session_day(rt):
             return "a new day"
-        if int(s.get("tokens") or 0) >= SESSION_MAX_TOKENS:
+        max_tok, max_runs, idle_s = rotate_limits(rt)
+        if int(s.get("tokens") or 0) >= max_tok:
             return "size"
-        if int(s.get("runs") or 0) >= SESSION_MAX_RUNS:
+        if int(s.get("runs") or 0) >= max_runs:
             return "number of runs"
-        if time.time() - float(s.get("last") or 0) > SESSION_IDLE_S:
+        if idle_s and time.time() - float(s.get("last") or 0) > idle_s:
             return "long pause"
         return ""
 
@@ -1665,11 +1733,33 @@ class Runner:
         with self.state.lock:
             s = self.state.data["sessions"].get(key) or {}
             if s.get("id") != st.session_id:
-                s = {"id": st.session_id, "day": time.strftime("%Y-%m-%d"), "runs": 0, "started": time.time(),
+                s = {"id": st.session_id, "day": session_day(rt), "runs": 0, "started": time.time(),
                      "model": rt.get("model") or "", "reset_seq": rt.get("reset_seq")}
             s.update(runs=int(s.get("runs") or 0) + 1, last=time.time(), tokens=st.context_tokens or s.get("tokens") or 0)
             self.state.data["sessions"][key] = s
             self.state.save()
+
+    def work_closed(self):
+        """2.236.0 (#2905): True while the work window is closed (the queue waits); one status line per change."""
+        closed = not work_window_open(self.agent.get("work_style"))
+        if closed != getattr(self, "ws_closed", False):
+            self.ws_closed = closed
+            if closed:
+                self.refresh_agent()  # the server's work_resumes_at
+                st = (self.agent.get("work_style") or {}).get("state") or {}
+                at = st.get("work_resumes_at") or ""
+                try:  # the instance's local time
+                    from datetime import datetime
+                    from zoneinfo import ZoneInfo
+                    at = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(ZoneInfo(st.get("timezone") or "UTC")).strftime("%a %H:%M")
+                except Exception:
+                    at = at[:16].replace("T", " ")
+                log(f"outside the work window: events wait{' until ' + at if at else ''}")
+                self.api.status("paused", "Outside working hours" + (f", back {at}" if at else ""))
+            else:
+                log("work window open: working through the queue")
+                self.api.status("idle")
+        return closed
 
     def refresh_agent(self):
         try:
@@ -2205,6 +2295,10 @@ class Runner:
             due = bool(ex and ex.due())
             if not self.state.data["queue"] and not due:
                 self.wake.wait(min(30, ex.wait_s(30)) if ex and hasattr(ex, "wait_s") else 30)
+                self.wake.clear()
+                continue
+            if self.work_closed():
+                self.wake.wait(60)
                 self.wake.clear()
                 continue
             time.sleep(QUEUE_SETTLE_S if self.state.data["queue"] else 0)

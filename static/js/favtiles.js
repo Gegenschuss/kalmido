@@ -18,7 +18,7 @@ const FV2_VIEWS = {inbox: ['inbox', N_('Basket')], assigned: ['user', N_('My tas
 // [icon, name] of the views and modules (an area of areas.js wins for its id: its row stands for all its parts)
 const FV2_MODS = {cal: ['cal', N_('Calendar')], timeline: ['timeline', N_('Timeline')], matrix: ['grid', N_('Matrix')], habits: ['habit', N_('Habits')],
   pomo: ['timer', N_('Focus timer')], time: ['clock', N_('Time tracking')], stats: ['chart', N_('Statistics')], contacts: ['users', N_('Contacts')],
-  life: ['home', N_('Home & life')], workload: ['chart', N_('Workload')], office: ['receipt', N_('Office & finance')], wiki: ['book', N_('Knowledge pages')], sheets: ['sheet', N_('Tables')],
+  life: ['home', N_('Home & life')], workload: ['chart', N_('Workload & absences')], office: ['receipt', N_('Office & finance')], wiki: ['book', N_('Knowledge pages')], sheets: ['sheet', N_('Tables')],
   review: ['journal', N_('Review & journal')], family: ['family', N_('Family')], overview: ['pulse', N_('Project status')], agents: ['bot', N_('Agents')],
   notes: ['note', N_('Notes')], news: ['bell', N_('News')], team: ['comment', N_('Messages')]};
 const FV2 = {drag: null, held: 0, lp: null};

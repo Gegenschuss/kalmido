@@ -173,6 +173,10 @@ check(pb["quota"] is None and pb["rest"] is None, "#2117: no entitlement = no ac
 Ag = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "helper", "display_name": "Helper"}).json()
 AGH = {"Authorization": "Bearer " + Ag["token"], **H}
 check(A.patch(B + f"/api/admin/agents/{Ag['id']}", json={"org_id": ORG}).ok, "setup: an agent of Alpha")
+# 2.223.7 (#2917): an agent sees only the people of its shared projects -- carol shares one with it
+_LS = Bo.post(B + "/api/lists", json={"name": "Helper shared", "org_id": ORG}).json()["id"]
+check(Bo.put(B + f"/api/lists/{_LS}/members", json={"user_id": CAROL, "role": "edit"}).ok
+      and Bo.put(B + f"/api/lists/{_LS}/members", json={"user_id": Ag["id"], "role": "view"}).ok, "setup: carol + the agent share a project")
 # off by default: a member's vacation is approved at once (as before)
 r = Ca.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": "2027-04-12"})
 check(r.status_code == 201 and r.json()["status"] == "approved", f"#2117: approvals off: carol's vacation is approved at once ({r.text[:150]})")

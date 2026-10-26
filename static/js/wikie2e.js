@@ -219,25 +219,29 @@ function wkeFront(text) {
 }
 // the cleaned path (wiki/pages.py wiki_clean_path): the server cannot clean a cipher, so the browser does it with the same rules
 const WKE_BAD = /[\x00-\x1f\x7f\[\]|#^\\]/g;
-function wkeClean(v, loose) {
+const WKE_DEPTH = 32, WKE_PMAX = 500;  // 2.210 A (#2755): as WIKI_DEPTH / WIKI_PATH_MAX (were 12 / 200)
+function wkeParts(v) {
   v = String(v ?? '').normalize('NFC').trim();
   if (v.toLowerCase().endsWith('.md')) v = v.slice(0, -3);
-  const parts = v.replace(/\\/g, '/').split('/').map(p => p.replace(WKE_BAD, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  return v.replace(/\\/g, '/').split('/').map(p => p.replace(WKE_BAD, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+function wkeClean(v, loose) {
+  const parts = wkeParts(v);
   if (!parts.length || parts.some(p => p === '.' || p === '..' || p.startsWith('.'))) throw wkeErr(tr('Please give the page a name'), 'bad');
-  if (parts.length > 12) throw wkeErr(tr('Too many folder levels (at most {0})', 12), 'bad');
+  if (parts.length > WKE_DEPTH) throw wkeErr(tr('Too many folder levels (at most {0})', WKE_DEPTH), 'bad');
   const out = parts.join('/');
-  if (out.length > 200) throw wkeErr(tr('The name is too long (at most {0} characters)', 200), 'bad');
+  if (out.length > WKE_PMAX) throw wkeErr(tr('The name is too long (at most {0} characters)', WKE_PMAX), 'bad');
   if (!loose && out.toLowerCase().startsWith(WKE_PRE)) throw wkeErr(tr('Invalid value: {0}', 'path'), 'bad');  // 2.64.3 E (#1817, review 2 M1): like wiki_clean_path
   return out;
 }
 // 2.64.3 E (#1817, review 2 M1): a plain value the server refuses on the way back (it begins like a cipher) gets a character in front
 function wkeDefuse(f, v) {
-  if (f === 'path') { const c = wkeClean(v, true); if (!c.toLowerCase().startsWith(WKE_PRE)) return c; WKE.defused = (WKE.defused || 0) + 1; return ('_' + c).slice(0, 200); }
+  if (f === 'path') { const c = wkeClean(v, true); if (!c.toLowerCase().startsWith(WKE_PRE)) return c; WKE.defused = (WKE.defused || 0) + 1; return ('_' + c).slice(0, WKE_PMAX); }
   if (!String(v).startsWith(WKE_PRE)) return v;
   WKE.defused = (WKE.defused || 0) + 1; return ' ' + v;
 }
 const wkeKey = p => { try { return wkeClean(p).toLowerCase(); } catch { return ''; } };
-const WKE_LINK = /\[\[([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]/g;
+const WKE_LINK = /\[\[([^\[\]|#\n]{1,500})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]/g;
 const wkeLinks = text => new Set([...String(text || '').matchAll(WKE_LINK)].map(m => wkeKey(m[1])).filter(Boolean));
 const wkeTasks = text => new Set([...String(text || '').matchAll(/(^|[^\w&/#])#(\d{1,12})\b/g)].map(m => +m[2]));
 // a page object of an encrypted space: path / body opened in place (the ciphers kept in _enc), attrs and the template flag from
@@ -459,6 +463,22 @@ async function wkeExport(sp) {
   wkeSave(wkeZip(pages.map(p => ({name: p.path + '.md', data: te.encode(p.body || '')}))), 'wiki.zip');
   return pages.length;
 }
+// 2.210 A (#2755): a name too deep / too long for the space, shortened (null: not possible): the deeper folders join the
+// page's name, long folder names and then the page's name keep their start and end with a short hash in the middle (the same
+// folder name gives the same short name). Simpler than the server's wiki_fit_paths (one name at a time), same limits.
+const wkeHash = t => { let h = 0x811c9dc5; for (const ch of t) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0; return h.toString(16).padStart(8, '0').slice(0, 6); };
+const wkeCut = (t, n) => { if (t.length <= n) return t; if (n < 10) return wkeHash(t).slice(0, Math.max(1, n));  /* 2.210 (#2755, review): never longer than n */ const k = Math.max(2, n - 8), hd = k - Math.floor(k / 3), tl = Math.floor(k / 3); return (t.slice(0, hd).trimEnd() + '~' + wkeHash(t) + '~' + (tl ? t.slice(-tl).trimStart() : '')).trim(); };
+function wkeFit(name) {
+  let parts = wkeParts(name);
+  if (!parts.length || parts.some(p => p === '.' || p === '..' || p.startsWith('.'))) return null;
+  if (parts.length > WKE_DEPTH) parts = [...parts.slice(0, WKE_DEPTH - 1), parts.slice(WKE_DEPTH - 1).join(' - ')];
+  const len = () => parts.slice(0, -1).join('/').length + 1 + Math.min(parts[parts.length - 1].length, 48);
+  for (const n of [48, 24, 12]) for (let i = parts.length - 2; i >= 0 && len() > WKE_PMAX; i--) parts[i] = wkeCut(parts[i], n);
+  const dir = parts.slice(0, -1).join('/'), room = WKE_PMAX - dir.length - (dir ? 1 : 0);
+  if (room < 8) return null;
+  const out = (dir ? dir + '/' : '') + wkeCut(parts[parts.length - 1], room);
+  return out.toLowerCase().startsWith(WKE_PRE) ? null : out;
+}
 // a ZIP of .md files into the space: the server's limits and path cleaning, names taken are skipped, every page created
 // encrypted (one call each; a "too many requests" waits and tries again). Answers {created: ids, skipped: names}.
 async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(done, total) for the progress window; false = stop
@@ -470,7 +490,7 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
   const files = ents.filter(x => !x.name.endsWith('/'));
   if (files.length > WKE_ZIP.files) throw wkeErr(tr('Too many files (at most {0})', WKE_ZIP.files), 'bad');
   if (files.filter(x => x.name.toLowerCase().endsWith('.md')).reduce((a, x) => a + x.usize, 0) > WKE_ZIP.total) throw wkeErr(tr('The archive is too large'), 'bad');
-  const created = [], skipped = [], detail = [], seen = new Set(), td = new TextDecoder('utf-8');
+  const created = [], skipped = [], detail = [], short = [], seen = new Set(), td = new TextDecoder('utf-8');
   for (const [k, x] of files.entries()) {
     if (onProg && onProg(k, files.length) === false) break;
     const nm = x.name.slice(0, 200);
@@ -479,9 +499,9 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
       continue;
     }
     if (x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
-    let path, text;
+    let path, text, cut = false;
     try {
-      path = wkeClean(x.name);
+      try { path = wkeClean(x.name); } catch (e) { path = wkeFit(x.name); if (!path) throw e; cut = true; }  // 2.210 A (#2755): shortened, not skipped
       const raw = x.method === 8 ? await wkeInflate(x.data(), WKE_ZIP.file) : x.data();
       text = td.decode(raw.subarray(0, WKE_ZIP.file)).replace(/^﻿/, '');
     } catch { skipped.push(nm); continue; }
@@ -489,7 +509,7 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
     for (let tries = 0; ; tries++) {
       try {
         const r = await wkeApi('POST', '/api/wiki/pages', {space: sp, path, body: text}, sp);
-        created.push(r.id); seen.add(path.toLowerCase());
+        created.push(r.id); seen.add(path.toLowerCase()); if (cut) short.push({name: nm, path});
         break;
       } catch (e) {
         if (e?.status === 429 && tries < 5) { await new Promise(res => setTimeout(res, 1500 * (tries + 1))); continue; }
@@ -498,7 +518,7 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
       }
     }
   }
-  return {ok: true, created, updated: [], files: [], files_n: 0, skipped: skipped.slice(0, 200), skipped_n: skipped.length,
+  return {ok: true, created, updated: [], files: [], files_n: 0, skipped: skipped.slice(0, 200), skipped_n: skipped.length, shortened: short.slice(0, 200), shortened_n: short.length,
     skipped_detail: [...detail, ...skipped.filter(n => !detail.some(d => d.name === n)).map(name => ({name, reason: ''}))].slice(0, 200)};
 }
 
@@ -963,15 +983,16 @@ async function wkr_run(src, dst, plan, tries = 2) {
   const pages = [];
   for (const [x, p] of rows) {
     const body = wkr_relink(p.body, pairs);
-    pages.push(to.mode ? {id: x.id, path: await wkeEnc(dst, 'path', wkeClean(x.path)), body: await wkeEnc(dst, 'body', body)}
-      : {id: x.id, path: wkeDefuse('path', x.path), body: wkeDefuse('body', body)});
+    const exp = p.updated_at ? {expect_updated_at: p.updated_at} : {};  // 2.273.0 B (#3042): a page saved since = 409, not overwritten
+    pages.push(to.mode ? {id: x.id, path: await wkeEnc(dst, 'path', wkeClean(x.path)), body: await wkeEnc(dst, 'body', body), ...exp}
+      : {id: x.id, path: wkeDefuse('path', x.path), body: wkeDefuse('body', body), ...exp});
   }
   try {
     const r = await rawFetch('POST', '/api/wiki/move-space', {pages, space: src, to: dst, gens: {from: e.from?.gen || 0, to: to.gen || 0}});
     r.moved = rows.map(([x, p]) => ({id: x.id, from: p.path, to: x.path}));  // plain names, known only here
     return r;
   } catch (er) {
-    if (er?.data?.code === 'wiki_e2e_gen' && tries > 1) return wkr_run(src, dst, plan, tries - 1);
+    if (['wiki_e2e_gen', 'wiki_changed'].includes(er?.data?.code) && tries > 1) return wkr_run(src, dst, plan, tries - 1);  // 2.273.0 B: + changed meanwhile (read again)
     throw er;
   }
 }

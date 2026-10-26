@@ -31,13 +31,13 @@ import re
 from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from .doclang import doc_lg
 from ..core.db import body, db, err
 from ..core.access import Denied
-from ..core.orgcrypt import oc_read_file, oc_write_file
+from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_settings, office_settings_lock, office_settings_save
-from .bpread import BpCopier, BpDoc, BpError, bp_check
+from .bpread import BpCopier, BpDoc, BpError, BpPdfaError, bp_check, bp_pdfa_issues
 from .pdf import A4_H, A4_W
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.149.0 G (#2517): pulled up from functions
@@ -49,6 +49,9 @@ BP_DEFAULT = {"m1": [45, 20, 32, 25], "m2": [30, 20, 32, 25], "hide_head": 1, "h
 BP_FILE_RE = re.compile(r"letterhead-[0-9a-f]{16}\.pdf")
 BP_SNAP_RE = re.compile(r"lhs-[0-9a-f]{16}\.pdf")
 BP_MIN_WIDTH_MM = 100  # the text column never gets narrower
+# 2.296.0 C (#3177): what of a letterhead breaks PDF/A (bpread.bp_pdfa_issues), named for the user
+BP_PDFA_LABELS = {"font": N_("a font is not embedded"), "cmyk": N_("CMYK colours (RGB is needed)"), "lzw": N_("LZW compression")}
+_PDFA_SEEN = {}  # (org, sha256) -> the issues of a letterhead stored before 2.296.0 (read once per process)
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -66,9 +69,37 @@ def bp_state(s):
     return lh
 
 
-def bp_public(lh):
-    """The state for the client: no server paths, no previous file name beyond the undo marker."""
-    return {"on": bool(lh["file"]), "file": lh["file"], "name": lh.get("name") or "", "bytes": int(lh.get("bytes") or 0),
+def bp_pdfa_of(c, oid, lh):
+    """2.296.0 C (#3177): the PDF/A issues of the current letterhead (stored since 2.296.0; an older one is read once)."""
+    if not lh["file"]:
+        return []
+    if isinstance(lh.get("pdfa"), list):
+        return lh["pdfa"]
+    key = (oid, lh.get("sha256") or lh["file"])
+    if key not in _PDFA_SEEN:
+        try:
+            data = bp_read(c, oid, lh["file"])
+            _PDFA_SEEN[key] = bp_pdfa_issues(BpDoc(data)) if data else []
+        except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:
+            log.info("letterhead PDF/A check: %s", e)
+            _PDFA_SEEN[key] = []
+        except (OSError, OrgCryptError) as e:  # 2.296.0 F (#3177): file gone / key unreadable: no hint, never a 500 (not cached)
+            log.info("letterhead PDF/A check: %s", e)
+            return []
+    return _PDFA_SEEN[key]
+
+
+def bp_pdfa_text(issues):
+    return ", ".join(tr(BP_PDFA_LABELS[k]) for k in issues if k in BP_PDFA_LABELS)
+
+
+def bp_public(lh, c=None, oid=None):
+    """The state for the client: no server paths, no previous file name beyond the undo marker.
+    2.296.0 C (#3177): with c / oid also pdfa_hint (a letterhead uploaded before the PDF/A check that would break it)."""
+    issues = bp_pdfa_of(c, oid, lh) if c is not None else []
+    return {"pdfa_issues": issues, "pdfa_hint": tr("This letterhead makes your documents invalid PDF/A (needed for e-invoices): {0}. Export it as PDF/A and upload it again.",
+                                                   bp_pdfa_text(issues)) if issues else "",
+            "on": bool(lh["file"]), "file": lh["file"], "name": lh.get("name") or "", "bytes": int(lh.get("bytes") or 0),
             "pages": int(lh.get("pages") or 0) if lh["file"] else 0, "m1": lh["m1"], "m2": lh["m2"],
             "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0,
             "prev": lh.get("prev") or ""}
@@ -97,7 +128,8 @@ def bp_margins_clean(v, name):
 def _save(c, oid, lh):
     office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
-    s["letterhead"] = {k: lh.get(k) for k in ("file", "sha256", "name", "bytes", "pages", "prev", "m1", "m2", "hide_head", "hide_footer")}
+    s["letterhead"] = {k: lh.get(k) for k in ("file", "sha256", "name", "bytes", "pages", "prev", "m1", "m2", "hide_head", "hide_footer",
+                                              "pdfa")}  # 2.296.0 C (#3177)
     office_settings_save(c, oid, s)
 
 
@@ -217,7 +249,7 @@ def bp_letter(c, oid):
 @app.get("/api/office/letterhead")
 def bp_get():
     c, uid, oid = _ctx()
-    return jsonify(letterhead=bp_public(bp_state(office_settings(c, oid))))
+    return jsonify(letterhead=bp_public(bp_state(office_settings(c, oid)), c, oid))
 
 
 @app.post("/api/office/letterhead")
@@ -238,7 +270,11 @@ def bp_upload():
     except UploadRefused as e:
         return err(str(e))
     try:
-        pages, sizes = bp_check(raw)
+        pages, sizes = bp_check(raw, pdfa=True)
+    except BpPdfaError as e:  # 2.296.0 C (#3177): readable, but the documents would no longer be PDF/A
+        log.info("letterhead refused: %s", e)
+        return err(tr("This letterhead would make your documents invalid PDF/A (needed for e-invoices): {0}. Please export it as PDF/A and upload it again.",
+                      bp_pdfa_text(e.issues)))
     except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:  # 2.120.0 review H1: + MemoryError
         log.info("letterhead refused: %s", e)
         return err(tr("This PDF cannot be used as letterhead. Please save it again as a plain PDF (not protected, A4)."))
@@ -255,12 +291,12 @@ def bp_upload():
     lh = bp_state(office_settings(c, oid))
     prev = lh["file"] if lh["file"] != name else lh.get("prev") or ""
     fname = re.sub(r"[\x00-\x1f\x7f/\\]", "", os.path.basename(f.filename or ""))[:120]
-    lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev)
+    lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev, pdfa=[])
     _save(c, oid, lh)
     bp_purge(oid, {name, prev})
     ofx_log(c, oid, "upload", target="letterhead", detail={"bytes": len(raw), "pages": pages, "sha256": sha})
     c.commit()
-    return jsonify(letterhead=bp_public(lh))
+    return jsonify(letterhead=bp_public(lh, c, oid))
 
 
 @app.put("/api/office/letterhead")
@@ -288,7 +324,7 @@ def bp_put():
         _save(c, oid, lh)
         ofx_log(c, oid, "update", target="letterhead", detail={"before": before, "after": after})
         c.commit()
-    return jsonify(letterhead=bp_public(lh))
+    return jsonify(letterhead=bp_public(lh, c, oid))
 
 
 @app.delete("/api/office/letterhead")
@@ -305,7 +341,7 @@ def bp_delete():
         bp_purge(oid, {lh["prev"]})
         ofx_log(c, oid, "delete", target="letterhead")
         c.commit()
-    return jsonify(letterhead=bp_public(lh))
+    return jsonify(letterhead=bp_public(lh, c, oid))
 
 
 @app.post("/api/office/letterhead/restore")
@@ -319,7 +355,7 @@ def bp_restore():
     write_lock(c, f"office_letterhead_{int(oid)}")
     lh = bp_state(office_settings(c, oid))
     if want == lh["file"]:
-        return jsonify(letterhead=bp_public(lh))
+        return jsonify(letterhead=bp_public(lh, c, oid))
     if not want:  # the undo of an upload onto no letterhead: none again, the uploaded file stays as prev
         lh["prev"], lh["file"] = lh["file"], ""
         lh.update(sha256="", bytes=0, pages=0)
@@ -331,11 +367,11 @@ def bp_restore():
             raise Denied(404)
         pages, _sizes = bp_check(data)
         lh["prev"], lh["file"] = lh["file"], want
-        lh.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), pages=pages)
+        lh.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), pages=pages, pdfa=None)  # 2.296.0 C (#3177): read again (bp_pdfa_of)
     _save(c, oid, lh)
     ofx_log(c, oid, "update", target="letterhead", detail={"restored": want})
     c.commit()
-    return jsonify(letterhead=bp_public(lh))
+    return jsonify(letterhead=bp_public(lh, c, oid))
 
 
 def bp_sample(c, oid):

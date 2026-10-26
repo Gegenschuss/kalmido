@@ -78,7 +78,7 @@ def _ln_task(c, tid):
 
 
 def _ln_mine(c, tid, uid):
-    r = c.execute("SELECT user_id, body, updated_at FROM task_note_locks WHERE task_id=?", (tid,)).fetchone()
+    r = c.execute("SELECT user_id, body, updated_at, legacy_aad FROM task_note_locks WHERE task_id=?", (tid,)).fetchone()
     if r and r["user_id"] != uid:
         raise Denied(403, ln_msg())
     return r
@@ -99,7 +99,8 @@ def ln_get(tid):
     r = _ln_mine(c, tid, uid)
     if not r:
         raise Denied(404)
-    return jsonify(task_id=tid, body=json.loads(r["body"]), updated_at=r["updated_at"])
+    # 2.278.0 C (#3091): legacy_aad = the AAD of the old server (an account move), only for its author
+    return jsonify(task_id=tid, body=json.loads(r["body"]), updated_at=r["updated_at"], legacy_aad=r["legacy_aad"])
 
 
 @app.put("/api/tasks/<int:tid>/note-lock")
@@ -123,7 +124,7 @@ def ln_put(tid):
             return err(e, 409)
     ts = iso_ms(now_utc())
     c.execute("INSERT INTO task_note_locks(task_id,user_id,body,updated_at) VALUES(?,?,?,?) ON CONFLICT(task_id) "
-              "DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at", (tid, uid, enc, ts))
+              "DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at, legacy_aad=NULL", (tid, uid, enc, ts))  # 2.278.0 C (#3091): sealed anew
     if not old:
         # the plain note goes in the same transaction; the history says only "locked" (never the text)
         c.execute("UPDATE tasks SET content='', updated_at=? WHERE id=?", (ts, tid))

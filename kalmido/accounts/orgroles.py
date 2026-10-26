@@ -41,7 +41,8 @@ def org_roles_of(c, uid):
         else:
             with system_ctx(c):  # membership structure (also asked for other people)
                 cache[uid] = {r[0]: role_known(r[1], r[0], uid)
-                              for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
+                              for r in c.execute("SELECT m.org_id, m.role FROM org_members m JOIN orgs o ON o.id=m.org_id "  # 2.223.2 A (#2859)
+                                                 "WHERE m.user_id=? AND o.retired_at IS NULL", (uid,))}
     return cache[uid]
 
 

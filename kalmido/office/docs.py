@@ -29,7 +29,8 @@ from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_or
                     office_seed_texts, office_trial_number, trial_flag)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
-from .invdelete import idt_applies, idt_delete, idt_info, idt_plan  # 2.162.0 A (#2603)
+from .invdelete import idt_applies, idt_delete, idt_info, idt_plan, odoc_unlink_refs  # 2.162.0 A (#2603)
+from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
@@ -105,10 +106,14 @@ def _choice(v, name, choices):
     return v
 
 
-def _fmt_date(s, pack):
-    """2026-10-09 -> 09.10.2026 by the pack's date format (dd.mm.yyyy / yyyy-mm-dd / mm/dd/yyyy)."""
+def _fmt_date(s, pack, lang=None):
+    """2026-10-09 -> 09.10.2026 by the pack's date format (dd.mm.yyyy / yyyy-mm-dd / mm/dd/yyyy). 2.296.0 B (#3175): a
+    document in another language than German writes the date of its language (pdf.pdf_date: "9 October 2026")."""
     if not s:
         return ""
+    if lang and str(lang).split("-")[0] != "de":
+        from .pdf import pdf_date
+        return pdf_date(str(s)[:10], str(lang).split("-")[0])
     f = ((pack or {}).get("formats") or {}).get("date") or "dd.mm.yyyy"
     try:
         d = date.fromisoformat(s)
@@ -202,8 +207,9 @@ def _recipient_from_client(cl, contact=None, home="DE"):
     if contact:
         lines.append(contact)
     country = g_("country").upper()
+    # 2.296.0 B (#3168): fk_country_label = "NIEDERLANDE" instead of "NL"
     lines += [x for x in (g_("street"), g_("address_extra"), " ".join(x for x in (g_("zip"), g_("city")) if x),
-                          country if country and country != (home or "DE").upper() else "") if x]
+                          fk_country_label(country, home or "DE") if country and country != (home or "DE").upper() else "") if x]
     return {"name": cl["name"], "name_extra": g_("name_extra"), "lines": lines[:12], "street": g_("street"), "extra": g_("address_extra"), "zip": g_("zip"),
             "city": g_("city"), "country": country, "missing": not all(g_(k) for k in ("street", "zip", "city"))}
 
@@ -1062,6 +1068,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
             p = os.path.join(OFFICE_DIR, str(oid), os.path.basename(s["logo"]))
             logo_path = p if os.path.isfile(p) else None
         color = s.get("color") or ""
+    _fd = lambda d, _p=None: _fmt_date(d, pack, lang)  # noqa: E731  2.296.0 B (#3175): dates in the document's language
     L = dict((pack.get("labels") or {}).get(lang) or {})
     cur = r["currency"]
     for ln in t["lines"]:
@@ -1076,9 +1083,9 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     rights = _j(r["rights"], {})
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         color = "#2f5d8a"
-    valid_text = _fmt_date(r["valid_until"], pack)
+    valid_text = _fd(r["valid_until"])
     # 2.149.0 A (#2520): the documents' own words (when the pack has no label) through tr() in the document's language
-    meta = [[L.get("offer_no", tr("Quotation no.|document", lg=lang)), r["number"]], [L.get("date", tr("Date|document", lg=lang)), _fmt_date(r["date"], pack)]]
+    meta = [[L.get("offer_no", tr("Quotation no.|document", lg=lang)), r["number"]], [L.get("date", tr("Date|document", lg=lang)), _fd(r["date"])]]
     # 2.114.4 A (#2277): no "Kunde" row any more, the name heads the address field (pdf.py adds it when the lines lack it)
     # 2.97.1 (#2224): the customer number as on the invoice; a document finalised before prints as it did
     if locked and "sender_line" in co:
@@ -1096,7 +1103,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         meta.append([L.get("valid_until", tr("Valid until|document", lg=lang)), valid_text])
     sf, st = (r["service_from"] or "", r["service_to"] or "") if "service_from" in r.keys() else ("", "")
     if sf or st:  # 2.36.2: period of service
-        per = _fmt_date(sf, pack) if sf == st or not st else (_fmt_date(st, pack) if not sf else f"{_fmt_date(sf, pack)} – {_fmt_date(st, pack)}")
+        per = _fd(sf) if sf == st or not st else (_fd(st) if not sf else f"{_fd(sf)} – {_fd(st)}")
         meta.append([L.get("service_period", tr("Period of service|document", lg=lang)), per])
     rows = [[L.get("net_total", t["labels"]["net"]), fmt_money(t["net"], lang, cur)]]
     if t.get("net_incl_raw") is not None:
@@ -1121,7 +1128,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
-        "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fmt_date(r["date"], pack),
+        "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fd(r["date"]),
         "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title(s, L, lang),
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
@@ -1146,9 +1153,9 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         from .parts import tp_render
         tp_render(c, oid, r, m, pack, lang, locked)
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the invoice words on top (title, due date, tax lines, reminder table, payment info)
-        inv_render(c, oid, r, m, t, pack, L, lang, _fmt_date)
+        inv_render(c, oid, r, m, t, pack, L, lang, _fd)
     from .terms import agb_print_line
-    m["terms_line"] = agb_print_line(c, oid, r, lambda d: _fmt_date(d, pack))  # 2.113.2 (#2253): quotations with terms only
+    m["terms_line"] = agb_print_line(c, oid, r, _fd)  # 2.113.2 (#2253): quotations with terms only
     return m if keep_detail else prd_strip_detail(m)  # 2.113.1 (#2251): keep_detail only for the signoff hash
 
 
@@ -1568,6 +1575,8 @@ def odoc_delete(did):
         trial_drop_files(paths)
         return jsonify(ok=True)
     if idt_applies(r):  # 2.162.0 A (#2603): test phase, a finalised / sent invoice with confirm_number (+ cash=0|1)
+        if office_role(c, uid, oid) != "admin":  # 2.237.0 B (#2864): only the admin of the office area, not office groups with manage
+            raise Denied(403, tr("Only an admin of this organisation can do this"))
         resp, paths = idt_delete(c, oid, uid, r)
         if resp[1] != 200:
             c.rollback()
@@ -1598,6 +1607,7 @@ def odoc_delete(did):
                 sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
+    odoc_unlink_refs(c, oid, [did])
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     from .docref import ofd_deleted
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes along

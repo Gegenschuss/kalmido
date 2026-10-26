@@ -29,6 +29,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import Denied, health_hidden, list_role, vis_sql, WRITE_ROLES
 from ..core import orgcrypt as oc
+from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement reader
 from ..core import stmtfiles as sf  # 2.146.0 C (#2455): several files / a ZIP in one import
 from ..core.errors import BadInput
@@ -946,11 +947,11 @@ def _row_of(r, m):
     return cx.csv_row(r, m, BUD_TITLE_MAX, BUD_CP_MAX, BUD_AMOUNT_MAX)
 
 
-def _camt_rows(text):
+def _camt_rows(text, mt940=False):
     """2.140.0 B (#2134): a CAMT.052 / .053 statement -> budget rows like _row_of (text = purpose, else the counterpart).
     The budget has no currency of its own: a booking in another currency than most of the file is refused.
     2.146.0 C (#2469): + pending (a CAMT.052 entry not booked yet), iban, ref (AcctSvcrRef), e2e (EndToEndId)."""
-    rows = cx.camt_rows(text)
+    rows = mt.mt_parse(text)[0] if mt940 else cx.camt_rows(text)  # 2.299.0 A (#3190): MT940 gives the same rows
     curs = [r["currency"] for r in rows if r["currency"]]
     main = max(set(curs), key=curs.count) if curs else ""
     out = []
@@ -1132,7 +1133,7 @@ def bud_import_parse(c, uid, lid, b, fs=None):
         if cx.camt_is(f["text"]):
             parts.append({**f, "fmt": "camt"})
         elif sf.is_mt940(f["text"]):
-            fs.errors.append({"file": f["name"], "error": tr("MT940 / MT942 is not read; please export CAMT.053 (XML) from your online banking")})
+            parts.append({**f, "fmt": "mt940"})  # 2.299.0 A (#3190)
         else:
             parts.append({**f, "fmt": "csv"})
     if not parts:
@@ -1162,7 +1163,7 @@ def bud_import_parse(c, uid, lid, b, fs=None):
             fs.errors.append({"file": p["name"], "error": p["error"]})
             continue
         try:
-            got = _camt_rows(p["text"]) if p["fmt"] == "camt" else _csv_rows(p["text"], b["mapping"])
+            got = _camt_rows(p["text"], p["fmt"] == "mt940") if p["fmt"] in ("camt", "mt940") else _csv_rows(p["text"], b["mapping"])
         except BadInput as x:
             if len(parts) == 1:
                 raise
@@ -1272,7 +1273,7 @@ def bud_import_commit(c, uid, lid, b):
     if run is None:
         import secrets  # noqa: PLC0415
         run = secrets.token_hex(8)
-        fmt = b.get("fmt") if b.get("fmt") in ("csv", "camt", "mixed") else "csv"
+        fmt = b.get("fmt") if b.get("fmt") in ("csv", "camt", "mt940", "mixed") else "csv"
         runs.append({"id": run, "at": iso(now_utc()), "label": cx.csv_clean(b.get("label"), 200), "fmt": fmt, "count": 0, "by": uid})
     dups = _Dups(c, lid)
     created = dup = 0

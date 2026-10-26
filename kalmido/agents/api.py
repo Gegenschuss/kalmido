@@ -373,7 +373,8 @@ def job_notify(c, j, old_state):
     lg = lang_of(s)
     name = user_names(c, [j["agent_id"]]).get(j["agent_id"], "?")
     g.pushes.append((uid, tr("{0} is waiting for your approval", name, lg=lg), j["title"],
-                     f"{PUBLIC_URL}/#t/{j['task_id']}" if j["task_id"] else f"{PUBLIC_URL}/#agents", push_prio(s)))
+                     f"{PUBLIC_URL}/#t/{j['task_id']}" if j["task_id"] else f"{PUBLIC_URL}/#agents", push_prio(s),
+                     {"ws": "limit", "scope": f"t:{j['task_id']}" if j["task_id"] else f"a:{j['agent_id']}"}))  # 2.240.0 B2 (#2867); 2.236.0 B (#2909): ws
 
 
 @app.patch("/api/v1/agent/jobs/<int:jid>")

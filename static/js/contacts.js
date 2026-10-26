@@ -431,12 +431,14 @@ function bk_edit(ids) {
   });
 }
 async function bk_set(body, ids, items) {  // 5000 per request; restore sends the old values (items) instead of ids
-  const out = {changed: 0, skipped: 0, undo: []}, all = items || ids;
+  const out = {changed: 0, skipped: 0, undo: [], conflicts: 0}, all = items || ids;
   for (let i = 0; i < all.length; i += 5000) {
     const part = all.slice(i, i + 5000);
     const j = await rawFetch('POST', '/api/contacts/bulk', items ? {...body, items: part} : {...body, ids: part});
     out.changed += j.changed || 0; out.skipped += j.skipped || 0; out.undo.push(...(j.undo || []));
+    out.conflicts += (j.conflicts || []).length;  // 2.273.0 C (#3048): changed again meanwhile, the undo left them
   }
+  if (out.conflicts) toast(trn('{0} contact was changed meanwhile and stayed as it is', '{0} contacts were changed meanwhile and stayed as they are', out.conflicts));
   return out;
 }
 async function bk_move(ids, b) {
@@ -649,7 +651,7 @@ function ctImpRun(bid, f, mapping, noPhotos) {
   let fi = null;  // 2.146.0 E (#2457): several files / a ZIP: how many were read, which not
   const done = async j => {
     const bad = fi?.errors?.length ? ' · ' + trn('{0} file not read', '{0} files not read', fi.errors.length) + ': ' + fi.errors.slice(0, 3).map(e => e.file).join(', ') : '';
-    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + bad, null, true);
+    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + (j.kept_newer ? ' · ' + trn('{0} contact not overwritten, it is newer here', '{0} contacts not overwritten, they are newer here', j.kept_newer) : '') + bad, null, true);
     if (j.dupes && (j.dupe_groups || []).length) ctx_dupBtn(p.el, j.dupe_groups);  // 2.119.1 A (#2084)
     await load().catch(() => {}); ctLoad();
   };

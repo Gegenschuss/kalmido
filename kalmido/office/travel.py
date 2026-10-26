@@ -29,7 +29,7 @@ from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
 from .periodlock import period_need_open
-from .rights import ofr_own_uid
+from .rights import ofr_own_uid, NO_SPECIAL, ofr_allows
 
 RK_CATS = (("car", N_("Car / fuel")), ("train", N_("Train")), ("flight", N_("Flight")), ("rental_car", N_("Rental car")),
            ("taxi", N_("Taxi / public transport")), ("parking", N_("Parking")), ("hotel", N_("Hotel")), ("meals", N_("Meals")),
@@ -767,6 +767,8 @@ def rk_report_get():
     rep = rk_report(c, oid, by, df, dt, request.args.get("missing") == "1", person)
     cur = rk_home_cur(c, oid)
     if request.args.get("format") == "csv":
+        if not ofr_allows(c, uid, oid, "travel", "own", "export"):  # 2.237.0 A (#2861): the file needs the special export
+            raise Denied(403, tr(NO_SPECIAL))
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";")
         head = {"month": tr("Month"), "year": tr("Year"), "person": tr("Person"), "project": tr("Project"), "client": tr("Client"), "category": tr("Category"), "purpose": tr("Purpose")}[by]

@@ -5,6 +5,14 @@
 .wktree .wktree{padding-left:.875rem;border-left:1px solid var(--line)}
 .wktree summary{list-style:none;cursor:pointer}
 .wktree summary::-webkit-details-marker{display:none}
+/* 2.210 A (#2755): the arrow of a folder row: a folder that is a page too opens here without opening the page */
+.wktree summary{display:flex;align-items:center}
+.wktree summary > .wkitem{flex:1;min-width:0}
+.wktog{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1.5rem;min-height:1.75rem;color:var(--muted);margin-right:-.25rem}
+.wktog .i{transform:rotate(-90deg);transition:transform .15s}
+.wktree details[open] > summary > .wktog .i{transform:none}
+@media (prefers-reduced-motion:reduce){.wktog .i{transition:none}}
+.wktree:has(> li > details) > li > .wkitem{margin-left:1.25rem}
 .wkdir{color:var(--muted)}
 .wktitle{flex:1;min-width:0}
 .wktitle h2{margin:0;font-size:1.25rem;font-weight:650;overflow-wrap:anywhere}

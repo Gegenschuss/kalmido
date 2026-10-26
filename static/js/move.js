@@ -31,19 +31,27 @@ const umzCount = (k, n) => ({lists: trn('{0} project', '{0} projects', n), tasks
   events: trn('{0} event', '{0} events', n), contacts: trn('{0} contact', '{0} contacts', n), journal: trn('{0} journal entry', '{0} journal entries', n),
   time_entries: trn('{0} time entry', '{0} time entries', n), templates: trn('{0} template', '{0} templates', n), filters: trn('{0} filter', '{0} filters', n)})[k];
 const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(k, n)).map(([k, n]) => esc(umzCount(k, n))).join(' · ');
+// 2.278.0 A (#3095): into an organisation an existing account is invited (joins once it accepts), with the role of the
+// file as a suggestion the admin confirms
+const UMZ_ORG_TICK = N_('Invite to the organisation (projects are shared with members only)');
+const umzRoleSel = (x, i, hide) => `<select class="umzrole" data-umzr="${i}" aria-label="${esc(tr('Role of {0}', x.name || ''))}"${hide ? ' hidden' : ''}>${['member', 'admin'].map(r => `<option value="${r}"${x.role === r ? ' selected' : ''}>${r === 'admin' ? tr('Admin') : tr('Member')}</option>`).join('')}</select>`;
 function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your projects')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
     <span class="n">${esc(x.name || tr('Unknown'))}<br><span class="muted">${x.found ? esc(tr('found: {0}', x.found_name)) : esc(tr('not on this server'))}</span></span>
-    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> <span data-umzsl>${org && p.targets[0]?.id !== 'private' ? tr('Add to the organisation and share the projects') : tr('Share my projects')}</span></label>`
-      : p.can_invite ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : `<span class="muted">${tr('Skipped')}</span>`}</div>`).join('')
+    ${x.found ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> <span data-umzsl>${org && p.targets[0]?.id !== 'private' ? tr(UMZ_ORG_TICK) : tr('Share my projects')}</span></label>${org ? umzRoleSel(x, i, p.targets[0]?.id === 'private') : ''}`
+      : (x.by_login ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="share"> ${tr('Share with this user name')}</label><input type="text" class="umzem" data-umzl="${i}" autocomplete="off" autocapitalize="none" placeholder="${esc(tr('User name on this server'))}" aria-label="${esc(tr('User name of {0} on this server', x.name || ''))}">${org ? umzRoleSel(x, i, p.targets[0]?.id === 'private') : ''}` : '')  // 2.278.0 B (#3094)
+      + (p.can_invite && !x.key.startsWith('id') ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : x.by_login ? '' : `<span class="muted">${tr('Skipped')}</span>`)}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
   const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${tr('You have imported this export already. Importing it again creates everything a second time.')}</div>` : '',
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
-    p.encrypted.attachments || p.encrypted.locked_notes ? hintK(tr('Encrypted content stays encrypted: you open it with your passwords as before.')) : '',
+    p.encrypted.attachments || p.encrypted.locked_notes ? hintK(p.encrypted.keys === 'take' ? tr('Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.')
+      : p.encrypted.keys === 'keep' ? tr('You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.')
+      : tr('The export has no encryption keys: locked notes and encrypted files arrive unreadable.')) : '',  // 2.278.0 C (#3091): only what the import does
+    p.encrypted.locked_lists ? hintK(trn('{0} encrypted project is not taken over: switch its encryption off before the export or export its content.', '{0} encrypted projects are not taken over: switch their encryption off before the export or export their content.', p.encrypted.locked_lists)) : '',
     (p.taken_areas || []).length ? hintK(tr('Also taken over: {0}', p.taken_areas.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.137.0 (#2344)
-    p.not_taken.length ? hintK(tr('Not taken over: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : ''].join('');
+    p.not_taken.length ? hintK(tr('These areas stay on the old server: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : ''].join('');  // 2.273.0 A (#3030)
   const tgt = p.targets.length > 1 || org ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
   const none = org && !p.targets.length;  // 2.73.0 B (part 4): an organisation export needs an organisation I administer here
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${org ? tr('Organisation export of {0}', esc(p.user.name)) : tr('Export of {0}', esc(p.user.name || p.user.email))}</b></div>
@@ -54,18 +62,21 @@ function umzPreviewHtml(j) {
 }
 // review M1: the file names other people only by a hash of their address; an address typed for an invitation is checked
 // against it here (the server checks again in the run)
-async function umzHash(em) {
+async function umzHash(em, salt) {
   if (!window.crypto?.subtle) return '';
-  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('kalmido-people|' + em.trim().toLowerCase()));
+  const enc = new TextEncoder(), msg = enc.encode('kalmido-people|' + em.trim().toLowerCase());
+  // 2.239.0 A (#2882): a newer file keys the hash with its people_salt (HMAC-SHA256), an older one is plain SHA-256
+  const b = salt ? await crypto.subtle.sign('HMAC', await crypto.subtle.importKey('raw', enc.encode(salt), {name: 'HMAC', hash: 'SHA-256'}, false, ['sign']), msg)
+    : await crypto.subtle.digest('SHA-256', msg);
   return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 async function umzEmailOk(p, i, em) {
-  const h = em.trim() ? await umzHash(em) : '';
+  const h = em.trim() ? await umzHash(em, p.people_salt) : '';
   return !h || h === p.people[i].key;
 }
 function umzResultHtml(j) {
   const r = j.result || {};
-  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} project', '{0} projects', x.lists)) : ''}</span></div>`).join('');
+  const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), org_invited: tr('Invited to the organisation'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} project', '{0} projects', x.lists)) : ''}</span></div>`).join('');
   const w = (r.warnings || []).map(x => `<li>${esc(x.text)}${x.count > 1 ? ` (${x.count})` : ''}</li>`).join('');
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${esc(r.stopped || tr('Import finished'))}</b></div>
     <div class="umzcnt">${umzCounts(r.created)}</div>${ppl}${w ? `<ul class="impwarn">${w}</ul>` : ''}
@@ -120,8 +131,9 @@ function umzInit(md) {
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
   md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
     if (e.target.id === 's-umz-tgt' && UMZ.cur?.preview?.kind === 'org') {  // 2.96.0 D (#1941): into Private nobody joins an organisation
-      const t = e.target.value === 'private' ? tr('Share my projects') : tr('Add to the organisation and share the projects');
+      const t = e.target.value === 'private' ? tr('Share my projects') : tr(UMZ_ORG_TICK);
       md.querySelectorAll('[data-umzsl]').forEach(x => { x.textContent = t; });
+      md.querySelectorAll('[data-umzr]').forEach(x => { x.hidden = e.target.value === 'private'; });  // 2.278.0 A (#3095)
       return;
     }
     const x = e.target.closest?.('[data-umze]'); if (!x || !UMZ.cur?.preview) return;
@@ -152,7 +164,10 @@ function umzInit(md) {
             if (!em) { toast(tr('Type the e-mail address of {0} for the invitation.', p.people[i].name || '')); return; }
             if (!await umzEmailOk(p, i, em)) { const m = $(`[data-umzm="${i}"]`, md); if (m) m.hidden = false; return; }
           }
-          people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {})};
+          const login = x.dataset.k === 'share' ? $(`[data-umzl="${i}"]`, md)?.value.trim() || '' : '';  // 2.278.0 B (#3094)
+          if (x.dataset.k === 'share' && p.people[i].by_login && !login) { toast(tr('Type the user name of {0} on this server.', p.people[i].name || '')); return; }
+          people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {}), ...(login ? {login} : {})};
+          const rs = $(`[data-umzr="${i}"]`, md); if (rs && x.dataset.k === 'share') people[k].role = rs.value;  // 2.278.0 A (#3095)
         }
         let t = $('#s-umz-tgt', md)?.value || 'private';
         // 2.87.9 (#1940): where the account's data goes, in words; from an organisation also into the private space

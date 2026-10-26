@@ -19,12 +19,15 @@ Kinds:
   project_status as that agent sees the list, the fixed Markdown text, no comments / notes / names). The agent answers
   {text} (Markdown); taking it over keeps the text with the job, the status report dialog then shows it instead of the
   fixed text (copy / share as before); undo goes back to the fixed text.
+- receipt_read (2.299.0 E, #3194): the agent reads a receipt (agents/rcread.py): the office switches with the receipts
+  right, the file shared with it; the input = doc_summary's + the file's address, the categories, maybe bank bookings. The
+  agent answers the values it read; taking them over sets amount, VAT rate, sender, date, category (one undo step).
 """
 import json
 import re
 from datetime import date
 
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app  # noqa: F401  (the routes are hooks of agents/proposals.py and lists/report.py)
 from ..core.i18n import N_, tr, LANGS
@@ -32,19 +35,22 @@ from ..core.db import bump, err, iso, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, list_role
 from ..core.errors import BadInput
-from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, job_dict, JOB_TITLE_MAX
+from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, is_agent, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
 from ..collab.comments import user_names
 from ..office.rights import ofr_allows
+from ..files.store import fs_role
+from .rcread import RCR_LIMITS, rcr_doc_view, rcr_input, rcr_run, rcr_target, rcr_undo, rcr_validate  # 2.299.0 E (#3194)
 
-AST_KINDS = ("office_text", "doc_summary", "report")
+AST_KINDS = ("office_text", "doc_summary", "report", "receipt_read")  # 2.299.0 E (#3194): + receipt_read (agents/rcread.py)
 AST_DOC_KINDS = ("offer", "invoice", "reminder")   # documents with an introduction / closing the agent may word
 AST_FIELDS = ("intro", "closing")
 AST_WISH_MAX = 500                                 # the person's short wish ("friendly, short")
 AST_DOC_TEXT_MAX = 20000                           # recognised text of a document sent to the agent
 AST_SUMMARY_MAX = 4000                             # a document's summary
 AST_ITEM_KEYS = ("kind", "title", "detail", "qty", "unit", "rate", "tax")  # never cost / cost_enc / margins
-AST_TITLES = {"office_text": N_("Text draft: {0}"), "doc_summary": N_("Summary: {0}"), "report": N_("Client report: {0}")}
+AST_TITLES = {"office_text": N_("Text draft: {0}"), "doc_summary": N_("Summary: {0}"), "report": N_("Client report: {0}"),
+              "receipt_read": N_("Read receipt: {0}")}  # 2.299.0 E (#3194)
 AST_NO_AGENT = N_("This agent cannot make proposals for you")
 
 
@@ -75,14 +81,15 @@ def _person_ok(c, a, uid):
 
 
 # ---------------------------------------------------------------- who may be asked
-def ast_office_agents(c, uid, oid):
+def ast_office_agents(c, uid, oid, area="offers"):
     """The agents of office area oid uid may ask for an office text: the agent's office switch on, the area's privacy switch
-    on, uid works in that office; a personal agent in an organisation only while its owner works there (as offer_accepted)."""
+    on, uid works in that office; a personal agent in an organisation only while its owner works there (as offer_accepted).
+    2.299.0 E (#3194): area = the office right both need (receipts for receipt_read)."""
     from ..office.agentdocs import ofa_agent_on, ofa_area, ofa_area_agents
     from ..office.model import office_on, office_role, office_settings
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         return []
-    if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
+    if not ofr_allows(c, uid, oid, area, "edit"):  # 2.187.0 C (#2476): office groups
         return []
     if not office_settings(c, oid).get("agents_read"):
         return []
@@ -90,12 +97,12 @@ def ast_office_agents(c, uid, oid):
     for aid, on in ofa_area_agents(c, oid):
         with system_ctx(c):  # the agent's settings row (structure), whoever asks
             a = agent_row(c, aid)
-        if not a or not ofa_agent_on(c, a, oid, "offers", "edit"):  # 2.187.0 C (#2476): its switch or its office groups
+        if not a or not ofa_agent_on(c, a, oid, area, "edit"):  # 2.187.0 C (#2476): its switch or its office groups
             continue
         if ofa_area(c, a) != oid or not _person_ok(c, a, uid):
             continue
         if a["owner_id"] and a["owner_id"] != uid and (office_role(c, a["owner_id"], oid) not in ("admin", "member") or not office_on(c, a["owner_id"])
-                                                       or not ofr_allows(c, a["owner_id"], oid, "offers", "edit")):
+                                                       or not ofr_allows(c, a["owner_id"], oid, area, "edit")):
             continue
         out.append(a)
     return out
@@ -107,14 +114,14 @@ def _doc_area(c, uid, node):
     return node["org_id"] or pb_personal(c, uid, create=False)
 
 
-def ast_doc_agents(c, uid, nid):
+def ast_doc_agents(c, uid, nid, area="offers"):
     """Agents uid may ask for a summary of document nid: office agents of the document's area that see the file themselves."""
     from ..files.store import fs_role, need_node
     from ..docs import store as S
     n = need_node(c, nid, write=True)
     if n["kind"] != "file" or not S.meta_row(c, nid):
         raise Denied(404)
-    return [a for a in ast_office_agents(c, uid, _doc_area(c, uid, n)) if fs_role(c, nid, uid=a["user_id"])], n
+    return [a for a in ast_office_agents(c, uid, _doc_area(c, uid, n), area) if fs_role(c, nid, uid=a["user_id"])], n
 
 
 def ast_list_agents(c, uid, lid):
@@ -146,8 +153,8 @@ def ast_agents_get(c, uid, a):
             r = _office_doc(c, uid, office_org(c, uid, area="offers"), a.get("doc_id"))[1]
             editable = not (r["locked_at"] or r["status"] == "sent")  # a finalised / sent document takes no text
             ags = ast_office_agents(c, uid, r["org_id"]) if r["kind"] in AST_DOC_KINDS and editable else []
-        elif kind == "doc_summary":
-            ags = ast_doc_agents(c, uid, _iid(a.get("doc_id"), "doc_id"))[0]
+        elif kind in ("doc_summary", "receipt_read"):  # 2.299.0 E (#3194): receipt_read with the receipts right
+            ags = ast_doc_agents(c, uid, _iid(a.get("doc_id"), "doc_id"), "receipts" if kind == "receipt_read" else "offers")[0]
         else:
             from ..core.access import need_list
             lid = _iid(a.get("list_id"), "list_id")
@@ -273,13 +280,15 @@ def ast_request(c, uid, b):
             return err(tr(AST_NO_AGENT), 404)
         inp = _office_input(c, oid, r, field, wish)
         title, doc_id = tr(AST_TITLES[kind], r["number"] or r["project_title"] or tr("Draft")), r["id"]
-    elif kind == "doc_summary":
+    elif kind in ("doc_summary", "receipt_read"):  # 2.299.0 E (#3194): receipt_read = doc_summary's input + rcread.rcr_input
         _p_keys(b, "", (*common, "doc_id"))
-        ags, n = ast_doc_agents(c, uid, _iid(b.get("doc_id"), "doc_id"))
+        ags, n = ast_doc_agents(c, uid, _iid(b.get("doc_id"), "doc_id"), "receipts" if kind == "receipt_read" else "offers")
         if not [a for a in ags if a["user_id"] == aid]:
             return err(tr(AST_NO_AGENT), 404)
         oid = _doc_area(c, uid, n)
         inp = _doc_input(c, aid, n, wish)
+        if kind == "receipt_read":
+            inp = rcr_input(c, uid, aid, oid, n, inp)
         title = tr(AST_TITLES[kind], n["name"][:80])
     else:
         _p_keys(b, "", (*common, "list_id", "from", "to", "days", "lang"))
@@ -314,7 +323,7 @@ def ast_request(c, uid, b):
     return jsonify(job_dict(c, j)), 201
 
 
-AST_LIMITS = {"text_max": PROP_TEXT_MAX, "summary_text_max": AST_SUMMARY_MAX}
+AST_LIMITS = {"text_max": PROP_TEXT_MAX, "summary_text_max": AST_SUMMARY_MAX, **RCR_LIMITS}  # 2.299.0 E (#3194): + receipt_read
 
 
 # ---------------------------------------------------------------- the agent's answer
@@ -327,6 +336,8 @@ def ast_validate(kind, b, inp):
         if f != inp.get("field"):
             raise BadInput(tr("Invalid value: {0}", "field"))
         return {"field": f, "text": _clean(b.get("text"), "text", TEXT_MAX, True)}
+    if kind == "receipt_read":  # 2.299.0 E (#3194): the values read off the receipt
+        return rcr_validate(b, inp)
     _p_keys(b, "", ("kind", "summary", "text"))
     return {"text": _clean(b.get("text"), "text", AST_SUMMARY_MAX if kind == "doc_summary" else PROP_TEXT_MAX, True)}
 
@@ -342,7 +353,9 @@ def ast_need_agent(c, j, aid):
     need_scope("office")  # as every office route of an agent
     with system_ctx(c):  # the agent's switch, its area and the area's privacy switch (structure; an agent's token does not see the settings of a personal office)
         a = agent_row(c, aid)
-        ok = ofa_agent_ok(c, aid, ofa_area(c, a))
+        ok = ofa_agent_ok(c, aid, ofa_area(c, a), "receipts" if j["kind"] == "receipt_read" else "offers")
+    if ok and j["kind"] == "receipt_read":  # 2.299.0 E (#3194): the file still shared with the agent
+        ok = bool(fs_role(c, (json.loads(j["input"] or "{}").get("document") or {}).get("id") or 0, uid=aid))
     if not ok:
         from ..office.agentdocs import OFA_OFF
         raise Denied(403, tr(OFA_OFF))
@@ -406,7 +419,7 @@ def ast_run(c, j, sel, ed, extra, rec):
     from ..office.ledger import ofx_need_editable
     from ..office.model import TEXT_MAX
     kind = j["kind"]
-    prop, text = _text_of(j, ed)
+    prop, text = _text_of(j, ed) if kind != "receipt_read" else (None, None)
     if kind == "office_text":
         text = _clean(text, "text", TEXT_MAX, True)
         oid, r = _office_target(c, j)
@@ -414,6 +427,9 @@ def ast_run(c, j, sel, ed, extra, rec):
         f = prop["field"]
         rec["office"] = {"doc": r["id"], "field": f, "before": r[f] or "", "after": text}
         _set_office(c, oid, r, f, text)
+    elif kind == "receipt_read":  # 2.299.0 E (#3194): the read values onto the receipt as the person (agents/rcread.py)
+        n, _ = _doc_target(c, j)
+        rec["receipt"] = rcr_run(c, j, n, g.user["id"], ed)
     elif kind == "doc_summary":
         text = _clean(text, "text", AST_SUMMARY_MAX, True)
         n, m = _doc_target(c, j)
@@ -441,6 +457,14 @@ def ast_undo(c, j, rec, back=True):
             return 0, [j["title"][:40]]
         _set_office(c, oid, r, o["field"], want)
         n = 1
+    elif kind == "receipt_read":  # 2.299.0 E (#3194)
+        try:
+            n_, _ = _doc_target(c, j)
+        except Denied:
+            return 0, [j["title"][:40]]
+        if not rcr_undo(c, n_, g.user["id"], rec["receipt"], back):
+            return 0, [j["title"][:40]]
+        n = 1
     elif kind == "doc_summary":
         o = rec["document"]
         try:
@@ -460,7 +484,7 @@ def ast_undo(c, j, rec, back=True):
 
 
 def ast_result(rec):
-    return {"changed": 1 if (rec.get("office") or rec.get("document") or rec.get("text")) else 0, "created": 0}
+    return {"changed": 1 if (rec.get("office") or rec.get("document") or rec.get("text") or rec.get("receipt")) else 0, "created": 0}
 
 
 def ast_view_extra(c, j):
@@ -475,6 +499,9 @@ def ast_view_extra(c, j):
         elif j["kind"] == "doc_summary":
             n, m = _doc_target(c, j)
             out["target"] = {"doc_id": n["id"], "name": n["name"], "text": ast_summary_of(c, m), "editable": True}
+        elif j["kind"] == "receipt_read":  # 2.299.0 E (#3194): what Take over would change, the checks, the bank booking
+            n, m = _doc_target(c, j, write=False)
+            out["target"] = rcr_target(c, j, n, m, g.user["id"])
         else:
             rec = json.loads(j["applied"] or "null") or {}
             out["target"] = {"list_id": j["list_id"], "text": rec.get("text") or "", "editable": True}
@@ -504,3 +531,5 @@ def ast_report_extra(c, d, lid, uid):
 def ast_doc_extra(c, d, m):
     """doc_json: the document's summary (a person's take-over of an agent's draft), '' without one."""
     d["summary"] = ast_summary_of(c, m)
+    if has_request_context() and g.get("user") and not is_agent(g.user) and g.get("auth_via") != "token":  # 2.299.0 E (#3194): people only
+        d["agent_read"] = rcr_doc_view(c, m, g.user["id"])

@@ -747,7 +747,7 @@
     reminder_scheme: 'MA-{yyyy}-{seq:03}', offer_number_at: 'create', offer_valid_days: 30, payment_days: 14, reminder_fee: 0, reminder_deadline_days: 10, small_business: 0,
     producing_on: 0, raw_on: 0, prod_quotient: 3, raw_factor: 0.25, producing_rate: 600, producing_service_id: null, logo: '', color: '', einvoice_format: 'zugferd',
     datev_email: '', datev_auto: 0, intro_text_id: {de: null, en: null}, closing_text_id: {de: null, en: null}, rights_default: {time_id: null, territory_id: null, media_id: null},
-    industry_packs: [], invoice_closing_de: '', invoice_closing_en: '', reminder_text_de: '', reminder_text_en: '', agents_read: 0, datev_extf: 0, parts_invoice_mode: ''};
+    industry_packs: [], invoice_closing_de: '', invoice_closing_en: '', delivery_closing_de: '', delivery_closing_en: '', reminder_text_de: '', reminder_text_en: '', agents_read: 0, datev_extf: 0, parts_invoice_mode: ''};
   const CO_KEYS = ['name', 'street', 'zip', 'city', 'country', 'email', 'phone', 'tax_number', 'vat_id', 'iban', 'bic', 'bank_name', 'register_court', 'register_no', 'managing_directors', 'md_label'];
   // an example sender, so a quotation can be finalised right away (Settings of the office: change it)
   const coDefault = () => ({name: T().coName || 'Demo Studio', street: 'Musterstraße 1', zip: '10115', city: 'Berlin', country: 'DE', email: 'office@example.com', phone: '',

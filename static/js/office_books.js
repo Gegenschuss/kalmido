@@ -89,12 +89,28 @@ function bkRcRow(r) {
     <small class="muted">${esc([fmtDateLoc(r.date), r.category, bkVatLabel(r.vat_pct), bkBilledTxt(BK.billed[r.node_id])].filter(Boolean).join(' · '))}</small></span>
     ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
 }
+// 2.237.0 C (#2865): an incoming e-invoice is a suggestion until a person takes it over (one tap; the row opens the sheet)
+function bkEinvHtml(ei) {
+  if (!ei.length) return '';
+  const row = r => `<li class="bk-einvrow"><button type="button" class="ofcrow" data-bk="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.supplier || r.title || tr('Receipt'))}</b>
+    <small class="muted">${esc([fmtDateLoc(r.date), r.supplier ? r.title : '', bkVatLabel(r.vat_pct)].filter(Boolean).join(' · '))}</small></span><span class="rksum">${r.amount ? ofcMoney(r.amount) : ''}</span></button>
+    <button type="button" class="btn sm pri" data-bk="einv" data-id="${r.node_id}">${tr('Take over')}</button></li>`;
+  return `<div class="bk-einvs" role="group" aria-labelledby="bk-einvh"><h4 class="bk-h" id="bk-einvh">${esc(trn('{0} e-invoice to check', '{0} e-invoices to check', ei.length))}</h4>
+    <p class="muted">${tr('Incoming e-invoices become receipts only once you take them over.')}</p><ul class="ofclist" role="list">${ei.map(row).join('')}</ul></div>`;
+}
+async function bkEinvTake(id, b) {
+  const take = async () => { await api('POST', `/api/docs/${id}/receipt/einvoice`); bkReload(); return {}; };
+  b.disabled = true;
+  try { await take(); } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); return; }
+  const label = tr('Taken over as receipt');
+  histToast(label, histAdd({label, undo: async () => { await api('PUT', `/api/docs/${id}/receipt`, {project_id: null, category: '', vat_pct: null}); bkReload(); return {}; }, redo: take}));
+}
 function bkReceiptsHtml() {
   const d = BK.info, rs = d.receipts || [], miss = d.missing || [];
   const missHtml = miss.length ? `<details class="bk-missing"><summary>${esc(trn('{0} receipt without VAT rate', '{0} receipts without VAT rate', miss.length))} · ${tr('add it')}</summary>
     <ul class="ofclist" role="list">${miss.map(bkRcRow).join('')}</ul></details>` : '';
   const billable = rs.some(r => !BK.billed[r.node_id]);
-  return `<section class="bk-sec" aria-labelledby="bk-rch"><h3 class="ofcgrp" id="bk-rch">${tr('Receipts this month')}</h3>${missHtml}
+  return `<section class="bk-sec" aria-labelledby="bk-rch"><h3 class="ofcgrp" id="bk-rch">${tr('Receipts this month')}</h3>${bkEinvHtml(d.einvoices || [])}${missHtml}
     ${billable ? `<p><button type="button" class="btn" data-bk="bill">${tr('Bill receipts on to a client …')}</button></p>` : ''}
     ${rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : `<p class="muted lempty">${tr('No receipts this month yet.')}</p>`}
     <p class="bk-all"><a class="btn ghost" href="#office/books/receipts">${ic('list', 's')}<span>${tr('All receipts')}</span>${ic('chev', 's')}</a></p></section>`;  // 2.153.0 (#2055)
@@ -237,7 +253,7 @@ async function bkSheet(id, fresh) {
     <p class="muted bk-rec" role="status">${wait ? tr('Being recognised…') : ''}</p>
     ${ofcRowF('bk-cat', tr('Category'), ofcIn('bk-cat', r.category, {max: 60, list: 'bk-cats', ph: tr('e.g. Travel, Material, Software')}) + `<datalist id="bk-cats">${cats.map(k => `<option value="${esc(k)}"${bkAcct(k) ? ` label="${esc(bkAcct(k).account)}"` : ''}>`).join('')}</datalist>`)}
     <div class="bk-acct muted" aria-live="polite"></div>
-    ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? '', BK_VATS, tr('unknown')))}
+    ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? (!r.is_receipt && doc.einvoice ? doc.extracted?.vat_pct ?? '' : ''), BK_VATS, tr('unknown')))}
     ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     <div class="row"><label id="bk-datel">${tr('Date')}</label>${dateIn('bk-date', doc.date || '', {label: tr('Date')})}</div>
     <div class="aerr" role="alert"></div>
@@ -248,7 +264,7 @@ async function bkSheet(id, fresh) {
   // 2.121.0 A (#2092): the recognised values (supplier, VAT rate, net / gross) with Take over (receipts.js of the documents)
   // 2.154.0 A (#1356): the agents' open suggestions of the receipt (Accept / Reject) and who confirmed one (receipts.js)
   if (rc.suggestions?.length || rc.confirmed) loadModule('docs').then(() => { if (typeof rc_bkSlot === 'function') rc_bkSlot(md, id, rc); }).catch(() => 0);
-  if (doc.extracted || doc.duplicate_of) loadModule('docs').then(() => { const el = $('.bk-rx', md); if (el && typeof rx_html === 'function') el.innerHTML = rx_html(doc); }).catch(() => 0);
+  if (doc.extracted || doc.duplicate_of || doc.checks || doc.role !== 'view') loadModule('docs').then(() => { const el = $('.bk-rx', md); if (el && typeof rx_html === 'function') el.innerHTML = rx_html(doc); }).catch(() => 0);  // 2.299.0 D (#3193) checks, E (#3194): + "Read with an agent"
   const close = fgModal(md), touched = new Set();
   md.addEventListener('input', e => { if (e.target.id) touched.add(e.target.id); });
   md.addEventListener('change', e => { if (e.target.id) touched.add(e.target.id); });
@@ -365,6 +381,8 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
   const st = $('.bk-rec', md); if (st) st.textContent = d.state === 'done' ? tr('Recognised') : (d.error_text || '');
   if (d.einvoice && !$('.bk-einv', md)) $('.bk-sname', md)?.insertAdjacentHTML('beforeend', ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>`);  // 2.146.0 A (#2451)
   if (d.amount && !touched.has('bk-amount') && !$('#bk-amount', md).value) $('#bk-amount', md).value = fmtNum(+d.amount, 2);
+  const vi = $('#bk-vat', md);  // 2.237.0 C (#2865): an e-invoice is no receipt by itself any more -- its rate fills the sheet
+  if (d.einvoice && d.extracted?.vat_pct && vi && !touched.has('bk-vat') && !vi.value) vi.value = d.extracted.vat_pct;
   const di = $('#bk-date', md);
   if (d.date && di && !touched.has('bk-date') && !di.value) { di.value = d.date; if (typeof dpSync === 'function') dpSync(di); }
 }
@@ -384,6 +402,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-bk]'); if (!b || S.route?.mod !== 'office') return;
   const k = b.dataset.bk;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
+  if (k === 'einv') { bkEinvTake(+b.dataset.id, b); return; }
   if (k === 'bill') { bkBillModal(null); return; }
   if (k === 'basis') { bkSetUndo('vat_basis', b.dataset.v); return; }
   if (k === 'mode' && BK.mode !== b.dataset.v) {

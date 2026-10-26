@@ -18,6 +18,7 @@ import json
 
 from ..core.config import APP_NAME, PUBLIC_URL
 from ..core.db import uset, usettings
+from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.i18n import N_, lang, tr
 from .bgjobs import BGJ_FNS, bgj_add
 
@@ -96,7 +97,7 @@ def sec_mail(c, uid, ev, *args, to=None, also=None):
             bgj_add("mail:security", a, *m, user_id=uid, delay=1.0)
         return True
     except Exception as e:  # noqa: BLE001 - a security mail never breaks the action itself
-        print("security mail not queued:", ev, type(e).__name__, e, flush=True)
+        print("security mail not queued:", ev, db_log_err(e), flush=True)
         return False
 
 
@@ -118,4 +119,4 @@ def sec_login(c, uid, via, ua, ip):
         if known and h not in known:
             sec_mail(c, uid, "login", sec_ua_label(ua, lang(c, uid)), sec_mask_ip(ip) if ip else "?")  # review: the person's language
     except Exception as e:  # noqa: BLE001
-        print("new device check skipped:", type(e).__name__, e, flush=True)
+        print("new device check skipped:", db_log_err(e), flush=True)

@@ -193,3 +193,32 @@ function asst_setWire(md) {
   });
   asst_paneDraw(md);
 }
+
+// ---- 2.240.0 A (#2884): Settings > Workspaces: whether the assistant may read other members' comments in the organisation's
+// projects (its admins decide, every member sees it; only when the server has an assistant). box._j = GET /api/orgs
+function asst_orgPaneDraw(box) {
+  if (!box?.isConnected || !S.assistant) return;
+  const orgs = (box._j || {}).orgs || [];
+  for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
+    const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.asst-orgrow') || o.asst_comments === undefined) continue;
+    const adm = o.role === 'admin' && box._j.manage, id = `asst-o${o.id}`;
+    const row = document.createElement('div');
+    row.className = 'row asst-orgrow';
+    row.innerHTML = `<label class="chkl"><input type="checkbox" id="${id}" ${o.asst_comments ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${tr('The assistant may read comments of other members')}</label>`;
+    const hint = document.createElement('div');
+    hint.className = 'shint keep';
+    hint.textContent = tr('Off: the assistant only gets the comments of the person who asks it. Titles and notes of a shared project go to it either way.') + (adm ? '' : ' ' + tr('Only an admin of this organisation can change it.'));
+    (det.querySelector('.xl-orgrow + .shint') || det.querySelector('.pmeta-row + .shint') || det.querySelector('summary')).after(row); row.after(hint);
+    if (!adm) continue;
+    const cb = $('#' + id, /** @type {any} */ (row));
+    cb.addEventListener('change', async () => {
+      const on = cb.checked, put = v => async () => {
+        await api('PATCH', `/api/orgs/${o.id}`, {asst_comments: v});
+        o.asst_comments = v; if (cb.isConnected) cb.checked = v; return {};
+      };
+      try { await put(on)(); } catch { cb.checked = !on; return; }
+      const label = tr('Assistant and comments of {0}', qn(o.name));
+      offerUndo(label, histAdd({label, undo: put(!on), redo: put(on)}));
+    });
+  }
+}

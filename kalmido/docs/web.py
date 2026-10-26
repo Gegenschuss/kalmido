@@ -66,10 +66,29 @@ def _ws_manage(c, ws, uid):
         raise Denied(404)
 
 
+def _agent_folder(c, aid, node, r):
+    """2.223.7 D (#2941): the folder of a shared document as an agent may see it: the visible tail of the path (folders
+    from the document's folder up while the agent has a role), None when it sees not even the document's folder."""
+    root = S.docs_root(c, node)
+    names = []
+    for x in S._fs_chain(c, r["id"]):
+        if x["id"] == root:
+            break
+        if not fs_role(c, x["id"], uid=aid):
+            break
+        names.append(x["name"])
+    if not names:
+        return None
+    return {"id": r["id"], "name": r["name"], "path": " / ".join(reversed(names))}
+
+
 # ---- serializing ------------------------------------------------------------------------------------------------------
 def doc_json(c, m, node, full=False, role=None):
     ws = m["ws"]
     auto = S.meta_json(c, m, "auto", {})
+    hand = S.hand_fields(auto)  # 2.273.0 C (#3047): own key, not a feature of "automatic"
+    auto.pop("_hand", None)
+    auto.pop("_was", None)      # 2.273.0 F2 (#3047): the recognised values behind the hand values (doc_update)
     sug = S.meta_json(c, m, "suggest", {})
     sug.pop("_given", None)
     out_sug = {}
@@ -90,6 +109,8 @@ def doc_json(c, m, node, full=False, role=None):
     if fl:
         r = c.execute("SELECT id, name FROM fs_nodes WHERE id=?", (int(fl),)).fetchone()
         folder = {"id": r["id"], "name": r["name"], "path": S.folder_path(c, node)} if r else None  # 2.199.0 B (#2742): + path
+        if r and acx_of(c, me()).role == "agent":  # 2.223.7 D (#2941): an agent gets only the part of the path it sees
+            folder = _agent_folder(c, me(), node, r)
     err_key = m["error"] or ""
     d = {"id": m["node_id"], "name": node["name"], "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
          "state": m["state"], "error": err_key, "error_text": tr(S.ERRORS[err_key]) if err_key in S.ERRORS else "",
@@ -100,7 +121,9 @@ def doc_json(c, m, node, full=False, role=None):
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
          "tags": S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
          "thumb": bool(m["thumb"]), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
-         "updated_at": m["updated_at"], "parent_id": node["parent_id"]}
+         "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand}
+    # 2.210 C (#2761): only a flag whether the document is shared (no names)
+    d["shared"] = bool(node["org_access"]) or bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone())
     if m["dup_of"] and not m["dup_ok"]:  # 2.146.0 B (#2452): an older document that looks like the same invoice
         from flask import has_request_context
         from .dups import dup_view
@@ -117,6 +140,8 @@ def doc_json(c, m, node, full=False, role=None):
         d["text"] = S.meta_text(c, m)
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        from ..receipts.rchecks import rck_view
+        d["checks"] = rck_view(c, m)  # 2.299.0 D (#3193): the hints of the fixed check of a receipt (never blocking)
         einv = S.meta_json(c, m, "extracted", {}).get("_einv")  # 2.146.0 A (#2451): an e-invoice (its readable view)
         if isinstance(einv, dict):
             d["einvoice"] = {k: einv.get(k) for k in ("format", "kind", "source", "number")}
@@ -347,6 +372,8 @@ def doc_update(c, nid, d, uid, by=None):
         sets["amount"] = S.doc_seal(c, ws, "doc_meta.amount", v)
     if "asn" in d and by is None:
         v = d["asn"]
+        if v not in (None, ""):
+            S.asn_lock(c, ws, nid)  # 2.273.0 C (#3047): two saves with "next" = two numbers, no unique violation
         if v == "next":
             v = S.asn_next(c, ws)
         if v in (None, ""):
@@ -374,6 +401,7 @@ def doc_update(c, nid, d, uid, by=None):
                 or (new_amt is not None and new_amt != (S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""))):
             from ..office.periodlock import pl_receipt_need_open
             pl_receipt_need_open(c, nid, sets.get("doc_date"))
+    m0 = m
     if sets:
         c.execute(f"UPDATE doc_meta SET {', '.join(k + '=?' for k in sets)}, updated_at=? WHERE node_id=?", (*sets.values(), _now(), nid))
         if "asn" in sets:
@@ -386,6 +414,38 @@ def doc_update(c, nid, d, uid, by=None):
             auto = S.meta_json(c, m, "auto", {})
             if auto.pop("date", None):
                 S.meta_set_json(c, nid, ws, "auto", auto)
+        hk = [f for f, col in S.HAND_FIELDS.items() if col in sets]
+        if hk:  # 2.273.0 C (#3047): a value set by hand (person or agent) stays on "Recognise again" / a new version; emptied = free again
+            m = S.meta_row(c, nid)
+            auto = S.meta_json(c, m, "auto", {})
+            hand = set(S.hand_fields(auto))
+            # 2.273.0 F2 (#3047): the recognised value behind a hand value (_was); setting it back (an undo, "restore") is no
+            # hand value: the mark goes and the recognition's source comes back
+            was = auto.get("_was") if isinstance(auto.get("_was"), dict) else {}
+            plain = lambda mm, f: S.was_digest(nid, f, str((S.doc_open(c, ws, "doc_meta.amount", mm["amount"]) if f == "amount" else mm[S.HAND_FIELDS[f]]) or ""))  # noqa: E731  # digest only, never the plain amount
+            for f in hk:
+                if str(d.get(f) or "").strip():
+                    if f not in hand:
+                        was[f] = {"v": plain(m0, f), "a": auto.get(f)}
+                    w = was.get(f)
+                    if isinstance(w, dict) and plain(m, f) == w.get("v"):
+                        hand.discard(f)
+                        was.pop(f, None)
+                        if w.get("a"):
+                            auto[f] = w["a"]
+                    else:
+                        hand.add(f)
+                        auto.pop(f, None)
+                else:
+                    hand.discard(f)
+                    was.pop(f, None)
+            auto.pop("_hand", None)
+            auto.pop("_was", None)
+            if hand:
+                auto["_hand"] = sorted(hand)
+            if was:
+                auto["_was"] = was
+            S.meta_set_json(c, nid, ws, "auto", auto)
         m = S.meta_row(c, nid)  # the feature part below reads auto / suggest as they are now
     if "custom_fields" in d:  # 2.153.0 (#2179): {field id (agents: or name): value | null}
         from .fields import df_set
@@ -513,7 +573,9 @@ def docs_redo(nid):
     c.commit()
     docs_kick()
     m, n = _doc(c, nid)
-    return jsonify(doc_json(c, m, n, role=n["role"]))
+    out = doc_json(c, m, n, role=n["role"])
+    out["kept"] = out["hand"]  # 2.273.0 C (#3047): the values set by hand the new run does not replace
+    return jsonify(out)
 
 
 @app.get("/api/docs/<int:nid>/thumb")

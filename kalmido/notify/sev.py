@@ -20,6 +20,7 @@ from ..core.i18n import N_
 from ..core.db import iso, now_utc
 from .alerts import _AA, _AA_LOCK, aa_now, fx2_mask_ip
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.login import login_log_ip  # 2.239.0 B (#2888): unless KALMIDO_LOG_FULL_IP=1
 
 SEV_IPS = 10  # sign-in addresses remembered per admin
 SEV_KINDS = ("admin", "org_admin", "agent", "agent_token")
@@ -144,6 +145,6 @@ def sev_login(c, uid, ip, via="password"):
         if rows:
             name = (c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone() or [""])[0]
             aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, fx2_mask_ip(ip)])
-            sev_log("admin_login_new_ip", user_id=uid, username=name, ip=ip, via=via)
+            sev_log("admin_login_new_ip", user_id=uid, username=name, ip=login_log_ip(ip), via=via)  # 2.239.0 B (#2888): shortened
     except Exception as e:  # noqa: BLE001
         print("admin sign-in check skipped:", type(e).__name__, e, flush=True)

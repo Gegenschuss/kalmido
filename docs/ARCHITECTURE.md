@@ -781,6 +781,14 @@ re-wraps the same bundle. Removing the keys deletes the person's encrypted notes
 
 Every nonce is random (12 bytes). The formats carry a version (`v: 1`, `KENC` 0x01) for later changes.
 
+**After an account move (2.278.0).** The account export carries the own `e2e_keys` row (never another person's); the
+import takes it over only into an account without keys (own keys are never replaced: the content of the file then stays
+unreadable, with a warning). The new server gives new task and user ids, so the old AAD is kept in `legacy_aad`:
+`e2e_keys.legacy_aad` = JSON list of `kalmido-e2e:v1:<old user id>`, `task_note_locks.legacy_aad` /
+`attachments.legacy_aad` = the whole old AAD. The browser tries the current AAD first, then the old one (only these
+shapes); it reaches only the owner. Saving a locked note seals it with the new ids and clears `legacy_aad`; a file keeps
+it. Projects encrypted in the browser are not taken over (their list keys do not move).
+
 **What the rest of the app sees.** Task outputs carry only `encrypted_note: true` (+ `encrypted_note_mine` for the
 author in the app); encrypted files are listed as such with a neutral name, never previewed, never text-extracted,
 never served to agents or to anyone but the uploader. Encrypted DMs: the server refuses plain text in them (and

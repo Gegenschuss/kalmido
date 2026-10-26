@@ -511,8 +511,11 @@ def task_update(tid):
     bump(c)
     c.commit()
     from ..tasks.depchain import dch_chain, dch_days
+    mv = (getattr(g, "tmm", None) or {}).get(tid) or {}  # 2.273.0 B (#3042): what the move ended / brought back (counts)
     return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted,
-                    "chain": dch_chain(shifted, skipped, dch_days(old["due"], new_due))})
+                    "chain": dch_chain(shifted, skipped, dch_days(old["due"], new_due)),
+                    **({"move_ended": mv["ended"]} if mv.get("ended") else {}),
+                    **({"move_restored": mv["restored"]} if mv.get("restored") else {})})
 
 
 # "Move dependent tasks along" (list setting dep_shift, package D2). 2.67.0 B (#1865): the whole chain moves by the same

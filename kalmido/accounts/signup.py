@@ -8,6 +8,8 @@ from ..core.config import app, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _accept_lang, _rate_fail, client_ip, me, rate_ip
+from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..accounts.login import finish_login, pend_cookie, pend_new, twofa_methods
 from ..core.access import Denied
 from ..api.common import hit_limit
@@ -170,7 +172,7 @@ def auth_signup():
     taken = c.execute("SELECT 1 FROM users WHERE lower(email)=lower(?)", (email,)).fetchone()
     if not allowed or taken:  # the same answer: nobody learns which addresses exist or are allowed
         c.rollback()
-        print("registration ignored (domain or address)", "from", client_ip(), flush=True)
+        print("registration ignored (domain or address)", "from", login_log_ip(client_ip()), flush=True)
         return answer
     uid = create_user(c, _username(c, email), name, pw if not mail else None, onboard=True)
     c.execute("UPDATE users SET email=?, disabled=1, signup=? WHERE id=?", (email, "confirm" if mail else "pending", uid))
@@ -190,7 +192,7 @@ def auth_signup():
         _notify_admins(c, uid)
     bump(c)
     c.commit()
-    print("registration:", "confirm by mail" if mail else "waits for approval", "from", client_ip(), flush=True)
+    print("registration:", "confirm by mail" if mail else "waits for approval", "from", login_log_ip(client_ip()), flush=True)
     return answer
 
 
@@ -299,7 +301,7 @@ def auth_link():
     if u["is_admin"] or (u["kind"] or "user") == "agent":
         # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)
         return err(tr("Admins sign in with their password"), 409)
-    print("signed in with a sign-in link:", u["username"], "from", client_ip(), flush=True)
+    print("signed in with a sign-in link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
     if twofa_methods(c, u):
         tok = pend_new("2fa", u["id"], remember=True)
         return pend_cookie(jsonify(ok=False, twofa=True, methods=twofa_methods(c, u)), tok)

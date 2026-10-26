@@ -181,7 +181,10 @@ lines = pdf_lines(p.content) if p.ok else None
 if lines is not None:
     txt = "\n".join(lines)
     check(txt.find("NORDLICHT") < txt.find("Berg, Tal und Partner GbR") and not any("NORDLICHT - Berg" in ln for ln in lines), "invoice PDF: name and addition, two lines")
-    check(any("Studio Polar Film und Ton Produktion GmbH" in ln for ln in lines), "invoice PDF: the sender line has the name on one line")
+    # bundle 2.305 (26.10.2026): with 2.296.0 E (#3170) the address has priority on the sender line: a name too long for
+    # the field gives way to its first line, the line stays one line with street and town
+    check(any(ln.strip().startswith("Studio Polar") and "Hafenstraße 12" in ln and "20457 Hamburg" in ln for ln in lines),
+          f"invoice PDF: the sender line is one line, name first, the address kept {[ln for ln in lines if 'Hafenstraße' in ln]}")
     check(sum(1 for ln in lines if "Produktion GmbH" in ln and "Studio Polar" not in ln) >= 2,
           "invoice PDF: letterhead and footer set the name lines one under the other")
     check(any("Speicher 3" in ln for ln in lines), "invoice PDF: the company's extra address line")

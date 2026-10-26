@@ -255,7 +255,8 @@ check(pdf.pdf_encode("a → b ≥ c") == b"a -> b >= c", "arrows and comparison 
 w = pdf.pdf_wrap("Donaudampfschifffahrtsgesellschaftskapitänsmützenhersteller und mehr", 9.6, 80)
 check(len(w) >= 3 and all(pdf.pdf_text_width(x, 9.6) <= 80 for x in w), f"a long word is cut to the column: {w}")
 check(pdf.pdf_wrap("Zeile eins\nZeile zwei", 9.6, 300) == ["Zeile eins", "Zeile zwei"], "explicit line breaks are kept")
-check(pdf.pdf_money(1234.5, "de", "EUR") == "1.234,50 €" and pdf.pdf_money(1234.5, "en", "USD") == "1,234.50 USD" and pdf.pdf_money(-12, "de", "EUR") == "-12,00 €",
+# 2.296.0 B (#3175): one money format with calc.fmt_money (was "1,234.50 USD")
+check(pdf.pdf_money(1234.5, "de", "EUR") == "1.234,50 €" and pdf.pdf_money(1234.5, "en", "USD") == "$1,234.50" and pdf.pdf_money(-12, "de", "EUR") == "-12,00 €",
       "money formats by language")
 check(pdf.pdf_num(4.5, "de") == "4,5" and pdf.pdf_num(3, "en") == "3" and pdf.pdf_num(0.25, "en") == "0.25", "quantity formats")
 check(pdf.pdf_date("2026-10-09", "de") == "09.10.2026" and pdf.pdf_date("2026-10-09", "en") == "9 October 2026" and pdf.pdf_date("", "de") == "", "date formats")

@@ -199,6 +199,10 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "extracted": {"type": ["object", "null"], "description": "Single document only: what the recognition read off an invoice / receipt, "
                       "a suggestion a person takes over (supplier, vat_id, tax_no, invoice_no, vat_pct 19|7|0, vat_rates [{pct, net, vat}], "
                       "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"},
+        # 2.299.0 D (#3193)
+        "checks": {"type": ["object", "null"], "description": "Single document only: hints of the fixed check of a receipt (required "
+                   "details of an invoice, net + VAT = gross, VAT rate, VAT ID format): items [{code, level hint|warn, text}], "
+                   "hidden = a person hid them; null = no receipt or nothing to say. Hints only, nothing is blocked"},
         # 2.126.1 A (#2123)
         "summary": {"type": "string", "description": "Single document only: the summary a person took over from an agent's draft ('' = none)"},
         "custom_fields": {"type": "array", "description": "2.153.0: the custom fields of the document's workspace with this document's "

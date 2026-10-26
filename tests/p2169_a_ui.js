@@ -6,6 +6,7 @@
 // - an offline change waits in the outbox (the copy has it at once); the tab closed and opened again online = sent
 // - changed elsewhere meanwhile: no version is lost, the own one waits at the page ("Compare" -> keep mine) until it is decided
 // - a space this account no longer has leaves the copy at the next sync; logout empties it
+// - 2.238.0 B (#2872): every record carries the sign-in mark (me.sgen); each boot here is a new sign-in (p2238_b_wikioffline_ui.js)
 // - 2.169.1 (#949 / #2672): on a computer with sidebar B the offline mark sits in the bar above the folder and the search finds
 //   words in the texts; on a phone the same in its list; waiting conflicts are read by key range (pre), the kept lock state
 //   fills WKE.info offline, a refused page change has its own toast, the index says more=false and the mark names the 5000 cap
@@ -149,6 +150,9 @@ function browser() {
   // ================= 2.169.1 (#949): a phone: the same offline mark and text search in its list
   const wp = await boot({...opt, mobile: true}), dp = wp.document;
   await until(() => typeof wp.wk_loadPage === 'function' && wp.eval(`(WK.idx.private?.pages || []).length`) >= 2, 60);
+  // 2.238.0 B (#2872): the phone window has its own sign-in (boot logs in again): the copy carries its mark once it synced
+  await wp.eval(`wk_load('private', true)`);
+  check(await until(() => br.db.get('s:private')?.g === wp.eval('S.me.sgen'), 40), '2.238.0 B: the copy carries the phone window\'s sign-in mark');
   wp.__offline = true;
   wp.eval(`WK.idx = {}; 1`); await wp.eval(`wk_load('private', true)`); wp.eval(`renderView(); 1`);
   const hp = await until(() => dp.querySelector('#view .wkoff'), 40);
@@ -157,7 +161,7 @@ function browser() {
   if (qp) { qp.value = 'edit two'; qp.dispatchEvent(new wp.Event('input', {bubbles: true})); }
   check([...dp.querySelectorAll('#wk-res a')].some(a => a.getAttribute('href') === '#wiki/' + P2), 'phone: offline the search finds a word of the text');
   // 2.169.1 (#2672): the kept lock state fills WKE.info offline (names, not ?)
-  br.db.set('e:org:4242', {k: 'e:org:4242', sp: 'org:4242', uid: st0.me.id, j: {mode: 'e2e', gen: 1, space_id: 4242, members: [{user_id: 777, name: 'Zora'}]}});
+  br.db.set('e:org:4242', {k: 'e:org:4242', sp: 'org:4242', uid: st0.me.id, g: wp.eval('S.me.sgen'), j: {mode: 'e2e', gen: 1, space_id: 4242, members: [{user_id: 777, name: 'Zora'}]}});
   await wp.eval(`delete WKE.info['org:4242']; wkeInfo('org:4242').catch(() => null)`);
   check(wp.eval(`wkeName('org:4242', 777)`) === 'Zora' && wp.eval(`!!WKE.st['org:4242']`), 'offline: the kept lock state fills WKE.info');
   br.db.delete('e:org:4242');
@@ -184,7 +188,9 @@ function browser() {
   // ================= a space this account no longer has goes; logout empties the copy
   br.db.set('s:org:9999', {k: 's:org:9999', sp: 'org:9999', uid: st0.me.id, pages: [{id: 1, path: 'Old', body: 'old'}]});
   br.db.set('s:private-other', {k: 's:private-other', sp: 'private', uid: 999999, pages: []});
-  await w.eval(`wko_syncAll()`);
+  // 2.280.0 C (#3114): the tidying runs at the first space opened in a session (no start sync any more)
+  await w.eval(`WKO.swept = null; wk_load('private', true)`);
+  await w.eval(`WKO.swept`);
   check(!br.db.has('s:org:9999') && !br.db.has('s:private-other') && br.db.has('s:private'), 'sync: a space no longer mine and another account\'s record leave the copy');
   // review: my own text sent twice (the first answer got lost) is no conflict
   const twice = await w.eval(`wkoReject({url: '/api/wiki/pages/${P1}', method: 'PATCH', body: {body: 'Same text'}}, {status: 409, data: {page: {id: ${P1}, space: 'private', body: 'Same text', updated_at: '2030-01-01T00:00:00Z'}}})`);

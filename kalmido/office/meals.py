@@ -42,7 +42,7 @@ from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .calc import dec, dstr, money
 from .ledger import ofx_log
-from .rights import ofr_own_uid
+from .rights import ofr_own_uid, NO_SPECIAL, ofr_allows
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
 
 BW_KINDS = ("food", "drinks")
@@ -53,7 +53,7 @@ BW_MAX_LINES = 20
 BW_MAX_CHOICES = 500
 BW_PURGE_DAYS = 30
 BW_KEEP_YEARS = 8  # receipts: 8 years after the end of the year (since 2025); 2.147.0 (#2459): the DE pack's value, see bw_years
-BW_BILL_HINT = dec(250)  # from 250 EUR gross the bill must name the company
+BW_BILL_HINT = dec(250)  # 2.296.0 A (#3176): above 250 EUR gross the bill must name the company (up to 250 EUR: small-amount invoice)
 BW_SHARE = dec("0.7")  # deductible share of the net amount
 # an occasion that only says "a business meal" is not enough (the tax office asks for the concrete reason)
 BW_VAGUE = {"geschäftsessen", "geschaeftsessen", "arbeitsessen", "essen", "bewirtung", "business meal", "business lunch",
@@ -875,6 +875,9 @@ def bw_report_get():
     rep = bw_report(c, oid, df, dt, person, occ)
     cur = rk_home_cur(c, oid)
     fmt = request.args.get("format") or ""
+    if fmt in ("csv", "pdf"):  # 2.237.0 A (#2861): the files for the tax adviser need the special export
+        if not ofr_allows(c, uid, oid, "meals", "own", "export"):
+            raise Denied(403, tr(NO_SPECIAL))
     if fmt == "csv":
         co = bw_company(c, oid)
         buf = io.StringIO()

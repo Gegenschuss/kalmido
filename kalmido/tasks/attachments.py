@@ -55,7 +55,12 @@ def attachment_upload(tid):
     if not files:
         return err(tr("File missing"))
     saved = []
-    e = save_attachments(c, tid, files, saved=saved)
+    try:
+        e = save_attachments(c, tid, files, saved=saved)
+    except Exception:  # 2.273.0 D (#3051): an error halfway (scan, sealing, disk) must not leave files without a row
+        c.rollback()
+        unlink_files(saved)
+        raise
     if e:
         c.rollback()
         unlink_files(saved)
@@ -94,6 +99,8 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
             name = unexec_name(name)
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
+        if saved is not None:
+            saved.append(rel)  # 2.273.0 D (#3051): listed before it is written, so a failure later on leaves no file without a row
         try:
             h6d_save(f, full)  # 2.86.0 (N22): stops right after MAX_FILE_MB (refused below)
         except OSError as e:
@@ -106,8 +113,6 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=N
         if not size:  # 2.13.2 (#478 N6): a 0-byte file is refused (it would only show up as a broken file)
             os.remove(full)
             return tr("{0}: the file is empty and was not uploaded", name)
-        if saved is not None:
-            saved.append(rel)
         if org is None:
             org = oc_task_org(c, tid) or 0  # the organisation (upload checks 2.61.0: a real org id or None)
             space = oc_task_space(c, tid) or 0  # 2.64.0 (#1864): the key's space: a private list's file with its owner's account key

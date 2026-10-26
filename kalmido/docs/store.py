@@ -25,7 +25,7 @@ from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k
 from . import classify as CL
 from . import extract as EX
 from . import rules as RU
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted  # 2.199.0 B (#2742)
@@ -389,6 +389,30 @@ def asn_next(c, ws):
 
 def asn_taken(c, ws, n, nid=None):
     return c.execute("SELECT 1 FROM doc_meta WHERE ws=? AND asn=? AND node_id<>?", (ws, int(n), int(nid or 0))).fetchone() is not None
+
+
+def asn_lock(c, ws, nid):
+    """2.273.0 C (#3047): hand out / check an archive number of a workspace under a lock until the transaction ends (two saves
+    with "next" got the same number: unique violation, the save's other fields were lost). The document's row first, then the
+    workspace lock -- the same order in every caller (no deadlock with a recognition run of the same document)."""
+    c.execute("SELECT 1 FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,))
+    write_lock(c, f"doc-asn:{ws}")
+
+
+# 2.273.0 C (#3047): the values a person set by hand, listed in doc_meta.auto["_hand"]; a recognition run ("Recognise again",
+# a new file version) keeps them. Older versions ignore the key.
+HAND_FIELDS = {"date": "doc_date", "due": "due_date", "amount": "amount", "currency": "currency"}
+
+
+def hand_fields(auto):
+    h = auto.get("_hand") if isinstance(auto, dict) else None
+    return [f for f in h if f in HAND_FIELDS] if isinstance(h, list) else []
+
+
+def was_digest(nid, f, v):
+    """2.273.0 (#3047): the recognised value behind a hand value is kept only as a keyed digest (auto is not sealed; the
+    amount must never sit there in plain text) - enough to see that a value was set back."""
+    return hmac.new(SECRET_KEY or b"kalmido-doc-was", f"{nid}|{f}|{v}".encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def index_text(c, m, name, text, cf=None):
@@ -897,12 +921,12 @@ def process(c, nid):
         res["method"] = "e-invoice"
     thumb_store(c, m, node, data, res.get("kind"))
     text = res.get("text") or ""
+    asn_found = None
     if not m["asn"]:
         from .ocr import qr_codes
-        n = EX.find_asn(cfg_get(c, ws)["asn_prefix"], [*qr_codes(data, res.get("kind")), text[:20000]])
-        if n and not asn_taken(c, ws, n, nid):
-            c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (n, nid))
-            given = {**given, "_asn": True}
+        # 2.273.0 F2 (#3047): only found here; written under the workspace lock just before the final write (the lock is not
+        # held over classifying / recognising, a save with "next" does not wait for them)
+        asn_found = EX.find_asn(cfg_get(c, ws)["asn_prefix"], [*qr_codes(data, res.get("kind")), text[:20000]])
     ex = EX.extract(text, guess=False)
     if m["source"] == "paperless":           # an import keeps due date and amount empty (only a monetary field fills them)
         ex["due"] = ex["amount"] = ex["currency"] = None
@@ -928,8 +952,6 @@ def process(c, nid):
     if not vals["doc_date"] and m["taken_at"]:  # 2.61.0 B (#1819): no date in the text -> the day the photo was taken
         vals["doc_date"] = str(m["taken_at"])[:10]
         auto_all["date"] = "photo"
-    if given.get("_asn"):
-        auto_all["asn"] = "code"
     imported = {}                            # features the caller gave (an import): set as they are
     for f in ("sender", "type"):
         if given.get(f):
@@ -966,7 +988,28 @@ def process(c, nid):
         vals["amount"] = str(given.get("amount") or ex["amount"] or vals["amount"] or "")
         vals["currency"] = str(given.get("currency") or ex["currency"] or vals["currency"] or "")[:8]
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
-    m2 = meta_row(c, nid)
+    # 2.273.0 C (#3047): the row locked from here on (a save waits); the values a person set by hand stay
+    m2 = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    if asn_found and not m2["asn"]:
+        asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write
+        if not asn_taken(c, ws, asn_found, nid):
+            c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (asn_found, nid))
+            auto_all["asn"] = "code"
+    hand = hand_fields(meta_json(c, m2, "auto", {}))
+    was = meta_json(c, m2, "auto", {}).get("_was")
+    was = {f: w for f, w in was.items() if f in hand} if isinstance(was, dict) else {}
+    for f in hand:
+        col = HAND_FIELDS[f]
+        if isinstance(was.get(f), dict):    # 2.273.0 F2 (#3047): this run's value is the recognised one behind the hand value
+            was[f]["v"], was[f]["a"] = was_digest(nid, f, str(vals[col] or "")), auto_all.get(f)
+        vals[col] = (doc_open(c, ws, "doc_meta.amount", m2["amount"]) or "") if col == "amount" else (m2[col] or ("" if col == "currency" else None))
+        auto_all.pop(f, None)
+    auto_all.pop("_hand", None)
+    auto_all.pop("_was", None)
+    if hand:
+        auto_all["_hand"] = hand
+    if was:
+        auto_all["_was"] = was
     review = 1 if sug or not (m2["sender_id"] or m2["type_id"]) else 0
     state = "failed" if res.get("error") else "done"
     # 2.90.0 A (#1921): a date / an amount typed in while the run was busy wins (the columns' values at the time of the

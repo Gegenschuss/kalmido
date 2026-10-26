@@ -119,7 +119,8 @@ async function rc_einvTake(id, b) {
 // "Recognised: ..." with Take over / Discard while it would change something (doc.extracted.new); Take over and Discard are
 // one undo step each. The invoice number stays visible (copy button) even after the take-over.
 function rx_html(d) {
-  if (!d?.extracted && !d?.duplicate_of) return '';
+  const ag = typeof rcr_html === 'function' ? rcr_html(d) : '';  // 2.299.0 E (#3194): read by an agent / "Read with an agent" (asstprop.js)
+  if (!d?.extracted && !d?.duplicate_of && !d?.checks && !ag) return '';  // 2.299.0 D (#3193): + the hints of the check
   const x = d.extracted || {};  // 2.146.0 B (#2452): a possible duplicate shows without recognised values too
   const w = d.role !== 'view', cur = x.currency || d.currency;
   const parts = [x.supplier && `<b>${esc(x.supplier)}</b>`, x.invoice_no && esc(tr('No. {0}', x.invoice_no)),
@@ -132,8 +133,37 @@ function rx_html(d) {
   // 2.146.0 B (#2452): an older document looks like the same invoice -- a link to it, "No duplicate" keeps the decision
   const du = d.duplicate_of, dup = du ? `<div class="rx-dup" role="note">${ic('alert', 's')}<span>${tr('Possibly a duplicate of')} <a href="#docs/${+du.id}">${esc(du.name)}</a></span>
     ${w ? `<button type="button" class="btn sm" data-rx="nodup:${d.id}">${tr('No duplicate')}</button>` : ''}</div>` : '';
-  return line || no || dup ? `<div class="rx-slot">${dup}${line}${no}</div>` : '';
+  const ck = rck_html(d);  // 2.299.0 D (#3193)
+  return line || no || dup || ag || ck ? `<div class="rx-slot">${dup}${ag}${line}${no}${ck}</div>` : '';
 }
+// 2.299.0 D (#3193): the hints of the fixed check of a receipt (required details, net + VAT = gross, rate, VAT ID) -- folded
+// below the recognised values, never blocking; "Hide hints" hides the ones shown now (one undo step), a new one shows again
+function rck_html(d) {
+  const k = d?.checks;
+  if (!k?.items?.length) return '';
+  const w = d.role !== 'view', n = k.items.length;
+  if (k.hidden) return w ? `<div class="rck rck-off"><span class="muted">${esc(trn('{0} hint hidden', '{0} hints hidden', n))}</span>
+    <button type="button" class="linkbtn" data-rck="show:${d.id}">${tr('Show')}</button></div>` : '';
+  const warn = k.items.some(x => x.level === 'warn');
+  return `<details class="rck${warn ? ' rck-warn' : ''}"><summary>${ic('alert', 's')}<span>${esc(trn('{0} hint on this receipt', '{0} hints on this receipt', n))}</span></summary>
+    <ul class="rck-list">${k.items.map(x => `<li class="${x.level === 'warn' ? 'rck-w' : 'rck-h'}">${esc(x.text)}</li>`).join('')}</ul>
+    ${w ? `<button type="button" class="btn sm ghost" data-rck="hide:${d.id}">${tr('Hide hints')}</button>` : ''}</details>`;
+}
+async function rck_post(id, act) {
+  const j = await api('POST', `/api/docs/${id}/checks`, {do: act});
+  if (typeof DC === 'object' && DC.doc?.id === id && j.doc) { DC.doc = j.doc; dc_mdDraw($('.dc-md')); dc_load(); }
+  if (typeof bkRxAfter === 'function') bkRxAfter(id);
+  if (typeof rclReload === 'function') rclReload();
+  return j;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-rck]'); if (!b) return;
+  const [act, sid] = b.dataset.rck.split(':'), id = +sid;
+  b.disabled = true;
+  try { await rck_post(id, act); } catch { b.disabled = false; return; }
+  const back = act === 'hide' ? 'show' : 'hide', label = act === 'hide' ? tr('Hints hidden') : tr('Hints shown');
+  histToast(label, histAdd({label, undo: () => rck_post(id, back), redo: () => rck_post(id, act)}));
+});
 async function rx_post(id, b) {
   const j = await api('POST', `/api/docs/${id}/extracted`, b);
   if (typeof DC === 'object' && DC.doc?.id === id && j.doc) { DC.doc = j.doc; dc_mdDraw($('.dc-md')); dc_load(); }

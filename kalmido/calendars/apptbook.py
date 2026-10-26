@@ -1153,4 +1153,4 @@ def apb_push(c, r, what):
     title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the customer", lg=lg)
     msg = f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
     click = f"{PUBLIC_URL}/#ev/{r['event_id']}" if r["event_id"] and what == "new" else f"{PUBLIC_URL}/#calendar"
-    g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s)))
+    g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s), {"scope": f"o:{p['office_org_id'] if p else None}"}))  # 2.240.0 B2 (#2867)

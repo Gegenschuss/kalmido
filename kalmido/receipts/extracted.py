@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..files.store import fs_log_add
 from ..docs import store as S
+from .suggest import rc_office_need  # 2.237.0
 
 RX_KEYS = ("supplier", "vat_id", "tax_no", "invoice_no", "vat_pct", "vat_rates", "net", "vat", "gross", "currency")
 RX_FIELDS = ("amount", "vat_pct", "sender")      # what Take over may set
@@ -120,6 +121,10 @@ def rx_post(nid):
         return err(tr("Invalid value: {0}", "do"))
     if not det and act not in ("nodup", "dup"):
         raise Denied(404)
+    fl, bf0 = b.get("fields") or RX_FIELDS, b.get("before") if isinstance(b.get("before"), dict) else {}
+    vat_in = act == "apply" and det.get("vat_pct") in ("19", "7", "0") and (not isinstance(fl, list) or "vat_pct" in fl)
+    if act in ("apply", "restore") and (_rc_row(c, nid) or vat_in or bf0.get("is_receipt") or bf0.get("vat_pct")):
+        rc_office_need(c, m, uid)  # 2.237.0 A (#2861): the values of a receipt (or one it becomes)
     before = None
     if act in ("nodup", "dup"):
         c.execute("UPDATE doc_meta SET dup_ok=? WHERE node_id=?", (1 if act == "nodup" else 0, nid))

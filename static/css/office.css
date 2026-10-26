@@ -403,6 +403,21 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnkprev{max-height:50vh;overflow:auto}
 /* 2.218.0 B (#2805): the document kind tabs (Quotations / Invoices / Credit notes …) are at least 2.75rem high on phones */
 @media (hover:none),(max-width:899px){ .ofdkinds button{min-height:2.75rem} }
+/* 2.299.0 B (#3191): bank rules */
+.bnkrsug{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.5rem .625rem;margin-bottom:.5rem;border-radius:var(--radius);border:1px solid var(--accent);background:var(--bg2)}
+.bnkrsn{display:flex;flex-direction:column;min-width:0}
+.bnkrsug .btn,.bnkrh .btn,.brlrow .btn{min-height:2.75rem}
+.bnkrh{margin:0;font-size:var(--fs-s)}
+.bnkbyr{font-size:var(--fs-s);white-space:nowrap}
+.brlrow{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.brlrow .ofcn{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column}
+/* 2.299.0 C (#3192): bookings without a receipt; computer: open receipts beside the list (drag onto a row) */
+.bnrbar select{min-height:2.75rem}
+.bnrcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(14rem,18rem);gap:1rem;align-items:start}
+.bnrrc{position:sticky;top:.5rem;max-height:80vh;overflow:auto}
+.bnrdrag{cursor:grab}
+[data-bnr-drop].on{border-color:var(--accent)}
+.bnrcnt{margin-bottom:.75rem}
 /* 2.90.0 A (#1921) */
 .bk-year{display:inline-flex;align-items:center;gap:.5rem}
 .bk-photo{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;margin:.5rem 0 1rem}
@@ -417,6 +432,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bk-warn{border-left:.2rem solid var(--accent);background:var(--bg2);padding:.5rem .75rem;border-radius:var(--radius);margin:.5rem 0}
 .bk-miss{color:var(--accent)}
 .bk-missing{margin:.25rem 0 .5rem}
+.bk-einvs{margin:.25rem 0 .75rem}.bk-einvrow{display:flex;align-items:center;gap:.5rem}.bk-einvrow .ofcrow{flex:1;min-width:0}  /* 2.237.0 C (#2865) */
 .bk-missing summary,.bk-items summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;color:var(--accent)}
 .bk-tab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .bk-tab th,.bk-tab td{padding:.5rem;border-bottom:1px solid var(--line2);text-align:left;font-weight:400}

@@ -56,7 +56,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     frm = frm or (to - timedelta(days=6))
     lo, hi = _bounds(frm, to)
     lst = c.execute("SELECT id, name, is_inbox, kind, status, time_tracking FROM lists WHERE id=?", (lid,)).fetchone()
-    vis = tvis(c, uid, "t.")
+    vis = tvis(c, uid, "t.")  # 2.223.7 D (#2941): open_blockers counts only blockers uid sees too
     base = f"FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL AND {vis}"
     cols = "t.id, t.title, t.due, t.due_time, t.status, t.completed_at, t.parent_id, t.ms, t.waiting_at, t.wait_note, t.wait_until"
 
@@ -70,7 +70,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     reached = [r for r in done_all if r["ms"]]
     opened = c.execute(f"""SELECT {cols},
                              (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project')) AS open_blockers,
+                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project') AND {tvis(c, uid, 'b.')}) AS open_blockers,
                              (EXISTS (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind!='created' AND a.created_at>=? AND a.created_at<?)
                               OR EXISTS (SELECT 1 FROM comments cm WHERE cm.task_id=t.id AND cm.deleted_at IS NULL AND cm.created_at>=? AND cm.created_at<?)
                               OR EXISTS (SELECT 1 FROM time_entries te WHERE te.task_id=t.id AND te.start>=? AND te.start<?)

@@ -185,7 +185,7 @@ def too_large(_):  # json, not flask's html page (the client treats html as "ses
         return err(tr(BK_ERR["too_large"], BK_MAX_BYTES // 1048576), 413)
     if request.path.startswith(("/api/import/", "/api/v1/import/")):
         return err(tr("The file is too large (at most {0} MB)", IMPORT_MAX_MB), 413)
-    return err(tr("Upload too large (max. {0} MB per file)", MAX_FILE_MB), 413)
+    return err(tr("Upload too large: at most {0} MB per file and {1} MB all files together", MAX_FILE_MB, MAX_FILE_MB * 4), 413)  # 2.273.0 D (#3051): the request limit is the total
 
 
 @app.get("/")

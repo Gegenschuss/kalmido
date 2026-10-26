@@ -194,6 +194,8 @@ r = ag("POST", "/reminders", json={"invoice_ids": [INV], "level": 1})
 check(r.status_code == 201 and r.json()["doc"]["kind"] == "reminder" and r.json()["doc"]["status"] == "draft" and not r.json()["doc"]["locked"],
       "#1350: a reminder draft " + r.text[:200])
 check(ag("POST", "/reminders", json={"invoice_ids": [FQ]}).status_code in (400, 404), "#1350: no reminder over another organisation's document")
+# 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (payment suggestions need one)
+check(A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects", "tpl:bookkeeping"]}).ok, "setup: the agent in Project management + Bookkeeping")
 r = ag("POST", "/payment-suggestions", json={"invoice_id": INV, "amount": "100.00", "date": TODAY, "reference": "Ueberweisung Musterfirma", "confidence": "high"})
 check(r.status_code == 201 and r.json()["state"] == "open", "#1350: a payment suggestion " + r.text[:200])
 P1 = r.json()["id"]
@@ -231,8 +233,12 @@ check(ag("GET", f"/docs/{DQ}").status_code == 404 and requests.get(V + f"/docs/{
 check(requests.post(V + "/offers", headers=DH, json={"client_id": CL, "title": "x"}).status_code == 404, "#1360: no client of an organisation")
 
 # ---------------------------------------------------------------- switched off again
-check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": False}).ok and ag("GET", "/services").status_code == 403, "#1348: switched off = 403 at once")
+# 2.223.2 B (#2862): the agent is in office groups since the payment suggestions -- "switched off" = the group No office access
+check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": False}).ok and A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:none"]}).ok
+      and ag("GET", "/services").status_code == 403, "#1348: switched off = 403 at once")
 A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True})
+# 2.223.7 C (#2670): offer_accepted (review 15 below) only for an agent whose office groups give it the offers -> back into its groups
+A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects", "tpl:bookkeeping"]})
 A.put(B + O + "/settings", json={"agents_read": 0})
 check(ag("GET", "/services").status_code == 403, "#1348: the privacy switch off = 403 at once")
 r = A.post(B + "/api/admin/agents", json={"username": "movebot", "display_name": "Move Bot", "scopes": ["read", "office"]})

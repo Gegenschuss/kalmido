@@ -14,7 +14,7 @@ from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERN
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings, iso
 from ..core.pg import system_ctx
-from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, _token_hash, me, user_public
+from ..accounts.session import _rate_fail, _rate_keys, _token_hash, login_wait, me, session_gen, user_public
 from ..accounts.pictures import (
     AVATAR_DIR, avatar_drop_file, AVATAR_MAX_MB, avatar_path, AVATAR_PRESETS, avatar_process, avatar_url, LIST_ICON_DIR,
     list_icon_drop_file, list_icon_path, LIST_ICON_PRESETS, list_icon_process, list_icon_url,
@@ -335,6 +335,8 @@ def user_update(uid):
         ses_end(c, uid)  # 2.190.0 A (#1991)
         # 2.190.0 A (#2496): the app passwords (CalDAV/CardDAV) go too; API tokens stay (agents keep working)
         c.execute("DELETE FROM app_passwords WHERE user_id=?", (uid,))
+        from ..docs.scankeys import sk_revoke_all  # 2.237.0 C (#2865): and the scan inbox keys
+        sk_revoke_all(c, uid)
     if "ntfy_topic" in b:
         topic = str(b["ntfy_topic"] or "").strip()
         if topic and not NTFY_TOPIC_RE.fullmatch(topic):
@@ -423,7 +425,7 @@ def user_delete(uid):
     if keep:
         c.rollback()
         return keep
-    files = user_purge(c, uid)  # 2.152.0 A (#2164): records kept by law retire the personal office instead of blocking (2.148.1 #2479)
+    files = user_purge(c, uid, gated=True)  # 2.152.0 A (#2164): records kept by law retire the personal office instead of blocking (2.148.1 #2479)
     bump(c)
     c.commit()
     unlink_files(files)  # 2.152.0 (#2164): with the photo (user_purge)
@@ -432,10 +434,10 @@ def user_delete(uid):
         for lid, icon in icons:
             list_icon_drop_file(lid, icon)
         list_files_drop(lfiles)
-    ua8_audit(g.user["username"], u["username"], *audit)  # 2.88.0 (#1980): the security log
+    ua8_audit(g.user["username"], f"#{uid}", *audit)  # 2.88.0 (#1980): the security log; 2.239.0 C (#2866): by number, not by name
     if retained:  # 2.146.0 D (#2468): deleted after the retention export / with its waiver
         from ..admin.retexport import rx_alert
-        rx_alert(retained[0], [g.user["username"], u["username"]])
+        rx_alert(retained[0], [g.user["username"], f"#{uid}"])
     return jsonify(ok=True, lists=n)
 
 
@@ -461,12 +463,13 @@ def _up_mail_nodes(c, uid):
     return paths
 
 
-def user_purge(c, uid):
+def user_purge(c, uid, gated=False):
     """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink
-    (2.152.0 A: and clean-ups to run after the commit, see serializers.unlink_files)."""
+    (2.152.0 A: and clean-ups to run after the commit, see serializers.unlink_files). gated: the caller passed rx_gate
+    (2.239.0 D, #2866: only user_delete; every other caller keeps the retention locks)."""
     from ..admin.hosting import hosted
     from ..office.olock import OLK_BYPASS
-    tok = OLK_BYPASS.set(hosted())  # 2.152.0 (#2164, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
+    tok = OLK_BYPASS.set(bool(gated) and hosted())  # 2.152.0 (#2164, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
     try:
         return _user_purge(c, uid)
     finally:
@@ -527,11 +530,18 @@ def _user_purge(c, uid):
     if av:  # 2.152.0 (#2164): the own photo goes after the commit for every caller (also the re-delete after a restore)
         files.append(lambda: avatar_drop_file(uid, av))
     with system_ctx(c):  # 2.172.0 (#2677): an organisation's feeds stay with the organisation (next admin), not with their adder
+        # 2.239.0 D (#2866): without another admin the heir of the account's organisation things takes them (orgretain.upg_heir),
+        # and the organisation's section templates stay the same way; private ones go with the account (cascade)
+        from ..accounts.orgretain import upg_heir
         for (o,) in c.execute("SELECT DISTINCT org_id FROM rss_feeds WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
-            h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
+            h = upg_heir(c, o, uid)
             if h:
-                c.execute("UPDATE rss_items SET user_id=? WHERE user_id=? AND feed_id IN (SELECT id FROM rss_feeds WHERE org_id=? AND user_id=?)", (h[0], uid, o, uid))
-                c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
+                c.execute("UPDATE rss_items SET user_id=? WHERE user_id=? AND feed_id IN (SELECT id FROM rss_feeds WHERE org_id=? AND user_id=?)", (h, uid, o, uid))
+                c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h, uid, o))
+        for (o,) in c.execute("SELECT DISTINCT org_id FROM section_templates WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+            h = upg_heir(c, o, uid)
+            if h:
+                c.execute("UPDATE section_templates SET user_id=? WHERE user_id=? AND org_id=?", (h, uid, o))
         # 2.172.1 A (#2689): an organisation's bookmarks stay with it the same way (private ones go with the account)
         for (o,) in c.execute("SELECT DISTINCT org_id FROM bookmarks WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
             h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
@@ -543,6 +553,7 @@ def _user_purge(c, uid):
 
 @app.get("/api/me")
 def me_get():
+    from ..accounts.orgs import workspaces_for
     c = db()
     u = g.user
     return jsonify({**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via,
@@ -551,7 +562,8 @@ def me_get():
                     # 2.138.0 C (#1907): the upload token is shown only when created (POST /api/me/drop-token); here only
                     # whether one is set and since when. 2.86.0 (N3): /drop takes no child account
                     "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
-                    "ntfy_topic": usettings(c, u["id"])["ntfy_topic"]})
+                    "ntfy_topic": usettings(c, u["id"])["ntfy_topic"],
+                    "sgen": session_gen(u, workspaces_for(c, u["id"]))})  # 2.238.0 B (#2872): the sign-in mark (as in /api/state)
 
 
 FIRST_PW_FRESH = 600  # s: 2.86.0 (N5) a first local password needs a sign-in at most this long ago
@@ -588,8 +600,9 @@ def me_update():
         c.execute("UPDATE users SET color=? WHERE id=?", (b["color"].lower(), u["id"]))
     if "password" in b:
         keys = _rate_keys(u["username"])
-        if _rate_blocked(keys):
-            return err(tr("Too many failed logins, please wait a few minutes"), 429)
+        e = login_wait(keys, u["username"])  # 2.282.0 (#3111): other accounts' failures at this address do not stop it
+        if e:
+            return e
         if u["password_hash"] and not check_password_hash(u["password_hash"], b.get("current_password") or ""):
             _rate_fail(keys)
             return err(tr("Current password is wrong"), 403)
@@ -607,6 +620,8 @@ def me_update():
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays
         ses_end(c, u["id"], keep=_token_hash(tok) if tok else None)  # 2.190.0 A (#1991): with their push subscriptions
+        from ..docs.scankeys import sk_revoke_all  # 2.237.0 C (#2865): the scan inbox keys go (a new setup code is made)
+        sk_revoke_all(c, u["id"])
     bump(c)
     c.commit()
     if "password" in b:  # 2.266.0 (#2963)

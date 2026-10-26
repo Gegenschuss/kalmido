@@ -615,7 +615,7 @@ def frq_notify(c, r, n, name, node):
     if s and notif_ok(c, uid, s, "filereq", "push"):
         lg = lang(c, uid)
         g.setdefault("pushes", []).append((uid, tr("Files received", lg=lg), trn("{0} new file for “{1}”", "{0} new files for “{1}”", n, r["title"], lg=lg),
-                                           f"{PUBLIC_URL}/#ablage/{r['node_id']}", push_prio(s)))
+                                           f"{PUBLIC_URL}/#ablage/{r['node_id']}", push_prio(s), {"scope": f"o:{r['org_id']}"}))  # 2.240.0 B2 (#2867)
 
 
 def frq_news_live(c, uid, data):

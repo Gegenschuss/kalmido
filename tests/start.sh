@@ -20,6 +20,7 @@
 #   KALMIDO_TEST_NOW        2.149.0 (#2512): ISO instant the server's clock starts at (default unset: the real time); the
 #                           clock runs on from there. KALMIDO_TEST_NOW_AT = the real Unix second it stands for (default: now).
 #                           The container always gets KALMIDO_TEST=1, without it the app ignores KALMIDO_TEST_NOW
+#   KALMIDO_LOGIN_SLOW_S    2.282.0 (#3111): delay of sign-ins above the address limit (default 0.3 here, the app: 2.5)
 #   KALMIDO_NOTIF_TEMPLATE  notification template of a share without one (default all here: the suites before 2.33 expect every push; the app itself starts with read)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,7 +80,7 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_SETUP_CODE="${KALMIDO_SETUP_CODE-off}" -e KALMIDO_NO_SECRET_KEY="${KALMIDO_NO_SECRET_KEY-1}" -e KALMIDO_SECRET_KEY_CHANGED="${KALMIDO_SECRET_KEY_CHANGED-1}" \
-  -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
+  -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_LOGIN_SLOW_S=${KALMIDO_LOGIN_SLOW_S:-0.3} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
   -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)
 for _ in $(seq 1 60); do

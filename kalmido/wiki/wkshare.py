@@ -159,15 +159,20 @@ def wsh_repath(c, oid, owner, old, new, folder):
         c.execute("UPDATE wiki_shares SET path=? WHERE id=?", (np, r["id"]))
 
 
-def wsh_end_moved(c, oid, owner, paths, folder=None):
-    """Pages left the space (wkmove.py): their page shares end, and the shares of a folder that moved as a whole."""
+def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
+    """Pages left the space (wkmove.py): their page shares end, and the shares of a folder that moved as a whole.
+    2.273.0 B (#3042): -> how many end; dry = only count them (the dry run names them)."""
     keys = {p.lower() for p in paths if p}
     f = folder.lower() if folder else None
     ts = iso(now_utc())
-    for r in wsh_rows(c, oid, owner, live=False):
+    n = 0
+    for r in wsh_rows(c, oid, owner, live=dry):
         p = r["path"].lower()
         if (not r["is_folder"] and p in keys) or (f and (p == f or p.startswith(f + "/"))):
-            c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
+            n += 1
+            if not dry:
+                c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
+    return n
 
 
 def wsh_expiry(v):
@@ -615,7 +620,7 @@ def wsh_pub_file(token, fid):
 WSH_INLINE = re.compile(
     r"`([^`\n]+)`"                                                       # 1 code
     r"|(!?)\[([^\[\]\n]*)\]\(\s*<?([^\s()<>]{1,2000})>?(?:\s+\"[^\"\n]*\")?\s*\)"  # 2 bang, 3 label, 4 address
-    r"|(!?)\[\[([^\[\]|#\n]{1,250})(?:#[^\[\]|\n]*)?(?:\|([^\[\]\n]*))?\]\]"  # 5 bang, 6 path, 7 label
+    r"|(!?)\[\[([^\[\]|#\n]{1,500})(?:#[^\[\]|\n]*)?(?:\|([^\[\]\n]*))?\]\]"  # 5 bang, 6 path, 7 label
     r"|\*\*(.+?)\*\*|__(.+?)__"                                          # 8, 9 strong
     r"|~~(.+?)~~"                                                        # 10 strike
     r"|\*([^*\n]+)\*|(?<!\w)_([^_\n]+)_(?!\w)"                           # 11, 12 emphasis

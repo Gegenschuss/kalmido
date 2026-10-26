@@ -34,6 +34,7 @@ from ..core.i18n import dec_comma, lang, tr
 from ..accounts.session import me
 from ..office.legacyimport import _col_index, _local, _rels
 from ..personal.timetrack import _csv_cell
+from ..core.serializers import csv_uncell  # 2.273.0 D (#3051)
 from ..core.errors import BadInput
 from .shkinds import shk_export, shk_guess  # 2.124.0 B (#2110)
 from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_create, sh_currency, sh_eval, sh_need, sh_options,
@@ -491,7 +492,7 @@ def shx_read_csv(raw):
             full += sum(1 for x in row[:SH_COLS_MAX + 1] if x != "")
             if full > SHX_CELLS_MAX + SH_COLS_MAX:
                 raise _shx_too_many()
-            g.rows.append([{"v": x, "f": None, "fmt": None} for x in row[:SH_COLS_MAX + 1]])
+            g.rows.append([{"v": csv_uncell(x), "f": None, "fmt": None} for x in row[:SH_COLS_MAX + 1]])  # 2.273.0 D (#3051)
     except csv.Error:
         raise BadInput(tr("This file could not be read")) from None
     return g

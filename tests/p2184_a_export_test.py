@@ -36,7 +36,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,docs,contacts,files"
 LT = "/api/office/letters"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
@@ -116,7 +116,7 @@ def fields(s, nid):
 
 
 def zip_names(s, url):
-    r = s.get(B + url)
+    r = su_get(s, B + url)  # 2.223.2 C (#2871): the download needs the step-up (kt.su_get)
     check(r.ok and r.content[:2] == b"PK", f"retention ZIP {url} {r.status_code}")
     try:
         return zipfile.ZipFile(io.BytesIO(r.content)).namelist()

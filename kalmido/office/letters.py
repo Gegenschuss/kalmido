@@ -29,7 +29,8 @@ from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_cl_sql, pb_owner
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
-from .rights import ofr_admin_or
+from .rights import ofr_admin_or, ofr_allows, ofr_need_area
+from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
 LT_CHANNEL_KEYS = tuple(k for k, _ in LT_CHANNELS)
@@ -102,7 +103,7 @@ def lt_clean(c, oid, b, cur=None):
                 from .model import pb_cl_sql
                 ok = c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (v,)).fetchone()
             elif k == "template_id":
-                ok = c.execute("SELECT 1 FROM office_doc_templates WHERE id=? AND org_id=?", (v, oid)).fetchone()
+                ok = c.execute("SELECT 1 FROM office_doc_templates WHERE id=? AND org_id=? AND kind='letter'", (v, oid)).fetchone()  # 2.237.0 A (#2861)
             else:
                 ok = lt_contact_ok(c, oid, v)
             if not ok:
@@ -232,13 +233,14 @@ def lt_like(q):
     return "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-def lt_recipients(c, oid, uid, q="", limit=20):
+def lt_recipients(c, oid, uid, q="", limit=20, clients=True):
     """[{kind client | contact, label, sub, rcpt_*, client_id | contact_id}]: the office's clients (+ their contact
-    persons as "z. Hd.") and the address book contacts the person sees in the office's space, matching q."""
+    persons as "z. Hd.") and the address book contacts the person sees in the office's space, matching q.
+    2.237.0 A (#2861): clients=False leaves the clients out (no right to read them)."""
     from .contacts_cl import fk_contacts
     words = [w for w in re.split(r"\s+", (q or "").lower().strip()) if w][:6]
     lg = lt_lang(c, oid)
-    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL", []
+    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL" + ("" if clients else " AND false"), []
     for w in words:
         sql += " AND (name ILIKE ? ESCAPE '\\' OR display_name ILIKE ? ESCAPE '\\' OR city ILIKE ? ESCAPE '\\')"
         args += [lt_like(w)] * 3
@@ -401,6 +403,23 @@ def lt_sig_image(c, oid, d):
         return None
 
 
+LT_ADDR_LINES = 9  # 2.296.0 E (#3170): address lines the window holds (10 pt, below the sender line, above the text)
+
+
+def lt_addr_lines(d):
+    """2.296.0 E (#3170): the printed lines of the recipient (name + address, each wrapped to the address field)."""
+    addr = [x for x in [(d.get("rcpt_name") or "").strip()] + [ln.strip() for ln in (d.get("rcpt_address") or "").split("\n")] if x]
+    return [s for ln in addr for s in pdf_wrap(ln, 10, PDF_ADDR_W)]
+
+
+def lt_addr_warn(d):
+    """2.296.0 E (#3170): [warning text] when the recipient needs more lines than the address field holds (they are all printed,
+    the letter text moves down; in a window envelope the last lines would not show)."""
+    n = len(lt_addr_lines(d))
+    msg = tr("The address has {0} lines, the address field holds {1}: the last lines are not visible in a window envelope.", n, LT_ADDR_LINES)
+    return [msg] if n > LT_ADDR_LINES else []
+
+
 def lt_pdf(c, oid, d):
     """The PDF (bytes, PDF/A-3b) of letter d (a decrypted office_letters row): letterhead (logo or name), fold marks,
     the sender line (ledger.ofx_sender_line) and the recipient in the window, the date on the right, the reference line,
@@ -436,8 +455,14 @@ def lt_pdf(c, oid, d):
     geo = P.bp_geometry(blh) if blh else None
     BPD = geo["bp"] if geo else None
     PL, PCW, PAT, PNT = (geo["l"], geo["cw"], geo["addr_top"], geo["next_top"]) if geo else (P.PDF_L, P.PDF_CW, P.PDF_ADDR_TOP, P.PDF_NEXT_TOP)
-    PBB = (BPD["bottom"][0] if BPD["hide_footer"] else min(BPD["bottom"][0], P.PDF_BODY_BOTTOM)) if BPD else P.PDF_BODY_BOTTOM
-    PBB2 = (BPD["bottom"][1] if BPD["hide_footer"] else min(BPD["bottom"][1], P.PDF_BODY_BOTTOM)) if BPD else P.PDF_BODY_BOTTOM
+    # 2.296.0 A (#3164): the same footer columns as the other office PDFs (name, address, contact, register / managing
+    # directors, bank); the body ends above its real height
+    foot = P.pdf_footer_cols(co)
+    foot_fit = P.p3f_fit(foot, PCW)
+    foot_h = P.p3f_foot_h(foot_fit)
+    PBX = P.pdf_body_bottom(foot_h)
+    PBB = (BPD["bottom"][0] if BPD["hide_footer"] else min(BPD["bottom"][0], PBX)) if BPD else PBX
+    PBB2 = (BPD["bottom"][1] if BPD["hide_footer"] else min(BPD["bottom"][1], PBX)) if BPD else PBX
     hide_head = bool(BPD and BPD["hide_head"])
 
     def new_page(first):
@@ -449,8 +474,12 @@ def lt_pdf(c, oid, d):
                 sc = min(P.PDF_LOGO_MAX_W / logo[0], P.PDF_LOGO_MAX_H / logo[1])
                 p.image("Logo", PL + PCW - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
             else:
-                p.text(PL + PCW, P.PDF_TOP + 4 * P.MM, co.get("name") or "", 15, True, P.C_INK, align="r", spacing=1.2)
-                p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24, 12 * P.MM, 2.2, accent)
+                # bundle 2.305 (#3170): the name lines one under the other, as the templates and the other office PDFs print
+                # them (2.99.0 D #2188; the joined name of several lines ran out of the page on the left)
+                hl = (co.get("name_lines") or [co.get("name") or ""])[:3]
+                for i, ln in enumerate(hl):
+                    p.text(PL + PCW, P.PDF_TOP + 4 * P.MM + i * 18, ln, 15, True, P.C_INK, align="r", spacing=1.2)
+                p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(hl) - 1) * 18, 12 * P.MM, 2.2, accent)
             for y in (() if hide_head else (105 * P.MM, 148.5 * P.MM, 210 * P.MM)):  # fold marks + punch mark
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
         else:
@@ -464,17 +493,14 @@ def lt_pdf(c, oid, d):
         return p
 
     page = new_page(True)
-    sender = ofx_sender_line(co)
-    while P.pdf_text_width(sender, 7) > P.PDF_ADDR_W and " · " in sender:
-        sender = sender.rsplit(" · ", 1)[0]
+    nl = co.get("name_lines") or []
+    sender = P.pdf_sender_line(ofx_sender_line(co), co.get("name"), nl[0] if len(nl) > 1 else "")  # 2.296.0 E (#3170): the address first
     y = PAT
     page.text(PL, y, sender, 7, False, P.C_INK2)
     page.line(PL, y + 11, PL + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
-    addr = [x for x in [(d.get("rcpt_name") or "").strip()] + [ln.strip() for ln in (d.get("rcpt_address") or "").split("\n")] if x]
     yy = y + 16
-    for ln in addr[:9]:
-        for s in P.pdf_wrap(ln, body_sz, P.PDF_ADDR_W)[:1]:
-            page.text(PL, yy, s, body_sz)
+    for s in lt_addr_lines(d):  # 2.296.0 E (#3170): every wrapped part of every line (was the first part of the first 9 lines)
+        page.text(PL, yy, s, body_sz)
         yy += lh
     info_x = PL + P.PDF_ADDR_W + 8 * P.MM
     info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
@@ -483,7 +509,7 @@ def lt_pdf(c, oid, d):
     if d.get("tracking_no") and d.get("channel") == "registered":
         page.text(info_x, y + 16, tr("Registered mail", lg=lang), 8.6, False, P.C_INK2)
         page.text(info_x, y + 16, d["tracking_no"][:30], 8, False, P.C_INK, align="r", width=info_w)
-    y = PAT + P.PDF_ADDR_H + 8 * P.MM
+    y = max(PAT + P.PDF_ADDR_H + 8 * P.MM, yy + 6)  # 2.296.0 E (#3170): a longer address (see the warning) pushes the text down
 
     def room(h):
         nonlocal page, y
@@ -547,16 +573,11 @@ def lt_pdf(c, oid, d):
     if sname:
         page.text(PL, y, sname, body_sz)
     total = len(pages)
-    foot = " · ".join(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) + list(co.get("contact_lines") or []) if str(x).strip())
     for n, p in enumerate(pages, 1):
         if BPD and BPD["hide_footer"]:  # the letterhead has its own footer: only the page count under the body
             p.text(PL + PCW, BPD["bottom"][n > 1] + 3 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
             continue
-        top = P.A4_H - 12 * P.MM - P.PDF_FOOT_H
-        p.line(PL, top, PL + PCW, top, 0.5, P.C_RULE)
-        for j, s in enumerate(P.pdf_wrap(foot, 6.9, PCW)[:3]):
-            p.text(PL, top + 5 + j * 9.6, s, 6.9, False, P.C_INK2)
-        p.text(PL + PCW, P.A4_H - 9 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang), foot_fit, foot_h, PL, PCW)
     if draft:  # 2.294.0 (#3155): DRAFT as the diagonal watermark on every page (was a head line)
         for p in pages:
             p.mark(draft)
@@ -605,7 +626,7 @@ def lt_public(c, oid, d, names=None, brief=False):
     out = {k: d.get(k) for k in keep if not (brief and k == "body")}
     if names is None:
         names = lt_names(c, oid, [d])
-    out.update(archived=int(d.get("archived") or 0), client_name=names.get(d.get("client_id"), ""),
+    out.update(archived=int(d.get("archived") or 0), client_name=names.get(d.get("client_id"), ""), warnings=[] if brief else lt_addr_warn(d),
                channel_label=tr(dict(LT_CHANNELS).get(d.get("channel"), "Post")), status_label=tr(dict(LT_STATUS).get(d.get("status"), "Draft")))
     return out
 
@@ -691,13 +712,14 @@ def lt_post():
     answers: document node id: recipient and reference line prefilled from the document (office/letterlinks.py
     ltl_prefill) and linked. copy_of: id = a copy of that letter as a new draft (today's date). template_id without a
     body: subject + text from the template, its variables filled (client.*, company.*, today)."""
-    from .doctpl import dt_fill, dt_tpl, dt_values
+    from .doctpl import dt_fill, dt_miss_labels, dt_tpl, dt_values
     from .letterlinks import ltl_link, ltl_prefill
     c, uid, oid = lt_ctx()
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     data = {k: v for k, v in b.items() if k not in ("copy_of", "answers")}
+    miss = []
     if b.get("copy_of") not in (None, ""):
         src = lt_row(c, oid, b["copy_of"])
         data = {**{k: src.get(k) for k in LT_COPY}, **data}
@@ -705,9 +727,12 @@ def lt_post():
             data["contact_id"] = None  # the contact is no longer reachable: the snapshot stays
     elif data.get("template_id") not in (None, "", 0) and data.get("body") in (None, ""):
         t = dt_tpl(c, oid, data["template_id"])
+        if t["kind"] != "letter":
+            raise Denied(404)  # 2.237.0 A (#2861): only letter templates fill a letter
         lang = lt_lang(c, oid, data.get("lang") or t["lang"])
         cid = data.get("client_id") if data.get("client_id") not in ("", 0) else None
-        data["body"] = dt_fill(t["body"], dt_values(c, oid, lang, cid))[0].strip("\n")
+        data["body"], miss = dt_fill(t["body"], dt_values(c, oid, lang, cid))  # 2.296.0 C (#3165): the missing details are named
+        data["body"] = data["body"].strip("\n")
         data["lang"] = lang
         if not data.get("subject"):
             data["subject"] = t["name"]
@@ -722,14 +747,18 @@ def lt_post():
     if nid not in (None, ""):
         ltl_link(c, oid, lid, nid, "answers", uid=uid)
     c.commit()
-    return jsonify(lt_public(c, oid, lt_row(c, oid, lid))), 201
+    out = lt_public(c, oid, lt_row(c, oid, lid))
+    if miss:  # 2.296.0 C (#3165): the editor names what the template could not fill (left out of the text)
+        out.update(unfilled=miss, unfilled_labels=dt_miss_labels(miss))  # not 'missing': the client's mark of a letter it cannot see
+    return jsonify(out), 201
 
 
 @app.get("/api/office/letters/recipients")
 def lt_recipients_get():
     """?q= -> {recipients: [{kind client | contact, label, sub, rcpt_name, rcpt_address, rcpt_email, client_id | contact_id}]}."""
     c, uid, oid = lt_ctx()
-    return jsonify(recipients=lt_recipients(c, oid, uid, (request.args.get("q") or "")[:100]))
+    cl = ofr_allows(c, uid, oid, "offers", "view")  # 2.237.0 A (#2861): the clients like the client list (quotes & invoices)
+    return jsonify(recipients=lt_recipients(c, oid, uid, (request.args.get("q") or "")[:100], clients=cl))
 
 
 @app.get("/api/office/letters/profile")
@@ -917,6 +946,7 @@ def lt_template_post(lid):
     (name = the subject) -> 201 + the template. The undo: DELETE /api/office/doc-templates/<id>."""
     from .doctpl import dt_tpl, dt_tpl_public
     c, uid, oid = lt_ctx()
+    ofr_need_area(c, uid, oid, "gendocs", "edit")  # 2.237.0 A (#2861): it writes a document template
     b = body() or {}
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))

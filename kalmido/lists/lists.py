@@ -406,8 +406,11 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "client_id"}
+    lmm0 = None
     if "org_id" in b:  # 2.28.0 (#935): the workspace of the list (owner only; members / agents must fit)
         from ..accounts.orgs import list_org_set
+        from ..tasks.movememo import lmm_snap
+        lmm0 = lmm_snap(c, lid)  # 2.273.0 B (#3042): what the change ends, for the way back
         if list_org_set(c, lid, b["org_id"]):  # Denied 403 / 409
             list_own_mark(c, lid, "org_id")  # 2.29.0 (#1030): differs from its folder from now on
         b = {k: v for k, v in b.items() if k != "org_id"}
@@ -559,6 +562,11 @@ def list_update(lid):
     if "org_id" in given or vals.get("family") or vals.get("life"):  # 2.46.0 (#1603): private again -> only its members
         from ..lists.orgvis import ov_private_reset
         ov_private_reset(c, lid, tidy0["org_id"] if tidy0 else None)
+    if lmm0:  # 2.273.0 B (#3042): back where it came from = what ended there comes back; the answer names both
+        from ..tasks.movememo import lmm_after, lmm_restore
+        back = lmm_restore(c, lid, lmm0["org"])
+        ended = lmm_after(c, lid, lmm0, me())
+        pt_out = {**pt_out, **({"move_ended": ended} if ended else {}), **({"move_restored": back} if back else {})}
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)
@@ -595,9 +603,9 @@ def list_reorder():
                     conflicts.append({"field": "folder", "id": int(k), "server": folders.get(str(k)), "mine": fm[k]})
                     del fm[k]
             b = {**b, "folder": fm}
-    for i, lid in enumerate(b.get("ids", [])):
-        c.execute("UPDATE lists SET sort=? WHERE id=? AND is_inbox=0 AND owner_id=?", (i, int(lid), uid))
-        c.execute("UPDATE list_members SET sort=? WHERE list_id=? AND user_id=?", (i, int(lid), uid))
+    for i, lid in enumerate(b.get("ids", [])):  # 2.280.0 A (#3109): only rows whose order moves (each write is a change for others)
+        c.execute("UPDATE lists SET sort=? WHERE id=? AND is_inbox=0 AND owner_id=? AND sort!=?", (i, int(lid), uid, i))
+        c.execute("UPDATE list_members SET sort=? WHERE list_id=? AND user_id=? AND sort!=?", (i, int(lid), uid, i))
     fmap = b.get("folder") or {}
     if not isinstance(fmap, dict):
         return err(tr("Invalid value: {0}", tr("Folder")))
@@ -606,7 +614,7 @@ def list_reorder():
         folder = clean_folder(folder)
         if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=?", (folder, int(lid), uid, folder)).rowcount:
             moved.append(int(lid))
-        c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=?", (folder, int(lid), uid))
+        c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=? AND folder!=?", (folder, int(lid), uid, folder))
     if fmap:
         grp_touch(c, uid)  # 2.10.0 (#441)
     if moved:  # 2.29.0 (#1030 / #929): dragged into a folder: its people (as the list dialog did) and its defaults
@@ -689,6 +697,8 @@ def list_purge(c, lid, inbox):
     lfiles += [o3c_head_rel(lid, r[0]) for r in c.execute("SELECT header_file FROM lists WHERE id=? AND header_file!=''", (lid,))]  # 2.83.0 C (#1427)
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
+    from ..receipts.suggest import olk_keep_project
+    olk_keep_project(c, lid)  # 2.239.0 D (#2874): booked receipts keep the project name
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     return icon, lfiles
 

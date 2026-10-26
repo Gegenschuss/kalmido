@@ -3378,7 +3378,8 @@ body.qsheet-open #fab{display:none}
 #view.calfit{padding-bottom:0}
 @media (max-width:899px){ #view.calfit{padding-bottom:calc(var(--tabs-h) + var(--safe-b))} }
 /* P16: the logo follows the accent */
-svg.logo{color:var(--acc-d,var(--accent));flex:none}
+svg.logo{color:var(--accent);flex:none}
+#app.wsb-on svg.logo{color:var(--wbc)}  /* 2.233.0 C (#3195): --wbc is always set (muted without a workspace colour), so only an active workspace colour wins */
 .sbrand svg.logo{width:1.25rem;height:1.25rem}
 /* 2.136.0 (#2193): the word mark of the design file (icons.js wordSvg): light on dark, dark on light */
 svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEEDF3;flex:none}
@@ -3386,6 +3387,7 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] svg.kword,:root:not([data-theme]) svg.kword{color:#18171D} }
 .sbrand .sbtxt > span:has(> svg.kword),.alogo b:has(> svg.kword){display:flex;align-items:center;min-height:1.2em}
 .authscreen .alogo svg.logo{width:2.125rem;height:2.125rem}
+.authscreen .alogo svg.logo,#app .authscreen .alogo svg.logo{color:#6d4bd8}  /* 2.233.0 C (#3195): sign-in keeps the brand colour */
 /* P20: settings search (every tab), the phone's tab row shows that it scrolls */
 .shdr{position:relative}
 .ssearch{display:flex;align-items:center;gap:.375rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);color:var(--muted);min-width:0;flex:0 1 14rem}
@@ -4896,6 +4898,17 @@ button.lkchip:hover{border-color:var(--accent)}
 @media (forced-colors:active){ #side .srow .sprog{background:GrayText} #side .srow .sprog::after{background:Highlight} }
 /* UX-03: Settings > Appearance > Sidebar */
 #side .srow.smore{color:var(--muted)}
+/* 2.250.0 C (#2995): the unfolded "+ N more views": a tick before each hidden view, a small link below */
+#side .smorebox{margin:.125rem 0 .25rem}
+#side .smrow{display:flex;align-items:center;gap:.25rem;padding-left:.5rem}
+#side .smrow>.srow{flex:1;min-width:0}
+#side .smrow>input{flex:none;margin:0;accent-color:var(--accent)}
+#side .smcust{display:block;margin:.125rem 0 0 2.25rem;padding:.125rem 0;background:none;border:0;color:var(--muted);font:inherit;font-size:var(--fs-s,.8125rem);cursor:pointer;text-decoration:underline}
+#side .smcust:hover{color:var(--text)}
+/* 2.250.0 C (#2994): the settings search jump: a soft accent ring around the target */
+.sflash{animation:sflash 1.6s ease-out;border-radius:var(--r-s)}
+@keyframes sflash{0%,50%{box-shadow:0 0 0 2px var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}100%{box-shadow:0 0 0 2px transparent;background:transparent}}
+@media (prefers-reduced-motion: reduce){.sflash{animation:none;box-shadow:0 0 0 2px var(--accent)}}
 /* UX-45: the comment text under a bundled News item, one line */
 .ngroup .ngex{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--fs-m);color:var(--text2);margin-top:.125rem}
 /* UX-48: the head of the bell's panel stays on one line: "4 new" and a small "All read" */
@@ -6964,6 +6977,16 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
 .cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
 .cmsg.agc.apv .cbub{background:transparent}
+/* 2.233.0 C (#3196): chat bubble colour of people / agents (settings > Appearance > Chat); icons.js applyLook sets data-chat-human /
+   data-chat-agent + the palette's two tones; no attribute = "Default" = the rules above. Text stays var(--text) on a light tint (contrast). */
+:root{--chat-h:var(--chat-h-d,var(--accent));--chat-a:var(--chat-a-d,var(--accent))}
+:root[data-theme="light"]{--chat-h:var(--chat-h-l,var(--accent));--chat-a:var(--chat-a-l,var(--accent))}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--chat-h:var(--chat-h-l,var(--accent));--chat-a:var(--chat-a-l,var(--accent))} }
+:root[data-chat-human] .cmsg.ag:not(.agc) .cbub:not(.del):not(.tcedit){background:color-mix(in srgb,var(--chat-h) var(--agent-tint),var(--bg3));color:var(--text)}
+:root[data-chat-agent] .cmsg.agc:not(.jobm):not(.apv) .cbub:not(.del){background:color-mix(in srgb,var(--chat-a) var(--agent-tint),var(--bg3))}
+.lkch{margin:.625rem 0 .25rem;font-size:var(--fs-s);font-weight:600;color:var(--text2)}
+.lkcpv{display:flex;flex-direction:column;gap:.375rem;padding:.625rem;border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg)}
+.lkswd{border:1px dashed var(--line2);box-sizing:border-box}
 .cmsg.agc.apv{background:var(--agent-bg)}
 .tgview{padding:1rem}
 .tggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.625rem}
@@ -8223,6 +8246,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 
 /* 2.152.3 Teil B (#2620 #2621): folder trees in the panel (areas.js sbb_treeHtml), no file store tree column on a computer */
 #side .sbbt{gap:.25rem;padding:0 .5rem 0 calc(.25rem + var(--sbbl,0)*.875rem);cursor:default}
+/* 2.210 B (#2757): a long press on a folder / file row opens its menu, not the phone's link callout */
+.abrow,#view .wkrow{-webkit-touch-callout:none}
 #side .sbbtar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1.25rem;height:1.25rem;padding:0;border-radius:var(--r-s,.375rem);color:var(--muted)}
 #side button.sbbtar:hover{background:var(--bg3);color:var(--text)}
 #side .sbbtn{display:flex;align-items:center;gap:.5rem;flex:1;min-width:0;min-height:var(--srow-h);padding:0;text-align:left;color:var(--text2);font-size:var(--fs-b)}

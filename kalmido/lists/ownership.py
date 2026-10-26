@@ -6,6 +6,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab
 from ..lists.groups import grp_sync
 
@@ -193,7 +194,7 @@ def list_owner_set(lid):
         own_takeover_log(c, lr, old, nname)
     bump(c)
     c.commit()
-    print("list", lid, "ownership", old, "->", new, "by", g.user["username"], f"({mode})", flush=True)
+    print("list", lid, "ownership", old, "->", new, "by", login_log_who(g.user), f"({mode})", flush=True)
     return jsonify(ok=True, id=lid, owner_id=new, owner_name=nname, previous_owner_id=old)
 
 

@@ -1,14 +1,15 @@
 """GET /api/state: everything the web client loads at start and after a change."""
 import json
+import time
 from datetime import timedelta
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
+from ..core.config import app, COOKIE, MAX_FILE_MB, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
-from ..accounts.session import me, user_public
+from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
 from ..core.access import (
@@ -83,13 +84,15 @@ def h6a_kid_ids(c, uid, vl):
     return [k for k in kids if k in seen]
 
 
-def visible_lists(c, uid):
-    """Lists the user sees, with role, sharing info and the user's own folder / sort / view."""
+def visible_lists(c, uid, light=False):
+    """Lists the user sees, with role, sharing info and the user's own folder / sort / view. light (2.280.0 B, #3116): the
+    same lists with their own columns only (name, color, rate, client ...; no role, members, progress, repositories ...) and
+    in no particular order -- for callers that only look up names (the time report)."""
     from ..lists.lists import columns_out
-    from ..lists.groups import grp_name, grp_shares_of_list
+    from ..lists.groups import grp_shares_of_lists  # 2.280.0 B (#3116): was grp_name, grp_shares_of_list per list
     from ..collab.comments import user_names
     from ..collab.news import bell_custom_of
-    from ..notify.caps import cap_hint
+    from ..notify.caps import cap_hint, tpl_prefetch
     from ..lists.projects import list_progress, milestones_of_lists
     from ..agents.core import agent_ids, listen_default, listen_ids
     from ..collab.reactions import ltags_of_lists
@@ -108,6 +111,8 @@ def visible_lists(c, uid):
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
         if tl is not None:
             rows = [r for r in rows if r["id"] in tl]
+    if light:
+        return [{k: r[k] for k in r.keys() if not k.startswith("m_")} for r in rows]
     ids = [r["id"] for r in rows]
     members, names = {}, {}
     if ids and collab_all():
@@ -140,10 +145,14 @@ def visible_lists(c, uid):
     snames = user_names(c, [r["status_by"] for r in rows])
     bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
-    mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
+    if collab_all():  # 2.280.0 B (#3116): the owners' limits of all foreign lists at once (cap_hint below reads the cache)
+        tpl_prefetch(c, [r["id"] for r in rows if r["owner_id"] != uid], uid)
+    _pl = set(plists(c, uid))  # 2.223.7 B (#2918): a participant sees no milestones of the list
+    mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project" and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
     from ..lists.sprints import spr_of_lists
     sprs = spr_of_lists(c, [r for r in rows if r["kind"] == "project"])  # 2.60.0 (#343)
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
+    gshares, gnames = grp_shares_of_lists(c, rows) if has_groups else ({}, {})  # 2.280.0 B (#3116): all lists at once
     from ..lists.playbook import pb_flags
     pbs = pb_flags(c, rows)  # 2.39.0 (#1168): lists with an effective Playbook
     lfids = {}  # 2.14.0 (#425): custom field ids per list (columns of deleted fields are dropped)
@@ -197,8 +206,8 @@ def visible_lists(c, uid):
         else:
             d.pop("sprint_cfg", None)
         # 2.10.0 (#441): the groups the list is shared with (directly or through a folder of its owner)
-        d["groups"] = [{"group_id": gid, "name": grp_name(c, gid), "role": role, "via": via}
-                       for gid, role, via in grp_shares_of_list(c, r["id"])] if has_groups else []
+        d["groups"] = [{"group_id": gid, "name": gnames.get(gid, "") if gid else "", "role": role, "via": via}
+                       for gid, role, via in gshares.get(r["id"], [])] if has_groups else []
         # 2.4.1 (#379): the one agent that tidies it up (same rule as tidy_agent_of, from the rows already loaded)
         cands = sorted(([r["owner_id"]] if r["owner_id"] in ag else [])
                        + [m["user_id"] for m in d["members"] if m.get("agent") and m["role"] in WRITE_ROLES])
@@ -240,8 +249,24 @@ def visible_sections(c, uid, tasks=None):
     return [r for r in rows if r["list_id"] not in pl or r["id"] in used]
 
 
+# 2.280.0 A (#3109): the brake. A reload of the live update (?auto=1, never one after an own action) of the same account
+# within ST_BRAKE_S of the last one answers {brake: true} (the client keeps its state, the next poll asks again): one
+# account cannot load its whole state over and over (several tabs / devices, a burst of changes). Per process, like the rate limits.
+# 2.280.0 F (#3109): per sign-in (session cookie; behind the proxy the browser): the phone and the desktop of one person are not
+# held back by each other, only the tabs of one browser
+ST_BRAKE_S = 8
+_st_auto = {}
+
+
 @app.get("/api/state")
 def state():
+    if request.args.get("auto") == "1" and me() is not None:
+        t, k = time.monotonic(), (me(), g.get("auth_via"), hash(request.cookies.get(COOKIE) or request.headers.get("User-Agent", "")))
+        if t - _st_auto.get(k, -ST_BRAKE_S) < ST_BRAKE_S:
+            return jsonify(brake=True, v=int(gsetting(db(), "version")))
+        if len(_st_auto) > 5000:
+            _st_auto.clear()
+        _st_auto[k] = t
     from ..lists.folders import folders_shared_in, my_folder_props
     from ..lists.foldershare import sh_folder_shares
     from ..notify.caps import notif_ask_state
@@ -275,7 +300,8 @@ def state():
     cutoff = iso(now_utc() - timedelta(days=14))
     # checklist lists (package B): every done item stays (the "Done" section is the reusable part of such a list)
     tasks = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND (status=0 OR completed_at>=? OR "
-                          "list_id IN (SELECT id FROM lists WHERE checklist=1)) ORDER BY id", (uid, uid, cutoff))
+                          "list_id IN (SELECT id FROM lists WHERE checklist=1)) ORDER BY id", (uid, uid, cutoff),
+                       lean_notes=True)  # 2.280.0 A (#3108): long notes come with the detail
     habits = [dict(r) for r in c.execute("SELECT * FROM habits WHERE user_id=? ORDER BY archived, sort, id", (uid,))]
     since = (local_now().date() - timedelta(days=400)).isoformat()
     logs, notes = {}, {}
@@ -298,7 +324,7 @@ def state():
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
             # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
             "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
-            "workspaces": workspaces_for(c, uid)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]
+            "workspaces": (ws := workspaces_for(c, uid)), "sgen": session_gen(u, ws)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]; 2.238.0 B (#2872): + the sign-in mark
         workspaces=has_workspaces(c),  # 2.28.0 (#935): lists / agents have a workspace (private | an organisation)
         ws_mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},  # 2.28.0: agents of another workspace in my lists
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)

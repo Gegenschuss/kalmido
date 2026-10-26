@@ -11,6 +11,8 @@ timezone}. This script runs on the agent's host and applies them:
   - restarts it (fresh session) when the model / auto-compact settings change, when an admin presses "Reset now"
     (reset_seq goes up), once a night at nightly_reset (HH:MM in runtime.timezone), and whenever the command exits by
     itself (after KALMIDO_RESTART_DELAY seconds)
+  - interim summary (2.233.0, #3189: rotate_size / rotate_runs / rotate_idle_min, sent as rotate_tokens etc.): applied per chat
+    conversation by mcp/agent_run.py in --events mode; without --events the command runs one session (not applicable)
 It polls GET /api/v1/agent every KALMIDO_POLL seconds (default 60): one small request, no events are consumed.
 
 usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
@@ -82,6 +84,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: merge_proposal (2.70.0: duplicate contacts as a proposal, in mcp/agent_run.py)
 # kalmido-capability: text_proposal (2.126.1: an office text, a document summary, a client report as a proposal, in mcp/agent_run.py)
 # kalmido-capability: ideas_proposal (2.156.0: ideas for a branch of the mind map as a proposal, in mcp/agent_run.py)
+# kalmido-capability: receipt_read (2.299.0: a receipt read by the agent from the file itself as a proposal, in mcp/agent_run.py)
 # kalmido-capability: abort (2.144.0: Stop in the chat ends the running command and confirms it, in mcp/agent_run.py)
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
@@ -105,7 +108,7 @@ $Poll = if ($env:KALMIDO_POLL) { [int]$env:KALMIDO_POLL } else { 60 }
 $RestartDelay = if ($env:KALMIDO_RESTART_DELAY) { [int]$env:KALMIDO_RESTART_DELAY } else { 10 }
 $Url = $env:KALMIDO_URL.TrimEnd('/') + '/api/v1/agent'
 
-# GET /api/v1/agent -> a settings object. A paused agent's token is refused (403): enabled = $false. $null: Kalmido not
+# GET /api/v1/agent -> a settings object (2.236.0: working / resumes = the work window of the work style). A paused agent's token is refused (403): enabled = $false. $null: Kalmido not
 # reachable (or another error). 2.157.0 (#1517): a revoked token (401) -> revoked = $true. The token only goes into the request header.
 function Fetch {
   $h = @{ Authorization = "Bearer $($env:KALMIDO_TOKEN)" }
@@ -115,7 +118,7 @@ function Fetch {
   } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch { }
-    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false} }
+    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false; working = $true; resumes = '-'} }
     if ($code -eq 401) { return [pscustomobject]@{revoked = $true} }
     if ($code) { Log "GET /api/v1/agent: HTTP $code" } else { Log "GET /api/v1/agent: $($_.Exception.Message)" }
     return $null
@@ -128,7 +131,10 @@ function Fetch {
   $seq = if ($rt -and $rt.reset_seq) { [int]$rt.reset_seq } else { 0 }
   $tz = if ($rt -and $rt.timezone) { [string]$rt.timezone } else { 'UTC' }
   $en = if ($null -ne $a.enabled) { [bool]$a.enabled } else { $true }
-  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en}
+  $ws = if ($a.work_style -and $a.work_style.state) { $a.work_style.state } else { $null }
+  $wk = -not ($ws -and $ws.working -eq $false)
+  $res = if ($ws -and $ws.work_resumes_at) { if ($ws.work_resumes_at -is [datetime]) { $ws.work_resumes_at.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') } else { [string]$ws.work_resumes_at } } else { '-' }
+  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en; working = $wk; resumes = $res}
 }
 
 # kalmido-capability: host_name
@@ -226,7 +232,16 @@ $script:Revoked = $false
 $script:Seq = $s.seq
 if ($Once) { Start-Agent $s; exit 0 }
 $sig = "$($s.model)|$($s.ac)|$($s.pct)"
-if ($s.enabled) { Report-Host; Start-Agent $s } else { Log 'the agent is paused in Kalmido; waiting' }
+# kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
+# false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
+$script:Closed = $false
+function Closed($s) {
+  if ($s.working) { if ($script:Closed) { Log 'work window open again' }; $script:Closed = $false; return $false }
+  if (-not $script:Closed) { $r = if ($s.resumes -ne '-') { $s.resumes } else { 'the window opens' }; Log "outside the work window of its work style: no new session until $r" }
+  $script:Closed = $true
+  return $true
+}
+if ($s.enabled) { Report-Host; if (-not (Closed $s)) { Start-Agent $s } } else { Log 'the agent is paused in Kalmido; waiting' }
 [void](Nightly-Due $s)  # a start after tonight's time already counts as the nightly restart
 try {
   while ($true) {
@@ -249,6 +264,6 @@ try {
       continue
     }
     if ($why -and $script:Proc) { Log "restart: $why"; Stop-Agent }
-    if (-not $script:Proc) { Start-Agent $n }
+    if (-not $script:Proc -and -not (Closed $n)) { Start-Agent $n }
   }
 } finally { Stop-Agent }

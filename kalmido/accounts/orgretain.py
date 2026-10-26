@@ -12,14 +12,16 @@ confirmation when wiki pages, tables or office data would go along (409 with the
 The account deletion (users.user_purge) uses the same: the personal office is dismantled with its files (no legal data)
 or retired; the rest of the account goes (upg_* helpers).
 """
+import json
 import os
+import re
 from datetime import date
 
 from flask import g, has_request_context
 
 from ..core.access import Denied
 from ..core.db import iso, now_utc
-from ..core.i18n import tr, trn
+from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
 from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
@@ -43,6 +45,15 @@ ODL_LEGAL = (
     # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
     ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), created_at), 1, 4) FROM office_letters "
                           "WHERE org_id=? AND status<>'draft'"),
+    # 2.239.0 C (#2874): the careful side -- received receipts not booked yet (an invoice received is kept, booked or not),
+    # payments of documents (books), the procedure documentation (organisation records, 10 years), confirmed sign-offs
+    # (business letters); e-invoices of the documents that are no receipt yet: odl_einvoice_years
+    ("open_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), r.set_at), 1, 4) FROM rc_receipts r "
+                                 "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND r.paid_at IS NULL AND r.vat_pct IS NULL"),
+    ("payments", "book", "SELECT substr(COALESCE(NULLIF(date, ''), created_at), 1, 4) FROM office_payments WHERE org_id=?"),
+    ("procdocs", "book", "SELECT substr(created_at, 1, 4) FROM office_procdocs WHERE org_id=?"),
+    ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), created_at), 1, 4) FROM office_signoffs "
+                           "WHERE org_id=? AND (state='accepted' OR signed_at IS NOT NULL)"),
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (
@@ -134,8 +145,31 @@ def odl_retention(c, oid):
             if end:  # review A8: only what is still kept
                 counts[key] = len(years)
                 ends.append(end)
+        years = odl_einvoice_years(c, int(oid))  # 2.239.0 C (#2874)
+        end = _until("receipt", years)
+        if end:
+            counts["einvoices"] = len(years)
+            ends.append(end)
     ends = [e for e in ends if e]
     return {"counts": counts, "until": max(ends) if ends else None}
+
+
+def odl_einvoice_years(c, oid):
+    """2.239.0 C (#2874): the years of the e-invoices in the documents of office oid that are no receipt (yet): received or
+    filed invoices are kept by law, also when nobody took them over as a receipt. The invoice data is sealed per space
+    (doc_meta.extracted), so it is opened here; one that cannot be opened counts (the careful side). The caller runs as system."""
+    from ..docs.store import doc_open_as
+    out = []
+    for m in c.execute("SELECT m.node_id, m.ws, m.extracted, m.doc_date, m.created_at FROM doc_meta m WHERE m.org_id=? AND m.extracted<>'' "
+                       "AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=m.node_id)", (oid,)).fetchall():
+        try:
+            v = json.loads(doc_open_as(c, m["ws"], "doc_meta.extracted", m["extracted"])[0] or "null")  # as docs/store.meta_json
+            hit = isinstance(v, dict) and v.get("_einv") is not None
+        except Exception:  # noqa: BLE001 -- not readable: kept
+            hit = True
+        if hit:
+            out.append(m["doc_date"] or m["created_at"])
+    return out
 
 
 def odl_content(c, oid):
@@ -185,11 +219,12 @@ def odl_retired(c, oid):
     return (r["retain_until"] or "") if r and r["retired_at"] else None
 
 
-def odl_admin_export(c, oid):
+def odl_admin_export(c, oid, retention=False):
     """2.152.0 (#2167, review A4): whether the signed-in person may export the retired organisation oid, never the retired
     personal office of a deleted person (private data, the boundary rule). 2.186.0 A (#2599): only its former admins
     (orgs.retired_admins, noted by odl_retire); an organisation retired before 2.186 (NULL) keeps the old rule: the
-    instance admins."""
+    instance admins. 2.239.0 C (#2943): the instance admins (no former admin left) only get the retention export
+    (retention=True: the records kept by law), never the whole organisation's export (the operator is no admin of it)."""
     with system_ctx(c):  # instance structure
         r = c.execute("SELECT retired_at, retired_personal, retired_admins FROM orgs WHERE id=?", (int(oid),)).fetchone()
     if not (r and r["retired_at"] and not r["retired_personal"]) or not has_request_context() or g.get("user") is None:
@@ -200,7 +235,7 @@ def odl_admin_export(c, oid):
             q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0 LIMIT 1"
             alive = c.execute(q, sorted(ids)).fetchone()
     if r["retired_admins"] is None or not ids or not alive:
-        return bool(g.user["is_admin"])
+        return bool(retention and g.user["is_admin"])
     return g.user["id"] in ids
 
 
@@ -232,6 +267,8 @@ def odl_retire(c, oid, until, gone=None):
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
+        c.execute("DELETE FROM org_joins WHERE org_id=?", (oid,))  # 2.223.2 A (#2859): no way back in by an open invitation
+        c.execute("DELETE FROM org_invites WHERE org_id=?", (oid,))
         c.execute("UPDATE office_inv_series SET active=0 WHERE org_id=?", (oid,))
         # 2.152.0 (#2167, review A7): no new data flows in any more (mail polling, newsletter sync)
         c.execute("UPDATE hub_mailboxes SET active=0 WHERE org_id=?", (oid,))
@@ -360,6 +397,8 @@ def upg_personal(c, uid):
     """The personal office of the deleted account uid: without legal data dismantled with its files (returned for after
     the commit), with legal data retired (the receipts of the private file store move into it with their files, an
     instance admin keeps them). The caller commits."""
+    if upg_heirless(c, uid):  # 2.239.0 C (#2866): before anything changes (files are copied below)
+        raise Denied(409, tr(UPG_NO_HEIR))
     poid, ret, nodes = upg_personal_state(c, uid)
     if not ret["until"]:
         return odl_dismantle(c, poid) if poid else []
@@ -397,11 +436,36 @@ def upg_personal(c, uid):
 
 
 def upg_heir(c, oid, uid):
+    """An active person of organisation oid (not uid) who takes over its projects / calendars from the deleted account:
+    an admin first. 2.239.0 C (#2866): only an admin or a member -- a guest, read-only or accounting person never becomes
+    the owner. None when there is none."""
     with system_ctx(c):  # membership structure of the organisation
         r = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=?
-                         AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""",
+                         AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 AND m.role IN ('admin', 'member')
+                         ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""",
                       (oid, uid)).fetchone()
     return r[0] if r else None
+
+
+UPG_NO_HEIR = N_("The organisation needs another admin or member first: nobody could take over this account's projects or calendars of the organisation. Disable the account instead.")
+
+
+def upg_heirless(c, uid):
+    """2.239.0 C (#2866): the organisations whose projects (of the account's agents) or calendars nobody may take over from
+    account uid -- no other active admin or member (a calendar of an organisation without any other person goes as before).
+    Asked before anything is changed (upg_personal), so the refusal leaves no half-done deletion."""
+    uid, out = int(uid), set()
+    with system_ctx(c):  # membership structure of every organisation of the account (numbers only)
+        need = {r[0] for r in c.execute("SELECT DISTINCT l.org_id FROM lists l JOIN agents a ON a.user_id=l.owner_id WHERE a.owner_id=? "
+                                        "AND l.is_inbox=0 AND l.org_id IS NOT NULL", (uid,))}
+        for (oid,) in c.execute("SELECT DISTINCT org_id FROM ev_cals WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+            if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
+                         "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
+                need.add(oid)
+    for oid in need:
+        if not upg_heir(c, oid, uid):
+            out.add(oid)
+    return sorted(out)
 
 
 def upg_rest(c, uid):
@@ -449,12 +513,37 @@ def upg_rest(c, uid):
                     "UPDATE org_list_log SET owner_id=NULL WHERE owner_id=?", "UPDATE org_list_log SET to_id=NULL WHERE to_id=?",
                     "UPDATE sheet_changes SET agent_id=NULL WHERE agent_id=?"):
             c.execute(sql, (uid,))
+        upg_alerts(c, uid)  # 2.239.0 C (#2866 / #2888): the admin alerts name the account by its number only
         # the inbox (the caller settled the rest); 2.186.0 A (#2566): not a project with receipts kept in the trash by law
         for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND COALESCE(retain_until, '')=''", (uid,)).fetchall():
             files = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
             icon, lfiles = list_purge(c, lid, None)
             todo.append(lambda lid=lid, icon=icon, f=lfiles + files: otr_drop_files(lid, icon, f))
     return todo
+
+
+def upg_alerts(c, uid):
+    """2.239.0 C (#2866 / #2888): the stored admin alerts that name the deleted account uid (user name, e-mail address or
+    display name as a whole word, in the text, the arguments of its template and its key) name "#<id>" instead."""
+    u = c.execute("SELECT username, email, display_name FROM users WHERE id=?", (int(uid),)).fetchone()
+    if not u:
+        return
+    dn = (u["display_name"] or "").strip()  # a lone first name ("Max") is too common a word: only a full name counts
+    names = sorted({x.strip() for x in (u["username"], u["email"], dn if " " in dn else "") if x and len(x.strip()) >= 3}, key=len, reverse=True)
+    if not names:
+        return
+    rx = re.compile(r"(?<![\w.@-])(?:" + "|".join(re.escape(x) for x in names) + r")(?![\w.@-])", re.I)
+    sub = lambda v: rx.sub(f"#{int(uid)}", v) if isinstance(v, str) else v  # noqa: E731
+    like = " OR ".join(["message ILIKE ? OR tmpl ILIKE ? OR key ILIKE ?"] * len(names))
+    pat = [f"%{x}%" for x in names for _ in range(3)]
+    for r in c.execute(f"SELECT id, key, message, tmpl FROM admin_alerts WHERE {like}", pat).fetchall():
+        try:
+            t = json.loads(r["tmpl"] or "[]")  # [text, n, args, click] (notify/alerts.aa_emit): every value after the text
+            deep = lambda v: [deep(x) for x in v] if isinstance(v, list) else sub(v)  # noqa: E731
+            tmpl = json.dumps(t[:1] + [deep(x) for x in t[1:]] if isinstance(t, list) else t, ensure_ascii=False)
+        except ValueError:
+            tmpl = sub(r["tmpl"] or "")
+        c.execute("UPDATE admin_alerts SET key=?, message=?, tmpl=? WHERE id=?", (sub(r["key"])[:200], sub(r["message"]), tmpl, r["id"]))
 
 
 UPG_MENTION = "<@{0}>"

@@ -438,12 +438,14 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     return p
 
 
-def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None):
+def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None,
+           scope=None, chn_msg=None):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
     subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
     2.142.0 A (#2145): kind (reminder | assign | comment | digest | other) also goes to the person's notification channels
-    that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin."""
+    that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin.
+    2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged."""
     from ..notify.alerts import aa_count
     if s is None:
         c = connect()
@@ -456,7 +458,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     from .channels import chn_kind, chn_push
-    queued = chn_push(uid, title, msg, prio, click, chn_kind(kind, tag), s)  # 2.142.0 A (#2145): queued, sent in the background
+    queued = chn_push(uid, title, msg, prio, click, chn_kind(kind, tag), s, task, scope, chn_msg)  # 2.142.0 A (#2145): queued, sent in the background (2.240.0 B: + task, B2: + scope)
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):
@@ -635,6 +637,8 @@ def _watchdog_tick(c):
     _wd_section(c, "server link tokens", msv_cleanup)  # 2.73.0 A (#661) review N1: tokens of removed accounts after 30 days
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
+    from ..agents.workstyle import ws_held_tick
+    _wd_section(c, "agent quiet pushes", ws_held_tick, users, S, LG)  # 2.236.0 B (#2905): one summary when an agent's quiet window ends
     from ..lists.sprints import spr_tick
     _wd_section(c, "sprints", spr_tick)  # 2.60.0 (#343): a sprint past its last day closes, the next one starts
     from ..agents.schedules import sched_tick
@@ -674,6 +678,8 @@ def _watchdog_tick(c):
     _wd_section(c, "invoice series", rin_tick, now)  # 2.91.0 A (#1923): the due periods of invoice series -> drafts / sent invoices
     from ..office.subs import abo_tick
     _wd_section(c, "subscription reminders", abo_tick, now)  # 2.91.0 B (#1924): reminder tasks before a subscription renews
+    from ..office.banknorc import bnr_tick
+    _wd_section(c, "bank bookings without a receipt", bnr_tick, now)  # 2.299.0 C (#3192): one reminder task while the list is not empty
     from ..office.dunning import dun_tick
     _wd_section(c, "payment reminder suggestions", dun_tick, now)  # 2.147.1 B (#2054): reminder drafts for overdue invoices
     from ..office.letterlinks import ltl_followup_tick
@@ -933,9 +939,9 @@ def _wd_pomo(c, p, users, S, LG):
         s, lg = S[p["user_id"]], LG[p["user_id"]]
         if p["kind"] == "focus":
             notify(p["user_id"], tr("Focus done", lg=lg), tr("{0} min{1}. Time for a break.", p["minutes"], " · " + p["title"] if p["title"] else "", lg=lg),
-                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s)
+                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope=f"t:{p['task_id']}" if p["task_id"] else "private")  # 2.240.0 B2 (#2867)
         else:
-            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s)
+            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope="private")
 
 
 def _wd_habits(c, users, S, LG, now):
@@ -972,7 +978,7 @@ def _wd_habit(c, h, users, S, LG, now):
     done = c.execute("SELECT count FROM habit_logs WHERE habit_id=? AND day=?", (h["id"], today)).fetchone()
     if not done or done[0] < h["goal"]:
         notify(h["user_id"], tr("Habit: {0}", h["name"], lg=lg), tr("Still open today.", lg=lg), push_prio(s),
-               f"{PUBLIC_URL}/#habits", s=s, tag=f"habit-{h['id']}")
+               f"{PUBLIC_URL}/#habits", s=s, tag=f"habit-{h['id']}", scope="private")  # 2.240.0 B2 (#2867): own habits
 
 
 def _wd_digest(c, users, S, LG, now):
@@ -1009,7 +1015,7 @@ def _wd_digest_user(c, uid, S, LG, now):
         head = trn("{0} task today", "{0} tasks today", len(rows), lg=lg) + \
             (tr(", {0} of them overdue", over, lg=lg) if over else "")
         notify(uid, tr("Today", lg=lg), head + "\n" + "\n".join(lines), push_prio(s), f"{PUBLIC_URL}/#today", s=s,
-               tag="digest", ttl=12 * 3600)
+               tag="digest", ttl=12 * 3600, scope="private", chn_msg=head)  # 2.240.0 B2 (#2867): the channels get the numbers, no titles
 
 
 def watchdog():

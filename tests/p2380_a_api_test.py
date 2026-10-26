@@ -288,7 +288,8 @@ check(inv["status"] == "issued" and inv["credits"] == "124.95" and inv["open"] =
       f"partial credit note lowers the open amount: {inv['open']} credits {inv['credits']}")
 rd = A.get(B + f"{D}/{CR['id']}/render").json()
 meta = dict((k, v) for k, v in rd["meta"])
-check(rd["title"] == "Gutschrift" and meta.get("Gutschrift Nr.") == "GS-2026-001" and meta.get("zu Rechnung Nr.", "").startswith("RE-2026-005") and rd["cancels"]["number"] == "RE-2026-005",
+# 2.296.0 B (#3175): the credit note prints as "Rechnungskorrektur" (was "Gutschrift")
+check(rd["title"] == "Rechnungskorrektur" and meta.get("Rechnungskorrektur Nr.") == "GS-2026-001" and meta.get("zu Rechnung Nr.", "").startswith("RE-2026-005") and rd["cancels"]["number"] == "RE-2026-005",
       f"credit note print model: {rd['title']} {meta}")
 # a full credit note cancels the invoice (INV2 is paid -> make a fresh one)
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 1, "rate": 500}]})

@@ -12,6 +12,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_collab, collab_all, need_list
 from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
@@ -342,7 +343,7 @@ def folder_props_put():
         return jsonify(props=_norm(props), changed=changed, lists=out, dry_run=True)
     bump(c)
     c.commit()
-    print("folder", repr(f), "of", g.user["username"], "props", json.dumps(props), "apply", apply, flush=True)
+    print("folder", repr(f), "of", login_log_who(g.user), "props", json.dumps(props), "apply", apply, flush=True)
     return jsonify(props=_norm(props), changed=changed, lists=out)
 
 

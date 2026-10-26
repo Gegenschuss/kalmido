@@ -216,9 +216,11 @@ def ms_restore_items(b):
         raise BadInput(tr("At most {0} contacts at once", BULK_MAX))
     out = {}
     for it in items:
-        if not isinstance(it, dict) or any(k not in ("id", *MS_RESTORE_COLS) for k in it):
+        if not isinstance(it, dict) or any(k not in ("id", "expect", *MS_RESTORE_COLS) for k in it):
             raise BadInput(tr("Invalid value: {0}", "items"))
-        v = {}
+        if it.get("expect") is not None and not isinstance(it["expect"], str):
+            raise BadInput(tr("Invalid value: {0}", "expect"))
+        v = {"_expect": it["expect"]} if it.get("expect") else {}  # 2.273.0 C (#3048): the change time the undo expects
         for k in MS_RESTORE_COLS:
             if k not in it:
                 continue
@@ -238,11 +240,25 @@ def ms_restore_items(b):
     return out
 
 
-def ms_write(c, rows, todo):
-    """Writes {id: columns} in committed blocks (search text, the books' ctag, the version)."""
+def ms_write(c, rows, todo, redo=None):
+    """Writes {id: columns} in committed blocks (search text, the books' ctag, the version). -> the change time written.
+    redo (2.273.0 C, #3048): row -> its columns; each block is read again under the row lock and its columns are made from
+    the rows as they are then (a change in between is kept, never overwritten); None / {} = left out."""
     ids = list(todo)
     ts = iso_ms(now_utc())
     for blk in bk_blocks(ids):
+        if redo:
+            fresh = {r["id"]: r for r in c.execute(f"SELECT * FROM contacts WHERE id IN ({bk_in(blk)}) ORDER BY id FOR UPDATE", blk).fetchall()}
+            for i in blk:
+                n = redo(fresh[i]) if i in fresh else None
+                if n:
+                    rows[i], todo[i] = fresh[i], n
+                else:
+                    todo.pop(i, None)
+            blk = [i for i in blk if i in todo]
+            if not blk:
+                c.commit()
+                continue
         for i in blk:
             f = {**todo[i], "updated_at": ts}
             m = {**dict(rows[i]), **f}
@@ -252,6 +268,7 @@ def ms_write(c, rows, todo):
             book_touch(c, bid)
         bump(c)
         c.commit()
+    return ts
 
 
 def ms_set(c, uid, b, action):
@@ -276,21 +293,31 @@ def ms_set(c, uid, b, action):
     mirrored = {r[0] for r in c.execute(f"SELECT id FROM books WHERE src_id IS NOT NULL AND id IN ({bk_in(list(books))})", list(books)).fetchall()}
     ok = [i for i in ids if books[rows[i]["book_id"]] in ("owner", "edit") and rows[i]["book_id"] not in mirrored]
     bk_gate(c, N_("Change {0} contacts at once"), len(ok))
-    todo, undo = {}, []
-    for i in ok:
+    todo, undo, conflicts = {}, {}, []
+
+    def redo(r):  # 2.273.0 C (#3048): made again from the locked row (a note / groups changed meanwhile are kept)
+        i = r["id"]
         if action == "set":
-            new, old = ms_apply(rows[i], f)
+            new, old = ms_apply(r, f)
             if new:
-                todo[i] = new
-                undo.append({"id": i, **old})
-        else:
-            new = {k: v for k, v in items[i].items() if rows[i][k] != v}
-            if new:
-                todo[i] = new
-    ms_write(c, rows, todo)
+                undo[i] = {"id": i, **old}
+            return new
+        want = dict(items[i])
+        exp = want.pop("_expect", None)
+        new = {k: v for k, v in want.items() if r[k] != v}
+        if new and exp and r["updated_at"] != exp:  # changed again after the step: the undo does not overwrite it
+            conflicts.append(i)
+            return None
+        return new
+
+    for i in ok:
+        todo[i] = True
+    ts = ms_write(c, rows, todo, redo=redo)
     out = {"action": action, "changed": len(todo), "skipped": len(ids) - len(ok)}
     if action == "set":
-        out.update(unchanged=len(ok) - len(todo), undo=undo)
+        out.update(unchanged=len(ok) - len(todo), undo=[{**undo[i], "expect": ts} for i in todo])
+    elif conflicts:
+        out["conflicts"] = conflicts
     return out
 
 

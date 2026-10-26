@@ -22,6 +22,7 @@ from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
 from ..core.access import Denied
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
@@ -137,7 +138,7 @@ def org_invite_new(oid):
     inv = _no_link_if_sent(invite_new(c, uid, me(), send=True), uid)  # job #692 review: always by mail (no "send": false - the link would go to the admin)
     bump(c)
     c.commit()
-    print("organisation invitation:", username, "into organisation", oid, "by", g.user["username"], flush=True)
+    print("organisation invitation: an account into organisation", oid, "by", login_log_who(g.user), flush=True)
     # 2.148.1 A (#2480): an organisation admin gets the same answer as for an existing account (the mail result only as
     # a notice); an instance admin sees every account anyway and keeps the id (undo) and the link
     if g.user["is_admin"]:
@@ -151,7 +152,7 @@ def _no_link_if_sent(inv, uid=None):
     if inv.get("sent"):
         inv.pop("link", None)
     elif g.user["is_admin"]:
-        print("organisation invitation: link shown to the instance admin", g.user["username"], "for account", uid, flush=True)
+        print("organisation invitation: link shown to the instance admin", login_log_who(g.user), "for account", uid, flush=True)
     else:
         inv.pop("link", None)
         inv["error"] = tr("The invitation e-mail could not be sent. Try Resend later or ask the server's admin.")
@@ -197,35 +198,38 @@ def org_invite_withdraw(oid, uid):
     bump(c)
     c.commit()
     unlink_files(files)
-    print("organisation invitation withdrawn: account", uid, "organisation", oid, "by", g.user["username"], flush=True)
+    print("organisation invitation withdrawn: account", uid, "organisation", oid, "by", login_log_who(g.user), flush=True)
     return jsonify(ok=True, email=u["email"] or "", name=u["display_name"] or "", role=r["role"], invites=oinv_list(c, oid))
 
 
 # ---- 2.148.1 A (#2480): an existing account invited into an organisation joins only when the person accepts
-def ojn_invite(c, oid, uid, role):
+def ojn_invite(c, oid, uid, role, by=None):
     """An organisation admin (checked by the caller) invites the existing account uid: one open invitation per organisation
-    and person (a repeat updates the role); the person gets a News item (at most one a day), no push. The caller commits."""
+    and person (a repeat updates the role); the person gets a News item (at most one a day), no push. The caller commits.
+    2.278.0 A (#3095): by = the inviting admin outside a request (the org import's thread)."""
     from ..core.pg import system_ctx
     now = now_utc()
+    by = by or me()
     old = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)
                  ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at""",
-              (oid, uid, role, me(), iso(now)))
+              (oid, uid, role, by, iso(now)))
     if old and old[0] > iso(now - timedelta(days=1)):
         return
     with system_ctx(c):  # the invitation reaches the person whatever their News settings say (they must answer it)
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
         c.execute("INSERT INTO notifications(user_id,kind,actor_id,data,created_at) VALUES(?,?,?,?,?)",
-                  (uid, "orgjoin", me(), json.dumps({"org_id": oid, "name": name, "role": role}, ensure_ascii=False), iso_ms(now)))
-    print("organisation", oid, "invited account", uid, "to join, by", g.user["username"], flush=True)
+                  (uid, "orgjoin", by, json.dumps({"org_id": oid, "name": name, "role": role}, ensure_ascii=False), iso_ms(now)))
+    print("organisation", oid, "invited account", uid, "to join, by", login_log_who(by), flush=True)
 
 
 def ojn_open(c, oid, uid):
     """The open invitation row of uid into organisation oid (None: none, expired or already a member)."""
     from ..core.pg import system_ctx
     with system_ctx(c):  # the invited person is not a member yet: row-level security would hide the organisation's row
-        r = c.execute("SELECT * FROM org_joins WHERE org_id=? AND user_id=? AND created_at>?",
-                      (oid, uid, iso(now_utc() - timedelta(days=OJN_DAYS)))).fetchone()
+        # 2.223.2 A (#2859): never into a retired organisation (an invitation left from before the retirement)
+        r = c.execute("SELECT j.* FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.org_id=? AND j.user_id=? AND j.created_at>? "
+                      "AND o.retired_at IS NULL", (oid, uid, iso(now_utc() - timedelta(days=OJN_DAYS)))).fetchone()
         if r and c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone():
             return None
     return r
@@ -237,7 +241,7 @@ def ojn_mine(c, uid):
     from ..collab.comments import user_names
     with system_ctx(c):  # my own invitations: I am not a member of these organisations yet
         rows = c.execute("""SELECT j.org_id, j.role, j.created_by, j.created_at, o.name FROM org_joins j JOIN orgs o ON o.id=j.org_id
-                            WHERE j.user_id=? AND j.created_at>? AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id
+                            WHERE j.user_id=? AND j.created_at>? AND o.retired_at IS NULL AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id
                             AND m.user_id=j.user_id) ORDER BY j.created_at DESC""", (uid, iso(now_utc() - timedelta(days=OJN_DAYS)))).fetchall()
     names = user_names(c, [r["created_by"] for r in rows])
     return [{"org_id": r["org_id"], "name": r["name"], "role": r["role"], "by": names.get(r["created_by"], ""),
@@ -262,7 +266,7 @@ def org_join_accept(oid):
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
     bump(c)
     c.commit()
-    print("organisation", oid, "invitation accepted by", g.user["username"], flush=True)
+    print("organisation", oid, "invitation accepted by", login_log_who(g.user), flush=True)
     return jsonify(ok=True, org_id=oid, name=name, role=r["role"])
 
 

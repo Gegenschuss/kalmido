@@ -86,7 +86,7 @@ check(r.status_code == 400, "#1206: a notice with two files 400 " + r.text[:160]
 # the person: the question's buttons are still open after the notices; the agent sees kind too
 ms = A.get(B + f"/api/agents/{AID}/chat?limit=30").json()["messages"]
 q = [m for m in ms if m["id"] == Q]
-check(q and q[0].get("choice_state") == "expired", "#1206: set-up: the later normal message makes the buttons expire " + json.dumps(q)[:200])
+check(q and q[0].get("choice_state") == "collected", "#1206: set-up: the later normal message makes the buttons expire " + json.dumps(q)[:200])  # 2.233.0 (#2848): collected (was expired)
 r = post({"body": "Pick one", "choices": [{"id": "a", "label": "A"}]})
 Q2 = r.json()["id"]
 post({"body": "Conversation compacted (22:12)", "kind": "notice"})

@@ -35,8 +35,13 @@ from datetime import datetime, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
+from ..core.config import USERNAME_RE  # 2.278.0 B (#3094)
+from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
+from ..core.errors import BadInput  # 2.273.0 A (#3030)
+from ..accounts.settings import clean_look_pref  # 2.273.0 A (#3030)
+from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
 from ..core.i18n import lang, LANGS, N_, tr as _tr_base
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
@@ -76,11 +81,22 @@ UMZ_RATIO = 200  # uncompressed / compressed of one entry above 1 MB
 UMZ_TEXT_MAX = 1_000_000  # characters of one text value
 UMZ_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._\-/]{0,250}")
 UMZ_EID_RE = re.compile(r"[0-9a-f]{8,64}")
+# 2.278.0 C (#3091): the AAD a browser ciphertext of the old server carries (collab/e2e.py, notelock.js, e2e.js)
+UMZ_AAD_RE = re.compile(r"kalmido-(locknote|file):v1:[0-9]{1,19}:[0-9]{1,19}|kalmido-e2e:v1:[0-9]{1,19}")
+
+
+def umz_legacy_aad(prefix, old, *ids):
+    """2.278.0 C (#3091): the old AAD of a ciphertext: the one the file already carries (moved twice), else from the old ids."""
+    if isinstance(old, str) and UMZ_AAD_RE.fullmatch(old) and old.startswith(prefix + ":"):
+        return old
+    ids = [_oid(x) for x in ids]
+    return f"{prefix}:" + ":".join(str(x) for x in ids) if all(ids) else None
 UMZ_UID_RE = re.compile(r"[A-Za-z0-9@._-]{1,200}")  # review N7: a contact uid taken from the file
 # settings that move along (nothing about security, sign-in, push or connections)
 UMZ_SETTINGS = ("lang", "allday_time", "default_reminder", "work_start", "work_end", "show_done_views", "show_done_new",
                 "show_done_default", "group_order", "comment_order", "time_rounding", "time_currency", "capacity_h",
-                "list_emoji", "side_icons", "prio_bg", "celebrate", "progress_subtasks", "hide_progress", "folders")
+                "list_emoji", "side_icons", "prio_bg", "celebrate", "progress_subtasks", "hide_progress", "folders",
+                "look", "workdays")  # 2.273.0 A (#3030): the appearance (theme) and the working days move along too
 # columns never taken from a file, in addition to ids, *_id / *_by columns, foreign keys and OX_SECRET_COLS
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
@@ -91,8 +107,36 @@ UMZ_DROP = {
     "list_files": {"path"},
     "events": {"href"},
     "contacts": {"href"},
-    "time_entries": {"billed_at"},  # 2.144.6 A (#2053): the invoice (billed_doc_id) stays behind, the entry comes open
+    # 2.278.0 B (#3094): time_entries.billed_at is kept (umz_billed): a billed entry never comes open again (billed twice)
 }
+# 2.273.0 A (#3030): the parts of an account export the import reads (umz_write; people + list_members through the sharing
+# step, server_links as a hint of the preview). Every other part of the file is named in the preview and in the result as
+# staying on the old server (umz_left): a part the import learns to read = its name here, one line.
+UMZ_READ = frozenset((
+    "lists", "list_members", "sections", "list_fields", "list_tags", "list_status", "list_links", "list_milestones", "tasks",
+    "task_deps", "task_field_values", "task_tags", "task_list_tags", "task_note_locks", "comments", "attachments", "list_files",
+    "time_entries", "habits", "habit_logs", "filters", "templates", "address_books", "contacts", "event_calendars", "events",
+    "event_attendees", "journal", "mailbox", "settings", "people", "server_links",
+    "e2e_keys",  # 2.278.0: the browser keys
+))
+UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
+    (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
+    (N_("Knowledge pages"), ("wiki_pages",)), (N_("E-mails"), ("hub_mails",)),
+    (N_("Video sign-offs"), ("video_reviews", "video_versions", "video_comments")), (N_("Bookmarks"), ("bookmarks",)),
+    (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
+    (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
+    (N_("Saved arrangements"), ("view_layouts", "list_layouts", "view_layout_offers")), (N_("Task bells"), ("task_bell",)),
+    (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats", "agent_chat_prefs")),
+    (N_("My files"), ("private_files",)), (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
+    (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
+    (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
+    (N_("Assistant"), ("assistant_access", "assistant_log")),
+    (N_("Log"), ("agent_steps",)), (N_("Log"), ("org_list_actions",)), (N_("Log"), ("merge_runs",)),
+    (N_("API tokens"), ("api_tokens",)), (N_("Webhooks"), ("webhooks",)), (N_("Calendar subscriptions"), ("calendar_subscriptions",)),
+    (N_("Karakeep connection"), ("karakeep",)), (N_("Newsletter connection"), ("newsletter_connection",)),
+    (N_("Newsletter"), ("newsletter_segments", "newsletter_runs")), (N_("Planned agent jobs"), ("agent_schedules",)),
+    (N_("Public links"), ("public_links",)), (N_("Feeds"), ("feeds",)),  # 2.85.0 B (#1162): moved by OPML export / import
+)
 
 _UMI = {}  # user id -> running check / import thread
 _UMI_LAST = {}  # 2.308.0 (#3261): user id -> the last worker until it really ended (umz_unlock leaves _UMI before that)
@@ -333,6 +377,8 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
     ("portal/", N_("Customer reports")),  # 2.81.0 (#1866)
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
+    ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
+    ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),
 )
 
 
@@ -370,13 +416,18 @@ def umz_org_open(zf, names, man, mraw, full):
         elif full or p.endswith(".json"):
             raw = _read_entry(zf, zi, UMZ_JSON_MAX if p.endswith(".json") else MAX_FILE_MB * 1024 * 1024 * 4, f["sha256"])
             what = next((w for pre, w in UMZ_ORG_SKIP if p.startswith(pre)), None)
-            if what and p.endswith(".json"):
+            if p.endswith(".json"):
                 try:
-                    n = len(json.loads(raw.decode("utf-8")))
+                    x = json.loads(raw.decode("utf-8"))
+                    # 2.273.0 A (#3030): a part without a name of its own keeps its technical name (rows only)
+                    n = len(x) if what or isinstance(x, list) else 0
                 except (ValueError, UnicodeDecodeError, RecursionError, TypeError):
                     n = 0
+                what = what or p[:-5]
                 if n:
                     skipped[what] = skipped.get(what, 0) + n
+    # 2.278.0 A (#3095): the members' roles of the file (admin / member) -> a suggestion in the preview
+    roles = {_oid(m.get("id")): m.get("role") for m in data.get("members", []) if isinstance(m, dict)}
     for kind, table in (("attachments", "attachments"), ("list_files", "list_files")):
         for r in data.get(table, []):
             path = f"files/{kind}/{_oid(r.get('id')) or 0}-{_safe_part(r.get('name'))}"
@@ -393,7 +444,14 @@ def umz_org_open(zf, names, man, mraw, full):
           "created_at": _txt(man.get("created_at"), 40), "source": {"url": "", "hosted": False},
           "user": {"id": None, "name": _txt(org.get("name"), 100), "email": ""}, "export_id": hashlib.sha256(mraw).hexdigest()[:32],
           "client_encrypted": {}, "org_skipped": skipped}
+    for p in data["people"]:
+        p["role"] = umz_role(roles.get(p["user_id"]))
     return m2, files, data
+
+
+def umz_role(v):
+    """2.278.0 A (#3095): the only roles an imported person is invited with (anything else = member)."""
+    return v if v in ("admin", "member") else "member"
 
 
 def _oid(v):
@@ -428,7 +486,7 @@ def umz_phash(p):
 def umz_pkey(v):
     """A key of the run's choice: the hash, or (older clients) a plain address."""
     from .acctexport import umz_email_hash
-    if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v):
+    if isinstance(v, str) and (re.fullmatch(r"[0-9a-f]{64}", v) or re.fullmatch(r"id[1-9]\d{0,17}", v)):  # 2.278.0 B (#3094): id<old id>
         return v
     return umz_email_hash(_email(v))
 
@@ -451,7 +509,13 @@ def umz_targets(c, uid):
     return out
 
 
-def umz_seen(c, uid):
+def umz_salt(man):
+    """2.239.0 A (#2882): the key of the file's e-mail hashes (people_salt of newer account exports), else None (older form)."""
+    v = man.get("people_salt") if isinstance(man, dict) else None
+    return v if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{32}", v) else None
+
+
+def umz_seen(c, uid, salt=None):
     """Review M1: {email hash: account} of the accounts the person may see on this server (never others: the preview must
     not reveal accounts the person could not find in the app either)."""
     from ..accounts.orgs import visible_people
@@ -461,7 +525,7 @@ def umz_seen(c, uid):
     for r in c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
                        "AND email IS NOT NULL AND email!='' AND id!=?", (uid,)):
         if vis is None or r["id"] in vis:
-            out.setdefault(umz_email_hash(r["email"]), r)
+            out.setdefault(umz_email_hash(r["email"], salt), r)
     return out
 
 
@@ -472,28 +536,72 @@ def umz_find(c, uid, h, seen=None):
     return (umz_seen(c, uid) if seen is None else seen).get(h)
 
 
+def umz_pid(p):
+    """2.278.0 B (#3094): the key of a person of the file in the preview / run -- the address hash, else (no address in the
+    file) "id<old id>"; such a person can only be matched by a user name the admin types."""
+    o = _oid(p.get("user_id")) if isinstance(p, dict) else None
+    return umz_phash(p) or (f"id{o}" if o else "")
+
+
+def umz_find_login(c, uid, login):
+    """2.278.0 B (#3094): the account with exactly this user name, only when the person may see it (like umz_find: never a
+    search, and "not there" / "not visible" give the same None -- no way to list accounts)."""
+    login = login.strip().lower() if isinstance(login, str) else ""
+    if not login or not USERNAME_RE.fullmatch(login):
+        return None
+    r = c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
+                  "AND id!=? AND username=?", (uid, login)).fetchone()
+    vis = umz_visible(c, uid) if r else None
+    return r if r and (vis is None or r["id"] in vis) else None
+
+
+def umz_left(data):
+    """2.273.0 A (#3030): what of an account export stays on the old server -> [{"what": name, "count": n}]: every part of
+    the file the import does not read (UMZ_LEFT names them, an unknown part keeps its technical name), the settings that
+    do not move and the tasks in the trash."""
+    n = {k: len(v) for k, v in data.items() if isinstance(v, list)}
+    out, known = {}, set(UMZ_READ)
+    for what, parts in UMZ_LEFT:
+        known.update(parts)
+        k = n.get(parts[0]) or sum(n.get(p, 0) for p in parts[1:])
+        if k:
+            out[what] = out.get(what, 0) + k
+    for t in sorted(set(n) - known):
+        if n[t]:
+            out[t] = n[t]
+    for what, k in ((N_("Other settings"), sum(1 for r in data.get("settings", []) if r.get("key") not in UMZ_SETTINGS)),
+                    (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at")))):
+        if k:
+            out[what] = k
+    return [{"what": tr(w), "count": k} for w, k in out.items()]
+
+
 def umz_preview(c, uid, man, data, can_invite):
     from .orgimport import oi_counts
     tables = {k: len(v) for k, v in data.items()}
     lists = [{"name": _txt(L.get("name"), 200), "folder": _txt(L.get("folder"), 300), "inbox": bool(L.get("is_inbox")),
               "tasks": sum(1 for t in data.get("tasks", []) if t.get("list_id") == L.get("id") and not t.get("deleted_at"))}
-             for L in data.get("lists", [])]
+             for L in data.get("lists", []) if not L.get("e2e")]  # 2.278.0 C (#3091): encrypted projects stay behind
     people = []
     from .acctexport import umz_email_hash
-    mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0])
-    seen = umz_seen(c, uid)
+    mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0], umz_salt(man))
+    seen = umz_seen(c, uid, umz_salt(man))
     for p in data.get("people", []):
         h = umz_phash(p)
-        if not h or p.get("agent") or h == mine:
+        if not umz_pid(p) or p.get("agent") or (h and h == mine):  # 2.278.0 B (#3094): people without an address too
             continue
         hit = umz_find(c, uid, h, seen)
         # review M1: never an address in the preview; key = hash, the admin types the address for an invitation
-        people.append({"key": h, "name": _txt(p.get("name"), 100), "lists": len(p.get("lists") or {}) if isinstance(p.get("lists"), dict) else 0,
+        people.append({"key": umz_pid(p), "name": _txt(p.get("name"), 100), "lists": len(p.get("lists") or {}) if isinstance(p.get("lists"), dict) else 0,
                        "found": bool(hit), "found_name": (hit["display_name"] or hit["username"]) if hit else "",
-                       "need_address": not _email(p.get("email"))})
+                       "need_address": not _email(p.get("email")), "by_login": not hit})  # by_login: the admin may type a user name
     eid = man.get("export_id") if isinstance(man.get("export_id"), str) and UMZ_EID_RE.fullmatch(man.get("export_id")) else ""
     again = bool(eid) and bool(c.execute("SELECT 1 FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND report ILIKE ?",
                                          (uid, UMZ_SOURCE, f'%"export_id": "{eid}"%')).fetchone())
+    if man.get("kind") == "org":  # 2.278.0 A (#3095): the role of the file as a suggestion, the admin confirms it
+        roles = {umz_pid(p): umz_role(p.get("role")) for p in data.get("people", [])}  # review M2: same key as the preview rows
+        for q in people:
+            q["role"] = roles.get(q["key"], "member")
     ce = man.get("client_encrypted") if isinstance(man.get("client_encrypted"), dict) else {}
     src = man.get("source") if isinstance(man.get("source"), dict) else {}
     u = man.get("user") or {}
@@ -501,12 +609,8 @@ def umz_preview(c, uid, man, data, can_invite):
     org_kind = man.get("kind") == "org"
     for what, n in (man.get("org_skipped") or {}).items():  # an organisation export: the areas that do not move
         skipped.append({"what": tr(what), "count": n})
-    for t, text in (("api_tokens", N_("API tokens")), ("webhooks", N_("Webhooks")), ("calendar_subscriptions", N_("Calendar subscriptions")),
-                    ("karakeep", N_("Karakeep connection")), ("newsletter_connection", N_("Newsletter connection")),
-                    ("agent_schedules", N_("Planned agent jobs")), ("public_links", N_("Public links")),
-                    ("feeds", N_("Feeds"))):  # 2.85.0 B (#1162): moved by OPML export / import
-        if tables.get(t):
-            skipped.append({"what": tr(text), "count": tables[t]})
+    if not org_kind:  # 2.273.0 A (#3030): every part of the file the import does not read (was a fixed list)
+        skipped += umz_left(data)
     return {
         "format": man.get("format"), "v": man.get("v"), "kalmido_version": _txt(man.get("kalmido_version"), 40),
         "created_at": _txt(man.get("created_at"), 40), "source": {"url": _txt(src.get("url"), 300), "hosted": bool(src.get("hosted"))},
@@ -515,12 +619,25 @@ def umz_preview(c, uid, man, data, can_invite):
                                                   "filters", "templates", "time_entries", "event_calendars", "events", "address_books",
                                                   "contacts", "journal")},
         "lists": lists[:500], "people": people[:500], "can_invite": bool(can_invite),
+        "people_salt": umz_salt(man) or "",  # 2.239.0 A (#2882): the client checks a typed address against the keyed hash
         "server_links": [_txt(x.get("name"), 100) or _txt(x.get("base_url"), 200) for x in data.get("server_links", [])][:20],
         "encrypted": {"attachments": len(ce.get("attachments") or []) if isinstance(ce.get("attachments"), list) else 0,
-                      "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0},
+                      "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0,
+                      **umz_enc_preview(c, uid, data, org_kind)},  # 2.278.0 C (#3091)
         "not_taken": skipped, "taken_areas": oi_counts(data) if org_kind else [], "again": again, "export_id": eid, "kind": "org" if org_kind else "account",
         "targets": umz_targets(c, uid),  # 2.96.0 D (#1941): an organisation export may go into the private space too
     }
+
+
+def umz_enc_preview(c, uid, data, org_kind):
+    """2.278.0 C (#3091): locked_lists = projects encrypted in the browser (never taken over: no list keys move along);
+    keys = the fate of my key bundle: "take" (no keys here yet), "keep" (own keys here: the file's ciphertexts stay unreadable),
+    "none" (the file has none)."""
+    keys = "none"
+    if not org_kind and data.get("e2e_keys"):
+        k0 = data["e2e_keys"][0] if isinstance(data["e2e_keys"], list) and data["e2e_keys"] and isinstance(data["e2e_keys"][0], dict) else {}
+        keys = "take" if not e2e_has_keys(c, uid) or e2e_same_keys(c, uid, k0) else "keep"  # review M1: the same pair again = take
+    return {"locked_lists": sum(1 for L in data.get("lists", []) if L.get("e2e")), "keys": keys}
 
 
 # ---------------------------------------------------------------- writing rows
@@ -572,6 +689,21 @@ def _coerce(v, typ):
             v = str(v)
         return v[:UMZ_TEXT_MAX].replace("\x00", "")
     return _BAD  # json, binary, time stamps: not taken over
+
+
+def _umz_snips(v, by):
+    """2.273.0 A (#3030): the code snippets of a task from the file -> the stored JSON (the importer is their author)."""
+    if isinstance(v, str) and v.startswith("["):  # stored as JSON text (a list's ciphertext "e2e1:..." stays behind)
+        try:
+            v = json.loads(v)
+        except ValueError:
+            return _BAD
+    if not isinstance(v, list) or not by:
+        return _BAD
+    try:
+        return snip_clean(v, by)
+    except BadInput:
+        return _BAD
 
 
 def _iso_ts(v):
@@ -639,7 +771,10 @@ def umz_row(c, table, src, fixed, ts):
         if not isinstance(k, str) or k not in cols or k in fixed or k == "id" or k in OX_SECRET_COLS or k in fks or k in drop \
                 or k.endswith("_id") or k.endswith("_by") or k in ("org_id", "reply_to"):
             continue
-        v = _coerce(v, cols[k][0])
+        if table == "tasks" and k == "snippets":  # 2.273.0 A (#3030): jsonb, checked like new snippets (a list's ciphertext stays behind)
+            v = _umz_snips(v, fixed.get("created_by"))
+        else:
+            v = _coerce(v, cols[k][0])
         if v is not _BAD:
             v = umz_fmt(table, k, v)
         if v is _BAD or (v is None and not cols[k][1]):
@@ -663,6 +798,21 @@ def umz_row(c, table, src, fixed, ts):
             d[k] = ts
         else:
             return None
+    return d
+
+
+def umz_billed(run, src, d, ts):
+    """2.278.0 B (#3094): a billed time entry stays billed -- on its invoice when that came along (d["billed_doc_id"] = the
+    new document, mapped by the caller), else marked not billable with its billing date, so nobody bills it a second time."""
+    if not (_oid(src.get("billed_doc_id")) or src.get("billed_at")):
+        d.pop("billed_at", None)
+        d["billed_doc_id"] = None
+        return d
+    d["billed_at"] = d.get("billed_at") or ts
+    if not d.get("billed_doc_id"):
+        d["billed_doc_id"] = None
+        d["billable"] = 0
+        run.warning(N_("Billed time entries without their invoice were taken over as not billable"))
     return d
 
 
@@ -753,6 +903,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if L.get("is_inbox"):
             run.put("lists", L.get("id"), inbox)
             continue
+        if L.get("e2e"):  # 2.278.0 C (#3091): its list keys never move along -- the texts would stay ciphertext for good
+            run.warning(N_("An encrypted project was not taken over: switch its encryption off before the export or export its content."))
+            continue
         sort += 1
         try:
             folder = clean_folder(_txt(L.get("folder"), 1000), strict=False)
@@ -798,6 +951,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         run.step()
         lid = run.m("lists", t.get("list_id"))
         if not lid or t.get("deleted_at"):
+            if t.get("deleted_at"):  # 2.278.0 B (#3094): left behind on purpose -- what hangs on it goes without a warning (oi_write)
+                run.put("tasks_left", t.get("id"), 1)
             continue
         sid = run.m("sections", t.get("section_id"))
         status = _coerce(t.get("status"), "bigint")
@@ -856,14 +1011,27 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     for r in data.get("task_note_locks", []):  # browser-encrypted with my note password: only my own
         tid = run.m("tasks", r.get("task_id"))
         if tid and _oid(r.get("user_id")) == me_old:
-            d = umz_row(c, "task_note_locks", r, {"task_id": tid, "user_id": uid}, ts)
+            d = umz_row(c, "task_note_locks", r, {"task_id": tid, "user_id": uid, "legacy_aad": umz_legacy_aad(  # 2.278.0 C (#3091)
+                "kalmido-locknote:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
             if d:
                 umz_insert(c, "task_note_locks", d, rid=False)
+    keys = [r for r in data.get("e2e_keys", []) if _oid(r.get("user_id")) == me_old] if run.kind != "org" else []
+    if keys:  # 2.278.0 C (#3091): my key bundle -- taken while I have none here, never replacing my own keys
+        k = e2e_import_keys(c, uid, keys[0], me_old)
+        if k == "kept":
+            run.warning(N_("Encrypted content from the export stays unreadable because you already have your own encryption keys here."))
+        elif k == "taken":
+            run.count("e2e_keys")
+            run.warning(N_("Encryption keys taken over: open locked notes and encrypted files with your passphrase from before."))
+        else:
+            run.warning(N_("The encryption keys in the export are broken: encrypted content stays unreadable."))
     names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people", [])}
     for r in sorted(data.get("comments", []), key=lambda x: _oid(x.get("id")) or 0):
         run.step()
         tid = run.m("tasks", r.get("task_id"))
         if not tid:
+            if run.m("tasks_left", r.get("task_id")):  # 2.278.0 B (#3094): on a task in the trash
+                run.put("comments_left", r.get("id"), 1)
             continue
         au = uid if _oid(r.get("user_id")) == me_old else None  # 2.148.1 C (#2492): others' comments by name only, never as an account
         ext = None if au else (names.get(_oid(r.get("user_id"))) or _txt(r.get("ext_name"), 100) or tr("Unknown"))
@@ -920,7 +1088,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                      "mime": mime[:120]}  # 2.148.1 C (#2492): the type found in the content, not the one in the file
             if kind == "tasks":
                 fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
-                              "enc_by": uid if enc else None})
+                              "enc_by": uid if enc else None,  # 2.278.0 C (#3091): the AAD of the old task + person
+                              "legacy_aad": umz_legacy_aad("kalmido-file:v1", r.get("legacy_aad"), r.get("task_id"), me_old) if enc else None})
             else:
                 fixed["list_id"] = parent
             d = umz_row(c, table, r, fixed, ts)
@@ -938,6 +1107,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         run.step()
         d = umz_row(c, "time_entries", r, {"user_id": uid, "task_id": run.m("tasks", r.get("task_id")),
                                             "list_id": run.m("lists", r.get("list_id"))}, ts)
+        if d:  # 2.278.0 B (#3094): the account export has no invoices: a billed entry stays billed (not billable)
+            d = umz_billed(run, r, {**d, "billed_doc_id": run.m("office_docs", r.get("billed_doc_id"))}, ts)
         nid = umz_insert(c, "time_entries", d) if d else None
         if nid:
             run.created["time_entries"].append(nid)
@@ -1027,7 +1198,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         k, v = r.get("key"), r.get("value")
         if k not in UMZ_SETTINGS or not isinstance(v, str) or len(v) > 20000:
             continue
-        if (k == "lang" and v not in LANGS) or (k not in ("lang", "folders") and not re.fullmatch(r"[A-Za-z0-9:,._ -]{0,64}", v)):
+        if k == "look":  # 2.273.0 A (#3030): JSON, checked like a value set by hand
+            try:
+                v = clean_look_pref(v)
+            except BadInput:
+                continue
+        elif (k == "lang" and v not in LANGS) or (k not in ("lang", "folders") and not re.fullmatch(r"[A-Za-z0-9:,._ -]{0,64}", v)):
             continue  # only plain values (the app checks the others when they are set by hand)
         if k == "folders":  # my folders stay; the file's are added behind them
             try:
@@ -1045,32 +1221,33 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         oi_write(c, run, uid, man, zf, files, data, who)
 
 
-def umz_share(c, run, uid, data, picks, can_invite):
+def umz_share(c, run, uid, data, picks, can_invite, salt=None):
     """After the import: lists shared with the people ticked in the preview (found by their e-mail hash), missing people
     invited (instance admins only, the address typed by the admin must match the hash). Returns the people's results for
     the report."""
     from ..lists.lists import _folder_member_add
     from .acctexport import umz_email_hash
     out = []
-    seen = umz_seen(c, uid)
+    seen = umz_seen(c, uid, salt)
     for p in data.get("people", []):
-        h = umz_phash(p)
+        h = umz_pid(p)  # 2.278.0 B (#3094): the address hash, else "id<old id>" (matched by user name only)
         pick = picks.get(h) or {}
         if not h or p.get("agent") or not (pick.get("share") or pick.get("invite")):
             continue
         lists = p.get("lists") if isinstance(p.get("lists"), dict) else {}
-        hit = umz_find(c, uid, h, seen)
+        hit = umz_find(c, uid, umz_phash(p), seen) or umz_find_login(c, uid, pick.get("login"))
         em = pick.get("email") or _email(p.get("email"))  # typed by the admin, or the plain address of an older file
         target, state = None, "skipped"
         if hit and pick.get("share"):
             target, state = hit["id"], "shared"
-            if run.org and run.kind == "org":  # an organisation export: the ticked member joins the target organisation
-                from ..accounts.orgs import org_member_add, org_role
-                if not org_role(c, hit["id"], run.org):
-                    with system_ctx(c):  # the organisation's admin adds the person they ticked (structure)
-                        org_member_add(c, run.org, hit["id"], "member")
+            # 2.278.0 A (#3095): an organisation export: an existing account joins only by accepting an invitation (#2480),
+            # with the role the admin confirmed; until then nothing of the organisation is shared with it
+            if run.org and run.kind == "org" and not umz_in_org(c, run.org, hit["id"]):
+                ojn_invite(c, run.org, hit["id"], umz_role(pick.get("role") or p.get("role")), by=uid)
+                target, state = None, "org_invited"
+                run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
         elif not hit and pick.get("invite") and can_invite:
-            if not em or umz_email_hash(em) != h:
+            if not em or umz_email_hash(em, salt) != h:
                 state = "mismatch"  # review M1: the typed address is not the one of the file -- nobody is invited
             else:
                 target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
@@ -1083,6 +1260,12 @@ def umz_share(c, run, uid, data, picks, can_invite):
                     n += 1
         out.append({"key": h, "name": _txt(p.get("name"), 100), "state": state, "lists": n})
     return out
+
+
+def umz_in_org(c, oid, uid):
+    """2.278.0 A (#3095): uid is a member of organisation oid."""
+    with system_ctx(c):  # membership structure of another person
+        return bool(c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone())
 
 
 def umz_fix_people(c, run, uid, names):
@@ -1142,16 +1325,18 @@ def umz_run(uid, iid, opts):
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"], full=False)
         try:
             people = {}
-            seen = umz_seen(c, uid)
+            seen = umz_seen(c, uid, umz_salt(man))
             for p in data.get("people", []):
-                h = umz_phash(p)
+                h = umz_pid(p)  # 2.278.0 B (#3094): + a user name the admin typed
                 if h and (opts["people"].get(h) or {}).get("share"):
-                    hit = umz_find(c, uid, h, seen)
-                    if hit and _oid(p.get("user_id")):
+                    hit = umz_find(c, uid, umz_phash(p), seen) or umz_find_login(c, uid, opts["people"][h].get("login"))
+                    # 2.278.0 A (#3095): into an organisation only its members; an invited account is none until it accepts
+                    # (its rows stay with me like those of a person not ticked)
+                    if hit and _oid(p.get("user_id")) and not (man.get("kind") == "org" and opts["org"] and not umz_in_org(c, opts["org"], hit["id"])):
                         people[_oid(p.get("user_id"))] = hit["id"]
             if man.get("kind") == "org":  # an organisation export: my own account there has my e-mail address
                 from .acctexport import umz_email_hash
-                mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0])
+                mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0], umz_salt(man))
                 hit = [p for p in data.get("people", []) if mine and umz_phash(p) == mine]
                 man["user"]["id"] = _oid(hit[0].get("user_id")) if hit else None
                 if hit and _oid(hit[0].get("user_id")) in people:
@@ -1170,7 +1355,11 @@ def umz_run(uid, iid, opts):
                 umz_write(c, run, uid, man, zf, files, data, people)
             except UmzStop:
                 pass
-            report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0)}
+            # 2.273.0 A (#3030): what stays on the old server, in the result and the import's report too
+            left = [{"what": tr(w), "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data)
+            if left:
+                run.warning(N_("These areas stay on the old server: {0}"), ", ".join(f"{x['what']} ({x['count']})" for x in left))
+            report = {**run.stats, "export_id": eid, "tasks": run.stats.get("tasks", 0), "not_taken": left}
             iid_db = None
             if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
                 from ..integrations.importers import IMPORT_KEEP
@@ -1183,7 +1372,7 @@ def umz_run(uid, iid, opts):
             shared = []
             if not run.stopped:
                 try:
-                    shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"])
+                    shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"], umz_salt(man))
                 except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
                     c.heal() or c.rollback()
                     print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
@@ -1659,7 +1848,9 @@ def umz_go(iid):
         e = umz_pkey(em)
         if e and isinstance(v, dict):
             picks[e] = {"share": v.get("share") is True, "invite": v.get("invite") is True, "email": _email(v.get("email"))
-                        or (_email(em) if "@" in str(em) else "")}
+                        or (_email(em) if "@" in str(em) else ""), "login": _txt(v.get("login"), 64)}  # 2.278.0 B (#3094): a user name
+            if "role" in v:  # 2.278.0 A (#3095): the role the admin confirmed (unknown = member; none sent = the file's)
+                picks[e]["role"] = umz_role(v["role"])
     c.rollback()
     _set(uid, iid, state="running", progress={"done": 0, "total": 1}, target=org)
     try:

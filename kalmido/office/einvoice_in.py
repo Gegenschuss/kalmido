@@ -529,31 +529,13 @@ def ei_own(c, oid, inv):
 
 
 def ei_receipt(c, node, ws, inv, vat_pct, late=False):
-    """docs/store.py process, the first time a document is read as an e-invoice: in the documents space of an office it
-    becomes a receipt (rc_receipts, VAT rate of the invoice) unless it is one already or the office issued it itself.
-    Never raises (an ordinary document stays, also when its month is locked). 2.185.0 A (#2583): True when the document is
-    a receipt afterwards (made now or already one) -- docs/store.py keeps that (_eirc), later runs then leave it alone.
-    late: made up afterwards -- not when a person changed the receipt of the document before (then took it out)."""
+    """docs/store.py process, the first time a document is read as an e-invoice. 2.185.0 A (#2583): True when the document is
+    a receipt (docs/store.py keeps that, _eirc, later runs then leave it alone). 2.237.0 C (#2865): an incoming e-invoice no
+    longer becomes a booked receipt by itself (no person, any inbound way): it stays an offer with its recognised values
+    (ei_rc_offer: the receipt sheet's "Take over as receipt", the office books' list) until a person with receipts edit
+    takes it over (ei_take). Receipts made before stay as they are. Never raises."""
     try:
-        with c.savepoint():
-            oid = _ei_office(c, ws)
-            if not oid or ei_own(c, oid, inv):
-                return False
-            if c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone():
-                return True
-            if late and c.execute("SELECT 1 FROM fs_log WHERE node_id=? AND action='receipt' AND agent=0 LIMIT 1", (node["id"],)).fetchone():
-                return False
-            from flask import has_app_context
-            from ..core.config import app
-            from ..office.periodlock import pl_receipt_need_open
-            if has_app_context():  # 2.153.0: a locked month (GoBD, #2471) takes no new receipt
-                pl_receipt_need_open(c, node["id"], becoming=True)
-            else:  # the document worker: the lock check keeps its state in flask.g
-                with app.app_context():
-                    pl_receipt_need_open(c, node["id"], becoming=True)
-            from ..receipts.suggest import rc_set
-            rc_set(c, node, ws, None, "", None, vat=vat_pct, keep=True)
-            return True
+        return bool(c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone())
     except Exception as e:  # noqa: BLE001
         print(f"WARNING e-invoice receipt of document {node['id']}: {type(e).__name__}", flush=True)
     return False

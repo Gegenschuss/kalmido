@@ -189,6 +189,9 @@ r = requests.delete(V + f"/lists/{GL}/members/{uid['carol']}", headers=SHH)
 check(r.status_code == 404 and jobs(SH) == n0, f"N29: removing someone who is no member: 404, no job naming them ({r.status_code})")
 r = requests.delete(V + f"/lists/{GL}/groups/{GID}", headers=SHH)
 check(r.status_code != 202 and jobs(SH) == n0, f"N29: unsharing a group the list is not shared with: no job ({r.status_code})")
+W0 = mklist("Common")  # 2.223.7 (#2917): an agent sees only the people of its shared projects
+check(A.put(B + f"/api/lists/{W0}/members", json={"user_id": SH, "role": "edit"}).ok
+      and A.put(B + f"/api/lists/{W0}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: bob + the sharer share a project")
 r = requests.put(V + f"/lists/{GL}/members/{uid['bob']}", headers=SHH, json={"role": "view"})
 check(r.status_code == 202 and jobs(SH) == n0 + 1 and "Bob" in r.json()["job"]["title"],
       f"N29: a person it may see still waits for approval {r.status_code} {r.text[:160]}")
@@ -227,6 +230,8 @@ check(r.ok and r.json().get("cursor", 0) >= max(x["seq"] for x in before), "N32:
 
 # ================================================================== N31: daily push budget per agent and person
 CH, CHH = agent("chatter", ["read", "tasks:write", "comments"])
+# 2.236.0 B (#2909): a new agent pushes only at limits (work style push "limits"); N31 counts plain chat pushes
+check(A.patch(B + f"/api/agents/{CH}/work-style", json={"push": "results"}).ok, "setup: the agent pushes its results (work style)")
 L5 = mklist("Pantry")
 check(A.put(B + f"/api/lists/{L5}/members", json={"user_id": CH, "role": "edit"}).ok, "setup: the agent shares a list with alice (the chat needs it)")
 if NOSTART:

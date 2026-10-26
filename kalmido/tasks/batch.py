@@ -126,6 +126,10 @@ def task_reorder():
             before = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
             from ..lists.rules import rul_fire, rul_snap
             rb = rul_snap(c, int(it["id"]))  # 2.71.0 A (#1457): dragging into a column / list starts its rules too
+            tmm = None  # 2.273.0 B (#3042): as PATCH, what the move ends is kept for the way back
+            if lid != cur["list_id"]:
+                from ..tasks.movememo import tmm_snap
+                tmm = tmm_snap(c, int(it["id"]))
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), it["id"]])
             log_changes(c, it["id"], before)
             if "section_id" in f or "list_id" in f:  # 2.126.0 D (#1992 A7): the review section / reviewer as with PATCH
@@ -137,6 +141,10 @@ def task_reorder():
                     from ..agents.core import agent_added_events
                     agent_added_events(c, int(it["id"]), before["list_id"])
                 ms_cleanup(c)  # 2.18.0 (#430): a moved milestone lets its tasks go, moved subtasks leave theirs
+            if tmm:
+                from ..tasks.movememo import tmm_after, tmm_restore
+                tmm_restore(c, int(it["id"]), (before["list_id"], before["parent_id"]))
+                tmm_after(c, int(it["id"]), tmm, me())
             if "due" in f and before["status"] == 0 and not before["deleted_at"]:  # dropped on a later day
                 shifted += dep_shift(c, int(it["id"]), before["due"], f["due"])
             rul_fire(c, int(it["id"]), rb)

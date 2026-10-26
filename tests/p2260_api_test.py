@@ -191,13 +191,14 @@ A.patch(B + f"/api/admin/agents/{CL}", json={"pause_reason": ""})
 X = A.post(B + "/api/lists", json={"name": "CMS"}).json()["id"]
 A.put(B + f"/api/lists/{X}/agent", json={"agent_id": CX})
 events(CXH, "cx")
-r = requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": X, "title": "Shared header", "reason": "The login needs a new header field",
+# 2.223.7 (#2919): a list the agent does not see answers 404 (no proposal, no name); one shared with it takes the proposal
+check(requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": X, "title": "x", "reason": "y", "tasks": [{"title": "z"}]}).status_code == 404,
+      "#949/#2919: a list the agent does not see: 404")
+r = requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": L, "title": "Shared header", "reason": "The login needs a new header field",
                                                                "tasks": [{"title": "Add field to header", "notes": "see feat/x"}]})
 check(r.status_code == 201 and r.json()["user_id"] == 1 and r.json()["proposal_state"] == "ready", "#949: proposal lands with the owner " + r.text[:200])
 jid = r.json()["id"]
-check(not events(CXH, "cx"), "#949: no event for the agent of that list")
-check(requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": L, "title": "x", "reason": "y", "tasks": [{"title": "z"}]}).status_code == 400,
-      "#949: a list the agent sees: create the tasks directly")
+check(not events(CXH, "cx"), "#949: no event for the agent of another list")
 C = A.post(B + "/api/lists", json={"name": "Private"}).json()["id"]
 Ca = sess("carol")
 CP = Ca.post(B + "/api/lists", json={"name": "Carol's"}).json()["id"]
@@ -206,7 +207,7 @@ check(requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": CP, "t
 check(requests.post(V + "/agent/proposals", headers=CLH, json={"list_id": 99999, "title": "x", "reason": "y", "tasks": [{"title": "z"}]}).status_code == 404,
       "#949: unknown list: 404")
 r = A.post(B + f"/api/proposals/{jid}/apply", json={"select": ["0"]})
-check(r.ok and r.json()["created"] == 1 and dbx("SELECT COUNT(*) FROM tasks WHERE list_id=? AND title='Add field to header'", (X,))[0][0] == 1,
+check(r.ok and r.json()["created"] == 1 and dbx("SELECT COUNT(*) FROM tasks WHERE list_id=? AND title='Add field to header'", (L,))[0][0] == 1,
       "#949: the owner applies it -> the task exists " + r.text[:160])
 
 # ================================================================== #933 connected, but no service

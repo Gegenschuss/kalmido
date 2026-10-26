@@ -216,7 +216,7 @@ const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
+  ['workload', N_('Workload & absences'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -294,6 +294,7 @@ function licShareHtml(l) {  // people: grey, agents: the robot in blue, both: si
   return sbc_slots('shr shk', tip, hasAg ? licBot() : '', hasP ? ic('users', 's') : '');
 }
 // 2.56.0 (#1797): the share symbols sit in two fixed columns at the row's right edge: agent | person (an empty slot keeps its room)
+let sb_moreOpen = false;  // 2.250.0 C (#2995): the unfolded "+ N more views" survives a redraw
 let sbc_res = false;  // set by renderSide: some row shows a symbol, so every row keeps the two columns
 const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `role="img" aria-label="${esc(tip)}" title="${esc(tip)}"` : 'aria-hidden="true"'}><span class="sbc-ag">${ag}</span><span class="sbc-pe">${pe}</span></span>`;
 const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
@@ -369,9 +370,14 @@ function renderSide0() {
     ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
     ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
   const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
-  const planHidden = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
+  const planHiddenRows = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x));
+  const planHidden = planHiddenRows.length;
+  // 2.250.0 C (#2995): "+ N more views" unfolds in place: the hidden views with a tick (= show in the sidebar), then a small link to the settings
+  const smOpen = planHidden && sb_moreOpen;
+  const smName = x => tr((SIDE_PLAN.find(y => y[0] === x) || [x, x])[1]);
   const focus = planP.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
-    + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
+    + (planHidden ? `<button class="srow smore" data-act="side-more" aria-expanded="${smOpen ? 'true' : 'false'}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>`
+      + (smOpen ? `<div class="smorebox">${planHiddenRows.map(([x, h]) => `<div class="smrow"><input type="checkbox" data-side-show="${esc(x)}" aria-label="${esc(tr('Show {0}', smName(x)))}" title="${esc(tr('Show {0}', smName(x)))}">${h}</div>`).join('')}<button type="button" class="smcust" data-act="side-customize" title="${esc(tr('Settings > Appearance > Sidebar'))}">${esc(tr('Customize…'))}</button></div>` : '') : '');
   const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
@@ -384,7 +390,7 @@ function renderSide0() {
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
     lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
-    workloadOn() ? mrow('workload', 'chart', tr('Workload')) : '',  // 2.23.0 (#463)
+    workloadOn() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)
     officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('wiki') ? mrow('wiki', 'book', tr('Knowledge pages')) : '',  // 2.49.0 (#1199)
     feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
@@ -483,7 +489,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload & absences'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
@@ -1009,7 +1015,7 @@ function taskRow(t, opts = {}) {
   if (rat_has(t) && !opts.checklist && rs('remind')) { const rtip = nagOf(t) ? tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)) : tr('Reminder'); meta.push(`<span${nagOf(t) ? ' class="nagm"' : ''} title="${esc(rtip)}">${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}<span class="sr">${esc(rtip)}</span></span>`); }
   if (t.deadline && t.due && !opts.checklist && !opts.trash && (rs('deadline') || dueClass(t) === 'over')) meta.push(dlChip(t));  // 2.7.0 (#412)
   if (kids.length && !lc && rs('sub')) meta.push(`<span class="subc" title="${esc(tr('{0} of {1} subtasks done', kids.length - openKids, kids.length))}">${ic('sub', 's')}${kids.length - openKids}/${kids.length}<span class="sr"> ${esc(tr('{0} of {1} subtasks done', kids.length - openKids, kids.length))}</span></span>`);
-  if (t.content && !opts.compact && rs('note')) meta.push(`<span title="${esc(tr('Has a description'))}">${ic('edit', 's')}<span class="sr">${tr('Has a description')}</span></span>`);
+  if ((t.content || (!('content' in t) && t.content_n)) && !opts.compact && rs('note')) meta.push(`<span title="${esc(tr('Has a description'))}">${ic('edit', 's')}<span class="sr">${tr('Has a description')}</span></span>`);  // 2.280.0 A (#3108): content_n = a long note not in the state; F: a note there (also emptied here) counts
   if (t.attachments?.length && rs('attach')) meta.push(`<span title="${esc(trn('{0} attachment', '{0} attachments', t.attachments.length))}">${ic('clip', 's')}${t.attachments.length}<span class="sr"> ${esc(trn('{0} attachment', '{0} attachments', t.attachments.length))}</span></span>`);
   if (t.url && rs('link')) meta.push(flkLink(t.url, 'lnk', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}${esc(urlHost(t.url))}`, true));  // 2.35.0 (#186): file links
   if (tFor(t) && t.id > 0) {

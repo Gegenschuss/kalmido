@@ -34,9 +34,11 @@ from ..accounts.session import me
 from ..accounts.orgretain import odl_admin_export, odl_retention, odl_retired, upg_personal_state  # 2.186.0 A (#2599)
 from .hosting import hosted  # 2.186.0 A: pulled up from rx_info
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
 from ..files.store import fs_read  # 2.184.0 A (#2628)
 from ..life.budget import bud_dec  # 2.168.1: pulled up from _project_bookings
 from ..lists.listtrash import otr_held, otr_need  # 2.168.1: the project download route lives here (no upward import)
+from ..office.ledger import ofx_log  # 2.296.0 F (#3177)
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10, "letters": 6}  # what the hint says (invoices / receipts 8, sent letters 6 (2.184.0 #2628), books 10 years)
@@ -77,7 +79,9 @@ def rx_subject(c, kind, sid):
         if kind == "user":
             r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (sid,)).fetchone()
             return {"key": f"user:{int(sid)}", "kind": kind, "id": int(sid), "office": r[0] if r else None, "ws": doc_ws(None, sid),
-                    "lists": ("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0", (sid,))}
+                    # 2.239.0 C (#2874): the person's own projects only -- an organisation's project (receipts, bookings) never
+                    # goes into the personal export, also not when the person owns it or left the organisation
+                    "lists": ("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL", (sid,))}
         if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (sid,)).fetchone():
             raise Denied(404)
     return {"key": f"org:{int(sid)}", "kind": kind, "id": int(sid), "office": int(sid), "ws": doc_ws(sid, None),
@@ -92,7 +96,7 @@ def rx_may_export(c, sub):
     if sub["kind"] == "user":
         return sub["id"] == me()
     from ..accounts.orgs import org_role
-    return org_role(c, me(), sub["id"]) == "admin" or odl_admin_export(c, sub["id"])  # 2.186.0 A (#2599): a retired one: its former admins
+    return org_role(c, me(), sub["id"]) == "admin" or odl_admin_export(c, sub["id"], retention=True)  # 2.186.0 A (#2599): a retired one: its former admins (2.239.0 C #2943: or the instance admins when none is left)
 
 
 def rx_counts(c, sub, along=True):
@@ -319,6 +323,17 @@ def _tables(c, z, sub):
         yield z.put(arc, text, arc.split("/")[0])
 
 
+def _checked(c, oid, z, r, ext, data, stem):
+    """2.296.0 F (#3177, GoBD): the stored bytes as they are (the export hides nothing), but a file whose SHA-256 differs from
+    the one noted at storing is named in the index and logged (store_mismatch) -- never a 409 that would stop the export."""
+    sha = r[ext + "_sha256"] if (ext + "_sha256") in r.keys() else ""
+    got = hashlib.sha256(data).hexdigest()
+    if sha and got != sha:
+        z.missing.append(f"{stem}.{ext} (checksum mismatch)")
+        ofx_log(c, oid, "store_mismatch", doc_id=r["id"], detail={"file": ext, "sha256": sha, "found": got, "at": "retention export"})
+    return data
+
+
 def _invoices(c, z, sub, done):
     """Every finalised document: its stored PDF / XML (decrypted), else rendered from its snapshot."""
     from ..office.pdfweb import _render, _stored, epdf_name
@@ -331,10 +346,10 @@ def _invoices(c, z, sub, done):
         try:
             if p:
                 done.add(os.path.realpath(p))
-                yield z.put(stem + ".pdf", oc_read_file(c, p), "invoices")
+                yield z.put(stem + ".pdf", _checked(c, oid, z, r, "pdf", oc_read_file(c, p), stem), "invoices")
                 if x:
                     done.add(os.path.realpath(x))
-                    yield z.put(stem + ".xml", oc_read_file(c, x), "invoices")
+                    yield z.put(stem + ".xml", _checked(c, oid, z, r, "xml", oc_read_file(c, x), stem), "invoices")
                 continue
             pdf, xml, _fmt = _render(c, oid, r)
         except Exception as e:  # noqa: BLE001 -- one unreadable document must not stop the export: named in the index
@@ -551,6 +566,9 @@ def _download(sub, title):
     c = db()
     if not rx_may_export(c, sub):
         raise Denied(404 if sub["kind"] == "org" else 403)
+    e = stepup_download(c)  # 2.223.2 C (#2871): POST with the step-up -> a ticket, GET with it -> the ZIP
+    if e is not None:
+        return e
     by = g.user["username"]
     lg = lang()
     name = f"kalmido-retention-{sub['kind']}{sub['id']}-{now_utc().strftime('%Y-%m-%d')}.zip"
@@ -562,6 +580,7 @@ def _download(sub, title):
 
 
 @app.get("/api/trash/lists/<int:lid>/export.zip")
+@app.post("/api/trash/lists/<int:lid>/export.zip")  # 2.223.2 C (#2871): POST = the step-up
 def otr_export(lid):
     """2.186.1 (#2732): the custodian downloads a kept private project (lists/listtrash.py otr_held): its receipts with their
     files and its bookings as the retention export ZIP (subject "list:<id>"). People only, no API token."""
@@ -569,6 +588,9 @@ def otr_export(lid):
     r = otr_need(c, lid)
     if not otr_held(r, me()) or getattr(g, "auth_via", None) not in ("session", "proxy"):
         raise Denied(404)
+    e = stepup_download(c)  # 2.223.2 C (#2871)
+    if e is not None:
+        return e
     return rx_list_download(r)
 
 
@@ -605,6 +627,7 @@ def rx_me_get():
 
 
 @app.get("/api/retention/me/export.zip")
+@app.post("/api/retention/me/export.zip")  # 2.223.2 C (#2871): POST = the step-up
 def rx_me_zip():
     return _download(rx_subject(db(), "user", me()), g.user["display_name"] or g.user["username"])
 
@@ -616,6 +639,7 @@ def rx_org_get(oid):
 
 
 @app.get("/api/retention/org/<int:oid>/export.zip")
+@app.post("/api/retention/org/<int:oid>/export.zip")  # 2.223.2 C (#2871): POST = the step-up
 def rx_org_zip(oid):
     c = db()
     sub = rx_subject(c, "org", oid)

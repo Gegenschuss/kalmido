@@ -11,9 +11,11 @@ function oxBoxHtml(o) {
 function oxStateHtml(j) {
   if (!j.enabled) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation export needs the server key KALMIDO_SECRET_KEY (the archive is encrypted with the organisation’s key), see SELF-HOSTING.md.'))}</div>`;
   const start = lbl => `<button type="button" class="btn sm" data-ox="start">${ic('download', 's')} ${lbl}</button>`;
+  // 2.278.0 A (#3093): another admin's archive (filtered by their rights): only the hint, a new one only when they left
+  if (j.foreign) return `<div class="shint keep">${ic('lock', 's')} ${esc(j.hint || '')}</div>` + (j.may_replace && j.state === 'done' ? `<div class="row">${start(tr('Create export'))}</div>` : '');
   if (j.state === 'running') return botBusy(`<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>`);  // 2.161.2 (#2611)
   if (j.state === 'done') return `<div class="row oxdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
-    <div class="row"><a class="btn sm" href="/api/orgs/${j.oid}/export/file" download data-ox="dl">${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-ox="del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
+    <div class="row"><a class="btn sm" href="/api/orgs/${j.oid}/export/file" download data-ox="dl"${+j.oid === 0 ? ' data-sudl' : ''}>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-ox="del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
   return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Create export'))}</div>`;
 }
 async function oxLoad(box) {
@@ -52,12 +54,13 @@ function ox_pbBoxHtml(oid) {
 // keep (invoices with e-invoice XML, receipts with files, cash books, bank statements, office log) -- in the settings for the
 // person (own office) and the organisation's admins, and as the step before deleting an account or an organisation: the
 // server deletes only after a finished export or an explicit waiver
+// 2.223.2 C (#2871): the download links carry data-sudl: the step-up first (orgcrypt.js)
 function rxBoxHtml(kind, id) {
   const url = kind === 'org' ? `/api/retention/org/${+id}/export.zip` : '/api/retention/me/export.zip';
   return `<div class="rxbox" data-rx="${esc(kind)}"><h5>${tr('Retention export')}</h5>
     <div class="shint">${tr('A readable ZIP with the records you must keep: invoices with their e-invoice, receipts with their files, cash books, bank statements and the office log, with a table of contents.')}</div>
     <div class="shint">${tr('Keep these records yourself: invoices and receipts for 8 years, sent business letters for 6 years, books (cash book, logs, bank statements) for 10 years. Kalmido does not keep them after the deletion; the duty to keep them lies with you.')}</div>
-    <div class="row"><a class="btn sm" href="${url}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div></div>`;
+    <div class="row"><a class="btn sm" href="${url}" download data-rxdl data-sudl>${ic('download', 's')} ${tr('Download retention export')}</a></div></div>`;
 }
 // the step before a deletion: resolves 'exported' | 'waived' | null (cancelled); info = the server's retention object
 async function rxAsk(info, title) {
@@ -68,7 +71,7 @@ async function rxAsk(info, title) {
   const md = modal(`<h3>${esc(tr('Retention export before deleting “{0}”', title))}</h3>
     <div class="shint keep warn">${ic('alert', 's')} ${esc(info.note)}</div>
     ${counts ? `<ul class="rxcounts">${counts}</ul>` : ''}
-    ${info.can_export ? `<div class="row"><a class="btn sm pri" href="${esc(info.url)}" download data-rxdl>${ic('download', 's')} ${tr('Download retention export')}</a></div>`
+    ${info.can_export ? `<div class="row"><a class="btn sm pri" href="${esc(info.url)}" download data-rxdl data-sudl>${ic('download', 's')} ${tr('Download retention export')}</a></div>`
       : `<div class="shint keep">${tr('Only the person themself (for their own office) or an admin of the organisation can download it, under Settings.')}</div>`}
     ${info.exported_at ? `<div class="shint keep">${esc(tr('Last finished export: {0}', fmtWhen(info.exported_at)))}</div>` : ''}
     <fieldset class="rxhow"><legend>${tr('Before deleting')}</legend>

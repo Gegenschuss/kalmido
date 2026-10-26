@@ -531,6 +531,8 @@ def fs_new_version(c, nid, data, mime=None):
     n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if not n or n["kind"] != "file":
         raise Denied(404)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # 2.237.0 B (#2864): every new version (upload of the same name, API v1) keeps a locked receipt
     data = bytes(data or b"")
     _check_data(n["name"], data)
     uid = _uid()

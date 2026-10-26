@@ -181,6 +181,8 @@ check(Ca.post(B + "/api/team/absences/feed", json={"action": "off"}).json()["url
 
 # ================================================================== #2077 free / busy
 CB = Bo.post(B + "/api/evcals", json={"name": "Bob privat", "org_id": None}).json()["id"]
+# 2.240.0 (#2868): a colleague sees a private calendar only when its owner shares all calendars (default: the organisation's)
+assert Bo.patch(B + "/api/settings", json={"freebusy_share": "all"}).ok
 
 
 def ev(s, calid, title, a, b, **kw):

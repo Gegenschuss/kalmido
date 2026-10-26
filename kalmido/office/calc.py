@@ -89,6 +89,10 @@ def calc_lang(v):
 DEFAULT_TAX = {"standard": 19, "reduced": 7, "exempt": 0}
 # 2.189.0 (#2475): currency signs like homecur.HC_SYMBOLS (this module stays free of package imports)
 CALC_SIGNS = {"EUR": "€", "USD": "$", "GBP": "£"}
+# 2.296.0 B (#3175): the number format of a document by its language: (thousands, decimal, sign before the amount);
+# fr groups with a no-break space ("1 234,50 €"), nl writes "€ 1.234,50"; any other language like de
+CALC_LOCALE = {"de": (".", ",", False), "en": (",", ".", True), "fr": ("\u00a0", ",", False), "es": (".", ",", False),
+               "it": (".", ",", False), "nl": (".", ",", True)}
 
 
 def calc_code(v, home="EUR"):
@@ -199,21 +203,22 @@ def fmt_qty(d, lang="de"):
 
 
 def fmt_money(d, lang="de", currency="EUR"):
-    """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en) / USD "1.234,50 $" / "$1,234.50"."""
+    """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en) / USD "1.234,50 $" / "$1,234.50"; 2.296.0 B (#3175): by CALC_LOCALE
+    ("1 234,50 €" fr, "€ 1.234,50" nl)."""
     d = money(dec(d))
     neg = d < 0
     whole, frac = f"{abs(d):.2f}".split(".")
-    en = (lang or "de").lower().startswith("en")
+    lg = str(lang or "de").lower()
+    tho, dp, before = CALC_LOCALE.get("en" if lg.startswith("en") else lg.split("-")[0], CALC_LOCALE["de"])
     groups = []
     while whole:
         groups.insert(0, whole[-3:])
         whole = whole[:-3]
     cur = calc_code(currency)
     sym = CALC_SIGNS.get(cur, cur)  # 2.189.0 (#2475): €, $, £, else the code ("CHF 1,234.50")
-    if en:
-        s = ",".join(groups) + "." + frac
-        return ("-" if neg else "") + sym + ("" if len(sym) == 1 else " ") + s
-    s = ".".join(groups) + "," + frac
+    s = tho.join(groups) + dp + frac
+    if before:
+        return ("-" if neg else "") + sym + ("" if len(sym) == 1 and dp == "." else " ") + s
     return ("-" if neg else "") + s + " " + sym
 
 
@@ -354,7 +359,7 @@ def office_calc(doc, items, pack=None):
         base["standard"] += amt
         lines.append({"kind": "surcharge", "slot": slot, "pos": pos + 1 + sum(1 for x in lines if x["kind"] in ("producing", "surcharge")),
                       "title": prd_label(doc.get(slot + "_label"), lang) or label(pack, lang, slot),
-                      "qty": 1, "qty_text": "1", "unit": "flat", "unit_text": "", "pct": _num(pct_), "rate": _num(amt),
+                      "qty": 1, "qty_text": "1", "unit": "flat", "unit_text": unit_text(pack, lang, "flat", 1), "pct": _num(pct_), "rate": _num(amt),  # 2.296.0 B (#3173): was "" (printed "1 flat")
                       "tax": "standard", "tax_pct": _num(rates["standard"]), "total": _num(amt),
                       "detail": label(pack, lang, det, pct=fmt_qty(pct_, lang))})
 
@@ -365,7 +370,7 @@ def office_calc(doc, items, pack=None):
         if incl:
             base["standard"] += raw_amount
         lines.append({"kind": "raw", "optional": not incl, "title": label(pack, lang, "raw_included" if incl else "raw_optional"),
-                      "qty": 1 if incl else None, "qty_text": "1" if incl else "", "unit": "flat", "unit_text": "",
+                      "qty": 1 if incl else None, "qty_text": "1" if incl else "", "unit": "flat", "unit_text": unit_text(pack, lang, "flat", 1) if incl else "",  # 2.296.0 B (#3173)
                       "rate": _num(raw_amount), "tax": "standard", "tax_pct": _num(rates["standard"]), "total": _num(raw_amount),
                       "detail": label(pack, lang, "raw_detail", pct=fmt_qty(raw_factor * 100, lang))})
 

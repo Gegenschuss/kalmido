@@ -173,7 +173,8 @@ check(str(v.get("last_odo", "")).startswith("1300"), f"(3) the admin: the vehicl
 r = Sa.get(B + O + "/trips/report", params={"by": "month"})
 check(r.ok and r.json().get("count") == 2 and r.json().get("total") == "62.00", f"(2c) the travel report: own trips only {r.status_code} {r.text[:200]}")
 r = Sa.get(B + O + "/trips/report", params={"by": "month", "format": "csv"})
-check(r.ok and "62,00" in r.text and "120,00" not in r.text, f"(2c) the travel report as CSV {r.status_code}")
+# 2.237.0 (#2861): the report as a file needs the special "export" (Staff has none)
+check(r.status_code == 403, f"(2c) the travel report as CSV needs the special export {r.status_code}")
 r = A.get(B + O + "/trips/report", params={"by": "month"})
 check(r.ok and r.json().get("total") == "132.00", f"(2c) the admin: every trip {r.text[:160]}")
 r = Sa.get(B + O + "/trips/vma", params={"year": Y})
@@ -190,7 +191,8 @@ check(Sa.get(B + O + "/trips/vma.csv", params={"year": Y}).status_code == 403, "
 r = Sa.get(B + O + "/meals/report", params={"year": Y})
 check(r.ok and sorted(m["id"] for m in r.json().get("meals", [])) == sorted([M_FOR, M_OWN]), f"(2c) the entertainment report: own only {r.text[:200]}")
 r = Sa.get(B + O + "/meals/report", params={"year": Y, "format": "csv"})
-check(r.ok and r.text.count("Trattoria Esempio") == 2, f"(2c) the entertainment report as CSV (not the admin's) {r.status_code}")
+# 2.237.0 (#2861): the report as a file needs the special "export" (Staff has none)
+check(r.status_code == 403, f"(2c) the entertainment report as CSV needs the special export {r.status_code}")
 r = Sa.get(B + O + "/logbook/report", params={"year": Y})
 vs = {x["id"]: x for x in (r.json().get("vehicles", []) if r.ok else [])}
 check(r.ok and vs.get(VEH, {}).get("drives") == 3 and str(vs.get(VEH, {}).get("km_total")).startswith("30"),

@@ -1168,4 +1168,4 @@ def kid_push(c, uid, title_fn, msg_fn, click="#family"):
     if not push_reachable(c, uid, s):
         return
     lg = lang_of(s)
-    g.pushes.append((uid, title_fn(lg), msg_fn(lg), f"{PUBLIC_URL}/{click}", push_prio(s)))
+    g.pushes.append((uid, title_fn(lg), msg_fn(lg), f"{PUBLIC_URL}/{click}", push_prio(s), {"scope": "private"}))  # 2.240.0 B2 (#2867): the family

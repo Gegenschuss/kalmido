@@ -39,6 +39,9 @@ from ..accounts.session import me
 from ..files.store import fs_log_add, fs_read, need_node
 from . import store as S
 from . import ocr as O
+from ..office.periodlock import pl_tree_need_open  # 2.237.0
+from ..files.fsmove import FSM_RECEIPT_STAYS  # 2.237.0
+from ..files.fsref import fs_trash_prepare  # 2.237.0
 
 SP_PAGES = O._env_int("KALMIDO_SPLIT_PAGES", 100, 2, 500)  # pages of a stack at most
 SP_SEP = "KALMIDO-SPLIT"     # the text of the separator sheet's QR code
@@ -351,6 +354,16 @@ def _stack(c, nid, write=False):
     return m, n
 
 
+def _sp_trash_need(c, uid, n):
+    """2.237.0 B (#2864): the checks of the trash (files/web.py files_node_delete) before a split / unsplit moves document n
+    (a row) into it: a receipt of a locked month, a protected node, a receipt of the cash book / equipment list -> 409."""
+    pl_tree_need_open(c, n["id"])
+    fs_trash_prepare(c, uid, n)  # a file: only checks, nothing moves
+    if c.execute("SELECT 1 FROM office_cash_entries WHERE node_id=? UNION ALL SELECT 1 FROM office_equipment WHERE receipt_node_id=? LIMIT 1",
+                 (n["id"], n["id"])).fetchone():
+        raise Denied(409, tr(FSM_RECEIPT_STAYS))
+
+
 @app.get("/api/docs/<int:nid>/split")
 def docs_split_get(nid):
     """The pages of a PDF document with the proposed cuts: {pages: n, scan: [{asn, sep, blank}], starts, drop, stack,
@@ -482,6 +495,7 @@ def docs_split(nid):
     v = _get(m)
     if v.get("state") == "done":
         return err(tr("This stack was already split"), 409)
+    _sp_trash_need(c, uid, n)  # 2.237.0 B (#2864): the stack goes into the trash like a single delete
     total = int(m["pages"] or 0)
     if total > SP_PAGES:
         return err(tr("A stack has at most {0} pages", SP_PAGES), 413)
@@ -552,14 +566,20 @@ def docs_unsplit(nid):
     if n["role"] != "owner" and n["deleted_by"] != uid:
         raise Denied(403)
     ts = _now()
+    pl_tree_need_open(c, nid)  # 2.237.0 B (#2864): the stack comes back like a single restore
+    parts = []
     for pid in [int(x) for x in v.get("parts") or [] if isinstance(x, int)]:
         pm = S.meta_row(c, pid)
         if not pm or _get(pm).get("from") != nid:
             continue
         try:
-            need_node(c, pid, write=True, trash=True)
+            pn = need_node(c, pid, write=True, trash=True)
         except Denied:
             continue
+        if not pn["deleted_at"]:
+            _sp_trash_need(c, uid, pn)  # 2.237.0 B (#2864): every part checked before any of them moves
+        parts.append(pid)
+    for pid in parts:
         c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (pid,))
         c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, pid))
         fs_log_add(c, pid, "trash", "unsplit")

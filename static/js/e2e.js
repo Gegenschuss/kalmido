@@ -63,12 +63,19 @@ async function e2eWrapCode(bundle, code) {
   const salt = e2eRand(16), b = await e2eSeal(await e2eKekCode(code, salt), e2eTEnc().encode(JSON.stringify(bundle)), e2eAad(S.me.id, 'rec'));
   return {v: E2E_V, kdf: 'hkdf-sha256', salt: e2eB64(salt), iv: b.iv, ct: b.ct};
 }
+// 2.278.0 C (#3091): current AAD first, then the old server's (legacy_aad after a move)
+async function e2eOpenAny(key, b, aads) {
+  let x = new Error('aad');
+  for (const a of aads) { if (!a) continue; try { return await e2eOpen(key, b, a); } catch (e) { x = e; } }
+  throw x;
+}
+const e2eLegacyAad = kind => (Array.isArray(E2E.st?.legacy_aad) ? E2E.st.legacy_aad : []).filter(x => /^kalmido-e2e:v1:\d+$/.test(x)).map(x => `${x}:${kind}`);
 async function e2eUnwrapPass(w, pass) {
   const kek = await e2eKekPass(pass, e2eUnb64(w.salt), w.iter);
-  return JSON.parse(e2eTDec().decode(await e2eOpen(kek, w, e2eAad(S.me.id, 'pass'))));
+  return JSON.parse(e2eTDec().decode(await e2eOpenAny(kek, w, [e2eAad(S.me.id, 'pass'), ...e2eLegacyAad('pass')])));
 }
 async function e2eUnwrapCode(w, code) {
-  return JSON.parse(e2eTDec().decode(await e2eOpen(await e2eKekCode(code, e2eUnb64(w.salt)), w, e2eAad(S.me.id, 'rec'))));
+  return JSON.parse(e2eTDec().decode(await e2eOpenAny(await e2eKekCode(code, e2eUnb64(w.salt)), w, [e2eAad(S.me.id, 'rec'), ...e2eLegacyAad('rec')])));
 }
 // the unwrapped bundle becomes two keys that cannot be exported again (only used inside this page)
 // 2.42.0 (#909): my public key from the bundle; the server's copy must match (else a server could swap it unnoticed)
@@ -411,10 +418,17 @@ async function e2eFileEncrypt(file, tid) {
   out.set([0x4b, 0x45, 0x4e, 0x43, 0x01]); out.set(iv, 5); out.set(ct, 17);
   return out;
 }
-async function e2eFileDecrypt(buf, tid) {
+async function e2eFileDecrypt(buf, tid, legacy) {
   const u = new Uint8Array(buf);
   if (u.length < 17 + 16 || String.fromCharCode(...u.subarray(0, 4)) !== 'KENC' || u[4] !== 1) throw new Error('format');
-  const plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: u.subarray(5, 17), additionalData: e2eTEnc().encode(e2eFileAad(tid, S.me.id))}, E2E.ckey, u.subarray(17)));
+  // 2.278.0 C (#3091): legacy = attachments.legacy_aad
+  const aads = [e2eFileAad(tid, S.me.id)].concat(/^kalmido-file:v1:\d+:\d+$/.test(legacy) ? [legacy] : []);
+  let plain, bad;
+  for (const aad of aads) {
+    try { plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: u.subarray(5, 17), additionalData: e2eTEnc().encode(aad)}, E2E.ckey, u.subarray(17))); break; }
+    catch (x) { bad = x; }
+  }
+  if (!plain) throw bad;
   const n = new DataView(plain.buffer).getUint32(0), head = JSON.parse(e2eTDec().decode(plain.subarray(4, 4 + n)));
   return {name: String(head.name || 'file'), type: String(head.type || 'application/octet-stream'), data: plain.subarray(4 + n)};
 }
@@ -443,7 +457,7 @@ async function e2eAttOpen(aid) {
   try { r = await fetch(`/api/attachments/${aid}?dl=1`, {headers: {'X-Requested-With': 'kalmido'}}); } catch { toast(tr('Offline: only works again with a connection')); return; }
   if (!r.ok) { toast(tr('File damaged or missing')); return; }
   let f;
-  try { f = await e2eFileDecrypt(await r.arrayBuffer(), t.id); } catch { toast(tr('Cannot be decrypted')); return; }
+  try { f = await e2eFileDecrypt(await r.arrayBuffer(), t.id, a.legacy_aad); } catch { toast(tr('Cannot be decrypted')); return; }
   const url = URL.createObjectURL(new Blob([f.data], {type: f.type})), el = document.createElement('a');
   el.href = url; el.download = f.name; document.body.appendChild(el); el.click(); el.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);

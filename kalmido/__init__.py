@@ -60,6 +60,7 @@ ORDER = (
     "core.csvimport",  # 2.140.0 B (#2134): the statement reader of budget and bank reconciliation
     "core.zipread",  # 2.146.0 (#2453 #2455 #2457): the in-memory ZIP reader of the importers
     "core.merges",  # 2.66.0 (#1835): merging contacts / clients (reversible)
+    "core.mt940",  # 2.299.0 A (#3190): MT940 / MT942 statements (after csvimport, before stmtfiles)
     "core.stmtfiles",  # 2.146.0 C (#2455): the uploaded statements of the bank imports (office + budget)
     "lists.lists",
     "lists.groups",
@@ -137,9 +138,12 @@ ORDER = (
     "collab.reactions",
     "agents.chat",
     "agents.jobchat",  # 2.56.0 A (#1791 / #1793)
+    "agents.chatprefs",  # 2.233.0 A (#2848): chat settings per person and agent, collected suggestions
     "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.quota",  # 2.33.0 (#1045)
     "agents.schedules",  # 2.34.0 (#272)
+    "agents.workstyle",  # 2.236.0 (#2904-#2911)
+    "agents.workqueue",  # 2.236.0 C (#2906 #2907)
     "agents.admin",
     "agents.api",
     "agents.proposals",
@@ -150,6 +154,7 @@ ORDER = (
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)
     "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
+    "tasks.movememo",  # 2.273.0 B (#3042): what a task move ends, restored by a move back (no routes)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
@@ -323,6 +328,8 @@ ORDER = (
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
     "office.receiptlist",  # 2.153.0 (#2055): receipts list over all months with filters + its CSV / ZIP for the tax adviser
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
+    "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
+    "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.privacy",  # 2.154.0 C (#2192): data protection sheets of a client (DPA, information, consent): mail, ways back, status
@@ -375,6 +382,7 @@ ORDER = (
     "admin.dataretention",  # 2.152.0 D (#2171 #2173): old logs, expired credentials, orphan files (no routes)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)
+    "docs.rcheck",  # 2.299.0 D (#3193): the fixed check of a receipt (no routes, standard library + docs.extract)
     "docs.rules",  # 2.48.0 (#1111): sorting rules (no routes)
     "docs.classify",  # 2.48.0 (#1111): the locally learning classifier (no routes)
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
@@ -407,6 +415,7 @@ ORDER = (
     "newsletter.web",  # 2.55.0 (#1455): the routes of the newsletter connection
     "receipts.suggest",  # 2.48.0 (#1356): receipts: project / category, agents suggest, people confirm
     "receipts.extracted",  # 2.121.0 A (#2092): supplier / VAT / net / gross / invoice number read off a receipt, taken over by a person
+    "receipts.rchecks",  # 2.299.0 D (#3193): the fixed check of a receipt (required details, arithmetic), hints only
     "accounts.layouts_more",  # 2.55.0 (#1067): the new views' blocks for the agents' proposals (after agents.lyprop)
     "tasks.related",  # 2.59.0 B (#1375): related tasks (text vectors from the optional embedding service, API v1, agent events)
     "lists.points",  # 2.60.0 B (#1511): story points velocity (after api.v1)
@@ -423,11 +432,13 @@ ORDER = (
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice
     "office.invdelete",  # 2.162.0 A (#2603): test phase - deleting a finalised / sent invoice (no routes of its own)
     "office.docproject",  # 2.168.0 A (#2665): quotations / invoices bound to a project, the project's documents
+    "office.search",  # 2.250.0 A (#2992): office hits of the web search /api/search (no routes; used by tasks.ftsearch)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
+    "agents.rcread",  # 2.299.0 E (#3194): an agent reads a receipt (receipt_read of agents.asstprop, no routes of its own)
     "agents.asstprop",  # 2.126.1 A (#2123 #2124): office texts, document summaries, client reports by an agent (no routes of its own)
     "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1

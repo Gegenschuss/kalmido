@@ -124,3 +124,17 @@ function ms_merge(o) {
   close = fgModal(md);
   return md;
 }
+// 2.210 B (#2757): the row's own "…" menu by a right click (computer; Shift+F10 / the menu key on a focused row too) or a
+// long press (phone) on a row matching sel: one menu, two ways, no own right-click list. open(row) -> true when a menu
+// came, otherwise the browser's menu stays. Shared by the file store and the knowledge folders (later the office documents).
+function cm_bind(sel, open) {
+  const st = ms_longPress(sel, () => false, r => open(r));
+  document.addEventListener('contextmenu', e => {
+    const r = e.target.closest?.(sel); if (!r || e.target.closest('input, textarea, [contenteditable="true"]')) return;
+    if (st.lp) { clearTimeout(st.lp.t); st.lp = null; st.done = Date.now(); if (open(r)) { e.preventDefault(); navigator.vibrate?.(10); } return; }  // Android: its menu event comes before the timer - one menu, not two
+    if (ms_lpRecent(st)) { e.preventDefault(); return; }
+    if (open(r)) e.preventDefault();
+  });
+  window.addEventListener('click', e => { if (ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row
+  return st;
+}

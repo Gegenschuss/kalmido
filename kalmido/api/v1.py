@@ -142,6 +142,11 @@ def api_authenticate():
     if u and (u["disabled"] or u["kid"]):  # 2.79.0 (#476 M5): a child account has no API (its limits live in the web session)
         u = None
     expired = bool(row and row["expires_at"] and parse_iso(row["expires_at"]) <= now_utc())
+    if row and not row["expires_at"] and row["created_at"] and str(row["token_hash"]).startswith(UPLOAD_HASH_PREFIX):
+        try:  # 2.237.0 (#2865): scan keys of before 2.237 run out a year after creation (scankeys.sk_expires)
+            expired = parse_iso(row["created_at"]) + timedelta(days=365) <= now_utc()
+        except (TypeError, ValueError):
+            pass
     if not u or expired:
         if _rate_blocked(bad):
             return v1_err(429, tr("Too many invalid tokens, please wait a few minutes"), {"Retry-After": str(FAIL_WINDOW)})
@@ -1014,6 +1019,9 @@ def v1_task_update(tid):
         out["chain"] = ch  # 2.67.0 B (#1865): the dependent tasks moved along / left in place
     if (r or {}).get("conflicts"):  # 2.270.0 D (#3028): fields changed by someone else meanwhile (kept, not overwritten)
         out["conflicts"] = [{**x, "field": _V1_FIELD_OUT.get(x["field"], x["field"])} for x in r["conflicts"]]
+    for k in ("move_ended", "move_restored"):  # 2.273.0 B (#3042): what the move ended / a move back brought back
+        if (r or {}).get(k):
+            out[k] = r[k]
     return jsonify(out)
 
 
@@ -1474,7 +1482,7 @@ def v1_group_get(gid):
     c = db()
     d = grp_dict(c, need_group(c, gid), full=False)
     from ..accounts.orgs import instance_mode, visible_people
-    vis = visible_people(c, me()) if instance_mode(c) == "workspaces" else None
+    vis = visible_people(c, me()) if instance_mode(c) == "workspaces" or (g.user["kind"] or "user") == "agent" else None  # 2.223.7 A (#2917)
     if vis is not None:  # 2.30.0 (#1036): only the members one may see (as GET /groups)
         d["members"] = [m for m in d["members"] if m["user_id"] in vis]
     return jsonify({**v1_group(d), "mine": gid in grp_of_user(c, me())})

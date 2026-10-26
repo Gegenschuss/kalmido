@@ -11,6 +11,8 @@
 #   - restarts it (fresh session) when the model / auto-compact settings change, when an admin presses "Reset now"
 #     (reset_seq goes up; the agent also gets the event `reset`), once a night at nightly_reset (HH:MM in runtime.timezone),
 #     and whenever the command exits by itself (after KALMIDO_RESTART_DELAY seconds)
+#   - interim summary (2.233.0, #3189: rotate_size / rotate_runs / rotate_idle_min, sent as rotate_tokens etc.): applied per chat
+#     conversation by mcp/agent_run.py in --events mode; without --events the command runs one session (not applicable)
 # It polls GET /api/v1/agent every KALMIDO_POLL seconds (default 60): one small request, no events are consumed.
 #
 # usage: agent_launcher.sh [-e ENV_FILE] [--once] [-- COMMAND ...]
@@ -47,7 +49,7 @@ while [[ $# -gt 0 ]]; do
     --once) ONCE=1; shift ;;
     --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
@@ -81,6 +83,7 @@ set +a
 # kalmido-capability: merge_proposal (2.70.0: duplicate contacts as a proposal, in mcp/agent_run.py)
 # kalmido-capability: text_proposal (2.126.1: an office text, a document summary, a client report as a proposal, in mcp/agent_run.py)
 # kalmido-capability: ideas_proposal (2.156.0: ideas for a branch of the mind map as a proposal, in mcp/agent_run.py)
+# kalmido-capability: receipt_read (2.299.0: a receipt read by the agent from the file itself as a proposal, in mcp/agent_run.py)
 # kalmido-capability: abort (2.144.0: Stop in the chat ends the running command and confirms it, in mcp/agent_run.py)
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
@@ -104,25 +107,28 @@ POLL=${KALMIDO_POLL:-60}
 RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
 log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
 
-# GET /api/v1/agent -> one tab-separated line: model autocompact pct nightly reset_seq timezone enabled. A paused agent's
-# token is refused (403): that prints "- - - - - - 0" (stop the agent). The token goes to curl on stdin, never on its
+# GET /api/v1/agent -> one tab-separated line: model autocompact pct nightly reset_seq timezone enabled working resumes_at
+# (2.236.0: the work window of the work style, 1 = inside or none set). A paused agent's token is refused (403): that prints
+# "- - - - - - 0 1 -" (stop the agent). The token goes to curl on stdin, never on its
 # command line. Exit 1: Kalmido not reachable (or another error); exit 2 (2.157.0, #1517): the token is revoked (401).
 fetch() {
   local out code
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
         curl -sS --max-time 20 --config - -w '\n%{http_code}' "${KALMIDO_URL%/}/api/v1/agent") || return 1
   code=${out##*$'\n'}
-  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\n' "${SEQ:-0}"; return 0; fi
+  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\n' "${SEQ:-0}"; return 0; fi
   [[ "$code" == 401 ]] && return 2
   [[ "$code" == 200 ]] || { log "GET /api/v1/agent: HTTP $code"; return 1; }
   printf '%s' "${out%$'\n'*}" | python3 -c '
 import json, sys
 a = json.load(sys.stdin)
 r = a.get("runtime") or {}
+w = (a.get("work_style") or {}).get("state") or {}
 pct = r.get("autocompact_pct")
 print("\t".join(str(x) for x in (r.get("model") or "-", "1" if r.get("autocompact", True) else "0", pct if pct else "-",
                                   r.get("nightly_reset") or "-", int(r.get("reset_seq") or 0), r.get("timezone") or "UTC",
-                                  "1" if a.get("enabled", True) else "0")))'
+                                  "1" if a.get("enabled", True) else "0", "0" if w.get("working") is False else "1",
+                                  w.get("work_resumes_at") or "-")))'
 }
 
 PID=""
@@ -188,7 +194,7 @@ while true; do
   sleep "$POLL" & wait $!
 done
 REVOKED=""
-IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED <<< "$line"
+IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED WORKING RESUMES <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
 SIG="$MODEL|$AC|$PCT"
 DONE_DAY=""  # the day whose nightly restart is done (a start after that time counts)
@@ -203,8 +209,16 @@ nightly_due() {
   DONE_DAY=$day
   (( STARTED < at ))  # started before tonight's time -> restart now
 }
+# kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
+# false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
+CLOSED=""
+closed() {
+  [[ "$WORKING" == 0 ]] || { [[ -n "$CLOSED" ]] && log "work window open again"; CLOSED=""; return 1; }
+  [[ -n "$CLOSED" ]] || log "outside the work window of its work style: no new session until ${RESUMES/#-/the window opens}"
+  CLOSED=1
+}
 [[ "$ENABLED" == 1 ]] && report_host
-[[ "$ENABLED" == 1 ]] && start || log "the agent is paused in Kalmido; waiting"
+if [[ "$ENABLED" != 1 ]]; then log "the agent is paused in Kalmido; waiting"; elif ! closed; then start; fi
 STARTED=${STARTED:-$(date +%s)}
 nightly_due >/dev/null || true  # a start after tonight's time already counts as the nightly restart
 while true; do
@@ -217,7 +231,7 @@ while true; do
   if [[ $rc == 2 ]]; then revoked; stop; continue; fi
   if [[ $rc != 0 ]]; then log "Kalmido not reachable; keeping the agent as it is"; continue; fi
   REVOKED=""
-  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED <<< "$line"
+  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED WORKING RESUMES <<< "$line"
   why=""
   [[ "$NSEQ" != "$SEQ" ]] && why="reset now ($SEQ -> $NSEQ)"
   [[ -z "$why" && "$MODEL|$AC|$PCT" != "$SIG" ]] && why="runtime settings changed"
@@ -228,5 +242,5 @@ while true; do
     continue
   fi
   if [[ -n "$why" && -n "$PID" ]]; then log "restart: $why"; stop; fi
-  [[ -n "$PID" ]] || start
+  [[ -n "$PID" ]] || closed || start
 done

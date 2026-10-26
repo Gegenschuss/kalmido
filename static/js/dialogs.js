@@ -389,7 +389,10 @@ async function listPatch(id, body, label, o = {}) {
   // (what stayed replaces the optimistic value)
   try { if (cf.length || !Object.keys(body).every(k => k === '_prev' || LIST_LOCAL.includes(k))) { await load(); render(); } } finally { run(); }
   if (cf.length) { o.conflicts?.(res.conflicts); toast(`${tr('Changed elsewhere in the meantime')}: ${cf.map(lp_fieldName).join(', ')}`); }
-  if ('org_id' in body && !cf.includes('org_id')) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
+  if ('org_id' in body && !cf.includes('org_id') && res?.move_ended) {  // 2.273.0 B (#3042): what the workspace change ended; its Undo brings it back
+    const put = org => async () => { await api('PATCH', '/api/lists/' + id, {org_id: org}); await load(); render(); return {}; };
+    offerUndo(tmm_msg('', res), histAdd({label: tr('Workspace of {0}', qn(lname(listById(id)) || '')), undo: put(ws0), redo: put(body.org_id || null)}));
+  } else if ('org_id' in body && !cf.includes('org_id')) wsc_listMoved(id, ws0, body.org_id || null);  // 2.53.0 (#1474): moved into an organisation: who sees it now
   return e;
 }
 // per user and project: the progress bar is off by default (2.40.0, #1190) and switched on in the list options / settings
@@ -1210,7 +1213,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow'];  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent'];  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 // 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
 // Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
 let lookTimer = 0, lookApplying = false;
@@ -1266,6 +1269,7 @@ function lookHtml() {
     <div class="shint">${tr('Atkinson Hyperlegible is especially easy to read.')}</div>
     <h4>${tr('Accent color')}</h4>
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
+    ${lkChatHtml() /* 2.233.0 C (#3196) */}
     ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
     <div class="row"><label class="chkl"><input type="checkbox" id="s-look-local" ${lookLocal() ? 'checked' : ''}> ${tr('Only on this device')}</label></div>
     <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor takes over.')}</div>

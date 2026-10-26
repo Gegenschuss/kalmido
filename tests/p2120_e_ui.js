@@ -20,7 +20,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const FEAT = 'cal,comments,collab,office,clients,docs';
 
 // a one page A4 PDF (no compression) with correct offsets, built in the page
-const MKPDF = `(() => { const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+// 2.296.0 (#3177): a Type 3 font (glyphs in the file); a named Helvetica without its program is refused (PDF/A)
+const MKPDF = `(() => { const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 >>', '<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 700] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << >> /Encoding << /Type /Encoding /Differences [] >> /FirstChar 32 /LastChar 32 /Widths [600] >>',
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>'];
   const c = 'BT /F1 16 Tf 40 800 Td (UI-LETTERHEAD) Tj ET'; objs.push('<< /Length ' + c.length + ' >>\\nstream\\n' + c + '\\nendstream');
   let out = '%PDF-1.4\\n'; const offs = [];

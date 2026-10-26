@@ -613,9 +613,87 @@ class BpCopier:
         return fid
 
 
-def bp_check(data):
+# 2.296.0 C (#3177): what of a letterhead breaks the PDF/A-3b of the documents it is copied into (office/pdf.py writes an
+# sRGB output intent): a font without its program, DeviceCMYK colour, LZW compression. Checked with veraPDF (profile 3b):
+# soft masks, constant opacity, transparency groups and optional content of a letterhead keep the document valid.
+BP_PDFA = ("font", "cmyk", "lzw")
+_CMYK_OP_RE = re.compile(rb"(?:^|[\s\]])(?:[+-]?(?:\d+\.?\d*|\.\d+)\s+){4}[kK](?=[\s/\[<(]|$)")
+_CMYK_CS_RE = re.compile(rb"/(?:DeviceCMYK|CMYK)\s+(?:cs|CS)(?=[\s/\[<(]|$)")
+_INLINE_RE = re.compile(rb"/(?:CS|ColorSpace)\s*/(?:DeviceCMYK|CMYK)\b|/(?:F|Filter)\s*(?:\[\s*)?/(?:LZWDecode|LZW)\b")
+
+
+class BpPdfaError(BpError):
+    """2.296.0 C (#3177): the letterhead is readable but would make the documents invalid PDF/A (codes of BP_PDFA)."""
+
+    def __init__(self, issues):
+        super().__init__("not PDF/A: " + ", ".join(issues))
+        self.issues = issues
+
+
+def bp_pdfa_issues(doc, n=2):
+    """2.296.0 C (#3177): the codes of BP_PDFA found in the first n pages of doc (their content, every object reachable
+    from their resources, nested forms / patterns / Type 3 glyphs included) -> sorted list, [] when clean."""
+    found, seen, todo = set(), set(), []
+
+    def content(data):
+        if _CMYK_OP_RE.search(data) or _CMYK_CS_RE.search(data):  # 2.296.0 F (#3177): + "/DeviceCMYK cs"
+            found.add("cmyk")
+        m = _INLINE_RE.findall(data)
+        for x in m:
+            found.add("lzw" if b"LZW" in x else "cmyk")
+
+    def walk(v, depth=0):
+        if depth > BP_MAX_DEPTH:
+            raise BpError("nested too deep")
+        if isinstance(v, BpRef):
+            if v.num not in seen:
+                if len(seen) >= BP_MAX_OBJECTS:
+                    raise BpError("too many objects")
+                seen.add(v.num)
+                todo.append(v)
+            return
+        if isinstance(v, BpName):
+            if v in (b"DeviceCMYK", b"CMYK"):
+                found.add("cmyk")
+            elif v in (b"LZWDecode", b"LZW"):
+                found.add("lzw")
+            return
+        if isinstance(v, list):
+            for x in v:
+                walk(x, depth + 1)
+            return
+        d = v.d if isinstance(v, BpStream) else v
+        if not isinstance(d, dict):
+            return
+        sub, typ = doc.obj(d.get(b"Subtype")), doc.obj(d.get(b"Type"))
+        if typ == b"FontDescriptor" and not any(k in d for k in (b"FontFile", b"FontFile2", b"FontFile3")):
+            found.add("font")
+        if sub in (b"Type1", b"MMType1", b"TrueType") and typ in (None, b"Font") and b"FontDescriptor" not in d:
+            found.add("font")  # a standard font (Helvetica ...) named only, its program not in the file
+        # 2.296.0 F (#3177): the Alternate of an ICC profile stream (N, no Type) is no colour used -- ICCBased CMYK is fine
+        icc = isinstance(v, BpStream) and b"N" in d and b"Alternate" in d and typ is None
+        for k, x in d.items():
+            # 2.296.0 F (#3177): a Type 3 font draws its glyphs itself, its FontDescriptor has no font program
+            if k not in BP_DROP_KEYS and not (icc and k == b"Alternate") and not (sub == b"Type3" and k == b"FontDescriptor"):
+                walk(x, depth + 1)
+        if isinstance(v, BpStream) and (sub == b"Form" or b"PatternType" in d or typ == b"CharProc"):
+            try:
+                content(bp_decode(v, doc))
+            except BpError:
+                pass  # its filter is kept as it is when copied; the names above still count
+
+    for i in range(min(n, len(doc.pages))):
+        content(doc.page_content(i))
+        walk(doc.pages[i][1].get(b"Resources"))
+        while todo:
+            walk(doc.obj(todo.pop()))
+    return sorted(found, key=BP_PDFA.index)
+
+
+def bp_check(data, pdfa=False):
     """Reads data as a letterhead -> (number of pages used (1 or 2), [(width pt, height pt)]); BpError when it cannot be
-    used. Every object a page needs is resolved here once, so a document PDF later never meets a broken one."""
+    used. Every object a page needs is resolved here once, so a document PDF later never meets a broken one.
+    pdfa=True (2.296.0 C #3177, the upload): BpPdfaError when it would make the documents invalid PDF/A (bp_pdfa_issues)."""
     doc = BpDoc(data)
     sizes = []
     for i in range(min(2, len(doc.pages))):
@@ -625,4 +703,8 @@ def bp_check(data):
         sizes.append((x1 - x0, y1 - y0))
         objs = []
         BpCopier(doc, objs).form(i, (1, 0, 0, 1, 0, 0))
+    if pdfa:
+        issues = bp_pdfa_issues(doc, len(sizes))
+        if issues:
+            raise BpPdfaError(issues)
     return len(sizes), sizes

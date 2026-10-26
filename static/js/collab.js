@@ -238,7 +238,8 @@ function newsText(it, U) {
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
       rename: tr('{0} renamed the project {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
-      restyle: tr('{0} changed the icon or colour of the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
+      restyle: tr('{0} changed the icon or colour of the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),
+      asstcomments: tr('{0} allowed the assistant to read comments of all members in projects shared with it (admin of {1})', who, q(d.org || ''))})[d.action] || tr('{0} changed something', who);  // 2.240.0 A (#2884)
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'orgjoin': return tr('{0} invites you to join the organisation {1}', who, q(d.name || ''));  // 2.148.1 A (#2480): oinvview.js

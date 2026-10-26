@@ -10,12 +10,14 @@ ZIP layout (format "kalmido-account", v 1; admin/acctimport.py reads it):
                         tables: {name: rows}, files: [{path, size, sha256}], client_encrypted: {...}, export_id, not_included}
     data/<table>.json  one JSON array per table: the tables of GET /api/export.json (accounts/settings.py
                         umz_export_queries) plus list tags, the lists shared with me (a reference only) with my own comments
-                        there, the people of my lists (for the mapping on import; other people's e-mail addresses only as
-                        email_hash, see umz_email_hash) and the server accounts (no token)
-    files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file)
+                        there, what I wrote or got elsewhere (umz_mine_queries: comments, channel messages, tasks of other
+                        lists, reactions, News, devices), the people of my lists (for the mapping on import; other people's
+                        e-mail addresses only as email_hash, see umz_email_hash) and the server accounts (no token)
+    files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file), my profile picture
     checksum.sha256    "sha256  path" lines (sha256sum -c): manifest.json and every file of the manifest
 
-Never in the file: passwords, sessions, token hashes, two-factor data, push subscriptions, webhook secrets and addresses
+Never in the file: passwords, session tokens, token hashes, two-factor data, push addresses and keys (only device, browser and
+dates of sessions and push devices), webhook secrets and addresses
 (url_hint only), server-side settings, access data
 (orgexport OX_SECRET_COLS is dropped from every row). Browser-encrypted content stays ciphertext (client_encrypted).
 
@@ -23,6 +25,7 @@ At rest (export here and the uploads of acctimport.py): with a server key (KALMI
 UMZ_BLOCK blocks with a key derived per person and purpose (HKDF), so it is readable with random access (zipfile seeks);
 without a server key it is plain with mode 0600 like the attachments next to it."""
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -40,7 +43,8 @@ from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import tr
-from ..core.access import Denied, acx_of
+from ..core.access import Denied, acx_lists_sql, acx_of
+from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
@@ -57,18 +61,28 @@ UMZ_V = 1
 UMZ_SUFFIX = ".zip"
 UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
 UMZ_NOT_INCLUDED = (
-    "passwords, sessions, API tokens (only their names), two-factor data, push subscriptions, webhook secrets and addresses",
+    # 2.239.0 A (#2882): sessions and push devices are in the file without their secrets
+    "passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses",
     "server-side settings (such as the ntfy topic an admin set)",
     "access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)",
-    "lists of other people that are shared with you (only a reference and your own comments there)",
+    # 2.239.0 A (#2882): what you wrote elsewhere is in the file, the rest of those lists is not
+    "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)",
     "organisation data that is not yours (use the organisation export for a whole organisation)",
     "the receipt files of household budgets (their entries are included)",  # 2.72.0 (#1333)
     # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
     "the content of your private files (only their list: name, type, size, dates), files of knowledge pages and tables",
-    "messages of other people in direct messages and team chats (only what you wrote in direct messages)",
+    "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)",  # 2.239.0 A (#2882)
+    # 2.239.0 A (#2882): tasks of lists you no longer see; what you wrote inside an organisation you left stays with it
+    "tasks of lists you can no longer see, and your comments and messages inside an organisation you left",
     "booking pages and their bookings, polls and forms with their answers, holiday allowances",
     "the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export",
 )
+
+# 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
+UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key bundle (e2e_keys, wrapped with your passphrase and "
+                "recovery code) comes along: after an import into an account without its own keys, locked notes and your encrypted "
+                "files open with the same passphrase. Into an account that already has keys they arrive unreadable. Projects "
+                "encrypted in the browser are not taken over by the import (switch their encryption off before the export).")
 
 _UMZ = {}  # user id -> the running export thread
 _UMZ_LOCK = threading.Lock()
@@ -240,13 +254,20 @@ def umz_clean(table, r):
     return umz_export_clean(table, d)
 
 
-def umz_email_hash(email):
-    """Review M1: other people's addresses leave the server only as this hash (the import finds the accounts it may see)."""
+def umz_email_hash(email, salt=None):
+    """Review M1: other people's addresses leave the server only as this hash (the import finds the accounts it may see).
+    2.239.0 A (#2882): with salt (the export's people_salt, manifest) an HMAC-SHA256 keyed with it: the target server of a
+    move computes it again from the addresses it knows, so it guards against precomputed tables, not against guessing one
+    address. Without salt the unkeyed form of older files (the import still reads both)."""
     e = (email or "").strip().lower() if isinstance(email, str) else ""
-    return hashlib.sha256(("kalmido-people|" + e).encode()).hexdigest() if e else ""
+    if not e:
+        return ""
+    if salt:
+        return hmac.new(salt.encode(), ("kalmido-people|" + e).encode(), hashlib.sha256).hexdigest()
+    return hashlib.sha256(("kalmido-people|" + e).encode()).hexdigest()
 
 
-def umz_people(c, uid):
+def umz_people(c, uid, salt=None):
     """The people of my lists (members, comment authors, assignees) with name + e-mail hash: the mapping on import."""
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
     out = {}
@@ -255,14 +276,14 @@ def umz_people(c, uid):
         if r["kind"] == "agent":
             continue
         p = out.setdefault(r["user_id"], {"user_id": r["user_id"], "name": r["display_name"] or r["username"],
-                                           "email_hash": umz_email_hash(r["email"]), "lists": {}})
+                                           "email_hash": umz_email_hash(r["email"], salt), "lists": {}})
         p["lists"][str(r["list_id"])] = r["role"]
     for r in c.execute(f"""SELECT DISTINCT u.id, u.display_name, u.username, u.email, COALESCE(u.kind,'user') AS kind FROM users u
                            WHERE u.id IN (SELECT user_id FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own}))
                               OR u.id IN (SELECT assignee_id FROM tasks WHERE list_id IN {own})""", (uid, uid)):
         if r["id"] != uid and r["id"] not in out:
             out[r["id"]] = {"user_id": r["id"], "name": r["display_name"] or r["username"],
-                            "email_hash": "" if r["kind"] == "agent" else umz_email_hash(r["email"]),
+                            "email_hash": "" if r["kind"] == "agent" else umz_email_hash(r["email"], salt),
                             "lists": {}, **({"agent": True} if r["kind"] == "agent" else {})}
     return list(out.values())
 
@@ -305,12 +326,50 @@ def umz_extra_queries(uid):
         "wiki_pages": ("SELECT id, org_id, owner_id, path, body, attrs, created_at, updated_at FROM wiki_pages WHERE owner_id=? "
                        "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
         "agent_chats": ("SELECT id, agent_id, sender, body, task_id, created_at FROM agent_chat WHERE user_id=? ORDER BY id", (uid,)),
+        "agent_chat_prefs": ("SELECT agent_id, prefs, updated_at FROM agent_chat_prefs WHERE user_id=? ORDER BY agent_id", (uid,)),  # 2.233.0 A (#2848)
         "direct_messages": ("SELECT m.id, m.room_id, m.body, m.enc, m.created_at, m.edited_at FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id "
                             "WHERE r.kind='dm' AND m.user_id=? AND m.deleted_at IS NULL ORDER BY m.id", (uid,)),
         "absences": ("SELECT id, org_id, kind, start_date, end_date, half_day, note, status, decided_at, decision_note, created_at "
                      "FROM hub_absences WHERE user_id=? AND deleted_at IS NULL ORDER BY start_date", (uid,)),
         "timesheets": ("SELECT id, org_id, month, state, closed_at, decided_at, note, created_at, updated_at FROM time_sheets "
                        "WHERE user_id=? ORDER BY month", (uid,)),
+        # 2.278.0 C (#3091): my own key bundle (wrapped in the browser with my passphrase / recovery code, the server never
+        # had it in plain): the import takes it over, so my locked notes and encrypted files open again. Never another person's
+        "e2e_keys": ("SELECT * FROM e2e_keys WHERE user_id=?", (uid,)),
+    }
+
+
+def umz_mine_queries(uid):
+    """2.239.0 A (#2882): Art. 15 -- what I wrote or got outside my own lists, whatever my membership: only my own rows
+    (author / assignee / recipient = me), never other people's content around them. Tasks of other lists and the task
+    title of a comment only while I still see the list (acx_lists_sql); no secrets of sessions and push devices."""
+    own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"
+    shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
+    vis = acx_lists_sql(req=False)
+    return {
+        "written_comments": (f"""SELECT c.id, c.task_id, CASE WHEN t.list_id IN {vis} THEN t.title END AS task_title,
+                                 CASE WHEN t.list_id IN {vis} THEN t.list_id END AS list_id, c.body, c.created_at, c.edited_at
+                                 FROM comments c JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL
+                                 AND t.list_id NOT IN {own} AND t.list_id NOT IN {shared} ORDER BY c.id""",
+                             (uid, uid, uid, uid, uid, uid, uid, uid)),
+        "channel_messages": (f"""SELECT m.id, m.room_id, r.kind AS room_kind, CASE WHEN r.list_id IN {vis}
+                                OR r.id IN (SELECT room_id FROM tchat_members WHERE user_id=?) THEN r.name END AS room_name, r.list_id, m.body, m.enc, m.task_id,
+                                m.thread_of, m.created_at, m.edited_at FROM tchat_msgs m LEFT JOIN tchat_rooms r ON r.id=m.room_id
+                                WHERE m.user_id=? AND m.deleted_at IS NULL AND m.room_id NOT IN (SELECT id FROM tchat_rooms WHERE kind='dm')
+                                ORDER BY m.id""", (uid, uid, uid, uid)),
+        "other_tasks": (f"""SELECT * FROM tasks WHERE (created_by=? OR assignee_id=? OR id IN (SELECT task_id FROM task_people WHERE user_id=?))
+                            AND deleted_at IS NULL AND list_id IN {vis} AND list_id NOT IN {own} ORDER BY id""",
+                        (uid, uid, uid, uid, uid, uid)),
+        "task_people": ("SELECT task_id FROM task_people WHERE user_id=? ORDER BY task_id", (uid,)),
+        "reactions": ("""SELECT 'comment' AS kind, comment_id AS target_id, emoji, created_at FROM comment_reactions WHERE user_id=?
+                         UNION ALL SELECT 'message', message_id, emoji, created_at FROM tchat_rx WHERE user_id=?
+                         UNION ALL SELECT 'agent_chat', message_id, emoji, created_at FROM chat_reactions WHERE user_id=?
+                         ORDER BY created_at""", (uid, uid, uid)),
+        "kid_stars": ("SELECT id, delta, kind, task_id, reward_id, title, at, created_at FROM kid_stars WHERE kid_id=? ORDER BY id", (uid,)),
+        "notifications": ("SELECT id, kind, task_id, list_id, actor_id, comment_id, data, created_at, read_at FROM notifications "
+                          "WHERE user_id=? ORDER BY id", (uid,)),
+        "sessions": ("SELECT created_at, expires_at, via, last_seen_at, user_agent FROM sessions WHERE user_id=? ORDER BY created_at", (uid,)),
+        "push_devices": ("SELECT id, label, created_at, last_ok FROM push_subs WHERE user_id=? ORDER BY id", (uid,)),
     }
 
 
@@ -387,6 +446,8 @@ def umz_build(c, uid, stream, export_id):
     u = c.execute("SELECT id, username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
     q = umz_export_queries(uid)
     q.update(umz_extra_queries(uid))
+    q.update(umz_mine_queries(uid))  # 2.239.0 A (#2882)
+    salt = secrets.token_hex(16)  # 2.239.0 A (#2882): the key of this file's e-mail hashes (manifest people_salt)
     client_enc = {"attachments": [], "locked_notes": 0}
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         files = {}  # (kind, row id) -> path in the ZIP
@@ -406,6 +467,13 @@ def umz_build(c, uid, stream, export_id):
                 files[(table, r["id"])] = name
                 if table == "attachments" and "enc" in r.keys() and r["enc"]:
                     client_enc["attachments"].append(name)
+        avatar = ""  # 2.239.0 A (#2882): my own profile picture
+        a = c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone()
+        if a and (a[0] or "").startswith("u:"):
+            full = _under(ATT_DIR, os.path.relpath(avatar_path(uid, _safe_part(a[0][2:])), ATT_DIR))
+            if full:
+                avatar = "files/avatar.jpg"
+                _put(zf, out, avatar, oc_read_file(c, full))
         for table, (sql, args) in q.items():
             def rows(table=table, sql=sql, args=args):
                 for r in c.execute(sql, args):
@@ -413,12 +481,12 @@ def umz_build(c, uid, stream, export_id):
                     if d is None:
                         continue
                     if table == "shared_lists":  # review M1: the owner's address only as a hash
-                        d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""))
+                        d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""), salt)
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
                     yield _umz_plain(c, table, d, uid)  # 2.148.1 C (#2494); 2.306.0 A (#2885): + uid
             _put_rows(zf, out, table, rows())
-        _put_rows(zf, out, "people", umz_people(c, uid))
+        _put_rows(zf, out, "people", umz_people(c, uid, salt))
         if "msv_links" in have:  # 2.73.0: msv_links comes with part A -- the server accounts, never their token
             try:
                 with c.savepoint():
@@ -433,9 +501,11 @@ def umz_build(c, uid, stream, export_id):
         manifest = {
             "format": UMZ_FORMAT, "v": UMZ_V, "kalmido_version": APP_VERSION, "created_at": iso(now_utc()),
             "source": {"url": PUBLIC_URL, "hosted": bool(hosted())},
-            "user": {"id": u["id"], "name": u["display_name"] or u["username"], "email": u["email"] or ""},
+            "user": {"id": u["id"], "name": u["display_name"] or u["username"], "email": u["email"] or "",
+                     **({"avatar": avatar} if avatar else {})},
+            "people_salt": salt,  # 2.239.0 A (#2882): email_hash = HMAC-SHA256 with this key (umz_email_hash)
             "tables": out.tables, "files": out.files,
-            "client_encrypted": {**client_enc, "note": "Encrypted in the browser: stored here as ciphertext, only with your password readable."},
+            "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
             "export_id": export_id, "not_included": list(UMZ_NOT_INCLUDED),
             "locked_files": locked,  # 2.209.0 D (#1856)
         }

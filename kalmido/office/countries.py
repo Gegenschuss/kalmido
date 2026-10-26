@@ -34,3 +34,46 @@ def fk_country(v, what="country"):
     if code is None:
         raise BadInput(tr("Unknown country code: {0} (two letters, ISO 3166-1, e.g. DE, AT, CH)", str(v).strip()[:10]))
     return code
+
+
+# 2.296.0 B (#3168): the country line of an address is the name in capitals in the language of the sender's country (DIN
+# 5008 / UPU: "NIEDERLANDE" on a letter from Germany), not the code; names from countrynames.json (CLDR, built once)
+FK_NAME_LANG = {"DE": "de", "AT": "de", "CH": "de", "LI": "de", "LU": "de", "FR": "fr", "BE": "fr", "MC": "fr", "ES": "es",
+                "IT": "it", "SM": "it", "VA": "it", "NL": "nl"}
+_FK_NAMES = {}
+
+
+def fk_country_label(code, home):
+    """The printed country of an address in a document of a sender in home (ISO code): '' for the sender's own country, the
+    name in capitals in home's language (English for other countries), the text as it was for an unknown code."""
+    c = fk_country_code(code)
+    h = fk_country_code(home) or str(home or "").strip().upper()
+    if c == "":
+        return ""
+    if c is None:
+        return str(code).strip()
+    if c == h:
+        return ""
+    if not _FK_NAMES:
+        import json
+        import os
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "countrynames.json"), encoding="utf-8") as fh:
+                _FK_NAMES.update(json.load(fh))
+        except (OSError, ValueError):
+            _FK_NAMES["en"] = {}
+    names = _FK_NAMES.get(FK_NAME_LANG.get(h, "en")) or _FK_NAMES.get("en") or {}
+    return str(names.get(c) or c).upper()
+
+
+# 2.296.0 F (#3168): the 27 member states (ISO codes; GR, not EL) -- reverse charge text and the client's VAT id
+FK_EU = frozenset("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK".split())
+
+
+def fk_reverse_case(client, home):
+    """'domestic' (client in the sender's country or without one), 'eu' (another member state) or 'other' (CH, GB, US ...)."""
+    cc = fk_country_code(client) or str(client or "").strip().upper()
+    h = fk_country_code(home) or str(home or "").strip().upper() or "DE"
+    if cc in ("", h):
+        return "domestic"
+    return "eu" if cc in FK_EU and h in FK_EU else "other"

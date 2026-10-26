@@ -10,7 +10,7 @@ function dsc_slot(s) {
   const dl = d => `<a class="btn sm" href="/api/docs/folder-watcher/${encodeURIComponent(d.file)}" download="${esc(d.file)}">${ic('download', 's')} ${esc(d.label)}</a>`;
   const small = d => `<a class="linkbtn" href="/api/docs/folder-watcher/${encodeURIComponent(d.file)}" download="${esc(d.file)}">${esc(d.label)}</a>`;
   const main = sc.downloads.filter(d => d.id.startsWith('mac') || d.id === 'windows'), more = sc.downloads.filter(d => !main.includes(d));
-  const key = k => `<li class="dc-rule dsc-key${k.ok ? '' : ' off'}"><span><b>${esc(k.name)}</b> <span class="muted">${esc(k.target)}</span><small class="muted">${k.last_used_at ? esc(tr('last used {0}', relTime(k.last_used_at))) : tr('never used')}</small></span>
+  const key = k => `<li class="dc-rule dsc-key${k.ok ? '' : ' off'}"><span><b>${esc(k.name)}</b> <span class="muted">${esc(k.target)}</span><small class="muted">${k.last_used_at ? esc(tr('last used {0}', relTime(k.last_used_at))) : tr('never used')}${k.expires_at ? ' · ' + esc(k.expired ? tr('expired') : tr('expires {0}', fmtDateLoc(k.expires_at.slice(0, 10)))) : ''}</small></span>
     <button type="button" class="iconbtn danger" data-dsc="del:${k.id}" aria-label="${esc(tr('Revoke {0}', k.name))}" title="${esc(tr('Revoke'))}">${ic('trash')}</button></li>`;
   const folders = [{id: 0, name: tr('Documents (directly)')}, ...(s.folders || [])];
   const watcher = `<div class="dsc-way"><h5>${ic('folder', 's')} ${tr('Folder watcher')}</h5>

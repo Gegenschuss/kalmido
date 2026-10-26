@@ -34,6 +34,7 @@ from ..core.db import body, bump, db, err, uset
 from ..core.i18n import N_, tr, trn
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_log_detail, oc_read_file, oc_write_file
 from ..core.pg import IntegrityError, system_ctx, table_columns, write_lock
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .ledger import ofx_log
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
@@ -198,6 +199,14 @@ def pbt_plan(c, uid, src, dst):
     if lk:
         notes.append(trn("{0} link of a letter to a private document ends: the document stays in your private documents",
                          "{0} links of letters to private documents end: the documents stay in your private documents", lk))
+    # 2.273.0 B (#3051): the links of letters and contact persons to the private address books end too (the one-way move says so)
+    ab = c.execute("SELECT COUNT(*) FROM office_letters WHERE org_id=? AND contact_id IS NOT NULL", (src,)).fetchone()[0]
+    if cl:
+        ab += c.execute(f"SELECT COUNT(*) FROM office_client_contacts WHERE contact_id IS NOT NULL AND client_id IN ({','.join('?' * len(cl))})",
+                        list(cl)).fetchone()[0]
+    if ab:
+        notes.append(trn("{0} link to your private address book ends: the contact stays there",
+                         "{0} links to your private address book end: the contacts stay there", ab))
     if counts.get("office_texts") and c.execute("SELECT 1 FROM office_texts WHERE org_id=? LIMIT 1", (dst,)).fetchone():
         notes.append(trn("{0} text block is added to those of the organisation (the same text can show twice there)",
                          "{0} text blocks are added to those of the organisation (the same text can show twice there)", counts["office_texts"]))
@@ -406,6 +415,6 @@ def pbt_post():
             pass
     g.pop("pb_owner", None)
     acx_drop()
-    print("personal office", src, "moved into organisation", dst, "by", g.user["username"], flush=True)
+    print("personal office", src, "moved into organisation", dst, "by", login_log_who(g.user), flush=True)
     return jsonify(ok=True, org_id=dst, name=name, clients=len(p["clients"]), files=len(p["files"]), letter_links=unlinked,
                    rows=sum(counts.values()))

@@ -131,7 +131,8 @@ async function dataPane(w) {
   const tg = md.querySelector('#s-umz-tgt');
   check(ob && /Organisation export of Kalmido/.test(ob.textContent) && /Private/.test(tg?.textContent || '') && tg.options.length > 1, 'opened: preview, private + organisations as target');
   if (tg && tg.options.length > 1) { tg.value = tg.options[1].value; tg.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  check(!ob.querySelector('[data-k="share"]') || /Add to the organisation/.test(ob.textContent), 'the tick adds to the organisation');
+  // 2.278.0 (#3095): into an organisation the tick invites (joins after accepting), with the role as a choice
+  check(!ob.querySelector('[data-k="share"]') || (/Invite to the organisation/.test(ob.textContent) && ob.querySelector('[data-umzr]:not([hidden])')), 'the tick invites into the organisation, role to choose');
   click(w, ob.querySelector('[data-umz="cancel"]')); await sleep(400);
   check(!md.querySelector('#s-umz-imp .umzbox'), 'cancel');
   w.close();

@@ -73,6 +73,11 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
     check(await ready(ev, `!!document.querySelector('#abc-state option[value="AT"]') && /Bayern/.test(document.querySelector('#abc-state option[value=""]').textContent)`),
       'the state picker: "As my organisation (Bayern)", Austria offered');
     check(!!(await ev(`document.querySelector('.evcmodal [data-abc="feed"]')`)), 'the subscription link button');
+    // 2.240.0 C (#2868): whose busy times colleagues see (org | all | off), saved like the other settings
+    check(await ev(`document.querySelector('#abc-fb')?.value === 'org' && document.querySelectorAll('#abc-fb option').length === 3`), 'the free / busy picker: org by default, three choices');
+    await ev(`(() => { const x = document.querySelector('#abc-fb'); x.value = 'off'; x.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ready(ev, `S.settings.freebusy_share === 'off' && fetch('/api/state').then(r => r.json()).then(j => j.settings.freebusy_share === 'off')`), 'the free / busy choice is saved');
+    await call(ev, 'PATCH', '/api/settings', {freebusy_share: 'org'});
     await shot('p2155-b-calendars.png');
     await ev(`(() => { document.querySelector('.evcmodal [data-key="x:team"]').click(); return 1; })()`);
     check(await ready(ev, `S.settings.cal_abs_team === '1'`), 'the team switch is saved');

@@ -355,7 +355,7 @@ check(r.status_code == 404 and not dbx("SELECT 1 FROM agent_jobs WHERE agent_id=
 dbx("UPDATE groups SET created_by=? WHERE id=?", (AG, GID))  # a group the agent sees (its own)
 r = cl.put(f"/lists/{GL}/groups/{GID}", {"role": "view"})
 check(r.status_code == 202, f"agent shares with a group: approval {r.status_code}")
-r = cl.put(f"/lists/{GL}/members/{ids['carol']}", {"role": "view"})
+r = cl.put(f"/lists/{GL}/members/{ids['bob']}", {"role": "view"})  # 2.223.7 (#2917): bob shares L with the agent (carol is invisible to it)
 check(r.status_code == 202, f"agent shares with a person: approval {r.status_code}")
 r = cl.post("/folders/rename", {"old": "A", "new": "B"})
 check(r.status_code == 202, "agent renames a folder: approval")

@@ -133,13 +133,14 @@ for _ in range(5):
     check(login("bob", "wrong-pass", "203.0.113.7").status_code == 401, "wrong password: 401")
 check(login("bob", "password123", "203.0.113.7").status_code == 429, "5 failures of bob from 203.0.113.7: locked there")
 check(login("bob", "password123", "198.51.100.9").ok, "bob from another address still logs in (no lockout for everyone)")
-check("from 203.0.113.7" in logs(), "the log names the forwarded client address")
+check("from 203.0.113." in logs(), "the log names the forwarded client address (shortened by default since 2.239, KALMIDO_LOG_FULL_IP)")
 for i in range(20):
     login(f"nobody{i}", "wrong-pass", "203.0.113.50")
-check(login("alice", "password123", "203.0.113.50").status_code == 429, "20 failures from one address: that address is blocked")
-check(login("alice", "password123", "203.0.113.51").ok, "a neighbour address is not")
-check(login("alice", "password123", "203.0.113.50, 198.51.100.77").ok,
-      "only the rightmost X-Forwarded-For entry counts (the one the proxy appended)")
+# 2.282.0 (#3111): 20 failures from one address delay the sign-ins from there, they no longer refuse a right password
+check(login("alice", "password123", "203.0.113.50").ok, "20 failures of other names from one address: alice still signs in there")
+check(login("alice", "password123", "203.0.113.51").ok, "a neighbour address too")
+check(login("bob", "password123", "203.0.113.7, 198.51.100.77").ok,
+      "only the rightmost X-Forwarded-For entry counts (the one the proxy appended; bob is locked at the first one)")
 r = login("alice", "password123", "198.51.100.10", **{"X-Forwarded-Proto": "https"})
 check(r.ok and "Secure" in r.headers.get("Set-Cookie", ""), "X-Forwarded-Proto https from the proxy: Secure cookie")
 check(r.headers.get("Strict-Transport-Security") == "max-age=31536000", "https from the proxy: HSTS header")

@@ -237,7 +237,9 @@ def fts_args(a, lim_default=20):
 
 @app.get("/api/search")
 def fts_web():
-    """?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks}, comment_id?}], next}."""
+    """?q, limit (1-50), cursor -- {hits: [{task, where, snippet: {text, marks}, comment_id?}], next, office?}.
+    2.250.0 A (#2992): office: [{kind, id, label, sub, go}] (clients, quotations / invoices: office/search.py) on the first
+    page only, and only when the person sees the office -- an extra key, old clients read hits as before."""
     a = request.args
     try:
         q, lim = fts_args(a)
@@ -251,7 +253,13 @@ def fts_web():
         if cid:
             h["comment_id"] = cid
         hits.append(h)
-    return jsonify(hits=hits, next=cursor_enc("fs", off + lim) if more else None)
+    extra = {}
+    if not off:
+        from ..office.search import bs_office_hits
+        office = bs_office_hits(db(), me(), q)
+        if office:
+            extra["office"] = office
+    return jsonify(hits=hits, next=cursor_enc("fs", off + lim) if more else None, **extra)
 
 
 def fts_v1(a, v1_task):

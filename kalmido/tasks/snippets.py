@@ -39,7 +39,7 @@ def snip_parse(raw):
     return [s for s in v if isinstance(s, dict) and isinstance(s.get("code"), str)] if isinstance(v, list) else []
 
 
-def snip_clean(v):
+def snip_clean(v, by=None):  # 2.273.0 A (#3030): by = the author outside a request (account import)
     """Client / API value -> the JSON to store (None for none: jsonb has no ''); raises BadInput. New snippets get an id, every snippet
     the writer as author and now as time (snip_keep restores both for unchanged ones)."""
     if v in (None, "", []):
@@ -87,7 +87,7 @@ def snip_clean(v):
         ids.add(sid)
         if not code.strip() and not path:
             continue  # an empty new snippet is not kept
-        out.append({"id": sid, "lang": lang, "path": path or None, "line": line, "code": code, "by": me(), "updated_at": ts})
+        out.append({"id": sid, "lang": lang, "path": path or None, "line": line, "code": code, "by": by or me(), "updated_at": ts})
     return json.dumps(out, ensure_ascii=False, separators=(",", ":")) if out else None
 
 

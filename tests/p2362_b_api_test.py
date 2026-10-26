@@ -196,7 +196,8 @@ m = wait_for(lambda: msgs("signed in from a new address"))
 check(len(m) == 1 and "Admin alice signed in from a new address: 203.0.113.x" in m[0]["msg"] and "203.0.113.77" not in m[0]["msg"],
       f"new address reported, its last octet masked (2.38.0, #1155): {m}")
 ev = log_events("admin_login_new_ip", username="alice")
-check(len(ev) == 1 and ev[0]["ip"] == "203.0.113.77" and ev[0]["via"] == "password", f"log line for the new address: {ev}")
+# 2.239.0 B (#2888): the log line shortens the address too (full only with KALMIDO_LOG_FULL_IP=1)
+check(len(ev) == 1 and ev[0]["ip"] == "203.0.113.x" and ev[0]["via"] == "password", f"log line for the new address: {ev}")
 rows = dbx("SELECT ip_hash FROM admin_login_ips WHERE user_id=1")
 check(len(rows) == 2 and all(len(x[0]) == 64 and "203.0" not in x[0] and "198.51" not in x[0] for x in rows),
       "addresses are stored as hashes only")

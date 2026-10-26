@@ -559,7 +559,7 @@ def _list_file_hits(c, uid, raw):
             continue
         if r["list_id"] not in ok:
             try:
-                need_overview(c, r["list_id"])  # the same check as opening the project file
+                need_overview(c, r["list_id"], full=True)  # the same check as opening the project file (2.223.7 B #2918)
                 ok[r["list_id"]] = True
             except Denied:
                 ok[r["list_id"]] = False

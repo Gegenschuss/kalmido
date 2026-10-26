@@ -121,6 +121,8 @@ AG, AH = my_agent(A, "letterbot", ORG)
 AG2, AH2 = my_agent(A, "quietbot", ORG)  # its office switch stays off
 CB, CH = my_agent(Ca, "betabot", ORG2)
 check(A.patch(B + f"{O}/agents/{AG}", json={"office_drafts": True}).ok, "setup: the office switch of the agent")
+# 2.223.2 B (#2862): an organisation's agent without an office group reaches only the quotes' scope (letters need a group)
+check(A.put(B + f"{O}/rights/people/{AG}", json={"groups": ["tpl:projects"]}).ok, "setup: the agent in Project management")
 check(Ca.patch(B + f"{O}/agents/{CB}", json={"office_drafts": True}).ok, "setup: the office switch of Beta's agent")
 
 D1 = upload(A, "anhoerung.pdf", ["Finanzamt Musterstadt", "Anhoerung zur Steuererklaerung 2025", "Frist 30.11.2026"], f"org:{ORG}")
@@ -226,6 +228,7 @@ d = ev[-1]["data"] if ev else {}
 check(len(ev) == 1 and d.get("node_id") == D1 and d.get("requested_by") == ALICE and d.get("title") == "anhoerung.pdf"
       and d.get("note") == "Bitte freundlich, Frist verlängern lassen." and d.get("office", {}).get("id") == ORG and d.get("org_id") == ORG
       and "create_letter_draft" in d.get("hint", ""), f"the event letter_draft_requested reaches the agent {d}")
+check(d.get("origin") == "document" and d.get("untrusted") is True, f"2.223.2 B (#2862): the event is marked as data from outside {d}")
 check(not events(AH2) and not events(CH), "no other agent hears of it")
 
 # ---------------------------------------------------------------- OpenAPI, the office log

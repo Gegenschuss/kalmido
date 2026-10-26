@@ -23,6 +23,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, inv_calc, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
+from .pdf import pdf_date  # 2.296.0 B (#3175)
 
 ABS_TYPES = ("", "progress", "final")
 ABS_TYPE_CODE = {"progress": "326", "final": "380"}  # UNTDID 1001: 326 partial invoice (XRechnung + EN 16931 accept it)
@@ -282,7 +283,9 @@ def abs_deductions(c, oid, offer, lang, cur):
         mf = inv_money_fields(x, pm)
         paid = _t("paid", lang) if dec(mf["open"]) <= 0 else _t("open", lang)
         dt = x["date"] or ""
-        dtext = f"{dt[8:10]}.{dt[5:7]}.{dt[0:4]}" if calc_lang(lang) != "en" and len(dt) == 10 else dt  # 2.185.0 C: not only de
+        dtext = f"{dt[8:10]}.{dt[5:7]}.{dt[0:4]}" if len(dt) == 10 else dt  # 2.185.0 C: not only de
+        if calc_lang(lang) != "de" and len(dt) == 10:  # 2.296.0 F (#3175): like the head and the skonto line (was ISO in English)
+            dtext = pdf_date(dt, calc_lang(lang))
         for k in sorted(eur, key=lambda k: TAX_KEYS.index(k)):
             if eur[k] == 0:
                 continue
@@ -343,7 +346,9 @@ def abs_render(r, m, L, lang):
     if sk is not None and isinstance(m.get("payment"), dict):
         cur = r["currency"]
         dl = sk["deadline"]
-        dtext = f"{dl[8:10]}.{dl[5:7]}.{dl[0:4]}" if calc_lang(lang) != "en" else dl
+        dtext = f"{dl[8:10]}.{dl[5:7]}.{dl[0:4]}"
+        if calc_lang(lang) != "de":  # 2.296.0 B (#3175): the date of the document's language like its head (was ISO in English)
+            dtext = pdf_date(dl, calc_lang(lang))
         line = _t("skonto", lang, date=dtext, pct=_pct_text(sk["pct"], lang), amt=fmt_money(sk["amount"], lang, cur), pay=fmt_money(sk["payable"], lang, cur))
         m["payment"]["text"] = (m["payment"].get("text") + "\n" if m["payment"].get("text") else "") + line
         m["payment"]["skonto_bt20"] = abs_skonto_bt20(r)

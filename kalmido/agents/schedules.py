@@ -449,6 +449,8 @@ def v1_agent_schedules():
         d = sched_dict(c, r, None, names)
         d.pop("mine", None)
         d["list"] = lst_brief(c, r["list_id"]) if r["list_id"] and list_role(c, r["list_id"], aid) else None
+        if not d["list"]:
+            d["list_name"] = None  # 2.223.7 D (#2941): no name of a list the agent no longer sees
         out.append(d)
     return jsonify(data=out, next_cursor=None)
 

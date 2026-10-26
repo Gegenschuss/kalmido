@@ -53,10 +53,12 @@ def list_progress(c, ids, subtasks, uid=None):
     out = {}
     # 2.65.0 (#1505): a done copy (an older task of the list with the same created_at and title exists) is found with one
     # window over the lists' tasks instead of a lookup per done task (the same rows: st_first = the oldest such task)
+    # 2.280.0 A (#3108): the window carries only the columns read here (was tasks.* = every note sorted along)
     for r in c.execute(f"""SELECT t.list_id, COUNT(*) FILTER (WHERE t.status=0) AS open, COUNT(*) FILTER (WHERE t.status=2) AS done,
                                   COUNT(*) FILTER (WHERE t.status=0 AND t.due IS NOT NULL AND t.due<?) AS overdue,
                                   MIN(CASE WHEN t.status=0 AND t.due>=? THEN t.due END) AS next_due
-                           FROM (SELECT tasks.*, MIN(id) OVER (PARTITION BY list_id, created_at, title) AS st_first
+                           FROM (SELECT id, list_id, status, due, parent_id, deleted_at,
+                                        MIN(id) OVER (PARTITION BY list_id, created_at, title) AS st_first
                                  FROM tasks WHERE list_id IN ({q})) t
                            WHERE t.deleted_at IS NULL AND t.status IN (0, 2) {sub}
                              AND {tvis(c, uid, "t.", write=True) if uid else "TRUE"} AND NOT (t.status=2 AND t.st_first<t.id)
@@ -153,7 +155,9 @@ OV_TITLE_MAX = 120
 LIST_FILES_SUB = "lists"  # below ATT_DIR
 
 
-def need_overview(c, lid, write=False):
+def need_overview(c, lid, write=False, full=False):
+    if full and list_role(c, lid) == "participant":  # 2.223.7 B (#2918): notepads / milestones / project files: full roles only
+        raise Denied(404)
     role = need_list(c, lid, write=write)
     need_project(c, lid, "overview")
     return role
@@ -258,6 +262,8 @@ def overview_build(c, lid, uid):
         sn = user_names(c, [r["user_id"] for r in srows])
         status = [{"id": r["id"], "user_id": r["user_id"], "name": sn.get(r["user_id"], ""), "status": r["status"], "note": r["note"],
                    "created_at": r["created_at"]} for r in srows]
+    if role == "participant":  # 2.223.7 B (#2918): no members, milestones, project files, nor the status history (who set what)
+        ms, frows, members, status = [], [], [], []
     out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
            "description": lst["description"] or "", "description_at": lst["description_at"] if "description_at" in lst.keys() else None,  # 2.270.0 A (#3019)
            "links": links, "milestones": ms,
@@ -625,7 +631,7 @@ def need_list_file(c, fid, write, trash=False):
     r = c.execute("SELECT * FROM list_files WHERE id=?", (fid,)).fetchone()
     if not r or (r["deleted_at"] is not None) != trash:  # 2.272.0 E2 (#3038): one in the trash only to restore it
         raise Denied(404)
-    need_overview(c, r["list_id"], write=write)
+    need_overview(c, r["list_id"], write=write, full=True)  # 2.223.7 B (#2918): a project file is no task file
     if not write:
         from ..files.scan import sc_guard
         sc_guard(c, "list", fid)  # 2.61.0 (#1818): a file found infected later is locked
@@ -704,6 +710,8 @@ def list_row_purge(c, lid, gone):
     paths += [x[0] for x in c.execute("SELECT path FROM budget_files WHERE list_id=?", (lid,))]  # 2.72.0 (#1333): receipts
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
+    from ..receipts.suggest import olk_keep_project
+    olk_keep_project(c, lid)  # 2.239.0 D (#2874): booked receipts keep the project name
     n = c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount
     gone.append((lid, r["icon"], paths))
     return n

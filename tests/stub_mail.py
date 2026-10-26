@@ -61,10 +61,17 @@ class Imap(socketserver.StreamRequestHandler):
                 u = int(args[1])
                 with open(os.path.join(D, "seen"), "a") as f:
                     f.write(f"{u}\n")
+                if "DELETED" in " ".join(args[2:]).upper():  # 2.240.0 A (#2883): the instance mailbox deletes what it took in
+                    with open(os.path.join(D, "deleted"), "a") as f:
+                        f.write(f"{u}\n")
                 self.w(f"* {msgs().index(u) + 1} FETCH (UID {u} FLAGS (\\Seen))\r\n{tag} OK STORE done\r\n")
             elif cmd == "LOGOUT":
                 self.w(f"* BYE\r\n{tag} OK LOGOUT done\r\n")
                 return
+            elif cmd == "EXPUNGE":  # 2.240.0 A (#2883): remembered only (the files stay for the other checks)
+                with open(os.path.join(D, "expunged"), "a") as f:
+                    f.write("1\n")
+                self.w(f"{tag} OK EXPUNGE done\r\n")
             elif cmd == "NOOP":
                 self.w(f"{tag} OK NOOP\r\n")
             else:

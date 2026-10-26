@@ -19,6 +19,7 @@ from .model import (
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 
 IMPORT_MAX = 4 * 1024 * 1024
@@ -422,5 +423,5 @@ def pb_move_post():
     ofx_log(c, oid, "move", target="settings", detail={"name": name, "clients": len(moved), "letter_links": unlinked})
     bump(c)
     c.commit()
-    print("organisation", name, "(id", oid, ") made from a personal office by", g.user["username"], flush=True)
+    print("organisation", oid, "made from a personal office by", login_log_who(g.user), flush=True)
     return jsonify(ok=True, org_id=oid, name=name, clients=len(moved))

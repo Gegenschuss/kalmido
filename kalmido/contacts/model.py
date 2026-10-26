@@ -7,7 +7,7 @@ import re
 import secrets
 import time
 import urllib.parse
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from flask import has_request_context
 
@@ -448,6 +448,35 @@ def vc_date(v, params):
     return f"{y:04d}-{mo:02d}-{dy:02d}" if y else f"--{mo:02d}-{dy:02d}"
 
 
+# 2.273.0 C (#3048): vCard property -> the contact columns it fills
+VC_PRESENT = {"FN": ("fn",), "N": ("family", "given", "middle", "prefix", "suffix"), "NICKNAME": ("nickname",), "ORG": ("org", "dept"),
+              "TITLE": ("title",), "EMAIL": ("emails",), "TEL": ("phones",), "URL": ("urls",), "ADR": ("addresses",), "BDAY": ("bday",),
+              "ANNIVERSARY": ("anniversary",), "X-ANNIVERSARY": ("anniversary",), "NOTE": ("note",), "CATEGORIES": ("groups",),
+              "PHOTO": ("photo",), "KIND": ("kind",), "X-ADDRESSBOOKSERVER-KIND": ("kind",)}
+
+
+def vc_rev(val):
+    """2.273.0 C (#3048): REV (20261024T154249Z / 2026-10-24T15:42:49Z / a date) -> 'YYYY-MM-DDTHH:MM:SS' (UTC) or ''."""
+    raw = str(val or "").strip().upper()
+    off = re.search(r"T[0-9:.]+([+-])(\d{2}):?(\d{2})?$", raw)  # 2.273.0 F2 (#3048): a UTC offset (+0200) moves the time to UTC
+    if off:
+        raw = raw[:off.start(1)]
+    d = re.sub(r"[^0-9T]", "", raw)
+    m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?\d*)?", d)
+    if not m:
+        return ""
+    y, mo, dd, h, mi, se = m.groups()
+    out = f"{y}-{mo}-{dd}T{h or '00'}:{mi or '00'}:{se or '00'}"
+    if off and h:
+        try:
+            t = datetime.strptime(out, "%Y-%m-%dT%H:%M:%S") - (1 if off.group(1) == "+" else -1) * \
+                timedelta(hours=int(off.group(2)), minutes=int(off.group(3) or 0))
+        except ValueError:
+            return ""
+        out = t.strftime("%Y-%m-%dT%H:%M:%S")
+    return out
+
+
 def parse_vcard(text):
     """One vCard -> the contact's columns (dict). BadInput when it is not a usable vCard."""
     lines = [x for x in vc_unfold(text) if x.strip()]
@@ -532,7 +561,9 @@ def parse_vcard(text):
             v["kind"] = "group" if k == "group" else "org" if k == "org" else "individual"
             if name == "X-ADDRESSBOOKSERVER-KIND":
                 keep.append(line)
-        elif name in ("REV", "PRODID", "BEGIN", "END"):
+        elif name == "REV":
+            v["rev"] = vc_rev(val)           # 2.273.0 C (#3048): the card's own change time (import: newer wins)
+        elif name in ("PRODID", "BEGIN", "END"):
             continue
         else:
             keep.append(line)  # X-ABLabel of a mapped item stays here, with its group, and is written back next to it
@@ -540,6 +571,9 @@ def parse_vcard(text):
     if not v["fn"]:
         v["fn"] = " ".join(x for x in (v["prefix"], v["given"], v["middle"], v["family"], v["suffix"]) if x).strip() or v["org"] or \
             (v["emails"][0]["value"] if v["emails"] else "") or (v["phones"][0]["value"] if v["phones"] else "")
+    # 2.273.0 C (#3048): the columns the card really carries (an import changes only these)
+    names = {p[1] for p, _ in props}
+    v["present"] = {f for prop, fs in VC_PRESENT.items() if prop in names for f in fs} - ({"photo"} if not v["photo"] else set())
     extra = "\n".join(keep)
     if len(extra) > EXTRA_MAX:
         extra = extra[:EXTRA_MAX].rsplit("\n", 1)[0]
@@ -1032,6 +1066,27 @@ def split_vcards(text):
 IMPORT_BATCH = 200
 
 
+def _imp_differs(k, new, old):
+    """2.273.0 C (#3048): a card's column differs from the stored one (lists compared by content, empty keys left out)."""
+    if k in ("emails", "phones", "addresses", "urls", "groups"):
+        def norm(x):
+            return [({a: b for a, b in it.items() if b not in ("", None, [], False)} if isinstance(it, dict) else it) for it in _jl(x)]
+        return norm(new) != norm(old)
+    return (new or "") != (old or "")
+
+
+def _imp_newer_here(rev, old):
+    """2.273.0 F2 (#3048): the stored contact is newer than a card with this REV. With the import marker (imp_at / imp_rev of the
+    last file import) the own import write does not count as a change here: newer = changed here after that import and after
+    the REV, or the card is older than the last imported one. Without a marker: updated_at against the REV (as before)."""
+    upd = str(old["updated_at"] or "")
+    if old["imp_at"] is None:
+        return rev < upd[:19]
+    if old["imp_rev"] and rev < old["imp_rev"]:
+        return True
+    return upd > old["imp_at"] and rev < upd[:19]
+
+
 def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0):
     """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
     2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
@@ -1040,6 +1095,7 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
     2.47.3 (#1738): photos=N (seconds of budget; only the file import) fetches PHOTO links of Google's image server; an existing
     contact that already has a picture keeps it, so importing the same file again only adds the missing ones."""
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
+    kept = 0                                 # 2.273.0 C (#3048): contacts changed here after the card's REV (not overwritten)
     cards = split_vcards(text) if cards is None else cards
     bk = c.execute("SELECT occ_list_id, src_id FROM books WHERE id=?", (book_id,)).fetchone()
     bulk = {"occ": bool(bk and bk["occ_list_id"] and not bk["src_id"])}
@@ -1074,10 +1130,11 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             continue
         if not v["uid"]:
             v["uid"] = "import-" + hashlib.sha1((v["fn"] + "|" + json.dumps(v["emails"])).encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
-        old = c.execute("SELECT id, src_digest, photo, deleted_at FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
+        old = c.execute("SELECT * FROM contacts WHERE book_id=? AND uid=?", (book_id, v["uid"])).fetchone()
         if photos and not v["photo"] and v.get("photo_url"):
             v["photo"] = (old["photo"] if old else "") or (photo_fetch(v["photo_url"]) if time.monotonic() < t_photos else "")
             if v["photo"]:  # the link is replaced by the picture (it would be sent twice otherwise)
+                v["present"].add("photo")    # 2.273.0 F2 (#3048): the fetched picture is part of the card (an import keeps it)
                 v["extra"] = "\n".join(x for x in v["extra"].split("\n") if not (x.upper().startswith("PHOTO") and v["photo_url"] in x))
         if old and src_digest and old["src_digest"] == dig and not old["deleted_at"]:
             res["unchanged"] += 1
@@ -1091,12 +1148,29 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
         if (not old or back) and have >= CONTACTS_PER_BOOK:
             flush(i)  # what is stored so far stays (batch) / is committed by the caller
             raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
-        contact_store(c, uid, book_id, f, cid=old["id"] if old else None, uid_=v["uid"], extra=v["extra"], version=v["version"],
-                      src_digest=dig if src_digest else None, bulk=bulk)
+        ext = v["extra"]
+        if old and not back and not src_digest:  # 2.272.0 E1: a contact back from the trash is written whole (as a new one)
+            # 2.273.0 C (#3048): a file import changes only the columns the card carries (an old export without a note keeps
+            # the note); a contact changed here after the card's REV keeps its values and is counted (kept_newer)
+            f = {k: x for k, x in f.items() if k in v["present"] and _imp_differs(k, x, old[k])}
+            ext = v["extra"] if v["extra"] and v["extra"] != (old["extra"] or "") else None
+            if f or ext is not None:
+                if v.get("rev") and _imp_newer_here(v["rev"], old):
+                    kept += 1
+                    continue
+            else:
+                res["updated"] += 1          # the same values: counted as before, nothing written
+                continue
+        cid = contact_store(c, uid, book_id, f, cid=old["id"] if old else None, uid_=v["uid"], extra=ext, version=v["version"],
+                            src_digest=dig if src_digest else None, bulk=bulk)
+        if not src_digest:  # 2.273.0 F2 (#3048): the import marker (this write is not a change here)
+            c.execute("UPDATE contacts SET imp_at=updated_at, imp_rev=? WHERE id=?", (v.get("rev") or "", cid))
         have += 0 if old and not back else 1
         dirty = True
         res["updated" if old and not back else "created"] += 1
     flush(min(len(cards), CONTACTS_PER_BOOK))
+    if kept:
+        res["kept_newer"] = kept
     return res
 
 

@@ -29,13 +29,14 @@ from ..core.access import Denied, list_role
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
-from .rights import LV, NO_RIGHT, ofr_admin_or, ofr_allows, ofr_groups_of, ofr_rights
+from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
@@ -50,6 +51,7 @@ NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#office/letters/\d{1,12}
 OFA_RULES = N_("Drafts only: a person reserves the number, finalises, sends and books. Free positions, other prices and discounts are marked.")
 OFA_OFF = N_("This agent may not work in the office (its switch “May draft office documents” is off)")
 OFA_NO_AREA = N_("The office rights of this agent do not include this area (office settings, rights)")  # 2.187.0 C (#2476)
+OFA_NOT_ASKED = N_("requested_by: this person has not asked the agent for anything lately (chat, mention, a request in the app)")  # 2.223.2 B (#2862)
 OFA_PRIVACY_OFF = N_("Agents may not read the office data of this area (switch in the office settings)")
 
 
@@ -71,13 +73,19 @@ OFA_TARGET_AREA = {"services": "services", "texts": "texts", "contracts": "contr
                    "payment": "bank", "leads": "pipeline", "letter": "letters"}
 
 
+# 2.223.2 B (#2862): what an organisation's agent without a row in the office groups reaches with its switch office_drafts
+OFA_LEGACY_AREAS = (None, "offers", "services", "texts", "contracts")
+
+
 def ofa_agent_on(c, a, oid, area=None, level="view"):
     """2.187.0 C (#2476): may agent row a work in office area oid (area: in that area with the level; None: in any area)?
     An agent with a row in the area's office groups: the groups decide (none = no office access, never "rights"); without
     a row: its switch office_drafts as before 2.187 (agents made since start with the switch off = no office access)."""
     aid = a["user_id"]
     if not ofr_groups_of(c, oid, aid):
-        return bool(a["office_drafts"])
+        # 2.223.2 B (#2862): in an organisation the switch alone opens only the quotes' scope of before 2.187 (no letters,
+        # bank, pipeline: those need a group); a personal office's own agent as before
+        return bool(a["office_drafts"]) and (area in OFA_LEGACY_AREAS or pb_owner(c, oid) is not None)
     r = ofr_rights(c, aid, oid)
     if r is None:
         return False
@@ -133,9 +141,9 @@ def _as_person(c, uid):
 def _v1ctx(c, rb=None, write=False, target="office", area=None):
     """-> (aid, oid, uid) for an agent's office request; 403 without the scope's switches, 400 / 404 for a wrong person.
     Logs the request (one line). 2.187.0 C (#2476): the agent's office groups (ofa_agent_on) and the person's own ones
-    (rights.ofr_allows) must both allow the area (area: by the target, OFA_TARGET_AREA; "office": any area) -- an agent
-    never gets more than the person it acts for."""
-    from ..agents.core import agent_row, agent_shares, need_agent
+    (rights.office_can; 2.223.2 B: also for "Previous access") must both allow the area (area: by the target, OFA_TARGET_AREA;
+    "office": any area) -- an agent never gets more than the person it acts for."""
+    from ..agents.core import agent_asked_by, agent_row, agent_shares, need_agent
     aid = need_agent()
     a = agent_row(c, aid)
     area = area or OFA_TARGET_AREA.get(target)
@@ -146,7 +154,7 @@ def _v1ctx(c, rb=None, write=False, target="office", area=None):
     if not oid:
         raise Denied(403, tr("This agent has no office area (its workspace or its owner's personal office)"))
     if not ofa_agent_on(c, a, oid, area, level):
-        raise Denied(403, tr(OFA_NO_AREA if ofr_groups_of(c, oid, aid) else OFA_OFF))
+        raise Denied(403, tr(OFA_NO_AREA if ofr_groups_of(c, oid, aid) or a["office_drafts"] else OFA_OFF))
     if rb not in (None, "", 0, "0"):
         try:
             uid = int(rb)
@@ -155,13 +163,15 @@ def _v1ctx(c, rb=None, write=False, target="office", area=None):
         u = c.execute("SELECT kind, kid, disabled FROM users WHERE id=?", (uid,)).fetchone()
         if not u or u["kind"] != "user" or u["kid"] or u["disabled"] or not agent_shares(c, aid, uid):
             raise Denied(404)
+        if uid != a["owner_id"] and not agent_asked_by(c, aid, uid):  # 2.223.2 B (#2862): only a person who asked the agent
+            raise Denied(403, tr(OFA_NOT_ASKED))
     elif a["owner_id"]:
         uid = a["owner_id"]
     else:
         raise BadInput(tr("requested_by is needed: the person this is for"))
     if office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise Denied(403, tr("This person does not work in this office"))
-    if area and not ofr_allows(c, uid, oid, area, level):
+    if area and not office_can(c, uid, oid, area, level):  # 2.223.2 B (#2862): previous access too (a member: no bank)
         raise Denied(403, tr(NO_RIGHT))
     _as_person(c, uid)
     if not office_settings(c, oid).get("agents_read"):
@@ -419,7 +429,7 @@ def ofa_offer_accepted(c, oid, did):
             ids = [aid for aid in ids if not own.get(aid) or (office_role(c, own[aid], oid) in ("admin", "member") and office_on(c, own[aid]))]
     if not ids:
         return
-    from ..agents.core import agent_emit
+    from ..agents.core import agent_emit, agent_row
     r = c.execute("SELECT id, number, client_id, list_id, project_title, currency, totals FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
     try:
         t = json.loads(r["totals"] or "{}")
@@ -428,7 +438,14 @@ def ofa_offer_accepted(c, oid, did):
     data = {"doc_id": r["id"], "number": r["number"], "title": r["project_title"], "client_id": r["client_id"], "list_id": r["list_id"],
             "net": t.get("net"), "gross": t.get("gross"), "currency": r["currency"]}
     for aid in ids:
-        agent_emit(c, aid, "offer_accepted", data, actor=None)
+        sees = None
+        with system_ctx(c):  # 2.223.7 C (#2670): the agent's office groups and project shares (structure), whoever accepts
+            a = agent_row(c, aid)
+            if a and ofa_agent_on(c, a, oid, "offers", "view") and ofa_doc_in_lists(c, aid, r):
+                sees = bool(r["list_id"]) and _agent_sees(c, aid, r["list_id"])
+        if sees is None:
+            continue  # 2.223.7 C (#2670): only agents whose office groups give them offers, within their list restriction
+        agent_emit(c, aid, "offer_accepted", dict(data, list_id=r["list_id"] if sees else None), actor=None)
 
 
 # ---------------------------------------------------------------- agents: reading (scope office)
@@ -875,7 +892,7 @@ def ofa_agent_patch(aid):
         c.execute("UPDATE agents SET office_drafts=? WHERE user_id=?", (1 if v else 0, aid))
     from .ledger import ofx_log
     ofx_log(c, oid, "update", target="agent", detail={"agent": aid, "before": {"office_drafts": int(a["office_drafts"] or 0)}, "after": {"office_drafts": int(v)}})
-    print("agent", aid, "office drafts", "on" if v else "off", "by", g.user["username"], flush=True)
+    print("agent", aid, "office drafts", "on" if v else "off", "by", login_log_who(g.user), flush=True)
     bump(c)
     c.commit()
     return jsonify(office_drafts=v)

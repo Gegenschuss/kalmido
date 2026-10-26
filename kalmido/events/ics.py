@@ -496,22 +496,53 @@ def atts_resolve(c, uid, raw, eid=None, cal_id=None):
     return out
 
 
-def store_parsed(c, uid, cal_id, v, eid=None, href=None, keep_attendees=False):
-    """Stores read_vevent() values as a new event (eid None) or into an existing one. Returns the id. keep_attendees: the
-    existing event's attendees stay as they are (2.144.5 B, #2379: a CalDAV client that never writes ATTENDEE)."""
+def _parsed_cols(c, uid, v):
+    """The event columns of read_vevent() values (store_parsed; 2.273.0 C #3048: the import compares them first)."""
     f = {k: v[k] for k in ("title", "location", "description", "all_day", "start", "end", "tz", "rrule", "exdates", "overrides",
                            "reminders", "status", "busy", "url", "extra")}
     me_ = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     if me_ and me_[0]:  # the writer's own address as organiser: Kalmido writes its own (no account e-mail reaches others)
         f["extra"] = "\n".join(x for x in f["extra"].split("\n")
                                if not (_prop_name(x) == "ORGANIZER" and x.split(":", 1)[-1].strip().lower() == "mailto:" + me_[0].lower()))
+    return f
+
+
+def store_parsed(c, uid, cal_id, v, eid=None, href=None, keep_attendees=False):
+    """Stores read_vevent() values as a new event (eid None) or into an existing one. Returns the id. keep_attendees: the
+    existing event's attendees stay as they are (2.144.5 B, #2379: a CalDAV client that never writes ATTENDEE)."""
+    f = _parsed_cols(c, uid, v)
     atts = None if keep_attendees and eid else atts_resolve(c, uid, v["attendees_raw"], eid, cal_id)
     return ev_store(c, uid, cal_id, f, eid=eid, uid_=v["uid"], href=href, attendees=atts)
 
 
+def _ics_mod(comp):
+    """2.273.0 C (#3048): LAST-MODIFIED of a VEVENT as 'YYYY-MM-DDTHH:MM:SS' (UTC) or ''."""
+    p = comp.get("LAST-MODIFIED")
+    dt = getattr(p, "dt", None)
+    if not dt or not hasattr(dt, "hour"):
+        return ""
+    if dt.tzinfo:
+        dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _ics_differs(c, uid, cal_id, v, old):
+    """2.273.0 C (#3048): the file's event differs from the stored one (columns; attendees only when the file has some)."""
+    f = _parsed_cols(c, uid, v)
+    if any(str(f[k] if f[k] is not None else "") != str(old[k] if old[k] is not None else "") for k in f):
+        return True
+    if not v.get("attendees_raw"):
+        return False
+    key = lambda a: ("u", a["user_id"]) if a.get("user_id") else ("e", str(a.get("email") or "").lower())  # noqa: E731
+    have = {key(dict(a)) for a in c.execute("SELECT user_id, email FROM event_attendees WHERE event_id=?", (old["id"],)).fetchall()}
+    return {key(a) for a in atts_resolve(c, uid, v["attendees_raw"], old["id"], cal_id)} != have
+
+
 # ---- ICS import (a file, e.g. an export of another calendar) into one calendar
 def import_ics(c, uid, cal_id, raw, dry=False):
-    """-> {created, updated, skipped, errors}. The same UID in that calendar is updated (importing twice changes nothing)."""
+    """-> {created, updated, skipped, errors}. The same UID in that calendar is updated (importing twice changes nothing).
+    2.273.0 C (#3048): an event changed here after the file's LAST-MODIFIED stays as it is (counted in kept_newer, only when
+    there is one); a file event without attendees leaves the stored attendees."""
     if len(raw) > IMPORT_MAX_BYTES:
         raise BadInput(tr("The file is too large (at most {0} MB)", IMPORT_MAX_BYTES // (1024 * 1024)))
     try:
@@ -547,11 +578,21 @@ def import_ics(c, uid, cal_id, raw, dry=False):
         except (EvError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
             res["errors"] += 1
             continue
-        old = c.execute("SELECT id FROM events WHERE cal_id=? AND uid=? AND deleted_at IS NULL", (cal_id, v["uid"])).fetchone()
+        old = c.execute("SELECT * FROM events WHERE cal_id=? AND uid=? AND deleted_at IS NULL", (cal_id, v["uid"])).fetchone()
+        if old:
+            lm = _ics_mod(cs[ms[0]] if len(ms) == 1 else cs[0])
+            upd = str(old["updated_at"] or "")  # 2.273.0 F2 (#3048): the own last import write is no change here (imp_at / imp_rev)
+            newer = lm < upd[:19] if old["imp_at"] is None else \
+                bool(old["imp_rev"] and lm < old["imp_rev"]) or (upd > old["imp_at"] and lm < upd[:19])
+            if lm and newer and _ics_differs(c, uid, cal_id, v, old):
+                res["kept_newer"] = res.get("kept_newer", 0) + 1
+                continue
         if dry:
             res["updated" if old else "created"] += 1
             continue
-        store_parsed(c, uid, cal_id, v, eid=old[0] if old else None)
+        eid = store_parsed(c, uid, cal_id, v, eid=old["id"] if old else None, keep_attendees=not v.get("attendees_raw"))
+        c.execute("UPDATE events SET imp_at=updated_at, imp_rev=? WHERE id=?",
+                  (_ics_mod(cs[ms[0]] if len(ms) == 1 else cs[0]), eid))  # 2.273.0 F2 (#3048): the import marker
         res["updated" if old else "created"] += 1
     return res
 

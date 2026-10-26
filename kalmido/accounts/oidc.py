@@ -433,7 +433,7 @@ def oidc_start():
         return _oidc_fail_redirect("failed")
     # 2.144.5 A (#2387): ?stepup=show|new&org=<id>: a real sign-in again before the recovery key of an account without a
     # password is shown (prompt=login, max_age=0; the callback checks auth_time). Only for the person signed in here
-    stepup = request.args.get("stepup") if request.args.get("stepup") in ("show", "new") else ""
+    stepup = request.args.get("stepup") if request.args.get("stepup") in ("show", "new", "su") else ""  # 2.223.2 (#2871): + su
     sess_uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
     if stepup and sess_uid is None:
         return _oidc_fail_redirect("session", True)
@@ -442,7 +442,8 @@ def oidc_start():
     except ValueError:
         so = 0
     soid = 0
-    if stepup:  # 2.144.5 A2 (#2387, review F11): only for an organisation (or the own office) this person administers
+    # 2.223.2 (#2871, review): "su" = the step-up of the person before an admin step (offsite.stepup_need), no organisation
+    if stepup and stepup != "su":  # 2.144.5 A2 (#2387, review F11): only for an organisation (or the own office) this person administers
         from ..core.access import Denied
         from ..core.orgcrypt import _org_admin
         try:

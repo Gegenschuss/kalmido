@@ -10,6 +10,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
+from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
 from ..accounts.colors import ac_assign
 from ..accounts.login import seal, unseal
@@ -123,7 +124,9 @@ def make_agent(c, uid):
     ses_end(c, uid)
     c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
-    c.execute("INSERT INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?) ON CONFLICT DO NOTHING", (uid, iso(now_utc())))
+    # 2.236.0 (#2909): a new agent disturbs only at its limits (agents/workstyle.py WS_NEW)
+    c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,1,'idle',?,?) ON CONFLICT DO NOTHING",
+              (uid, iso(now_utc()), json.dumps(WS_NEW)))
 
 
 def agent_restricted_dict(c, a):
@@ -210,7 +213,7 @@ def admin_agent_create():
         ac_assign(c, [uid])  # 2.47.1 (#1721): its fixed colour (the least used one of its organisation)
         bump(c)
         c.commit()
-        print("agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
+        print("agent", uid, "created by", login_log_who(g.user), flush=True)
         return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok, "webhook_secret": secret}), 201
 
 
@@ -223,8 +226,8 @@ def runtime_set(c, a, rt):
             raise BadInput(tr("Invalid value: {0}", "perm_user"))
     if any(new[k] != cur[k] for k in RUNTIME_DEFAULTS):
         c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(new), a["user_id"]))
-        agent_emit(c, a["user_id"], "runtime_changed", {"runtime": {**new, "reset_seq": cur["reset_seq"], "timezone": str(TZ)}})
-        print("agent", a["user_id"], "runtime", json.dumps(new), "by", g.user["username"], flush=True)
+        agent_emit(c, a["user_id"], "runtime_changed", {"runtime": {**new, **runtime_derived(new), "reset_seq": cur["reset_seq"], "timezone": str(TZ)}})
+        print("agent", a["user_id"], "runtime", json.dumps(new), "by", login_log_who(g.user), flush=True)
     return new
 
 
@@ -248,7 +251,7 @@ def admin_agent_update(aid):
                 return err(tr("Username already exists"), 409)
             if username != a0["username"]:
                 c.execute("UPDATE users SET username=? WHERE id=?", (username, aid))
-                print("agent", aid, "renamed", a0["username"], "->", username, "by", g.user["username"], flush=True)
+                print("agent", aid, "renamed by", login_log_who(g.user), flush=True)
         old_avatar = None
         if "avatar_preset" in b:
             p = b["avatar_preset"]
@@ -260,7 +263,7 @@ def admin_agent_update(aid):
         if "limits" in b:
             lim = usage_limits_clean(b["limits"])
             c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?", (lim, aid))
-            print("agent", aid, "usage limits", lim or "none", "by", g.user["username"], flush=True)
+            print("agent", aid, "usage limits", lim or "none", "by", login_log_who(g.user), flush=True)
         if a0["owner_id"] and a0["owner_id"] != me():  # 2.28.0 (#965): somebody else's personal agent: the kill switch and "Belongs to" only
             extra = sorted(k for k in b if k not in ("enabled", "owner_id"))
             if extra:
@@ -277,7 +280,7 @@ def admin_agent_update(aid):
             try:
                 if "owner_id" in b:
                     agent_owner_set(c, aid, b["owner_id"], True)
-                    print("agent", aid, "belongs to", b["owner_id"] or "team", "(was", a0["owner_id"] or "team", ") set by", g.user["username"], flush=True)
+                    print("agent", aid, "belongs to", b["owner_id"] or "team", "(was", a0["owner_id"] or "team", ") set by", login_log_who(g.user), flush=True)
                 if "org_id" in b:
                     agent_org_set(c, aid, b["org_id"])
             except BadInput:
@@ -305,7 +308,7 @@ def admin_agent_update(aid):
             except (BadInput, Denied):
                 c.rollback()
                 raise
-        if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?, permission_mode?}; only the given keys change
+        if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?, permission_mode?, rotate_size?, rotate_runs?, rotate_idle_min? (2.233.0 B, #3189)}; only the given keys change
             try:
                 runtime_set(c, a0, b["runtime"])
             except BadInput:
@@ -330,7 +333,7 @@ def admin_agent_update(aid):
             agent_enable(c, aid, b["enabled"])
             if a0["owner_id"] and a0["owner_id"] != me():  # 2.7.2 (#420): an admin paused somebody's personal agent: only an admin resumes it
                 c.execute("UPDATE agents SET admin_paused=? WHERE user_id=?", (0 if b["enabled"] else 1, aid))
-            print("agent", aid, "enabled" if b["enabled"] else "PAUSED (kill switch)", "by", g.user["username"], flush=True)
+            print("agent", aid, "enabled" if b["enabled"] else "PAUSED (kill switch)", "by", login_log_who(g.user), flush=True)
         bump(c)
         c.commit()
         if old_avatar and old_avatar != c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]:
@@ -353,7 +356,7 @@ def admin_agent_reset(aid):
                                            "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
         bump(c)
         c.commit()
-        print("agent", aid, "reset", rt["reset_seq"], "by", g.user["username"], flush=True)
+        print("agent", aid, "reset", rt["reset_seq"], "by", login_log_who(g.user), flush=True)
         return jsonify(ok=bool(seq), reset_seq=rt["reset_seq"])
 
 
@@ -468,6 +471,12 @@ def agent_org_set(c, aid, v):
         _agent_org_set(c, aid, v, main_org, user_orgs)
 
 
+def _agent_rgroups_drop(c, oid, aid):
+    """2.223.2 B (#2860): an agent leaving an organisation leaves its office rights groups (coming back = no old groups)."""
+    with system_ctx(c):
+        c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id=?", (oid, aid))
+
+
 def _agent_org_set(c, aid, v, main_org, user_orgs):
     a = agent_row(c, aid)
     if v == "auto":
@@ -478,6 +487,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         c.execute("UPDATE agents SET org_id=NULL, office_drafts=CASE WHEN org_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
+            _agent_rgroups_drop(c, a["org_id"], aid)
             from ..core.access import acx_drop
             acx_drop()
         return
@@ -505,6 +515,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
     # former mode organisation); it leaves the membership of its former workspace
     if a["org_id"] and a["org_id"] != v:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
+        _agent_rgroups_drop(c, a["org_id"], aid)
     from ..accounts.orgs import org_member_add
     org_member_add(c, v, aid)
 
@@ -560,7 +571,7 @@ def admin_agent_policy_put():
                                                                                   + (["-docs:upload"] if k == "tokens" and "docs:upload" not in keep else [])))  # 2.207.0 A (#2763): see scope_cap
     bump(c)
     c.commit()
-    print("agent policy", json.dumps(agent_policy(c)), "by", g.user["username"], flush=True)
+    print("agent policy", json.dumps(agent_policy(c)), "by", login_log_who(g.user), flush=True)
     return jsonify(agent_policy(c))
 
 
@@ -635,7 +646,7 @@ def my_agent_create():
     ac_assign(c, [uid])  # 2.47.1 (#1721)
     bump(c)
     c.commit()
-    print("personal agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
+    print("personal agent", uid, "created by", login_log_who(g.user), flush=True)
     return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok}), 201
 
 
@@ -699,7 +710,7 @@ def my_agent_update(aid):
             c.rollback()
             return err(tr("An admin paused this agent; only an admin can resume it"), 403)
         agent_enable(c, aid, b["enabled"])
-        print("personal agent", aid, "enabled" if b["enabled"] else "PAUSED", "by its owner", g.user["username"], flush=True)
+        print("personal agent", aid, "enabled" if b["enabled"] else "PAUSED", "by its owner", login_log_who(g.user), flush=True)
     bump(c)
     c.commit()
     return jsonify(agent_admin_dict(c, agent_row(c, aid)))
@@ -781,7 +792,7 @@ def my_agent_delete(aid):
     c.commit()
     unlink_files(files)
     avatar_drop_file(aid, a["avatar"])
-    print("personal agent", aid, "deleted by its owner", g.user["username"], flush=True)
+    print("personal agent", aid, "deleted by its owner", login_log_who(g.user), flush=True)
     return jsonify(ok=True)
 
 
@@ -797,5 +808,5 @@ def admin_agent_delete(aid):
         c.commit()
         unlink_files(files)
         avatar_drop_file(aid, a["avatar"])
-        print("agent", aid, "deleted by", g.user["username"], flush=True)
+        print("agent", aid, "deleted by", login_log_who(g.user), flush=True)
         return jsonify(ok=True)

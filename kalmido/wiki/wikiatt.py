@@ -34,7 +34,7 @@ from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_s
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput
 from ..tasks.attachments import file_ext, safe_name, send_stored
-from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_frontmatter, wiki_insert, wiki_need,
+from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
@@ -66,6 +66,7 @@ SVG = "image/svg+xml"
 WKA_URL_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(/api/wiki/files/(\d{1,15})(?:/[^\s()]*)?\)")
 # [[file.pdf]], ![[pic.png]], [[file.pdf|label]] -- and Markdown links / pictures with a relative address
 WKA_WIKILINK_RE = re.compile(r"(!?)\[\[([^\[\]|\n]{1,250}?)(?:\|([^\[\]\n]*))?\]\]")
+WKA_PAGELINK_RE = re.compile(r"\[\[([^\[\]|#\n]{1,1000})((?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]")  # 2.210 A (#2755)
 WKA_MDLINK_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(\s*(<[^<>\n]{1,500}>|[^\s()<>]{1,500}(?:\([^\s()]*\)[^\s()<>]*)*)"
                            r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\s*\)")
 WKA_TMP = os.path.join(ATT_DIR, ".wikitmp")  # the export ZIP while it is written (the backup skips this folder)
@@ -465,6 +466,15 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
     created, updated, skipped, ts = [], [], [], iso_ms(now_utc())
     budget, md_left = [total], [WKA_MD_TOTAL]
     pages, files = [], {}  # pages: (id, folder, path, text) of the new / replaced ones; files: lower path -> (info, name, path)
+    for i in infos:  # 2.210 A (#2755): names stored as UTF-8 without the archive's UTF-8 mark (zipfile reads them as cp437)
+        if not i.flag_bits & 0x800:
+            try:
+                i.filename = i.filename.encode("cp437").decode("utf-8")
+            except UnicodeError:
+                pass
+    # 2.210 A (#2755): too deep / too long paths are shortened (not skipped); short = what was shortened, renamed = old -> new
+    fit = wiki_fit_paths([i.filename for i in infos if file_ext(_wka_nfc(i.filename)) == "md" and "__MACOSX" not in _wka_nfc(i.filename).split("/")])
+    short, renamed = [], {}
 
     def skip(name, why):
         skipped.append({"name": name[:200], "reason": why})
@@ -482,7 +492,10 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                 continue
             folder = "/".join(parts[:-1])  # the page's folder in the archive (its relative links start there)
             try:
-                path = wiki_clean_path(name)
+                path, cutn = fit.get(name) or (None, tr("Invalid value: {0}", "path"))
+                if path is None:
+                    raise BadInput(cutn)
+                path = wiki_clean_path(path)
                 raw = _wka_read(z, i, WIKI_ZIP_FILE_MAX, budget)
                 if raw is None:
                     raise BadInput(tr("Larger than {0} MB", WIKI_ZIP_FILE_MAX // 1_000_000))
@@ -498,6 +511,9 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
             except (zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError, EOFError):
                 skip(name, tr("The file is damaged"))
                 continue
+            if cutn:
+                short.append({"name": name[:200], "path": path})
+                renamed["/".join(wiki_path_parts(name)).lower()] = path
             pid = wiki_insert(c, oid, uid, path, text, ts)
             if pid:
                 created.append(pid)
@@ -562,6 +578,9 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
             if pid not in linked[k]:
                 linked[k].append(pid)
     by_path = {path.lower(): pid for pid, folder, path, text in pages}
+    for o, n in renamed.items():  # 2.210 A (#2755): a file at the archive place of a shortened page still finds it
+        if n.lower() in by_path:
+            by_path.setdefault(o, by_path[n.lower()])
 
     def home(p):
         """The folder of a file without a leading _attachments/ (the export puts a page's files at _attachments/<page>/)."""
@@ -663,6 +682,8 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
             k = resolve(folder, m.group(3))
             return md(k, m.group(1), m.group(2)) if k in stored else m.group(0)
         nb = WKA_MDLINK_RE.sub(ml, WKA_WIKILINK_RE.sub(wl, text))
+        if renamed:  # 2.210 A (#2755): [[links]] to a shortened page get its new name
+            nb = WKA_PAGELINK_RE.sub(lambda m: f"[[{renamed.get('/'.join(wiki_path_parts(m.group(1))).lower(), m.group(1))}{m.group(2)}]]", nb)
         nb = _wka_append(nb, [md(k, True, None) for k in extra.pop(pid, [])])
         if nb != text:
             _wka_save(c, pid, nb, uid, ts)
@@ -676,7 +697,8 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
         c.commit()
     # 2.99.0 A (#2182): skipped stays the list of names (older callers); skipped_detail = {name, reason} for the report
     return {"ok": True, "created": created, "updated": updated, "files": new_ids, "files_n": len(stored),
-            "skipped": [s["name"] for s in skipped][:200], "skipped_detail": skipped[:200], "skipped_n": len(skipped)}
+            "skipped": [s["name"] for s in skipped][:200], "skipped_detail": skipped[:200], "skipped_n": len(skipped),
+            "shortened": short[:200], "shortened_n": len(short)}  # 2.210 A (#2755): [{name, path}] of the shortened names
 
 
 def _wka_lost(c, pid):

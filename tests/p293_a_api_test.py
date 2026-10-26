@@ -161,7 +161,7 @@ check(A.delete(B + f"{TP}/{TT}").ok and TT not in [t["id"] for t in A.get(B + TP
 check(TT in [t["id"] for t in A.get(B + TP + "?archived=1").json()["templates"]], "archived templates on request")
 check(A.post(B + f"{TP}/{TT}/restore").ok and TT in [t["id"] for t in A.get(B + TP).json()["templates"]], "restore (the undo)")
 j = A.get(B + TP).json()
-check(len(j["vars"]) == 10 and j["vars"][0]["key"] == "client.name" and {k["key"] for k in j["kinds"]} == {"contract", "confirmation", "nda", "other", "letter"},  # 2.153.0 (#2028): kind letter
+check(len(j["vars"]) == 13 and j["vars"][0]["key"] == "client.name" and {k["key"] for k in j["kinds"]} == {"contract", "confirmation", "nda", "other", "letter"},  # 2.153.0 (#2028): kind letter
       "the variables and kinds")
 check(Ca.get(B + TP).json()["templates"] == [], "another organisation: its own empty templates")
 
@@ -180,7 +180,7 @@ G = r.json()["id"]
 check(str(sql("SELECT body FROM office_gen_docs WHERE id=?", (G,))[0][0]).startswith("kenc1:"), "the document's text is encrypted at rest")
 pv = A.post(B + GD + "/preview", json={"gen_doc_id": G}).json()
 t = pv["text"]
-check("Vereinbarung Kunde Eins GmbH" in t and "Beispiel Film GmbH, Musterweg 1, 12345 Musterstadt" in t and "Kundenweg 5\n20000 Hamburg" in t  # 2.114.4 (#2280): the client address on own lines
+check("Vereinbarung Kunde Eins GmbH" in t and "Beispiel Film GmbH, Musterweg 1, 12345 Musterstadt" in t and "Kundenweg 5, 20000 Hamburg" in t  # 2.296.0 (#3165): in running text with ", " (alone on its line: own lines, #2280)
       and "Ansprechpartner: Erika Beispiel" in t and "Projekt: Imagefilm Frühling" in t, f"preview: client, company, address, contact, project {t[:300]}")
 check(f"Angebot {OFN['number']} vom" in t and "1.190,00" in t, f"preview: quotation number and total (gross) {OFN.get('number')}")
 check("[{{client.shoesize}}]" in t and pv["missing"] == ["client.shoesize"], f"preview: the unknown variable stays marked {pv['missing']}")
@@ -372,7 +372,8 @@ check(r.status_code == 201 and r.json()["list_name"] == "Dora Projekt", f"person
 GP = r.json()["id"]
 check(str(sql("SELECT body FROM office_gen_docs WHERE id=?", (GP,))[0][0]).startswith("kenc1:"), "personal office: encrypted at rest")
 pv = Do.post(B + GD + "/preview", json={"gen_doc_id": GP}).json()
-check("Privatkunde Eins, Weg 1\n10000 Berlin" in pv["text"] and "Dora Projekt" in pv["text"] and "Dora Film" in pv["text"], "personal office: the preview")
+check("Privatkunde Eins, Weg 1, 10000 Berlin" in pv["text"]  # 2.296.0 (#3165): an address in running text with ", "
+       and "Dora Projekt" in pv["text"] and "Dora Film" in pv["text"], "personal office: the preview")
 F = Do.post(B + f"{GD}/{GP}/final").json()
 check(F["status"] == "final" and F["node_id"], "personal office: finished")
 n = sql("SELECT n.org_id, n.owner_id, p.name FROM fs_nodes n JOIN fs_nodes p ON p.id=n.parent_id WHERE n.id=?", (F["node_id"],))

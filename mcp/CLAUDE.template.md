@@ -128,7 +128,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - End every chat answer with exactly **one** suggestion for the next step as an answer button; never offer one that an
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
   message's buttons stay live: a newer message expires older open ones (2.212.0: per source -- a job's messages only
-  expire that job's buttons, yours only your own; the person's message expires all); take back buttons that are no longer current
+  expire that job's buttons, yours only your own; the person's message expires all; 2.233.0: by default the person keeps
+  them for 24 h as "collected", a press on one comes as `chat_choice` with `collected: true` - an answer to that older
+  question); take back buttons that are no longer current
   with `withdraw_chat_choices`. A host that posts your answer for you (the launcher's event mode, 2.40.0) turns a final
   block ` ```suggest ` (one line per suggestion) into the button. A button holds at most **80 characters**: keep the
   suggestion shorter (a longer one is cut at a word with "…" and the person sends the cut text).
@@ -247,7 +249,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - Coding agents: before you integrate a branch, ask with `request_integration_approval` (source, target, evidence:
   build, start, logs, tests); before a deploy, with `request_deploy_approval` (the approved integrations; open tasks
   tagged `deploy` must be done first). Act only on the reaction event with approval `approved`.
-- A change that belongs to a topic (project) you cannot see: send it with `propose_to_other_topic`; its owner decides.
+- A change that belongs to another topic (a project shared with you): send it with `propose_to_other_topic`; its owner decides.
   Never ask another agent to do it.
 
 ### Coding agents
@@ -320,7 +322,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   group you have none, you never get more than the person in `requested_by`, and you never manage office rights; a `403`
   for an area means: tell the person, do not retry. A month the office has locked (GoBD) refuses a payment suggestion dated in it (409): tell the person instead of
   retrying with another date. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
-  work for; `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
+  work for -- only somebody who asked you (chat, mention, assignment, job, letter request; else 403, 2.223.2); `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
   suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
   2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
@@ -336,6 +338,18 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - If your host knows your plan usage (e.g. Claude Code's status line `rate_limits`), it reports it with
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
+
+### Work style (2.236.0)
+- **Read your work style and keep to it**: `get_agent` gives `work_style` (set by your owner; for a team agent an admin),
+  again with the event `work_style_changed`. Budget (`budget_state`, at the limit Kalmido pauses you): finish the step,
+  report, start nothing new. Outside the work window (`state.working` false) start nothing until `work_resumes_at`. In
+  the quiet window keep working, Kalmido holds the pushes.
+- **Queue**: work on at most `max_parallel` tasks at once (`get_queue`, your order with `set_queue_order`); choose the next
+  task from the queue by `priority_rule`, the owner's rule (it also comes with the event `assigned`).
+- **Reports** as `report_length` / `report_lang` / `report_tables` / `report_jargon` say; results go where `results_to`
+  says (comment, chat or both: the comment + one line in the chat).
+- **Pushes**: with `push` "limits" only a limit disturbs - send such a message (a one-way step, a refusal, a stop, an error)
+  with `limit: true` in `send_chat`. With `next_step` on, end every chat answer with the next step as `next_step` (one button).
 <!-- kalmido-agent-rules:end -->
 
 ### An inquiry becomes a project, setting up (2.51.0)
@@ -372,6 +386,15 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   only: invent nothing (no dates, prices, names or promises that are not in the input), no placeholders for unknown facts,
   in the language of the document (`input.doc.lang`) or `input.lang`. Kalmido sends nothing: the person edits the text and
   takes it over herself or himself.
+### Reading a receipt (2.299.0, job_request kind receipt_read)
+- A person asks you to read a receipt ("Read with an agent"). Open the file itself: `read_file` with `file_id` =
+  `input.document.id` and `as: "base64"` for an image or PDF (`input.document.text` is what the server recognised so far).
+  Kalmido runs no model; you may read the file with a local model on this computer (for example through Ollama).
+- Answer with ONE `submit_proposal`: only values that are on the receipt, at least one -- `supplier`, `vat_id`, `tax_no`,
+  `invoice_no`, `date` (YYYY-MM-DD), `net`, `vat`, `gross` ("12.34"), `vat_pct`, `vat_rates` [{pct, net, vat}], `currency`,
+  `positions` [{text, qty?, net?, vat_pct?}] (at most 100), `category` (one of `input.categories` when one fits), `account`;
+  `bank_tx` only an id of `input.bank` that clearly fits. Unknown fields are refused. Never guess a value; the person
+  checks the values and takes them over, you change nothing yourself.
 ### Ideas for a branch of the mind map (2.156.0, job_request kind ideas)
 - A person asks you for ideas on one branch of a project's mind map ("Add ideas"). The input is all you get: `input.list`
   (the project's name), `input.path` (the titles from the top of the map down to the branch; empty = the project itself),
@@ -483,7 +506,8 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
   the folder with you (never through "every member" access); `read_file` reads one where its area offers a file (`404`:
   no access, `409`: no file). A folder share never gives an office action (release, send, payments, lock, export), nor
   the right to move such a node or a folder holding one, or to put it into the trash (`403`).
-  A quotation or invoice (`ref_kind: "office_doc"`) reads as its PDF (a finalised one: the stored original); you only read it.
+  A quotation or invoice (`ref_kind: "office_doc"`) reads as its PDF (a finalised one: the stored original); you only read it,
+  and only with the scope `office` and the office switches on (2.238.0; a table needs `sheets:read`), else the node is hidden.
 
 ### Tables (2.89.0)
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
@@ -575,6 +599,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   (kind `cleanup`, 2.39.0: tidy up a project - send only ONE bundled proposal with `submit_proposal`, never change
   the tasks yourself; follow the project's playbook)
 - `runtime_changed`: an admin changed your runtime settings
+- `work_style_changed`: your owner (an admin for a team agent) changed your work style (2.236.0: read `work_style` anew)
 - `reset`: an admin pressed Reset now (start a fresh session)
 - `team_message`: someone @mentioned you in a project's team chat (2.46.1: or any person's message there in a project where you listen in, `mentioned: false`)
 - `task_added`: a task was created in / moved into a project where you listen in
@@ -589,6 +614,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
+  (or office groups with offers); `list_id` is null when the project is not shared with you
 - `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
 - `sprint_started` / `sprint_closed`: a sprint of a project shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
@@ -623,7 +649,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
-`get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`,
+`get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_queue`,
 `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
 `ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
@@ -644,7 +670,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
-`set_project_overview`, `set_project_status`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
+`set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
