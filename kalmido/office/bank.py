@@ -647,8 +647,10 @@ def bnk_match(tid):
             raise Denied(409, tr("Only money received can pay an invoice"))
         if t["day"] > local_now().date().isoformat():  # a booking marked in advance (value date tomorrow) cannot pay yet
             raise Denied(409, tr("The booking lies in the future, match it on its day"))
-        if bnk_split_live(c, oid, tid):  # 2.355.0 B (#2843): parts of an earlier split are still booked
-            raise Denied(409, tr("Payments of this booking are still on invoices; take them back there first"))
+        live = bnk_split_live(c, oid, tid)
+        if live:  # 2.355.0 B (#2843): parts of an earlier split are still booked; 2.355.0 E (#2843): the answer names the invoices
+            nums = ", ".join(dict.fromkeys(doc_row(c, oid, p["doc_id"])["number"] or str(p["doc_id"]) for p in live))
+            raise Denied(409, tr("Payments of this booking are still on invoices ({0}); take them back there first", nums))
         parts = bnk_parts(b, t) if split else [(mid, t["amount"])]
         pids = []
         for did, a in parts:

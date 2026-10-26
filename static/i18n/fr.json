@@ -14428,7 +14428,6 @@
   "This entry booked a payment on the invoice: cancel it and enter it anew.": "Cette écriture a enregistré un paiement sur la facture : annule-la et saisis-la à nouveau.",
   "Cash book no. {0}": "Livre de caisse n° {0}",
   "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Ton bureau est verrouillé jusqu'à {0} : l'organisation sera aussi verrouillée jusqu'à {0} (y compris ses propres données de ces mois)",
-  "Payments of this booking are still on invoices; take them back there first": "Des paiements de cette opération figurent encore sur des factures ; annule-les d'abord là-bas",
   "The parts are more than the booking": "Les parts dépassent le montant de l'opération",
   "overpaid {0}": "trop-perçu {0}",
   "Split across invoices…": "Répartir sur plusieurs factures…",
@@ -14439,5 +14438,8 @@
   "A final invoice is only made from its quotation": "Une facture finale ne se crée qu'à partir de son devis",
   "Marked as paid by hand": "Marquée comme payée à la main",
   "To pay back: {0}": "À rembourser : {0}",
-  "To pay back": "À rembourser"
+  "To pay back": "À rembourser",
+  "Payments of this booking are still on invoices ({0}); take them back there first": "Des paiements de cette opération figurent encore sur des factures ({0}) ; annule-les d'abord là-bas",
+  "Payment of {0}, already in a DATEV export": "Paiement du {0}, déjà dans un export DATEV",
+  "In the organisation up to {0}: {1}": "Dans l'organisation jusqu'à {0} : {1}"
 }

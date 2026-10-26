@@ -14428,7 +14428,6 @@
   "This entry booked a payment on the invoice: cancel it and enter it anew.": "Dieser Eintrag hat eine Zahlung auf der Rechnung gebucht: storniere ihn und erfasse ihn neu.",
   "Cash book no. {0}": "Kassenbuch Nr. {0}",
   "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Dein Büro ist bis {0} festgeschrieben: die Organisation wird ebenfalls bis {0} festgeschrieben (auch ihre eigenen Daten dieser Monate)",
-  "Payments of this booking are still on invoices; take them back there first": "Zahlungen aus dieser Buchung stehen noch auf Rechnungen; nimm sie dort zuerst zurück",
   "The parts are more than the booking": "Die Teile ergeben mehr als die Buchung",
   "overpaid {0}": "überzahlt {0}",
   "Split across invoices…": "Auf mehrere Rechnungen aufteilen…",
@@ -14439,5 +14438,8 @@
   "A final invoice is only made from its quotation": "Eine Schlussrechnung entsteht nur aus ihrem Angebot",
   "Marked as paid by hand": "Von Hand als bezahlt markiert",
   "To pay back: {0}": "Zu erstatten: {0}",
-  "To pay back": "Zu erstatten"
+  "To pay back": "Zu erstatten",
+  "Payments of this booking are still on invoices ({0}); take them back there first": "Zahlungen aus dieser Buchung stehen noch auf Rechnungen ({0}); nimm sie dort zuerst zurück",
+  "Payment of {0}, already in a DATEV export": "Zahlung vom {0}, schon in einem DATEV-Export",
+  "In the organisation up to {0}: {1}": "In der Organisation bis {0}: {1}"
 }

@@ -14428,7 +14428,6 @@
   "This entry booked a payment on the invoice: cancel it and enter it anew.": "Deze boeking heeft een betaling op de factuur geboekt: storneer haar en voer haar opnieuw in.",
   "Cash book no. {0}": "Kasboek nr. {0}",
   "Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)": "Je kantoor is vergrendeld tot {0}: de organisatie wordt ook vergrendeld tot {0} (ook haar eigen gegevens van die maanden)",
-  "Payments of this booking are still on invoices; take them back there first": "Betalingen uit deze boeking staan nog op facturen; neem ze daar eerst terug",
   "The parts are more than the booking": "De delen zijn meer dan de boeking",
   "overpaid {0}": "te veel betaald {0}",
   "Split across invoices…": "Verdelen over facturen…",
@@ -14439,5 +14438,8 @@
   "A final invoice is only made from its quotation": "Een eindfactuur ontstaat alleen uit de bijbehorende offerte",
   "Marked as paid by hand": "Met de hand als betaald gemarkeerd",
   "To pay back: {0}": "Terug te betalen: {0}",
-  "To pay back": "Terug te betalen"
+  "To pay back": "Terug te betalen",
+  "Payments of this booking are still on invoices ({0}); take them back there first": "Betalingen uit deze boeking staan nog op facturen ({0}); neem ze daar eerst terug",
+  "Payment of {0}, already in a DATEV export": "Betaling van {0}, al in een DATEV-export",
+  "In the organisation up to {0}: {1}": "In de organisatie tot en met {0}: {1}"
 }
