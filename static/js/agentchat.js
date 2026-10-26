@@ -306,7 +306,8 @@ async function chatChoice(mid, cid, send = false) {
     acsug_put(mid, r);  // 2.233.0 A (#2848): it leaves the shelf
     if (apvHeld(m)) { S.chat.apv = (S.chat.apv || []).filter(x => x.id !== mid); const a = agentById(S.chat.aid); if (a && a.approvals_open) { a.approvals_open--; renderTop?.(); renderSide(); chatFabDraw(); } }  // 2.36.2 (#1123): the sidebar's "N approvals open" at once
     chatPatch({});
-    if (apvHeld(m)) $('#chat-in')?.focus({preventScroll: true});  // the buttons are gone: the focus goes back to the box
+    if (kbd_close('agent')) $('#chat-in')?.blur();  // 2.235.0 D (#2899)
+    else if (apvHeld(m)) $('#chat-in')?.focus({preventScroll: true});  // the buttons are gone: the focus goes back to the box
   } catch { chatLoad(); }  // api() said it ("This suggestion is no longer current"); the buttons follow the server
 }
 // 2.39.1 (#1224): a suggestion into the message box: the pen, right click / Alt+click (desktop), a long press (touch). Text
@@ -904,7 +905,8 @@ async function chatSend() {
   // its focus where it had it (a tap on Send does not take it, see below), a desktop always types on
   const ci = $('#chat-in');
   if (sent) autosize(ci);
-  if (ci && (hadF || !isTouch())) ci.focus({preventScroll: true});
+  if (ci && kbd_close('agent')) ci.blur();  // 2.235.0 D (#2899)
+  else if (ci && (hadF || !isTouch())) ci.focus({preventScroll: true});
 }
 // 2.13.2 (#478 N9): "New message ↓" and Send do not take the focus from the chat box (the phone keyboard stays up)
 for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (document.activeElement?.id === 'chat-in' && e.target.closest?.('#chat-new, [data-act="chat-send"], .chclip')) e.preventDefault(); });

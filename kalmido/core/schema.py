@@ -4014,6 +4014,7 @@ USER_DEFAULTS = {
     # organisation(s) | all = also my private and subscribed calendars | off = nothing (shown as unknown)
     "freebusy_share": "org",
     # 2.240.0 (#2886): '1' = load YouTube / Vimeo players in video reviews without asking each time (remembered per person)
+    "chat_kbd_agent": "1", "chat_kbd_team": "1",  # 2.235.0 D (#2899): phones: the keyboard closes after sending
     "video_ext_ok": "0",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched

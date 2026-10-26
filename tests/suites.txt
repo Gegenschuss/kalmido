@@ -2199,3 +2199,5 @@ shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new sui
 fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO_TEST_DATA"
 # 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar": off = icons only, narrower bar, names as title / aria-label (computer + phone, account)
 fresh; run p2319_b_rail_labels_ui node p2319_b_rail_labels_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 D (#2899): phones close the keyboard after sending (settings chat_kbd_agent / chat_kbd_team); freelancer-matrix: agents
+fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"

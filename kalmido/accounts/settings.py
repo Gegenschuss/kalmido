@@ -58,6 +58,7 @@ SETTINGS_FLAGS += ("assistant_on",)  # 2.75.0 A (#1411): the built-in assistant 
 SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over midnight count on each day (personal/timesheet.py)
 SETTINGS_FLAGS += ("chat_read_receipts",)  # 2.139.0 A (#2129): read receipts in the team chat (collab/teamchat.py)
 SETTINGS_FLAGS += ("cal_holidays", "cal_abs", "cal_abs_team")  # 2.155.0 B (#2076): holidays / absences in the calendar (hub/abscal.py)
+SETTINGS_FLAGS += ("chat_kbd_agent", "chat_kbd_team")  # 2.235.0 D (#2899): close the phone keyboard after sending (agent chat / team chat)
 SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo players without asking (static/js/videorev.js)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),

@@ -14318,5 +14318,8 @@
   "More…": "Meer…",
   "Documents stay in their own area": "Documenten blijven in hun eigen onderdeel",
   "Sent letter": "Verzonden brief",
-  "Shared through a folder": "Gedeeld via een map"
+  "Shared through a folder": "Gedeeld via een map",
+  "Close the keyboard after sending (agent chat)": "Toetsenbord sluiten na verzenden (agentchat)",
+  "Close the keyboard after sending (team chat)": "Toetsenbord sluiten na verzenden (teamchat)",
+  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Op een telefoon sluit het toetsenbord na het verzenden van een bericht of een druk op een suggestie, zodat het antwoord het hele scherm heeft. Tikken in het veld opent het weer."
 }

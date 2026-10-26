@@ -14318,5 +14318,8 @@
   "More…": "Mehr…",
   "Documents stay in their own area": "Dokumente bleiben in ihrem Bereich",
   "Sent letter": "Versendeter Brief",
-  "Shared through a folder": "Über einen Ordner geteilt"
+  "Shared through a folder": "Über einen Ordner geteilt",
+  "Close the keyboard after sending (agent chat)": "Tastatur nach dem Senden schließen (Agenten-Chat)",
+  "Close the keyboard after sending (team chat)": "Tastatur nach dem Senden schließen (Team-Chat)",
+  "On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.": "Auf dem Handy schließt sich die Tastatur nach dem Senden oder nach Druck auf einen Vorschlag, damit die Antwort den ganzen Bildschirm hat. Tippen ins Feld holt sie zurück."
 }
