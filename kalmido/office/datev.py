@@ -26,15 +26,24 @@ from ..core.db import db, local_now
 from ..core.errors import BadInput
 from .calc import dec, money
 from .homecur import hc_home
+from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
 
 # tax cases -> the default revenue accounts per chart (automatic accounts: DATEV adds the VAT itself, no tax key needed)
-DX_CASES = ("standard", "reduced", "exempt", "reverse", "abroad", "small")
+# 2.355.0 C (#2840): + the cash discounts granted (Gewaehrte Skonti) at 19 % / 7 % / without VAT. 2.355.0 C (#2844): reverse =
+# services to EU businesses (8336 / 4336, was 8337), reverse_dom = section 13b at home (8337 / 4337), eu_goods = goods to EU
+# businesses (8125 / 4125), export = exports of goods (8120 / 4120); the tax advisor checks (#1153)
+DX_CASES = ("standard", "reduced", "exempt", "reverse", "abroad", "small", "skonto_standard", "skonto_reduced", "skonto_other",
+            "reverse_dom", "eu_goods", "export")
 DX_CHARTS = {
-    "SKR03": {"standard": "8400", "reduced": "8300", "exempt": "8100", "reverse": "8337", "abroad": "8338", "small": "8195",
+    "SKR03": {"standard": "8400", "reduced": "8300", "exempt": "8100", "reverse": "8336", "abroad": "8338", "small": "8195",
+              "skonto_standard": "8736", "skonto_reduced": "8731", "skonto_other": "8730",
+              "reverse_dom": "8337", "eu_goods": "8125", "export": "8120",
               "debtor": "10000", "bank": "1200", "cash": "1000"},
-    "SKR04": {"standard": "4400", "reduced": "4300", "exempt": "4100", "reverse": "4337", "abroad": "4338", "small": "4185",
+    "SKR04": {"standard": "4400", "reduced": "4300", "exempt": "4100", "reverse": "4336", "abroad": "4338", "small": "4185",
+              "skonto_standard": "4736", "skonto_reduced": "4731", "skonto_other": "4730",
+              "reverse_dom": "4337", "eu_goods": "4125", "export": "4120",
               "debtor": "10000", "bank": "1800", "cash": "1600"},
 }
 DX_DEFAULTS = {"advisor_no": "", "client_no": "", "fy_start": 1, "acct_len": 4, "chart": "SKR03",
@@ -219,7 +228,7 @@ def _case(r, s):
     if (r["vat_mode"] or "vat") != "novat":
         return None
     note = (r["vat_note"] if "vat_note" in r.keys() else "") or ""
-    if note in ("reverse", "abroad", "small"):
+    if note in ("reverse", "abroad", "small", "eu_goods", "export"):  # 2.355.0 C (#2844): + goods
         return note
     return "exempt"  # 2.47.3 (review S2): the document's own note decides, never today's switch (documents already exported keep their account)
 
@@ -230,7 +239,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     s = s if s is not None else office_settings(c, oid)
     st = dx_settings(s)
     home = hc_home(s)  # 2.189.0 B (#2475): lines in the home currency (DATEV itself only for EUR, dx_need_eur)
-    out = []
+    from .books import bk_reverse_dom  # 2.355.0 C (#2844)
+    out, memo = [], {}
     docs = c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? AND d.kind IN ('invoice','credit') "
                      "AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? AND d.trial=0 "
@@ -244,6 +254,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
         text = (r["number"] + " " + name).strip()[:60]
         perf = _ddmmyyyy(r["service_to"] or r["date"] or "") if "service_to" in r.keys() else ""
         case = _case(r, s)
+        if case == "reverse" and bk_reverse_dom(c, oid, r, memo):
+            case = "reverse_dom"  # 2.355.0 C (#2844): section 13b at home
         parts = []  # (case, gross amount in the document's currency)
         if case:
             parts.append((case, dec(t.get("gross") or 0)))
@@ -269,6 +281,29 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                         "Belegdatum": _ddmm(r["date"]), "Belegfeld 1": dx_beleg(r["number"]),
                         "Buchungstext": text, "Leistungsdatum": perf, "Festschreibung": "0",
                         "_date": r["date"], "_kind": r["kind"], "_doc": r["id"]})  # 2.148.0 B (#2470): _doc = its receipt image
+    # 2.355.0 C (#2840): a cash discount taken = a reduction of the revenue per tax rate (section 17 UStG) on the day of the
+    # payment, debtor against the discount account of that rate -- the debtor balances with the payment
+    for r, sk in abs_skonto_rows(c, oid, d_from, d_to):
+        t = _j(r["totals"])
+        fx, case = _fx(r, t, home), _case(r, s)
+        parts = [("skonto_other", Decimal(1))]
+        if not case:
+            lines = [(tl.get("rate_key") or "standard", dec(tl.get("base") or 0) + dec(tl.get("amount") or 0)) for tl in t.get("tax_lines") or []]
+            tot = sum((a for _, a in lines), Decimal(0))
+            if lines and tot:
+                parts = [("skonto_" + k if k in ("standard", "reduced") else "skonto_other", a / tot) for k, a in lines]
+        total = money(sk["amount"] / fx)
+        conv = [(k, money(total * sh)) for k, sh in parts]
+        conv[-1] = (conv[-1][0], conv[-1][1] + total - sum((a for _, a in conv), Decimal(0)))  # the cents of the split on the last line
+        name = (_j(r["recipient"]).get("name") or r["dx_client_name"] or "").strip()
+        for k, amount in conv:
+            if amount == 0:
+                continue
+            out.append({"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "H", "WKZ Umsatz": home,
+                        "Konto": dx_debtor(st, r81b_customer_no(r)), "Gegenkonto (ohne BU-Schlüssel)": _acct(st, k), "BU-Schlüssel": st["bu"].get(k, ""),
+                        "Belegdatum": _ddmm(sk["day"]), "Belegfeld 1": dx_beleg(r["number"]),
+                        "Buchungstext": ("Skonto " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
+                        "_date": sk["day"], "_kind": "skonto"})
     pays = c.execute("SELECT p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "

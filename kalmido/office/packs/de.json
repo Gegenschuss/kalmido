@@ -365,6 +365,14 @@
       "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren, § 13b UStG).",
       "en": "VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC)."
     },
+    "vat_note_eu_goods": {
+      "de": "Steuerfreie innergemeinschaftliche Lieferung (§ 4 Nr. 1b i. V. m. § 6a UStG).",
+      "en": "Tax-exempt intra-Community supply of goods (Art. 138 Directive 2006/112/EC)."
+    },
+    "vat_note_export": {
+      "de": "Steuerfreie Ausfuhrlieferung (§ 4 Nr. 1a i. V. m. § 6 UStG).",
+      "en": "Tax-exempt export of goods (Art. 146 Directive 2006/112/EC)."
+    },
     "vat_note_abroad": {
       "de": "Nicht im Inland steuerbar.",
       "en": "Not taxable in Germany."

@@ -66,11 +66,15 @@ COUNTRY_WORDS = {"deutschland": "DE", "germany": "DE", "österreich": "AT", "aus
                  "polen": "PL", "poland": "PL", "dänemark": "DK", "denmark": "DK", "vereinigtes königreich": "GB", "united kingdom": "GB"}
 # tax category by the document's VAT note (vat_mode novat); S for taxed documents
 # 2.296.0 B (#3173): "abroad" (service not taxable domestically) = O, not G (export of goods); see _doc_cat for the fallback
-VAT_CATEGORY = {"reverse": ("AE", "VATEX-EU-AE"), "abroad": ("O", "VATEX-EU-O"), "small": ("E", "")}
+# 2.355.0 C (#2844): + "eu_goods" (intra-Community supply of goods) = K, "export" (export of goods to a third country) = G
+VAT_CATEGORY = {"reverse": ("AE", "VATEX-EU-AE"), "abroad": ("O", "VATEX-EU-O"), "small": ("E", ""),
+                "eu_goods": ("K", "VATEX-EU-IC"), "export": ("G", "VATEX-EU-G")}
 # 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en table; the words stay the same)
 EXEMPT_TEXT = {"reverse": N_("Reverse charge: VAT liability of the recipient.|einvoice"),
                "abroad": N_("Not taxable domestically (export / service outside the EU).|einvoice"),
                "small": N_("No VAT charged under section 19 of the German VAT Act (small business).|einvoice"),
+               "eu_goods": N_("Tax-exempt intra-Community supply of goods.|einvoice"),  # 2.355.0 C (#2844)
+               "export": N_("Tax-exempt export of goods.|einvoice"),
                "exempt": N_("Tax exempt.|einvoice")}  # 2.296.0 B (#3169): a 0 % line of a taxed invoice without its own reason
 EIN_WORDS = {"project": N_("Project: {0}|einvoice"), "transfer": N_("Credit transfer|einvoice"),
              "refund": N_("The amount will be refunded or offset.|einvoice"), "now": N_("Payable on receipt.|einvoice")}
@@ -339,7 +343,13 @@ def ein_build(model, fmt="zugferd"):
            person=rc.get("contact") if isinstance(rc.get("contact"), dict) else None)
     if m.get("order_ref"):
         _e(_e(ag, "ram:BuyerOrderReferencedDocument"), "ram:IssuerAssignedID", m["order_ref"])
-    _e(tx, "ram:ApplicableHeaderTradeDelivery")  # BG-13: the period of service stands in BillingSpecifiedPeriod below
+    dl = _e(tx, "ram:ApplicableHeaderTradeDelivery")  # BG-13: the period of service stands in BillingSpecifiedPeriod below
+    if cat == "K":  # 2.355.0 C (#2844): BR-IC-12 the deliver-to address (BG-15, BT-80; XRechnung BR-DE-10/11 city + postcode) = the client's
+        sa = _e(_e(dl, "ram:ShipToTradeParty"), "ram:PostalTradeAddress")
+        _e(sa, "ram:PostcodeCode", rfields.get("zip") or "")
+        _e(sa, "ram:LineOne", rfields.get("street") or "")
+        _e(sa, "ram:CityName", rfields.get("city") or "")
+        _e(sa, "ram:CountryID", _country(rfields.get("country"), home))
     se = _e(tx, "ram:ApplicableHeaderTradeSettlement")
     if cur != hcur:
         _e(se, "ram:TaxCurrencyCode", hcur)
@@ -752,6 +762,12 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     bname = " - ".join(x for x in (str(rc.get("name") or "").strip(), str(rc.get("name_extra") or "").strip()) if x)
     person = rc.get("contact") if isinstance(rc.get("contact"), dict) else None
     _ubl_party(root, "cac:AccountingCustomerParty", bname, rfields, home, endpoint=receiver_id, email=rc.get("email_invoice"), contact=person)
+    if cat == "K":  # 2.355.0 C (#2844): BR-IC-12 the deliver-to address (BG-15, BT-80; XRechnung BR-DE-10/11) = the client's
+        sa = _u(_u(_u(root, "cac:Delivery"), "cac:DeliveryLocation"), "cac:Address")
+        _ut(sa, "cbc:StreetName", rfields.get("street"))
+        _ut(sa, "cbc:CityName", rfields.get("city"))
+        _ut(sa, "cbc:PostalZone", rfields.get("zip"))
+        _u(_u(sa, "cac:Country"), "cbc:IdentificationCode", _country(rfields.get("country"), home))
 
     iban = str(pay.get("iban") or sf.get("iban") or "").replace(" ", "")
     bic = str(pay.get("bic") or sf.get("bic") or "").replace(" ", "")

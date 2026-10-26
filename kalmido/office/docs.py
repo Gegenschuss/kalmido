@@ -651,9 +651,12 @@ def clean_doc(c, oid, b, cur, admin):
     if "fx_rate" in b:
         f["fx_rate"] = _num(b.get("fx_rate"), "fx_rate", 0.0001, 100000) or _doc_office_fx(c, oid, f.get("currency") or cur["currency"])
     elif f.get("currency") and f["currency"] != cur["currency"]:  # 2.189.0 (#2475): a new currency takes the office's rate of it
-        r = hc_office_rate(office_settings(c, oid), f["currency"])
+        s_ = office_settings(c, oid)
+        r = hc_office_rate(s_, f["currency"])
         if r is not None and r != 1:
             f["fx_rate"] = float(r)
+        elif (hc_home(s_), f["currency"]) != ("EUR", "USD"):  # 2.355.0 C (#2844): no rate of the former currency / no made-up 1.09
+            f["fx_rate"] = 1  # = no rate: finalising asks for one (invoices.inv_missing)
     if "vat_mode" in b:
         f["vat_mode"] = _choice(b.get("vat_mode"), "vat_mode", ("vat", "novat"))
     if "client_id" in b:

@@ -357,6 +357,14 @@
       "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge).",
       "en": "Reverse charge: VAT to be accounted for by the recipient."
     },
+    "vat_note_eu_goods": {
+      "de": "Steuerfreie innergemeinschaftliche Lieferung.",
+      "en": "Tax-exempt intra-Community supply of goods."
+    },
+    "vat_note_export": {
+      "de": "Steuerfreie Ausfuhrlieferung.",
+      "en": "Tax-exempt export of goods."
+    },
     "vat_note_abroad": {
       "de": "Im Land des Leistenden nicht steuerbar.",
       "en": "Not taxable in the supplier's country."

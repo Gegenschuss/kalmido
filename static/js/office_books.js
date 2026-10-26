@@ -134,7 +134,10 @@ function bkEuerHtml() {
 }
 
 const BK_KZ = [['81', N_('Taxable sales at 19 % (base)')], ['86', N_('Taxable sales at 7 % (base)')], ['35', N_('Sales at other rates (base)')], ['36', N_('Tax on sales at other rates')],
-  ['21', N_('Services to businesses in the EU (reverse charge)')], ['45', N_('Other sales not taxable domestically')], ['66', N_('Input tax from receipts')], ['83', N_('Advance payment (negative = refund)')]];
+  ['21', N_('Services to businesses in the EU (reverse charge)')], ['45', N_('Other sales not taxable domestically')],
+  // 2.355.0 C (#2841, #2844): + goods to the EU, exports, other tax-free sales, reverse charge at home
+  ['41', N_('Goods to businesses in the EU (tax-free)')], ['43', N_('Exports of goods (tax-free)')], ['48', N_('Other tax-free sales (without input tax)')],
+  ['60', N_('Sales with reverse charge at home (section 13b)')], ['66', N_('Input tax from receipts')], ['83', N_('Advance payment (negative = refund)')]];
 function bkPeriods(mode) {
   if (mode === 'month') return Array.from({length: 12}, (_, i) => ['m' + String(i + 1).padStart(2, '0'), new Date(2000, i, 1).toLocaleDateString(LOCALE(), {month: 'long'})]);
   return [1, 2, 3, 4].map(q => ['q' + q, tr('Quarter {0}', q)]);
@@ -148,9 +151,9 @@ function bkUstvaHtml() {
   if (d.small_business) body = `<p class="bk-warn">${tr('Small business: no VAT return')}</p>`;
   else {
     const shown = BK_KZ.filter(([k]) => ['81', '86', '66', '83'].includes(k) || +d.kz[k]);
-    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${tr('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + ofcSym(ofcHome()) : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
+    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${tr('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45', '41', '43', '48', '60'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + ofcSym(ofcHome()) : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
       <p class="muted ofchint">${esc(tr('VAT 19 %: {0} · VAT 7 %: {1}', ofcMoney(d.tax['19']), ofcMoney(d.tax['7'])))} · ${d.basis === 'soll' ? tr('VAT on invoicing (by invoice date)') : tr('VAT on payment received')}</p>
-      ${+d.exempt_other ? `<p class="bk-warn">${esc(tr('Other tax-free sales of {0} have no field here: please check.', ofcMoney(d.exempt_other)))}</p>` : ''}
+      ${+d.exempt_other ? `<p class="bk-warn">${esc(tr('Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.', ofcMoney(d.exempt_other)))}</p>` : ''}
       ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
       <details class="bk-items"><summary>${esc(trn('Based on {0} entry', 'Based on {0} entries', d.items.length))}</summary><ul class="ofclist" role="list">${d.items.map(bkItemRow).join('')}</ul></details>`;
   }
@@ -159,7 +162,7 @@ function bkUstvaHtml() {
 function bkItemRow(it) {
   const rc = it.kind === 'receipt';
   const t = rc ? (it.title || tr('Receipt')) : `${it.kind === 'credit' ? tr('Credit note') : tr('Invoice')} ${it.number || ''}`;
-  const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : ''].filter(Boolean).join(' · ');
+  const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : it.source === 'skonto' ? tr('Cash discount') /* 2.355.0 C (#2840) */ : ''].filter(Boolean).join(' · ');
   return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/offers/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
 }
 function bkSettingsHtml() {

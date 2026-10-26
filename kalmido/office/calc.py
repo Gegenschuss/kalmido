@@ -475,7 +475,7 @@ def _num(d):
 
 # ---------------------------------------------------------------- 2.38.0 (#1021, F1): invoices, credit notes, reminders
 INV_ITEM_KINDS = ("service", "text", "heading", "discount")
-INV_VAT_NOTES = ("reverse", "abroad", "small")
+INV_VAT_NOTES = ("reverse", "abroad", "small", "eu_goods", "export")  # 2.355.0 C (#2844): + goods to the EU (K) / a third country (G)
 
 
 def dstr(d):

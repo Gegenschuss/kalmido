@@ -28,16 +28,23 @@ from ..core.db import db, local_now
 from ..core.access import Denied
 from ..core.i18n import N_, tr, lang
 from ..core.errors import BadInput
+from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .calc import dec, dstr, money
+from .countries import fk_reverse_case  # 2.355.0 C (#2844)
 from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
+from .ledger import ofx_company  # 2.355.0 C (#2844)
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
 PERIOD_RE = re.compile(r"^(m(0[1-9]|1[0-2])|q[1-4]|y)$")  # 2.122.0 D (#2315): y = the whole year
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# document groups of a document without VAT by its note (2.355.0 C #2844: + eu_goods = field 41, export = field 43)
+BK_NOVAT_GROUPS = ("small", "reverse", "abroad", "eu_goods", "export")
 BK_LIST_MAX = 500  # rows behind the VAT return figures / of the receipts list
+# 2.355.0 C (#2841): the day a payment counts on: a reversal line (p, its payment o joined) on the day of its payment
+BK_PAY_DAY = "COALESCE(NULLIF(o.date, ''), p.date)"
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -208,7 +215,7 @@ def bk_doc_parts(r):
     its tax lines (group "vat19" / "vat7" / "vat<pct>", 0 % = exempt), shares by each line's gross."""
     if (r["vat_mode"] or "vat") == "novat":
         note = (r["vat_note"] if "vat_note" in r.keys() else "") or ""
-        return [(note if note in ("small", "reverse", "abroad") else "exempt", Decimal(1), Decimal(0))]
+        return [(note if note in BK_NOVAT_GROUPS else "exempt", Decimal(1), Decimal(0))]
     lines = []
     for tl in _j(r["totals"]).get("tax_lines") or []:
         lg = dec(tl.get("base") or 0) + dec(tl.get("amount") or 0)
@@ -227,14 +234,28 @@ def _income_label(key):
             "abroad": tr("Tax-free revenue / reverse charge"), "exempt": tr("Tax-free revenue / reverse charge")}[key]
 
 
+def bk_reverse_dom(c, oid, r, memo):
+    """2.355.0 C (#2844): True when reverse charge document r goes to a client in the office's own country (section 13b
+    UStG, field 60) instead of another EU state (field 21); the client's country of the snapshot, else the live client."""
+    if "home" not in memo:
+        memo["home"] = ofx_company(c, oid).get("country") or "DE"
+    cc = _j(r["recipient_snapshot"] if "recipient_snapshot" in r.keys() else "").get("country") or ""
+    if not cc and r["client_id"]:
+        cl = c.execute("SELECT country FROM clients WHERE id=?", (r["client_id"],)).fetchone()
+        cc = (cl["country"] if cl else "") or ""
+    return fk_reverse_case(cc, memo["home"]) == "domestic"
+
+
 def bk_payments(c, oid, frm, to, home):
     """[(payment row, document row)] of invoices / credit notes paid in [frm, to] (ISO days, both included)."""
     # 2.144.10 B (#2576): trial documents never reach the books
     docs = {r["id"]: r for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0",
                                           (oid,))}
     out = []
-    for p in c.execute("SELECT id, doc_id, date, amount FROM office_payments WHERE org_id=? AND date>=? AND date<=? ORDER BY date, id",
-                       (oid, frm, to)):
+    # 2.355.0 C (#2841): a reversal line counts on the day of the payment it takes back (was the day of the correction)
+    for p in c.execute(f"SELECT p.id, p.doc_id, {BK_PAY_DAY} AS date, p.amount FROM office_payments p LEFT JOIN office_payments o "
+                       f"ON o.id=p.reverses_id AND o.org_id=p.org_id WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<=? "
+                       "ORDER BY 3, p.id", (oid, frm, to)):
         r = docs.get(p["doc_id"])
         if r is not None and p["date"]:
             out.append((p, r))
@@ -265,7 +286,7 @@ def bk_euer(c, oid, year):
     inc = {}
     for p, r in bk_payments(c, oid, y0, y1, home):
         for k, gross, net, vat in _pay_parts(p, r, home):
-            k = "exempt" if k in ("reverse", "abroad") else k
+            k = "exempt" if k in ("reverse", "abroad", "eu_goods", "export") else k  # 2.355.0 C (#2844): + goods
             x = inc.setdefault(k, [Decimal(0)] * 3)
             x[0], x[1], x[2] = x[0] + net, x[1] + vat, x[2] + gross
     exp, missing, unrated = {}, 0, set()
@@ -357,11 +378,13 @@ def _euro_floor(v):
 def bk_ustva(c, oid, year, period):
     """The figures of the German VAT return (UStVA) of a period to type into ELSTER. Field numbers (Kennzahlen):
     81 = base of the sales at 19 %, 86 = at 7 %, 35 / 36 = base / tax at other rates; 21 = services to businesses in the EU
-    with reverse charge (vat_note "reverse", section 18b UStG -- Kalmido documents are services; deliveries of goods to the
-    EU would be field 41, which Kalmido cannot tell apart, so 41 stays empty); 45 = other sales not taxable domestically
-    (vat_note "abroad", e.g. services to a third country); 66 = input tax from receipts with a VAT rate; 83 = the advance
-    payment (VAT minus input tax; negative = a refund). Bases in whole euros (cut off), taxes in cents computed from the
-    bases as ELSTER does. Other tax-free sales (no note) are listed apart, without a field (to check)."""
+    with reverse charge (vat_note "reverse", section 18b UStG); 60 = reverse charge to a client at home (section 13b (5));
+    41 = goods to businesses in the EU (vat_note "eu_goods", section 6a); 43 = exports of goods (vat_note "export",
+    section 6); 45 = other sales not taxable domestically (vat_note "abroad", e.g. services to a third country); 48 = other
+    tax-free sales (no note / 0 % lines, section 4 no. 8-28, also listed as exempt_other); 66 = input tax from receipts with
+    a VAT rate; 83 = the advance payment (VAT minus input tax; negative = a refund). Bases in whole euros (cut off), taxes in
+    cents computed from the bases as ELSTER does. 2.355.0 C (#2841, #2844): + 41 / 43 / 48 / 60; a cash discount taken
+    lowers the bases of the accrual basis ("soll") in the period of its payment (#2840)."""
     s = office_settings(c, oid)
     home = _home(s)
     frm, to = bk_period(year, period)
@@ -371,7 +394,11 @@ def bk_ustva(c, oid, year, period):
         return dict(head, small_business=True)
     sums, items = {}, []
 
-    def add(k, net, vat):
+    memo = {}
+
+    def add(k, net, vat, r=None):
+        if k == "reverse" and r is not None and bk_reverse_dom(c, oid, r, memo):
+            k = "reverse_dom"  # 2.355.0 C (#2844): section 13b at home = field 60, not 21
         x = sums.setdefault(k, [Decimal(0), Decimal(0)])
         x[0], x[1] = x[0] + net, x[1] + vat
 
@@ -379,7 +406,7 @@ def bk_ustva(c, oid, year, period):
         for p, r in bk_payments(c, oid, frm, to, home):
             gross_all = Decimal(0)
             for k, gross, net, vat in _pay_parts(p, r, home):
-                add(k, net, vat)
+                add(k, net, vat, r)
                 gross_all += gross
             items.append({"kind": r["kind"], "doc_id": r["id"], "number": r["number"], "date": p["date"], "gross": dstr(money(gross_all)),
                           "source": "payment"})
@@ -392,9 +419,18 @@ def bk_ustva(c, oid, year, period):
             for k, share, pct in bk_doc_parts(r):
                 part = gross * share
                 net = part * 100 / (100 + pct) if pct > 0 else part
-                add(k, net, part - net)
+                add(k, net, part - net, r)
             items.append({"kind": r["kind"], "doc_id": r["id"], "number": r["number"], "date": r["date"], "gross": dstr(money(gross)),
                           "source": "document"})
+        # 2.355.0 C (#2840): a cash discount taken reduces the base (section 17 UStG) per tax rate, in the period of its payment
+        for r, sk in abs_skonto_rows(c, oid, frm, to):
+            minus = -sk["amount"] / _fx(r, home)
+            for k, share, pct in bk_doc_parts(r):
+                part = minus * share
+                net = part * 100 / (100 + pct) if pct > 0 else part
+                add(k, net, part - net, r)
+            items.append({"kind": "skonto", "doc_id": r["id"], "number": r["number"], "date": sk["day"], "gross": dstr(money(minus)),
+                          "source": "skonto"})
     kz66, missing = Decimal(0), 0
     for rc in bk_receipts(c, oid, frm, to, by="doc"):
         kz66 += rc["vat"]
@@ -410,8 +446,11 @@ def bk_ustva(c, oid, year, period):
     kz66 = money(kz66)
     kz83 = t19 + t7 + kz36 - kz66
     e = lambda v: str(int(v))  # noqa: E731 -- bases: whole euros
+    # 2.355.0 C (#2841, #2844): + 41 goods to EU businesses, 43 exports (tax-free with input tax), 48 other tax-free sales
+    # (section 4 no. 8-28 UStG, without input tax), 60 reverse charge at home (section 13b) -- the tax advisor checks (#1153)
     kz = {"81": e(kz81), "86": e(kz86), "35": e(kz35), "36": dstr(kz36), "21": e(_euro_floor(b("reverse"))),
-          "41": "0", "45": e(_euro_floor(b("abroad"))), "66": dstr(kz66), "83": dstr(kz83)}
+          "41": e(_euro_floor(b("eu_goods"))), "43": e(_euro_floor(b("export"))), "45": e(_euro_floor(b("abroad"))),
+          "48": e(_euro_floor(b("exempt"))), "60": e(_euro_floor(b("reverse_dom"))), "66": dstr(kz66), "83": dstr(kz83)}
     return dict(head, small_business=False, kz=kz, tax={"19": dstr(t19), "7": dstr(t7)},
                 exempt_other=dstr(money(b("exempt"))), missing_vat=missing, items=items[:BK_LIST_MAX], items_more=len(items) > BK_LIST_MAX)
 

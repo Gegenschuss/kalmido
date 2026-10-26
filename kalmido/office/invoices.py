@@ -24,7 +24,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
-from .homecur import hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
+from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
 from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
@@ -248,6 +248,18 @@ def inv_missing(c, oid, r, s, pack, items):
         miss.append(tr("valid country of the client (ISO code, now {0})", cl["country"]))
     if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
         miss.append(tr("due date or payment days"))
+    if r["kind"] in ("invoice", "credit") and hc_rate_missing(r, hc_home(s)):  # 2.355.0 C (#2844): a foreign currency needs its rate (the tax in the home currency)
+        miss.append(tr("the exchange rate of {0} (document or office settings)", r["currency"]))
+    if r["kind"] == "invoice" and dec(_col(r, "skonto_pct") or 0) > 0 and int(_col(r, "skonto_days") or 0) > 0 and r["date"]:
+        # 2.355.0 C (#2840): the cash discount period ends on the due day at the latest (else the PDF and BT-20 contradict the terms)
+        due = _col(r, "due_date") or ""
+        try:
+            days = (date.fromisoformat(due) - date.fromisoformat(r["date"])).days if due else int(
+                _col(r, "payment_days") if _col(r, "payment_days") is not None else (s.get("payment_days") or 14))
+        except ValueError:
+            days = None
+        if days is not None and int(_col(r, "skonto_days")) > days:
+            miss.append(tr("a cash discount period no longer than the payment terms ({0} days)", days))
     if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
         miss.append(tr("VAT note (reverse charge / not taxable / small business)"))
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "reverse":  # 2.296.0 B (#3168): both VAT ids (section 14a (1) UStG, BR-AE-02)
@@ -259,6 +271,17 @@ def inv_missing(c, oid, r, s, pack, items):
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (
                 cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
             miss.append(tr("the client's VAT ID (reverse charge)"))
+    if r["vat_mode"] == "novat" and _col(r, "vat_note") in ("eu_goods", "export"):
+        # 2.355.0 C (#2844): goods to a business in another EU state (section 6a UStG: both VAT ids, BR-IC-02) / to a third
+        # country (section 6 UStG; BR-G-02 the seller's VAT id in the e-invoice); the delivery date = the period of service
+        case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
+        eu = _col(r, "vat_note") == "eu_goods"
+        if case != ("eu" if eu else "other"):
+            miss.append(tr("a client in another EU country (intra-Community supply)") if eu else tr("a client outside the EU (export)"))
+        if not co.get("vat_id") and (eu or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))):
+            miss.append(tr("your VAT ID"))
+        if eu and not (cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
+            miss.append(tr("the client's VAT ID"))
     # 2.296.0 B (#3169): a 0 % position of a taxed invoice needs the reason of its exemption (section 14 (4) no. 8 UStG, BT-120)
     if r["vat_mode"] != "novat" and not str(s.get("exempt_reason") or "").strip() and any(
             it.get("kind") in ("service", "discount") and pack_tax(pack, it.get("tax") if it.get("tax") in TAX_KEYS else "standard") == 0 for it in items):
@@ -1411,16 +1434,18 @@ def inv_payment_delete(did, pid):
 
 def olk_pay_reverse(c, oid, did, p, note="", uid=None):
     """2.152.0 C (#2168): payments sit on finalised invoices only (books, GoBD): a wrong one is reversed, never deleted -- a
-    second line with the negative amount on the day of the correction, reverses_id = the payment, the reason in its note.
+    second line with the negative amount, reverses_id = the payment, the reason in its note. 2.355.0 C (#2841): dated on the
+    payment's day (was the day of the correction: a payment of December taken back in January moved VAT between the years);
+    its month is open (inv_pay_del checks it), the reversal's own creation time stays in created_at.
     The balance (SUM of the amounts) is right again; both lines stay in the list, the books and the DATEV export. 409 for a
     reversal line or a payment already reversed. Returns the id of the reversal line."""
     if p["reverses_id"] is not None:
         raise Denied(409, tr("A reversal cannot be reversed"))
     if c.execute("SELECT 1 FROM office_payments WHERE org_id=? AND reverses_id=? LIMIT 1", (oid, p["id"])).fetchone():
         raise Denied(409, tr("This payment has already been reversed"))
-    d = local_now().date().isoformat()
+    d = p["date"] or local_now().date().isoformat()
     return insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, reverses_id) "
-                        "VALUES(?,?,?,?,?,?,?,?,?)", (oid, did, max(d, p["date"] or d), -float(money(dec(p["amount"]))), p["method"],
+                        "VALUES(?,?,?,?,?,?,?,?,?)", (oid, did, d, -float(money(dec(p["amount"]))), p["method"],
                                                       (note or "").strip()[:500], uid, iso(now_utc()), p["id"]))
 
 
