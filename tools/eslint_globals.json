@@ -7486,6 +7486,7 @@
 "wk_palAdd",
 "wk_panelAllHtml",
 "wk_panelHtml",
+"wk_pgAt",
 "wk_queue",
 "wk_rename",
 "wk_render",

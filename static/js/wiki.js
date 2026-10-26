@@ -25,10 +25,18 @@ const wk_spaceName = sp => sp === 'private' ? tr('Private|workspace') : (wsOrg(s
 // the phone's list, the overview), the open one is in the address (#wiki/s/<space>[/d/<path>]), a page brings its own
 // space; null = no space open (the overview). One space shown above (or only Private) = that space, as before.
 const wk_all = () => wk_spaces().length > 1 && (!wsCur?.() || wsCur() === 'all');
+// 2.319 (#3287): the open page's space and path -- the loaded page, else its row in a loaded index (a click in the tree
+// draws the panel before the page has loaded: the tree stays open down to it)
+function wk_pgAt(id) {
+  if (!id) return null;
+  if (WK.pg && WK.pg.id === id) return {space: WK.pg.space, path: WK.pg.path};
+  for (const sp of wk_spaces()) { const p = WK.idx[sp]?.pages?.find(x => x.id === id); if (p) return {space: sp, path: p.path}; }
+  return null;
+}
 function wk_open() {
   if (!wk_all()) return wk_cur();
   const r = S.route, ok = v => !!v && wk_spaces().includes(v); if (r.mod !== 'wiki') return null;
-  if (r.wid) return WK.pg && WK.pg.id === r.wid && ok(WK.pg.space) ? WK.pg.space : null;
+  if (r.wid) { const x = wk_pgAt(r.wid); return x && ok(x.space) ? x.space : null; }
   if (ok(r.wsp)) return r.wsp;
   return r.wdir != null ? wk_cur() : null;  // an older #wiki/d/<path> link: the space used last
 }
@@ -74,6 +82,7 @@ async function wk_loadPage(id, force) {
     WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
   finally { WK.busy['p' + id] = false; }
   if (S.route.mod === 'wiki') viewSafeRender();
+  if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.319 (#3287): the panel follows the loaded page (its space, its folder)
 }
 const wk_pages = sp => WK.idx[sp]?.pages || [];
 const wk_byPath = (sp, p) => wk_pages(sp).find(x => x.path.toLowerCase() === String(p).trim().toLowerCase());
@@ -316,8 +325,9 @@ function wk_panelHtml() {
   if (wk_all()) return wk_panelAllHtml();  // 2.198.0 A (#2743)
   const sp = wk_cur(), d = WK.idx[sp]; if (!d || d.v === -1) wk_load(sp);  // 2.152.3: only a missing or marked index (wk_after), the bodies are big - no fetch per render
   const r = S.route, onW = r.mod === 'wiki';
-  const at = (onW && r.wdir != null ? r.wdir : onW && r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase();  // the open folder (a page: its folder)
-  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/'), sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
+  const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
+  const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
+  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
   const top = `<div class="sgroup sbbp">${sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
@@ -330,8 +340,9 @@ function wk_panelAllHtml() {
   const r = S.route, onW = r.mod === 'wiki', op = onW ? wk_open() : null;
   return `<div class="sgroup sbbp sbbtree" role="group" aria-label="${esc(tr('Workspaces'))}">${wk_spaces().map(sp => {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
-    const at = here ? (r.wdir != null ? r.wdir : r.wid && WK.pg?.id === r.wid ? wk_dirOf(WK.pg.path) : '').toLowerCase() : '';
-    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/'), sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
+    const pa = here && r.wid ? wk_pgAt(r.wid) : null;  // 2.319 (#3287)
+    const at = here ? (r.wdir != null ? r.wdir : pa ? wk_dirOf(pa.path) : '').toLowerCase() : '';
+    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), on: !!at && at === lp, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
     const root = {k: 'wk:' + sp + ':', name: wk_rootName(sp), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true} : {}),  // 2.200.0 A (#2747): dropped on = to the top
