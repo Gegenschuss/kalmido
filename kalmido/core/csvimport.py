@@ -187,7 +187,7 @@ def amount_text(s, dec=None):
     m = re.fullmatch(rf"(\d{{1,3}}(?:{grp}\d{{3}})+|\d{{1,12}})(?:{re.escape(dec)}(\d{{1,10}}))?", s)
     if not m or (m.group(2) and len(m.group(2)) == 3 and len(m.group(1)) <= 3):
         return None  # "1,500" / "1.234" with that decimal mark: a thousand or three decimals -- never guessed
-    v = Decimal(re.sub(r"\D", "", m.group(1)) + "." + (m.group(2) or "0"))
+    v = Decimal(re.sub(r"\D", "", m.group(1)) + ("." + m.group(2) if m.group(2) else ""))
     return -v if neg else v
 
 

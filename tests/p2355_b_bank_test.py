@@ -199,6 +199,17 @@ for who, s in (("org", A), ("freelancer", Fr)):
     j = csv_prev(s, "Date,Amount,Description\n03/04/2026,10.00,Tea\n", mu)
     check(j["rows"][0]["day"] == "2026-04-03", p + f"DD/MM/YYYY reads 3 April {j['rows'][0]}")
 
+# ---- the same reader in the import of old documents and of fixed costs (one parser, core/csvimport.amount_text)
+out = in_app("from kalmido.office.legacyimport import _amount, _num\nfrom kalmido.office.fixedimport import fci_num\n"
+             "for v in ('1.500', '1,500', '2.436,53', '2,436.53', '12.5', '29,90', '1,234.5'):\n"
+             "    print('NUM', v, _amount(v), _num(v), fci_num(v))")
+got = {x.split()[1]: x.split()[2:] for x in out.splitlines() if x.startswith("NUM ")}
+check(got.get("1,500") == ["None", "None", "None"], "#2843 old documents / fixed costs: 1,500 is unreadable (was 1.5) " + out[-400:])
+num = {k: [float(x) if x != "None" else None for x in v] for k, v in got.items()}
+check(num.get("1.500") == [1500] * 3 and num.get("2.436,53") == [2436.53] * 3 and num.get("2,436.53") == [2436.53] * 3
+      and num.get("1,234.5") == [1234.5] * 3 and num.get("29,90") == [29.9] * 3 and num.get("12.5") == [12.5] * 3,
+      f"#2843 German first, both forms with groups of three {got}")
+
 # ======================================================================== #2843 duplicates with the booking day
 for who, s, oid in (("org", A, ORG), ("freelancer", Fr, None)):
     p = f"{who}: "
