@@ -27,6 +27,7 @@ from .orgimport import OiT
 from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
+from ..files.fsroots import fs_area_root, fs_area_ws  # 2.353.0 C (#2829)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -103,7 +104,6 @@ def _node(c, run, src, d, ctx):
     if area == "wiki" and _wiki_locked(c, ctx):
         return False  # the target's knowledge pages have the lock: their pages stay out (_page), so does the tree
     if sid in st["roots"]:  # an area's root: the target's own root of that area when it has one (never a second root)
-        from ..files.fsroots import fs_area_root
         have = fs_area_root(c, ctx.uid, ctx.space, area, "", create=False)
         if have:
             run.put("fs_nodes", sid, have)
@@ -138,7 +138,6 @@ def _node(c, run, src, d, ctx):
 
 def _area_root(c, run, src, d, ctx):
     """2.353.0 C (#2829): the mark of an area's root made by this import (a root put into the target's own one: nothing)."""
-    from ..files.fsroots import fs_area_ws
     st = _areas(run, ctx)
     sid = _oidi(src.get("node_id"))
     nid = run.m("fs_nodes", sid)
