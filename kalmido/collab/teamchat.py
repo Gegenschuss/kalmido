@@ -672,7 +672,9 @@ def tchat_notify(c, r, m, mentions, replied=None):
                 agent_emit(c, uid, "team_message", {"room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
                                                      "mentioned": uid in mentions, "listening": uid in listen,
                                                      "message": {"id": m["id"], "text": text[:AGENT_EVENT_COMMENT_CHARS], "user_id": sender,
-                                                                 "task_id": m["task_id"], "created_at": m["created_at"],
+                                                                 # 2.235.0 B2 (#2902): like tchat_msg_dict, only a task the agent may see
+                                                                 "task_id": m["task_id"] if m["task_id"] and task_visible(c, m["task_id"], uid) else None,
+                                                                 "created_at": m["created_at"],
                                                                  "reply_to": m["reply_to"], "reply": rq,
                                                                  "attachments": _tcx_files_api(c, m["id"]),  # 2.113.1 (#2059)
                                                                  "thread_of": root},  # 2.139.0 A (#2127)

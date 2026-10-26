@@ -19,7 +19,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, task_visible
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
-from ..agents.core import agent_emit, agent_row, agent_shares, need_agent
+from ..agents.core import agent_emit, agent_row, agent_shares, agent_usable, need_agent
 from ..agents.workstyle import ws_need_editor
 
 AR_TEXT_MAX = 500  # characters of one rule
@@ -85,8 +85,14 @@ def _source_of_agent(c, aid, src):
         if not m or m["sender"] != "user" or not agent_shares(c, aid, m["user_id"]):
             raise Denied(404)
         return ("chat", sid, None, m["user_id"], _excerpt(m["body"]))
-    m = c.execute("SELECT id, task_id, user_id, body FROM comments WHERE id=? AND deleted_at IS NULL", (sid,)).fetchone()
+    m = c.execute("""SELECT k.id, k.task_id, k.user_id, k.body, k.ext_name, u.kind, t.list_id FROM comments k
+                     JOIN tasks t ON t.id=k.task_id LEFT JOIN users u ON u.id=k.user_id
+                     WHERE k.id=? AND k.deleted_at IS NULL""", (sid,)).fetchone()
     if not m or m["user_id"] == aid or not task_visible(c, m["task_id"], aid, full=True):
+        raise Denied(404)
+    # 2.235.0 B2 (#2903): only a person who may address this agent in the task's project gives it a rule (no agent, no
+    # customer through the approval link, no member the agent is not opened to)
+    if not m["user_id"] or m["ext_name"] or m["kind"] in (None, "agent") or not agent_usable(c, aid, m["user_id"], m["list_id"]):
         raise Denied(404)
     return ("comment", sid, m["task_id"], m["user_id"], _excerpt(m["body"]))
 
@@ -112,7 +118,29 @@ def v1_agent_rules():
     {kind, id, task_id, user_id, excerpt}}], max, text_max}. Only the active ones apply."""
     v1_args(())
     aid = need_agent()
-    return jsonify(data=[ar_dict(r) for r in _rows(db(), aid)], max=AR_MAX, text_max=AR_TEXT_MAX)
+    c = db()
+    out = []
+    for r in _rows(c, aid):
+        d = ar_dict(r)
+        if d["source"]["excerpt"] and not _src_seen(c, r, aid):
+            d["source"]["excerpt"] = ""  # 2.235.0 B2 (#2903): the source is gone or locked / out of reach now
+        out.append(d)
+    return jsonify(data=out, max=AR_MAX, text_max=AR_TEXT_MAX)
+
+
+def _src_seen(c, r, aid):
+    """2.235.0 B2 (#2903): does the source of rule r still exist for agent aid (the chat message in a conversation it still
+    has, the comment on a task it may see in full)?"""
+    if r["source_kind"] == "chat":
+        m = c.execute("SELECT user_id FROM agent_chat WHERE id=? AND agent_id=?", (r["source_id"], aid)).fetchone()
+        return bool(m) and agent_shares(c, aid, m["user_id"])
+    if r["source_kind"] == "comment":
+        return _comment_alive(c, r["source_id"]) and task_visible(c, r["source_task_id"], aid, full=True)
+    return True
+
+
+def _comment_alive(c, cid):
+    return bool(cid) and bool(c.execute("SELECT 1 FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone())
 
 
 @app.post("/api/v1/agent/rules")
@@ -144,14 +172,14 @@ def _view(c, r, uid):
     """A rule for the settings: the excerpt and the link only when the person may see the source themselves."""
     d = ar_dict(r)
     s = d["source"]
-    if s["kind"] == "chat":
-        s["visible"] = s["user_id"] == uid
+    if s["kind"] == "chat":  # 2.235.0 B2 (#2903): and the message still exists
+        s["visible"] = s["user_id"] == uid and bool(c.execute("SELECT 1 FROM agent_chat WHERE id=?", (s["id"],)).fetchone())
     elif s["kind"] == "comment":
-        s["visible"] = bool(s["task_id"]) and task_visible(c, s["task_id"], uid, full=True)
+        s["visible"] = bool(s["task_id"]) and _comment_alive(c, s["id"]) and task_visible(c, s["task_id"], uid, full=True)
     else:
         s["visible"] = True
     if not s["visible"]:
-        s["excerpt"] = ""
+        s["excerpt"], s["user_id"] = "", None  # 2.235.0 B2 (#2903): nor who chatted with the agent
     return d
 
 
