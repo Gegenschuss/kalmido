@@ -195,7 +195,9 @@ def run(s, who):
     t0 = s.get(B + f"{D}/{rm5}").json()["totals"]
     check(s.put(B + O + "/settings", json={"dunning_interest": 0, "dunning_flat_fee": 0, "dunning_client_kind": "auto"}).ok, f"{who}: switched off again")
     t1 = s.get(B + f"{D}/{rm5}").json()["totals"]
-    check(t1.get("interest") == t0.get("interest") == str(want) and t1.get("gross") == t0.get("gross"), f"{who}: the finalised reminder keeps interest and total (GoBD) {t1.get('interest')} {t1.get('gross')}")
+    check(t0.get("interest") == str(want6) and t0.get("flat_fee") == "40.00", f"{who}: a draft follows the settings until it is finalised (all businesses) {t0.get('interest')} {t0.get('flat_fee')}")
+    check(t1.get("interest") == t0.get("interest") and t1.get("flat_fee") == t0.get("flat_fee") and t1.get("gross") == t0.get("gross"),
+          f"{who}: the finalised reminder keeps interest, flat fee and total (GoBD) {t1.get('interest')} {t1.get('gross')}")
 
 
 run(A, "Alpha")
