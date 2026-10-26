@@ -3596,6 +3596,9 @@ MIGRATIONS = [
     ("agents", "work_style", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS work_style TEXT NOT NULL DEFAULT ''"),
     # 2.236.0 C (#2906): the order of the agent's queue it set last (JSON list of task ids, agents/workqueue.py). Older versions ignore it
     ("agents", "queue_order", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS queue_order TEXT NOT NULL DEFAULT ''"),
+    # 2.235.0 B (#2902): what the agent may never see (JSON {areas, lists, tags}, core/dlock.py; '' = the defaults: private
+    # e-mails locked). Older versions ignore it
+    ("agents", "data_lock", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS data_lock TEXT NOT NULL DEFAULT ''"),
     # 2.239.0 D (#2874): the name of the project a booked receipt was assigned to when that project was deleted for good
     # (receipts/suggest.py olk_keep_project; list_id is emptied by its foreign key). Older versions ignore it
     ("rc_receipts", "list_name", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS list_name TEXT"),

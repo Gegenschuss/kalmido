@@ -451,6 +451,11 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .awdlg .awrex{display:block;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .awdlg .awrbtns{display:flex;gap:.5rem;margin-top:.25rem}
 .awdlg .awradd input{flex:1 1 auto;min-width:0}
+/* 2.235.0 B (#2902): the section "Data the agent never sees" */
+.awdlg .awl-areas{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:0 .75rem;margin:.25rem 0 .5rem}
+.awdlg .awl-a{min-height:2.75rem;align-items:center}
+.awdlg .awl-i{min-height:2.75rem}
+.awdlg .awl-i .n{white-space:normal;min-width:0}
 @media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}
 /* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */

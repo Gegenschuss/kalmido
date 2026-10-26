@@ -14335,5 +14335,16 @@
   "Rule paused": "Regel gepauzeerd",
   "Rule": "Regel",
   "The rule is empty.": "De regel is leeg.",
-  "Delete this rule?": "Deze regel verwijderen?"
+  "Delete this rule?": "Deze regel verwijderen?",
+  "This area is never visible to agents": "Dit onderdeel is nooit zichtbaar voor agents",
+  "Private e-mails": "Privé-e-mails",
+  "Private trips": "Privéreizen",
+  "always": "altijd",
+  "A project you cannot see": "Een project dat je niet ziet",
+  "Data the agent never sees": "Gegevens die de agent nooit ziet",
+  "The agent cannot read, find or change these, not in events either. You still see everything.": "De agent kan dit niet lezen, vinden of wijzigen, ook niet via gebeurtenissen. Jij ziet nog steeds alles.",
+  "Add a project…": "Project toevoegen…",
+  "No project locked.": "Geen project vergrendeld.",
+  "Add a tag…": "Tag toevoegen…",
+  "No tag locked.": "Geen tag vergrendeld."
 }

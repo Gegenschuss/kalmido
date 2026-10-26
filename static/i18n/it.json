@@ -14335,5 +14335,16 @@
   "Rule paused": "Regola in pausa",
   "Rule": "Regola",
   "The rule is empty.": "La regola è vuota.",
-  "Delete this rule?": "Eliminare questa regola?"
+  "Delete this rule?": "Eliminare questa regola?",
+  "This area is never visible to agents": "Quest'area non è mai visibile agli agenti",
+  "Private e-mails": "E-mail private",
+  "Private trips": "Viaggi privati",
+  "always": "sempre",
+  "A project you cannot see": "Un progetto che non vedi",
+  "Data the agent never sees": "Dati che l'agente non vede mai",
+  "The agent cannot read, find or change these, not in events either. You still see everything.": "L'agente non può leggerlo, trovarlo o modificarlo, nemmeno tramite eventi. Tu continui a vedere tutto.",
+  "Add a project…": "Aggiungi un progetto…",
+  "No project locked.": "Nessun progetto bloccato.",
+  "Add a tag…": "Aggiungi un tag…",
+  "No tag locked.": "Nessun tag bloccato."
 }

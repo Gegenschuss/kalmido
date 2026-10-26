@@ -945,6 +945,8 @@ ROUTES = {
     # 2.235.0 C (#2903): the standing rules of an agent (the agent itself; owner / instance admin, else 404; p2235_c_rules_api_test.py)
     "GET /api/v1/agent/rules": "agents", "POST /api/v1/agent/rules": "agents", "GET /api/agents/{}/rules": "agents",
     "POST /api/agents/{}/rules": "agents", "PATCH /api/agents/{}/rules/{}": "agents", "DELETE /api/agents/{}/rules/{}": "agents",
+    # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
+    "GET /api/agents/{}/data-lock": "agents", "PATCH /api/agents/{}/data-lock": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",

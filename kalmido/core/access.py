@@ -13,6 +13,7 @@ from ..core.db import db, ensure_inbox, err, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
+from .dlock import dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 2.235.0 B (#2902): an agent's data lock
 
 
 # ---------------------------------------------------------------- access control
@@ -481,6 +482,7 @@ def _req_filters_sql():
         out += f" AND NOT {reading_sql()}"  # 2.172.1 A (#2689): read later: in the app only
     if has_request_context() and getattr(g, "user", None) is not None and "kind" in g.user.keys() and g.user["kind"] == "agent":
         out += " AND l.e2e IS NULL"  # 2.64.1 B (#1817): an agent never sees a list with the lock (it is never a member either)
+        out += dl_lists_sql(db(), g.user["id"])  # 2.235.0 B (#2902): the lists its data lock leaves out
     tl = token_lists()
     if tl is not None:
         out += f" AND l.id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"
@@ -544,11 +546,11 @@ def tvis(c, uid, a="", write=False):
     """SQL condition (no ? params) that keeps only the task rows uid may see (write: change) among tasks of lists uid
     can access at all. Combine it with the list-level filter (vis_sql / wr_sql / a list id): it only removes the tasks
     a participant must not see. "TRUE" when uid is a participant nowhere (the usual case)."""
-    pl = plists(c, uid)
+    pl, dl = plists(c, uid), dl_task_sql(c, uid, a)  # 2.235.0 B (#2902): dl = the tasks the agent's data lock leaves out
     if not pl:
-        return "TRUE"  # 2.37.0 (#1150): Postgres needs a boolean (was "1")
+        return f"(TRUE{dl})" if dl else "TRUE"  # 2.37.0 (#1150): Postgres needs a boolean (was "1")
     q = ",".join(str(int(x)) for x in pl)
-    return f"({a}list_id NOT IN ({q}) OR {a}id IN ({_pset_sql(uid, pl, write)}))"
+    return f"(({a}list_id NOT IN ({q}) OR {a}id IN ({_pset_sql(uid, pl, write)})){dl})"
 
 
 def pvis(c, uid, lid=None):
@@ -570,6 +572,8 @@ def task_visible(c, tid, uid, write=False, full=False):
     if not r:
         return False
     role = list_role(c, r[0], uid)
+    if role and dl_task_hidden(c, tid, uid):
+        return False  # 2.235.0 B (#2902): a task the agent's data lock leaves out (404 like any task it cannot see)
     if write and role and has_request_context() and g.get("audit_aid") == uid:
         access_note(r[0], True)
     if role == "participant":
@@ -670,6 +674,8 @@ def _list_role(c, lid, uid, r=_LR_NO, m=_LR_NO):
         return None
     if r[1] in ("health", "budget") and health_hidden(c, uid):  # 2.22.0 (#663); 2.72.0 (#1333): budgets too
         return None
+    if dl_list_hidden(c, uid, lid, r[1], r[2]):  # 2.235.0 B (#2902): a list the agent's data lock leaves out
+        return None
     if not acx_org_ok(c, uid, r[2]):  # 2.36.2 (#1142): an organisation's list only for its members
         return None
     if has_request_context() and g.get("auth_via") == "token" and getattr(g, "user", None) is not None and uid == g.user["id"]:
@@ -731,7 +737,7 @@ def need_task(c, tid, write=True, full=False):
     Participants: only their tasks (and subtasks); the parent chain of an assigned subtask is context -- readable with
     full=False only (no notes, comments, files, history)."""
     r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
-    if not r:
+    if not r or dl_task_hidden(c, tid, me()):  # 2.235.0 B (#2902): a task the agent's data lock leaves out
         raise Denied(404)
     role = list_role(c, r[0])
     if write and role:

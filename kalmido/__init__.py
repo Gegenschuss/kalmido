@@ -32,6 +32,7 @@ ORDER = (
     "core.db",
     "core.errors",  # 2.149.0 G (#2517): BadInput, Denied, UnknownFields (re-exported at the old places)
     "core.ctx",  # 2.149.0 G (#2517): me()
+    "core.dlock",  # 2.235.0 B (#2902): THE check of an agent's data lock (core/access.py calls it)
     "core.conflict",  # 2.269.0 C (#3017): expect_updated_at -> 409 with the current state (Conflict, ccf_check)
     "core.ratedb",  # 2.306.0 D1 (#2875): rate limits counted for every web process
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
