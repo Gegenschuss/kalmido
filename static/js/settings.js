@@ -869,15 +869,17 @@ function settingsModal(focus) {
     const q = e.target.value.trim().toLowerCase(), sb = $('.sbody', md);
     if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; sb.classList.remove('snores'); return; }
     const hits = ss_hits(md, q, shown, SYN);  // 2.250.0 C (#2994): titles / field names first, one explanation per section, synonyms
+    hits.push(...ss_areaHits(q));  // 2.353.0 E (#2775): + the settings windows of the areas
     const tab = k => $(`.snav [data-sec="${k}"] span`, md)?.textContent || k;
     const lab = h => ss_cut(h.el?.matches('select') ? (h.el.closest('.row')?.querySelector('label')?.textContent || h.t) : h.t, 80);
-    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}">${h.act ? '' : `<span class="muted">${esc(tab(h.k))} ›</span> `}${esc(lab(h))}</button>`).join('') : `<div class="muted mhint">${esc(tr('Nothing found for “{0}”', e.target.value.trim()))}</div>`;
+    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}">${h.act === 'area' ? `<span class="muted">${esc(h.pre)} ›</span> ` : h.act ? '' : `<span class="muted">${esc(tab(h.k))} ›</span> `}${esc(lab(h))}</button>`).join('') : `<div class="muted mhint">${esc(tr('Nothing found for “{0}”', e.target.value.trim()))}</div>`;
     sb.classList.toggle('snores', !hits.length); sb.dataset.nores = hits.length ? '' : tr('Nothing found for “{0}”', e.target.value.trim());
     sres._hits = hits; sres.classList.remove('hidden');
   });
   sres.addEventListener('click', e => {
     const b = e.target.closest('[data-hit]'); if (!b) return;
     const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = ''; $('.sbody', md).classList.remove('snores');
+    if (h.act === 'area') { $('[data-m="close"]', md)?.click(); ss_areaOpen(h); return; }  // 2.353.0 E (#2775): the area's own window
     if (h.act === 'absence') { $('[data-m="close"]', md)?.click(); Promise.resolve(AB2.data || ab2_load()).then(() => ab2_sheet(null)); return; }  // 2.250.0 C (#2994): no setting for it: the sheet itself
     show(h.k); idx(false);
     const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
@@ -1423,6 +1425,13 @@ function tabAddSheet(onPick) {
 const SS_SYN = [  // [the words in every language, the label(s) to look for instead | 'absence']
   [['logo', 'signet', 'emblem', 'emblema', 'emblème'], () => [tr('Symbol')]],
   [['mitglieder', 'mitglied', 'members', 'member', 'miembros', 'membres', 'membri', 'leden'], () => [tr('People|admin'), tr('People')]],
+  // 2.353.0 E (#2775): the words people type for the integrations (the scan program is under Integrations since #2773)
+  [['scanner', 'scannen', 'scan', 'wächter', 'waechter', 'ordner-wächter', 'watcher', 'folder watcher', 'download', 'herunterladen', 'mac', 'macos', 'windows', 'programm', 'program'], () => [tr('Scans from your computer')]],
+  [['import', 'importieren', 'einlesen', 'importer', 'importar', 'importeren'], () => [tr('Import')]],
+  [['export', 'exportieren', 'exporter', 'exportar', 'exporteren'], () => [tr('Export')]],
+  [['token', 'tokens', 'api', 'api-key', 'api key', 'zugangsschlüssel', 'app-passwort'], () => [tr('API tokens'), tr('App passwords')]],
+  [['kalender', 'calendar', 'calendrier', 'calendario', 'agenda', 'ical', 'ics', 'caldav', 'kalender-abo'], () => [tr('Calendar subscription'), tr('Calendar apps (CalDAV)'), tr('Calendars')]],
+  [['mail', 'e-mail', 'email', 'mails', 'postfach', 'mailbox', 'correo', 'courriel'], () => [tr('Tasks by e-mail'), tr('E-mail for single events')]],
   [['urlaub', 'abwesenheit', 'krank', 'frei', 'vacation', 'absence', 'holiday', 'sick', 'leave', 'vacaciones', 'ausencia', 'congé', 'ferie', 'assenza', 'vakantie', 'afwezig'], 'absence']];
 // the text of an element with a blank between its parts (textContent glues "Title" + "explanation" together)
 function ss_text(el) {
@@ -1472,4 +1481,71 @@ function ss_hits(md, q, shown, SYN) {
     }
   }
   return hits;
+}
+// 2.353.0 E (#2775): the settings windows of the areas (they are not in this dialog): the search finds them too. One entry
+// per window: src = the functions that draw it (tests/p2353_e_setsearch_guard_test.py: every area settings window has an
+// entry here), on = its module is on and the person may open it, open = its area + the window, root = the window once drawn,
+// secs = its sections [label, words people type (German + English), the element (else the heading with that label), office pane, gate]
+const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
+const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
+const SS_AREA = [
+  {src: ['dc_settings', 'dc_sDraw', 'dc_cfSettings', 'dsc_slot'], area: N_('File store|area'), name: N_('Settings of the documents'), words: ['dokumente', 'documents', 'ablage', 'erkennung', 'recognition', 'paperless'],
+    on: () => modOn('docs') && typeof dc_settings === 'function', open: async () => { go('docs'); await ss_until(() => $('[data-dc="settings"]')); return dc_settings(); }, root: '.dc-smd',
+    secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise', 'archivnummer', 'asn', 'trennblatt']], [N_('Rules'), ['regel', 'rule']],
+      [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
+      [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
+  {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
+    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
+    on: () => modOn('office') && ss_ofm('settings'), open: () => go('office/settings'), root: '#ofc-set',
+    secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
+      [N_('Documents & numbers'), ['nummer', 'nummern', 'number', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice'], '', 'docs'],
+      [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
+      [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
+      [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
+      [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
+      [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
+      [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
+      [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
+      [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},
+  {src: ['bkSettingsHtml'], area: N_('Office|area'), name: N_('Bookkeeping'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],
+    on: () => modOn('office') && ss_ofm('books'), open: () => go('office/books'), root: '#bk-sh', secs: [[N_('Settings'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping'], '#bk-sh']]}];
+// the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
+function ss_areaHits(q, max = 6) {
+  const out = [], lo = s => String(s || '').toLowerCase();
+  const wOk = ws => ws.some(w => w === q || (q.length >= 3 && w.startsWith(q)));
+  const lOk = l => q.length >= 3 ? lo(tr(l)).includes(q) || lo(l).includes(q) : lo(tr(l)).startsWith(q);
+  for (const w of SS_AREA) {
+    if (out.length >= max) break;
+    try { if (!w.on()) continue; } catch { continue; }
+    const pre = `${tr(w.area)} › ${tr(w.name)}`, secs = w.secs.filter(([l, ws, , , gate]) => (!gate || gate()) && (lOk(l) || wOk(ws)));
+    for (const s of secs.slice(0, max - out.length)) out.push({el: null, k: '', act: 'area', w, s, pre, t: tr(s[0])});
+    if (!secs.length && (lOk(w.name) || lOk(w.area) || wOk(w.words))) out.push({el: null, k: '', act: 'area', w, s: null, pre: tr(w.area), t: tr(w.name)});
+  }
+  return out;
+}
+// wait for a real state (the window drawn), never a fixed time; null after `ms`
+function ss_until(fn, ms = 6000) {
+  return new Promise(res => { const t0 = Date.now(), tick = () => { const v = fn(); if (v || Date.now() - t0 > ms) res(v || null); else setTimeout(tick, 60); }; tick(); });
+}
+// open the area + its window, then the section: unfold it, scroll to it and the soft ring of the settings search; a window
+// that draws itself again (data arriving, the letterhead's own redraw) gets the ring again
+async function ss_areaOpen(h) {
+  const {w, s} = h;
+  await w.open();
+  if (!await ss_until(() => $(w.root))) return;
+  if (s?.[3] && typeof ost_show === 'function') ost_show(s[3], true);  // the office pane (kept, so a redraw shows it too)
+  const box = () => { const rt = $(w.root); return rt && (rt.closest('.modal, .card, .dash') || rt.parentElement || rt); };
+  const head = (b, l) => $$('h3, h4, h5, summary, legend, .row > label', b).find(x => !x.closest('[hidden]') && ss_text(x).startsWith(tr(l)));
+  const mark = () => {
+    const b = box(), el = b && (s ? (s[2] ? $(s[2], b) : head(b, s[0])) : $(w.root)); if (!el) return null;
+    for (let det = el.closest('details'); det; det = det.parentElement?.closest('details')) det.open = true;
+    const r = el.closest('.row, details, h3, h4') || el; r.classList.add('sflash'); return r;
+  };
+  let r = await ss_until(mark, 3000); if (!r) return;
+  r.scrollIntoView?.({block: 'center'});
+  const mo = new MutationObserver(() => { if (!r.isConnected || !r.classList.contains('sflash')) { const n = mark(); if (n && n !== r) { r = n; r.scrollIntoView?.({block: 'center'}); } } });  // (a morphing redraw keeps the element, drops the class)
+  mo.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']});
+  setTimeout(() => { mo.disconnect(); r.classList.remove('sflash'); }, 1600);
 }
