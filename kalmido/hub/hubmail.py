@@ -38,6 +38,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
+from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
 HBM_FILES = 20          # attachments of one mail at most
@@ -512,6 +513,7 @@ def _move_folder(c, uid, m, cid, lid):
         with c.savepoint():
             parent = fs_folder(c, uid, m["org_id"], [ROOT, cn or ln or tr("Not assigned", lg=lang(c, uid))])
             if parent != n["parent_id"]:
+                fsl_need_plain(c, parent)  # 2.353.0 F (#2758, review M4): the mail (plain eml) never moves into a locked folder
                 c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?",
                           (parent, _free_name(c, parent, n["owner_id"], n["org_id"], n["name"], skip=n["id"]), _now(), n["id"]))
     except (Denied, ValueError) as e:

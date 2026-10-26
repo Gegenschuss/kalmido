@@ -6,6 +6,8 @@
 // - uploads a picture: encrypted here, opened here (the viewer shows it from memory, a data: URL)
 // - the name search runs in the browser
 // - unlocks it with her password: plain names and files on the server again
+// - 2.353.0 F (review): no scan / server search there, the reference palette skips it, a waiting person gets the key only by the
+//   banner's button with the name (fslInfo / fslRelease stubbed: frida is alone)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -77,6 +79,23 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwA
     await ev(`(() => { const q = document.querySelector('#fsl-q'); q.value = 'pic'; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     check(await waitFor(`(() => { const n = [...document.querySelectorAll('.abrow .abname')].map(x => x.textContent); return n.length === 1 && n[0] === 'pic.png'; })()`), 'the name search filters in the browser');
     await ev(`(() => { const q = document.querySelector('#fsl-q'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+
+    // ---- 2.353.0 F (#2758, review): no scan, no server search, no decrypted names in the reference palette, keys only by the named button
+    check(await ev(`!document.querySelector('[data-ab="scan"]') && !!document.querySelector('[data-ab="upload"]')`), 'F M6: no camera scan in a locked folder (upload stays)');
+    check(await ev(`(typeof ftxtBox !== 'function' || !document.querySelector('#ftxt-q')) && !!document.querySelector('#fsl-q')`), 'F N9: no server search box, the name search of the folder stays');
+    check(await ev(`(typeof rf_palItems !== 'function' || !rf_palItems('pic').some(x => x.id.startsWith('rf:f:'))) ? 1 : 0`) === 1, 'F M7: the reference palette offers no file of the locked folder');
+    const m1 = await ev(`(async () => {
+      const keep = {info: fslInfo, rel: fslRelease}; window.__rel = null;
+      fslInfo = async () => ({can_manage: true, mode: 'on', gen: 1, members: [], keys: [], pending: [{user_id: 77, name: 'Ida Example', has_keys: true}]});
+      fslRelease = async (lid, uids) => { window.__rel = uids; return {ok: true, released: uids}; };
+      try { FSL.auto = {}; await fsl_auto(AB.data); return {silent: window.__rel === null, wait: (FSL.wait[${BOX}] || []).map(p => p.name)}; }
+      finally { window.__keep = keep; }
+    })()`);
+    check(m1 && m1.silent && (m1.wait || []).join() === 'Ida Example', 'F M1: opening hands no key over, the waiting person is noted ' + JSON.stringify(m1));
+    check(await waitFor(`(document.querySelector('[data-fsl="release"]')?.textContent || '').includes('Ida Example')`), 'F M1: the banner names who waits, with a button');
+    await ev(`(document.querySelector('[data-fsl="release"]').click(), 1)`);
+    check(await waitFor(`(window.__rel || []).join() === '77' && document.body.textContent.includes(tr('Key handed over to {0}', 'Ida Example'))`), 'F M1: the button hands it over, the toast names the person');
+    await ev(`(() => { fslInfo = window.__keep.info; fslRelease = window.__keep.rel; FSL.wait = {}; return 1; })()`);
 
     // ---- unlock with the password
     const s = await ev(`fslStop(${BOX}, 'password123').then(x => ({x}), e => ({err: e.message}))`);

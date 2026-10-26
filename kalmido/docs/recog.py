@@ -48,16 +48,18 @@ def rc_state(c, nid, chain=None):
     own = _val(chain[0])
     if _ab_locked(c, chain[0]["id"]):
         return {"on": False, "own": own, "from": None, "root": False, "locked": True}
-    for x in chain:
+
+    def src(i):  # 2.353.0 F (#2758, review N1): the deciding folder by name only when the asker sees it (_crumbs hides it too)
+        x = chain[i]
+        return {"id": x["id"], "name": x["name"]} if fs_role(c, x["id"], chain=chain[i:]) else None
+    for i, x in enumerate(chain):
         v = _val(x)
         if v:
-            return {"on": v == "on", "own": own, "from": None if x["id"] == chain[0]["id"] else {"id": x["id"], "name": x["name"]},
-                    "root": False}
+            return {"on": v == "on", "own": own, "from": None if i == 0 else src(i), "root": False}
     top = chain[-1]
     root = (top["kind"] == "folder" and top["parent_id"] is None
             and S.root_id(c, S.doc_ws(top["org_id"], top["owner_id"])) == top["id"])
-    return {"on": root, "own": own, "from": {"id": top["id"], "name": top["name"]} if root and top["id"] != chain[0]["id"] else None,
-            "root": root}
+    return {"on": root, "own": own, "from": src(len(chain) - 1) if root and top["id"] != chain[0]["id"] else None, "root": root}
 
 
 def rc_on(c, nid):

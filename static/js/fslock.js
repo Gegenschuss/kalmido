@@ -4,7 +4,7 @@
 'use strict';
 
 // lock id = the id of the locked folder. info: GET /api/files/lock/<id>; keys: {gen: CryptoKey} once the encryption is unlocked
-const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: ''};
+const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F)
 const FSL_HEAD = 9, FSL_MAX = 50 * 1024 * 1024;
 const fslIs = v => typeof v === 'string' && v.startsWith('e2e1:');
 const fslNameAad = (lid, g) => `kalmido-fsname:v1:${lid}:${g}`;
@@ -125,9 +125,11 @@ const fsl_prep1 = n => fslPrepNode(n);
 function fsl_bannerHtml(d) {
   const n = d?.node; if (!n?.locked) return '';
   const sealed = (d.items || []).some(x => x._sealed) || n._sealed;
-  const busy = n.lock_mode && n.lock_mode !== 'on';
-  return `<div class="fslbar" role="note">${ic('lock', 's')}<span>${esc(busy ? tr('This folder is being encrypted. Try again in a moment.') : tr('Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.'))}</span>
+  const busy = n.lock_mode && n.lock_mode !== 'on', wait = FSL.wait[n.lock_id] || [], names = wait.map(p => p.name).join(', ');
+  // 2.353.0 F (#2758, review M1): waiting people get the key only by this button (with their names), never silently
+  return `<div class="fslbar" role="note">${ic('lock', 's')}<span>${esc(busy ? tr('This folder is being encrypted. Try again in a moment.') : tr('Locked folder: names and files are encrypted in your browser. The server, agents and API tokens cannot read them.') + ' ' + tr('No camera scan here: the server would see the pages.'))}</span>
     ${sealed ? `<button type="button" class="btn sm" data-fsl="unlock">${ic('lock', 's')} ${tr('Unlock')}</button>` : ''}
+    ${wait.length ? `<span class="muted">${esc(trn('{0} person waits for the key', '{0} people wait for the key', wait.length))}</span><button type="button" class="btn sm" data-fsl="release" title="${esc(names)}">${ic('key', 's')} ${esc(tr('Hand over the key to {0}', names))}</button>` : ''}
     <input type="search" class="fslq" id="fsl-q" data-fsl="q" value="${esc(FSL.q)}" placeholder="${esc(tr('Search names'))}" aria-label="${esc(tr('Search names in this folder'))}"></div>`;
 }
 document.addEventListener('input', (/** @type {any} */ e) => {
@@ -137,7 +139,20 @@ document.addEventListener('input', (/** @type {any} */ e) => {
 document.addEventListener('click', async (/** @type {any} */ e) => {
   const b = e.target.closest?.('[data-fsl]'); if (!b || b.dataset.fsl === 'q') return;
   if (b.dataset.fsl === 'unlock') { if (await e2eEnsure()) { FSL.keys = {}; ab_reload(); } }
+  if (b.dataset.fsl === 'release') {
+    const lid = AB.data?.node?.lock_id, wait = FSL.wait[lid] || []; if (!lid || !wait.length) return;
+    b.disabled = true;
+    try { const j = await fslRelease(lid, wait.map(p => p.user_id)); fslReleased(lid, j); } catch (x) { if (!x.shown) fslToast(x); b.disabled = false; return; }
+    ab_reload();
+  }
 });
+// the toast after handing the key over: the names of who got it (2.353.0 F, #2758 review M1)
+function fslReleased(lid, j, people) {
+  const got = new Set(j?.released || []), all = [...(FSL.wait[lid] || []), ...(people || [])];
+  const names = [...new Set(all.filter(p => got.has(p.user_id)).map(p => p.name))];
+  FSL.wait[lid] = (FSL.wait[lid] || []).filter(p => !got.has(p.user_id));
+  toast(names.length ? tr('Key handed over to {0}', names.join(', ')) : trn('Key handed over to {0} person', 'Key handed over to {0} people', got.size));
+}
 const fslLockOf = id => { const d = AB.data; if (!id) return null; const n = d?.node?.id === +id ? d.node : ab_ptItem?.(id) || ab_item(id); return n?.locked ? n.lock_id : null; };
 async function fslFetch(n, v) {
   let r;
@@ -160,8 +175,8 @@ async function fsl_open(n, dl, v) {
   if (!dl && ab_isPdf(a) && typeof pdfView === 'function') { pdfView({url, dlUrl: url, name: f.name, size: a.size, data: new Uint8Array(f.data)}); return; }
   const el = document.createElement('a'); el.href = url; el.download = f.name; document.body.appendChild(el); el.click(); el.remove();
 }
-async function fsl_upload(files, target) {
-  const lid = fslLockOf(target); files = [...(files || [])].filter(f => f.size > 0); if (!lid || !files.length) return;
+async function fsl_upload(files, target, lid0) {
+  const lid = lid0 || fslLockOf(target); files = [...(files || [])].filter(f => f.size > 0); if (!lid || !files.length) return;
   const big = files.find(f => f.size > FSL_MAX); if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
   const fd = new FormData();
   try {
@@ -176,8 +191,8 @@ async function fsl_upload(files, target) {
   offerUndo(trn('{0} file encrypted and uploaded', '{0} files encrypted and uploaded', ids.length), histAdd({label: tr('Upload'),
     undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
 }
-async function fsl_newFolder(pid, name) {
-  const lid = fslLockOf(pid);
+async function fsl_newFolder(pid, name, lid0) {
+  const lid = lid0 || fslLockOf(pid);
   let n; try { await fslKeys(lid, true); n = await api('POST', '/api/files/lock/folder', {parent_id: pid, name: await fslNameEnc(lid, name.trim())}); } catch (x) { if (!x.shown) fslToast(x); return; }
   ab_reload();
   offerUndo(tr('Folder “{0}” created', name.trim()), histAdd({label: tr('New folder “{0}”', name.trim()), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
@@ -328,9 +343,11 @@ async function fsl_lockDlg(n) {
   if (info.mode) return fsl_infoDlg(n, info);
   if (info.block) { toast(info.block); return; }
   const without = (info.members || []).filter(m => !m.has_keys && m.user_id !== S.me.id);
+  const get = (info.members || []).filter(m => m.has_keys && m.user_id !== S.me.id);  // 2.353.0 F (#2758, review M1): named before the lock
   const yes = await askConfirm(tr('Lock “{0}”?', n.name), '', {ok: tr('Lock folder'), danger: true, html:
     [tr('Names and files of this folder are encrypted in your browser. The server, the operator, agents and API tokens cannot read them any more: no preview, no text recognition, no search on the server.'),
       `<b>${esc(tr('Warning: if you and everyone holding the key lose passphrase and recovery code, the content is lost for good. Nobody can restore it, not even the operator.'))}</b>`,
+      get.length ? tr('These people get the key with the lock: {0}', get.map(m => m.name).join(', ')) : '',
       without.length ? tr('Waiting for the key until they set up encryption: {0}', without.map(m => m.name).join(', ')) : ''].filter(Boolean).map(x => `<p>${x.startsWith('<b>') ? x : esc(x)}</p>`).join('')});
   if (!yes) return;
   try { await fslStart(n.id, fslProgToast(tr('Encrypting'))); } catch (x) { if (!x.shown) toast(tr('The folder stays open: {0}', x.message || '?')); ab_reload(); return; }
@@ -349,7 +366,7 @@ async function fsl_infoDlg(n, info) {
     const b = e.target.closest('[data-fsld]'); if (!b) return;
     b.disabled = true;
     try {
-      if (b.dataset.fsld === 'release') { const j = await fslRelease(n.id, pend.filter(p => p.has_keys).map(p => p.user_id)); toast(trn('Key handed over to {0} person', 'Key handed over to {0} people', j?.released?.length || 0)); }
+      if (b.dataset.fsld === 'release') { const j = await fslRelease(n.id, pend.filter(p => p.has_keys).map(p => p.user_id)); fslReleased(n.id, j, pend); }
       if (b.dataset.fsld === 'resume') await fslResume(n.id, fslProgToast(tr('Encrypting')));
       if (b.dataset.fsld === 'stop') {
         const pw = await askPrompt(tr('Unlock “{0}”?', n.name), '', {ok: tr('Unlock folder'), danger: true, input: {type: 'password', placeholder: tr('Your account password')},
@@ -369,7 +386,8 @@ function fsl_menuItem(n) {
   if (n.locked || n.role !== 'owner' || n.agent_id) return null;
   return {label: tr('Lock folder…'), icon: 'lock', fn: () => fsl_lockDlg(n)};
 }
-// an owner opening a locked folder: an interrupted switch continues, people waiting with encryption set up get the key (once per page)
+// an owner opening a locked folder: an interrupted switch continues; people waiting with encryption set up are shown in the banner
+// (2.353.0 F, #2758 review M1: like the knowledge spaces and lists, the key goes only by the button -- never silently)
 async function fsl_auto(d) {
   const n = d?.node; if (!n?.locked || typeof e2eUnlocked !== 'function' || !e2eUnlocked()) return;
   const lid = n.lock_id, tag = lid + ':' + (n.lock_mode || '');
@@ -379,8 +397,10 @@ async function fsl_auto(d) {
     const info = await fslInfo(lid, true);
     if (!info.can_manage) return;
     if (info.mode !== 'on') { await fslResume(lid); ab_reload(); return; }
-    const w = (info.pending || []).filter(p => p.has_keys).map(p => p.user_id);
-    if (w.length && !w.some(u => LE2E.fresh.has(u))) await fslRelease(lid, w);
+    const w = (info.pending || []).filter(p => p.has_keys).map(p => ({user_id: p.user_id, name: p.name}));
+    const was = (FSL.wait[lid] || []).map(p => p.user_id).join();
+    FSL.wait[lid] = w;
+    if (w.map(p => p.user_id).join() !== was) ab_draw();
   } catch (x) { console.warn('fsl: auto', x?.message); } finally { delete FSL.busy[lid]; }
 }
 // a version in the details of an encrypted file: decrypted here
