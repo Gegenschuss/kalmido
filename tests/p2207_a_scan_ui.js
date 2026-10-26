@@ -72,6 +72,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   w.eval(`settingsModal('scans')`);
   await until(() => d.querySelector('#s-scan .dsc-key'));
   check(!d.querySelector('#dsc-code') && !etxt().includes(code), 'opened again: the code is gone');
+  w.eval(`document.querySelectorAll('.modal').forEach(m => modalClose(m))`);
   w.eval('dc_settings()');
   await until(() => d.querySelector('.dc-smd .dsc-way'));
   check(!d.querySelector('.dc-smd .dsc-note'), 'opened again: the mail note stays small');

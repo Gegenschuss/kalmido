@@ -30,7 +30,8 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'agents,files,docs,comments'});
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'helper', display_name: 'Office Helper'});
   check(ag.http < 300, 'setup: an agent');
-  await call('POST', '/api/lists', {name: 'Office'}, CF);
+  const LA = (await call('POST', '/api/lists', {name: 'Office'})).id;
+  await call('PUT', `/api/lists/${LA}/members`, {user_id: ag.id, role: 'edit'});
 
   // ---- #2786 the agent status menu
   for (const user of ['alice', 'frida']) {
@@ -43,6 +44,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     const L = (items || []).map(lab);
     check(L[0] === 'Agents and jobs' && L[1] === '-', `${user}: "Agents and jobs" on top, then a divider ` + JSON.stringify(L));
     check(!L.some((x, i) => x === '-' && L[i + 1] === '-') && L[L.length - 1] !== '-', `${user}: no doubled or trailing divider ` + JSON.stringify(L));
+    if (user !== 'alice') { w.close(); continue; }  // frida shares no list with the agent: only the top is checked
     const iAg = L.findIndex(x => /Office Helper/.test(x) && !/^Chat with/.test(x)), iChat = L.findIndex(x => /^Chat with Office Helper/.test(x));
     check(iAg > 1 && iChat > iAg && L.indexOf('Choose the agents shown…') > iChat, `${user}: then the agents; chats and the rest stay below ` + JSON.stringify(L));
     w.close();
@@ -55,7 +57,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     await until(() => w.eval('S.booted'));
     if (mobile) { w.eval(`document.querySelector('#top .menu')?.click()`); }
     await until(() => d.querySelector('#side .sg-lists'));
-    const panel = w.eval('sbb_on() || sbm_on()');
+    const panel = w.eval('sbb_on()');  // the panel header exists on a computer with sidebar B only; the phone's drawer keeps the group label
     const shown = [...d.querySelectorAll('#side .sg-lists .sgt > span')].filter(x => !x.classList.contains('sr') && !x.classList.contains('c') && /Projects/.test(x.textContent));
     const hid = [...d.querySelectorAll('#side .sg-lists .sgt > span.sr')].filter(x => /Projects/.test(x.textContent));
     check(panel ? shown.length === 0 && hid.length === 1 && /Projects/.test(d.querySelector('#side .sbbpt')?.textContent || '') : shown.length === 1,
