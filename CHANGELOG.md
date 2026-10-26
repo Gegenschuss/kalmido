@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.1] - 2026-10-27
+
+### Fixed
+- CI of 2.351.0: the shard plan no longer runs into its time limit on a large push. Choosing the test stage searched every route of every changed server module through all 1,300 test files one by one (over 6 minutes for the 204 files of the live train push, the plan was cancelled and every shard skipped); now a file that needs the full run decides at once, the importers of a module are looked up once and each word is searched once, so the same choice takes seconds. The plan step and each download of the suite times have their own time limit (a slow step means a full run, not a cancelled run).
+
 ## [2.351.0] - 2026-10-26
 
 Package 2.300.0 (Brand colour petrol).
@@ -8797,7 +8802,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.1...HEAD
+[2.351.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.1
 [2.351.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.0
 [2.323.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.1
 [2.323.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.0
