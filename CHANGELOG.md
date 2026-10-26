@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.323.1] - 2026-10-26
+
+Package 2.323.1 (CI fix).
+### Fixed
+- CI of 2.323.0: saving an agent's runtime settings could lose the model and the auto-compact percentage when the daily summary time was saved at the same moment (both saves merged into the same old values; the stored runtime is now read under a row lock); `tools/eslint_globals.py --check` no longer asks for `tools/eslint_globals.json`, which is generated and not kept in git since 2.321; three suites proven flaky (p21445_c_ui, p2169_a_ui, p2412_ui) skipped until 2026-11-09 (#3330).
+
 ## [2.323.0] - 2026-10-26
 
 - Trunk workflow: CI on job branches, suite list by marker, merge drivers for i18n and sw.js lists, 2-hour cut for the live train.
@@ -8726,7 +8732,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.323.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.323.1...HEAD
+[2.323.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.1
 [2.323.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.0
 [2.322.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.322.0
 [2.321.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.321.0
