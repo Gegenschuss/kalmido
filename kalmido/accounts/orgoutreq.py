@@ -31,7 +31,7 @@ def oor_admins(c, oid):
 
 
 def oor_org_name(c, oid):
-    with system_ctx(c):
+    with system_ctx(c):  # the name of an organisation (structure)
         return (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
 
 

@@ -25,7 +25,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
-from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -80,24 +80,29 @@ def decide(s, rid, d):
 
 
 if not os.environ.get("P23612A_NOSTART"):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = usess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
-A = usess("alice")
+A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
+r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE})
+assert r.status_code == 201, r.text
+ORG = r.json()["id"]
 uid = {}
-for u, role in (("bob", "member"), ("carol", "member"), ("erin", "admin")):
-    r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": role}], "username": u, "display_name": u.title(),
-                                       "password": "password123", "email": f"{u}@example.com"})
+for u in ("bob", "carol", "erin"):
+    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
     uid[u] = r.json()["id"]
+    check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"}).ok and org_join(B, u, ORG), f"setup: {u} joins Alpha")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["erin"], "role": "admin"}).ok, "setup: erin is an admin of Alpha")
 Bo, Ca, Er = usess("bob"), usess("carol"), usess("erin")
+for s_ in (A, Bo, Ca, Er):
+    s_.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 BOB, ERIN = uid["bob"], uid["erin"]
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEATURES + ",sheets"})
