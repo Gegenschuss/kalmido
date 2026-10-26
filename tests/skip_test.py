@@ -36,7 +36,7 @@ def problems(text, suites, today):
 
 def main():
     sys.path.insert(0, HERE)
-    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    import suites as _suites  # 2.321 (#1368): the suite list (suites.txt + marker files)
     suites = {n for _, n, _ in _suites.rows(HERE)}
     today = datetime.datetime.now(ZoneInfo("Europe/Berlin")).date()
     d = datetime.date(2026, 10, 25)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The suite list of Kalmido's test run (2.320, #1368 - Allison #1304 Änderung 3: no hand-kept list that every package appends to).
+"""The suite list of Kalmido's test run (2.321, #1368 - Allison #1304 Änderung 3: no hand-kept list that every package appends to).
 
 A suite is a file tests/<name>_test.py (python) or tests/<name>.js / tests/<name>_test.js (node) with a marker line in its
 first 15 lines:
@@ -60,10 +60,17 @@ def read(path):
         return ""
 
 
+SHARD_RE = re.compile(r"^shard ([0-9]+)\b")
+
+
 def legacy(path=LIST):
-    """The suites of tests/suites.txt (old run_all.sh line syntax), in file order."""
+    """The suites of tests/suites.txt (old run_all.sh line syntax), in file order; `shard N` marker lines pass through as
+    entries without a name (run_all.sh and tools/shards.py read them for runs without a shard plan - the Mac full run)."""
     out = []
     for ln in read(path).splitlines():
+        if SHARD_RE.match(ln):
+            out.append(Suite(None, None, "", False, line=ln, legacy=True))
+            continue
         m = RUN_RE.match(ln)
         if not m:
             continue
@@ -140,11 +147,13 @@ def all_suites(tests_dir=HERE, list_path=None):
 
 
 def groups(tests_dir=HERE, list_path=None):
-    """[(first suite, [suites], 0)] - the shape tools/shards.py uses (marker shard = 0: the plan assigns)."""
-    out = []
+    """[(first suite, [suites], marker shard)] - the shape tools/shards.py uses (`shard N` lines of suites.txt; 0 = none)."""
+    out, cur = [], 1
     for s in all_suites(tests_dir, list_path)[0]:
+        if s.name is None:
+            cur = int(SHARD_RE.match(s.line).group(1)); continue
         if s.fresh or not out:
-            out.append([s.name, [], 0])
+            out.append([s.name, [], cur])
         out[-1][1].append(s.name)
     return [tuple(g) for g in out]
 
@@ -153,6 +162,8 @@ def rows(tests_dir=HERE, list_path=None):
     """[(group index from 1, suite, test file or None)] - the shape tests/stages.py uses."""
     out, g = [], 0
     for s in all_suites(tests_dir, list_path)[0]:
+        if s.name is None:
+            continue
         if s.fresh or g == 0:
             g += 1
         out.append((g, s.name, s.file))
@@ -163,14 +174,14 @@ def main(argv=None):
     a = argv if argv is not None else sys.argv[1:]
     suites, errs = all_suites()
     if "--check" in a or not a:
-        names = [s.name for s in suites]
+        names = [s.name for s in suites if s.name]
         dup = sorted({n for n in names if names.count(n) > 1})
         if dup:
             errs.append(f"suite names twice: {', '.join(dup)}")
         for e in errs:
             print("suites.py: " + e, file=sys.stderr)
         if not a:
-            print(f"{len(suites)} suites, {len(groups())} groups, {sum(1 for s in suites if not s.legacy)} by marker")
+            print(f"{sum(1 for s in suites if s.name)} suites, {len(groups())} groups, {sum(1 for s in suites if not s.legacy)} by marker")
         return 1 if errs else 0
     if "--bash" in a:
         print("\n".join(s.bash() for s in suites))

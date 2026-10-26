@@ -990,7 +990,7 @@ def main():
     tests = {os.path.basename(p): open(p, encoding="utf-8").read() for p in glob.glob(os.path.join(N, "*.py"))
              if os.path.basename(p) != os.path.basename(__file__)}
     sys.path.insert(0, N)
-    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    import suites as _suites  # 2.321 (#1368): the suite list (suites.txt + marker files)
     run_all = " " + " ".join(f or "" for _, _, f in _suites.rows(N)) + " "
     # a marker line: "freelancer-matrix: area, area, ..." (a comment in the suite, next to the calls of these areas)
     marked = {}

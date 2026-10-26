@@ -136,7 +136,7 @@ two Mac runs) goes into `skip.txt` with a date at most 14 days ahead and the tas
 until that date (a run naming it with `ONLY=` still runs it), and the lint step `skip_test.py` turns red once the date has
 passed. Fix the suite, delete its line.
 
-The suite list (2.320, #1368): `suites.txt` holds the old `run` lines (`[now ...; ]fresh; run <name> <command>` = a group
+The suite list (2.321, #1368): `suites.txt` holds the old `run` lines (`[now ...; ]fresh; run <name> <command>` = a group
 with a fresh container; an indented `run` line = same group). A **new suite needs no list entry**: a marker line in the
 first 15 lines of its file is enough, `python3 suites.py --check` validates it, `--list` shows every suite with its group:
 

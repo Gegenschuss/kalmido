@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The precache lists of the service worker (static/sw.js: SHELL, LAZY, LAZY_CSS) written from their sources (2.320, #1368).
+"""The precache lists of the service worker (static/sw.js: SHELL, LAZY, LAZY_CSS) written from their sources (2.321, #1368).
 
 SHELL = the fixed start files (kept as they stand in sw.js: '/', manifest, app.css, i18n.js, icons, fonts, ...) + every
 static/js/<module>.js that static/index.html loads with a <script> tag, in that order; LAZY = the modules of LD_MODS in

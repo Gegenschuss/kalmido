@@ -28,7 +28,7 @@ PY_TALK = re.compile(r"requests\.|urlopen|\bsess\(|\blogin\(|\.(?:get|post|put|p
 
 def suites():
     sys.path.insert(0, N)
-    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    import suites as _suites  # 2.321 (#1368): the suite list (suites.txt + marker files)
     for _, name, fname in _suites.rows(N):
         if fname:
             yield name, fname

@@ -450,7 +450,7 @@ image) with three rules: `no-undef`, `no-unused-vars` (local variables only; top
 and the HTML use) and `eqeqeq` (`== null` stays allowed for "null or undefined"). The client's global names come from
 `tools/eslint_globals.json`, which `tools/eslint_globals.py` writes from the top-level declarations of `static/i18n.js` +
 `static/js/*.js`; the browser's own names stand in a fixed list in the config (a new browser API = one name there).
-`static/sw.js` has its own service-worker scope. Since 2.320 (#1368) the JSON is generated right before ESLint and not kept
+`static/sw.js` has its own service-worker scope. Since 2.321 (#1368) the JSON is generated right before ESLint and not kept
 in git (it changed in nearly every package and conflicted in every second merge). CI runs, and locally the same in the repo root:
 
 ```bash
@@ -459,7 +459,7 @@ python3 tools/eslint_globals.py && npx --yes eslint@10.13.0 static/i18n.js 'stat
 
 The generator exits 1 when two scripts declare the same top-level name.
 
-### Merging without conflicts (2.320, #1368)
+### Merging without conflicts (2.321, #1368)
 
 Packages are built side by side on their own branches and land on `main` one by one. The files every package touched by
 hand used to conflict in almost every merge; they are handled now so two packages that add different things never meet:

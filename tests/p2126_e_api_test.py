@@ -1,6 +1,6 @@
 """2.126.0 tests, part E (#1993 ESLint in CI): the generated list of the client's global names.
 
-- tools/eslint_globals.py writes the globals list cleanly (2.320, #1368: generated in CI / lint, not kept in git)
+- tools/eslint_globals.py writes the globals list cleanly (2.321, #1368: generated in CI / lint, not kept in git)
 - the scanner finds the top-level names of a script (several declarators, destructuring, classes, window.X =) and skips
   the inner ones and what stands in strings, template literals, comments and regular expressions
 No server needed; the data dir argument of run_all.sh is ignored.
@@ -16,7 +16,7 @@ import eslint_globals  # noqa: E402
 from kt import FAILS, OKS, check  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
-# 2.320 (#1368): the list is generated (CI, Mac lint, landen), not kept in git: the generator must run clean (no name twice)
+# 2.321 (#1368): the list is generated (CI, Mac lint, landen), not kept in git: the generator must run clean (no name twice)
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "eslint_globals.py")], capture_output=True, text=True)
 check(r.returncode == 0 and os.path.isfile(os.path.join(ROOT, "tools", "eslint_globals.json")),
       f"tools/eslint_globals.py writes the globals list: {r.stdout.strip()} {r.stderr.strip()[-300:]}")

@@ -76,7 +76,7 @@ def read(path):
 
 
 def suites(run_all):
-    """[(group index, suite, test file or None)] in run order. 2.320 (#1368): from tests/suites.py (tests/suites.txt + the test
+    """[(group index, suite, test file or None)] in run order. 2.321 (#1368): from tests/suites.py (tests/suites.txt + the test
     files with a `kalmido-suite:` marker); an older tree whose run_all.sh still holds the lines is read as before."""
     text = read(run_all)
     if RUN_RE.search(text) is None or 'eval "$LIST"' in text:
@@ -246,7 +246,7 @@ def classify(repo, path, base=None, head=None):
     p = p[2:] if p.startswith("./") else p
     name = os.path.basename(p)
     stem = os.path.splitext(name)[0]
-    if p == "tests/suites.txt":  # 2.320 (#1368): the old list; new suites come by marker (their test file maps below)
+    if p == "tests/suites.txt":  # 2.321 (#1368): the old list; new suites come by marker (their test file maps below)
         new = run_all_added(base, head, repo.root, p)
         if new is not None and all(n in repo.group_of for n in new):
             return "suites", {n: "new in suites.txt" for n in new}
@@ -409,11 +409,14 @@ def ci_base():
         # without the train's release push: always every suite
         return "full", "hotfix branch (fast lane): full run", None
     if ev == "push" and os.environ.get("GITHUB_REF", "").startswith("refs/heads/job/"):
-        # 2.320 (#1368): a package branch before it lands on main (kalmido-livezug.py landen): its files against main come from
-        # ci.yml (compare API, CI_CHANGED_FILES); without them the full run
-        if os.environ.get("CI_CHANGED_FILES", "").strip():
-            return None, "package branch (job/**) against main", "env"
-        return "full", "package branch (job/**) without a file list: full run", None
+        # 2.321 (#1368): a package branch before it lands on main (kalmido-livezug.py landen): the push stage against the
+        # merge base with origin/main (ci.yml checks out the full history and fetches main); no base = the full run
+        if git_ok("rev-parse", "--verify", "-q", "origin/main^{commit}") is None:
+            git_ok("fetch", "--no-tags", "origin", "main:refs/remotes/origin/main")
+        base = (git_ok("merge-base", "origin/main", "HEAD") or "").strip()
+        if base:
+            return None, "package branch (job/**) against main", base
+        return "full", "package branch (job/**) without a merge base with main: full run", None
     if ev == "push":
         before = os.environ.get("CI_BEFORE", "")
         if not before or set(before) == {"0"}:
@@ -449,10 +452,7 @@ def main(argv=None):
     if a.ci:
         pre, reason, base = ci_base()
         files = []
-        if pre is None and base == "env":  # 2.320 (#1368): the file list of a package branch (ci.yml, compare API)
-            files = [x.strip() for x in os.environ.get("CI_CHANGED_FILES", "").splitlines() if x.strip()]
-            base = head = None
-        elif pre is None:
+        if pre is None:
             if git_ok("rev-parse", "--verify", "-q", base + "^{commit}") is None:
                 pre, reason = "full", f"{reason}: base {base} not available"
             else:

@@ -49,14 +49,15 @@ for fn, head in (("p9_a_api_test.py", "#!/usr/bin/env python3\n# kalmido-suite: 
         f.write(head)
 order, errs = suites.all_suites(d)
 check(not errs, f"no errors: {errs}")
-check([s.name for s in order] == ["api", "p9_b_ui", "p9_c_ui", "ui", "t_api", "p9_a_api", "p9_z"],
+check([s.name for s in order if s.name] == ["api", "p9_b_ui", "p9_c_ui", "ui", "t_api", "p9_a_api", "p9_z"],
       f"order: legacy first, after=api suites right after api by name, own groups at the end: {[s.name for s in order]}")
 bash = [s.bash() for s in order]
 check(bash[1] == '       run p9_b_ui node p9_b_ui.js "$KALMIDO_TEST_DATA"' and bash[2] == "       run p9_c_ui node p9_c_ui.js", f"after= lines: {bash[1:3]}")
-check(bash[5] == 'now wed 10:00; fresh; run p9_a_api "$PY" p9_a_api_test.py "$KALMIDO_TEST_DATA"', f"now= + fresh line: {bash[5]}")
-check(bash[6] == '       run p9_z "$PY" p9_z_test.py', f"after a marker suite, nodata: {bash[6]}")
-check(suites.groups(d) == [("api", ["api", "p9_b_ui", "p9_c_ui", "ui"], 0), ("t_api", ["t_api"], 0), ("p9_a_api", ["p9_a_api", "p9_z"], 0)],
-      f"groups: {suites.groups(d)}")
+check(bash[4] == "shard 2", f"the shard marker of suites.txt passes through (Mac full run): {bash[4]}")
+check(bash[6] == 'now wed 10:00; fresh; run p9_a_api "$PY" p9_a_api_test.py "$KALMIDO_TEST_DATA"', f"now= + fresh line: {bash[6]}")
+check(bash[7] == '       run p9_z "$PY" p9_z_test.py', f"after a marker suite, nodata: {bash[7]}")
+check(suites.groups(d) == [("api", ["api", "p9_b_ui", "p9_c_ui", "ui"], 1), ("t_api", ["t_api"], 2), ("p9_a_api", ["p9_a_api", "p9_z"], 2)],
+      f"groups with the marker shard (new suites land in the last marked shard): {suites.groups(d)}")
 check([r for r in suites.rows(d) if r[1] == "p9_z"] == [(3, "p9_z", "p9_z_test.py")], "rows carry group index + file")
 # 3. errors
 with open(os.path.join(d, "p9_bad_test.py"), "w") as f:

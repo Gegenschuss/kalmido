@@ -6,7 +6,7 @@
 #                                suites after it) stays whole. Keep the shards about equal (~14 min each on CI) by moving
 #                                a marker when one grows; new suites go at the end (the last shard).
 #   ONLY="a b" tests/run_all.sh   just these suites (the containers of their groups are still started)
-#   The suite list (2.320, #1368): tests/suites.txt holds the old `run` lines; a NEW suite only needs a marker line in its
+#   The suite list (2.321, #1368): tests/suites.txt holds the old `run` lines; a NEW suite only needs a marker line in its
 #                                test file (`# kalmido-suite: ...` / `// kalmido-suite: ...`, see tests/suites.py) - no list
 #                                to append to, so parallel packages no longer conflict here.
 #   ONLY_GROUPS="a b" tests/run_all.sh  2.149.0 (#2514): the whole groups of these suites (every suite of each group, in order;
@@ -42,7 +42,7 @@ SHARDS_DEFINED=21
 #   every marker is followed by `fresh` now (tools/shards.py warns when one is not)
 #   CI of 2.168.4 (job #1052): the group p2180_git_api still held 29 suites (2.18-2.29, > 50 min, shard 1 cancelled in 2.168.3
 #   and 2.168.4); every API suite there restarts its own container, so each starts its own group now (`fresh`)
-# 2.320 (#1368): the suite list = tests/suites.txt + the test files with a `kalmido-suite:` marker (tests/suites.py --bash)
+# 2.321 (#1368): the suite list = tests/suites.txt + the test files with a `kalmido-suite:` marker (tests/suites.py --bash)
 LIST=$("$PY" "$HERE/suites.py" --bash) || { echo "run_all.sh: tests/suites.py failed (python3 tests/suites.py --check)"; exit 2; }
 declare -A PLAN=(); PLAN_STAGE=
 if [[ -n "${KALMIDO_SHARD_PLAN:-}" ]]; then
@@ -152,7 +152,7 @@ _fresh_start() {  # _fresh_start <suite>
   if [[ "$SELFSTART" == *" $1 "* ]]; then docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1; return 0; fi
   bash "$HERE/start.sh" >/dev/null || { echo "container start failed"; exit 1; }
 }
-# 2.320 (#1368): the suites come from tests/suites.py - tests/suites.txt (the old lines of this file) plus every test file
+# 2.321 (#1368): the suites come from tests/suites.py - tests/suites.txt (the old lines of this file) plus every test file
 # with a `kalmido-suite:` marker (a new suite needs no list entry: no more conflicts of parallel packages in this file)
 eval "$LIST"
 _group_end

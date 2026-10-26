@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""git merge driver for static/i18n/<code>.json: three-way merge BY KEY instead of by line (2.320, #1368; before: job #1273
+"""git merge driver for static/i18n/<code>.json: three-way merge BY KEY instead of by line (2.321, #1368; before: job #1273
 kalmido_ableitbar.py did this only inside the release tooling).
 
 Every package appends its new texts at the end of the five language files, so two packages built side by side always
