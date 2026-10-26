@@ -110,7 +110,8 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
   `PATCH /api/admin/agents/{id}`, `PATCH /api/my/agents/{id}` and `POST` / `PATCH /api/me/tokens`; `GET /api/v1/me`
   shows `token.list_ids`. Other projects answer `404`, queries leave them out, and no events about them arrive (2.86.0: also
   events queued before the project was taken away or limited are left out when polled; 2.351.0: also a quotation or
-  invoice of another project filed in a folder shared with the agent). See
+  invoice of another project filed in a folder shared with the agent). Documents made from a template (office documents) are
+  not tied to the limit, neither through the office routes nor through a folder. See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
 
 ## Personal agents
