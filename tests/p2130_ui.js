@@ -93,7 +93,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(wc && /1 job waits for you/.test(wc.textContent) && /Publish page 1/.test(wc.textContent) && wc.querySelector(`[data-act="job-do"][data-a="approve"][data-jid="${J}"]`) && wc.querySelector('[data-a="reject"]'), 'A6: Today: "1 job waits for you" with Approve / Reject');
   await w.eval(`agentChipMenu(document.querySelector('#top .achip') || document.querySelector('#top h1'))`); await idle(w);
   const mi = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
-  check(mi[0] && /Claude waits for you: Publish page 1/.test(mi[0]) && mi.some(t => /Approve/.test(t)) && mi.some(t => /Reject/.test(t)), 'A6: the agent pill menu starts with what waits for me: ' + mi.slice(0, 4).join(' | '));
+  // 2.353.0 (#2786): "Agents and jobs" leads the menu, then a divider, then what waits for me
+  check(/Agents and jobs/.test(mi[0] || '') && /Claude waits for you: Publish page 1/.test(mi[1] || '') && mi.some(t => /Approve/.test(t)) && mi.some(t => /Reject/.test(t)), 'A6: the agent pill menu: Agents and jobs, then what waits for me: ' + mi.slice(0, 4).join(' | '));
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => /Approve/.test(b.textContent)));
   check(await until(async () => (await tcall('GET', `/agent/jobs/${J}`, TOK)).action === 'approve'), 'A6: Approve from the menu reaches the job');
   await w.eval('load().then(render)'); await idle(w);
