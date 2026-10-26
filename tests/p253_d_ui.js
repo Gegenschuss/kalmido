@@ -140,7 +140,13 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     check(pv.in, 'preview: inside the screen at the bottom right corner');
     check(/Write the brief/.test(pv.t) && /Agents/.test(pv.t) && /High/.test(pv.t) && /#studio/.test(pv.t) && /First line of the brief/.test(pv.t) && /1 comment/.test(pv.t),
       'preview: title, list, priority, tag, description, comments ' + pv.t);
-    check(await ev(`!document.querySelector('#d-tl a.tref[data-tref="${T1}"]').title`), 'preview: no browser tooltip on top');
+    // CI of 2.307.3: a late live redraw (the new comment) swaps the link under the open card - hover the new one, so the
+    // card belongs to the link on the page before its tooltip is checked
+    for (let i = 0; i < 2 && !(await ev(`RFH.a === document.querySelector('#d-tl a.tref[data-tref="${T1}"]')`)); i++) {
+      await hover(`#d-tl a.tref[data-tref="${T1}"]`, 1270, 890);
+      await ready(ev, `RFH.a === document.querySelector('#d-tl a.tref[data-tref="${T1}"]') && !!document.querySelector('.rfpv.on')`, 8);
+    }
+    check(await ev(`!document.querySelector('#d-tl a.tref[data-tref="${T1}"]').title`), 'preview: no browser tooltip on top ' + await ev(`RFH.a === document.querySelector('#d-tl a.tref[data-tref="${T1}"]')`));
     await shot('p253-d-preview.png');
     await ev(`(() => { document.querySelector('.rfpv').dispatchEvent(new PointerEvent('pointerover', {bubbles: true, pointerType: 'mouse'})); return 1; })()`);
     await sleep(300);

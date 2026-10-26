@@ -3548,6 +3548,8 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
   .trow > .caret{position:relative;left:auto;top:auto;flex:none;margin:1px -.375rem 0 -.375rem}
   .trow > .caret::before{left:0}  /* its touch area grows rightwards only, never over the circle */
   :root .trow > .caret::after{left:0}
+  /* CI of 2.307.3: on touch a full 2.75rem target (K10), still only rightwards (was 31 px wide) */
+  @media (pointer:coarse){ :root .trow > .caret::after{content:"";position:absolute;left:0;right:auto;width:2.75rem;top:50%;bottom:auto;height:2.75rem;transform:translateY(-50%)} }
 }
 @media (pointer:coarse){
   .trow .caret::after,.qchip::after,.ib::after{content:'';position:absolute;inset:-.6875rem}

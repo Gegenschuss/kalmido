@@ -200,9 +200,8 @@ def pl_import_stop():
     d = body()
     uid, org, ws = _ws(c, d.get("ws"))
     r = _need_conn(c, ws)
-    if r["run_state"] == "queued":
-        c.execute("UPDATE pl_sources SET run_state='' WHERE id=?", (r["id"],))
-    elif r["run_state"] == "busy":
-        c.execute("UPDATE pl_sources SET run_state='stop' WHERE id=?", (r["id"],))
+    # CI of 2.307.3: in one statement on the current state (the worker may claim the run between a read and the write)
+    c.execute("UPDATE pl_sources SET run_state=CASE WHEN run_state='busy' THEN 'stop' ELSE '' END "
+              "WHERE id=? AND run_state IN ('queued','busy')", (r["id"],))
     c.commit()
     return jsonify(_public(c, ws, uid, org))

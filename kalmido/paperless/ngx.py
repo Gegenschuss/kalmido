@@ -675,8 +675,11 @@ def pl_claim(c):
         return None
     x = c.execute("""SELECT 'url' AS k, id, run_beat FROM pl_sources WHERE run_state='queued' UNION ALL
                      SELECT 'zip' AS k, id, run_beat FROM pl_uploads WHERE run_state='queued' ORDER BY run_beat, k, id LIMIT 1""").fetchone()
-    if x:
-        c.execute(f"UPDATE {'pl_sources' if x['k'] == 'url' else 'pl_uploads'} SET run_state='busy', run_beat=? WHERE id=?", (_now(), x["id"]))
+    # CI of 2.307.3: only while still queued -- a Stop between the SELECT and here (Postgres: the advisory lock does not hold
+    # the web request back) set it back to '' and must not be undone by the claim
+    if x and not c.execute(f"UPDATE {'pl_sources' if x['k'] == 'url' else 'pl_uploads'} SET run_state='busy', run_beat=? "
+                           "WHERE id=? AND run_state='queued'", (_now(), x["id"])).rowcount:
+        x = None
     c.commit()
     return (x["k"], x["id"]) if x else None
 
