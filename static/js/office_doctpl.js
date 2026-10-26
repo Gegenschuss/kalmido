@@ -66,7 +66,7 @@ function dtTabHtml() {
   const id = S.route.tab === 'gendocs' ? S.route.id : null;
   if (id) { const d = dtDoc(id); return d ? dtDocHtml(d) : `<div class="empty">${tr('This document does not exist or you cannot see it.')}</div>`; }
   const seg = `<div class="seg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-dt="view" data-v="docs" class="${DT.view === 'docs' ? 'on' : ''}" aria-pressed="${DT.view === 'docs'}">${tr('Documents')}</button><button type="button" data-dt="view" data-v="templates" class="${DT.view === 'templates' ? 'on' : ''}" aria-pressed="${DT.view === 'templates'}">${tr('Templates')}</button></div>`;
-  return DT.view === 'templates' ? dtTplsHtml(seg) : dtDocsHtml(seg);
+  return DT.view === 'templates' ? dtTplsHtml(seg) : dtDocsHtml(seg) + (typeof oft_sharedHtml === 'function' ? oft_sharedHtml('gendocs') : '');  // 2.351.0 A (#2823): + shared through a folder
 }
 function dtDocsHtml(seg) {
   const d = DT.data, f = x => (d.docs || []).filter(x);

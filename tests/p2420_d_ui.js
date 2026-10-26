@@ -61,9 +61,12 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(after.dl >= 2 && after.r < before.r && after.b < before.b, '#1376: the delta: fewer render() calls and bytes ' + JSON.stringify({before, after}));
     check(await ready(`/Delta task new 2/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title');
     // only task changes (no comments: those move news / sidebar badges by design): marks on an unchanged row and the sidebar
-    // a bundled follow-up of the comments above is done (LP_DEFER_MS 15 s, a timer on purpose). 2.206.0 B (#2513): running it at
-    // once (lpFollow) left the later deleted row on the screen (the state without it) - kept as a wait, see the report of 2.206.0 B
-    await sleep(16000); await caught();
+    // a bundled follow-up of the comments above is done (LP_DEFER_MS 15 s, a timer on purpose): run at once.
+    // 2.351.0 D (#2785): no 16 s wait any more - a follow-up that loaded the whole state now draws the view (see below);
+    // waits until it is through (a braked load tries again after 4 s) and its bundled redraw is done
+    await ev(`(async () => { if (lpT) { clearTimeout(lpT); await lpFollow(); } return 1; })()`);
+    check(await ready(`!lpT && !td_rsT && !td_polling`, 120), '#2785: the bundled follow-up is through');
+    await caught();
     await ev(`(() => { document.querySelector('#view [data-id="${T[1]}"]').__keep = 1; const s = document.querySelector('#side .srow, #side button'); if (s) s.__keep = 1; Object.assign(window.__lp, {r: 0, side: 0, st: 0, dl: 0, b: 0}); return 1; })()`);
     for (let i = 0; i < 2; i++) { await agPatch(T[3], {title: `Delta task only ${i}`}); await caught(); }
     await sleep(600);  // a redraw that would follow (TD_RS_MS) is counted too
@@ -79,6 +82,17 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ev(`document.querySelector('#dlf')?.value === 'half filled' && S.viewStale === true && window.__lp.r === 0`), '#1376: the input stays, nothing is redrawn');
     await ev(`(() => { fgDone('dl-test'); document.querySelector('#dlform')?.remove(); return 1; })()`);
     check(await ready(`!S.viewStale && /Alpha changed while typing/.test(document.querySelector('#view [data-id="${T[0]}"]')?.textContent || '')`, 30), '#1376: afterwards the view follows');
+    // 2.351.0 D (#2785): the bundled follow-up answered with the whole state (the server's delta full; here S.lpOff) after a
+    // task was deleted on another device: the state lost the task, the row stayed (lpDraw compared only the counters, the poll
+    // saw no new version any more). The poll is held so only the follow-up takes the change.
+    const TZ = (await call(CA, 'POST', '/api/tasks', {title: 'Zeta task', list_id: L})).id;
+    check(await ready(`!!document.querySelector('#view [data-id="${TZ}"]')`, 60), '#2785: the new row is shown');
+    check(await ready(`(() => { if (td_polling) return false; td_polling = true; return true; })()`, 120), '#2785: the poll held');
+    await call(CA, 'DELETE', `/api/tasks/${TZ}`);
+    await ev(`(async () => { S.lpOff = true; clearTimeout(lpT); lpT = 0; await lpFollow(); return 1; })()`);
+    check(await ready(`!lpT && !S.tasks.has(${TZ}) && !document.querySelector('#view [data-id="${TZ}"]')`, 120), '#2785: a task deleted elsewhere leaves the list after a full follow-up '
+      + JSON.stringify(await ev(`({inState: S.tasks.has(${TZ}), row: !!document.querySelector('#view [data-id="${TZ}"]'), lpT: !!lpT, rsT: td_rsT})`).catch(e => String(e))));
+    await ev(`(() => { S.lpOff = false; td_polling = false; return 1; })()`);
     // a deletion (another device of the person): the row goes
     await call(CA, 'DELETE', `/api/tasks/${T[2]}`);
     check(await ready(`!S.tasks.has(${T[2]}) && !document.querySelector('#view [data-id="${T[2]}"]')`, 120), '#1376: a deleted task leaves the list '

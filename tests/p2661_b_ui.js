@@ -38,6 +38,7 @@ const WS_VIEWS = {
   'static/js/sbnav.js': 'draw',
   'static/js/core.js': 'draw',                // also: the new state reloads the workload tabs (absences, disposition)
   'static/js/chat.js': 'draw',                // team chats of the workspace
+  'static/js/ctfold.js': 'draw',              // 2.351.0 B (#2749): the address book's folder tree shows the shown workspace's entry
   'static/js/collab.js': 'draw',              // 2.145.0 (#2444): the news list's hint rows for the OTHER workspaces (newsElseHtml), drawn with the list
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
   'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
@@ -51,7 +52,7 @@ const WS_VIEWS = {
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',
   'static/js/sheets.js': 'draw',              // 2.89.1 (#1916): the tables overview filtered by the workspace while drawing
-  'static/js/office_docs.js': 'draw',       // 2.199.0 B (#2742): the office panel's folders of the shown workspace (wsCur while drawing)
+  'static/js/office_tree.js': 'draw',       // 2.351.0 (#3312): the office panel's area trees of the shown workspace (wsCur while drawing; was office_docs.js)
   'static/js/favtiles.js': 'draw',
   'static/js/dupprop.js': 'helper',
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
@@ -75,7 +76,6 @@ const WS_VIEWS = {
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
                                               // like office_where (no view keeping data; p2250_a_officesearch checks Private)
-  'static/js/office_docs.js': 'draw',         // 2.199.0 B (#2742): the office panel's folders of the shown workspace (wsCur while drawing)
 };
 const ROOT = path.join(__dirname, '..');
 const CLIENT_RE = /\brd_space\(|\bwsCur\(|\bdc_ws\(|settings\.workspace|\bp61b_wsOn\(|\bwsObjIn\(|\binWs\(|\bwsHidden\(|\bwsAgentIn\(/;  // 2.172.0 B (#2679): + rd_space (the views of Reading)

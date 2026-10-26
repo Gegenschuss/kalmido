@@ -19,7 +19,9 @@ const ab_canWrite = r => r === 'owner' || r === 'edit';
 const ab_role = r => r === 'owner' ? tr('Owner') : r === 'edit' ? tr('Can edit') : r === 'view' ? tr('Can view') : '';
 const ab_when = iso => iso ? fmtDay('short', new Date(iso)) : '';
 // 2.199.0 A (#2742): FS_REF_ICON[ref_kind] = the icon of a filed office document / sheet (set by its module)
-const FS_REF_ICON = {};
+const FS_REF_ICON = {address_book: 'book', contact: 'user', contract_file: 'pdf', office_agreement: 'shield'};  // 2.351.0 B (#2749): + address books, contacts, contracts
+// 2.351.0 B (#2749): a filed object the file store shows itself (its content): 'pdf' | 'text' (a person without the office's role reads it here)
+const FS_REF_VIEW = {contract_file: 'pdf', office_agreement: 'text'};
 const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n.kind === 'link' ? ic('link') : n.kind === 'ref' ? ic(FS_REF_ICON[n.ref_kind] || 'file') : ab_isPdf(n) ? ic('pdf') : ab_isImg(n) ? ic('picture') : ic('file');
 // 2.199.0 A (#2742): the hint after a folder went into the trash: what may not be deleted stayed, one level up (kept of the server)
 const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
@@ -158,6 +160,8 @@ const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data
 
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n) {
+  if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
+  if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'text') { textView({url: ab_url(n, true), name: n.name, size: n.size, md: false, ext: 'txt'}); return; }
   if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser

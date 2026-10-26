@@ -24,3 +24,6 @@
 .ctdate .chkl{min-width:0;color:var(--text);font-size:var(--fs-m);display:flex;align-items:center;gap:.375rem}
 .ctmulti .linkbtn{align-self:flex-start}
 .ctrow.ctro{opacity:.5}
+/* 2.351.0 B (#2749): the folder filter above the contacts list (ctfold.js) */
+.ctfbar{display:flex;align-items:center;gap:.5rem;padding:.375rem .75rem;margin:0 0 .5rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-m)}
+.ctfbar>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}

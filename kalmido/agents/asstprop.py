@@ -38,7 +38,7 @@ from ..core.errors import BadInput
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, is_agent, job_dict, JOB_TITLE_MAX
 from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_keys, _p_str, prop_mode
 from ..collab.comments import user_names
-from ..office.rights import ofr_allows
+from ..office.rights import NO_RIGHT, ofr_allows
 from ..files.store import fs_role
 from .rcread import RCR_LIMITS, rcr_doc_view, rcr_input, rcr_run, rcr_target, rcr_undo, rcr_validate  # 2.299.0 E (#3194)
 
@@ -392,6 +392,16 @@ def _doc_target(c, j, write=True):
     return n, m
 
 
+def _receipt_target(c, j, write=True):
+    """2.351.0 C (#3247): _doc_target of a receipt_read job + the person's receipts right in the document's office area,
+    asked again at take-over / undo (granted when asking, ast_office_agents; it may be taken away in between)."""
+    n, m = _doc_target(c, j, write=write)
+    uid = g.user["id"]
+    if not ofr_allows(c, uid, _doc_area(c, uid, n), "receipts", "edit"):
+        raise Denied(403, tr(NO_RIGHT))
+    return n, m
+
+
 def ast_summary_of(c, m):
     from ..docs import store as S
     try:
@@ -428,7 +438,7 @@ def ast_run(c, j, sel, ed, extra, rec):
         rec["office"] = {"doc": r["id"], "field": f, "before": r[f] or "", "after": text}
         _set_office(c, oid, r, f, text)
     elif kind == "receipt_read":  # 2.299.0 E (#3194): the read values onto the receipt as the person (agents/rcread.py)
-        n, _ = _doc_target(c, j)
+        n, _ = _receipt_target(c, j)  # 2.351.0 C (#3247): the receipts right again
         rec["receipt"] = rcr_run(c, j, n, g.user["id"], ed)
     elif kind == "doc_summary":
         text = _clean(text, "text", AST_SUMMARY_MAX, True)
@@ -459,7 +469,7 @@ def ast_undo(c, j, rec, back=True):
         n = 1
     elif kind == "receipt_read":  # 2.299.0 E (#3194)
         try:
-            n_, _ = _doc_target(c, j)
+            n_, _ = _receipt_target(c, j)  # 2.351.0 C (#3247)
         except Denied:
             return 0, [j["title"][:40]]
         if not rcr_undo(c, n_, g.user["id"], rec["receipt"], back):
@@ -502,6 +512,8 @@ def ast_view_extra(c, j):
         elif j["kind"] == "receipt_read":  # 2.299.0 E (#3194): what Take over would change, the checks, the bank booking
             n, m = _doc_target(c, j, write=False)
             out["target"] = rcr_target(c, j, n, m, g.user["id"])
+            if not ofr_allows(c, g.user["id"], _doc_area(c, g.user["id"], n), "receipts", "edit"):
+                out["target"]["editable"] = False  # 2.351.0 C (#3247): Take over would be refused
         else:
             rec = json.loads(j["applied"] or "null") or {}
             out["target"] = {"list_id": j["list_id"], "text": rec.get("text") or "", "editable": True}

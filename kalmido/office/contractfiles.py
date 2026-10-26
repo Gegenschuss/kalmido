@@ -35,6 +35,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .ledger import ofx_log
+from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .model import office_gate, office_org
 
 DMA_PURGE_DAYS = 30
@@ -86,6 +87,7 @@ def dma_purge(c, oid, paths):
                      (oid, ret_trash_cut())).fetchall()
     for r in rows:
         c.execute("DELETE FROM office_contract_files WHERE id=? AND org_id=?", (r["id"], oid))
+        oft_dropped(c, "contract_file", r["id"])  # 2.351.0 F (#2749, review N2): its node in a folder goes too
         p = dma_path(oid, r["file"])
         if p:
             paths.append(p)

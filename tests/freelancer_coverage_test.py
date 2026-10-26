@@ -41,7 +41,7 @@ KINDS = {
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
                        "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private space; "
                        "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1)"),
-    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py, p2155_b_absence_cal_test.py: own calendars, events, address books, contacts, the booking page; CalDAV / CardDAV with an app password; "
+    "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py, p2155_b_absence_cal_test.py, p2351_b_contacts_tree_test.py: own calendars, events, address books, contacts (2.351.0: in folders, her agent), the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
     "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
@@ -253,6 +253,8 @@ ROUTES = {
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
     "GET /api/fsref/office_doc/{}": "office", "GET /api/fsref/office_doc/{}/pdf": "office", "PATCH /api/fsref/office_doc/{}": "office",
     "PUT /api/fsref/office_doc/{}/items": "office", "GET /api/office/docs/groups": "office",  # 2.199.0 B (#2742): p2199_b_office_test.py (f)
+    "GET /api/office/docs/tree": "office", "POST /api/office/docs/tree/folders": "office", "GET /api/office/gen-docs/tree": "office", "POST /api/office/gen-docs/tree/folders": "office",
+    "GET /api/office/letters/tree": "office", "POST /api/office/letters/tree/folders": "office", "GET /api/office/receipts/tree": "office", "POST /api/office/receipts/tree/folders": "office",  # 2.351.0 A (#3312): p2351_a_officetree_test.py (f)
     "POST /api/files/nodes/{}/versions": "files", "POST /api/files/nodes/{}/versions/{}/restore": "files",
     "POST /api/files/upload": "files", "POST /api/v1/documents/{}/receipt-suggestion": "files", "POST /api/v1/files": "files",
     "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)
@@ -754,6 +756,7 @@ ROUTES = {
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "GET /api/sheets/folders": "sheets", "POST /api/sheets/folders": "sheets",  # 2.199.0 C (#2742): p2199_c_sheets_test.py
+    "GET /api/contacts/folders": "pim", "POST /api/contacts/folders": "pim",  # 2.351.0 B (#2749): p2351_b_contacts_tree_test.py
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a person without an organisation adds, renames, moves,
     # deletes and restores sheets of her private table; API v1 through the agents of the same test)
     "GET /api/sheets/{}/tabs": "sheets", "POST /api/sheets/{}/tabs": "sheets", "PATCH /api/sheets/{}/tabs/{}": "sheets",

@@ -9,8 +9,8 @@
 const LD_MODS = {
   settings: ['acctset', 'sesview', 'oinvview', 'servers', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers)
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
-  contacts: ['contacts', 'newsletter'],  // 2.65.0 (#1823): newsletter.js
-  office: ['office', 'office_docs', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook
+  contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
+  office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree
     'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt

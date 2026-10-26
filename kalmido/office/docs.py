@@ -1651,6 +1651,8 @@ def trial_drop_gen_doc(c, oid, g_):
             paths += p
     ofx_log(c, oid, "gen_doc_delete", target="gen_doc", detail={"gen_doc": g_["id"], "status": g_["status"], "trial": True})
     c.execute("DELETE FROM office_gen_docs WHERE id=? AND org_id=? AND trial=1", (g_["id"], oid))
+    from .oftref import GD_KIND, oft_dropped
+    oft_dropped(c, GD_KIND, g_["id"])  # 2.351.0 A (#2823): its node in a folder goes too
     return ids, paths
 
 

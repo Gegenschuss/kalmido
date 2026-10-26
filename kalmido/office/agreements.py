@@ -32,6 +32,8 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.access import Denied, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
+from ..files.fsref import fs_ref_rename
+from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, pb_owner
 
@@ -395,8 +397,12 @@ def agr_get_all():
     """Office admin. ?archived=1 also the archived ones -> {items, doc_ws (the documents space for the picker / upload:
     private | org:<id>), lists (where the deadline task can go), currency}."""
     c, uid, oid = _ctx()
+    gone = [r[0] for r in c.execute("SELECT id FROM office_agreements WHERE org_id=? AND archived=? AND updated_at<?",
+                                   (oid, AGR_DELETED, ret_trash_cut()))] if ret_on("trash") else []
     n = c.execute("DELETE FROM office_agreements WHERE org_id=? AND archived=? AND updated_at<?",
-                  (oid, AGR_DELETED, ret_trash_cut())).rowcount if ret_on("trash") else 0
+                  (oid, AGR_DELETED, ret_trash_cut())).rowcount if gone else 0
+    for x in gone:  # 2.351.0 F (#2749, review N2): its node in a folder goes too (hard delete after the period)
+        oft_dropped(c, "office_agreement", x)
     if n:
         ret_report(c, "trash", {"agreements": n}, True, run="agreements")
         c.commit()
@@ -475,6 +481,8 @@ def agr_patch(aid):
         row["updated_at"] = iso(now_utc())
         enc = oc_enc_fields(c, oid, "office_agreements", row)
         c.execute(f"UPDATE office_agreements SET {','.join(k + '=?' for k in enc)} WHERE id=? AND org_id=?", list(enc.values()) + [aid, oid])
+        if row.get("name"):
+            fs_ref_rename(c, "office_agreement", aid, row["name"])  # 2.351.0 B (#2749): the name on its folder node (office/agrref.py)
     _save_task(c, oid, uid, aid, b, revive=revive, new_end="ends" in row and row["ends"] != cur.get("ends"))
     bump(c)
     c.commit()

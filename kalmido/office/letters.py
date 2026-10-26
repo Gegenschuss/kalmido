@@ -31,6 +31,7 @@ from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_c
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .rights import ofr_admin_or, ofr_allows, ofr_need_area
 from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
+from .oftref import LT_KIND, lt_title, oft_renamed  # 2.351.0 A (#2823)
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
 LT_CHANNEL_KEYS = tuple(k for k, _ in LT_CHANNELS)
@@ -811,6 +812,8 @@ def lt_patch(lid):
         return err(tr("A sent letter cannot be changed any more. Edit a copy instead."), 409)
     ccf_check(body(), cur["updated_at"], "letter", lambda: lt_public(c, oid, cur))  # 2.269.0 C (#3017): saved elsewhere meanwhile
     d = lt_update(c, oid, lid, body())
+    if d.get("letter_date") != cur.get("letter_date"):  # 2.351.0 A (#2823): its node in a folder is named by the date
+        oft_renamed(c, LT_KIND, lid, lt_title(c, lid))
     c.commit()
     return jsonify(lt_public(c, oid, d))
 

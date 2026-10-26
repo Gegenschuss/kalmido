@@ -1224,6 +1224,10 @@ def org_leave(c, oid, uid, heir):
     with system_ctx(c):  # 2.223.2 B (#2860): their office rights groups go too (coming back = no old groups)
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+    # 2.351.0 D (#3214): their read marks in the organisation's channels / groups and list conversations go too (tchat_sig_q
+    # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible)
+    c.execute("DELETE FROM tchat_reads WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR "
+              "list_id IN (SELECT id FROM lists WHERE org_id=?))" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid, oid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..sheets.shshare import shs_leave

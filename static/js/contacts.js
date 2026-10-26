@@ -6,7 +6,7 @@
 // 2.21.0 (#658): the contacts live in Kalmido's own address books (S.books from /api/state) and sync with the phone over
 // CardDAV. The view loads its page of contacts (GET /api/contacts, never part of /api/state: contacts are personal data
 // and can be many); a contact opens as a card (desktop: next to the list, phone: the whole view), "Edit" opens the editor.
-const CT = {q: '', group: '', book: '', items: null, total: 0, groups: [], sel: null, card: null, loading: false, seq: 0, pick: null};  // 2.46.1 (#1554): pick = the selected ids (Set) in the selection mode
+const CT = {q: '', group: '', book: '', folder: null, items: null, total: 0, groups: [], sel: null, card: null, loading: false, seq: 0, pick: null};  // 2.46.1 (#1554): pick = the selected ids (Set) in the selection mode
 // 2.53.0 (#1410): ctOn + CT_LINK live in ctlinks.js (loaded at start: the task panel shows the linked contacts)
 const CT_TYPES = {emails: [['home', N_('Home')], ['work', N_('Work')], ['other', N_('Other')]],
   phones: [['cell', N_('Mobile')], ['home', N_('Home')], ['work', N_('Work')], ['other', N_('Other')]],
@@ -49,6 +49,7 @@ async function ctLoad() {
   const qs = new URLSearchParams({q: CT.q, limit: String(Math.max(CTX_PAGE, keep))});
   if (CT.group) qs.set('group', CT.group);
   if (CT.book) qs.set('book_id', CT.book);
+  if (CT.folder) qs.set('folder', CT.folder);  // 2.351.0 B (#2749): the books / contacts filed in one folder
   try {
     const j = await api('GET', '/api/contacts?' + qs);
     if (seq !== CT.seq) return;
@@ -63,6 +64,11 @@ async function ctLoad() {
   if (fresh) for (const w of [$('#view .ctlistw'), $('#view')]) if (w) w.scrollTop = 0;  // 2.119.1 A (#2081): another search starts at the top (not at the end, which would load page two)
 }
 async function ctRoute(id) {
+  // 2.351.0 B (#2749): #contacts/f/<folder> filters by a folder (ctfold.js), #contacts/b/<book> by an address book; the plain
+  // #contacts ends the folder filter, opening a contact keeps it
+  const r = S.route, fo = r.ctf || (id ? CT.folder : null);
+  if (fo !== CT.folder || (r.ctb && String(r.ctb) !== String(CT.book))) { CT.folder = fo; if (r.ctb) CT.book = String(r.ctb); CT.items = null; CT.loading = false; }
+  if (typeof ctf_load === 'function') ctf_load();
   if (CT.items === null && !CT.loading) ctLoad();
   if (id) await ctOpen(id); else if (isMobile()) { CT.sel = null; CT.card = null; ctDraw(); }
 }
@@ -88,7 +94,8 @@ function viewContacts() {
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
-  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  const fbar = typeof ctf_barHtml === 'function' && !(mob && showCard) ? ctf_barHtml() : '';  // 2.351.0 B (#2749): the folder filter
+  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
 // 2.272.0 E1 (#3038): the contacts' trash (More > Trash): the deleted contacts and address books, Restore, Delete for good
 // (asks with the number); after the trash period the server deletes them for good (trash_days)
@@ -129,7 +136,7 @@ async function ctt_act(k, id) {
 // 2.119.1 A (#2081): every contact is reachable: the list loads pages of CTX_PAGE (GET /api/contacts offset / limit); scrolling
 // near the end of the list (or "Show more") appends the next page. A new search / group / address book starts again at page one
 const CTX_PAGE = 500;
-const ctx_key = () => [CT.q, CT.group, CT.book].join('\u0001');
+const ctx_key = () => [CT.q, CT.group, CT.book, CT.folder].join('\u0001');  // 2.351.0 B (#2749): + the folder
 async function ctx_more() {
   if (!CT.items || CT.loading || CT.more || CT.items.length >= CT.total) return;
   const seq = CT.seq, key = ctx_key();
@@ -138,6 +145,7 @@ async function ctx_more() {
   const qs = new URLSearchParams({q: CT.q, limit: String(CTX_PAGE), offset: String(CT.items.length)});
   if (CT.group) qs.set('group', CT.group);
   if (CT.book) qs.set('book_id', CT.book);
+  if (CT.folder) qs.set('folder', CT.folder);  // 2.351.0 B (#2749): the books / contacts filed in one folder
   try {
     const j = await api('GET', '/api/contacts?' + qs);
     if (seq === CT.seq && key === ctx_key() && CT.items) {
@@ -162,7 +170,7 @@ function ctRows(items, row) {
   return vl_seg('ct', items, (c, i) => row(c, ` data-vlg="${c.id}" aria-setsize="${items.length}" aria-posinset="${i + 1}"`), false, 'li');
 }
 function ctCardHtml(c) {
-  const b = ctBook(c.book_id), w = ctWrite(b);
+  const b = ctBook(c.book_id), w = c.role ? c.role === 'owner' || c.role === 'edit' : ctWrite(b);  // 2.351.0 B (#2749): also through a folder
   const it = (k, icon, href) => (c[k] || []).map(x => `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(ctTypeWord(k, x))}</span>${href(x)}</div>`).join('');
   const adr = (c.addresses || []).map(a => { const t = [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
     return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span>${ctk_mapLink(t)}</div>`; }).join('');  // 2.119.1 B (#2086): a map link
@@ -322,7 +330,8 @@ document.addEventListener('click', async e => {
       toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } await load().catch(() => {}); ctLoad(); }); }},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
       typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
-      ctk_clientItem(c, ctBook(c.book_id))]);  // 2.119.1 B (#2082): create a client from the contact / open its client
+      ctk_clientItem(c, ctBook(c.book_id)),  // 2.119.1 B (#2082): create a client from the contact / open its client
+      ...(typeof ctf_cardItems === 'function' ? ctf_cardItems(c) : [])]);  // 2.351.0 B (#2749): into a folder, share it there
   }
 });
 
@@ -456,10 +465,11 @@ const bk_lpS = ms_longPress('#view .ctrow[data-ctopen]', () => !!CT.pick, r => b
 // ---- the editor
 async function ctEditor(c) {
   const books = (S.books || []).filter(b => ctWrite(b) && (wsObjIn(b) || (c && b.id === c.book_id)));  // 2.30.0 (#1036): of the shown workspace (+ the contact's own)
-  if (!books.length) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}); await load(); books.push(bk); } catch { return; } }
+  const fold = !!c && !ctWrite(ctBook(c.book_id));  // 2.351.0 B (#2749): changed through its folder: stays in its address book
+  if (!books.length && !fold) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}); await load(); books.push(bk); } catch { return; } }
   const st = c ? JSON.parse(JSON.stringify(c)) : {book_id: +(CT.book || LS.get('ctBook', 0)) || books[0].id, given: '', family: '', fn: '', org: '', title: '', dept: '', nickname: '',
     emails: [{value: '', type: ['home']}], phones: [{value: '', type: ['cell']}], addresses: [], urls: [], bday: '', anniversary: '', note: '', groups: [], photo: ''};
-  if (!books.some(b => b.id === st.book_id)) st.book_id = books[0].id;
+  if (!fold && !books.some(b => b.id === st.book_id)) st.book_id = books[0].id;
   const custom = st.fn && st.fn !== [st.prefix, st.given, st.middle, st.family, st.suffix].filter(Boolean).join(' ');
   const typeSel = (k, i, it) => `<select class="ctty" data-ctk="${k}" data-ci="${i}" aria-label="${esc(tr('Kind'))}">${CT_TYPES[k].map(([v, n]) => `<option value="${v}" ${(it.type || [])[0] === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${(it.type || [])[0] && !CT_TYPES[k].some(x => x[0] === it.type[0]) ? `<option value="${esc(it.type[0])}" selected>${esc(ctTypeWord(k, it))}</option>` : ''}</select>`;
   const multi = (k, label, ph, inputType) => `<fieldset class="ctmulti" data-ctm="${k}"><legend>${label}</legend>${(st[k] || []).map((it, i) => `<div class="ctmi">${typeSel(k, i, it)}<input data-ctk="${k}" data-ci="${i}" data-cf="value" value="${esc(it.value || '')}" type="${inputType}" ${inputType === 'tel' ? 'inputmode="tel"' : inputType === 'email' ? 'inputmode="email"' : ''} placeholder="${esc(ph)}" aria-label="${esc(label)}" autocomplete="off"><button type="button" class="iconbtn" data-ctrm="${k}" data-ci="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>`).join('')}
@@ -488,7 +498,7 @@ async function ctEditor(c) {
       <div class="row"><label for="ct-nick">${tr('Nickname')}</label><input id="ct-nick" value="${esc(st.nickname || '')}" autocomplete="off" maxlength="300"></div>
       <div class="row"><label for="ct-dept">${tr('Department')}</label><input id="ct-dept" value="${esc(st.dept || '')}" autocomplete="off" maxlength="300"></div>
       ${multi('urls', tr('Website'), 'https://…', 'url')}
-      <div class="row"><label for="ct-bk">${tr('Address book')}</label><select id="ct-bk">${books.map(b => `<option value="${b.id}" ${b.id === st.book_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div></details>
+      ${fold ? '' : `<div class="row"><label for="ct-bk">${tr('Address book')}</label><select id="ct-bk">${books.map(b => `<option value="${b.id}" ${b.id === st.book_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>`}</details>
     <div class="foot"><span class="spacer"></span><button class="btn" data-ctm2="close">${tr('Cancel')}</button><button class="btn pri" data-ctm2="save">${tr('Save')}</button></div>`);
   md.classList.add('ctmodal');
   const redraw = () => {  // the repeatable rows after adding / removing one
@@ -523,7 +533,7 @@ async function ctEditor(c) {
     const clean = (k, addr) => (st[k] || []).map(x => ({...x})).filter(x => addr ? ['street', 'city', 'code', 'country'].some(f => (x[f] || '').trim()) : (x.value || '').trim());
     const body = {given: v('ct-given'), family: v('ct-family'), org: v('ct-org'), title: v('ct-title'), fn: v('ct-fn'), nickname: v('ct-nick'), dept: v('ct-dept'),
       phones: clean('phones'), emails: clean('emails'), urls: clean('urls'), addresses: clean('addresses', true), bday: dt('bday'), anniversary: dt('anniversary'),
-      note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: +v('ct-bk') || st.book_id};
+      note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: fold ? st.book_id : +v('ct-bk') || st.book_id};
     if (!body.given && !body.family && !body.org && !body.fn) { toast(tr('A name or a company, please')); $('#ct-given', md).focus(); return; }
     if (!c && !await ctx_dupAsk(body, md)) return;  // 2.119.1 A (#2084): a look-alike first (the next Save creates it anyway)
     try {
@@ -774,6 +784,7 @@ async function ctBooksModal() {
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the address book'), b.name, {input: {max: 100}}); if (n && n.trim()) { const nm = n.trim(); optWrite(optSet(() => ctBook(b.id), {name: nm}), () => api('PATCH', `/api/books/${b.id}`, {name: nm}), () => { draw(); ctDraw(); }).catch(() => {}); } }},  // 2.46.2 (#1659): at once
         own && wsOn() && !b.org_owned && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, b.org_id, async org => { try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => ctShareModal(b, users, names, refresh)},
+        ...(typeof ctf_bookItems === 'function' ? ctf_bookItems(b, m) : []),  // 2.351.0 B (#2749): into a folder of the address book
         b.can_org && {label: tr('Hand over to the organisation…'), icon: 'building', fn: () => ob_take(b, refresh)},  // 2.52.0 (#1438)
         own && b.org_owned && {label: tr('Members of the organisation'), icon: 'building', more: ob_roleItems(b, refresh)},
         own && b.org_owned && {label: tr('Make personal again…'), icon: 'home', fn: () => ob_drop(b, refresh)},
@@ -798,18 +809,28 @@ async function ctBooksModal() {
     }
   });
 }
-function ctShareModal(b, users, names, done) {
+// 2.351.0 B (#2749): + the agents of the book's workspace (like a list's Share dialog; the server already took them and
+// refuses somebody else's personal agent): an agent sees the book only through this share, like every other share
+async function ct_shareAgents() {
+  try { return (await api('GET', '/api/users')).users.filter(u => u.agent && !u.disabled); } catch { return []; }
+}
+const ct_agentOpts = (ags, org, taken) => { const xs = ags.filter(u => (u.org_id || null) === org && !taken.some(m => m.user_id === u.id));
+  return xs.length ? `<optgroup label="${esc(tr('Agents'))}">${xs.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</optgroup>` : ''; };
+async function ctShareModal(b, users, names, done) {
   const bOrg = () => b.imported || b.src_id ? null : b.org_id || null;  // 2.46.4 (#1737): a book mirrored from a connected account is always private
+  const ags = await ct_shareAgents();
+  for (const u of ags) names.set(u.id, u.display_name);
+  const opts = () => shWsOptions(users, bOrg(), b.members || []) + ct_agentOpts(ags, bOrg(), b.members || []);
   const md = modal(`<h3>${tr('Share {0}', esc(b.name))}</h3><div class="shws"></div><div id="cbs-list"></div>
-    <div class="row"><label for="cbs-user">${tr('Person')}</label><select id="cbs-user" data-sheet-av>${shWsOptions(users, bOrg(), b.members)}</select>
+    <div class="row"><label for="cbs-user">${tr('Person or agent')}</label><select id="cbs-user" data-sheet-av>${opts()}</select>
       <select id="cbs-role" aria-label="${esc(tr('Role'))}"><option value="view">${tr('can view')}</option><option value="edit">${tr('can edit')}</option></select><button class="btn sm pri" data-cbs="add">${tr('Share')}</button></div>
     <div class="shint">${tr('Contacts are personal data: share an address book only with people who may see all of it.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-cbs="close">${tr('Done')}</button></div>`);
-  const draw = () => { $('#cbs-list', md).innerHTML = (b.members || []).length ? `<ul class="evclist">${b.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-cbsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  const draw = () => { $('#cbs-list', md).innerHTML = (b.members || []).length ? `<ul class="evclist">${b.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')}${ags.some(u => u.id === m.user_id) && typeof agentBadge === 'function' ? agentBadge() : ''} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-cbsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
   const wsDraw = () => {  // 2.46.4 (#1737)
     shWsFill($('.shws', md), bOrg(), b.imported || b.src_id ? null : a => wsMoveMenu(a, b.org_id, async org => {
       try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; }
-      b.org_id = org; wsDraw(); $('#cbs-user', md).innerHTML = shWsOptions(users, bOrg(), b.members); shWsPick($('#cbs-user', md)); done();
+      b.org_id = org; wsDraw(); $('#cbs-user', md).innerHTML = opts(); shWsPick($('#cbs-user', md)); done();
     }));
   };
   wsDraw(); shWsPick($('#cbs-user', md));
@@ -821,6 +842,7 @@ function ctShareModal(b, users, names, done) {
     if (k === 'close') md.remove();
     if (k === 'add' && $('#cbs-user', md).value) {
       try { const j = await api('PUT', `/api/books/${b.id}/members`, {user_id: +$('#cbs-user', md).value, role: $('#cbs-role', md).value}); b.members = j.members; } catch { return; }
+      $('#cbs-user', md).innerHTML = opts(); shWsPick($('#cbs-user', md));  // 2.351.0 B (#2749): the one just added leaves the select
       draw(); done();
     }
   });

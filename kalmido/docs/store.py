@@ -28,7 +28,7 @@ from . import rules as RU
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
-from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted  # 2.199.0 B (#2742)
+from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 
 STATES = ("wait", "run", "done", "failed")
@@ -754,7 +754,11 @@ def classify(c, m, node, text, given=None):
             continue
         if rr.get(f):
             if f == "folder":
-                fid = folder_by_name(c, node, uid, rr[f], path=True)  # 2.199.0 B (#2742): "A / B" = a subfolder
+                fid = folder_by_name(c, node, uid, rr[f], path=True, check=True)  # 2.199.0 B (#2742): "A / B" = a subfolder
+                # 2.351.0 A (#2823): a rule files only into a folder the uploading person may edit (walks and makes folders
+                # only where they see / edit); otherwise the file stays where it lands without the rule
+                if fid and _fs_role(c, fid, uid) not in ("owner", "edit"):
+                    fid = None
                 if fid:
                     out[f], auto[f] = str(fid), "rule"
             else:

@@ -43,6 +43,7 @@ from ..core.merges import mg_fk_refs
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_store, oc_read_file, oc_write_file
 from ..core.pg import insert_id, table_columns, write_lock
 from ..files.scan import sc_copy_mark
+from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from ..core.errors import BadInput
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .ledger import ofx_log
@@ -887,6 +888,7 @@ def rmv_unmake(c, m, dst, gone):
         r = c.execute("SELECT file FROM office_contract_files WHERE id=? AND org_id=?", (rid, dst)).fetchone()
         if r:
             c.execute("DELETE FROM office_contract_files WHERE id=?", (rid,))
+            oft_dropped(c, "contract_file", rid)  # 2.351.0 F (#2749, review N2): its node in a folder goes too
             gone.append(rmv_path(dst, r["file"]))
         return 0
     if not c.execute(f"SELECT 1 FROM {t} WHERE id=? AND org_id=?", (rid, dst)).fetchone():

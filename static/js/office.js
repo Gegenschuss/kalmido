@@ -146,7 +146,7 @@ function viewOffice() {
 // so the office is read for the new workspace only once the server knows it; a switch on another device is caught here.
 function pb_reset(nav) {
   OFC.info = null; OFC.infoErr = null; OFC.data = {};
-  if (typeof OFD !== 'undefined') { OFD.list = null; OFD.doc = null; OFD.docId = null; OFD.log = null; }
+  if (typeof OFD !== 'undefined') { OFD.list = null; OFD.doc = null; OFD.docId = null; OFD.log = null; OFD.flt = {client_id: '', project: '', year: ''}; }  // 2.351.0 F (#3312, review N7): + the filters (clients / projects of the other office)
   if (typeof OIM !== 'undefined') { OIM.list = null; OIM.runs = null; OIM.clients = null; }  // 2.80.0 (#1836): runs, counter and clients of the new workspace
   if (nav && S.route.mod === 'office' && S.route.id) setTimeout(() => go('office/' + (S.route.tab || 'offers')), 0);  // a document of the other area
 }

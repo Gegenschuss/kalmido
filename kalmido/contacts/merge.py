@@ -89,7 +89,7 @@ def ctm_load(c, uid, all_ids):
     mixing scopes (an organisation's contacts never merge with private ones or another organisation's)."""
     if not contacts_on(c, uid):
         raise Denied(404)
-    rows = [need_contact(c, i, write=True, uid=uid)[0] for i in all_ids]
+    rows = [need_contact(c, i, write=True, uid=uid, own=True)[0] for i in all_ids]  # 2.351.0 B (#2749): merging deletes
     books = {}
     for r in rows:
         if r["book_id"] not in books:

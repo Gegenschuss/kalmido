@@ -260,7 +260,8 @@ FS = share(Fr, FF, agent_id=r.json().get("id"), role="view", expires_at="2099-01
 check(isinstance(FS, int) and Fr.patch(B + f"/api/files/shares/{FS}", json={"expires_at": "2099-12-31"}).ok, f"(h) she shares with her agent and extends ({FS})")
 check(Fr.delete(B + f"/api/files/nodes/{FF}").ok and Fr.post(B + f"/api/files/nodes/{FF}/restore").ok, "(h) she deletes and restores her folder")
 FT = token(Fr, ["read", "files:read"])
-check(content(None, FN, FT).status_code == 403, "(h) her own token without the scope office: no content (people's tokens never have it)")
+# 2.351.0 F (#3246, review M2): a token's hidden (no scope office) now outranks her own base role too: the node is not found (404)
+check(content(None, FN, FT).status_code == 404, "(h) her own token without the scope office: no content (people's tokens never have it)")
 
 print(f"p2238_a_fsref_gate: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

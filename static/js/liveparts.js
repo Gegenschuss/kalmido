@@ -62,7 +62,7 @@ function lpLive(v, ch, n, inDelta) {
 const lpSideSig = () => JSON.stringify([(S.agents || []).map(x => [x.id, x.chat_unread, x.approvals_open, x.waiting, x.status]), S.team, S.news?.unread, S.news?.unread_me]);
 function lpRowSig() { const o = []; for (const t of S.tasks.values()) if (t.comment_count || t.unread || t.approvals_open) o.push(t.id, t.comment_count, t.unread, t.approvals_open || 0); return o.join(','); }
 async function lpFollow() {
-  lpT = 0;
+  clearTimeout(lpT); lpT = 0;  // 2.351.0 D (#2785): called early (not by its timer): the timer must not run it a second time later
   if (document.hidden || lpBusy()) { lpT = setTimeout(lpFollow, 4000); return; }
   const side = lpSideSig(), rows = lpRowSig(), areas = lpAreas, since = S.lpBase ?? S.v; lpAreas = new Set();
   let ok = false;
@@ -71,6 +71,9 @@ async function lpFollow() {
     S.lpN.state++;
     let r; try { r = await load(true); } catch { return; }
     if (r === 'brake') { for (const k of areas) lpAreas.add(k); if (!lpT) lpT = setTimeout(lpFollow, 4000); return; }  // 2.280.0 F (#3109): held back: again later
+    // 2.351.0 D (#2785): the whole state may bring more than the light counters (a task deleted on another device meanwhile):
+    // it took S.v, so the poll sees nothing new any more -> drawn bundled like the poll's full way (lpDraw checks only counters)
+    td_renderSoon();
   }
   lpDraw(side, rows, areas);
 }

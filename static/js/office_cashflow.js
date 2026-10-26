@@ -37,8 +37,10 @@ function rk_cashflowHtml() {
   const bars = r => `<div class="rkcfbars" aria-hidden="true"><span class="rkcfbin" style="transform:scaleX(${((+r.in.actual + +r.in.plan) / max).toFixed(3)})"></span><span class="rkcfbout" style="transform:scaleX(${((+r.out.actual + +r.out.plan) / max).toFixed(3)})"></span></div>`;
   const cards = d.rows.map(r => {
     const k = RKF.open?.startsWith(r.month + '|') ? RKF.open : null;
+    // 2.330 (#3296): the balance in the head counts the month's corrections by hand too (like the account balance below)
+    const bal = r.manual ? Math.round((+r.balance + +(r.manual.in || 0) - +(r.manual.out || 0)) * 100) / 100 : +r.balance;
     return `<section class="rkcfm ${r.current ? 'cur' : ''}" aria-label="${esc(rk_month(r.month))}"><header><b>${esc(rk_month(r.month))}</b>${r.current ? `<span class="rotag">${tr('this month')}</span>` : ''}<span class="spacer"></span>
-      <span class="rkcfbal ${+r.balance < 0 ? 'neg' : ''}">${tr('Balance')} ${ofcMoney(r.balance)}</span></header>${bars(r)}
+      <span class="rkcfbal ${bal < 0 ? 'neg' : ''}"${r.manual ? ` title="${esc(tr('Corrections by hand'))}"` : ''}>${tr('Balance')} ${ofcMoney(bal)}</span></header>${bars(r)}
       <table class="rkcftab"><thead><tr><th></th><th class="num" title="${esc(tr('Paid or already past'))}">${tr('Actual')}</th><th class="num" title="${esc(tr('Expected'))}">${tr('Planned')}</th></tr></thead><tbody>
       <tr><th>${tr('In|cashflow')}</th><td class="num">${val(r.month, 'in', 'actual', r.in.actual)}</td><td class="num">${val(r.month, 'in', 'plan', r.in.plan, 'plan')}</td></tr>
       <tr><th>${tr('Out|cashflow')}</th><td class="num">${val(r.month, 'out', 'actual', r.out.actual)}</td><td class="num">${val(r.month, 'out', 'plan', r.out.plan, 'plan')}</td></tr>${bk_cfReserveRows(r)}${cfs_accRows(r)}${cfb_rows(r)}</tbody></table>${cfb_realBar(r)}
@@ -263,7 +265,7 @@ function cfs_adjHtml(mo) {
 }
 function cfs_modal(a, mo) {
   const md = modal(`<h3>${a ? tr('Edit correction') : tr('New correction')}</h3>
-    <div class="shint">${esc(tr('For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.', rk_month(a?.month || mo)))}</div>
+    <div class="shint">${esc(tr('For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.', rk_month(a?.month || mo)))}</div>
     ${ofcRowF('cfs-dir', tr('Kind'), ofcSel('cfs-dir', a?.dir || 'in', CFS_DIRS.map(([k, n]) => [k, tr(n)])))}
     ${ofcRowF('cfs-amount', tr('Amount'), ofcIn('cfs-amount', a ? fmtNum(+a.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     ${ofcRowF('cfs-note', tr('Note'), ofcIn('cfs-note', a?.note, {max: 200, ph: tr('e.g. cash payment')}))}

@@ -84,7 +84,7 @@ function ltListHtml() {
   const list = !rows.length ? `<div class="empty nempty eact">${ic('mail')}<span>${all.length ? tr('No letters match the filter.') : tr('No letters yet. Write one to an authority, an insurer or a client.')}</span>${all.length ? '' : `<button class="btn pri" data-lt="new">${tr('New letter')}</button>`}</div>`
     : `<ul class="ofclist dtp-list lt-list" role="list">${rows.map(x => `<li><button type="button" class="ofcrow" data-lt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.rcpt_name || tr('No recipient'))}</b>
     <small class="muted">${esc([fmtDateLoc(x.letter_date) || x.letter_date, x.subject, tr(LT_CH[x.channel] || x.channel)].filter(Boolean).join(' · '))}</small></span>${ltStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
-  return bar + list + ltHooks('sections', null);
+  return bar + list + (typeof oft_sharedHtml === 'function' ? oft_sharedHtml('letters') : '') + ltHooks('sections', null);  // 2.351.0 A (#2823): + shared through a folder
 }
 function ltHead(d) {
   return `<div class="ofcbar"><button class="btn sm ghost" data-lt="back">${ic('back', 's')}<span>${tr('All letters')}</span></button><span class="spacer"></span>
@@ -255,12 +255,20 @@ async function ltCreate(b) {
     return '';
   } catch (x) { if (!b.template_id && !b.client_id) toast(x.message || tr('unknown')); return x.message || tr('unknown'); }
 }
-function ltSentModal(d) {
+// 2.351.0 A (#2823): the folder of Correspondence the letter goes into when it is sent (the folders the person may add to,
+// with their path; office_tree.js) -- filed as the letter's reference node, the PDF stays filed in the documents as before
+function lt_foldRow() {
+  const fs = typeof oft_get === 'function' ? (oft_get('letters')?.folders || []).filter(f => oft_canW(f)) : [];
+  return fs.length ? ofcRowF('lt-sfold', tr('Folder'), ofcSel('lt-sfold', '', [['', tr('No folder')], ...fs.map(f => [String(f.id), oft_path('letters', f)])])) : '';
+}
+async function ltSentModal(d) {
+  if (typeof oft_load === 'function' && !OFT.d.letters) await oft_load('letters');  // 2.351.0 A (#2823): the folders to pick
   /** @type {any} */
   const md = modal(`<h3>${tr('Mark as sent')}</h3><p class="muted">${esc(tr('The letter is then fixed and its PDF is filed in the documents.'))}</p>
     ${ofcRowF('lt-schan', tr('Sent by'), ofcSel('lt-schan', d.channel || 'post', Object.entries(LT_CH).map(([k, n]) => [k, tr(n)])))}
     <div class="row lt-strk" ${d.channel === 'registered' ? '' : 'hidden'}><label for="lt-strack">${esc(tr('Tracking number'))}</label>${ofcIn('lt-strack', d.tracking_no, {max: 120})}</div>
     ${ofcRowF('lt-sfu', tr('Follow-up after days'), `<input id="lt-sfu" inputmode="numeric" maxlength="3" value="${esc(String(d.followup_days || 14))}">`, tr('0 = no follow-up'))}
+    ${lt_foldRow()}
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('send', 's')} ${tr('Mark as sent')}</button></div>`);
   md.classList.add('ofcdlg');
@@ -273,6 +281,9 @@ function ltSentModal(d) {
     try {
       const ch = $('#lt-schan', md).value;
       const j = await api('POST', `/api/office/letters/${d.id}/sent`, {channel: ch, tracking_no: ch === 'registered' ? $('#lt-strack', md).value : '', followup_days: Math.max(0, Math.min(365, +$('#lt-sfu', md).value || 0))});
+      const fid = +($('#lt-sfold', md)?.value || 0);
+      if (fid) { try { await api('POST', '/api/files/refs', {ref_kind: 'office_letter', ref_id: d.id, parent_id: fid}); } catch { /* shown; the letter is sent */ } }
+      if (typeof oft_after === 'function') oft_after('letters');
       md.remove(); LT.cur = j; LT.data = null; ofcDraw();
       toast(tr('Sent and filed'));
     } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }

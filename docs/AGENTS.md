@@ -109,7 +109,9 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
   token can be limited to selected projects on top of membership: `list_ids` (empty = all its projects) on
   `PATCH /api/admin/agents/{id}`, `PATCH /api/my/agents/{id}` and `POST` / `PATCH /api/me/tokens`; `GET /api/v1/me`
   shows `token.list_ids`. Other projects answer `404`, queries leave them out, and no events about them arrive (2.86.0: also
-  events queued before the project was taken away or limited are left out when polled). See
+  events queued before the project was taken away or limited are left out when polled; 2.351.0: also a quotation or
+  invoice of another project filed in a folder shared with the agent). Documents made from a template (office documents) are
+  not tied to the limit, neither through the office routes nor through a folder. See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
 
 ## Personal agents
@@ -1808,12 +1810,25 @@ the folder share's. Only explicit shares with you count -- a folder opened to "e
 such object -- and a share never gives an office action (release, send, payments, lock, export; those stay with the office
 rights groups). A quotation or invoice (`ref_kind: "office_doc"`, 2.199.0 B) reads as its PDF -- a finalised one as its
 stored original, a draft rendered -- and an agent only reads it (changing a draft through a folder is for people). Since
+2.351.0 (#2823) generated documents (`ref_kind: "office_gendoc"`), letters (`"office_letter"`, named "Letter <date>": the
+subject stays encrypted) and receipts (`"office_receipt"`, `ref_id` = the receipt's file) can lie in folders too and read the
+same way (their PDF / the receipt's file); in an organisation an agent reaches documents and letters only with an office
+rights group for that area, and receipts keep the receipts lock of the office groups also through a folder share. Since
 2.238.0 (#2863) the folder way keeps the area's own conditions: an office document is listed and readable only with the scope
 `office`, your office switch and the office's "Agents may read office data" switch (as for `/api/v1/office`); a table needs
 `sheets:read`; otherwise the node is left out (`404`). Sharing a folder with filed documents, or extending such a share,
 needs the edit right on them. Moving
 such a node (or a folder holding one), putting it into the trash or filing an object needs the edit right of its area -- a
 folder share alone answers `403` (2.199.0 F). Lists sort folders first, then by hand (`sort_no`, `null` = by name after the sorted ones), then by name.
+
+**Address books, contacts and contracts in folders (2.351.0, #2749):** `ref_kind: "address_book"` (a whole address book:
+your role covers all its contacts, also in `GET /api/v1/contacts` and `/api/v1/address-books`) and `"contact"` (only that
+contact; you may read / change its fields, deleting it stays with a role on its address book) need the scope `contacts`
+and read as vCard (`text/vcard`). `"contract_file"` (the PDF of a framework contract) and `"office_agreement"` (a contract or
+insurance, read as a short text) need the scope `office` and the office's agent switches for that area (in an organisation:
+an office rights group with Framework contracts / Contracts & insurance); a folder gives them reading only, every change
+stays in the office. An address book can also be shared with you directly (its members:
+`PUT /api/v1/address-books/{id}/members/{user_id}`).
 
 2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
 store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,

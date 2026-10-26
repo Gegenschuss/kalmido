@@ -139,6 +139,9 @@ def tp_tick(c, force=False):
                             # 2.199.0 C (#2742): their folder nodes (files/fsref.py) go with them
                             c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
                                       "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
+                        if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
+                            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "
+                                      f"AND ref_id IN (SELECT id {w})", (cut,))
                         if table == "books":  # 2.272.0 F (#3038, review N7): the merge undo data goes with it, like op_book_purge
                             c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id IN "
                                       f"(SELECT id {w})", (cut,))

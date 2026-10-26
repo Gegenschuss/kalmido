@@ -105,6 +105,9 @@ def op_book_edit(c, uid, bid, b):
     if f:
         c.execute(f"UPDATE books SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), bid])
         book_touch(c, bid)
+        if "name" in f:  # 2.351.0 B (#2749): the name on its folder node
+            from .ctfolder import CTF_BOOK, ctf_renamed
+            ctf_renamed(c, CTF_BOOK, bid, f["name"])
         if f.get("occ_list_id"):
             for (cid,) in c.execute("SELECT id FROM contacts WHERE book_id=? AND (bday!='' OR anniversary!='')", (bid,)).fetchall():
                 occ_sync(c, cid)
@@ -154,6 +157,8 @@ def op_book_purge(c, uid, bid):
     if not b["deleted_at"]:
         raise Denied(409, tr("Only what is in the trash can be deleted for good"))
     c.execute("DELETE FROM books WHERE id=?", (bid,))
+    from .ctfolder import CTF_BOOK, ctf_dropped
+    ctf_dropped(c, CTF_BOOK, bid)  # 2.351.0 B (#2749): its folder node goes
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
     bump(c)
@@ -187,7 +192,11 @@ def op_contacts(c, uid, a):
     limit = as_int(a.get("limit", 500), "limit", 1, 2000)
     offset = as_int(a.get("offset", 0), "offset", 0)
     trash = str(a.get("trash") or "") in ("1", "true")  # 2.272.0 E1 (#3038): the contacts in the trash
-    rows, n = contacts_query(c, uid, a.get("q") or "", book, a.get("group") or None, limit, offset, trash=trash)
+    folder = None
+    if a.get("folder") not in (None, ""):  # 2.351.0 B (#2749): the books / contacts filed in one folder (and below it)
+        from .ctfolder import ctf_folder_ids
+        folder = ctf_folder_ids(c, uid, as_int(a["folder"], "folder", 1))
+    rows, n = contacts_query(c, uid, a.get("q") or "", book, a.get("group") or None, limit, offset, trash=trash, folder=folder)
     if trash:
         return {"items": [{**contact_brief(r), "deleted_at": r["deleted_at"]} for r in rows], "total": n, "trash_days": ctt_days()}
     ids = my_book_ids(c, uid)
@@ -235,6 +244,7 @@ def op_contact_edit(c, uid, cid, b):
     b = {k: v for k, v in b.items() if k != "expect"}
     if "book_id" in b and b["book_id"] not in (None, "") and as_int(b["book_id"], "book_id", 1) != r["book_id"]:
         nb = as_int(b["book_id"], "book_id", 1)
+        need_contact(c, cid, write=True, own=True)  # 2.351.0 B (#2749): moving it out of its book: never through its own folder alone
         if need_book(c, nb, write=True)[0]["src_id"]:  # 2.58.0 (#1656): as the bulk move
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
@@ -262,7 +272,7 @@ def op_contact_edit(c, uid, cid, b):
 
 
 def op_contact_delete(c, uid, cid):
-    r, role = need_contact(c, cid, write=True)
+    r, role = need_contact(c, cid, write=True, own=True)  # 2.351.0 B (#2749): never through the contact's own folder alone
     ctt_trash(c, uid, [cid])  # 2.272.0 E1 (#3038): into the trash (2.46.1 #1554: its birthday tasks with it)
     book_touch(c, r["book_id"])
     bump(c)

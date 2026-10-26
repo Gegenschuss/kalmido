@@ -19,6 +19,7 @@ from ..calendars.caldav import (
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DavError, dav_color, dav_report_props,
 )
 from ..core.errors import BadInput
+from ..core.i18n import tr
 from ..contacts.model import (
     contact_store, contacts_on, my_book_ids, parse_vcard, render_vcard,
 )
@@ -32,6 +33,9 @@ AB_REPORTS = ("<D:supported-report><D:report><CR:addressbook-query/></D:report><
               "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>")
 
 
+AB_SHARED = "s1"  # 2.351.0 B (#2749): the collection of the contacts shared one by one through folders
+
+
 def ab_home_href(u):
     return dav_href("addressbooks", u["username"], coll=True)
 
@@ -40,13 +44,23 @@ def ab_books(c, u):
     if not contacts_on(c, u["id"]):
         return {}
     ids = my_book_ids(c, u["id"])
-    if not ids:
-        return {}
-    q = ",".join("?" * len(ids))
-    # 2.126.0 C (#1992 K5): an imported (mirrored) address book is written by its source only: read only over CardDAV
-    return {f"b{r['id']}": {"key": f"b{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"],
-                            "role": "view" if r["src_id"] else ids[r["id"]]}
-            for r in c.execute(f"SELECT * FROM books WHERE id IN ({q}) ORDER BY owner_id!=?, id", [*ids, u["id"]])}
+    out = {}
+    if ids:
+        q = ",".join("?" * len(ids))
+        # 2.126.0 C (#1992 K5): an imported (mirrored) address book is written by its source only: read only over CardDAV
+        out = {f"b{r['id']}": {"key": f"b{r['id']}", "id": r["id"], "name": r["name"], "color": r["color"],
+                               "role": "view" if r["src_id"] else ids[r["id"]]}
+               for r in c.execute(f"SELECT * FROM books WHERE id IN ({q}) ORDER BY owner_id!=?, id", [*ids, u["id"]])}
+    # 2.351.0 B (#2749): the contacts a folder opens one by one (not through their book): one read-only collection "s1"
+    from .ctfolder import CTF_CONTACT, ctf_reached
+    one = ctf_reached(c, u["id"], CTF_CONTACT)
+    if one:
+        q = ",".join(str(int(x)) for x in sorted(one))
+        got = [r[0] for r in c.execute(f"SELECT id, book_id FROM contacts WHERE id IN ({q}) AND deleted_at IS NULL AND kind!='group' "
+                                       "ORDER BY id") if r[1] not in ids]
+        if got:
+            out[AB_SHARED] = {"key": AB_SHARED, "id": None, "ids": tuple(got), "name": tr("Shared contacts"), "color": "", "role": "view"}
+    return out
 
 
 _PRODID_RE = re.compile(r"^PRODID[:;][^\r\n]*(?:\r?\n[ \t][^\r\n]*)*\r?\n", re.I | re.M)
@@ -74,7 +88,7 @@ class AbColl:
 
 
 def ab_coll(c, u, book):
-    key = (u["id"], book["key"], gsetting(c, "version"), book["name"], book["role"], collab_all())
+    key = (u["id"], book["key"], gsetting(c, "version"), book["name"], book["role"], collab_all(), book.get("ids"))
     now = time.monotonic()
     with _LOCK:
         hit = _CACHE.get(key)
@@ -82,13 +96,17 @@ def ab_coll(c, u, book):
             return hit[1]
     members = {}
     # 2.272.0 E1 (#3038): a contact in the trash is gone for the device (sync-collection reports it as deleted, the ctag changes)
-    for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND deleted_at IS NULL ORDER BY id", (book["id"],)):
+    if book.get("ids") is not None:  # 2.351.0 B (#2749): the shared contacts (names c<id>.vcf: hrefs of two books may clash)
+        rows = c.execute(f"SELECT * FROM contacts WHERE id IN ({','.join(str(int(x)) for x in book['ids']) or '0'}) AND deleted_at IS NULL ORDER BY id")
+    else:
+        rows = c.execute("SELECT * FROM contacts WHERE book_id=? AND deleted_at IS NULL ORDER BY id", (book["id"],))
+    for r in rows:
         try:
             text = render_vcard(r)
         except (ValueError, TypeError, KeyError) as e:
             print("carddav: skipping contact", r["id"], e, flush=True)
             continue
-        members[r["href"]] = (r["id"], _etag(text), text, r)
+        members[f"c{r['id']}.vcf" if book.get("ids") is not None else r["href"]] = (r["id"], _etag(text), text, r)
     ac = AbColl(book, members)
     with _LOCK:
         if len(_CACHE) > 64:
@@ -156,7 +174,7 @@ def ab_path(p, u):
         raise DavError(404, "Not found")
     if len(parts) == 2:
         return "abhome", None, None
-    if not re.fullmatch(r"b\d{1,12}", parts[2]):
+    if not re.fullmatch(r"b\d{1,12}", parts[2]) and parts[2] != AB_SHARED:  # 2.351.0 B (#2749): + the shared contacts
         raise DavError(404, "Not found")
     if len(parts) == 3:
         return "book", parts[2], None
@@ -176,6 +194,13 @@ def _want_version(root):
 def card_now(c, book, name, lock=False):
     """lock (2.273.0 C, #3048): PUT / DELETE check If-Match and write under one lock (the book's card name + the row), so two
     writers with the same ETag cannot both pass -- the second one gets 412."""
+    if book.get("ids") is not None:  # 2.351.0 B (#2749): the shared contacts (read only: never locked / written)
+        m = re.fullmatch(r"c(\d{1,12})\.vcf", name or "")
+        r = c.execute("SELECT * FROM contacts WHERE id=? AND deleted_at IS NULL", (int(m.group(1)),)).fetchone() if m and int(m.group(1)) in book["ids"] else None
+        if not r:
+            return None
+        text = render_vcard(r)
+        return r, _etag(text), text
     if lock:
         write_lock(c, f"carddav:{book['id']}:{name}")
     r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL" + (" FOR UPDATE" if lock else ""), (book["id"], name)).fetchone()
