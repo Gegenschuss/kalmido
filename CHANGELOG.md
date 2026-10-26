@@ -5,6 +5,71 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.0] - 2026-10-26
+
+Package 2.300.0 (Brand colour petrol).
+### Changed
+- #3198 Petrol is the brand colour: app icon, home screen icon, favicon, push shortcuts, the logo while the app loads and on the sign-in page, the invitation and welcome mails, the public list page and the folder watch page are petrol instead of violet.
+- #3198 Settings > Appearance: the new accent colour "Petrol" is the first entry and the default. Devices and accounts that never picked an accent colour switch to petrol; whoever picked violet (or any other colour) keeps it. Violet stays selectable.
+- #3198 iOS and iPadOS keep the old home screen icon of an installed app until it is removed and added to the home screen again; Android and desktop browsers pick up the new icon on their own after a while.
+
+Package 2.350.0 (Chat bundle: chat header on phone and desktop, chat width, knowledge editor).
+### Added
+- Knowledge pages: live preview while writing - the page stays drawn, only the block with the cursor shows its Markdown; the plain text field is back via the page's "…" menu (account setting) (#3147)
+- Knowledge editor: "/" at the start of a line opens commands (heading, lists, checkbox, table, code, mind map, picture or file, embedded table, page link, date, templates); Ctrl/Cmd+K inserts a link, Ctrl/Cmd+Shift+7 / 8 / 9 make a numbered list / list / checkbox (#3149)
+- Knowledge: checkboxes tick in read mode (saved like an edit: history, conflicts, offline, locked spaces); a line with #123 ticks its task too; right click / long press offers "Create as task" (#3148)
+- Knowledge import: "Import running · 34 %" on top of the knowledge pages and at Knowledge in the bar; a click reopens the progress window, a click next to it keeps the import in the background with a note (#2744)
+- Chat and left sidebar can be dragged as wide as you like; only the list keeps a minimum of 12 rem; double-click on the handle resets the width (#2750)
+### Changed
+- Agent chat header: one row on phones (max 56 px) and on the desktop with the name and a single state ("working: <job>" / "ready"); permissions, model, workspace, usage and search moved into the "…" menu; at most three icons on the right (sidebar, "…", close) (#2790, #3317)
+- The usage ring shows next to the agent's name only near its limit; its numbers are in the "…" menu (#3317)
+- Desktop chat composer: tools, box and Send on one line with one height; the key hint is Send's tooltip; the narrow chat panel puts the tools behind "+" (#2793)
+- Team chat on phones: the app header steps aside while a conversation is open; long names stay on one line (#2790)
+### Fixed
+- Project and folder settings: the fixed title no longer covers the first row (#2745)
+- The undo message closes on a page change also from the start page (empty address hash) (#3242)
+- Sidebar pins are saved as single entries, so a reload crossing the save no longer drops an earlier pin (#2806)
+
+Package 2.330 (Small fixes: Home shows company contracts, cash flow balance).
+### Fixed
+- Home & life in the private space showed the contracts of an organisation (the deadline tasks of Office > Contracts & insurances in an organisation project) and counted them in the monthly sum; devices, upkeep, health and read later of organisation projects likewise. The private view now shows only what lies in private projects (#3295).
+- Office > Cash flow: the balance in the head of a month now counts that month's corrections by hand, like the account balance below it; the computed money in and out stay as they are (#3296).
+
+Package 2.351.0 (Office sidebar trees, address book and contracts in folders, office rights fixes).
+
+### Added
+- Office: Quotes & invoices, Documents, Correspondence and Receipts open as trees in the sidebar - their folders, the 20 newest documents and "More…"; drag documents (also quote rows from the list) into folders, or use "Move…" in the menu on the phone; new folders, sharing and renaming right at the area (#3312, #2823).
+- Folders: generated documents, letters and receipts can be filed in folders and shared like quotes; the receipts lock of the office groups and the retention period still apply (#2823).
+- Correspondence: "Mark as sent" offers the correspondence folders with their path (#2823).
+- Address books and single contacts can be filed in folders and shared there (one Share dialog, rights inherited, book members stay); CardDAV shows them, single contacts in a read-only "Shared contacts" book; the address book's Share dialog offers agents (#2749).
+- Framework contract PDFs and contracts & insurance can be filed into folders of the file store (read-only through a folder) (#2749).
+
+### Changed
+- Office: client, project and year are filters at the top of the quotes list instead of automatic groups in the sidebar; the separate sidebar group "Folders" is part of the area trees now (#3312).
+- A draft reached only through a folder shared with edit rights can be edited in the office editor (#2823).
+- Documents: sorting rules only file into folders the uploading person may edit (#2823).
+- Hard-deleted contracts and framework contract PDFs leave no folder node behind; the client / project / year filters reset when the workspace changes (#2749, #3312).
+- Tables: the folder chains are read once per request in the table index (#2823).
+
+### Security
+- An agent limited to selected projects no longer reads quotations or invoices of other projects through a folder shared with it (#3246).
+- Taking over or undoing an agent's receipt reading checks the person's receipts right again (#3247).
+- Office folders (review of this package): the accounting role does not read letters through the Correspondence tree or a filed letter; receipts in the trash and archived documents / letters open through no folder; agents and API tokens get no node of an object their area hides, even when an office group would give it; editing a draft through a folder keeps the conflict protection and shows only the document's own controls; folders outside an area show their path only from the first folder the person sees; reads through a folder are in the office log (#2823, #3246).
+
+### Fixed
+- A task deleted on another device could stay in the open list after the bundled live update loaded the whole state (#2785).
+- Leaving an organisation also removes your read marks in its team channels and list chats (#3214).
+
+Package 2.235.0 (agent gear: control, one-way steps, data lock, standing rules).
+### Added
+- Agents: a control level in the agent's settings (gear > Work style and notifications > Control), per agent and per project: Approve everything (default for new agents), Routine free (create, plan, comment and tick off tasks without asking) or Free run with a goal; the server enforces it, a refused write answers 409 approval_required and an approval card with a step allows exactly that request once (method, path and body); the card shows the person the step, whether it is a one-way step and the agent's recommendation. Agents made before keep working as before until a level is chosen (#2891).
+- Agents: one-way steps (deleting, costs, login / registration, migrations without a way back, plus your own items such as "send invoices") always need an approval card, on every level; every decision the agent took without a card is in a history with Undo (#2900, #2891).
+- Agents: a deadline for approval cards (off, 1 h, 4 h, 1 day, 3 days); when it passes: reject (default), ask once more or take the recommendation (never for one-way steps) (#2901).
+- Agents: "Data the agent never sees" in the agent's settings: private e-mails (locked by default for every agent), contracts, home & devices, private trips, single projects and tags; the server hides them in every read path of the agent (lists, tasks, search, files, calendar, roadmap, events, proposal inputs) with 404. Journal, mood, health, budget and read later stay never visible (#2902).
+- Agents: standing rules - a "from now on always ..." instruction becomes a rule with date and source (chat message or comment); the settings list them to edit, pause, delete or add by hand; the agent confirms a new rule in one line (#2903).
+- Agent API / MCP: `control`, `data_lock` and `rules` in GET /api/v1/agent; events control_changed, approval_expired, decision_undone, data_lock_changed, rules_changed; GET/POST /api/v1/agent/rules (MCP get_rules, add_rule); approval cards with a step and the header X-Kalmido-Approval (MCP use_approval); the reference starters put control level and active rules into the rules block (#2891, #2902, #2903).
+- Phones close the keyboard after sending a chat message or pressing a suggestion, so the answer has the whole screen; a tap into the box brings it back. Two switches in Settings > Notifications > Chat (agent chat, team chat), on by default (#2899).
+
 ## [2.323.1] - 2026-10-26
 
 Package 2.323.1 (CI fix).
@@ -8732,7 +8797,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.323.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.0...HEAD
+[2.351.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.0
 [2.323.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.1
 [2.323.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.0
 [2.322.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.322.0
