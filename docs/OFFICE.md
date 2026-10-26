@@ -1022,6 +1022,17 @@ is opened) and `mapping` (a JSON string) / `account` as form fields; the answer 
 and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`. Since 2.146 the answers add `pending_count` and `camt052`,
 each row `pending`; the mapping may name `sign` (the column of the debit / credit mark).
 
+Since 2.355: amounts take thousand separators only in groups of three ("1.234,56", "1,234.56"); anything else is an
+unreadable row instead of another number ("1,234.5" with the decimal comma, "1.234" with the decimal point), cents are
+rounded half up; a minus in the credit column counts (a return); `DD/MM/YYYY` is a date format (a British file is guessed
+day first). The duplicate key of an EndToEndId carries the booking day (a fixed EndToEndId with the same amount every
+month gives one booking per month); keys stored before stay valid for their own day. A personal office moved into an
+organisation keeps its bookings found as duplicates there, and its locked months go along. `match` with `kind: invoice`
+takes `parts: [{id, amount}]` instead of `id`: one booking on several invoices or with a rest (100.01 on 100.00); every
+part is a payment, the rest shows as `match.rest`, `unmatch` takes every part back (its `was.parts` re-splits). A receipt
+match keeps a payment day typed by hand and answers `amount_differs: {receipt, booking}` when the amounts differ. A cash
+book entry "in" for an invoice books a cash payment on it (`office_cash_entries.payment_id`); its cancellation takes it back.
+
 ## Tax dates as tasks
 
 *Since 2.90.*
