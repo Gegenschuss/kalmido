@@ -19,6 +19,7 @@ async function wki_limits() {
 // the window: a bar, one line what happens, Cancel + In the background (or OK at the end)
 function wki_sheet() {
   if (WKI.md?.isConnected) return WKI.md;
+  /** @type {any} */
   const md = modal(`<h3>${esc(tr('Import'))}</h3><div class="wki-box" role="status" aria-live="polite"></div>
     <div class="foot"><button type="button" class="btn" data-wki="stop">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-wki="bg">${esc(tr('In the background'))}</button></div>`);
   md.addEventListener('click', async e => {
