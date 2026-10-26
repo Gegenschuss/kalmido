@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.8] - 2026-10-26
+
+### Fixed
+- CI of 2.307.7: p202_ui created and deleted a helper task through the API behind the page's back. When the page's 4-second change check ran in between (likely on the slower CI), the deleted task stayed the top row of its section until the next check and took the first ArrowDown. The test now reloads the page state after the delete and waits until the row is gone. Reproduced on v2.304.1 as well; no app change.
+- CI of 2.307.7, preventive (same patterns on a slow runner): p2117_a, p2119_a, p2146_b, p260, p208, p2473_c and p2361_a now wait for their own toast text before clicking its button (a hidden older toast keeps its Undo button in the page, so an early click undid the wrong step); news_ui waits for the poll's result instead of fixed 5 s pauses; p2156_d_sideviews_ui gives the second window's poll 15 s instead of 6 s.
+
 ## [2.307.7] - 2026-10-26
 
 ### Fixed
@@ -8340,7 +8346,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.7...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.8...HEAD
+[2.307.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.8
 [2.307.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.7
 [2.307.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.6
 [2.307.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.5
