@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.318.1] - 2026-10-26
+
+### Fixed
+- CI of 2.318.0: four test suites follow the code again - the selfstart guard takes only the env var `KEEP` (not `LS_KEEP` of #3270), the upload export test exports as the admin (#2880 shows only the admin's lists), the newsletter test switches the planned sync off before its own runs (the watchdog's run took the adds), and the encrypted-DM downgrade step holds the change poll (a room reload switched encryption back on).
+
 ## [2.318.0] - 2026-10-26
 
 - Privacy quick fixes, landscape fold layout for desktop view, release image built only after green CI.
@@ -8390,7 +8395,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.1...HEAD
+[2.318.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.1
 [2.318.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.0
 [2.317.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.317.0
 [2.316.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.316.0
