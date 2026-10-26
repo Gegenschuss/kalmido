@@ -19,6 +19,7 @@ from ..core.i18n import tr
 from ..accounts.session import me
 from ..files.store import ROLE_RANK, fs_chain, fs_log_add, fs_role, need_node
 from ..files.fsroots import fs_area_root_of
+from ..files.fslock import fl_is_locked
 from . import store as S
 from .ingest import doc_add, docs_kick
 from .web import _no_agent, doc_json
@@ -30,8 +31,7 @@ DEPTH = 30      # folder levels walked below a switched folder
 
 def _ab_locked(c, nid):
     """A node inside a locked (end-to-end encrypted) folder: no recognition there."""
-    # 2.353.0 D (#2759): wired to fslock.fl_is_locked after part A is merged
-    return False
+    return fl_is_locked(c, nid)  # 2.353.0 (#2759): part A's lock (files/fslock.py)
 
 
 def _val(r):

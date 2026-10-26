@@ -208,6 +208,13 @@ check(not [h for h in hits if h["id"] in (F1, F3, SUB)], "server search leaves t
 r = A.get(B + f"/api/files/lock/{SAFE}/raw/{F1}")
 check(r.ok and r.content[:5] == b"KENC\x02", "raw: the ciphertext for the browser")
 check(A.get(B + f"/api/files/nodes/{F1}/content").content[:5] == b"KENC\x02", "content: the stored ciphertext only")
+# 2.353.0 (#2759 x #2758): recognition per folder never reaches a locked folder (docs/recog.py asks fslock.fl_is_locked)
+check(A.put(B + f"/api/files/nodes/{SAFE}/recognition", json={"mode": "on"}).status_code == 409, "recognition: a locked folder 409")
+check(A.put(B + f"/api/files/nodes/{F1}/recognition", json={"mode": "on"}).status_code == 409, "recognition: a locked file 409")
+r = A.put(B + f"/api/files/nodes/{TOP}/recognition", json={"mode": "on"})
+check(r.ok and not dbx("SELECT 1 FROM doc_meta WHERE node_id IN (?, ?)", (F1, F3)), "recognition on above: the locked files stay no documents " + r.text[:160])
+check(items(A, TOP).get(SAFE, {}).get("recog_on") is False, "listing: the locked folder does not recognise")
+A.put(B + f"/api/files/nodes/{TOP}/recognition", json={"mode": "inherit"})
 
 # ---------------------------------------------------------------- (d) agents, API tokens, external people
 r = A.post(B + f"/api/files/nodes/{SAFE}/shares", json={"agent_id": AGID, "role": "view"})
