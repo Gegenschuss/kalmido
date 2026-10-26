@@ -570,7 +570,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Free for everyone in the house or team.** No per-seat subscription, unlimited users, projects and tasks, and everyone you share a project with works in it for free.
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
 - **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal project again.
-- **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
+- **Yours.** Runs on your own server, no vendor account, no telemetry (the update check asks GitHub for the latest version every 6 hours and can be switched off; everything else that leaves your server is listed in docs/SELF-HOSTING.md, Outgoing connections), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
 - **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
 ## Features
@@ -820,7 +820,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries), or your projects as Todoist CSV files or Markdown checklists (2.142.0) - no lock-in
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
-- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
+- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes; the switch **View on this device** (Automatic / Phone / Computer) is kept per device, and an unfolded foldable or small tablet in landscape gets the narrow desktop view
 - English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](CONTRIBUTING.md#translations))
 
 | | | |
@@ -1061,7 +1061,7 @@ own project with the same name is reused) or one existing project you can edit. 
   two projects shared with the same people); moving it anywhere else is up to the project owner, so a member can never take a
   shared task (with its subtasks and comments) away from the owner. Subtasks follow their parent; a subtask that lives
   in someone else's project stays there (at the top level) when a member moves the parent elsewhere.
-- **Trash:** everyone with edit rights can move tasks to the trash and restore them. Only the project owner deletes
+- **Trash:** deletion after the trash period needs `KALMIDO_RETENTION_PURGE=1` (new installations get it from the installer). Everyone with edit rights can move tasks to the trash and restore them. Only the project owner deletes
   tasks of a shared project permanently (*Empty trash* of a member leaves shared projects of other owners alone, marks those
   items *stays* and says how many stayed). Instance admins also empty the trash of shared projects where they may edit.
 - **Assignment:** in shared projects a task or subtask can be assigned to the owner or any member (task panel >
@@ -1679,12 +1679,12 @@ may see and use the agent* is on); somebody else's personal agent is listed in t
 the kill switch only. *Add agent…* asks **team agent or personal agent** and explains both; **Belongs to** turns a team
 agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
 *Workspaces*) and joins only its projects. A small **robot badge** marks agents wherever people appear (#985). Kalmido
-itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
+itself never starts an agent or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
 the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
 server); every person switches it on for themselves and ticks the projects it may read, and gets summaries, extracted
 tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
-direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md).
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](docs/ASSISTANT.md). The optional similarity service (`KALMIDO_EMBED_URL`) likewise sends task titles and descriptions to the service the admin enters.
 
 **Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
 agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](docs/AGENTS.md#which-agent-when-2466).
@@ -2121,12 +2121,12 @@ access tokens (never the session cookie or the proxy header), so it needs no suc
 and a restrictive `Permissions-Policy`. Attachments are served with a sandbox CSP; only images
 and PDFs are shown inline, everything else is a download. Your proxy does not need to add anything.
 
-**Server-side requests:** the browser makes no external requests; the server only contacts the services you configure
+**Server-side requests:** the server only contacts services you or your admin configure or use (full list: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#outgoing-connections)); the browser loads no CDN, fonts or scripts from outside (exception: the video review shows YouTube / Vimeo players and video files from other https hosts once such a review is opened). The services are
 (ntfy, Git hosts), the push services of the browsers that subscribed to Web Push (see *Notifications*), the calendar
 links and CalDAV servers your users subscribe to (with an SSRF guard that refuses internal addresses unless an admin
 allows the host, see *Calendar subscriptions*), the OpenID Connect provider if you configure one (same guard), your users' webhook URLs (same guard, no redirects, see [docs/API.md](docs/API.md#webhooks)), plus an optional update check against GitHub (`api.github.com`,
 see *Updating*), all http/https only with redirects only within the same host (calendar links: see there). Web Push only goes to https endpoints of an allow-list of known push services, so a crafted
-subscription cannot make the server call anything else. Links in tasks or shared text are never fetched.
+subscription cannot make the server call anything else. Links in tasks or shared text are not fetched, with these exceptions: the preview of a saved bookmark (module on), contact photos at a Google import, feeds and calendar subscriptions you add.
 
 ### Two-factor authentication and passkeys
 
@@ -2572,7 +2572,7 @@ stays empty. Otherwise the server creates a key once and from then on encrypts o
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`.
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
 
 How to update depends on how you installed:
 
