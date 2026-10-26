@@ -15,6 +15,7 @@
  - an agent from before 2.235.0 (control '') works as before (no gate) until its owner picks a level
  - the same as a team agent of an instance admin; another person gets 404 (freelancer-matrix: agents)
 usage: p2235_a_control_api_test.py <datadir>      (KMT_NOSTART=1 / P2235A_NOSTART=1: a running server)"""
+import os
 import sys
 from datetime import timedelta, timezone
 
@@ -28,6 +29,7 @@ from testclock import now
 V = B + "/api/v1"
 HDR = "X-Kalmido-Approval"
 
+os.environ["KALMIDO_AGENT_CONTROL_NEW"] = "approve_all"  # the real default (tests/start.sh starts other suites with legacy)
 fresh(prefix="P2235A")
 A = setup()
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})

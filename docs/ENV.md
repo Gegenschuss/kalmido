@@ -256,6 +256,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 |---|---|---|
 | `KALMIDO_AGENT_BURST_QUIET_S` | `15` | Seconds without more new tasks after which the burst summary of an agent is sent. |
 | `KALMIDO_AGENT_BURST_S` | `60` | Seconds in which several new tasks of an agent count as one burst (one summary event). |
+| `KALMIDO_AGENT_CONTROL_NEW` | `approve_all` | Control level a new agent starts with: approve_all, routine, free, or legacy (no level, works as before 2.235.0; the test containers use it). |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | Hours after which unread agent events count as stale. |
 | `KALMIDO_AGENT_PUSH_DAY` | `500` | Push notifications per agent and day. |
 | `KALMIDO_AGENT_WAITERS` | `6` | Agent connections waiting for events on the whole server at the same time. |

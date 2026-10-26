@@ -2,7 +2,7 @@
 
 Applies to agents only (people keep their roles and the approvals of gates.py). Stored as JSON in agents.control; '' = no
 level chosen (an agent from before 2.235.0): it works as before, no gate at all, until its owner picks a level. A new agent
-starts with approve_all (agents/admin.py make_agent, CTL_NEW).
+starts with approve_all (agents/admin.py make_agent, ctl_new; KALMIDO_AGENT_CONTROL_NEW).
 
 Levels, per agent and per project (a project's exception wins over the agent's level):
   approve_all  every change waits for an approval card
@@ -26,6 +26,7 @@ plan -> the old dates, comment -> deleted).
 watchdog): reject (default), ask_again (one more push, then reject) or recommend (the card's recommended answer; never on a
 one-way step -- there reject). The result is a line in the history and the event approval_expired."""
 import json
+import os
 import re
 from datetime import timedelta
 from flask import g, jsonify, request
@@ -55,7 +56,6 @@ CTL_DEADLINES = {"off": None, "1h": 3600, "4h": 4 * 3600, "1d": 86400, "3d": 3 *
 CTL_THEN = ("reject", "ask_again", "recommend")
 CTL_GOAL_MAX = 500
 CTL_DEFAULTS = {"level": "approve_all", "goal": "", "projects": {}, "one_way": [], "deadline": "off", "then": "reject"}
-CTL_NEW = {"level": "approve_all"}  # what a new agent stores at creation
 CTL_KEEP = 50  # history lines per agent
 CTL_WRITE = ("POST", "PUT", "PATCH", "DELETE")
 CTL_PLAN_KEYS = {"due", "due_time", "start"}  # "plan" = only these dates (+ the conflict helpers of PATCH)
@@ -110,6 +110,13 @@ def ctl_class(method, path, b=None):
 
 
 # ---------------------------------------------------------------- the stored settings
+def ctl_new():
+    """What a new agent stores at creation (agents/admin.py make_agent): {"level": ...}, None = nothing (works as before;
+    the test containers start so, tests/start.sh)."""
+    v = (os.environ.get("KALMIDO_AGENT_CONTROL_NEW") or "approve_all").strip()
+    return None if v == "legacy" else {"level": v if v in CTL_LEVELS else "approve_all"}
+
+
 def ctl_load(a):
     """The stored dict of agent row a (None = no level chosen yet: an agent from before 2.235.0)."""
     raw = a["control"] if a is not None and "control" in a.keys() else ""

@@ -72,6 +72,8 @@ if [[ -n "${KALMIDO_TEST_DB_LOGIN:-}" ]]; then
 fi
 # 2.149.0 E (#2512): the test clock (run_all.sh `now <instant>; fresh`)
 TNOW=(-e KALMIDO_TEST=1)
+# 2.235.0 A (#2891): a new agent of the test container has no control level (works as before); the control suites ask for approve_all
+TNOW+=(-e "KALMIDO_AGENT_CONTROL_NEW=${KALMIDO_AGENT_CONTROL_NEW:-legacy}")
 [[ -z "${KALMIDO_TEST_NOW:-}" ]] || TNOW+=(-e "KALMIDO_TEST_NOW=$KALMIDO_TEST_NOW" -e "KALMIDO_TEST_NOW_AT=${KALMIDO_TEST_NOW_AT:-$(date +%s)}")
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --security-opt no-new-privileges:true --cap-drop ALL \
