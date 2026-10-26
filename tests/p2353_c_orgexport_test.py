@@ -224,6 +224,9 @@ check(not made and one("SELECT org_id FROM fs_area_roots WHERE ws=? AND area='wi
       f"only rows of the target organisation {made}")
 check(dbx("SELECT COUNT(*) AS n FROM fs_nodes WHERE org_id=?", (ORG,))[0]["n"] == src_n and root_of(f"o{ORG}", "wiki") == WROOT
       and root_of(f"o{ORG}", "sheets") == SROOT, "the source's tree is untouched")
+# 2.353.0 (#2829, review): a new knowledge root of an organisation opens to its members like wkf_root, whatever the archive says
+check((one("SELECT org_access FROM fs_nodes WHERE id=?", (root_of(f"o{GAM}", "wiki") or 0,)) or {}).get("org_access") == "edit",
+      "the new knowledge root carries org_access edit")
 r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
 check(not dbx("SELECT 1 FROM fs_nodes WHERE org_id=?", (GAM,)) and not dbx("SELECT 1 FROM fs_area_roots WHERE ws=?", (f"o{GAM}",)),
@@ -231,14 +234,16 @@ check(not dbx("SELECT 1 FROM fs_nodes WHERE org_id=?", (GAM,)) and not dbx("SELE
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- into an organisation with its own knowledge root
-r = A.post(B + "/api/wiki/folders", json={"space": f"org:{DEL}", "name": "Handbuch"})
+# 2.353.0 (#2829, review): the target's folder differs in case only - knowledge names are case-blind (wkf_name), it takes the archive's
+r = A.post(B + "/api/wiki/folders", json={"space": f"org:{DEL}", "name": "handbuch"})
 check(r.status_code == 201, "the target's own knowledge folder " + r.text[:160])
 DHB, DROOT = r.json()["folder"]["id"], root_of(f"o{DEL}", "wiki")
 iid, _ = imp(A, OX, RK, DEL)
 check(root_of(f"o{DEL}", "wiki") == DROOT, "the target's knowledge root stays the root")
 dk = kids(DROOT)
 check(len(tops(DEL, one("SELECT name FROM fs_nodes WHERE id=?", (DROOT,))["name"])) == 1, "no second knowledge root")
-check(dk.get("Handbuch", {}).get("id") == DHB and "Leer" in dk, f"the folder of the same name takes the archive's {sorted(dk)}")
+check(dk.get("handbuch", {}).get("id") == DHB and "Handbuch" not in dk and "Leer" in dk,
+      f"the folder of the same name (other case) takes the archive's {sorted(dk)}")
 check({"Eins", "Zwei"} <= set(kids(DHB)), "the pages lie in the target's folder")
 r = A.get(B + "/api/wiki", params={"space": f"org:{DEL}"})
 check(r.ok and root_of(f"o{DEL}", "wiki") == DROOT and {"Eins", "Zwei"} <= set(kids(DHB)), "the index keeps it so")

@@ -9238,6 +9238,7 @@
   "Entries of people who were not chosen were not taken over: {0}": "Items van personen die niet zijn gekozen, zijn niet overgenomen: {0}",
   "Entries that belong to other people were not taken over: {0}": "Items die van andere personen zijn, zijn niet overgenomen: {0}",
   "Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel.": "In de browser versleutelde chatberichten zijn ongewijzigd overgenomen: ze openen met de sleutels van hun kanaal.",
+  "The target's knowledge has the lock: files of the knowledge tree were left out.": "De kennis van het doel is vergrendeld: bestanden uit de kennisboom zijn weggelaten.",
   "A booking of a resource that was not taken over was left out: {0}": "Een boeking van een niet overgenomen middel is weggelaten: {0}",
   "The access data does not come with an export: connect the newsletter service again.": "De toegangsgegevens gaan niet mee met een export: verbind de nieuwsbriefdienst opnieuw.",
   "Newsletter connection taken over without its access data: connect it again.": "Nieuwsbriefverbinding zonder toegangsgegevens overgenomen: verbind haar opnieuw.",

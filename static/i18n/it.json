@@ -9238,6 +9238,7 @@
   "Entries of people who were not chosen were not taken over: {0}": "Le voci delle persone non selezionate non sono state importate: {0}",
   "Entries that belong to other people were not taken over: {0}": "Le voci che appartengono ad altre persone non sono state importate: {0}",
   "Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel.": "I messaggi di chat cifrati nel browser sono stati importati così come sono: si aprono con le chiavi del loro canale.",
+  "The target's knowledge has the lock: files of the knowledge tree were left out.": "La conoscenza di destinazione è bloccata: i file dell'albero della conoscenza sono stati esclusi.",
   "A booking of a resource that was not taken over was left out: {0}": "È stata tralasciata una prenotazione di una risorsa non importata: {0}",
   "The access data does not come with an export: connect the newsletter service again.": "I dati di accesso non fanno parte di un’esportazione: ricollega il servizio di newsletter.",
   "Newsletter connection taken over without its access data: connect it again.": "Connessione newsletter importata senza i dati di accesso: ricollegala.",

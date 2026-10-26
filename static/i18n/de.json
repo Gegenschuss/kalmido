@@ -9216,6 +9216,7 @@
   "Entries of people who were not chosen were not taken over: {0}": "Einträge von Personen, die nicht ausgewählt wurden, wurden nicht übernommen: {0}",
   "Entries that belong to other people were not taken over: {0}": "Einträge, die anderen Personen gehören, wurden nicht übernommen: {0}",
   "Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel.": "Im Browser verschlüsselte Chat-Nachrichten wurden unverändert übernommen: Sie lassen sich mit den Schlüsseln ihres Kanals öffnen.",
+  "The target's knowledge has the lock: files of the knowledge tree were left out.": "Das Wissen im Ziel ist gesperrt: Dateien aus dem Wissens-Baum wurden ausgelassen.",
   "A booking of a resource that was not taken over was left out: {0}": "Eine Buchung einer nicht übernommenen Ressource wurde ausgelassen: {0}",
   "The access data does not come with an export: connect the newsletter service again.": "Die Zugangsdaten kommen nicht mit einem Export mit: Verbinde den Newsletter-Dienst neu.",
   "Newsletter connection taken over without its access data: connect it again.": "Newsletter-Verbindung ohne Zugangsdaten übernommen: Bitte neu verbinden.",

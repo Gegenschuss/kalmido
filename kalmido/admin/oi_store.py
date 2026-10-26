@@ -102,6 +102,9 @@ def _node(c, run, src, d, ctx):
     sid = _oidi(src.get("id"))
     area = st["area_of"].get(sid)
     if area == "wiki" and _wiki_locked(c, ctx):
+        if d.get("kind") == "file" and not st.get("lockwarn"):  # 2.353.0 (#2829, review): files of the tree do not drop silently
+            st["lockwarn"] = True
+            run.warning(N_("The target's knowledge has the lock: files of the knowledge tree were left out."))
         return False  # the target's knowledge pages have the lock: their pages stay out (_page), so does the tree
     if sid in st["roots"]:  # an area's root: the target's own root of that area when it has one (never a second root)
         have = fs_area_root(c, ctx.uid, ctx.space, area, "", create=False)
@@ -111,10 +114,12 @@ def _node(c, run, src, d, ctx):
             return False
         st["new_roots"][sid] = area
         d["parent_id"] = None
+        if area == "wiki" and ctx.space:
+            d["org_access"] = "edit"  # 2.353.0 (#2829, review): like wkf_root, not the archive's value
     elif area == "wiki" and d["kind"] == "folder" and run.m("fs_nodes", src.get("parent_id")) in st["merged"]:
-        have = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND name=? AND deleted_at IS NULL",
+        have = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL",
                          (run.m("fs_nodes", src.get("parent_id")), d.get("name"))).fetchone()
-        if have:  # a knowledge folder's names are exact (wiki/wkfolder.py): the target's folder of that name takes it
+        if have:  # the target's folder of that name takes it (case-blind like wkf_name, 2.353.0 review)
             run.put("fs_nodes", sid, have[0])
             st["merged"].add(have[0])
             return False
