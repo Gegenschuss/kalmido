@@ -1,5 +1,5 @@
 // News UI tests (jsdom). Needs the api_test.py DB (alice en, bob de, carol, eve collab off).
-const {boot, errs, sleep} = require('./boot');
+const {boot, errs, sleep, until} = require('./boot');
 const ids = require('./ids.json');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -68,12 +68,13 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // two users: bob mentions alice while alice's window polls
   wb = await boot({user: 'bob', wait: 800});
   await api(wb, 'POST', `/api/tasks/${ids.ST}/comments`, {body: '<@1> once more'});
-  await sleep(5500);
+  // CI of 2.307.7: wait for the poll's result instead of a fixed 5.5 s (poll every 4 s + version + news fetch + render)
+  await until(() => d.querySelector('#kbar .bell .nbadge')?.textContent === '1' && d.querySelectorAll('#view .nitem.unread').length === 1);
   check(d.querySelector('#kbar .bell .nbadge')?.textContent === '1', 'badge updates within the poll');  // 2.152.3 (#2619): the bell moved into the head bar
   check(d.querySelectorAll('#view .nitem.unread').length === 1, 'open News view refreshes');
   // read on another device -> badge goes away via the version signature
   await api(w, 'POST', '/api/news/read', {all: true}); w.eval('S.news.sig = "stale"');
-  await sleep(5000);
+  await until(() => !d.querySelector('#kbar .bell .nbadge'));
   check(!d.querySelector('#kbar .bell .nbadge'), 'signature change reloads the badge');  // 2.152.3 (#2619): the bell moved into the head bar
   w.close();
   // bob: German, mobile, tab bar

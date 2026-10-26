@@ -98,7 +98,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   click(w, side('.sv-tile.on'));
   check(await until(async () => (await stored()).act === ''), 'a second tap on the active tile switches back to "Everything"');
   check(await until(() => side('.sv-tile.on')?.dataset.svid === '' && !side('.sg-svmore') && !inMore(side('.sg-filters'))), 'Everything: the whole sidebar, no "Others"');
-  check(await until(() => !d2.querySelector('#side .sv-tile.on[data-svid]:not([data-svid=""])') && !d2.querySelector('#side .sg-svmore')), 'the second session follows without reload');
+  check(await until(() => !d2.querySelector('#side .sv-tile.on[data-svid]:not([data-svid=""])') && !d2.querySelector('#side .sg-svmore'), 100), 'the second session follows without reload');  // CI of 2.307.7: w2 learns it with its 4 s poll + load + render, 6 s was tight
   w.location.hash = '#inbox'; await sleep(300);
   click(w, side(`.sv-tile[data-svid="${V?.id}"]`));
   check(await until(() => w.eval('S.route.key') === 'today'), 'switching to the view opens its start page');

@@ -123,6 +123,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   check((await call('GET', `/api/clients/${cl[1]}`)).archived, '#1733: Archive');
   await until(() => d.querySelectorAll('#view .msclients .ctrow').length === 2, 40);
   check(d.querySelectorAll('#view .msclients .ctrow').length === 2, '#1733: an archived client leaves the list (Archived shows it)');
+  await until(() => /1 client archived/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button'), 40);  // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
   d.querySelector('#toast button')?.click();
   await until(async () => !(await call('GET', `/api/clients/${cl[1]}`)).archived, 40);
   check(!(await call('GET', `/api/clients/${cl[1]}`)).archived, '#1733: Undo of Archive');

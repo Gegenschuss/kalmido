@@ -105,6 +105,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('[data-cd="yes"]')`), 'Delete asks first');
     await ev(clk('[data-cd="yes"]'));
     check(await ready(ev, `${getJ('/api/office/trips?year=2025')}.then(j => j.trips.length === 3)`), 'the copy is deleted');
+    // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
+    check(await ready(ev, `!document.querySelector('#toast').classList.contains('hidden') && /Deleted/.test(document.querySelector('#toast').textContent) && !!document.querySelector('#toast button:not(.tx)')`), 'the delete toast with undo');
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/trips?year=2025')}.then(j => j.trips.length === 4)`), 'one undo step brings it back');
 
@@ -142,6 +144,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`${getJ('/api/office/trips?year=2025')}.then(j => j.trips.some(t => t.purpose === 'Messe'))`), 'the trip keeps its text');
     await ev(clk('.rkpset [data-rkp="del"]'));
     check(await ready(ev, `${getJ('/api/office/trips/purposes')}.then(j => !j.purposes.length) && !document.querySelector('.rkpset [data-rkp="del"]')`), 'removed');
+    check(await ready(ev, `!document.querySelector('#toast').classList.contains('hidden') && /Removed/.test(document.querySelector('#toast').textContent) && !!document.querySelector('#toast button:not(.tx)')`), 'the remove toast with undo');  // CI of 2.307.7: not the rename's Saved toast
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/trips/purposes')}.then(j => j.purposes.length === 1) && !!document.querySelector('.rkpset [data-rkp="del"]')`), 'one undo step brings it back');
     await ev(`(() => { const x = document.querySelector('#rkp-new'); x.value = 'Workshop'; x.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return 1; })()`);

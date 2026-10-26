@@ -110,6 +110,7 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
     'Only this: every other calendar (subscriptions and own) hidden ' + JSON.stringify([subs.map(s => [s.name, s.visible]), cals.map(c => [c.name, c.hidden])]));
   await until(() => d.querySelectorAll('.tl-cal').length === 1);
   check(d.querySelectorAll('.tl-cal').length === 1 && d.querySelector('.tl-cal .tln')?.textContent === 'Family feed', 'Only this: one row left');
+  await until(() => /Only this calendar is shown/.test(d.querySelector('#toast')?.textContent || '') && /Show all/.test(d.querySelector('#toast button')?.textContent || ''));  // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
   click(w, d.querySelector('#toast button')); await sleep(900);  // "Show all"
   subs = (await call('GET', '/api/calendars')).subs; cals = (await call('GET', '/api/evcals')).items;
   check(subs.every(s => s.visible) && cals.every(c => !c.hidden), 'Show all: everything visible again');

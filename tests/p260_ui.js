@@ -285,7 +285,8 @@ const TOUCH = `(() => {
   check((await members()).some(p => p.user_id === CAROL && p.role === 'view') && md.querySelector(`#l-members .mrow[data-uid="${CAROL}"]`), 'Carol invited as a viewer');
   // switch to Helper (Claude leaves in the same step), Undo brings Claude back, then no agent
   const agsel = () => md.querySelector('#sh-agsel');
-  agsel().value = String(ag2.id); agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  agsel().value = String(ag2.id); agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
+  await until(() => /Helper now works in/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button'));  // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
   let mm = await members();
   check(mm.some(p => p.user_id === ag2.id) && !mm.some(p => p.user_id === ag.id) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'switched to Helper in one step, with Undo');
   d.querySelector('#toast button')?.click(); await sleep(1400);

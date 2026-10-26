@@ -96,6 +96,8 @@ const PDF = '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 o
     await ev(`(() => { document.querySelector('.bk-sheet .rx-dup [data-rx^="nodup:"]').click(); return 1; })()`);
     check(await ready(ev, `fetch('/api/docs/${T2}', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => !j.duplicate_of)`, 60), '"No duplicate": stored');
     check(await ready(ev, `!!document.querySelector('.bk-sheet') && !document.querySelector('.bk-sheet .rx-dup')`, 60), 'the warning goes');
+    // CI of 2.307.7: the own toast before its button (the "already exists" toast and its Open can still be there on a slow runner)
+    check(await ready(ev, `/Marked as no duplicate/.test(document.querySelector('#toast')?.textContent || '') && /Undo/.test(document.querySelector('#toast button')?.textContent || '')`, 60), 'the undo toast of "No duplicate"');
     await ev(`(() => { document.querySelector('#toast button')?.click(); return 1; })()`);
     check(await ready(ev, `fetch('/api/docs/${T2}', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.duplicate_of && j.duplicate_of.id === ${T1})`, 60), 'undo: the warning is back');
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);

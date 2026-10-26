@@ -9,7 +9,7 @@
 //      comment box focused
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const {boot, errs, sleep, B, login} = require('./boot');
-const {idle} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
+const {idle, until} = require('./boot');  // 2.206.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -152,6 +152,7 @@ async function swTests() {
   st = await call('GET', '/api/state');
   check(st.lists.find(l => l.id === HOME).agent_tidy === 'suggest', 'tidy: saved as suggest');
   agSel().value = ''; agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
+  await until(() => /No agent in/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button'));  // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
   st = await call('GET', '/api/state');
   check(!(st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'No agent: unshared, with Undo');
   d.querySelector('#toast button')?.click(); await idle(w);

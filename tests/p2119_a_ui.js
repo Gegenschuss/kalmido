@@ -107,6 +107,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#cdlg-in')`), 'it asks for a reason');
     await ev(`(() => { const x = document.querySelector('#cdlg-in'); x.value = 'Wrong tip'; document.querySelector('[data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `${getJ('/api/office/meals/' + nid)}.then(m => m.status === 'draft' && m.log.at(-1).reason === 'Wrong tip')`), 'undone and logged with the reason');
+    // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
+    check(await ready(ev, `${undoToast} && /Approval undone/.test(document.querySelector('#toast').textContent)`), 'the Approval undone toast');
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals/' + nid)}.then(m => m.status === 'approved' && m.log.length === 3)`), 'one undo step approves it again (logged)');
     await ready(ev, `[...document.querySelectorAll('.bwlist li')].some(l => /Osteria Muster/.test(l.textContent) && l.querySelector('.bwok'))`);
