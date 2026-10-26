@@ -1158,7 +1158,8 @@ def work_window_open(ws, now=None):
         return st.get("working") is not False
     m = t.hour * 60 + t.minute
     inside = a == b or (a <= m < b if a < b else (m >= a or m < b))
-    return t.isoweekday() in (ws.get("work_days") or [1, 2, 3, 4, 5]) and inside
+    days = ws.get("work_days")  # an empty list = no work day (closed); only a missing one means Monday to Friday
+    return t.isoweekday() in ([1, 2, 3, 4, 5] if days is None else days) and inside
 
 
 class RunnerState:

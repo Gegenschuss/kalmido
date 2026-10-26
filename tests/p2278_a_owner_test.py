@@ -142,6 +142,9 @@ def connect_people(s, uid, others):
 connect_people(Dv, DAVE, (ALICE, BOB, CAROL))
 L = Bo.post(B + "/api/lists", json={"name": "Alpha Projekt", "org_id": ORG}).json()["id"]
 check(Bo.post(B + "/api/tasks", json={"title": "Aufgabe von Bob", "list_id": L}).ok, "setup: bob's task in the organisation")
+# 2.305 (#2880): the export takes only the projects the exporting admin sees -> bob shares his project with alice
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+    (L, ALICE, "edit", "edit"))
 
 # ---------------------------------------------------------------- #3093: the archive belongs to its starter
 P = f"/api/orgs/{ORG}/export"

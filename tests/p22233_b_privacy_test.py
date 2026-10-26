@@ -32,7 +32,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # noqa: E402
+from kt import FAILS, OKS, check, sess, su_get  # noqa: E402
 FEAT = "cal,comments,collab,office,clients,docs,files,dispo"
 O = "/api/office"
 D = O + "/docs"
@@ -218,7 +218,7 @@ check(r.status_code == 404, f"#2878: the admin of another organisation 404 {r.st
 check(A.post(B + f"/api/clients/{OC}/anonymize").ok, "#2878: its creator anonymises it")
 
 # ================================================================== #2879: the retention export without the clients' trash
-r = Fr.get(B + "/api/retention/me/export.zip")
+r = su_get(Fr, B + "/api/retention/me/export.zip")  # 2.223.2 C (#2871): the download needs the step-up (bundle 2.305)
 csv = ""
 if r.ok and r.content[:2] == b"PK":
     z = zipfile.ZipFile(io.BytesIO(r.content))

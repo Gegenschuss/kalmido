@@ -66,7 +66,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
       for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.complete.news === false && st.notify.newtask.push === true, 'undo takes back the last change');
+      check(st.notify.complete.news === false && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, toast ${[...d.querySelectorAll('.toast')].map(t => t.textContent).join(' / ')})`);
     }
     w.close();
   }

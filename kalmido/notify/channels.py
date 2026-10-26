@@ -636,9 +636,9 @@ def chn_test_do(chid, oid=None):
     c.commit()
     text = chn_text(tr("{0}: test", APP_NAME), tr("Notifications are arriving."), PUBLIC_URL)
     ok, status, code = chn_send(r["kind"], t, text, allow) if t else (False, None, "config")
-    status = f"{int(status) // 100}xx" if status else None  # 2.306.0 D3 (#2875): only the class of the target's answer
     with system_ctx(c):  # the count of the channel (an organisation's too) after its test
-        chn_result(c, chid, ok, status, code)
+        chn_result(c, chid, ok, status, code)  # the raw status: chn_result keeps only its class itself
+    status = f"{int(status) // 100}xx" if status else None  # 2.306.0 D3 (#2875): only the class of the target's answer
     c.commit()
     return jsonify(ok=ok, status=status, error=code, error_text=chn_err_text(code, status) if code else "",
                    channel=chn_public(chn_need(c, chid, oid)))

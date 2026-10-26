@@ -256,7 +256,8 @@ got("/fail", has("Failing delivery"))
 # 2.192.0 B (#2513): wait until the failure is counted instead of 1.5 s
 ch = until(lambda: [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR and c["fails"] >= 1], 15)
 ch = ch[0] if ch else [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR][0]
-check(ch["fails"] == 1 and "500" in ch["last_error"], f"#2145: a real push that failed is counted, not retried: {ch}")
+check(ch["fails"] == 1 and "5xx" in ch["last_error"] and "500" not in ch["last_error"],  # 2.306.0 (#2875 review N13): the class only
+      f"#2145: a real push that failed is counted, not retried: {ch}")
 check(len(got("/fail", has("Failing delivery"), timeout=0)) == 1, "sent once (no retries)")
 check(Bo.delete(B + f"/api/me/channels/{BR}").ok and not dbx("SELECT 1 FROM notify_channels WHERE id=?", (BR,)), "removed")
 

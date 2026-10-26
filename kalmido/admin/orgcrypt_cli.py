@@ -419,7 +419,7 @@ def _priv_rows(c, plain=None, stop=None):
 def priv_rows_count(c):
     """2.306.0 Fix-2a (#2885): journal rows and private filed mails still sealed with an account key -> {"journal", "hub_mails"}."""
     pre = oc.PREFIX + "%"
-    mail = " OR ".join(f"{k} LIKE ?" for k in oc.FIELDS["hub_mails"])
+    mail = " OR ".join(f"{k} LIKE ?" for k in oc.FIELDS["hub_mails"])  # pg-ok: the prefix has no case
     with system_ctx(c):  # orgcrypt: server-side bulk work over the private spaces (counts only, no content)
         j = c.execute("SELECT COUNT(*) FROM journal WHERE text LIKE ? OR mood_enc IS NOT NULL", (pre,)).fetchone()[0]  # pg-ok: the prefix has no case
         m = c.execute(f"SELECT COUNT(*) FROM hub_mails WHERE org_id IS NULL AND ({mail})", [pre] * len(oc.FIELDS["hub_mails"])).fetchone()[0]  # pg-ok: the prefix has no case

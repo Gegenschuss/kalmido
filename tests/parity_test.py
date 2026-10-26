@@ -534,6 +534,9 @@ APP_ONLY = [
     ("2.236.0 (#2904-#2911): the owner / an instance admin sets an agent's work style and looks at its queue in the app; the "
      "agent reads the work style in GET /agent (work_style, event work_style_changed) and its queue with GET/PUT /agent/queue",
      ("* /api/agents/{}/work-style", "GET /api/agents/{}/queue")),
+    ("2.312.0 D (#3266): the choice who answers an agent's permission questions is a picker in the agent's settings in the app; "
+     "the value itself is runtime.perm_user (PATCH /api/admin/agents/{id}, PATCH /api/my/agents/{id}), the agent never picks it",
+     ("=GET /api/agents/{}/perm-users",)),
     ("2.32.0 (#1081): an agent's steps are read only by the person they are for, in the app (the agent sends them with "
      "POST /agent/progress; no token reads them back)", ("GET /api/agents/jobs/{}/steps",)),
     ("2.34.0 (#272): people plan jobs for an agent in the app (for themselves; admins / owners manage them); the agent only "
