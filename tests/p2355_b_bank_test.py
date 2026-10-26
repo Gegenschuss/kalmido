@@ -9,18 +9,19 @@ tenant-matrix: office  freelancer-matrix: office
  - #2843 duplicates: a fixed EndToEndId with the same amount in two months = two bookings (was one); the same day again =
    duplicate; a key stored before 2.355 (without the day) still finds the booking of its own day, not one of another month
  - #2843 a personal office moved into an organisation: the organisation's import finds the moved bookings (no doubles);
-   #2845 its locked months go along (the move was refused before)
+   #2845 its locked months go along (the move was refused before), the preview names the organisation's open points (review F4)
  - #2843 receipt match: a payment day typed by hand stays (match and unmatch); a receipt with another amount is matched
    and the answer says so (amount_differs)
  - #2843 split: one booking on two invoices (both paid) with a rest of 0.01 shown as match.rest; the parts above the
-   booking 400; unmatch takes every part back (both open again); a booking of 100.01 on an invoice of 100.00 (one part)
+   booking 400; unmatch takes every part back (both open again); a booking of 100.01 on an invoice of 100.00 (one part);
+   the first or another part taken back by hand: the booking keeps the other part, a refused match names the invoices (review F3)
  - #2843 cash book: cash in for an invoice books a cash payment on it (paid, never reminded); amount / day of that entry
    409; its cancellation takes the payment back (open again)
  - #2847 an import taken back while its booking is matched at the same moment: never a matched booking of an import
    taken back (threads, several rounds)
  - #2845 retention: the asset register counts when an organisation is deleted (odl_retention "assets"); entertainment
    receipts at least 8 years with a lower value of the neutral pack; an open receipt not booked yet cannot be deleted for
-   good; #2847 the one-day CSV newest first gives the closing balance of the first row
+   good (a person without an office: deleted, review F1); #2847 the one-day CSV newest first gives the closing balance of the first row
 usage: p2355_b_bank_test.py <datadir>"""
 import base64
 import os
@@ -242,10 +243,15 @@ check(r.ok, f"freelancer: month {M} locked {r.status_code} {r.text[:200]}")
 GAM = A.post(B + "/api/admin/orgs", json={"name": "Gamma", "admin_id": FID}).json()["id"]
 Fr.patch(B + "/api/settings", json={"workspace": f"org:{GAM}"})
 Fr.put(B + O + "/settings", json={"company_fields": {"name": "Gamma Beispiel GmbH", **COMPANY}})
+gcl = Fr.post(B + "/api/clients", json={"name": "Kunde Gamma", "street": "Weg 3", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
+r = Fr.post(B + D, json={"kind": "invoice", "client_id": gcl, "items": [{"title": "Entwurf", "qty": 1, "rate": 10}]})
+assert r.status_code == 201, r.text
+sql("UPDATE office_docs SET date=? WHERE id=?", (f"{M}-15", r.json()["id"]), write=True)  # a draft of the organisation in the month locked by the move
 Fr.patch(B + "/api/settings", json={"workspace": "private"})
 r = Fr.get(B + O + f"/move/check?org={GAM}")
 notes = " | ".join(r.json().get("notes") or []) if r.ok else r.text
 check(r.ok and r.json()["ok"] and "locked up to" in notes, f"#2845: the preview says the locks go along, no conflict {r.text[:300]}")
+check("In the organisation up to" in notes and "invoice drafts" in notes, f"#2845 (review F4): the preview names the organisation's open draft of those months {notes[:400]}")
 r = Fr.post(B + O + "/move/org", json={"org": GAM, "confirm": True})
 check(r.ok, f"#2845: a locked personal office moves (was 409) {r.status_code} {r.text[:200]}")
 check(sql("SELECT MAX(period) FROM office_period_locks WHERE org_id=?", (GAM,))[0][0] == M, "#2845: the organisation is locked up to the same month")
@@ -308,6 +314,28 @@ for who, s in (("org", A), ("freelancer", Fr)):
     check(r.status_code == 409, p + "119.01 on 119.00 as a plain match: 409 as before")
     r = s.post(B + f"{K}/tx/{tu['id']}/match", json={"kind": "invoice", "parts": [{"id": I3, "amount": "119.00"}]})
     check(r.ok and r.json()["match"].get("rest") == "0.01" and status(s, I3) == "paid", p + f"overpaid by 0.01: paid, rest shown {r.text[:200]}")
+    # 2.355.0 E (#2843, review F3): taking back the first part or another part by hand behaves alike: the booking stays matched
+    # with the other part (was: the first part freed the whole booking and the other part stayed on its invoice unseen)
+    I5, I6 = invoice(s, cl, "Rahmen", 100), invoice(s, cl, "Druck", 200)  # 119 / 238 gross
+    imp(s, [(357.00, DAY[3], f"Kunde Sammel {who}", f"Teile {who}", None)])
+    t3 = tx(s, f"Teile {who}")
+    r = s.post(B + f"{K}/tx/{t3['id']}/match", json={"kind": "invoice", "parts": [{"id": I5, "amount": "119.00"}, {"id": I6, "amount": "238.00"}]})
+    check(r.ok, p + f"a second split {r.status_code} {r.text[:200]}")
+    for purpose, gone, stays, which in ((f"Sammel {who}", I1, I2, "the first part"), (f"Teile {who}", I6, I5, "another part")):
+        pid = [x for x in payments(s, gone) if x.get("reverses_id") is None and not x.get("reversed")][0]["id"]
+        r = s.delete(B + f"{D}/{gone}/payments/{pid}", json={"note": "Teil falsch"})
+        m = tx(s, purpose)["match"] or {}
+        check(r.ok and m.get("kind") == "invoice" and [x["id"] for x in m.get("parts") or []] == [stays] and status(s, gone) != "paid"
+              and status(s, stays) == "paid", p + f"#2843 (review F3): {which} taken back by hand: the booking keeps the other part {r.status_code} {m}")
+        r = s.post(B + f"{K}/tx/{tx(s, purpose)['id']}/unmatch")
+        check(r.ok and status(s, stays) != "paid", p + f"#2843 (review F3): {which}: unmatch then takes the other part back too {r.status_code} {r.text[:200]}")
+    # a booking left free with a part still booked (by a version before the fix): the 409 names the invoices
+    r = s.post(B + f"{K}/tx/{t3['id']}/match", json={"kind": "invoice", "parts": [{"id": I5, "amount": "119.00"}, {"id": I6, "amount": "238.00"}]})
+    check(r.ok, p + f"the split again {r.status_code} {r.text[:200]}")
+    sql("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL WHERE id=?", (t3["id"],), write=True)
+    r = s.post(B + f"{K}/tx/{t3['id']}/match", json={"kind": "invoice", "id": I5})
+    n5, n6 = (s.get(B + f"{D}/{i}").json().get("number") for i in (I5, I6))
+    check(r.status_code == 409 and n5 and n5 in r.text and n6 in r.text, p + f"#2843 (review F3): the 409 names the invoices {n5} {n6} {r.status_code} {r.text[:200]}")
     # the cash book
     I4 = invoice(s, cl, "Licht", 50)  # 59.50 gross
     cb = s.post(B + O + "/cashbooks", json={"name": "Hauptkasse", "opening": "100.00", "opening_day": DAY[30]})
@@ -369,6 +397,18 @@ for who, s, ws in (("org", A, f"org:{ORG}"), ("freelancer", Fr, "private")):
     assert s.delete(B + f"/api/files/nodes/{nid}").ok
     r = s.delete(B + f"/api/files/nodes/{nid}?purge=1")
     check(r.status_code == 409 and "Kept by law until" in r.text, f"{who} #2845: an open receipt not booked yet is kept from its arrival (was deleted) {r.status_code} {r.text[:200]}")
+# 2.355.0 E (#2845): a person without an office keeps nothing by law: a receipt with a category is deleted for good
+NID, Nr = freelancer(B, A, "nora", features="files,docs")  # freelancer-matrix: office (no personal office at all)
+Nr.patch(B + "/api/settings", json={"workspace": "private"})
+r = Nr.post(B + "/api/docs", data={"ws": "private"}, files={"files": ("privat.pdf", tiny_pdf("Beleg privat"), "application/pdf")})
+check(r.status_code == 201, f"no office: upload {r.status_code} {r.text[:200]}")
+nid = r.json()["ids"][0] if r.status_code == 201 else 0
+r = Nr.put(B + f"/api/docs/{nid}/receipt", json={"category": "Haushalt", "vat_pct": None, "keep": True})
+check(r.ok and sql("SELECT COUNT(*) FROM rc_receipts WHERE node_id=?", (nid,))[0][0] == 1, f"no office: the receipt row exists {r.status_code} {r.text[:200]}")
+check(sql("SELECT COUNT(*) FROM orgs WHERE personal_of=?", (NID,))[0][0] == 0, "no office: the person has no personal office")
+assert Nr.delete(B + f"/api/files/nodes/{nid}").ok
+r = Nr.delete(B + f"/api/files/nodes/{nid}?purge=1")
+check(r.ok, f"#2845 (review F1): a receipt of a person without an office is deleted for good (was kept by law) {r.status_code} {r.text[:200]}")
 
 # ======================================================================== #2847 one-day CSV, newest first: the closing balance
 mb = {"date": 0, "amount": 1, "title": 2, "balance": 3, "decimal": ",", "date_format": "DD.MM.YYYY"}

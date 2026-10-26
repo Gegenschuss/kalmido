@@ -126,13 +126,15 @@ def pbt_plan(c, uid, src, dst):
     """What a transfer of personal office src into organisation dst would do: {moves, keeps, conflicts, counts, files, ...}."""
     counts, keeps, conflicts, notes = {}, [], [], []
     tables = pbt_tables(c)
-    from .periodlock import pl_first_month, pl_label, pl_through
+    from .periodlock import pl_first_month, pl_hints, pl_label, pl_through  # 2.355.0 E (#2845): + pl_hints
     lk, first = pl_through(c, dst), pl_first_month(c, src)
     if lk and first and first <= lk:  # 2.148.0 A (#2471): nothing lands in a locked month of the organisation
         conflicts.append(tr("The organisation is locked up to {0}; the personal office has data from {1}", pl_label(lk), pl_label(first)))
     if pl_through(c, src):  # 2.355.0 B (#2845): its locks go along (was a conflict: the moved data would be editable again)
         notes.append(tr("Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)",
                         pl_label(pl_through(c, src))))
+        # 2.355.0 E (#2845, review F4): what the lock dialog would point out
+        notes += [tr("In the organisation up to {0}: {1}", pl_label(pl_through(c, src)), h["text"]) for h in pl_hints(c, dst, pl_through(c, src))]
     for t in tables:
         w, n = pbt_where(t)
         if t in PBT_KEEP:

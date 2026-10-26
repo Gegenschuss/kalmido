@@ -541,13 +541,14 @@ def olk_fs_locked(c, node_id, arrival=False):
     2.355.0 B (#2845): arrival=True (deleting for good, olk_on_delete) also keeps an open receipt not booked yet and an
     e-invoice received into an office from their arrival; moving them and the folder trash stay as before."""
     nid = int(node_id)
-    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, m.doc_date FROM rc_receipts r
+    r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, r.ws, r.org_id, m.doc_date FROM rc_receipts r
                      LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.node_id=?""", (nid,)).fetchone()
     k = c.execute("SELECT kept_until FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
     ends = [olk_day(k["kept_until"])] if k and k["kept_until"] else []
     if r and (r["paid_at"] is not None or r["vat_pct"] is not None):
         ends.append(olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt"))
-    elif r and arrival:  # 2.355.0 B (#2845): an open receipt not booked yet is kept from its arrival on (decision of 23.10.2026)
+    elif r and arrival and olk_office_ws(c, r["ws"], r["org_id"]):  # 2.355.0 B (#2845): an open receipt not booked yet is kept
+        # from its arrival on (decision of 23.10.2026); 2.355.0 E (#2845): only in an office's space, a person without one keeps nothing by law
         ends.append(olk_until(r["doc_date"] or r["set_at"], "receipt"))
     elif arrival:  # 2.355.0 B (#2845): an e-invoice received into an office's documents that is no receipt (yet)
         ends.append(olk_einv_until(c, nid))
@@ -565,6 +566,18 @@ def olk_fs_locked(c, node_id, arrival=False):
     until = max((e for e in ends if e), default=None)
     return until.isoformat() if olk_active(until) else None
 
+def olk_office_ws(c, ws, org_id):
+    """2.355.0 E (#2845): whether workspace ws belongs to an office: an organisation's, or the space of a person with a
+    personal office (structure only)."""
+    if org_id is not None:
+        return True
+    u = re.fullmatch(r"u(\d+)", ws or "")
+    if not u:
+        return False
+    with system_ctx(c):
+        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (int(u.group(1)),)).fetchone())
+
+
 def olk_einv_until(c, nid):
     """2.355.0 B (#2845): the keep day of document nid when it is an e-invoice in an office's documents (an organisation's,
     or the space of a person with a personal office); else None. As accounts/orgretain.odl_einvoice_years: the invoice
@@ -573,11 +586,8 @@ def olk_einv_until(c, nid):
     m = c.execute("SELECT ws, org_id, extracted, doc_date, created_at FROM doc_meta WHERE node_id=? AND extracted<>''", (int(nid),)).fetchone()
     if not m:
         return None
-    if m["org_id"] is None:
-        u = re.fullmatch(r"u(\d+)", m["ws"] or "")
-        with system_ctx(c):  # whether the owner of the space has a personal office (structure only)
-            if not u or not c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (int(u.group(1)),)).fetchone():
-                return None
+    if not olk_office_ws(c, m["ws"], m["org_id"]):
+        return None
     try:
         v = json.loads(S.doc_open_as(c, m["ws"], "doc_meta.extracted", m["extracted"])[0] or "null")
         hit = isinstance(v, dict) and v.get("_einv") is not None
