@@ -9,6 +9,7 @@ thing into their private space with the usual move (and its preview) within OO_G
 the move like an admin's ("moveout", released). Releasing and declining are written to the organisation's list log.
 People only (agents 403). App only (APP_ONLY "* /api/orgs" in tests/parity_test.py)."""
 import json
+from datetime import timedelta
 
 from flask import jsonify
 
@@ -22,6 +23,7 @@ from .orgout import OO_GRANT_DAYS, OO_KINDS, oo_grant, oo_mine, oo_news
 from .orgs import _need_org_admin, org_need_person
 
 OOR_LIMIT = 30  # decided requests shown next to the open ones
+OOR_PAUSE_DAYS = 3  # after a decline the same thing is asked again only after this many days
 
 
 def oor_admins(c, oid):
@@ -69,7 +71,7 @@ def oor_ask(oid):
     c, b = db(), body()
     role = org_need_person(c, oid)
     kind, obj = b.get("kind"), b.get("id")
-    if kind not in OO_KINDS:
+    if not isinstance(kind, str) or kind not in OO_KINDS:
         raise Denied(400, tr("Invalid value: {0}", "kind"))
     if kind == "sheet" and isinstance(obj, int) and not isinstance(obj, bool):  # a further sheet: the table it belongs to
         r = c.execute("SELECT id, book_id FROM sheets WHERE id=?", (obj,)).fetchone()
@@ -83,6 +85,9 @@ def oor_ask(oid):
                     "ORDER BY id DESC LIMIT 1", (oid, kind, obj, me())).fetchone()
     if old and (old["state"] == "open" or oo_grant(c, oid, kind, obj)):
         return jsonify({"ok": True, "id": old["id"], "state": old["state"], "again": True})
+    if c.execute("SELECT 1 FROM org_out_requests WHERE org_id=? AND kind=? AND obj_id=? AND by_id=? AND state='declined' AND decided_at>=?",
+                 (oid, kind, obj, me(), iso(now_utc() - timedelta(days=OOR_PAUSE_DAYS)))).fetchone():  # review: no News spam after a no
+        raise Denied(409, tr("An admin declined this a short while ago. Ask again in a few days or talk to the admins."))
     rid = insert_id(c, "INSERT INTO org_out_requests(org_id,kind,obj_id,name,by_id,state,created_at) VALUES(?,?,?,?,?,'open',?)",
                     (oid, kind, obj, mine[1], me(), iso(now_utc())))
     oo_news(c, oor_admins(c, oid), {"action": "outreq", "name": mine[1], "org": oor_org_name(c, oid), "org_id": oid, "kind": kind})

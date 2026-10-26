@@ -88,7 +88,9 @@ def org_out(c, oid, to_oid, kind, name, list_id=None, obj=None):
         grants = [oo_grant(c, oid, kind, o) for o in objs] if to_oid is None else []
         if not grants or not all(grants):
             raise oo_denied(c, oid, to_oid, kind, next((o for o, g in zip(objs, grants) if not g), objs[0] if objs else None))
-        c.execute(f"UPDATE org_out_requests SET state='used' WHERE id IN ({','.join('?' * len(grants))})", grants)
+        n = c.execute(f"UPDATE org_out_requests SET state='used' WHERE state='approved' AND id IN ({','.join('?' * len(grants))})", grants).rowcount
+        if n != len(set(grants)):  # review: a second move at the same time does not use the same release again
+            raise oo_denied(c, oid, to_oid, kind, objs[0])
     detail = {"kind": kind, "to": "org" if to_oid else "private", **({"released": True} if grants else {})}
     c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) VALUES(?,?,?,?,?,?,?,?,?)",
               (oid, list_id, str(name or "")[:200], "moveout", me(), None, None, iso(now_utc()), json.dumps(detail)))

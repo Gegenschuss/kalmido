@@ -162,6 +162,7 @@ def wiki_move_space():
                 c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, updated_by=?, updated_at=? WHERE id=?",
                           (to, None if to else uid, n, uid, ts, r["id"]))
     except IntegrityError:
+        c.rollback()  # 2.361.2 (#2923, review): nothing of the move stays, also not the used release
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
     from .wikiatt import wka_move_files
     wka_move_files(c, ids, to, uid)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
