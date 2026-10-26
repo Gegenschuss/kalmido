@@ -17,7 +17,8 @@ from ..core.config import app
 from ..core.db import body, bump, db, err
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..files.store import fs_chain, fs_log_add, need_node
+from ..files.store import ROLE_RANK, fs_chain, fs_log_add, fs_role, need_node
+from ..files.fsroots import fs_area_root_of
 from . import store as S
 from .ingest import doc_add, docs_kick
 from .web import _no_agent, doc_json
@@ -90,7 +91,8 @@ def rc_kick(added):
 
 def rc_bulk(c, fid, uid, limit=BULK):
     """The plain files below folder fid (subfolders with their own value follow it) become documents while the folder
-    recognises: at most limit of them. Returns the count."""
+    recognises: at most limit of them, only files uid may change (a hub mail's folder, a share-less corner) and never in the
+    root folder of another area (knowledge, office, tables: their own rules). Returns the count."""
     if not rc_on(c, fid):
         return 0
     n, level, depth = 0, [fid], 0
@@ -100,9 +102,10 @@ def rc_bulk(c, fid, uid, limit=BULK):
         nxt = []
         for r in rows:
             if r["kind"] == "folder":
-                if _val(r) != "off" and not _ab_locked(c, r["id"]):
+                if _val(r) != "off" and not _ab_locked(c, r["id"]) and not fs_area_root_of(c, r["id"]):
                     nxt.append(r["id"])
-            elif r["kind"] == "file" and _val(r) != "off" and n < limit and _add(c, r, uid):
+            elif (r["kind"] == "file" and _val(r) != "off" and n < limit
+                  and (not uid or ROLE_RANK[fs_role(c, r["id"], uid)] >= ROLE_RANK["edit"]) and _add(c, r, uid)):
                 n += 1
         level, depth = nxt, depth + 1
     return n

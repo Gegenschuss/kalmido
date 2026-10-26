@@ -162,8 +162,19 @@ r = A.post(B + f"/api/files/nodes/{OF}/shares", json={"user_id": BOB, "role": "v
 check(r.status_code == 201, f"(c) setup: alice shares an organisation folder with bob to read ({r.status_code} {r.text[:120]})")
 check(recog(Bo, OF, "on").status_code == 403, "(c) shared to read: 403")
 check(sql("SELECT recog FROM fs_nodes WHERE id=?", (OF,))[0][0] == "", "(c) nothing changed by the refused request")
-check(A.patch(B + f"/api/files/shares/{r.json()['id']}", json={"role": "edit"}).ok and recog(Bo, OF, "on").ok,
-      "(c) shared to edit: bob may switch it")
+# a folder filed with a hub mail only its reader (alice) sees, inside the shared folder: bob's switch never reaches its file
+MB = folder(A, "Mail box", OF)
+MF = file_up(A, "mail-attachment.pdf", MB)
+ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, created_at) VALUES(?,?,?,?,?)", (ORG, ALICE, f"org:{ORG}", "p2353d@example.com", ts), write=True)
+HM = sql("SELECT id FROM hub_mails WHERE message_id=?", ("p2353d@example.com",))[0][0]
+sql("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (HM, MB), write=True)
+OFF1 = file_up(A, "contract-draft.pdf", OF)
+check(A.patch(B + f"/api/files/shares/{r.json()['id']}", json={"role": "edit"}).ok, "(c) setup: the share becomes edit")
+check(Bo.get(B + f"/api/files/nodes/{MF}").status_code in (403, 404), "(c) setup: bob does not see the mail's file")
+r = recog(Bo, OF, "on")
+check(r.ok and r.json()["added"] == 1 and is_doc(A, OFF1), f"(c) shared to edit: bob may switch it, its file became a document ({r.text[:120]})")
+check(not sql("SELECT 1 FROM doc_meta WHERE node_id=?", (MF,)), "(c) the file in the mail's folder he does not see stays a plain file")
 
 # ---------------------------------------------------------------- (d) the search finds a document by its fields
 r = Fr.patch(B + f"/api/docs/{F1}", json={"sender": "Gamma Example Insurance", "type": "Policy", "tags": ["Yearly"]})
