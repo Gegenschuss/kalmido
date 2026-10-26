@@ -36,9 +36,9 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'files', 'sheets'])].join(',');
-  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
   const CB = await login('bob');
-  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats}, CB);
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats}, CB);  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: st0.me.id})).id, SP = 'org:' + ORG;
   await call('PUT', `/api/orgs/${ORG}/members`, {email: 'bob@example.com', role: 'member'});
   const TEAM = (await call('POST', '/api/files/folders', {name: 'Team', space: SP})).id;
