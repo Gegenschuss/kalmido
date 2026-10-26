@@ -44,7 +44,8 @@ def oo_mine(c, kind, obj, uid):
     r = c.execute(f"SELECT org_id, {ncol} AS name, {', '.join(makers)} FROM {table} WHERE id=?", (obj,)).fetchone()
     if not r or not r["org_id"] or not any(r[m] == uid for m in makers):
         return None
-    return r["org_id"], str(r["name"] or "")[:200]
+    name = str(r["name"] or "")
+    return r["org_id"], "" if name.startswith("e2e1:") else name[:200]  # a locked space's ciphertext is no name for the admins
 
 
 def oo_grant(c, oid, kind, obj):

@@ -22,6 +22,7 @@ from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_target
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.361.2 B (#2923)
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_err_text, cal_http, cal_rate
@@ -657,7 +658,6 @@ def bm_move(c, uid, b):
                                     (uid, to)).fetchall()}
     dup = [r for r in rows if r["url_key"] in have]
     go = [r for r in rows if r["url_key"] not in have]
-    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
     # 2.361.2 B (#2923): out of an organisation only by its admin, or by who saved it into the private space once released
     bad = [r for r in go if not org_out_ok(c, r["org_id"], to, "bookmark", r["id"])]
     x = next((r for r in bad if r["user_id"] != uid), bad[0]) if bad else None
