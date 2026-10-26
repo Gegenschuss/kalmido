@@ -34,6 +34,7 @@ ROUTES = {
     "POST /api/v1/agent/proposals": "meta", "POST /api/v1/agent/proposals/import": "meta",
     "POST /api/v1/agent/proposals/sheet-tasks": "meta", "POST /api/v1/agent/proposals/shoot": "meta",
     "POST /api/v1/agent/proposals/time": "meta", "POST /api/v1/agent/typing": "meta", "POST /api/v1/agent/usage": "meta",
+    "POST /api/v1/agent/rules": "meta",  # 2.235.0 A2: C (#2903) its own standing rules, taken from a person's message
     "POST /api/v1/agents/{}/chat/{}/choice": "meta", "POST /api/v1/agents/{}/chat/{}/reactions": "meta",
     "POST /api/v1/comments/{}/withdraw": "meta", "POST /api/v1/documents/{}/receipt-suggestion": "meta",
     "POST /api/v1/layouts/proposals": "meta", "POST /api/v1/lists/{}/playbook/proposals": "meta",
