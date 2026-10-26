@@ -5,6 +5,30 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.310.0] - 2026-10-26
+
+Package 2.223.3 (Privacy: immediate fixes from audit G).
+### Changed
+- Trash views no longer promise deletion after N days while the server's deletion runs only count; they say the items stay until the admin switches the runs on (#2877).
+- Administration > Server lists every deletion run: deletes or counts only, the numbers of its last pass and the switch `KALMIDO_RETENTION_PURGE` (#2877).
+- docker-compose.yml passes `KALMIDO_RETENTION_PURGE`; the installer switches it on for new installations only, an existing .env is never changed (#2877).
+- The organisation export holds only the projects the exporting admin sees in the app, and no deleted items; the retention export skips deleted rows too (#2880, #2879).
+- Clients: deleting an account or an organisation removes their clients; a client held only by drafts or trial documents can now be deleted; a client kept by finalised documents can be anonymised in the delete dialog ("Deleted client") (#2878).
+### Fixed
+- The trash run now also covers deleted absences, disposition bookings, scheduling polls with their guests' votes, appointment types and file requests (#2879).
+- Texts and docs name the optional assistant and similarity service as the only places where Kalmido itself sends text to an AI service; new docs section "Outgoing connections"; `KALMIDO_AUDIT_DAYS=0` documented as "no log at all" (#2881).
+
+Package 2.310.0 (Foldable in landscape: desktop view).
+### Fixed
+- An unfolded foldable held sideways (Galaxy Z Fold 8, the unfolded iPhone) showed the phone view again: every touch screen in landscape whose short side is at least 600 px now gets the layout width 900, i.e. the narrow desktop view (sidebar + list, an open task as a drawer, no four columns). Portrait keeps the tablet layout, phones in landscape keep the phone view. On iOS the orientation comes from `window.orientation` (the screen size stays in portrait there), an iPad-like user agent (Mac with touch) counts as iOS and the zoom stop `maximum-scale=1` stays with the width 900 (#3270).
+### Added
+- Settings > Appearance > **View on this device**: Automatic / Phone / Computer, kept only on this device (not part of the account's appearance, stays on logout). Computer: a touch screen below 900 px always gets the desktop view, scaled down; Phone: never scaled. Below it a grey line shows the screen size, the layout width and the current view (#3270).
+- Device test of the train: Android emulator with a foldable profile in landscape, and the iOS simulator "iPhone Duo" (iOS 27.1 runtime) unfolded in landscape - read the real screen values from the grey line under Settings > Appearance > View on this device.
+
+Package 2.309.0 (release image only after green CI).
+### Changed
+- Releases: a version tag builds the image (`:X.Y.Z`, `:latest`) and the GitHub release only after a green full CI run of the tagged commit; a red, cancelled or push-stage-only run stops the release, so self-hosters never get a red version as "latest" (`release.yml` job `ci-gate`, `tools/ci_gate.py`) (#3269).
+
 ## [2.307.8] - 2026-10-26
 
 ### Fixed
@@ -8346,7 +8370,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.8...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.310.0...HEAD
+[2.310.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.310.0
 [2.307.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.8
 [2.307.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.7
 [2.307.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.6
