@@ -71,7 +71,7 @@ CAL_ALERT_FAILS = 5          # failed syncs in a row -> admin alert ("integratio
 CAL_NET_LIMIT = _env_int("KALMIDO_CALENDAR_RATE", 30)  # adds / discoveries / manual refreshes per user within FAIL_WINDOW (15 min)
 CAL_COLORS = ("#6d8cff", "#2dd4bf", "#f5b041", "#f87171", "#c084fc", "#4ade80", "#f472b6", "#94a3b8", "#6ee7b7")
 CAL_TEXT = {"title": 300, "location": 300, "description": 4000}
-CAL_ERR = {"blocked": N_("This address is in a private network. An admin can allow the host under Settings > Administration > Advanced."),
+CAL_ERR = {"blocked": N_("This address is in a private network. An admin can allow the host under Settings > Server > Server > Advanced."),
            "auth": N_("Access denied: wrong username or password, or the link needs a login"),
            "not_found": N_("Not found: check the link"),
            "http": N_("The server answered with an error ({0})"),

@@ -72,7 +72,7 @@
 .agsteps.agb li span{color:var(--muted)}
 .agprompt,.agcmd{white-space:pre-wrap;word-break:break-word;font-family:var(--mono,monospace);font-size:var(--fs-s);background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-s);padding:.5rem .625rem;margin:.25rem 0;max-height:22rem;overflow:auto}
 .agcmd{max-height:none}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .aighint{display:block;margin:.25rem 0 0}
 }
 .agsrow .agwarn{font-size:var(--fs-s);white-space:normal}
@@ -99,7 +99,7 @@
 .audbar .spacer{flex:1}
 .audfbtn{display:none}
 .audr{grid-template-columns:4.25rem minmax(0,5rem) minmax(0,1.3fr) 3rem minmax(0,1fr) 3.5rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .agsrow .agu{margin-left:2.125rem}
   .airow .aiag{grid-column:auto;grid-row:auto}
   .airow.aihead{display:none}
@@ -150,14 +150,14 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .aimlbl{display:none;font-size:var(--fs-xs);color:var(--muted);min-width:4.5rem}
 .airow .aisel{width:100%;max-width:16rem}
 .airow .aitd{display:flex;align-items:center;gap:.5rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .aimlbl{display:inline-block}
   .airow .aiag{flex-wrap:nowrap;align-items:center;gap:.5rem}
   .airow .aisel{max-width:none;flex:1}
 }
 .chst.st-paused .chstx{white-space:normal;overflow:visible;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .agacts .aglbl{display:none}
-@media (max-width:899px),(pointer:coarse) {
+@media (max-width:767px),(pointer:coarse) {
   .agacts .aglbl{display:inline;white-space:nowrap}
 }
 .airow .ailn{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}

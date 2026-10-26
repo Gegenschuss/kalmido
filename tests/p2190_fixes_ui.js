@@ -163,7 +163,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   // ================= #669 Firefox: the docked "Add task" bar with the keyboard up (unfolded Fold / tablet)
   const L3 = (await call('POST', '/api/lists', {name: 'Long'})).id;
   for (let i = 0; i < 40; i++) await call('POST', '/api/tasks', {title: `Task number ${i + 1} with some words`, list_id: L3});
-  for (const [vw, vh, what] of [[690, 829, 'Fold unfolded portrait'], [829, 690, 'Fold unfolded landscape'], [904, 1000, 'Fold 904'], [768, 1024, 'tablet portrait']]) await firefox(async o => {
+  for (const [vw, vh, what] of [[690, 829, 'Fold unfolded portrait'], [829, 690, 'Fold unfolded landscape'], [904, 1000, 'Fold 904'], [744, 1133, 'tablet portrait']]  /* 2.364.0 (#3040): 768 is the computer layout now; an iPad mini (744) keeps the docked bar */) await firefox(async o => {
     const {cmd, ev, ctx, nav} = o, tag = `${what} ${vw}x${vh}`;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await ffLogin(o);

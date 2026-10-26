@@ -48,7 +48,8 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   const icCols = w.eval(`(() => { const t = document.createElement('span'); t.innerHTML = ic('columns', 's'); return t.innerHTML; })()`);
   const icPlus = w.eval(`(() => { const t = document.createElement('span'); t.innerHTML = ic('plus', 's'); return t.innerHTML; })()`);
   check(sb && sb.innerHTML.includes(icCols) && !sb.innerHTML.includes(icPlus) && sb.title === 'Move to section…', 'the section button: the section icon, named "Move to section…"');
-  check(d.querySelector('#detail .dtop [data-act="pin"]') && d.querySelector('#detail .dtop .tlkb'), 'Pin + Lock still rendered (CSS hides them on a phone)');
+  // 2.364.0 (#3036): Lock is in "…"; the header shows it only while it is set (to unlock)
+  check(d.querySelector('#detail .dtop [data-act="pin"]') && !d.querySelector('#detail .dtop .tlkb'), 'Pin still rendered (CSS hides it on a phone), an unset Lock only in "…"');
   let its = menuItems(w, d, T0);
   check(item(its, new RegExp('^Copy link · #' + T0 + '$')), '"…": Copy link · #' + T0);
   check(item(its, /^Pin$/) && !item(its, /^Pin$/).classList.contains('on'), '"…": Pin (not on)');

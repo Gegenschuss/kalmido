@@ -114,7 +114,7 @@ ocStepUpBack();
 // Administration > Organisation: the instance switch (with the boxes of the organisations I administer)
 const ocAdminHtml = hint => `<h4 id="s-orgenc-h">${tr('Encryption of organisation data')}</h4>
   ${hint(tr('Bank and tax data, purchase prices, framework contract rates and the files of organisations are stored encrypted with a key per organisation, made from the server key KALMIDO_SECRET_KEY. Switched off, new data is stored unencrypted; encrypted data stays readable.'))}
-  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div><div class="ocadm"></div>`;
+  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;  // 2.364.0 C (#3041): no .ocadm: the recovery keys are once, in Organisation > Data above
 async function ocAdminDraw(md) {
   const box = $('#s-orgenc', md); if (!box) return;
   let j, o; try { [j, o] = await Promise.all([api('GET', '/api/admin/orgcrypt'), api('GET', '/api/orgs')]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }

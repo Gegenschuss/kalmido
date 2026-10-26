@@ -95,11 +95,11 @@ const RK_RE = /^R2(-[A-Z2-7]{4}){13}$/;
   // ================= the box
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('org')`);
-  const box = await until(() => d.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"] [data-oc="show"]`) && d.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"]`));
+  const box = await until(() => d.querySelector(`#s-wsdata .ocbox[data-ocorg="${ORG}"] [data-oc="show"]`) && d.querySelector(`#s-wsdata .ocbox[data-ocorg="${ORG}"]`));
   check(!!box, 'the encryption box of the organisation');
   check(box && /New recovery key/.test(box.querySelector('[data-oc="new"]')?.textContent || ''), 'button "New recovery key"');
   check(box && /command line/.test(box.textContent) && /SELF-HOSTING\.md/.test(box.textContent), 'hint: the full renewal on the command line');
-  const pbox = d.querySelector('#s-ws .ocbox[data-ocorg="0"]');
+  const pbox = d.querySelector('#s-wsdata .ocbox[data-ocorg="0"]');
   await until(() => pbox && pbox.hidden);
   check(!pbox || pbox.hidden, 'no personal office: its box stays hidden');
 
@@ -118,8 +118,8 @@ const RK_RE = /^R2(-[A-Z2-7]{4}){13}$/;
   check(await until(() => !d.querySelector('#oc-rk')), 'show: Done closes the dialog');
 
   // ================= new: confirm, password, a different key
-  await until(() => d.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"] [data-oc="new"]`));
-  click(w, d.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"] [data-oc="new"]`));
+  await until(() => d.querySelector(`#s-wsdata .ocbox[data-ocorg="${ORG}"] [data-oc="new"]`));
+  click(w, d.querySelector(`#s-wsdata .ocbox[data-ocorg="${ORG}"] [data-oc="new"]`));
   const ask = await until(() => d.querySelector('.cdlg'));
   check(ask && /stops working at once/.test(ask.textContent), 'new: asks first (the current key stops working)');
   submit(w, ask && ask.querySelector('form'));

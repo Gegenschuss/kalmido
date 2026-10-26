@@ -491,7 +491,7 @@ document.addEventListener('click', async e => {
       // 2.31.0 (#378): the connection as the first line (online = "All saved" from 2.25), offline / waiting: try again now
       {label: n.k === 'on' ? tr('Online') + ' · ' + tr('All saved') : n.label, icon: n.k === 'on' ? 'check' : n.k === 'off' ? 'cloudoff' : 'sync', dis: true, cls: 'mnet n-' + n.k},
       ...(n.k !== 'on' ? [{label: tr('Try again'), icon: 'sync', fn: () => { if (OUT.q.length) flush(); refreshNow().then(staleDraw).catch(() => {}); }}] : []), '-',
-      {label: tr('Start|home'), icon: 'home', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
+      {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }

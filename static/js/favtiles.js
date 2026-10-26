@@ -20,7 +20,7 @@ const FV2_MODS = {cal: ['cal', N_('Calendar')], timeline: ['timeline', N_('Timel
   pomo: ['timer', N_('Focus timer')], time: ['clock', N_('Time tracking')], stats: ['chart', N_('Statistics')], contacts: ['users', N_('Contacts')],
   life: ['home', N_('Home & life')], workload: ['chart', N_('Workload & absences')], office: ['receipt', N_('Office & finance')], wiki: ['book', N_('Knowledge pages')], sheets: ['sheet', N_('Tables')],
   review: ['journal', N_('Review & journal')], family: ['family', N_('Family')], overview: ['pulse', N_('Project status')], agents: ['bot', N_('Agents')],
-  notes: ['note', N_('Notes')], news: ['bell', N_('News')], team: ['comment', N_('Messages')]};
+  notes: ['note', N_('Notes')], news: ['bell', N_('News')], team: ['comment', N_('Team chat')]};  // 2.364.0 B (#3040): one name for the team chat
 const FV2 = {drag: null, held: 0, lp: null};
 
 function fv2_stored() {
@@ -69,7 +69,7 @@ function fv2_tile(key, ctx) {
   if (p === 'm') {
     if (MG_IDS.includes(v)) {
       const a = mg_area(v); if (!mg_on(v)) return null;
-      return {key, name: tr(mg_nameKey(a)), icon: ic(a[1]), ...go(mg_target(v), mg_areaOf(S.route.mod) === a)};
+      return {key, name: tr(mg_nameKey(a)), icon: ic(mg_icon(a)), ...go(mg_target(v), mg_areaOf(S.route.mod) === a)};
     }
     const x = FV2_MODS[v]; if (!x) return null;
     if (v === 'timeline') return feat('timeline') ? {key, name: tr(x[1]), icon: ic(x[0]), attrs: 'data-act="side-timeline"', on: isRoadmap()} : null;

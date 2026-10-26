@@ -131,7 +131,7 @@ function bootDone() {
     const url = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
     if (title || url) quickCapture(title || (url ? urlTitle(url) : ''), url ? {url} : {});
     else captureHelp();
-  } else await route();
+  } else { st_landing(); await route(); }  // 2.364.0 B (#3031): the start page
   bootDone();  // 2.39.1 (#1213): the first view is drawn
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -145,6 +145,7 @@ function bootDone() {
   // 2.24.0 (UX-22): not while the first-run setup is still open (its "Start" reloads; then the list, in the chosen language,
   // and the tour follow, one after the other)
   if (S.setupPending) return;
+  if ((S.settings.purpose_ask || 'done') !== 'done') await paskOpen();  // 2.364.0 A (#3032): the short question first, then the list and the tour
   if (S.settings.onboard === 'pending') {
     try { const j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC}); if (j?.created) { await load(); render(); } } catch { /* offline: next start */ }
   }

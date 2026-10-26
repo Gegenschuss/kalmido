@@ -219,7 +219,7 @@ async function uiTests() {
   w.close();
   w = await boot({user: 'carol', setup: f.setup});
   p = await pane(w);
-  check(/Auf diesem Gerät benachrichtigen/.test(text(p)) && /Noch kein Gerät für Push angemeldet\. Bis dahin kommen Benachrichtigungen über dein ntfy-Topic\./.test(text(p)) && /Zustellung/.test(text(p)), 'German strings');
+  check(/Auf diesem Gerät benachrichtigen/.test(text(p)) && /Noch kein Gerät für Push angemeldet\. Bis dahin kommen Benachrichtigungen über dein ntfy-Thema\./.test(text(p)) && /Zustellung/.test(text(p)), 'German strings');  // 2.364.0 C (#3044): ntfy-Thema
   await api(w, 'PATCH', '/api/settings', {lang: 'en'});
   w.close();
 }

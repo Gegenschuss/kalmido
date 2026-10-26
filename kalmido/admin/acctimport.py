@@ -1301,7 +1301,7 @@ def umz_invite(c, run, uid, email, name):
     while c.execute("SELECT 1 FROM users WHERE username=?", (login,)).fetchone():
         i += 1
         login = f"{base}{i}"[:32]
-    nid = create_user(c, login, name or login, None, None, False, onboard=True)
+    nid = create_user(c, login, name or login, None, None, False, onboard=True, ask_purpose=uid if run.org else 0)  # 2.364.0 A (#3032)
     c.execute("UPDATE users SET email=? WHERE id=?", (email, nid))
     uset(c, nid, "lang", usettings(c, uid).get("lang") or "en")
     if run.org:

@@ -21,7 +21,7 @@ function modal(html) {
 // dialog kind (its own classes; none = not kept); double click on the grip = back to the default size. Phones: no grip.
 const DLG_SKIP = /^(modal|cdlg|authscreen|shopmode|smodal|lmodal|fgrqdlg|hidden|open|closing)$/;
 const dlg_key = m => { const c = [...m.classList].filter(x => !DLG_SKIP.test(x)).sort().join('.'); return c ? 'kalmido.dlgsize.' + c : ''; };
-const dlg_wide = () => { try { return matchMedia('(min-width: 900px) and (pointer: fine)').matches; } catch { return false; } };
+const dlg_wide = () => { try { return matchMedia('(min-width: 768px) and (pointer: fine)').matches; } catch { return false; } };  // 2.364.0 B (#3040): was 900 px
 // 2.161.2 (#2615): only a dialog whose content can grow gets the grip: a text field, an editor, a preview, a scrolling list / table,
 // or content that already overflows; a short one (confirm, password, one input) has none and forgets a size kept earlier
 const DLG_GROWS = 'textarea,[contenteditable="true"],[contenteditable=""],.editor,iframe,img,embed,object,canvas,table,.tbl,.list,.scroll,[class*="editor"]';
@@ -846,6 +846,17 @@ async function lwsDry(id, from, to) {
   if (!r.block && !(r.notes || []).length) return true;
   return !!await smv_open({what: qn(lname(listById(id)) || ''), from, only: [smv_ws(to)], check, run: async () => true});
 }
+// 2.364.0 D (#3033): "New project" in short: "For whom?" (the workspace) on top, then the name; the rest under "More options"
+// (closed; open when the dialog comes with a project type or a use). The fields stay in the form and are sent as before.
+function lnew_short(md, o) {
+  const h = $('h3', md), box = h?.parentElement, ws = $('.lwsrow', md), wh = $('#l-wshint', md), grid = $('#l-emogrid', md), foot = $('.foot', md);
+  if (!box || !grid || !foot || foot.parentElement !== box) return;
+  if (ws) { const lab = $('label[for="l-ws"]', ws); if (lab) lab.textContent = tr('For whom?'); h.after(ws); if (wh) ws.after(wh); }
+  const det = document.createElement('details');
+  det.className = 'lnmore'; det.innerHTML = `<summary>${esc(tr('More options'))}</summary>`; det.open = !!(o.ptype || o.family);
+  for (let n = grid.nextElementSibling; n && n !== foot;) { const nx = n.nextElementSibling; det.append(n); n = nx; }
+  foot.before(det);
+}
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
   const own = isOwner(l), dis = own ? '' : 'disabled';
@@ -864,8 +875,8 @@ function listModal(id, folder = '', o = {}) {
     <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><span></span><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Progress and status')}</label></div>${''/* 2.152.2 (#2624): the type "Simple list | Project" became this switch; on = kind project */}
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
-    ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
-    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
+    ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
+    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
@@ -919,7 +930,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
     ${id && !l.is_inbox && collab() ? `<h4>${tr('Project tags')}</h4><div class="shint lhint">${tr('Tags of this project: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the project.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
     <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
-  if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
+  if (id) md.classList.add('lmodal'); else { md.classList.add('lnew'); lnew_short(md, o); }  // 2.364.0 D (#3033)
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }
   }).catch(() => {});
@@ -1170,6 +1181,7 @@ function listModal(id, folder = '', o = {}) {
         try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : b0); } catch { return; }
       }
       if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
+      if ($('#l-ws', md)) LS.set('wsLastProj', $('#l-ws', md).value ? 'org:' + $('#l-ws', md).value : 'private');  // 2.364.0 D (#3033): the next one starts there
       md.remove(); await load(); go('l/' + n.id);
       modulesOnToast(n.modules_on);
       if (pt === 'software') projectNextSteps(n.id);
@@ -1316,12 +1328,12 @@ function vpLookHtml() {
   const cur = vpMode();
   return `<h4>${tr('View on this device')}</h4>
     <div class="row"><div class="seg wrap" id="s-vmode" role="group" aria-label="${esc(tr('View on this device'))}">${VP_MODES.map(v => `<button data-vmode="${v}" aria-pressed="${cur === v}" class="${cur === v ? 'on' : ''}">${tr(VP_NAMES[v])}</button>`).join('')}</div></div>
-    <div class="shint">${tr('Automatic: a large touch screen held sideways (an unfolded foldable, a small tablet) gets the computer view, phones the phone view. Computer: the computer view, scaled down to fit.')}</div>
+    <div class="shint">${tr('Automatic: from 768 px wide (a tablet, an unfolded foldable) the computer view, phones the phone view. Computer: the computer view, scaled down to fit.')}</div>
     <div class="shint vpinfo" id="s-vpinfo">${esc(vpInfo())}</div>`;
 }
 function vpSet(md, v) {
   if (v === 'auto') LS.del('vmode'); else LS.set('vmode', v);
-  stableViewport();  // the layout width changes; the (max-width:899px) listener (detail.js) renders the new layout
+  stableViewport();  // the layout width changes; the (max-width:767px) listener (detail.js) renders the new layout
   lookRedraw(md, `[data-vmode="${v}"]`);
   const upd = () => { const el = $('#s-vpinfo', md); if (el) el.textContent = vpInfo(); };
   addEventListener('resize', upd, {once: true}); requestAnimationFrame(() => requestAnimationFrame(upd));

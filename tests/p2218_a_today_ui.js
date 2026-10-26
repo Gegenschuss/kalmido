@@ -27,7 +27,7 @@ const lstOf = (d, id) => d.querySelector(`#view .trow[data-id="${id}"] .meta .ls
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice', undefined, {rowIcons: null});
   await call('POST', '/api/admin/setup', {lang: 'en'});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', sidebar: JSON.stringify({hidden: ['e:home']})});  // 2.364.0 (#3031): Today's briefing only while Start is hidden in the bar
   const P = (await call('POST', '/api/lists', {name: 'Postproduction'})).id;
   const mk = async b => (await call('POST', '/api/tasks', {list_id: P, ...b})).id;
   const O1 = await mk({title: 'Acceptance with the client', due: day(-1)});
@@ -83,7 +83,7 @@ const lstOf = (d, id) => d.querySelector(`#view .trow[data-id="${id}"] .meta .ls
   const fu = await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   check(fu.http < 300, 'a person without an organisation ' + fu.http);
   const FK = await login('frida', undefined, {rowIcons: null});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, FK);
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', sidebar: JSON.stringify({hidden: ['e:home']})}, FK);  // 2.364.0 (#3031)
   const FL = (await call('POST', '/api/lists', {name: 'Clients'}, FK)).id;
   const FO = (await call('POST', '/api/tasks', {list_id: FL, title: 'Invoice', due: day(-1)}, FK)).id;
   w = await boot({user: 'frida', mobile: true, hash: 'today', rowIcons: null}); d = w.document;

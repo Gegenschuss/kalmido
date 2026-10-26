@@ -190,7 +190,7 @@ const newsExcerpt = (body, U) => esc(String(body || '').replace(/\s+/g, ' ').rep
 const ROLES = [['admin', N_('Admin'), N_('Sees and changes everything, manages the members')],
   ['edit', N_('Member'), N_('Sees and changes every task')],
   ['participant', N_('Participant'), N_('Sees only the tasks assigned to them')],
-  ['view', N_('Viewer'), N_('Sees everything, changes nothing')]];
+  ['view', N_('Read-only'), N_('Sees everything, changes nothing')]];  // 2.364.0 C (#3041): one word with the organisation role
 const roleLabel = r => r === 'owner' ? tr('Owner') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[1]);
 const roleHelp = r => r === 'owner' ? tr('Created the project; can rename, archive and delete it') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[2]);
 function newsListName(it) {

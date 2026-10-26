@@ -113,7 +113,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
-ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
+ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Read-only")}  # 2.364.0 C (#3041): one role word
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
                "wont_do": N_("Mark {0} tasks as won’t do"), "delete": N_("Move {0} tasks to the trash"),
                "restore": N_("Restore {0} tasks from the trash")}

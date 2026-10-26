@@ -114,6 +114,8 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const CK = await login('alice');
   for (const u of ['bob', 'carol', 'dave']) await call('POST', '/api/users', {username: u, display_name: u, password: 'password123'}, CK);
+  // 2.364.0 (#3032): accounts an admin made first answer "What do you use Kalmido for?" (p2364_a_*); answered here, this suite is about the tour
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), process.env.KALMIDO_TEST_DATA || path.join(__dirname, '.data'), "UPDATE user_settings SET value='done' WHERE key='purpose_ask'"]);
   const tourOpen = async w => until(() => w.document.querySelector('.tour .tcard h3'), 4000);
   // alice: all modules (projects) -> preticked, Next creates it
   w = await boot({user: 'alice'}); d = w.document;

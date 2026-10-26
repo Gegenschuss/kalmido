@@ -1014,7 +1014,7 @@ def pma_full():
     return tuple(x for x in PM_FULL if not (x == "collab" and not collab_all()) and not (x == "time" and not time_all()))
 
 
-def purpose_apply(c, uid, purpose, examples=False, all_mods=None):
+def purpose_apply(c, uid, purpose, examples=False, all_mods=None, only=False):
     """Switches the user's modules to the purpose and (examples) creates its sample project once. -> {features, created}
     2.46.1 (#1591): all_mods True / False = the switch "Switch on all modules" (stored as mods_all); False switches off the
     business modules too (lists and tasks only). #1602: the sample project only on request (examples, off by default)."""
@@ -1022,7 +1022,12 @@ def purpose_apply(c, uid, purpose, examples=False, all_mods=None):
         raise BadInput(tr("Invalid value: {0}", "purpose"))
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = pm_purpose_on(purpose, all_mods)
-    sw = PURPOSE_MODS + (PM_FULL if all_mods is False else ())  # 2.56.1 (#1808): off = every module off (was PURPOSE_MODS + office extras)
+    sw = PURPOSE_MODS + (PM_FULL if all_mods is False or only else ())  # 2.56.1 (#1808): off = every module off (was PURPOSE_MODS + office extras)
+    if only:  # 2.364.0 A (#3032): exactly the purpose's package, every other module off (the first start's short question);
+        with system_ctx(c):  # a member of an organisation keeps collaboration (team chat, sharing); memberships as user_orgs
+            org = c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL LIMIT 1",
+                            (uid,)).fetchone()
+        sw = tuple(x for x in sw + ("docs",) if not (x == "collab" and org))
     fs = [x for x in fs if x not in sw or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
     fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x in on and x not in fs]
     fs += [x for x in PM_FULL if x in on and x not in fs]  # 2.56.1 (#1808): "all on" = every module of the list

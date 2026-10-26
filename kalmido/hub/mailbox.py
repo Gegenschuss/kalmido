@@ -79,7 +79,7 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 MBX_ERR = {  # error code -> the text people see (never the server's own words: they may echo a user name)
     "auth": N_("The server refused the user name or the password"),
     "network": N_("The server cannot be reached (address or port wrong, or the server is down)"),
-    "blocked": N_("This server is in the local network: an admin has to allow it first (Settings > Administration > Advanced, allowed internal hosts)"),
+    "blocked": N_("This server is in the local network: an admin has to allow it first (Settings > Server > Server > Advanced, allowed internal hosts)"),
     "tls": N_("The encrypted connection failed (check SSL / TLS and the port)"),
     "folder": N_("The folder does not exist on the server"),
     "password": N_("The password is missing"),

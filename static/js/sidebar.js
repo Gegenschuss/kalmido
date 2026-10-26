@@ -692,7 +692,7 @@ document.addEventListener('focusin', sbt_tip);
 // "Members may use it", tidying; 2.40.0 #1373: no "Agents may address each other" any more) next to its people and roles ("Share folder"). A new list
 // in the folder gets them; on a change the existing lists follow (or only new ones); a list changed on its own keeps its
 // value ("differs from the folder") until "Back to the folder" in its dialog.
-const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Viewer')]];
+const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Read-only')]];  // 2.364.0 C (#3041)
 const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may see and use the agent'), agent_tidy: N_('Agent may tidy up entries'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed'),  // 2.39.1 (#1214): hide_done
   agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking')};  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
 function folderEff(path) {

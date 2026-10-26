@@ -146,7 +146,7 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    fields, emptying the trash, changing 10+ tasks at once, moving projects and sharing always wait for a person's approval.
 2. **Share projects** with it in the table *Projects*: one click on the agent's chip shares a project (role
    *Member*) or ends the sharing. Share only what the agent should work in. Use the project's Share dialog (*…* > *Share…* > *Agents*) for the
-   roles *Participant* (only tasks assigned to it) or *Viewer*.
+   roles *Participant* (only tasks assigned to it) or *Read-only* (called *Viewer* before 2.364).
 3. Optional, per agent above the table:
    - **Share all existing projects** shares every project you own with the agent (role *Member*), except your inbox and the
      projects you took out in the table before.
@@ -816,7 +816,7 @@ needs no entry in the agent's allow list.
 ### 11. Test checklist
 
 Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test project**
-with the agent; delete both afterwards. Watch the answers and *Settings > Administration > Agents* (the log).
+with the agent; delete both afterwards. Watch the answers and *Settings > Organisation > Agents* (the log).
 
 **Basics**
 

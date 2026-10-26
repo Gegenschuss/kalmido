@@ -41,10 +41,14 @@ const PASS = 'correct horse battery staple';
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await boot('#t/' + TS);
-    check(await waitFor(`!!document.querySelector('#d-content')`) && !(await ev(`!!document.querySelector('[data-ln="lock"]')`)), '#1642: no "Lock note" in a shared list');
+    // 2.364.0 (#3036): "Lock note" is an entry of the task's "…" menu (no longer a link under the note)
+    const lnMenu = id => `(() => { taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id}); return 1; })()`;
+    const lnItem = `[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent.trim() === 'Lock note')`;
+    check(await waitFor(`!!document.querySelector('#d-content')`) && await ev(lnMenu(TS)) && await waitFor(`!!document.querySelector('#pop [role="menuitem"]')`) && !(await ev(`!!${lnItem}`)), '#1642: no "Lock note" in a shared list');
+    await ev(`(closePop(), 1)`);
     await boot('#t/' + T);
-    check(await waitFor(`!!document.querySelector('[data-ln="lock"]')`), '#1642: "Lock note" under the description of an own, unshared list');
-    await ev(`(document.querySelector('[data-ln="lock"]').click(), 1)`);
+    check(await waitFor(`!!document.querySelector('#d-content')`) && !(await ev(`!!document.querySelector('[data-ln="lock"]')`)) && await ev(lnMenu(T)) && await waitFor(`!!${lnItem}`), '#1642: "Lock note" in the "…" menu of a task in an own, unshared list');
+    await ev(`(${lnItem}.click(), 1)`);
     const warn = await waitFor(`document.querySelector('.cdlg #cdlg-b')?.textContent || ''`);
     check(/lost/.test(warn || '') && /not even the operator/.test(warn || ''), '#1642: the first lock warns clearly: lost = lost, not even the operator ' + warn);
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]').click(), 1)`);

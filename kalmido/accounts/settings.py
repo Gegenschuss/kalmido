@@ -24,7 +24,7 @@ from .layouts import LAYOUT_KEYS
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
@@ -282,6 +282,10 @@ def clean_setting(k, v):
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
         return clean_cal_list(k, v)
+    if k == "start_page":  # 2.364.0 B (#3031)
+        if sv not in ("home", "inbox", "today", "last"):
+            raise bad
+        return sv
     if k == "side_icons":  # 2.36.0 (#1117)
         if sv not in ("line", "emoji", "dot"):
             raise bad

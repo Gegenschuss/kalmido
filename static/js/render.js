@@ -110,7 +110,7 @@ function tabItem(id) {
   if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
   if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
-  if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
+  if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
   if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Projects')};  // 2.24.0 (UX-36): opens the drawer
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
@@ -134,13 +134,17 @@ function tabBtn(t, on, cls = '') {
 // 2.8.0 (#434): no icon rail any more. The desktop has one sidebar with grouped text navigation (renderSide) and the
 // command bar in the header; the tab bar setting is for phones only.
 // what "Mehr" offers: overflow tabs + enabled modules that are not pinned + search/settings if not pinned
+// 2.364.0 B (#3040): "More" = the drawer's list of areas, the same entries in the same order (sbb_btnHtml decides: switched on,
+// not hidden in the sidebar settings, not private in an organisation's view; pinned ones too), then the conversations not
+// pinned, Search and Settings last. Overflowing pinned tabs stay on top. rest = those, for the groups of tabsMore
+const tabAreaItems = () => { const cur = sbb_area(); return SBB_RAIL.map(r => r[0]).filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, ...(a ? {area: id} : {})}; }); };
 function tabOverflow() {
   const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
-  const rest = items.slice(shown.length);
-  const mods2 = mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m)).filter(t => t && !o3a_hidT(t));
-  const misc = ['home', 'team', 'news', 'agents', 'overview', ...MG_IDS.map(x => 'a:' + x), 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(t => t && !o3a_hidT(t));  // 2.83.0 (#1845)
+  const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
+  const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k)).map(tabItem).filter(t => t && !o3a_hidT(t));
+  const end = ['search', 'settings'].filter(k => !pinned(k)).map(tabItem).filter(Boolean);
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
-  return {shown, more: rest.length || mods2.length ? [...rest, ...mods2, ...misc] : []};
+  return {shown, rest, more: rest.length || areas.some(t => !pinned(t.id)) ? [...rest, ...areas, ...conv, ...end] : []};
 }
 function renderTabs() {
   const {shown, more} = tabOverflow(), all = tabItems(), on = tabOn(all);
@@ -160,15 +164,18 @@ function sideToLists() {
   sd.scrollTop = Math.max(0, sd.scrollTop + g.getBoundingClientRect().top - sd.getBoundingClientRect().top - 8);
 }
 function tabsMore(anchor) {
-  const {more} = tabOverflow();
+  const {more, rest} = tabOverflow();
   // 2.23.0 (#824): who is working, on top of the "More" menu (when the agents are in it)
   const wk = more.some(t => t.id === 'agents') ? (S.agents || []).filter(a => a.enabled && !agentOffline(a) && a.status === 'working') : [];
   // 2.31.0 (#1056): three groups: places to go (Views), the conversations (team chat, news, agents), then search / settings /
   // the tab bar, set apart
-  const grp = t => ['team', 'news', 'agents'].includes(t.id) ? 1 : ['search', 'settings'].includes(t.id) ? 2 : 0;
-  const ord = [0, 1, 2].flatMap(g => [...(g === 1 ? [{head: tr('Conversations|nav')}] : g === 2 ? ['-'] : [{head: tr('Views')}]), ...more.filter(t => grp(t) === g)]);
-  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
+  // 2.364.0 B (#3040): overflowing pinned tabs (Views), the areas (as in the drawer), the conversations, then Search, the tab
+  // bar and Settings fixed at the end
+  const grp = t => rest.includes(t) ? 0 : ['team', 'news'].includes(t.id) ? 2 : t.id === 'search' ? 3 : t.id === 'settings' ? 4 : 1;
+  const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, {head: tr('Conversations|nav')}, '-', null];
+  const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
+  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)}))]);
 }
 function counts() {
   const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, byme: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
@@ -321,7 +328,7 @@ function renderSide0() {
     const nmOf = x => em ? listName(x._live ?? x.name).slice(em.length).trim() : listName(x._live ?? x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
-    const shr = (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
+    const shr = ws_prvMark(l) + (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
       (l.e2e && typeof le2u_sideMark === 'function' ? le2u_sideMark(l) : '') + ovSideMark(l) + (l.shared && collab() && rsy_sideShr() ? licShareHtml(l) : sbc_ph());  // 2.64.1 (#1817): the lock  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
@@ -362,7 +369,7 @@ function renderSide0() {
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
   const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
-    ['assigned', row('assigned', ic('user'), tr('My tasks'), c.assigned)],  // 2.40.0 (#1344): right under the basket, always shown
+    ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
     ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
@@ -1132,7 +1139,7 @@ async function assignMenu(anchor, id) {
   const gs = listGroups(t.list_id);
   menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
-    ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
+    ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Read-only') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
       ...ac_mi(p.user_id), on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),  // 2.47.1 (#1721): + the person's colour
     ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])], null, null, tr('Assign'));  // 2.354.0 C (#3013): the sheet gets a heading
 }

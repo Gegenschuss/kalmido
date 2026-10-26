@@ -17,7 +17,7 @@
 .sbody{display:flex;flex:1;min-height:0}
 .spanes{flex:1;min-width:0;overflow-y:auto;padding:0 1.5rem 1.375rem}
 .spane > h4:first-child{margin-top:1.125rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .sbody{flex-direction:column}
   .spanes{padding:0 1rem 1.125rem}
 }
@@ -46,7 +46,7 @@
 .aglist .agsrow:first-child{border-top:0}
 .aitblctl{margin:.5rem 0}
 .aitblctl input{width:100%;max-width:20rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .aisub button{padding:.25rem .375rem}
   .aglist .agsrow{flex-wrap:wrap}
   .aitblctl input{max-width:none}
@@ -65,7 +65,7 @@
 .ssres.hidden{display:none}
 .ssres button{display:block;text-align:left;padding:.5rem .625rem;min-height:2.75rem;border-radius:var(--r-s);font-size:var(--fs-m)}
 .ssres button:hover,.ssres button:focus-visible{background:var(--bg3)}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .sbody{position:relative}
 }
 #s-sclim .sclim+.sclim{margin-top:.75rem}
@@ -86,7 +86,7 @@
 .sidecfg .sideents .chkl{min-height:2.75rem}
 .smodal .sndesc{display:none}
 .smodal .sback{display:none}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .smodal:not(.sidx) .sback{display:inline-flex}
   .smodal.sidx .spanes,.smodal.sidx .snmore{display:none}
   .smodal.sidx .snav{flex-direction:column;flex:1;gap:.125rem;padding:.25rem .75rem 1rem;overflow-y:auto;overflow-x:hidden;border-bottom:0;-webkit-mask-image:none;mask-image:none}
@@ -115,7 +115,7 @@
 .icard small{color:var(--muted);font-size:var(--fs-m)}
 .icard > svg:first-child{color:var(--accent);flex:none}
 .icard .fcar{transform:rotate(-90deg);color:var(--muted);flex:none}
-@media (min-width:900px) {
+@media (min-width:768px) {
   .icards{grid-template-columns:repeat(3,1fr)}
 }
 .pushnow{display:flex;align-items:center;gap:.75rem;padding:.75rem .875rem;margin:.25rem 0 1rem;border-radius:var(--radius);border:1px solid var(--line2);background:var(--bg2)}
@@ -130,7 +130,7 @@
   .sidecfg .iconbtn{min-width:2.75rem;min-height:2.75rem}
   .aisub button{min-height:2.75rem}  /* 2.66.0: this file loads after app.css, its 2rem beat the 44 px touch rule there */
 }
-@media (max-width:899px),(pointer:coarse) {
+@media (max-width:767px),(pointer:coarse) {
   .aglist .agsrow{flex-wrap:wrap}
   .aglist .agsrow .agacts{display:flex;flex:1 0 100%;flex-wrap:wrap;justify-content:flex-end;gap:.375rem}
 }
@@ -190,10 +190,12 @@
   .ogchk input{width:1.5rem;height:1.5rem}
 }
 /* 2.92.0 D (#2010): on the phone the selection bar is fixed above the tab bar, so the first tick no longer pushes the list down */
-@media (max-width:899px) {
+@media (max-width:767px) {
   .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
 }
 /* 2.115.0 B (#2062): active sessions + open organisation invitations: two lines per row (name, details), large buttons */
 .sesrow .n,.oinvrow .n{white-space:normal}
 .sesrow .n small,.oinvrow .n small{display:block}
 @media (pointer:coarse){.sesrow .btn,.oinvrow .btn{min-height:2.75rem}}
+/* 2.364.0 C (#3041): an info button at the right end of a wide switch row keeps its tap area inside the area (no sideways scroll) */
+.spane .featgrid label.wide>.ib:last-child{margin-right:.6875rem}

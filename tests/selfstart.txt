@@ -599,6 +599,8 @@ p2177_a_ui
 p2280_c_ui
 p2233_c_chatcolor_ui
 p2240_a_assistant
+p2364_c_admin_ui
+p2350_a_chathead_ui
 p2330_a_kleine_fehler
 p2330_a_kleine_fehler_ui
 p2376_a_wiki_snippet_ui

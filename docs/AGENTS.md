@@ -53,7 +53,7 @@ Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|pro
   - an optional **webhook URL** and signing secret.
   - an **Enabled** switch.
   - a **note**, for example who runs the agent and where.
-- **Limited by design.** An agent is never an admin. It cannot sign in to the web app. It sees only the projects that are shared with it (plus projects it owns), with the role it was given (Member, Participant or Viewer; never project admin). An agent shares a project (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person)) and never becomes or hands over the owner of a project. A project an agent created is managed by an admin: *Settings > Administration > Projects owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the project as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
+- **Limited by design.** An agent is never an admin. It cannot sign in to the web app. It sees only the projects that are shared with it (plus projects it owns), with the role it was given (Member, Participant or Read-only; never project admin). An agent shares a project (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person)) and never becomes or hands over the owner of a project. A project an agent created is managed by an admin: *Settings > Organisation > People > Projects owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the project as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
 - **Team and personal agents (2.7.2).** Agents created by an admin are team agents. If an admin allows it, people can also create their own [personal agent](#personal-agents): it belongs to them, sees only what they share with it, and only they can chat with it.
 - **Kill switch.** Turning **Enabled** off stops the agent at once:
   - its token is refused (`403`).
@@ -133,7 +133,7 @@ responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalm
 a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a project, everyone
 in the project gets a News item naming the agent, who added it and where it runs.
 
-- **Admin policy**, *Administration > Agents* (server admins): *Users may create their own agents* (off by default: then
+- **Admin policy**, *Settings > Organisation > Agents* (server admins): *Users may create their own agents* (off by default: then
   each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
   new personal agent gets.
 
@@ -263,8 +263,10 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
   rules in its `CLAUDE.md`.
 
 The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
-team agent without a webhook) it offers *Set it up on a computer now?*: **Set up** opens the one-command setup, the API
-token of the new agent is shown only on request (*Show the token for an own setup*). Until a computer connected, the
+team agent without a webhook) the one-command setup opens right away; the API token of the new agent is shown only on
+request, under *For advanced users* (*Show the token for an own setup*). The dialog *New agent* shows only the display
+name, team or personal, the workspace and the picture; everything else sits under *Advanced* with the usual defaults
+(the runtime's permission mode is called *Approvals* there). Until a computer connected, the
 agent's row says **Set up**. The Agents view lists on every agent's card the projects it is in that you see (folder, who may
 address it there, *listens in* / *only via @*; a tap opens the project's settings); the row of a personal agent shows its
 workspace and changes it (`PATCH /api/my/agents/<id>` with `org_id`).
@@ -454,7 +456,7 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
 ### Guide B: a personal agent on your own computer (users)
 
 1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Workspaces*:
-   *Members may have their own agents*), or a server admin for everyone (*Administration > Agents*). If *Create agent* is
+   *Members may have their own agents*), or a server admin for everyone (*Settings > Organisation > Agents*). If *Create agent* is
    missing in *Settings > Agents > Set up*, personal agents are off on this server: ask a server admin.
 2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
    the token (shown once) into the env file (paths in the table above), readable only by you.
@@ -3009,7 +3011,7 @@ there is no write route in the API, and the app refuses agents.
 
 *Since 2.10.0.*
 
-Admins create groups of people (Settings > Administration > Groups; optionally their members follow a sign-in group of
+Admins create groups of people (Settings > Organisation > People > Groups; optionally their members follow a sign-in group of
 the OIDC provider). A project or a folder can be shared with a group; every member then is a member of the project with the
 group's role, which is the higher of their own role and the group's. Agents are never group members; share projects with an
 agent directly. A task can be assigned to a group (`assignee_group_id`); members see it in *Assigned to me* until one of
@@ -3174,7 +3176,7 @@ bodies), status code, the task / project id when the path or the body names one,
 too: 401 (expired token), 403 (paused, wrong scope, a project it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > Administration > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+- **Settings > Organisation > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
   class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
   20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
   line shows today's requests and denied calls. Rows name the task / project where you can see it. Denied calls are marked
