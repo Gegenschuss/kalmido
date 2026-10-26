@@ -96,6 +96,14 @@ def fs_ref_token_lacks(uid, scope):
     return scope not in (g.get("scopes") or set())
 
 
+def _api_way(c, uid):
+    """2.351.0 F (#3246, review M2): uid asks as an agent or through an API token -- there hidden (project limit, scopes, agent
+    switches) outranks the area's base role; a signed-in person keeps the area's own role (e.g. a locked page's owner)."""
+    if has_request_context() and g.get("auth_via") == "token" and g.get("user") and g.user["id"] == uid:
+        return True
+    return acx_of(c, uid).role == "agent"
+
+
 def fs_ref_all_sql(kind):
     """2.238.0 A (#2863): a hidden subquery naming every filed object of kind (a token without the area's scope)."""
     return f"(SELECT ref_id FROM fs_nodes WHERE kind = 'ref' AND ref_kind = '{kind}')"
@@ -179,8 +187,8 @@ def fs_ref_role(c, uid, ref_kind, ref_id):
     reg = FSR.get(ref_kind or "")
     if reg is None or not uid:
         return None
-    if _hidden(c, uid, reg, ref_id):  # 2.351.0 F (#3246, review M2): what a folder never opens, the base role does not either
-        return None
+    if _api_way(c, uid) and _hidden(c, uid, reg, ref_id):
+        return None  # 2.351.0 F (#3246, review M2): an agent / a token: what a folder never opens, the base role does not either
     base = _role_of(reg["base_role"](c, uid, int(ref_id)))
     if base == "edit":
         return base
