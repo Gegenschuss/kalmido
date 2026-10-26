@@ -151,7 +151,8 @@ function viewWiki() {
   const pages = d?.pages || [], q = WK.q.trim().toLowerCase();
   const vis = q ? pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)) : pages;  // 2.169.0 (#2671): offline the texts are searched here
   const sel = op && typeof wkeMark === 'function' ? wkeMark(op) : '';  // 2.64.3 (#1817): the lock mark; 2.198.0 A (#2743): the space switch is gone (the panel / the list has an entry per space)
-  if (typeof sbb_on === 'function' && sbb_on()) return wk_deskHtml(sp, d, id, cur, sel, op);  // 2.152.3 B (#2620): a computer: the folders are in the panel
+  const wst = typeof wki_statHtml === 'function' ? wki_statHtml() : '';  // 2.350.0 C (#2744): a running import on top (wkimport.js)
+  if (typeof sbb_on === 'function' && sbb_on()) { const h = wk_deskHtml(sp, d, id, cur, sel, op); return wst ? h.replace(/^(<div class="ntwrap[^>]*>)/, '$1' + wst) : h; }  // 2.152.3 B (#2620): a computer: the folders are in the panel
   const side = `<div class="ntlist wkside">
     ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}">${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
@@ -161,7 +162,7 @@ function viewWiki() {
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : symEmpty('book', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>`}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js)
   const main = id ? `<article class="ntedit wkpage" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article>` : '';
   if (mob) wk_scrollAfter(id, !!d?.pages);
-  return `<div class="ntwrap wkwrap"><div class="ntview ${id ? 'open' : ''}">${mob && id ? '' : side}${main}</div></div>`;
+  return `<div class="ntwrap wkwrap">${wst}<div class="ntview ${id ? 'open' : ''}">${mob && id ? '' : side}${main}</div></div>`;
 }
 // 2.152.3 B (#2620): knowledge on a computer with sidebar B: the panel holds the folders (wk_panelHtml), the page shows a bar
 // (space, search, "New page", the space's menu) and below it the open page or the open folder as a list like a file manager

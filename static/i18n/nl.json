@@ -14307,5 +14307,8 @@
   "Picture or file": "Afbeelding of bestand",
   "Embed a table": "Tabel insluiten",
   "Link to a page": "Link naar een pagina",
-  "Idea": "Idee"
+  "Idea": "Idee",
+  "Import running · {0} %": "Import loopt · {0} %",
+  "The import goes on in the background.": "De import loopt op de achtergrond door.",
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "De voortgang staat bij Kennis in de balk en bovenaan de kennispagina's."
 }

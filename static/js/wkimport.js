@@ -23,12 +23,54 @@ function wki_sheet() {
     <div class="foot"><button type="button" class="btn" data-wki="stop">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-wki="bg">${esc(tr('In the background'))}</button></div>`);
   md.addEventListener('click', async e => {
     const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-wki]')); if (!b) return;
-    if (b.dataset.wki === 'bg') { modalClose(md); toast(tr('The import goes on in the background. Keep Kalmido open until the upload is done.')); }
-    else if (b.dataset.wki === 'stop') { modalClose(md); await wki_stop(); }
+    if (b.dataset.wki === 'bg') modalClose(md);
+    else if (b.dataset.wki === 'stop') { md.remove(); await wki_stop(); }
   });
+  // 2.350.0 C (#2744): a click next to the window / Esc while the import runs = "In the background" with the note (no silent close)
+  md._close = () => {
+    md.remove(); if (wki_pct() === null) return;
+    toast((WKI.cur?.state === 'upload' ? tr('The import goes on in the background. Keep Kalmido open until the upload is done.') : tr('The import goes on in the background.'))
+      + ' ' + tr('Its progress shows at Knowledge in the bar and on top of the knowledge pages.'), null, 6000);
+  };
   WKI.md = md;
   return md;
 }
+// 2.350.0 C (#2744): the running import's share in percent (null: none runs) for the note at Knowledge in the bar and on top
+// of the knowledge pages; a click there opens the window again (also after a reload: wki_resume, and for a locked space)
+function wki_pct() {
+  const c = WKI.cur; if (!c || !['upload', 'running', 'e2e'].includes(c.state)) return null;
+  const [d, t] = c.state === 'upload' ? [c.received, c.size] : c.state === 'e2e' ? [c.done, c.total] : [c.progress?.done, c.progress?.total];
+  return t ? Math.max(0, Math.min(99, Math.floor(100 * (d || 0) / t))) : 0;
+}
+const wki_label = () => tr('Import running · {0} %', wki_pct());
+function wki_statHtml() {
+  return wki_pct() === null ? '' : `<button type="button" class="wki-st" data-wki-open="1" aria-haspopup="dialog">${botBusy(`<span class="wki-stt">${esc(wki_label())}</span>`)}</button>`;
+}
+const wki_dotHtml = () => wki_pct() === null ? '' : `<span class="srbd wki-dot" data-wki-open="1" title="${esc(wki_label())}">${wki_pct()} %</span>`;
+// the note follows the progress in place (a redraw draws it with viewWiki / sbb_btnHtml)
+function wki_mark() {
+  const on = wki_pct() !== null;
+  for (const b of $$('#srail [data-sbb="wiki"], #side [data-sbb="wiki"], #side [data-go="wiki"], #tabs [data-go="wiki"]')) {
+    const s = $('.wki-dot', b);
+    if (!on) s?.remove();
+    else if (s) { s.textContent = wki_pct() + ' %'; s.title = wki_label(); }
+    else b.insertAdjacentHTML('beforeend', wki_dotHtml());
+  }
+  const w = $('#view .wkwrap'), st = w && $('.wki-st', w);
+  if (!on) st?.remove();
+  else if (st) { const t = $('.wki-stt', st); if (t) t.textContent = wki_label(); }
+  else if (w) w.insertAdjacentHTML('afterbegin', wki_statHtml());
+}
+function wki_open() {
+  const c = WKI.cur; if (wki_pct() === null) return;
+  wki_sheet();
+  if (c.state === 'e2e') wki_show(c.done || 0, c.total || 0, c.total ? tr('{0} of {1} pages', c.done || 0, c.total) : tr('Unpacking…'));
+  else wki_draw(c);
+}
+document.addEventListener('click', e => {
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-wki-open]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); wki_open();
+}, true);
 // done / total with a line; total 0 = not known yet
 function wki_show(done, total, line) {
   const box = WKI.md?.isConnected && $('.wki-box', WKI.md); if (!box) return;
@@ -41,6 +83,7 @@ function wki_line(j) {
 }
 function wki_draw(j) {
   if (!j) return;
+  wki_mark();  // 2.350.0 C (#2744)
   if (j.state === 'upload') wki_show(j.received, j.size, wki_line(j));
   else wki_show(j.progress?.done, j.progress?.total, wki_line(j));
 }
@@ -84,7 +127,7 @@ async function wki_start(sp, file, replace = false) {
   wki_poll();
 }
 function wki_fail(msg) {
-  WKI.up = ''; WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md);
+  WKI.up = ''; WKI.cur = null; wki_mark(); if (WKI.md?.isConnected) modalClose(WKI.md);
   toast(msg);
 }
 function wki_tooBig(file, max) {
@@ -98,7 +141,7 @@ async function wki_stop() {
   if (c?.state === 'e2e') { c.abort = true; return; }  // the browser import stops after its current page
   if (!c?.id) return;
   try { await rawFetch('DELETE', `/api/wiki/import/upload/${c.id}`); } catch { /* gone already */ }
-  if (c.state === 'upload') { WKI.cur = null; toast(tr('Import cancelled')); }
+  if (c.state === 'upload') { WKI.cur = null; wki_mark(); toast(tr('Import cancelled')); }
   else wki_poll();  // a running import stops at its next file: its end comes as "stopped"
 }
 // the server's state every 1.5 s while it runs (also with the window closed and in other views)
@@ -106,7 +149,7 @@ function wki_poll() {
   clearTimeout(WKI.t);
   const c = WKI.cur; if (!c?.id) return;
   WKI.t = setTimeout(async () => {
-    let j; try { j = await rawFetch('GET', `/api/wiki/import/upload/${c.id}`); } catch (e) { if (e?.status === 404) { WKI.cur = null; return; } wki_poll(); return; }
+    let j; try { j = await rawFetch('GET', `/api/wiki/import/upload/${c.id}`); } catch (e) { if (e?.status === 404) { WKI.cur = null; wki_mark(); return; } wki_poll(); return; }
     WKI.cur = j;
     if (j.state === 'running') { wki_draw(j); wki_poll(); return; }
     wki_end(j);
@@ -115,7 +158,7 @@ function wki_poll() {
 // the end: the report (wiki.js wka_done: pages, files, skipped with reasons, one Undo step), the folder on the server goes
 function wki_end(j) {
   if (WKI.seen === j.id) return; WKI.seen = j.id;
-  WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md);
+  WKI.cur = null; wki_mark(); if (WKI.md?.isConnected) modalClose(WKI.md);
   rawFetch('DELETE', `/api/wiki/import/upload/${j.id}`).catch(() => {});
   if (j.state === 'done' && j.result) wka_done(j.space || 'private', j.result);
   else if (j.state === 'stopped') toast(tr('Import cancelled'));
@@ -129,22 +172,22 @@ function wki_resume() {
     const c = j.current; if (!c || WKI.cur) return;
     if (c.state === 'upload') { rawFetch('DELETE', `/api/wiki/import/upload/${c.id}`).catch(() => {}); return; }  // the file is not here any more
     WKI.cur = c;
-    if (c.state === 'running') wki_poll(); else wki_end(c);
+    if (c.state === 'running') { wki_mark(); wki_poll(); } else wki_end(c);
   }).catch(() => {});
 }
 // a locked space: the browser imports (wikie2e.js wkeImport) with the same window
 async function wki_e2e(sp, file) {
   if (file.size > WKE_ZIP.zip) { wki_tooBig(file, Math.floor(WKE_ZIP.zip / 1e6)); return null; }
   if (WKI.cur) { toast(tr('An import is already running')); return null; }
-  const cur = WKI.cur = {state: 'e2e', abort: false};
-  wki_sheet(); wki_show(0, 0, tr('Unpacking…'));
+  const cur = WKI.cur = {state: 'e2e', abort: false, done: 0, total: 0};
+  wki_sheet(); wki_show(0, 0, tr('Unpacking…')); wki_mark();
   try {
-    const r = await wkeImport(sp, file, (done, total) => { wki_show(done, total, tr('{0} of {1} pages', done, total)); return !cur.abort; });
+    const r = await wkeImport(sp, file, (done, total) => { Object.assign(cur, {done, total}); wki_show(done, total, tr('{0} of {1} pages', done, total)); wki_mark(); return !cur.abort; });  // 2.350.0 C (#2744): + the note
     if (!cur.abort) return r;
     // review L7: a cancelled import leaves nothing behind -- the pages made so far go to the trash
     if (r?.created?.length) await rawFetch('POST', '/api/wiki/trash', {ids: r.created, files: []}).catch(() => {});
     wk_after(sp); toast(tr('Import cancelled'));
     return null;
-  } finally { WKI.cur = null; if (WKI.md?.isConnected) modalClose(WKI.md); }
+  } finally { WKI.cur = null; wki_mark(); if (WKI.md?.isConnected) modalClose(WKI.md); }
 }
 wki_resume();

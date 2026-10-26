@@ -14307,5 +14307,8 @@
   "Picture or file": "Bild oder Datei",
   "Embed a table": "Tabelle einbetten",
   "Link to a page": "Verweis auf eine Seite",
-  "Idea": "Idee"
+  "Idea": "Idee",
+  "Import running · {0} %": "Import läuft · {0} %",
+  "The import goes on in the background.": "Der Import läuft im Hintergrund weiter.",
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten."
 }
