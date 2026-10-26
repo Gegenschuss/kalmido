@@ -3608,6 +3608,9 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.353.0 D (#2759): recognition per folder / file of the file store ('' = as the folder above, 'on', 'off'; docs/recog.py).
+    # Older versions ignore it (their documents folder recognises as before)
+    ("fs_nodes", "recog", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS recog TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3882,6 +3885,7 @@ USER_DEFAULTS = {
     "show_done_views": "{}",
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
     "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
+    "ab_cards": "[]",           # 2.353.0 D (#2759): the file store's folders shown as cards (all devices): ["n:<id>", "s:<space>"]
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks

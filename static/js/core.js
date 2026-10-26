@@ -1222,7 +1222,7 @@ function parseHash() {
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
-  if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null};  // 2.48.0 (#1111): documents (docs.js)
+  if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null, ...(b === 'review' ? {review: true} : {})};  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
   if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload', 'tags'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
   if (SMART[a]) return {mod: 'tasks', key: a};

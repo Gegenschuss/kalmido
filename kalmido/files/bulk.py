@@ -367,7 +367,10 @@ def files_scan():
         c.rollback()
         return err(str(e))
     fs_log_add(c, nid, "upload")
+    from ..docs.recog import rc_after_add, rc_kick
+    added = rc_after_add(c, nid, uid)  # 2.353.0 D (#2759): a scan into a recognising folder = a document
     bump(c)
     c.commit()
+    rc_kick(added)
     rows = [c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()]
     return jsonify(items=_items(c, rows)), 201
