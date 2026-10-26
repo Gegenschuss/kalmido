@@ -41,7 +41,9 @@ async function dc_load() {
   try {
     const j = await api('GET', '/api/docs?' + dc_params());
     if (seq !== DC.seq || ws !== dc_ws()) return;  // 2.66.1 (#1945): an answer for a workspace no longer shown is dropped
+    const rv0 = DC.review;
     Object.assign(DC, {docs: j.docs, total: j.total, review: j.review, waiting: j.waiting, facets: j.facets || DC.facets, err: null});
+    if (rv0 !== DC.review && typeof sbb_sync === 'function') setTimeout(() => sbb_sync('ablage'), 0);  // 2.353.0 D (#2759): the counter of the saved filter To review
   } catch (x) { if (seq !== DC.seq || ws !== dc_ws()) return; DC.err = x.message || tr('unknown'); }
   DC.loading = false; DC.at = Date.now(); DC.atWs = ws;  // 2.62.0 (#1844)
   dc_draw();
