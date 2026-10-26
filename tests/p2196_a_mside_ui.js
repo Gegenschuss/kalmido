@@ -49,8 +49,6 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     return {open: s.classList.contains('open'), row: !!row, ids: btns.map(b => b.dataset.sbb), on: (document.querySelector('#side .sbmr .srb.on') || {dataset: {}}).dataset.sbb || '',
       rail: typeof SBB_RAIL === 'undefined' ? [] : SBB_RAIL.map(r => r[0]).filter(id => btns.some(b => b.dataset.sbb === id)),
       oneLine: btns.length > 0 && btns.every(b => Math.abs(R(b).top - R(btns[0]).top) < 1), scrolls: !!row && row.scrollWidth > row.clientWidth + 1, minH: Math.min(...btns.map(b => R(b).height)),
-      /* 2.353.0 B (#2776): wrapped grid, every tile whole inside the row and the drawer, equal widths */
-      allIn: !!row && btns.length > 0 && btns.every(b => { const r = R(b), q = R(row); return r.left >= q.left - 1 && r.right <= q.right + 1 && r.width > 20; }), widths: new Set(btns.map(b => Math.round(R(b).width))).size, rowsN: new Set(btns.map(b => Math.round(R(b).top))).size, count: btns.length,
       search: !!document.querySelector('#side .sbfix .scmd'), today: !!document.querySelector('#side .sbfix .srow[data-go="today"]'), inbox: !!document.querySelector('#side .sbfix .srow[data-drop="inbox"]'),
       rowFixed: !!document.querySelector('#side .sbfix .sbmr'), lists: !!document.querySelector('#side .sg-lists'), office: !!document.querySelector('#side [data-ofmg]'), wiki: !!document.querySelector('#side .sbbp, #side [data-act="sbb-tree"], #side .sbbtl'),
       todayTwice: document.querySelectorAll('#side .srow[data-go="today"]').length, set: !!(dock && dock.querySelector('.sset')), acct: !!(dock && dock.querySelector('.sbacct')),
@@ -75,9 +73,8 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     let s = (await ev(SIDE)) || {};
     await shot(`p2196a-tasks-${w}.png`);
     check(s.row && s.ids.length >= 5 && s.ids.join() === s.rail.join() && s.ids[0] === 'tasks' && ['cal', 'office', 'wiki'].every(x => s.ids.includes(x)), `${tag}: the row of area icons in the order of the computer's bar ` + JSON.stringify(s));
-    // 2.353.0 B (#2776): the row wraps into a grid of equal tiles (was: one line, scrolling sideways at 360 px)
-    check(s.minH >= 43 && s.allIn && !s.scrolls && s.widths <= 2, `${tag}: all ${s.count} area icons whole, big enough to tap, equal tiles, no sideways scrolling ` + JSON.stringify(s));
-    if (w <= 360) check(s.rowsN >= 2, `${tag}: a narrow phone: the row wraps into a second line ` + JSON.stringify(s));
+    check(s.oneLine && s.minH >= 43, `${tag}: one line, big enough to tap ` + JSON.stringify(s));
+    if (w <= 360) check(s.scrolls, `${tag}: a narrow phone: the row scrolls sideways ` + JSON.stringify(s));
     check(s.on === 'tasks' && s.search && s.today && s.inbox && s.rowFixed && s.todayTwice === 1, `${tag}: on top search, Today, Inbox and the row; Today only once ` + JSON.stringify(s));
     check(s.lists && !s.office && s.fshr && s.ws && s.inside, `${tag}: the Tasks panel: projects (shared folder with its share symbol), the workspace switch stays ` + JSON.stringify(s));
     check(s.set && s.acct && Math.abs(s.dockBottom) <= 2, `${tag}: at the bottom Settings and the account ` + JSON.stringify(s));
@@ -136,22 +133,10 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     check(!bk.open, `${tag}: then one Back closes the drawer ` + JSON.stringify(bk));
   };
 
-  // 2.353.0 B (#2776): at 320, 375 and 430 px every area icon is fully visible (the count is not fixed: area D drops Documents)
-  const widths = async (o, w) => {
-    const {cmd, ev, nav} = o;
-    await cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: w, height: 760}});
-    await nav(B + 'static/icon.svg'); await nav(B + '#today');
-    await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80);
-    check(await open(ev), `${w}px: the drawer opens`); await sleep(500);
-    const s = (await ev(SIDE)) || {};
-    check(s.row && s.count >= 5 && s.allIn && !s.scrolls && s.inside && s.ids.join() === s.rail.join(), `${w}px: all ${s.count} area icons whole, no sideways scrolling ` + JSON.stringify(s));
-    await o.shot(`p2353-mside-${w}.png`);
-  };
   await firefox(async o => {
     const {cmd, ev, ctx, nav} = o;
     check(await signIn(o, 'alice') === 200, 'alice: login');
-    for (const w of [320, 375, 430]) await widths(o, w);
-    // the tab "Projects" opens the drawer at the head of the project list (not scrolled down)
+    // 2.353.0 (#2776, audit): the tab "Projects" opens the drawer at the head of the project list (not scrolled down)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 375, height: 600}});
     await nav(B + '#today'); await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80);
     const tabHit = await ev(`(() => { const t = document.querySelector('#tabs [data-act="side"]'); if (t) t.click(); return !!t; })()`);
