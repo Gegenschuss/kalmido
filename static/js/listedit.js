@@ -150,7 +150,9 @@ function palViewed() {
 // one removes the picture and the other way round.
 const LICON_PRESETS = [['kalmido', 'Kalmido'], ...AV_PRESETS, ...AV_BOTS];  // 2.170.0 (#2675): people and bots
 const liconSrc = k => k === 'kalmido' ? '/static/icon.svg' : `/static/avatars/${k}.svg`;
-const licon = (l, cls = 'licon') => l && l.icon ? `<img class="${cls}" src="${esc(l.icon)}" alt="" loading="lazy" decoding="async">` : '';
+const LICON_OK = /^(\/static\/|\/api\/list-icon\/|data:image\/(png|jpeg|gif|webp);)/;  // 2.306.0 D4 (#2875): the picture of a list only from the app or inline
+const liconOk = src => LICON_OK.test(src || '');  // 2.306.0 (#2875 review N23): one check for every place that shows a list picture
+const licon = (l, cls = 'licon') => l && l.icon && liconOk(l.icon) ? `<img class="${cls}" src="${esc(l.icon)}" alt="" loading="lazy" decoding="async">` : '';
 function liconPickHtml(l) {
   const cur = l.icon || '';
   return `<div class="lipick" role="group" aria-label="${esc(tr('Picture'))}">${LICON_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === liconSrc(k) ? 'on' : ''}" data-licon="${k}" title="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-label="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-pressed="${cur === liconSrc(k)}"><img src="${liconSrc(k)}" alt=""></button>`).join('')}` +

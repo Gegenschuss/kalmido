@@ -10,6 +10,7 @@ const {sleep, B, login} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2123_d_ui', check, shots: 'P2123D_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -72,7 +73,7 @@ const MONTH = TC.today().slice(0, 7);
       'the correction is listed, marked "by hand", and counts in the account ' + await ev(`${card}?.textContent.replace(/\\s+/g, ' ').slice(0, 300) || ''`));
     check(await ev(`${card}.querySelector('[data-k="${MONTH}|out|actual"]')?.textContent.trim() === ofcMoney(100)`), 'the computed values stay as they are (money out 100)');
     await shot('p2123-d-correction.png');
-    await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
+    await undoToast(ev, 'Added');  // 2.312.0 A (#3283)
     check(await ready(ev, `${accIs(900)} && !${card}.querySelector('.cfs-adj')`, 60), 'the undo takes the correction out again');
     check(await ready(ev, `fetch('/api/office/cashflow?from=${MONTH}&months=3', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => !j.adjust)`), 'the server has no correction any more');
     // the real balance at the end of the month -> the difference

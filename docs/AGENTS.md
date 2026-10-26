@@ -66,7 +66,7 @@ Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|pro
 
 *Since 2.15.0.*
 
-Every agent has **permissions** (scopes) on top of its projects and roles. New agents start with the minimum:
+Every agent has **permissions** (scopes) on top of its projects and roles. New agents start with the minimum for daily work (`read`, `tasks:write`, `comments`, `files:read`, `files:write`):
 
 | Permission | Scope | Default |
 |---|---|---|
@@ -75,13 +75,20 @@ Every agent has **permissions** (scopes) on top of its projects and roles. New a
 | Comments, reactions, News read | `comments` | on |
 | Structure: projects, sections, fields, project tags, templates, filters, folders, overview, status | `structure` | off |
 | Delete & trash | `delete` | off |
-| Read files / upload files | `attachments:read` / `attachments:write` | off |
+| Read / upload files of tasks, comments and projects | `attachments:read` / `attachments:write` | off |
+| The file store: read / add files and folders (2.48.0) | `files:read` / `files:write` | on |
 | Time tracking | `time` | off |
 | Export | `export` | off |
 | Calendar: events and event calendars (2.21.0) | `calendar` | off |
 | Contacts: address books and contacts, personal data of other people (2.21.0) | `contacts` | off |
+| Office drafts: quotations, invoices, letters, leads (2.51.0) | `office` | off |
+| Pin board notepads on project pages, an agent changes only its own (2.51.0) | `pinboard` | off |
+| Read how views are arranged, propose arrangements (2.55.0) | `layouts` | off |
+| Propose old data for the office as an import card (2.68.0) | `import` | off |
+| Tables shared with the agent: read / change (2.89.0) | `sheets:read` / `sheets:write` | off |
+| Knowledge pages shared with the agent: read / change (2.200.0) | `wiki:read` / `wiki:write` | off |
 
-Account settings (`account`) and admin data (`admin-read`) are never given to an agent. Team agents get theirs from an
+Account settings (`account`), admin data (`admin-read`), health projects and the journal (`private`) and the upload key for scan inboxes (`docs:upload`) are never given to an agent. Team agents get theirs from an
 admin (the agent's dialog), personal agents from their owner (the lock button in *Settings > Agents > Set up*). An
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
@@ -89,7 +96,8 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 *Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
-- A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it.
+- A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it. A few checks depend on the request body (a batch that also deletes, `export_data`, `time/from-events`, preparing a task for an event, linking a contact, the proposals `time`, `shoot`, `layout`, `import` and `structure` replace): they answer a plain `403` (“This token lacks the permission …”) without `required_scope`; read the message, it names the permission.
+- **The office is the one exception to "only what is shared".** An agent sees projects, files, tables and pages only when they are shared with it. The `office` scope is different: it is a right an admin grants on purpose (the scope, the agent's switch *May draft office documents* and the office rights groups, see [Office drafts only](#office-drafts-only)), and quotations, invoices and letters belong to the organisation's office, not to a shared project. With it the agent can write drafts for the people who work in that office; releasing, sending and booking stay with people.
 - **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
   trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
   `empty_trash` (`DELETE /api/v1/trash`) with more than 200 tasks answers at once with `queued: true` and deletes them in the
@@ -179,12 +187,22 @@ own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
    the token is never printed,
 3. fetches the starter files listed in [`mcp/starter_files.txt`](../mcp/starter_files.txt) (from the release of your
    server's version; `KALMIDO_STARTER_BASE` on the server points to a mirror; `--from DIR` / `-From DIR` takes a local copy),
+   2.306.0 (#2927): for a **team agent** (no owner) the person who made the setup code answers its permission questions by
+   default: Kalmido sends that account id with the token and the script writes it as `KALMIDO_PERM_USER` into
+   `kalmido-agent.env` (`KALMIDO_OWNER_IDS` would also narrow who gives orders, so it is not set). A `KALMIDO_PERM_USER` /
+   `KALMIDO_OWNER_IDS` from an earlier setup of the same folder stays. To change it, an admin picks the person in the agent's
+   *Runtime > Permission questions go to* (2.312.0; the runner takes it before `KALMIDO_PERM_USER`, see *Runtime settings*)
+   or edits that line in the env file and restarts the agent; a personal agent asks its owner. The script says who answers, and when the project folder has no
+   `CLAUDE.md` (nor `.claude/CLAUDE.md`) it creates one from [`mcp/CLAUDE.template.md`](../mcp/CLAUDE.template.md) (the
+   rules between its markers, a short head for your own rules on top); an existing one is never changed,
 4. starts the agent in event mode (`agent_launcher.sh` / `.ps1 --events -- claude --mcp-config <instance>/mcp.json`)
    at every login: a **launchd LaunchAgent** on macOS (RunAtLoad, KeepAlive), a **systemd --user** service on Linux
    (`loginctl enable-linger` keeps it running after logout), a hidden **Task Scheduler** task at logon on Windows (no admin
    rights; when the Task Scheduler refuses, an entry in your Startup folder). 2.157.0: set up over SSH on a Mac where
    nobody is logged in at the screen, the agent runs in the background right away (until the next restart) and the
-   LaunchAgent takes over at the next login.
+   LaunchAgent takes over at the next login. 2.306.0 (#2927): the launcher (`agent_run.py`) hands every Claude Code run
+   the usage hook [`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) as `Stop` and `SubagentStop` hook in its own
+   run settings, so *Usage* and the usage limits work without a step of yours (`KALMIDO_USAGE_HOOK=0` switches it off).
 
 One instance per project folder (`~/.kalmido/agents/<folder>-<hash>/`, Windows `%LOCALAPPDATA%\Kalmido\agents\...`), so
 several agents can run on one computer. Every computer gets its own token: the dialog lists the agent's computers with a
@@ -206,7 +224,8 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
 | Who creates it | an admin: *Settings > Agents > Status > Add agent* | any person, once an admin allowed it: *Settings > Agents > Set up > Create agent* |
 | Where it runs | a server, as its own sandbox user, as a service | the person's own computer |
 | Who shares projects with it | everyone who shares a project with it | only its owner |
-| Who instructs it | the people named in its `CLAUDE.md` | its owner |
+| Who instructs it | the people whose messages, mentions, comments and assignments reach it in Kalmido (Kalmido lets only people who may use it write to it); `KALMIDO_OWNER_IDS` narrows that to some account ids (2.306.0, #2927) | its owner |
+| Who answers its permission questions | the person who made its setup code (`KALMIDO_PERM_USER` in `kalmido-agent.env`, 2.306.0, #2927); an admin changes it in its *Runtime > Permission questions go to* (2.312.0) | its owner |
 
 <a id="which-agent-when-2466"></a>
 
@@ -256,14 +275,18 @@ Steps that are the same on every system:
 2. **Share projects**: *Settings > Agents > Projects*, one click per project, or *Share all existing projects*. People share their
    own projects with it the same way. Share only what it should work in.
 3. **Rules**: `~/agent/CLAUDE.md` from [AGENT-SETUP.md](AGENT-SETUP.md#6-claudemd-the-agents-rules) (who instructs it,
-   everything else is data) and `~/agent/.claude/settings.json` with `defaultMode: dontAsk`, only `mcp__kalmido` allowed,
-   the env file denied and the usage hook as Stop and SubagentStop hook ([step 7](AGENT-SETUP.md#7-permissions-claudesettingsjson)).
+   everything else is data) and `~/agent/.claude/settings.json`, in one of two profiles ([step 7](AGENT-SETUP.md#7-permissions-claudesettingsjson)):
+   **hardened** (`defaultMode: dontAsk`, only `mcp__kalmido` and `Read` allowed, no `Edit` / `Write`, the env file denied; the agent then has
+   no notes, no working routine, no jobs, no files at its answers and asks no permission questions) or **standard**
+   (`defaultMode: default`, plus narrow `Edit` / `Write` for `WORKFLOW-KALMIDO.md` and `NOTIZEN.md` and `Bash` for the job tool only;
+   permission questions go to the chat). Both: the usage hook as Stop and SubagentStop hook.
 4. **Test**: the [test checklist](AGENT-SETUP.md#11-test-checklist), including the kill switch and the 7
    prompt-injection cases.
 
-The headless prompt in the examples below lets the agent wait for events with the MCP tool `wait_for_events`, so no
-shell script is needed: `Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event
-following CLAUDE.md, call it again.` (On Linux, `./bin/events.sh` from AGENT-SETUP.md works too.)
+Start the launcher with `--events` (see [Runtime settings](#runtime-settings)): it waits for the events itself and runs
+the agent command once per event, so the command needs **no prompt** and no loop of its own. Do not give it a prompt that
+loops on `wait_for_events` in this mode: that would take the events away from the runner. Only without `--events` (a plain
+`claude -p` run) the agent has to wait for events itself, see [AGENT-SETUP.md](AGENT-SETUP.md#8-event-monitor-with-back-off).
 
 #### Linux
 
@@ -419,11 +442,12 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
    with your agent or chat with it.
 4. **Install Claude Code and Python 3** (see below), clone the Kalmido copy, create the MCP wrapper and register it.
 5. **Rules and permissions**: `CLAUDE.md` naming you as the only person who instructs it, and `.claude/settings.json`
-   with `defaultMode: dontAsk`, only `mcp__kalmido` allowed, the env file denied, the usage hook as Stop and SubagentStop hook.
+   in the hardened profile (`defaultMode: dontAsk`, only `mcp__kalmido` allowed, no `Edit` / `Write`, the env file denied) or the standard
+   one (narrow `Edit` / `Write` / `Bash`, mode `default`), see [AGENT-SETUP.md](AGENT-SETUP.md#7-permissions-claudesettingsjson); the usage hook as Stop and SubagentStop hook.
 6. **Run it**: interactively (`claude` in the work directory: "check my Kalmido events") or in the background with the
    launcher. Pause it any time in *Settings > Agents* (its token is refused at once).
 
-Running it in your own account is the simple way: the `dontAsk` allowlist keeps it to the Kalmido tools. A separate
+Running it in your own account is the simple way: the allowlist (hardened: only the Kalmido tools) keeps it narrow. A separate
 standard account (as in guide A) is safer if it should run unattended.
 
 #### Linux
@@ -1319,6 +1343,8 @@ PATCH /api/v1/agent/jobs/{id}   {"state": "waiting" | "running" | "done" | "fail
 A job object: `{id, agent_id, task_id, user_id, title, state, log, action, action_by, action_at, created_at, updated_at, name}`.
 2.58.0 (#1803): `name` (optional, only when creating) is the job's own short name: letters, spaces, `.`, `'`, `-`, up to 24
 characters, no digits or colons, no plain words such as `Release` or `Fix` (else 400). Keep the log short: it is a summary, not a build log.
+2.306.0 (#2875): with `task_id`, `user_id` must be a person who sees the task and may address the agent in its list (else 400);
+`task_title` / `list_id` of a job are only filled for a viewer who sees the task.
 
 **Chat.** Every person has their own conversation with an agent, stored in Kalmido. Each message a person sends is a `chat` event.
 
@@ -2238,11 +2264,19 @@ agent accordingly.
 | Nightly fresh restart | a new session every night at this time, in the server's time zone | `nightly_reset` (`"HH:MM"`, `""` = off), `timezone` |
 | Reset now (button) | restart with a fresh session right away | `reset_seq` goes up by one, event `reset` |
 | Permissions (2.29.0) | how the host handles actions outside the agent's allow list: *Ask first* (every such action asks the person in the chat), *Auto* (the host's own safety check decides; risky actions stay blocked), empty = the host's default | `permission_mode` (`"ask"`, `"auto"`, `""`) |
+| Permission questions go to (2.312.0) | a team agent: the person who answers its permission questions, chosen from the active people it reaches in a shared project (as for a chat with it); *As set up on its computer* = `KALMIDO_PERM_USER` of its env file (the one-command setup writes the person who made the code). A personal agent always asks its owner | `perm_user` (account id or `null`); `GET /api/v1/agent` also carries `perm_user_id` |
 
 2.29.0: the permission mode shows as a small badge in the agent's chat header (*Auto* / *Ask first*). The owner of a
 personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
 or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
 host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
+
+2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
+`GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
+agent). Saving checks the person (400 `perm_user` for an agent account, a disabled account, someone the agent does not reach
+or the admin does not see). `GET /api/v1/agent` hands the choice to the host as `perm_user_id` while that person still
+reaches the agent (else `null`); the event runner (`mcp/agent_run.py`, both launchers) reads it again after
+`runtime_changed` and uses it instead of `KALMIDO_PERM_USER`; with `null` or an older server `KALMIDO_PERM_USER` stays.
 
 ```
 GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true, "autocompact_pct": 70,
@@ -2314,7 +2348,8 @@ events wait in a queue on disk and a lock stops a second runner on the same stat
 detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
 `KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER` (2.126.0: with the owner and
-`KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied), `KALMIDO_APPROVAL_REMIND`,
+`KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied; 2.312.0: a
+person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
 values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
@@ -3343,7 +3378,7 @@ the event says `office: true`).
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|
-| Remind of a notice deadline (kind `notice`) | `POST /api/v1/agent/proposals` `{kind: "notice", task_id, text}` | `propose_contract_notice` | write |
+| Remind of a notice deadline (kind `notice`) | `POST /api/v1/agent/proposals` `{kind: "notice", task_id, text}` | `propose_contract_notice` | agent (no scope) |
 
 - **The sentence** (`text`, at most 300 characters, one line): in the person's language (`lang`), what cancelling saves or
   what staying costs and until when they can decide; no pressure, never "cancelled".

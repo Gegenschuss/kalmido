@@ -55,7 +55,8 @@ def user_admin_dict(c, u):
     from ..family.family import kid_parents
     return {**user_public(u), "kind": u["kind"] or "user", "is_admin": bool(u["is_admin"]), "disabled": bool(u["disabled"]),
             "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
-            "created_at": u["created_at"], "ntfy_topic": usettings(c, u["id"])["ntfy_topic"],
+            "created_at": u["created_at"],
+            **({"ntfy_topic": usettings(c, u["id"])["ntfy_topic"]} if u["id"] == me() else {}),  # 2.306.0 C (#2889): no foreign topics
             "email": u["email"] or "",
             "twofa": twofa_methods(c, u), "oidc_linked": bool(u["oidc_subject"]),
             "parents": kid_parents(c, u["id"]) if u["kid"] else [],  # 2.19.0 (#653)
@@ -265,16 +266,23 @@ def user_update(uid):
     if "orgs" in b and instance_mode(c) == "workspaces":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
-        from ..accounts.orgs import org_leave, org_member_add
+        from ..accounts.orgs import _operator_apart, org_join_or_add, org_leave, org_own_admin
         with system_ctx(c):  # 2.37.0 (#1150): the instance admin moves the account between organisations (structure)
             have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
             for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
+                if _operator_apart():  # 2.306.0 Fix-1 (#2875 review): hosted: the lists go to an admin of its own, never the operator (409 without one)
+                    heir = org_own_admin(c, o, uid)
+                    if heir is None:
+                        c.rollback()
+                        return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
+                    org_leave(c, o, uid, heir)
+                    continue
                 heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
                 org_leave(c, o, uid, heir if heir != uid else me())
             for o in b["orgs"]:
                 if o not in have:
                     if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (o,)).fetchone():
-                        org_member_add(c, o, uid)
+                        org_join_or_add(c, o, uid)  # 2.306.0 D1 (#2875): hosted: an invitation the person accepts
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent
@@ -475,6 +483,8 @@ def _user_purge(c, uid):
     files += upg_rest(c, uid)
     from ..team.clients import cl_user_purge
     cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
+    from ..admin.acctexport import umz_forget
+    files.append(lambda: umz_forget(uid))  # 2.306.0 C (#2889): after the commit, the account export folder goes at once
     c.execute("DELETE FROM habits WHERE user_id=?", (uid,))
     c.execute("DELETE FROM pomos WHERE user_id=?", (uid,))
     c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))  # 2.152.0 A: the private ones (organisation time stays, upg_rest)

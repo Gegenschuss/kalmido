@@ -703,6 +703,19 @@ def news_read():
     return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
 
 
+def news_forget_comment(c, cid):
+    """2.306.0 C (#2889): a deleted comment takes the text copy of its News items along (public / portal comments keep an
+    excerpt in the item's data; plain comments are read from the comment itself)."""
+    for r in c.execute("SELECT id, data FROM notifications WHERE comment_id=?", (cid,)).fetchall():
+        try:
+            d = json.loads(r["data"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(d, dict) and "excerpt" in d:
+            d.pop("excerpt")
+            c.execute("UPDATE notifications SET data=? WHERE id=?", (json.dumps(d, ensure_ascii=False), r["id"]))
+
+
 NEWS_CLEAN = {"at": 0.0}
 
 

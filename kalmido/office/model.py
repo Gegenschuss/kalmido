@@ -23,6 +23,7 @@ from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#24
 from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
 from ..core.db import iso_ms  # 2.269.0 C (#3017)
+from ..notify.alerts import aa_now  # 2.312.0 C (#3265)
 from ..core.pg import write_lock  # 2.269.0 C (#3017)
 
 OFFICE_FEAT = "office"
@@ -596,6 +597,8 @@ def office_scheme_clean(v, name=None, offer=True):
         if offer:  # 2.118.0 A (#2265): + {version}
             bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
         bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}"), m.group(0) if m else "{")
+    if sum(m.group(1) in SCHEME_TEXT for m in SCHEME_RE.finditer(v)) > 4:  # 2.306.0 (#2875 review N8): onc_parse reads four text blocks at most
+        bad(N_("A number can hold four text building blocks at most (project, client, initials)"))
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
         bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
     return v
@@ -640,6 +643,38 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
 # it: "{project}-KV{seq:2}-{initials}" without a project gives "KV02-M", not "-KV02-M"; no double or trailing separators.
 # Numbers already given stay as they are (nothing is renumbered).
 SCHEME_TEXT = ("project", "client", "initials")
+SCHEME_KEYS = ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme", "delivery_scheme")
+ONC_LONG = N_("Number schemes with more than four text building blocks: {0}. Numbering no longer continues from the numbers given under them; shorten them in Office > Settings ({1}).")
+
+
+def onc_long_schemes(c):
+    """2.312.0 C (#3265): the saved schemes with more than four text blocks (refused since 2.306, onc_parse no longer reads
+    them) -> [(office area id, settings key)]. Only reported at the start, never changed here."""
+    out = []
+    with system_ctx(c):
+        rows = c.execute("SELECT org_id, data FROM office_settings ORDER BY org_id").fetchall()
+    for r in rows:
+        try:
+            d = json.loads(r["data"] or "{}")
+        except ValueError:
+            continue
+        for k in SCHEME_KEYS:
+            v = d.get(k) if isinstance(d, dict) else None
+            if isinstance(v, str) and sum(m.group(1) in SCHEME_TEXT for m in SCHEME_RE.finditer(v)) > 4:
+                out.append((r["org_id"], k))
+    return out
+
+
+def onc_long_report(c):
+    """At the start (startup.py): a log line and an admin alert ("Storage and health") per set of such schemes."""
+    bad = onc_long_schemes(c)
+    if not bad:
+        return bad
+    where = ", ".join(f"{oid}:{k}" for oid, k in bad[:20])
+    print(f"WARNING office: {len(bad)} number scheme(s) with more than four text building blocks are no longer read "
+          f"(office area:setting {where}); shorten them in Office > Settings", flush=True)
+    aa_now("storage", "onclong:" + where[:150], ONC_LONG, [len(bad), where])
+    return bad
 
 
 def scheme_collapse(s):
@@ -742,8 +777,15 @@ def onc_ready(s, r):
 
 def onc_parse(scheme, num):
     """(seq, version) number num carries under scheme; None each when it does not follow the scheme / has no such block.
-    2.144.9 (#2575): also a number whose text blocks were empty (scheme_variants)."""
+    2.144.9 (#2575): also a number whose text blocks were empty (scheme_variants).
+    2.306.0 D2 (#2875): a text block matches at most 40 characters (what _slug makes) -- the parse stays fast for any
+    scheme; a number longer than 300 characters follows no scheme, a form with more than four text blocks (scheme_variants
+    varies four) is not read."""
+    if len(num or "") > 300:
+        return None, None
     for sv in scheme_variants(scheme):
+        if sum(m.group(1) in SCHEME_TEXT for m in SCHEME_RE.finditer(sv)) > 4:
+            continue
         pat, pos, names = "", 0, []
         for m in SCHEME_RE.finditer(sv):
             pat += re.escape(sv[pos:m.start()])
@@ -752,7 +794,7 @@ def onc_parse(scheme, num):
                 pat += r"(\d+)"
                 names.append("version" if t == "version" else "seq")
             else:
-                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".+?")
+                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".{1,40}?")
             pos = m.end()
         pat += re.escape(sv[pos:])
         m = re.fullmatch(pat, num or "")

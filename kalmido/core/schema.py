@@ -2522,6 +2522,15 @@ CREATE INDEX IF NOT EXISTS mail_in_seen_at ON mail_in_seen(seen_at);
 CREATE TABLE IF NOT EXISTS idem_keys (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, k TEXT NOT NULL, method TEXT NOT NULL DEFAULT '',
   path TEXT NOT NULL DEFAULT '', status INTEGER, body TEXT, created_at TEXT NOT NULL, PRIMARY KEY (user_id, k));
+-- 2.306.0 D1 (#2875): the hits of the shared rate limits (core/ratedb.py): a hash of the key, the Unix time; gone after a
+-- day. New table only: 2.305 ignores it (it counts in memory)
+CREATE TABLE IF NOT EXISTS rate_hits (k TEXT NOT NULL, at DOUBLE PRECISION NOT NULL);
+CREATE INDEX IF NOT EXISTS rate_hits_k ON rate_hits(k, at);
+CREATE INDEX IF NOT EXISTS rate_hits_at ON rate_hits(at);  -- 2.306.0 Fix-1 (#2875 review): the clean-up without a full scan
+-- 2.312.0 C (#3265): the addresses an account signed in from (core/ratedb.py rate_known_add): hashes of the key and of
+-- key + address, the Unix time; gone after KNOWN_DAYS. New table only: 2.311 ignores it (it remembers them in memory)
+CREATE TABLE IF NOT EXISTS rate_known (u TEXT NOT NULL, a TEXT NOT NULL, at DOUBLE PRECISION NOT NULL, PRIMARY KEY (u, a));
+CREATE INDEX IF NOT EXISTS rate_known_at ON rate_known(at);
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -3533,6 +3542,9 @@ MIGRATIONS = [
     # 2.272.0 F (#3038, review M8): the contact a client's contact person was linked to when that contact went to the trash
     # (no FK); its restore links them again. Older versions ignore it (the contact person stays unlinked, as before)
     ("office_client_contacts", "trash_contact_id", "ALTER TABLE office_client_contacts ADD COLUMN IF NOT EXISTS trash_contact_id BIGINT"),
+    # 2.306.0 A (#2885): the mood of a sealed journal entry (life/model.py jr_seal; mood is NULL then). Older versions show a
+    # sealed entry without its mood and its text as the sealed value (the way back first: orgcrypt_cli decrypt-private)
+    ("journal", "mood_enc", "ALTER TABLE journal ADD COLUMN IF NOT EXISTS mood_enc TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -15,6 +15,8 @@ from ..core.config import (
 )
 from ..core.i18n import LANGS, tr
 from ..core.db import db, err, iso, now_utc
+from ..core.ratedb import rate_clear, rate_counts  # 2.306.0 D1 (#2875): failures counted for every process
+from ..core.ratedb import rate_known_add, rate_known_at  # 2.312.0 C (#3265): known addresses for every process
 
 
 # ---------------------------------------------------------------- auth
@@ -309,6 +311,7 @@ KNOWN_DAYS = 30
 def _rate_reset(username, pre=""):
     """A successful login clears the counter of the pair user name + this address and remembers the address as known."""
     ip = rate_ip()  # 2.126.0 C (#1976)
+    rate_clear(pre + "u:" + username + "@" + ip)  # 2.306.0 D1 (#2875)
     with _fail_lock:
         _fails.pop(pre + "u:" + username + "@" + ip, None)
         seen = _known.setdefault(pre + "uall:" + username, {})
@@ -316,22 +319,34 @@ def _rate_reset(username, pre=""):
         if len(seen) > 20:  # a handful of addresses per account is enough (home, phone, office)
             for old in sorted(seen, key=seen.get)[:len(seen) - 20]:
                 seen.pop(old, None)
+    rate_known_add(pre + "uall:" + username, ip, KNOWN_DAYS)  # 2.312.0 C (#3265): every process knows it
 
 
 def h6a_uall_exempt(k, now):
     """2.86.0 (N2): the per-name ceiling ("uall:", many addresses) does not lock out the account's owner: it is skipped
     for an address this account logged in from successfully before (last KNOWN_DAYS days) and for a request that is
-    signed in as this account already (re-authentication). The pair and address limits still apply everywhere."""
+    signed in as this account already (re-authentication). The pair and address limits still apply everywhere.
+    2.312.0 C (#3265): an address another process saw (core/ratedb.py rate_known) counts too; called outside _fail_lock."""
     if "uall:" not in k:
         return False
-    if (now - _known.get(k, {}).get(rate_ip(), 0)) < KNOWN_DAYS * 86400:
+    ip = rate_ip()
+    if (now - _known.get(k, {}).get(ip, 0)) < KNOWN_DAYS * 86400:
         return True
     u = getattr(g, "user", None)
-    return bool(u is not None and k == "uall:" + (u["username"] or ""))
+    if u is not None and k == "uall:" + (u["username"] or ""):
+        return True
+    at = rate_known_at(k, ip)  # only for a key over its ceiling: rare
+    if at and now - at < KNOWN_DAYS * 86400:
+        with _fail_lock:
+            _known.setdefault(k, {})[ip] = at
+        return True
+    return False
 
 
 def _rate_blocked(keys):
+    shared = rate_counts([k for k, _ in keys], FAIL_WINDOW) or {}  # 2.306.0 D1 (#2875): every process's failures (failed: this one's)
     now = time.time()
+    over = []
     with _fail_lock:
         for k, limit in keys:
             arr = [t for t in _fails.get(k, []) if now - t < FAIL_WINDOW]
@@ -339,9 +354,9 @@ def _rate_blocked(keys):
                 _fails[k] = arr
             else:  # 2.126.0 review (#1976): a look-up never adds a key (only failures do)
                 _fails.pop(k, None)
-            if len(arr) >= limit and not h6a_uall_exempt(k, now):
-                return True
-    return False
+            if max(len(arr), shared.get(k, 0)) >= limit:
+                over.append(k)
+    return any(not h6a_uall_exempt(k, now) for k in over)  # 2.312.0 C (#3265): outside the lock (it may ask the database)
 
 
 _FAILS_MAX, _FAILS_ARR = 20000, 500  # 2.126.0 C (#1976): idle keys are forgotten above this many; per key the newest 500
@@ -351,12 +366,14 @@ _fails_swept = [0.0]
 def _rate_fail(keys):
     """Records a failure; returns the keys whose limit this failure just reached (the rate limit trips)."""
     out = []
+    # 2.306.0 D1 (#2875): counted for every process; Fix-1 (#2875 review): up to twice the limit (the trip at == limit stays)
+    shared = rate_counts([k for k, _ in keys], FAIL_WINDOW, add=True, cap={k: 2 * limit for k, limit in keys})
     now = time.time()
     with _fail_lock:
         for k, limit in keys:
             arr = _fails.setdefault(k, [])
             arr.append(now)
-            if len(arr) == limit:
+            if (len(arr) if shared is None else shared.get(k, 0)) == limit:
                 out.append(k)
             if len(arr) > _FAILS_ARR:
                 del arr[:len(arr) - _FAILS_ARR]

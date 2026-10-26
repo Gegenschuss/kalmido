@@ -782,6 +782,9 @@ run p2440_a_launcher "$PY" p2440_a_launcher_test.py
 fresh; run p2440_c_api "$PY" p2440_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2440_c_ui node p2440_c_ui.js "$KALMIDO_TEST_DATA"
        run p2440_c_setup "$PY" p2440_c_setup_test.py
+# 2.312.0 D (#3266): who answers a team agent's permission questions, chosen in its settings (route, checks, runner)
+fresh; run p2312_d_perm_user "$PY" p2312_d_perm_user_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2312_d_perm_user_ui node p2312_d_perm_user_ui.js "$KALMIDO_TEST_DATA"
 # 2.44.0 part D: #1187 areas (Office, Time, Review, Home): sidebar, tabs, old links, one switch per area, setup
 fresh; run p2440_d_ui node p2440_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.45.0 part C: #1529 reload safety: service worker 5xx / cache fallback, reload guard (no server needed)
@@ -2139,10 +2142,39 @@ fresh; run p2298_c_lesstext "$PY" p2298_c_lesstext_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2298_c_lesstext_ui node p2298_c_lesstext_ui.js "$KALMIDO_TEST_DATA"
 # 2.298.0 B (#3185): less text in tasks, projects, views, calendar, sidebar (freelancer-matrix: tasks)
 fresh; run p2298_b_lesstext_ui node p2298_b_lesstext_ui.js "$KALMIDO_TEST_DATA"
+# 2.306.0 D1 (#2875): hardening core / accounts (queue key, shared rate limits, trips by id, hosted operator, sign-on password, savepoint context, free names); freelancer-matrix: core_hardening
+fresh; run p2306_d1_core_hardening "$PY" p2306_d1_core_hardening_test.py "$KALMIDO_TEST_DATA"
 # 2.276.0 B: the knowledge editor in the normal font with a formatting bar (#3043)
 fresh; run p2276_c_ui node p2276_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.276.0 A (#3039): the office for the first day: Quotes & invoices first, Money folded until used, menu point Receipts
 fresh; run p2276_a_ui node p2276_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.306.0 E (#2927, #2741): team agent setup names who answers permission questions; every MCP tool has its route's scope
+fresh; run p2306_e_team_agent_setup "$PY" p2306_e_team_agent_setup_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2306_e_mcp_scope "$PY" p2306_e_mcp_scope_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 A (#2885): journal + mood and private filed mails sealed with the account key, the way back (own container, server key)
+fresh; run p2306_a_private_seal "$PY" p2306_a_private_seal_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 D2 (#2875): office hardening (audit D): Peppol endpoint, redirects, DATEV duplicates, downloads, malware lock, bank lock
+fresh; run p2306_d2_office_hardening "$PY" p2306_d2_office_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 D3 (#2875): hardening of files / knowledge and agents / integrations (audit D)
+fresh; run p2306_d3_files_agents_hardening "$PY" p2306_d3_files_agents_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 D4 (#2875): hardening of lists / collaboration / life, server side of three client findings
+fresh; run p2306_d4_lists_client_hardening "$PY" p2306_d4_lists_client_hardening_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 F (#2942 #2939 #2933 #2930): agent pages: link check incl. mcp/, MCP version, short README, permission profiles, setup prompt
+       run p2306_f_doc_anchors "$PY" p2306_f_doc_anchors_test.py
+fresh; run p2306_b_privacy_links "$PY" p2306_b_privacy_links_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2306_b_storage_ui node p2306_b_storage_ui.js "$KALMIDO_TEST_DATA"
+# 2.306.0 C (#2889 #2946): topic prefix, no foreign topics, contact photo switch, comment excerpts, error report names, export folder
+fresh; run p2306_c_privacy_small "$PY" p2306_c_privacy_small_test.py "$KALMIDO_TEST_DATA"
+# 2.306.0 G (#2946): weekly backups capped at 104 weeks (52 with the switch)
+fresh; run p2306_g_backup_cap "$PY" p2306_g_backup_cap_test.py "$KALMIDO_TEST_DATA"
+# 2.312.0 A (#3285): render() while a late start script (listcolor.js) is still loading throws nothing
+fresh; run p2312_a_slowload_ui node p2312_a_slowload_ui.js "$KALMIDO_TEST_DATA"
+# 2.312.0 B (#3264): the health data note on the area switches Home / Review and in the first-run setup; freelancer-matrix: settings
+fresh; run p2312_b_health_note_ui node p2312_b_health_note_ui.js "$KALMIDO_TEST_DATA"
+# 2.312.0 B (#3264): the journal of deleted accounts goes after the backup period (dry run without the switch); freelancer-matrix: admin
+fresh; run p2312_b_journal_period "$PY" p2312_b_journal_period_test.py "$KALMIDO_TEST_DATA"
+# 2.312.0 C (#3265): hardening rest of 2.306 (ntfy inbox in parallel, old http inboxes, known sign-in address for every process, long number schemes); freelancer-matrix: ntfy_inbox, office
+fresh; run p2312_c_hardening "$PY" p2312_c_hardening_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

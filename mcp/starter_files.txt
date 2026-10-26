@@ -1,6 +1,8 @@
 # 2.44.0 (#1517): the files of the reference starter, one per line. The setup scripts (static/agent/setup.sh | setup.ps1)
 # fetch exactly these into the agent's instance folder; a new starter module goes here, else a set-up computer lacks it.
-# Required: agent_launcher.sh, agent_run.py, kalmido_mcp.py (the setup stops without them); others are skipped when missing.
+# Required: agent_run.py, kalmido_mcp.py and the launcher of the system (agent_launcher.sh for setup.sh on macOS / Linux,
+# agent_launcher.ps1 for setup.ps1 on Windows); the setup stops without them, the others are skipped when missing.
+# 2.306.0 (#2927): VERSION is not fetched: the setup writes the server's version from its answer next to these files.
 agent_launcher.sh
 agent_launcher.ps1
 agent_run.py

@@ -246,4 +246,5 @@ def dz_zip_get():
         return info
     ofx_log(c, oid, "export", target="datev", detail={"from": info["from"], "to": info["to"], "count": info["count"], "files": info["files"]})
     c.commit()
-    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{info["file"]}"'})
+    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{info["file"]}"',
+                                                               "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)

@@ -115,7 +115,7 @@ def git_norm_base_url(u):
     p = urllib.parse.urlsplit(u)
     if p.query or p.fragment:
         return None
-    if p.scheme.lower() == "http" and (p.hostname or "").lower().rstrip(".") not in ("localhost", "127.0.0.1", "::1"):
+    if p.scheme.lower() == "http":  # 2.306.0 D3 (#2875): also localhost only through the allow list (no exception)
         # 2.190.0 C (#2496): the access token never goes in plain text: http only for hosts an admin allowed (like webhooks)
         try:
             port = p.port or 80

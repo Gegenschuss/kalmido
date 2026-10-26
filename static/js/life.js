@@ -434,7 +434,7 @@ function viewReview() {
   const journal = r.journal ? `<section class="dcard fcard lcard rvjournal" aria-labelledby="rvh-j"><h2 id="rvh-j">${ic('journal', 's')}<span>${tr('Journal')}</span><span class="spacer"></span><span class="muted rvsaved" aria-live="polite"></span></h2>${jdays}
     <div class="rvmood" role="radiogroup" aria-label="${esc(tr('How was the day?'))}">${MOODS.map(([v, e, w]) => `<button type="button" role="radio" data-act="rv-mood" data-v="${v}" class="${je.mood === v ? 'on' : ''}" aria-checked="${je.mood === v}" title="${esc(tr(w))}" aria-label="${esc(tr(w))}">${e}</button>`).join('')}</div>
     <textarea id="rv-text" data-day="${jsel}" rows="6" maxlength="20000" placeholder="${esc(tr('What happened, what went well, what is on your mind?'))}" aria-label="${esc(tr('Journal of {0}', fmtDayAbs(jsel)))}">${esc(je.text)}</textarea>
-    <p class="muted rvpriv">${ic('lock', 's')} ${tr('Only you can read your journal.')}</p></section>` : '';
+    <p class="muted rvpriv">${rvPrivHtml(r.journal_sealed)}</p></section>` : '';
   // 2.43.0 (#1452): the cards are blocks of the view builder (width, height, order, hide at their "…" menu)
   return `<div class="dash fam review">${head}${lyHtml('review', {
     done: card('done', 'done', tr('Done'), li(r.done, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing ticked off yet.')}</p>`, r.done.length),
@@ -444,7 +444,9 @@ function viewReview() {
     ...(r.journal ? {journal} : {})})}</div>`;
 }
 // ---- 2.140.0 C (#2133): the journal history: all entries (newest first), search, mood filter, export, mood statistics
-const JH = {q: '', mood: 0, days: 30, from: '', to: '', items: [], next: null, loaded: false, loading: false, stats: null, seq: 0, t: null};
+const JH = {q: '', mood: 0, days: 30, from: '', to: '', items: [], next: null, loaded: false, loading: false, stats: null, seq: 0, t: null, sealed: null};
+// 2.306.0 A (#2885): the privacy line says what is true -- sealed with the key of the private space, or private in the app only
+const rvPrivHtml = sealed => `${ic('lock', 's')} ${sealed ? tr('Private: only you see your journal. It is stored encrypted on the server.') : tr('Private: only you see your journal in the app. On the server it is stored unencrypted until the administrator turns on the encryption of private spaces.')}`;
 const jhParams = () => { const p = new URLSearchParams(); if (JH.q) p.set('q', JH.q); if (JH.mood) p.set('mood', JH.mood); if (JH.from) p.set('from', JH.from); if (JH.to) p.set('to', JH.to); return p; };
 const jhMood = v => (MOODS.find(m => m[0] === v) || [])[1] || '';
 function jhHit(text) {  // a short excerpt around the first match, the match marked
@@ -485,7 +487,7 @@ function viewJournalHist() {
       <div class="jhrange"><label>${tr('From')} ${dateIn('jh-from', JH.from, {label: tr('From'), empty: tr('any')})}</label><label>${tr('To')} ${dateIn('jh-to', JH.to, {label: tr('To'), empty: tr('any')})}</label></div>
       <div id="jh-list">${jhListHtml()}</div>
       <div class="fcfoot"><span class="muted">${tr('Download')}</span><a class="btn sm" href="${esc(exp('md'))}" download>${ic('download', 's')} Markdown</a><a class="btn sm" href="${esc(exp('csv'))}" download>${ic('download', 's')} CSV</a></div>
-      <p class="muted rvpriv">${ic('lock', 's')} ${tr('Only you can read your journal.')}</p></section>
+      <p class="muted rvpriv" id="jh-priv">${JH.sealed == null ? '' : rvPrivHtml(JH.sealed)}</p></section>
     <section class="dcard fcard lcard" aria-labelledby="jh-s"><h2 id="jh-s">${ic('chart', 's')}<span>${tr('Mood')}</span></h2><div id="jh-stats">${jhStatsHtml()}</div></section></div>`;
 }
 const jhDrawList = () => { const el = $('#jh-list'); if (el && S.route.mod === 'review' && RV.period === 'hist') setHtml(el, jhListHtml()); };
@@ -497,6 +499,7 @@ async function jhLoad(more) {
     const j = await api('GET', '/api/life/journal?' + p);
     if (seq !== JH.seq) return;
     JH.items = more ? [...JH.items, ...j.entries] : j.entries; JH.next = j.next;
+    JH.sealed = !!j.sealed; const pv = $('#jh-priv'); if (pv) setHtml(pv, rvPrivHtml(JH.sealed));  // 2.306.0 A (#2885)
   } catch { if (seq !== JH.seq) return; }
   JH.loaded = true; JH.loading = false; jhDrawList();
 }

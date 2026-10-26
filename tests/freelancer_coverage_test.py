@@ -203,6 +203,7 @@ ROUTES = {
     "POST /api/v1/agent/typing": "agents", "POST /api/v1/agent/usage": "agents",
     "POST /api/v1/agents/{}/chat/{}/choice": "agents", "POST /api/v1/agents/{}/chat/{}/reactions": "agents",
     "PUT /api/agents/{}/autoshare": "agents", "PUT /api/agents/{}/permission-mode": "agents",
+    "GET /api/agents/{}/perm-users": "agents",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
     "PUT /api/assistant/lists": "agents", "PUT /api/v1/agent/quota": "agents", "PUT /api/v1/agent/status": "agents",
     # ---- auth (31)
     "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/info": "auth", "GET /api/auth/oidc/callback": "auth",
@@ -460,6 +461,7 @@ ROUTES = {
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875)
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "POST /api/office/docs/{}/invoice": "office",

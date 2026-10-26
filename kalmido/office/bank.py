@@ -601,6 +601,7 @@ def bnk_match(tid):
         from ..files.store import fs_role
         if t["amount"] >= 0:
             raise Denied(409, tr("Only money paid out can pay a receipt"))
+        write_lock(c, f"office_bank_receipt_{mid}")  # 2.306.0 D2 (#2875): two bookings at once on the same receipt wait for each other
         if c.execute("SELECT 1 FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt' AND match_id=? LIMIT 1",
                      (oid, mid)).fetchone():
             raise Denied(409, tr("This receipt is matched with another booking"))

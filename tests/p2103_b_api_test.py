@@ -262,12 +262,12 @@ check(not sql("SELECT 1 FROM comments WHERE id=?", (CM,)) and sql("SELECT 1 FROM
 
 # ================================================================== #2172 backups
 # 2.186.0 (#2602): the cap of 52 weeks holds only with the switch KALMIDO_PURGE_BACKUPS (p2186_c_retention covers it);
-# this server runs without it: the stored value stays
+# this server runs without it: 2.306.0 G (#2946): the cap is 104 weeks (older stored values and PATCH up to 520 are cut to it)
 r = A.patch(B + "/api/admin/backups", json={"keep_weekly": 100})
 j = A.get(B + "/api/admin/backups").json()
-check(r.ok and j["keep_weekly"] == 100 and j.get("keep_weekly_max") is None, f"keep_weekly 100 stays without the switch: {r.status_code} {j.get('keep_weekly')}")
+check(r.ok and j["keep_weekly"] == 100 and j.get("keep_weekly_max") == 104, f"keep_weekly 100 stays without the switch: {r.status_code} {j.get('keep_weekly')}")  # 2.306.0 G (#2946): max is always set
 sql("UPDATE settings SET value='300' WHERE key='bk_keep_weekly'", write=True)
-check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 300, "a stored older value (300 weeks) stays without the switch")
+check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 104, "a stored older value (300 weeks) reads as 104 without the switch")  # 2.306.0 G (#2946)
 check(A.patch(B + "/api/admin/backups", json={"keep_weekly": 600}).status_code == 400, "above the old limit: still refused")
 check(j.get("encrypt_required") is False and not j["encrypt"], "encryption: not required by default (self-hosted)")
 

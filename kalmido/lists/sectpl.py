@@ -125,13 +125,17 @@ def sct_create():
             if role not in WRITE_ROLES:
                 raise Denied(403, tr("View only: the project cannot be saved as a template"))
             names = sct_clean_names(sct_list_names(c, lid))
+            src_org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()["org_id"]
         else:
+            src_org = None
             names = sct_clean_names(b.get("sections"))
     except BadInput as e:
         return err(str(e))
     name = str(b.get("name") or "").strip()[:SCT_NAME_MAX]
     if not name:
         return err(tr("Name missing"))
+    from ..accounts.orgout import org_out  # 2.306.0 D4 (#2875): the sections of an organisation's list leave it only through its admin
+    org_out(c, src_org, oid, "template", name)
     if c.execute("SELECT COUNT(*) FROM section_templates WHERE user_id=?", (uid,)).fetchone()[0] >= SCT_MAX_PER_USER:
         return err(tr("At most {0} templates", SCT_MAX_PER_USER))
     ts = iso(now_utc())

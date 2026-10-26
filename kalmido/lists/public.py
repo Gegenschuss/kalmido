@@ -15,7 +15,7 @@ from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, task_visible
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, reading_ids, reading_sql, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
@@ -65,9 +65,9 @@ def pub_find(c, token):
     if not PUB_TOKEN_RE.fullmatch(token or ""):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
-        r = c.execute("""SELECT p.*, l.name AS l_name, l.is_inbox AS l_inbox, l.checklist AS l_checklist, l.owner_id AS l_owner,
+        r = c.execute(f"""SELECT p.*, l.name AS l_name, l.is_inbox AS l_inbox, l.checklist AS l_checklist, l.owner_id AS l_owner,
                          l.org_id AS l_org FROM public_links p JOIN lists l ON l.id=p.list_id JOIN users u ON u.id=l.owner_id
-                         WHERE p.token_hash=? AND u.disabled=0 AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health')""", (_token_hash(token),)).fetchone()  # 2.72.0 (#1333): never a budget; 2.102.0 review F4: never a list in the trash; 2.190.0 C (#2496): never a health list
+                         WHERE p.token_hash=? AND u.disabled=0 AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health') AND NOT {reading_sql('l')} AND NOT (l.life='travel' AND l.org_id IS NOT NULL)""", (_token_hash(token),)).fetchone()  # 2.72.0 (#1333): never a budget; 2.102.0 review F4: never a list in the trash; 2.190.0 C (#2496): never a health list; 2.306.0 Fix-2a (#2875): never read later (private or the organisation's)
     if not r or (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()):
         return None
     acx_anon_bind(c, r["l_org"])  # ... then the page reads as nobody, inside exactly the list's organisation
@@ -556,6 +556,9 @@ def pub_set(lid):
         return err(tr("A budget is private: it cannot get a public link"), 409)
     if c.execute("SELECT life FROM lists WHERE id=?", (lid,)).fetchone()[0] == "health":  # 2.190.0 C (#2496): a health list stays private
         return err(tr("Health projects stay private: they never get a public link."), 409)
+    lrow = c.execute("SELECT life, org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if lid in reading_ids(c, [lid]) or (lrow["life"] == "travel" and lrow["org_id"]):  # 2.306.0 D4 (#2875): as the other private kinds; Fix-2a: also the organisation's read later
+        return err(tr("This project stays private: it never gets a public link."), 409)
     b = body()
     old = c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()
     mode = b.get("mode", old["mode"] if old else "view")

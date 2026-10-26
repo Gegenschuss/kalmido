@@ -665,9 +665,7 @@ def _sup_row(c, oid, sid, deleted=False):
 def di_suppliers_get():
     """Org admin: the suppliers (creditors) of the DATEV import {items: [{id, account_no, name, street, zip, city, country,
     vat_id, iban}]}."""
-    c, uid, oid = _ctx()
-    _purge(c, oid)
-    c.commit()
+    c, uid, oid = _ctx()  # 2.306.0 D2 (#2875): reading has no side effect; the trash is cleaned on delete / restore
     return jsonify(items=[_sup_public(x) for x in di_suppliers(c, oid)])
 
 
@@ -692,6 +690,7 @@ def di_supplier_put(sid):
 def di_supplier_delete(sid):
     """Org admin: deletes a supplier (restore possible for DI_TRASH_DAYS days, then removed for good)."""
     c, uid, oid = _ctx()
+    _purge(c, oid)
     _sup_row(c, oid, sid)
     c.execute("UPDATE office_suppliers SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
     c.commit()
@@ -702,6 +701,8 @@ def di_supplier_delete(sid):
 def di_supplier_restore(sid):
     """Org admin: puts a deleted supplier back."""
     c, uid, oid = _ctx()
+    _purge(c, oid)  # one past the trash period is gone (404; committed before the refusal rolls back)
+    c.commit()
     _sup_row(c, oid, sid, deleted=True)
     c.execute("UPDATE office_suppliers SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
     c.commit()

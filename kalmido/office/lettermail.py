@@ -4,16 +4,19 @@ office area to insert into letters.
 
 Sending is a person's button press only (no automatic mail): POST /api/office/letters/<id>/send-mail, a draft, the admin
 of the office area (like every letter route). Sender name and the day's limits like the invoice mail (office/invoices.py
-inv_send, h6c_send_budget). Reply-To = the sending person's document address of the office's documents space (doc_mail):
-an answer then arrives in the documents space, docs/ingest.py docs_mail_import hands its documents to ltm_link_replies,
+inv_send, h6c_send_budget). Reply-To = an address bound to the letter (2.312.0 C #3265, ltm_letter_token; sent only while the sending person has a
+document address of the office's documents space, doc_mail): an answer then arrives in that documents space, docs/ingest.py docs_mail_import hands its documents to ltm_link_replies,
 which links them when In-Reply-To / References name the Message-ID of a letter of the SAME office area. Without such an
 address the answer goes to the company e-mail (like invoices) and is assigned by hand (part B)."""
+import hashlib
+import hmac
 import re
 
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, write_lock
+from ..accounts.login import auth_key  # 2.312.0 C (#3265)
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, iso, now_utc
@@ -40,14 +43,60 @@ def ltm_space(c, oid, uid):
     return (owner, None) if owner is not None else (uid, oid)
 
 
-def ltm_reply_address(c, oid, uid):
-    """The document address (doc_mail token) of uid's documents space of office area oid, '' without one / no mail input."""
+def ltm_reply_address(c, oid, uid, lid=None):
+    """The document address (doc_mail token) of uid's documents space of office area oid, '' without one / no mail input.
+    2.312.0 C (#3265): with a letter lid the address bound to that letter instead (what goes to the recipient)."""
     from ..integrations.mail import MAIL_IN_ON, mail_addr
     if not MAIL_IN_ON:
         return ""
     who, org = ltm_space(c, oid, uid)
     r = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (who, org)).fetchone()
+    if r and lid:
+        return mail_addr(ltm_letter_token(c, lid, uid))
     return mail_addr(r[0]) if r else ""
+
+
+# 2.312.0 C (#3265): "l<letter>-<person>-<mac>" (base 36 ids, a MAC with the sign-in key): only valid for that letter and
+# person, so a recipient never learns the person's own document address; gone with the letter. No table, no new secret.
+LTM_TOKEN_RE = re.compile(r"l([0-9a-z]{1,13})-([0-9a-z]{1,13})-([0-9a-f]{16})")
+
+
+def _b36(n):
+    n, out = int(n), ""
+    while True:
+        n, d = divmod(n, 36)
+        out = "0123456789abcdefghijklmnopqrstuvwxyz"[d] + out
+        if not n:
+            return out
+
+
+def _ltm_mac(c, lid, uid):
+    with system_ctx(c):  # the instance's sign-in key (cached after its first use)
+        k = auth_key(c)
+    return hmac.new(k, f"kalmido-letter-reply|{int(lid)}|{int(uid)}".encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def ltm_letter_token(c, lid, uid):
+    return f"l{_b36(lid)}-{_b36(uid)}-{_ltm_mac(c, lid, uid)}"
+
+
+def ltm_token_space(c, tok):
+    """docs/ingest.py docs_mail_import (inside its system_ctx): the plus token of a letter's Reply-To -> (user id, org id or
+    None, letter id) of the documents space its answers go to; None = not such a token / the letter is gone."""
+    m = LTM_TOKEN_RE.fullmatch(tok or "")
+    if not m:
+        return None
+    lid, uid = int(m.group(1), 36), int(m.group(2), 36)
+    if not hmac.compare_digest(m.group(3), _ltm_mac(c, lid, uid)):
+        return None
+    r = c.execute("SELECT org_id FROM office_letters WHERE id=? AND status<>'draft'", (lid,)).fetchone()
+    if not r:
+        return None
+    who, org = ltm_space(c, r[0], uid)
+    # 2.312.0 (#3265, review): only while that space still has its document address (removing it stops letter replies too)
+    if not c.execute("SELECT 1 FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (who, org)).fetchone():
+        return None
+    return who, org, lid
 
 
 def ltm_company_mail(c, oid):
@@ -92,7 +141,7 @@ def ltm_draft_get(lid):
     d = lt_row(c, oid, lid)
     lg = ltm_lang(c, oid, d)
     return jsonify(to=d.get("rcpt_email") or "", subject=d.get("subject") or tr("Letter", lg=lg), text=ltm_default_text(c, oid, d, lg),
-                   filename=ltm_filename(d, lg), reply_address=ltm_reply_address(c, oid, uid))
+                   filename=ltm_filename(d, lg), reply_address=ltm_reply_address(c, oid, uid, d["id"]))
 
 
 def ltm_drop_filed(c, nid):
@@ -137,7 +186,7 @@ def ltm_send_post(lid):
     h6c_send_budget(c, oid, uid, [to] + ([cc] if cc else []))  # the day's limits of the office mails (2.86.0 N27)
     pdf = lt_pdf(c, oid, {**d, "status": "sent"})  # the mailed PDF is the final letter (no draft mark)
     u = g.user
-    rt = ltm_reply_address(c, oid, uid) or ltm_company_mail(c, oid) or None
+    rt = ltm_reply_address(c, oid, uid, d["id"]) or ltm_company_mail(c, oid) or None
     # review 2.153.0: mark sent + file the PDF BEFORE the mail goes out (a full quota / filing error then sends nothing);
     # a refused mail raises and rolls all of it back, the Message-ID is written after the server took the mail
     d = lt_mark_sent(c, oid, d, channel="email", uid=uid)
@@ -169,13 +218,14 @@ def ltm_msg_ids(msg):
     return out[:20]
 
 
-def ltm_link_replies(c, uid, org, msg, node_ids):
+def ltm_link_replies(c, uid, org, msg, node_ids, letter=None):
     """Called by docs/ingest.py docs_mail_import (inside its system_ctx) with the documents made from one mail to the
     document address of (uid, org): links each with the letter of the SAME office area (the organisation org, or uid's
-    personal office when org is None) whose Message-ID the mail answers. Another area never matches. No commit -> count."""
+    personal office when org is None) whose Message-ID the mail answers. Another area never matches. No commit -> count.
+    2.312.0 C (#3265): letter = the letter whose bound Reply-To the mail went to (linked also without a Message-ID)."""
     node_ids = [n for n in node_ids if n]
     ids = ltm_msg_ids(msg)
-    if not node_ids or not ids:
+    if not node_ids or not (ids or letter):
         return 0
     if org:
         oid = int(org)
@@ -185,7 +235,9 @@ def ltm_link_replies(c, uid, org, msg, node_ids):
         if not oid:
             return 0
     rows = c.execute(f"SELECT id FROM office_letters WHERE org_id=? AND msg_id<>'' AND msg_id IN ({','.join('?' * len(ids))}) ORDER BY id",
-                     [oid] + ids).fetchall()
+                     [oid] + ids).fetchall() if ids else []
+    if letter and letter not in [r[0] for r in rows]:
+        rows += c.execute("SELECT id FROM office_letters WHERE id=? AND org_id=?", (letter, oid)).fetchall()
     if not rows:
         return 0
     from .letterlinks import ltl_link

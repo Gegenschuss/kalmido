@@ -895,7 +895,8 @@ def bw_report_get():
         ofx_log(c, oid, "export", target="meals", detail={"what": "meals.csv", "from": df, "to": dt})
         c.commit()
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                        headers={"Content-Disposition": f'attachment; filename="{bw_fname(df, dt, person, occ, "csv")}"'})
+                        headers={"Content-Disposition": f'attachment; filename="{bw_fname(df, dt, person, occ, "csv")}"',
+                                 "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)
     if fmt == "pdf":
         from .mealpdf import bw_report_pdf
         data = bw_report_pdf(c, oid, rep, df, dt, person, occ, cur)

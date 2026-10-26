@@ -10,6 +10,7 @@ const {sleep, B, login} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2124_d_ui', check, shots: 'P2124D_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -75,7 +76,7 @@ const CSV = `Buchungstag;Name;Verwendungszweck;Betrag;Saldo\n${DE};Laden Beispie
     check(await ready(ev, `!!document.querySelector('.cfb-box') && !document.querySelector('.cfb-box [data-cfb="start"]') && /Difference to the computed balance/.test(document.querySelector('.cfb-box').textContent)`, 60),
       'with a start: the difference, no button any more');
     check(await ready(ev, `!!document.querySelector('.rkcfm .cfs-acc')`, 40), 'the account rows of #2341 appear');
-    await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
+    await undoToast(ev, 'Saved');  // 2.312.0 A (#3283)
     check(await ready(ev, startIs('j.start === null'), 60), 'the undo removes the start again');
     check(await ready(ev, `!!document.querySelector('.cfb-box [data-cfb="start"]')`, 60), 'the suggestion is back');
   }, false);

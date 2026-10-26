@@ -336,14 +336,16 @@ def sc_locked_all(c, org_id=None):
     out and list them; org_id: also {office file name: (kind, id, signature)} of that office's folder under key "office"."""
     out = {(r[0], int(r[1]), int(r[2])): r[3] or "" for r in c.execute("SELECT kind, ref_id, ver, sig FROM upload_scan WHERE state='infected'")}
     if org_id is not None:
-        off = {}
+        off, sig = {}, {}
+        for k, v in out.items():  # 2.306.0 D3 (#2875): an office file has no versions -- any row of it counts (no KeyError)
+            sig.setdefault(k[:2], v)
         for kind, tbl in (*SC_OFFICE_KINDS.items(), ("oar", "office_archive")):
-            ids = [k[1] for k in out if k[0] == kind]
+            ids = sorted({k[1] for k in out if k[0] == kind})
             if ids:
                 q = ",".join("?" * len(ids))
                 for r in c.execute(f"SELECT id, file FROM {tbl} WHERE org_id=? AND id IN ({q})", (int(org_id), *ids)):
                     if r[1]:
-                        off[r[1]] = (kind, int(r[0]), out[(kind, int(r[0]), 0)])
+                        off[r[1]] = (kind, int(r[0]), out.get((kind, int(r[0]), 0), sig[(kind, int(r[0]))]))
         out["office"] = off
     return out
 

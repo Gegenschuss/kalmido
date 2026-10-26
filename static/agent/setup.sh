@@ -75,6 +75,13 @@ msg_de() {
     noreach) echo "%s ist nicht erreichbar: %s" ;;
     stopped) echo "Einrichtung abgebrochen (es wurde nichts installiert)" ;;
     agent) echo "  Agent: %s, Token gespeichert in %s (nur für dich lesbar)" ;;
+    perm_you) echo "  Rechte-Fragen beantwortet Konto-Id %s (wer den Code erzeugt hat); ändern: in Kalmido beim Agenten unter Laufzeit > Rechte-Fragen an (oder KALMIDO_PERM_USER in %s)" ;;
+    perm_kept) echo "  Rechte-Fragen: wie bisher eingestellt (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in %s)" ;;
+    perm_none) echo "  Rechte-Fragen: niemand eingetragen, jede wird abgelehnt; wähle in Kalmido beim Agenten unter Laufzeit > Rechte-Fragen an eine Person oder trage KALMIDO_PERM_USER=<Konto-Id> in %s ein" ;;
+    perm_owner) echo "  Rechte-Fragen beantwortet die Person, der der Agent gehört" ;;
+    claude_new) echo "  CLAUDE.md angelegt: %s (aus der Vorlage; eigene Regeln oben ergänzen)" ;;
+    claude_kept) echo "  CLAUDE.md vorhanden, bleibt unverändert: %s" ;;
+    dry_claude) echo "  (Probelauf) CLAUDE.md aus der Vorlage anlegen, wenn keine da ist: %s" ;;
     s_starter) echo "Lade die Starter-Dateien" ;;
     dry_files) echo "  (Probelauf) die Dateien aus %s/starter_files.txt nach %s" ;;
     nobase) echo "Kalmido hat keine Adresse für die Starter-Dateien geschickt; nimm --from ORDNER" ;;
@@ -133,6 +140,13 @@ msg_en() {
     noreach) echo "cannot reach %s: %s" ;;
     stopped) echo "setup stopped (nothing was installed)" ;;
     agent) echo "  agent: %s, token stored in %s (only readable for you)" ;;
+    perm_you) echo "  permission questions are answered by account id %s (who made the code); change it: in Kalmido, the agent's Runtime > Permission questions go to (or KALMIDO_PERM_USER in %s)" ;;
+    perm_kept) echo "  permission questions: as set before (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in %s)" ;;
+    perm_none) echo "  permission questions: nobody set, every one is denied; choose a person in Kalmido (the agent's Runtime > Permission questions go to) or add KALMIDO_PERM_USER=<account id> to %s" ;;
+    perm_owner) echo "  permission questions are answered by the agent's owner" ;;
+    claude_new) echo "  CLAUDE.md created: %s (from the template; add your own rules on top)" ;;
+    claude_kept) echo "  CLAUDE.md exists, left as it is: %s" ;;
+    dry_claude) echo "  (dry run) create CLAUDE.md from the template when there is none: %s" ;;
     s_starter) echo "Fetching the starter files" ;;
     dry_files) echo "  (dry run) the files of %s/starter_files.txt into %s" ;;
     nobase) echo "Kalmido sent no address for the starter files; use --from DIR" ;;
@@ -296,7 +310,7 @@ else
   # the code goes to python in the environment, the token straight into the env file (mode 600) -- neither is printed
   out=$(KALMIDO_SETUP_CODE=$CODE KALMIDO_SETUP_URL=$URL KALMIDO_SETUP_ENV=$ENVF KALMIDO_SETUP_HOST=$HOSTN \
         KALMIDO_SETUP_DIR=$DIR KALMIDO_SETUP_OS=$OS KALMIDO_M_REF="$(msg refused)" KALMIDO_M_DEF="$(msg refused_def)" KALMIDO_M_REACH="$(msg noreach)" "$PY" - <<'PYEOF'
-import json, os, sys, urllib.error, urllib.request
+import json, os, re, sys, urllib.error, urllib.request
 e = os.environ
 body = json.dumps({"code": e["KALMIDO_SETUP_CODE"].strip(), "host": e["KALMIDO_SETUP_HOST"][:80], "folder": e["KALMIDO_SETUP_DIR"][:300],
                    "os": e["KALMIDO_SETUP_OS"]}).encode()
@@ -312,21 +326,47 @@ except urllib.error.HTTPError as x:
     sys.exit(e["KALMIDO_M_REF"] % (x.code, msg or e["KALMIDO_M_DEF"]))
 except (urllib.error.URLError, OSError) as x:
     sys.exit(e["KALMIDO_M_REACH"] % (e["KALMIDO_SETUP_URL"], x))
+# 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
+# person who made the code (operator_id), as KALMIDO_PERM_USER; KALMIDO_OWNER_IDS would also narrow who gives orders
+keep = []
+try:
+    with open(e["KALMIDO_SETUP_ENV"], encoding="utf-8") as f:
+        keep = [ln.rstrip("\n") for ln in f if ln.startswith(("KALMIDO_PERM_USER=", "KALMIDO_OWNER_IDS="))]
+except OSError:
+    pass
+op = r.get("operator_id")
+perm = "kept" if keep else str(int(op)) if isinstance(op, int) else "none" if r["agent"].get("team") else "owner"
+if not keep and isinstance(op, int):
+    keep = ["KALMIDO_PERM_USER=%d" % op]
+# 2.306.0 (#2927): the name goes into a comment line and the tab-separated answer below: no control characters
+nm, un = (re.sub(r"[\x00-\x1f\x7f]", " ", str(r["agent"].get(k) or "")) for k in ("name", "username"))
 old = os.umask(0o077)
 with open(e["KALMIDO_SETUP_ENV"] + ".new", "w", encoding="utf-8") as f:
-    f.write("# Kalmido agent %s (%s), set up by agent-setup.sh -- keep this file private\n" % (r["agent"]["name"], r["agent"]["username"]))
+    f.write("# Kalmido agent %s (%s), set up by agent-setup.sh -- keep this file private\n" % (nm, un))
     f.write("KALMIDO_URL=%s\nKALMIDO_TOKEN=%s\nKALMIDO_EVENTS=1\n" % (e["KALMIDO_SETUP_URL"], r["token"]))  # the address that worked here
     # one state folder per instance (event cursor, approvals, lock): two project folders on one computer never share one
     f.write("KALMIDO_STATE_DIR=%s\n" % os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state"))
+    f.write("".join(ln + "\n" for ln in keep))
 os.umask(old)
 os.chmod(e["KALMIDO_SETUP_ENV"] + ".new", 0o600)
 os.replace(e["KALMIDO_SETUP_ENV"] + ".new", e["KALMIDO_SETUP_ENV"])
-print("%s\t%s" % (r["agent"]["name"], r.get("starter_base") or ""))
+# 2.306.0 (#2927): the server's version next to the starter files (the MCP server reports it; they have no VERSION file)
+ver = str(r.get("version") or "")
+if re.fullmatch(r"\d+(\.\d+){1,3}", ver):
+    with open(os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "VERSION"), "w", encoding="utf-8") as f:
+        f.write(ver + "\n")
+print("%s\t%s\t%s" % (nm, perm, r.get("starter_base") or ""))
 PYEOF
   ) || dief stopped
-  IFS=$'\t' read -r AGNAME STARTER_BASE <<< "$out"
+  IFS=$'\t' read -r AGNAME PERM STARTER_BASE <<< "$out"
   REDEEMED=1
   sayf agent "$AGNAME" "$ENVF"
+  case "$PERM" in
+    kept) sayf perm_kept "$ENVF" ;;
+    none) sayf perm_none "$ENVF" ;;
+    owner) sayf perm_owner ;;
+    *) sayf perm_you "$PERM" "$ENVF" ;;
+  esac
 fi
 
 # kalmido-setup-step: starter_files
@@ -368,6 +408,27 @@ else
     "$(command -v "$PY")" "$INST/kalmido_mcp.py" "$MCPJ"
 fi
 run mkdir -p "$DIR"
+
+# kalmido-setup-step: claude_md
+# 2.306.0 E (#2927): a CLAUDE.md for the project folder from mcp/CLAUDE.template.md (the rules between its markers) when the
+# folder has none yet -- never overwritten
+if [ -e "$DIR/CLAUDE.md" ] || [ -e "$DIR/.claude/CLAUDE.md" ]; then sayf claude_kept "$DIR/CLAUDE.md"
+elif [ "$DRY" = 1 ]; then sayf dry_claude "$DIR/CLAUDE.md"
+elif [ -f "$INST/CLAUDE.template.md" ] && "$PY" - "$INST/CLAUDE.template.md" "$DIR/CLAUDE.md" <<'PYEOF'
+import sys
+t = open(sys.argv[1], encoding="utf-8").read()
+a, b = t.find("<!-- kalmido-agent-rules:start -->"), t.find("<!-- kalmido-agent-rules:end -->")
+if a < 0 or b < a:
+    sys.exit(1)
+head = ("# Rules for this project\n\n"
+        "<!-- Created by the Kalmido agent setup. Add your own rules here: what this agent works on, and, to narrow it\n"
+        "further, the Kalmido account ids allowed to give it orders. The launcher's fixed rules come first in every run and\n"
+        "this file cannot weaken them. -->\n\n")
+with open(sys.argv[2], "x", encoding="utf-8") as f:
+    f.write(head + t[a:b + len("<!-- kalmido-agent-rules:end -->")] + "\n")
+PYEOF
+then sayf claude_new "$DIR/CLAUDE.md"
+fi
 
 # kalmido-setup-step: autostart
 stepf s_auto

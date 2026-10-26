@@ -5,7 +5,7 @@
 //   toast's Undo puts the contact back (one step); the card's history line has Undo; on the phone the bar and the dialog work
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p266_a_ui', check, shots: 'P266A_SHOTS'});  // 2.80.0 (#1897): the real phone layout
@@ -75,7 +75,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(/1 contact merged|2 contacts merged/.test(d.querySelector('#toast')?.textContent || ''), '#1835: a toast with Undo ' + (d.querySelector('#toast')?.textContent || ''));
   check(/Merged with Erika Mustermann/.test(d.querySelector('.ctmsec')?.textContent || '') && !!d.querySelector('.ctmsec [data-ctmundo]'), '#1835: the card shows the history line with Undo');
   // the toast's Undo
-  d.querySelector('#toast button').click();
+  await undoToast(w, /contacts? merged/);  // 2.312.0 A (#3283)
   await until(async () => (await call('GET', `/api/contacts/${C2}`, null, CB)).http === 200, 40);
   check((await call('GET', `/api/contacts/${C2}`, null, CB)).http === 200, '#1835: Undo in the toast brings the contact back');
   await until(() => d.querySelectorAll('#view .ctrow').length === 3, 60);

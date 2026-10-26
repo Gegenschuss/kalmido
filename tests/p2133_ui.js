@@ -6,7 +6,7 @@
 // 680 x 904 touch, 1440 mouse. Screenshots with P2133_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login, errs} = require('./boot');
+const {boot, sleep, B, login, errs, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2133_ui', check, shots: 'P2133_SHOTS'});
@@ -49,9 +49,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(await until(() => d.querySelector('#pop').classList.contains('hidden')), '"No date" closes the popover');
   const t1 = await until(async () => { const t = (await call('GET', '/api/state')).tasks.find(x => x.id === T); return !t.due && t; }, 60);
   check(t1 && !t1.due && !t1.due_time && !t1.reminders && !t1.nag && !t1.start, '"No date": date, time, reminders and repeat reminder removed in one step ' + JSON.stringify(t1 && {due: t1.due, time: t1.due_time, rem: t1.reminders, nag: t1.nag}));
-  const tb = await until(() => /Undo/.test(d.querySelector('#toast button')?.textContent || '') && d.querySelector('#toast'), 40);
-  check(tb && /Date removed/.test(tb.textContent), 'the toast says so and offers Undo: ' + (tb?.textContent || ''));
-  if (tb) { d.querySelector('#toast button').click(); await sleep(900); }
+  // 2.312.0 A (#3283): the own toast (text), then the click
+  check(await undoToast(w, /Date removed/), 'the toast says so and offers Undo: ' + (d.querySelector('#toast')?.textContent || '')); await sleep(900);
   const t2 = (await call('GET', '/api/state')).tasks.find(x => x.id === T);
   check(t2.due === day(2) && t2.due_time === '10:00' && t2.reminders === t0.reminders && t2.nag === t0.nag, 'Undo brings date, time, reminders and the repeat reminder back ' + JSON.stringify({due: t2.due, rem: t2.reminders, nag: t2.nag}));
   w.close();

@@ -683,7 +683,8 @@ def tidy_tick(c):
 # auto-compact, a nightly fresh restart) and hands it to the agent (GET /api/v1/agent "runtime", event runtime_changed);
 # the host's launcher applies it (docs/AGENTS.md "Runtime settings", mcp/agent_launcher.sh). "Reset now" raises reset_seq
 # and sends the event reset: the host restarts the agent with a fresh session.
-RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": ""}
+RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "",
+                    "perm_user": None}  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
 # 2.29.0 (#1029): how the agent's host handles actions outside its allow list: ask = asks the person in the chat every time,
 # auto = the host's safety check decides (risky things stay blocked); '' = the host's own default
 PERMISSION_MODES = ("", "ask", "auto")
@@ -736,7 +737,28 @@ def runtime_clean(cur, b):
         if v not in PERMISSION_MODES:
             raise BadInput(tr("Invalid value: {0}", "permission_mode"))
         out["permission_mode"] = v
+    if "perm_user" in b:  # 2.312.0 D (#3266): an account id or None; who may be chosen: runtime_set (perm_user_ok)
+        v = b["perm_user"]
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v <= 0):
+            raise BadInput(tr("Invalid value: {0}", "perm_user"))
+        out["perm_user"] = v
     return out
+
+
+def perm_user_ok(c, a, uid):
+    """2.312.0 D (#3266): may person uid answer the permission questions of agent a? A personal agent: only its owner. A team
+    agent: an active person the agent reaches in the chat (agent_shares, where its host posts the question)."""
+    if a["owner_id"]:
+        return uid == a["owner_id"]
+    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND disabled=0", (uid,)).fetchone()
+    return bool(u) and agent_shares(c, a["user_id"], uid)
+
+
+def perm_user_of(c, a):
+    """2.312.0 D (#3266): the chosen person of a team agent while still allowed (GET /api/v1/agent perm_user_id), else None:
+    the host keeps KALMIDO_PERM_USER of its setup / the owner."""
+    v = agent_runtime(a)["perm_user"]
+    return v if v and not a["owner_id"] and perm_user_ok(c, a, v) else None
 
 
 def may_set_runtime(c, a, uid):
@@ -889,6 +911,9 @@ def jc_job_name(title, name=None):
 def job_dict(c, j, names=None):
     names = names or user_names(c, [j["agent_id"], j["user_id"], j["action_by"]])
     t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone() if j["task_id"] else None
+    viewer = g.user["id"] if has_request_context() and getattr(g, "user", None) else None
+    if t and viewer and viewer != j["agent_id"] and not task_visible(c, j["task_id"], viewer, full=True):
+        t = None  # 2.306.0 D3 (#2875): the task's title / list only for who sees the task (the job itself stays visible)
     return {"id": j["id"], "agent_id": j["agent_id"], "agent_name": names.get(j["agent_id"], ""), "task_id": j["task_id"],
             "task_title": t["title"] if t else None, "list_id": t["list_id"] if t else None, "user_id": j["user_id"],
             "title": j["title"], "state": j["state"], "log": j["log"], "action": j["action"], "action_by": j["action_by"],

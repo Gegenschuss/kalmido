@@ -91,6 +91,8 @@ def start(keep=False, extra=(), alerts="1"):
         env["KEEP"] = "1"
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+    if keep:  # 2.306.0 (#2875): the failure counters live in the database now (a restart keeps them): fresh for the next phase / the UI suite
+        dbx("DELETE FROM rate_hits")
     subprocess.run(["cp", os.path.join(N, "stub_webpush.py"), DATA])
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_webpush.py"])
     with open(os.path.join(DATA, "fake_release.py"), "w") as f:

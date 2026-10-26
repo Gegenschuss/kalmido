@@ -359,7 +359,7 @@ def ntfy_inbox_import(c, m, who=None):
                     except (urllib.error.URLError, OSError, ValueError) as e:
                         print("ntfy inbox: attachment download failed:", e, flush=True)
             if data and len(data) <= MAX_FILE_MB * 1024 * 1024:  # 2.13.2: never a 0-byte file
-                save_attachment_bytes(c, tid, str(att.get("name") or "datei"), str(att.get("type") or ""), data)
+                save_attachment_bytes(c, tid, str(att.get("name") or "datei"), "", data)  # 2.306.0 D3 (#2875): type from the content, not the sender
         print("ntfy inbox: task", tid, "user", uid, repr(title), "attachment" if att else "", flush=True)
     if who:
         who["since"](mid)

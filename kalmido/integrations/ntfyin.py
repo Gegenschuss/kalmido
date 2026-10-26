@@ -1,21 +1,24 @@
 """2.142.0 C (#2150): the ntfy share inbox per person. Everyone can switch on an own topic (and optionally an own ntfy server
 with a read token) in Settings > Notifications; what is shared to it lands in THAT person's inbox. The environment's
 NTFY_INBOX_* inbox (core/pages.py ntfy_inbox_loop) stays as the fallback and works unchanged. The loop here polls (poll=1)
-the topics of all switched-on people, one after the other, every failure is counted per person only."""
+the topics of all switched-on people, every failure is counted per person only. 2.312.0 C (#3265): up to NI_WORKERS people at the
+same time, so one slow server never holds the others."""
 import json
 import os
+import queue
 import secrets
+import threading
 import time
 import urllib.parse
 
 from flask import jsonify
 
 from ..core.config import app, MAX_FILE_MB, NTFY_URL, ntfy_inbox_allowed, _origin
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..accounts.session import GATE, me
 from ..accounts.login import seal, unseal
-from ..calendars.subscriptions import cal_allow, cal_http, CalError, cal_norm_url
+from ..calendars.subscriptions import cal_allow, cal_host_allowed, cal_http, CalError, cal_norm_url
 from ..core.pages import ntfy_inbox_import
 
 NI_ROUND_S = int(os.environ.get("KALMIDO_NTFYIN_TICK", "") or 20)  # s between two rounds (tests: 1)
@@ -28,6 +31,22 @@ _NEXT = {}               # user id -> unix time of the next try (in memory)
 def ni_new_topic():
     """A long random topic (24 characters, a-z A-Z 0-9 - _): not guessable."""
     return "kalmido-" + secrets.token_urlsafe(18)[:24]
+
+
+NI_HTTPS = N_("The ntfy server needs https:// (http:// only for hosts an admin allowed)")
+
+
+def ni_scheme_ok(c, url):
+    """2.306.0 D3 (#2875): the read token / topic never go in plain text: http:// only for hosts an admin allowed (like
+    webhooks and Git servers, cal_allow)."""
+    p = urllib.parse.urlsplit(url)
+    if p.scheme.lower() != "http":
+        return True
+    try:
+        port = p.port or 80
+    except ValueError:
+        return False
+    return cal_host_allowed(cal_allow(c), p.hostname or "", port)
 
 
 def ni_row(c, uid):
@@ -44,6 +63,8 @@ def ni_public(c, uid):
     return {"enabled": bool(r and r["enabled"]), "topic": (r["topic"] if r else "") or "", "url": (r["url"] if r else "") or "",
             "default_server": NTFY_URL.rstrip("/"), "has_token": bool(r and r["token"]),
             "last_ok": (r["last_ok"] if r else None), "fails": (r["fails"] if r else 0), "last_error": (r["last_error"] if r else "") or "",
+            # 2.312.0 C (#3265): an own server saved over http:// before 2.306 to a host no admin allowed (keeps running: a hint)
+            "insecure": bool(r and r["url"] and not ni_scheme_ok(c, r["url"])),
             "suggest": ni_new_topic()}
 
 
@@ -68,6 +89,9 @@ def ni_put():
         if not url:
             return err(tr("Invalid value: {0}", "url"))
         url = url.rstrip("/")
+        # 2.306.0 Fix-2a (#2875): check the address only when it changes or the inbox is switched on; switching off always works
+        if enabled and (url != ((old["url"] if old else "") or "") or not (old and old["enabled"])) and not ni_scheme_ok(c, url):
+            return err(tr(NI_HTTPS))
     if enabled and not topic:
         topic = ni_new_topic()
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
@@ -145,30 +169,77 @@ def ni_poll_one(c, r):
     return n
 
 
-def ni_round():
-    """One round over all switched-on people (an error of one never stops the others)."""
+NI_WORKERS = 4  # 2.312.0 C (#3265): people polled at the same time (a slow server holds one worker, never the others)
+_NQ = queue.Queue()
+_BUSY = set()            # user ids queued or being polled right now
+_BLK = threading.Lock()
+_WORKERS = []
+
+
+def ni_person(uid):
+    """One person on a worker thread, with an own connection: poll, then count success or failure (backoff as before)."""
     c = connect()
     try:
-        rows = c.execute("SELECT n.* FROM ntfy_inboxes n JOIN users u ON u.id=n.user_id WHERE n.enabled=1 AND u.disabled=0 ORDER BY n.user_id").fetchall()
-        for r in rows:
-            uid = r["user_id"]
-            if _NEXT.get(uid, 0) > time.time():
-                continue
-            try:
-                with GATE.bg():
-                    ni_poll_one(c, r)
-                c.execute("UPDATE ntfy_inboxes SET fails=0, last_error='', last_ok=? WHERE user_id=?", (iso(now_utc()), uid))
-                _NEXT.pop(uid, None)
-            except Exception as e:  # noqa: BLE001
-                c.rollback()
-                code = e.stored() if isinstance(e, CalError) else type(e).__name__
-                fails = (r["fails"] or 0) + 1
-                c.execute("UPDATE ntfy_inboxes SET fails=?, last_error=? WHERE user_id=?", (fails, str(code)[:40], uid))
-                _NEXT[uid] = time.time() + min(NI_BACKOFF_MAX, NI_ROUND_S * 2 ** min(fails, 5))
-                print("ntfy inbox (person", uid, "):", code, flush=True)
-            c.commit()
+        r = c.execute("SELECT n.* FROM ntfy_inboxes n JOIN users u ON u.id=n.user_id WHERE n.user_id=? AND n.enabled=1 AND u.disabled=0",
+                      (uid,)).fetchone()
+        if not r:
+            return
+        try:
+            with GATE.bg():
+                ni_poll_one(c, r)
+            c.execute("UPDATE ntfy_inboxes SET fails=0, last_error='', last_ok=? WHERE user_id=?", (iso(now_utc()), uid))
+            _NEXT.pop(uid, None)
+        except Exception as e:  # noqa: BLE001
+            c.rollback()
+            code = e.stored() if isinstance(e, CalError) else type(e).__name__
+            fails = (r["fails"] or 0) + 1
+            c.execute("UPDATE ntfy_inboxes SET fails=?, last_error=? WHERE user_id=?", (fails, str(code)[:40], uid))
+            _NEXT[uid] = time.time() + min(NI_BACKOFF_MAX, NI_ROUND_S * 2 ** min(fails, 5))
+            print("ntfy inbox (person", uid, "):", code, flush=True)
+        c.commit()
     finally:
         c.close()
+
+
+def _ni_worker():
+    while True:
+        uid = _NQ.get()
+        try:
+            ni_person(uid)
+        except Exception as e:  # noqa: BLE001 - e.g. no database connection: the next round tries again
+            print("ntfy inbox (person", uid, "):", type(e).__name__, flush=True)
+        finally:
+            with _BLK:
+                _BUSY.discard(uid)
+
+
+def ni_round():
+    """One round over all switched-on people: each due person goes to the worker threads (an error or a slow server of one
+    never stops or delays the others; a person still being polled is skipped until done). Returns the user ids queued."""
+    c = connect()
+    try:
+        with GATE.bg():  # in the loop thread: waits for this process's turn to run the loop (admin/worker.py)
+            rows = c.execute("SELECT n.user_id FROM ntfy_inboxes n JOIN users u ON u.id=n.user_id WHERE n.enabled=1 AND u.disabled=0 "
+                             "ORDER BY n.user_id").fetchall()
+    finally:
+        c.close()
+    with _BLK:
+        while len(_WORKERS) < NI_WORKERS:
+            t = threading.Thread(target=_ni_worker, daemon=True, name=f"ntfy-inbox-person-{len(_WORKERS) + 1}")
+            _WORKERS.append(t)
+            t.start()
+    out = []
+    for r in rows:
+        uid = r["user_id"]
+        if _NEXT.get(uid, 0) > time.time():
+            continue
+        with _BLK:
+            if uid in _BUSY:
+                continue
+            _BUSY.add(uid)
+        _NQ.put(uid)
+        out.append(uid)
+    return out
 
 
 def ni_loop():

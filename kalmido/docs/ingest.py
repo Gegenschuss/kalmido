@@ -21,6 +21,7 @@ from ..files.store import fs_add_hooks, fs_on_delete, fs_put
 from . import store as S
 from .unpack import doc_unpack
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..office.lettermail import ltm_token_space  # 2.312.0 C (#3265)
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -95,15 +96,17 @@ def _iso_day(v):
 
 
 def doc_on_delete(c, nid):
-    """fs_on_delete hook: a document deleted for good leaves the models, its preview goes (rows: ON DELETE CASCADE)."""
+    """fs_on_delete hook: a document deleted for good leaves the models, its preview goes (rows: ON DELETE CASCADE).
+    2.306.0 D3 (#2875): the preview file is returned for the caller to unlink after the commit (a failed delete keeps it)."""
     m = c.execute("SELECT thumb FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
     if not m:
-        return
+        return []
     try:
         S.untrain(c, nid)
     except Exception as e:  # noqa: BLE001 -- deleting never fails because of a model
         print("docs: untrain", nid, type(e).__name__, flush=True)
-    S.thumb_drop(m["thumb"])
+    rel = m["thumb"] or ""
+    return [rel] if rel.startswith(S.THUMB_DIR + os.sep) and ".." not in rel else []
 
 
 fs_on_delete.append(doc_on_delete)
@@ -261,12 +264,17 @@ def docs_mail_import(c, msg, raw):
         return None
     with system_ctx(c):  # docs mail: resolving a secret address token (like a public link), membership checked below
         r = next((x for x in (c.execute("SELECT * FROM doc_mail WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
-        if not r:
-            return None
-        u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
+        letter = None
+        if r:
+            uid, org = r["user_id"], r["org_id"]
+        else:  # 2.312.0 C (#3265): the Reply-To bound to one mailed letter -> that letter's documents space
+            hit = next((x for x in (ltm_token_space(c, t) for t in toks) if x), None)
+            if not hit:
+                return None
+            uid, org, letter = hit
+        u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone()
         if not u or u["disabled"]:
             return 0
-        uid, org = r["user_id"], r["org_id"]
         if org and int(org) not in acx_of(c, uid).org_ids:
             return 0  # no longer a member: nothing goes in
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
@@ -297,7 +305,7 @@ def docs_mail_import(c, msg, raw):
             try:
                 from ..office.lettermail import ltm_link_replies
                 with c.savepoint():
-                    ltm_link_replies(c, uid, org, msg, made)
+                    ltm_link_replies(c, uid, org, msg, made, letter)
             except Exception as e:  # noqa: BLE001 -- the documents are in; a failed link is assigned by hand
                 print("docs: letter link failed", type(e).__name__, flush=True)
     c.commit()

@@ -13,7 +13,7 @@ address without that proof may be forged and files the mail "Not assigned" with 
 several clients = "Not assigned" (only the recipient sees it and assigns it by hand).
 
 hub_mails keeps the headers and the plain text (subject, sender, recipients and text sealed with the organisation's key
-like the other office texts, core/orgcrypt.py FIELDS); the original .eml and the attachments go into the file store
+like the other office texts, core/orgcrypt.py FIELDS; 2.306.0 A (#2885): a private one with the account key); the original .eml and the attachments go into the file store
 (folder "E-Mails / <client> / <date> <subject>" of the workspace, fs_put: scan, quota, sealing). A virus find leaves the
 attachment out, a full quota all of them (a note on the mail). The search uses hashed words (hub_words, the documents'
 index key per workspace, docs/store.py), never a plain index.
@@ -36,7 +36,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
-from ..core.orgcrypt import oc_active, oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
@@ -238,10 +238,74 @@ def hbm_address_del():
     return jsonify(ok=True)
 
 
+# ---- 2.306.0 A (#2885): the key of a filed mail -- its organisation's, a private one (org_id NULL) the account key of the
+# person whose space it lies in (ws 'u<id>'), sealed like the private files while the private spaces are encrypted
+def hbm_space(m):
+    if m["org_id"]:
+        return int(m["org_id"])
+    ws = m["ws"] or ""
+    if ws[:1] == "u" and ws[1:].isdigit():
+        return -int(ws[1:])
+    return -int(m["owner_id"]) if m["owner_id"] else 0
+
+
+def hbm_seal(c, org, uid, ws, plain):
+    """(the values as stored, sealed?) for a new mail of workspace ws."""
+    sp = hbm_space({"org_id": org, "ws": ws, "owner_id": uid})
+    plain = {k: oc_plain_safe(v) for k, v in plain.items()}  # 2.306.0 Fix-2a (#2885): a field that only looks sealed stays a text
+    if not oc_active_for(c, sp):
+        return dict(plain), False
+    enc = oc_enc_fields(c, sp, "hub_mails", plain)
+    return enc, enc != plain or not any(plain.values())
+
+
+def hbm_settle(c, plain=None, stop=None):
+    """The private filed mails (org_id NULL) sealed with their account key while the private spaces are encrypted;
+    plain(sid) -> True: opened again (the way back, admin/orgcrypt_cli.py decrypt-private / decrypt-all). Organisation
+    mails stay with fields_pass. A row that cannot be opened is left as it is. Commits per batch. -> number of rows changed."""
+    cols = FIELDS["hub_mails"]
+    todo = "" if plain else " AND (" + " OR ".join(f"({k}<>'' AND {k} NOT LIKE '{PREFIX}%')" for k in cols) + ")"  # pg-ok: the prefix has no case
+    n, last = 0, 0
+    while True:
+        if stop and stop():
+            return n
+        with system_ctx(c):  # orgcrypt: server-side bulk work over the private spaces (no content leaves this function)
+            rows = c.execute(f"SELECT id, org_id, owner_id, ws, {', '.join(cols)} FROM hub_mails WHERE org_id IS NULL AND id > ?{todo} "
+                             "ORDER BY id LIMIT 200", (last,)).fetchall()
+            for m in rows:
+                sp = hbm_space(m)
+                if not sp:
+                    continue
+                if plain and plain(sp):
+                    seal = False
+                elif oc_active_for(c, sp):
+                    seal = True
+                else:
+                    continue
+                if seal and all(oc_is_enc(m[k]) or not m[k] for k in cols):
+                    continue  # nothing to seal
+                if not seal and not any(oc_is_enc(m[k]) for k in cols):
+                    continue  # nothing to open
+                try:
+                    d = oc_dec_fields(c, sp, "hub_mails", m)
+                    vals = {k: oc_plain_safe(d[k]) for k in cols}  # 2.306.0 Fix-2a (#2885)
+                    new = oc_enc_fields(c, sp, "hub_mails", vals) if seal else vals  # inside the try: one key never stops the pass
+                except OrgCryptError:
+                    print("orgcrypt: a filed mail cannot be opened, left as it is", flush=True)
+                    continue
+                n += c.execute(f"UPDATE hub_mails SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND "
+                               + " AND ".join(k + "=?" for k in cols), [new[k] for k in cols] + [m["id"]] + [m[k] for k in cols]).rowcount
+        c.commit()
+        if len(rows) < 200:
+            return n
+        last = rows[-1]["id"]
+
+
 # ---- the rows for the client --------------------------------------------------------------------------------------------
 def _open(c, m):
     try:
-        return oc_dec_fields(c, m["org_id"], "hub_mails", m) if m["org_id"] else dict(m)
+        sp = hbm_space(m)  # 2.306.0 A (#2885): private ones with the account key
+        return oc_dec_fields(c, sp, "hub_mails", m) if sp else dict(m)
     except Exception:  # noqa: BLE001 -- a key that cannot open the row: show it without its texts
         d = dict(m)
         for k in ("subject", "body", "from_name", "from_addr", "to_addrs"):
@@ -728,7 +792,7 @@ def _import(c, r, msg, raw, mail_text):
     ts = _now()
     plain = {"from_addr": from_addr[:300], "from_name": (from_name or "").strip()[:300], "to_addrs": ", ".join(to)[:2000],
              "subject": subj, "body": text}
-    enc = oc_enc_fields(c, org, "hub_mails", plain)
+    enc, sealed = hbm_seal(c, org, uid, ws, plain)  # 2.306.0 A (#2885): private ones sealed, too
     mid = insert_id(c, """INSERT INTO hub_mails(org_id,owner_id,client_id,list_id,ws,message_id,from_addr,from_name,to_addrs,subject,
                           sent_at,body,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (org, uid, cid, lid, ws, msgid, enc["from_addr"], enc["from_name"], enc["to_addrs"], enc["subject"],
@@ -737,10 +801,9 @@ def _import(c, r, msg, raw, mail_text):
     cn, ln = _names(c, cid, lid)
     day = (sent or ts)[:10]
     notes, node_ids, folder, eml_id = [], [], None, None
-    sealed = bool(org) and oc_active(c)
     try:
         with c.savepoint():
-            # 2.84.0: file store names are not sealed -- with the organisation encryption on, no subject in the names
+            # 2.84.0: file store names are not sealed -- with the encryption on, no subject in the names
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (subj or tr("E-mail", lg=lg))
             folder = fs_folder(c, uid, org, [ROOT, cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
     except (Denied, ValueError) as e:

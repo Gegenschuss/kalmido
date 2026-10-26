@@ -29,3 +29,20 @@ func startDetached(exe string, args ...string) error {
 }
 
 func hideWindow(c *exec.Cmd) {}
+
+// lockFile: an exclusive flock on the open file (released when the process ends). 2.306.0 (#2875): one engine per
+// settings folder, also next to an older copy that does not answer /hello.
+func lockFile(path string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
+			return nil, errLocked
+		}
+		return nil, err
+	}
+	return f, nil
+}

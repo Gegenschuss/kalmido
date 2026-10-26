@@ -271,6 +271,10 @@ def cal_url_hint(u):
 CAL_UA = f"{APP_NAME}/{APP_VERSION} (calendar subscription)"
 
 
+_CAL_PORT = {"http": 80, "https": 443}
+_CAL_CRED_HEADERS = {"authorization", "proxy-authorization", "cookie", "x-api-key"}
+
+
 def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozenset(), cross_redirects=False,
              max_bytes=None, timeout=None, deadline=None):
     """One request, redirects followed by hand (at most 5; never https -> http). Returns (status, headers, body,
@@ -297,9 +301,18 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
             if code in (301, 302, 303, 307, 308) and loc:
                 new = urllib.parse.urljoin(url, loc.strip())
                 q = urllib.parse.urlsplit(new)
-                same = (q.hostname or "").lower() == p.hostname.lower()
+                # 2.306.0 D2 (#2875): same = same origin (scheme, host, port; http -> https on the default ports counts);
+                # caller credentials (Authorization, a body) never go to another origin
+                try:
+                    same = (q.hostname or "").lower() == p.hostname.lower() and (
+                        (q.scheme, q.port or _CAL_PORT.get(q.scheme)) == (p.scheme, p.port or _CAL_PORT.get(p.scheme))
+                        or (p.scheme, q.scheme, p.port or 80, q.port or 443) == ("http", "https", 80, 443))
+                except ValueError:
+                    raise CalError("redirect") from None
+                cred = bool(auth) or (body is not None and code != 303) or \
+                    any(k.lower() in _CAL_CRED_HEADERS for k in (headers or {}))
                 if q.scheme not in ("http", "https") or (p.scheme == "https" and q.scheme != "https") or \
-                        (not same and not (cross_redirects and not auth and q.scheme == "https")):
+                        (not same and not (cross_redirects and not cred and q.scheme == "https")):
                     raise CalError("redirect") from None
                 if method in ("PUT", "DELETE"):  # 2.58.0 (#1789): a write never follows a redirect
                     raise CalError("redirect") from None

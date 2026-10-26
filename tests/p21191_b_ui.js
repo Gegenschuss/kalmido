@@ -6,7 +6,7 @@
 // - #2083 "Contact history" on the card: the client's quotation and the event, a tap target each; the phone shows it too
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -58,7 +58,7 @@ const acme = async () => ((await call('GET', '/api/clients')).clients || []).fin
   await until(() => /Added: Acme GmbH/.test(d.querySelector('#toast')?.textContent || ''), 30);
   check(/Added: Acme GmbH/.test(d.querySelector('#toast')?.textContent || ''), '#2082: a toast with Undo');
   check(await until(() => d.querySelector(`#view .cklsec a[href="#client/${cl?.id}"]`), 40), '#2082: the card lists the client');
-  d.querySelector('#toast button')?.click();
+  await undoToast(w, /Added: Acme GmbH/);  // 2.312.0 A (#3283)
   check(await until(async () => !(await acme()), 40), '#2082: Undo deletes the client again');
   await until(() => !d.querySelector('#view .cklsec'), 40);
   check(!d.querySelector('#view .cklsec'), '#2082: ... and the card no longer lists it');

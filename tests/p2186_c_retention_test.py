@@ -117,7 +117,7 @@ r = A.patch(B + "/api/admin/backups", json={"keep_weekly": 100})
 j = A.get(B + "/api/admin/backups").json()
 check(r.ok and j["keep_weekly"] == 52 and j.get("keep_weekly_max") == 52, f"backups: with the switch 100 -> 52 {r.status_code} {j.get('keep_weekly')}")
 sql("UPDATE settings SET value='300' WHERE key='bk_keep_weekly'", write=True)
-check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 52, "backups: a stored older value reads as 52 with the switch")
+check(A.get(B + "/api/admin/backups").json()["keep_weekly"] == 52, "backups: a stored older value reads as 52 with the switch")  # 2.306.0 G (#2946): switch on keeps 52
 
 # ================================================================== newsletter suppression list
 BK = Fr.post(B + "/api/books", json={"name": "Clients", "org_id": None}).json()["id"]

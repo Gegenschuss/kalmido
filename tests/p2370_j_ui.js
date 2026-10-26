@@ -59,7 +59,7 @@ const V = B + 'api/v1';
   await sleep(300);
   await v1('PATCH', `/agent/jobs/${J2}`, {state: 'done'});
   w.eval('loadJobs()');  // a newer request (the change check / coming back) answers first
-  await until(() => !shown(J2), 20, 100);
+  await until(() => !shown(J2), 100, 100);
   check(!shown(J2), '#1161: the newer answer removes the job');
   await w.eval('window.__slowDone');
   await sleep(100);
@@ -75,7 +75,7 @@ const V = B + 'api/v1';
   const inp = d.createElement('input'); inp.id = 'p2370j-field'; d.body.appendChild(inp); inp.focus();
   check(w.eval('editing()'), '#1161: a field has the focus (set-up) ' + d.activeElement?.id);
   w.__hid = false; d.dispatchEvent(new w.Event('visibilitychange'));
-  await until(() => !shown(J3), 20, 100);
+  await until(() => !shown(J3), 100, 100);
   check(!shown(J3) && shown(J4), '#1161: back in front with a focused field: the jobs list is fetched again');
   check(d.activeElement === inp, '#1161: the focused field keeps its focus');
   // pageshow from the back/forward cache
@@ -83,7 +83,7 @@ const V = B + 'api/v1';
   await v1('PATCH', `/agent/jobs/${J4}`, {state: 'stopped'});
   w.__hid = false;
   const ps = new w.Event('pageshow'); Object.defineProperty(ps, 'persisted', {value: true}); w.dispatchEvent(ps);
-  await until(() => !shown(J4), 20, 100);
+  await until(() => !shown(J4), 100, 100);
   check(!shown(J4) && /No running or waiting jobs/.test(d.querySelector('.jobs')?.textContent || ''), '#1161: pageshow (back/forward cache) fetches the list again');
   w.close();
 

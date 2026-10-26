@@ -55,10 +55,10 @@ These hold no matter what the model decides:
 
 - **Never admin.** An agent user can never be made an admin; admin endpoints refuse its token.
 - **Only shared projects.** An agent sees exactly the projects shared with it (use the *Participant* role to limit it to tasks
-  assigned to it). It cannot connect repositories or transfer ownership; sharing and member changes wait for a person.
+  assigned to it). It cannot connect repositories or transfer ownership; sharing and member changes wait for a person. **One exception, on purpose:** the `office` scope is a right an admin grants explicitly, and quotations, invoices and letters belong to the organisation's office, not to a shared project (see [AGENTS.md](AGENTS.md#permissions)).
 - **Least privilege (2.15.0).** Every token has permissions (scopes), enforced per route as the OpenAPI document states:
-  new agents only read, write tasks and comment; structure, deleting, files, time and export are switched on per agent
-  by its admin / owner; account settings and admin data never. An admin caps all of them server-wide (Settings > Agents >
+  new agents read, write tasks, comment and use the file store (`files:read` / `files:write`: only what is shared with them, plus their own folder); structure, deleting, task attachments, time, export, calendar, contacts, office drafts, tables and knowledge pages are switched on per agent
+  by its admin / owner; account settings, admin data, health lists and the journal (`private`) and scan-inbox keys (`docs:upload`) never. An admin caps all of them server-wide (Settings > Agents >
   Set up > Permission limit) and can restrict a token to IP addresses. The MCP server offers only the allowed tools.
 - **Approval for dangerous changes (2.15.0).** Deleting projects or fields, emptying the trash, batches of 10+ tasks,
   moving projects and sharing by an agent wait as a job until a person approves; the request then runs as the agent with
@@ -283,7 +283,11 @@ must not see its token or your files, use the dedicated user, the firewall and t
 
 ### 4. Claude Code project settings
 
-`~kalmido-agent/kalmido/.claude/settings.json`:
+`~kalmido-agent/kalmido/.claude/settings.json`. This is the **hardened profile**: nothing but the Kalmido tools and reading
+the work folder, so the agent has no notes (`NOTIZEN.md`), no working routine (`WORKFLOW-KALMIDO.md`), no jobs, no files at its
+answers and asks no permission questions in the chat. The **standard profile** (`defaultMode: default`, narrow `Edit` / `Write` for those
+two files and `Bash` for the job tool only) is in [AGENT-SETUP.md](AGENT-SETUP.md#7-permissions-claudesettingsjson); use it when the agent
+should have those functions, and keep the rest of the recipe unchanged:
 
 ```json
 {
@@ -310,7 +314,9 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
 - No answer within `KALMIDO_PERM_TIMEOUT` (default 540 s = 9 minutes) is a **no**; when the runner is not running, the
   hook denies at once; a late answer gets a note and changes nothing. The question shows the tool and its command or
   file with secrets masked.
-- Only the agent's operator answers (2.126.0): the owner, `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`. When
+- Only the agent's operator answers (2.126.0): the owner, `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`
+  (2.312.0: for a team agent the person chosen in its runtime settings replaces `KALMIDO_PERM_USER`; Kalmido offers and
+  hands over only an active person the agent reaches in a shared project). When
   someone else chats with a team agent, a step that needs a permission is denied at once and that person gets a short
   note (`KALMIDO_PERM_OPERATOR_ONLY`); task runs ask the operator. `dontAsk` above never
   asks anyone: keep it for agents that must never wait for a click.

@@ -414,13 +414,20 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.cwins', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint', 'tasks.vmode']);  // 2.310.0 (#3270): + the view of this device; 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
+// 2.306.0 B (#2889): tasks.cwins (the open chat windows) no longer stays
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold', 'tasks.mdOpen', 'tasks.pack', 'tasks.headShow', 'tasks.rings', 'tasks.lookLocal', 'tasks.pwaHint', 'tasks.vmode']);  // 2.310.0 (#3270): + the view of this device; 2.143.0 C (#2153): + the install hint (per device); 2.83.0 C (#1427): + theme, header pictures, rings
 function clearLocal() {
   try {
     const ks = [];
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tasks.') && !LS_KEEP.has(k)) ks.push(k); }
     ks.forEach(k => localStorage.removeItem(k));
   } catch { /* private mode */ }
+  // 2.306.0 B (#2889): the session's own keys too (step-up, tour, receipts filter); the reload guards stay (no reload loop)
+  try {
+    const ss = [];
+    for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (k && (k === 'rck-stepup' || k.startsWith('kalmido-tour-') || k.startsWith('kalmido.rcl.'))) ss.push(k); }
+    ss.forEach(k => sessionStorage.removeItem(k));
+  } catch { /* no storage */ }
   // 2.169.0 (#2671): the offline copy of the knowledge pages (wiki.js) goes too
   const wk = (typeof wko_wipe === 'function' ? wko_wipe() : Promise.resolve()).then(() => { try { indexedDB.deleteDatabase('kalmido-wiki'); } catch { /* no IndexedDB */ } });
   return Promise.all([wk, typeof obxClear === 'function' ? obxClear() : Promise.resolve()]);  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)

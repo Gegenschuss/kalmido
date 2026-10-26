@@ -258,6 +258,7 @@ check(login("dave")[1].json().get("ok") is True, "login without a second step ag
 # per IP within 15 minutes would block this client from here on.
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env=dict(os.environ, KEEP="1"))
 assert r.returncode == 0, r.stdout + r.stderr
+dbx("DELETE FROM rate_hits")  # 2.306.0 (#2875): the failure counters live in the database too now (a restart keeps them)
 E = sess("erin")
 k = Authenticator()
 check(E.post(B + "/api/me/passkeys/options", json={"password": "bad-password"}).status_code == 403, "passkey options need the password")

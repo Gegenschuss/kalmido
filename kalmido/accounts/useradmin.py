@@ -87,7 +87,7 @@ def ua8_admin_dicts(c, rows):
         st["lists"] = nlists.get(uid, 0)
         out.append({**user_public(u), "kind": u["kind"] or "user", "is_admin": bool(u["is_admin"]), "disabled": bool(u["disabled"]),
                     "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
-                    "created_at": u["created_at"], "ntfy_topic": topic.get(uid, USER_DEFAULTS.get("ntfy_topic", "")),
+                    "created_at": u["created_at"], **({"ntfy_topic": topic.get(uid, USER_DEFAULTS.get("ntfy_topic", ""))} if uid == me() else {}),  # 2.306.0 C (#2889): no foreign topics
                     "email": u["email"] or "", "twofa": tf, "oidc_linked": bool(u["oidc_subject"]),
                     "parents": parents.get(uid, []) if u["kid"] else [], "invite": invite.get(uid),
                     "signup": u["signup"] or "", "kid": bool(u["kid"]), **st,

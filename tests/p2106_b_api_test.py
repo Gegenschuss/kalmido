@@ -242,7 +242,9 @@ r3 = sql("SELECT followup_task_id FROM office_letters WHERE id=?", (L3["id"],))[
 r1 = sql("SELECT followup_task_id FROM office_letters WHERE id=?", (L1["id"],))[0][0]
 check(bool(r3) and r1 is None, f"follow-up: a task for the letter without an answer only ({r3}, {r1})")
 t = A.get(B + f"/api/tasks/{r3}").json() if r3 else {}
-check(t.get("title") == "Follow-up: Ohne Antwort" and f"#office/letters/{L3['id']}" in (t.get("content") or ""), f"follow-up: the task {t.get('title')}")
+# 2.306.0 D2 (#2875): the office is encrypted here (server key), so the sealed subject stays out of the plain task
+check(t.get("title") == "Follow-up: Letter" and "Ohne Antwort" not in (t.get("content") or "")
+      and f"#office/letters/{L3['id']}" in (t.get("content") or ""), f"follow-up: the task {t.get('title')}")
 check(in_ct(TICK) == 0 and sql("SELECT followup_task_id FROM office_letters WHERE id=?", (L3["id"],))[0][0] == r3, "follow-up: once only")
 x = A.get(B + f"{LT}/{L3['id']}/links").json()["followup"]
 check(x["task_id"] == r3 and x["answered"] is False, f"follow-up: shown at the letter {x}")

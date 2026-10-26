@@ -280,7 +280,10 @@ check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "ad
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": "kalmido"})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is False, "left the admin group -> no longer admin (another admin exists)")
 # 2.9.0 (#438): admins by verified e-mail domain, stored in the settings next to the environment's admin group
-r = A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test"})
+# 2.306.0 (#2875): who becomes an admin through the sign-on changes only with the account password
+check(A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test"}).json().get("password_needed") is True, "admin domains without the password: asked for it (403)")
+check(A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test", "password": "wrong-pass"}).status_code == 403, "admin domains with a wrong password: 403")
+r = A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test", "password": "password123"})
 check(r.status_code == 200 and r.json()["admin_domains"] == "corp.test" and "admin_group" in r.json()["env"], "admin domain stored next to the env group")
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"], "email": "max@corp.test", "email_verified": True})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "verified e-mail of an admin domain -> admin")
@@ -303,20 +306,23 @@ r = A.put(B + "/api/admin/oidc/draft", json={"username_claim": "preferred_userna
 check(r.ok and r.json()["draft"]["checked"] is False, "a change after the check: the draft must be checked again")
 check(A.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 409, "apply after a change -> 409")
 check(A.post(B + "/api/admin/oidc/check", json={"draft": True}).json().get("ok") is True, "checked again")
-r = A.post(B + "/api/admin/oidc/draft/apply", json={})
+check(A.post(B + "/api/admin/oidc/draft/apply", json={}).json().get("password_needed") is True, "apply of new admin domains asks for the password (2.306.0, #2875)")
+r = A.post(B + "/api/admin/oidc/draft/apply", json={"password": "password123"})  # 2.306.0 (#2875): admin domains in the draft
 j = r.json() if r.ok else {}
 check(r.ok and j.get("admin_domains") == "corp.test, draft.test" and (j.get("stored") or {}).get("username_claim") == "preferred_username" and j.get("draft") is None,
       f"apply: the draft is in effect, the draft is gone ({j.get('admin_domains')}, {j.get('stored')})")
 # review: a direct change (PUT /api/admin/oidc) voids a checked draft (it was checked against the old values)
 A.put(B + "/api/admin/oidc/draft", json={"groups_claim": "groups"})
 check(A.post(B + "/api/admin/oidc/check", json={"draft": True}).json().get("ok") is True, "a new draft checked")
-A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test, draft.test"})
+A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test, draft.test", "password": "password123"})  # 2.306.0 (#2875): the password
 check(A.post(B + "/api/admin/oidc/draft/apply", json={}).status_code == 409, "a direct change in between -> the draft must be checked again (409)")
 r = A.put(B + "/api/admin/oidc/draft", json={"admin_domains": "other.test"})
 check(r.ok and A.delete(B + "/api/admin/oidc/draft").json().get("draft") is None
       and A.get(B + "/api/state").json()["about"]["oidc"]["admin_domains"] == "corp.test, draft.test", "discard: the draft is gone, the setting in effect stays")
 # 2.9.0: an Entra-style login (user name with @, xms_edov instead of email_verified) creates "eva" when auto-create is on
-A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True})
+# 2.306.0 (#2875 review): with an admin rule in effect auto-create is switched on with the account password
+check(A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True}).json().get("password_needed") is True, "auto-create with an admin rule: asked for the password")
+assert A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True, "password": "password123"}).ok
 s, r = oidc_login({"sub": "sub-eva", "preferred_username": "Eva@corp.test", "groups": ["kalmido"], "email": "eva@corp.test", "xms_edov": True})
 me = s.get(B + "/api/me").json() if err_of(r) == "ok" else {}
 check(me.get("username") == "eva" and me.get("is_admin") is True, f"Entra style: account eva from the verified e-mail, admin by domain ({me})")

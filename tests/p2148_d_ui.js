@@ -11,6 +11,7 @@ const {sleep, B, login} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2148_d_ui', check, shots: 'P2148D_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -78,7 +79,7 @@ const F21 = [head(21, 'Buchungsstapel', 13), '"Umsatz (ohne Soll/Haben-Kz)";"Sol
       'the dialog closed, the suppliers list shows the creditor');
     check(await ev(`/1 new|2 new/.test(document.querySelector('#toast')?.textContent || '')`), 'the toast names the result');
     await shot('p2148-d-suppliers.png');
-    await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
+    await undoToast(ev, /(1|2) new/);  // 2.312.0 A (#3283)
     check(await ready(ev, sup('j.items.length === 0'), 60), 'the undo in the toast takes the import back');
     check(await ready(ev, `/No suppliers yet/.test(document.querySelector('#dimp-sup')?.textContent || '')`, 60), 'the list is empty again');
     // a booking batch (over the API) -> the bookkeeping shows the opening balances of the year

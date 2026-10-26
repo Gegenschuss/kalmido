@@ -59,6 +59,7 @@ def stub_file(name, content):
 
 if os.environ.get("P2154B_NOSTART") != "1":
     extra = ["-e KALMIDO_INSTANCE_MODE=workspaces", "-e KALMIDO_CALENDAR_ALLOW_HOSTS=127.0.0.1:8098",
+             "-e KALMIDO_PEPPOL_ALLOW_HOSTS=127.0.0.1:8098",  # 2.306.0 D2 (#2875): the stub as allowed host for every office
              f"-e KALMIDO_PEPPOL_STORECOVE_URL={STUB}/sc/api/v2"]
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " " + " ".join(extra)),
                        capture_output=True, text=True)
@@ -109,7 +110,9 @@ def invoice(s, cl, finalise=True):
 
 
 def view(s, did, refresh=False):
-    return s.get(B + f"{D}/{did}/peppol" + ("?refresh=1" if refresh else ""))
+    if refresh:  # 2.306.0 D2 (#2875): the status fetch is a POST now (a GET has no side effect)
+        return s.post(B + f"{D}/{did}/peppol/refresh")
+    return s.get(B + f"{D}/{did}/peppol")
 
 
 # ---------------------------------------------------------------- Peppol ids at the client

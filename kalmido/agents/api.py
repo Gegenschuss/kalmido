@@ -18,11 +18,12 @@ from ..notify.push import push_prio
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..agents.core import (
     _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
-    AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, AGENT_STATUSES, AGENT_WAIT_MAX,
+    AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, agent_usable, AGENT_STATUSES, AGENT_WAIT_MAX,
     AGENT_WAITERS_ALL, AGENT_WAITERS_PER, job_dict, JOB_LOG_MAX, JOB_STATES, JOB_TITLE_MAX, job_visible, need_agent,
     STATUS_TEXT_MAX, f8f_job_name_in,
 )
 from ..agents.chat import chat_delivered, chat_event_mids
+from ..agents.core import perm_user_of
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -38,6 +39,9 @@ def agent_self(c, aid):
             "events": list(AGENT_EVENTS), "long_poll_max": AGENT_WAIT_MAX,
             "usage_limit": usage_state(c, a),  # 2.1.1 (#326): where it stands against its limits (None = no limits)
             "runtime": {**agent_runtime(a), "timezone": str(TZ)},  # 2.4.1 (#377): what the host's launcher applies
+            # 2.312.0 D (#3266): who answers its permission questions (a team agent, chosen in its settings, still allowed);
+            # null = the host keeps KALMIDO_PERM_USER / the owner
+            "perm_user_id": perm_user_of(c, a),
             # 2.46.6 (#1715): the language the launcher's rules block asks for (the owner's for a personal agent, else its own)
             "lang": lang_of(usettings(c, p["owner_id"] or aid))}
 
@@ -286,6 +290,10 @@ def v1_job_in(c, aid, b, create):
             u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
             if not u or u["kind"] == "agent" or not agent_shares(c, aid, uid):
                 raise BadInput(tr("Invalid value: {0}", "user_id"))
+            if f.get("task_id"):  # 2.306.0 D3 (#2875): for a task, the person must reach the agent in its list (agent_usable)
+                lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (f["task_id"],)).fetchone()[0]
+                if not task_visible(c, f["task_id"], uid, full=True) or not agent_usable(c, aid, uid, lid):
+                    raise BadInput(tr("Invalid value: {0}", "user_id"))
             f["user_id"] = uid
         try:
             f["name"] = f8f_job_name_in(b.get("name"))  # 2.58.0 (#1803)

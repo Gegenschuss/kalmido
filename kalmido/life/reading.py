@@ -45,10 +45,10 @@ def _rl_org_list(c, oid):
 
 def rl_list(c, uid, oid, create=True):
     """The read-later project of a space for a new entry: private = the person's first writable "Read later" project
-    outside every organisation (made when missing); an organisation's = its registered project (made on first use)."""
+    outside every organisation owned by the person (made when missing); an organisation's = its registered project (made on first use)."""
     if not oid:
-        r = c.execute(f"""SELECT id FROM lists WHERE life='reading' AND archived=0 AND e2e IS NULL AND org_id IS NULL AND id IN {wr_sql()}
-                          ORDER BY owner_id!=?, id LIMIT 1""", (uid, uid, uid)).fetchone()
+        r = c.execute(f"""SELECT id FROM lists WHERE life='reading' AND archived=0 AND e2e IS NULL AND org_id IS NULL AND owner_id=? AND id IN {wr_sql()}
+                          ORDER BY id LIMIT 1""", (uid, uid, uid)).fetchone()  # 2.306.0 D4 (#2875): own project only, never a shared one
         if r:
             return r[0]
         return life_list_create(c, uid, "reading") if create else None

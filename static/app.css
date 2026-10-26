@@ -1766,6 +1766,10 @@ body.tdrag .sdrop{display:flex}
 .modrow .mmain>span{display:flex;flex-direction:column;gap:.125rem;min-width:0}
 .modrow .mmain b{font-weight:600}
 .modrow .mmain small{font-size:var(--fs-s);line-height:1.4}
+.modrow .mmain small.modpriv{color:var(--text2)}  /* 2.306.0 B (#2887) */
+.modrow .mmain small.modpriv .i{vertical-align:-.125em;color:var(--muted)}
+.supriv small.modpriv{display:block;margin:0 0 .5rem;color:var(--text2)}  /* 2.312.0 B (#3264): first-run setup */
+.supriv small.modpriv .i{vertical-align:-.125em;color:var(--muted)}
 .modrow.off .mmain b{color:var(--text2)}
 .modrow .mall{display:inline-flex;align-items:center;gap:.4375rem;font-size:var(--fs-s);color:var(--muted);cursor:pointer;white-space:nowrap;margin-left:auto}
 .modrow .mopt{flex:1 1 100%;margin:.125rem 0 0 2.75rem}
@@ -4772,6 +4776,8 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.23.0 (#711 / #444 / #799): registration link on the login page, the QR code, the organisation in the setup */
 .aulink{margin:.75rem 0 0;text-align:center;font-size:var(--fs-s);color:var(--muted)}
 .aulink .linkbtn{min-height:2.75rem}
+.aulegal{margin:.5rem 0 0;display:flex;justify-content:center;gap:1rem;font-size:var(--fs-s)}  /* 2.306.0 B (#2887) */
+.aulegal .linkbtn{color:var(--muted);text-decoration:none;min-height:2.75rem;display:inline-flex;align-items:center}
 #su-form .linkbtn{display:block;margin:.5rem auto 0;min-height:2.75rem}
 .qrbox{display:flex;justify-content:center;margin:.5rem 0 1rem}
 .qrbox img{width:15rem;height:15rem;max-width:100%;height:auto;border-radius:.5rem;background:#fff;padding:.5rem}

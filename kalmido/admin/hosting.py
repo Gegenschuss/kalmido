@@ -11,6 +11,7 @@ from ..core.errors import Denied  # 2.281.0 E (#3117)
 from ..core.config import app, APP_NAME, PUBLIC_URL, EMAIL_RE
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, usettings
+from ..core.instance import LEGAL_ENV, legal_url_ok  # 2.306.0 B (#2887): the legal links live in core (layers)
 from ..accounts.session import me
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..core.env import env_bool
@@ -34,6 +35,7 @@ def hosted():
 # 100 % uploads are refused (413, code quota_exceeded) and nothing is ever deleted; the app offers "Contact support".
 QUOTA_ENV_MB = os.environ.get("KALMIDO_STORAGE_QUOTA_MB", "").strip()
 SUPPORT_EMAIL_ENV = os.environ.get("KALMIDO_SUPPORT_EMAIL", "").strip()[:200]
+# 2.306.0 B (#2887): the operator's privacy statement and imprint (setting in Administration > Server wins, like support_email)
 QUOTA_MAX_MB = 10_000_000
 
 
@@ -395,6 +397,12 @@ def hosting_settings(c, b):
         if v and not EMAIL_RE.fullmatch(v):
             return err(tr("Invalid value: {0}", "support_email"))
         gset(c, "support_email", v)
+    for k in LEGAL_ENV:  # 2.306.0 B (#2887)
+        if k in b:
+            v = str(b[k] or "").strip() if isinstance(b[k], (str, type(None))) else None
+            if v is None or not legal_url_ok(v):
+                return err(tr("Invalid value: {0}", k))
+            gset(c, k, v)
     if "mail_day_limit" in b:
         v = b["mail_day_limit"]
         if isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 1000:
@@ -422,7 +430,8 @@ def hosting_admin(c):
     return {"hosted": HOSTED, "storage_quota_mb": _mb(v) if v != "" else None, "storage_quota_env": _mb(QUOTA_ENV_MB) or 0,
             "storage_pool": gsetting(c, "storage_pool") or "user", "support_email": gsetting(c, "support_email"),
             "support_email_env": SUPPORT_EMAIL_ENV, "mail_day_limit": mail_day_limit(c), "announce_all": announce_get(c, True),
-            "user_agents": gsetting(c, "user_agents") == "1"}
+            "user_agents": gsetting(c, "user_agents") == "1",
+            **{k: gsetting(c, k) for k in LEGAL_ENV}, **{k + "_env": v for k, v in LEGAL_ENV.items()}}  # 2.306.0 B (#2887)
 
 
 def user_storage(c, uid):

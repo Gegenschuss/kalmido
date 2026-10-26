@@ -76,9 +76,15 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floo
     const main = await ev(probe(`S.booted && !!document.querySelector('#view')`));
     console.log(`p2145_b_ui: main window: scripts ${main.scripts} ms, state ${main.state} ms (ends at ${main.stateEnd} ms), drawn ${main.drawn} ms`);
 
-    const open = async (hash, cond) => {
+    const nonce = await ev(`sessionStorage.getItem('kalmido-mwn') || ''`);
+    check(/^[0-9a-f]{32}$/.test(nonce), '#2875: the main window holds a nonce for the channel ' + nonce);
+    const open = async (hash, cond, inherit = true) => {
       const c = (await cmd('browsingContext.create', {type: 'tab'})).context;
       await cmd('browsingContext.setViewport', {context: c, viewport: {width: 440, height: 720}});
+      if (inherit) {  // 2.306.0 D4 (#2875): a window opened by window.open copies the opener's sessionStorage (the nonce of the channel)
+        await cmd('browsingContext.navigate', {context: c, url: B + 'static/icon.svg', wait: 'complete'});
+        await evIn(c, `sessionStorage.setItem('kalmido-mwn', ${JSON.stringify(nonce)})`);
+      }
       await cmd('browsingContext.navigate', {context: c, url: B + '?mini=1#' + hash, wait: 'interactive'});
       const m = await evIn(c, probe(cond));
       return [c, m];
@@ -138,10 +144,11 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floo
     {
       const c = (await cmd('browsingContext.create', {type: 'tab'})).context;
       await cmd('browsingContext.navigate', {context: c, url: B + 'static/icon.svg', wait: 'complete'});
-      const ask = uid => evIn(c, `new Promise(res => { const ch = new BroadcastChannel('kalmido-mini-state'); let got = null; ch.onmessage = e => { if (e.data && e.data.re === 'q${uid}') got = e.data; };
-        ch.postMessage({ask: 'q${uid}', uid: ${uid}}); setTimeout(() => { ch.close(); res(got ? {uid: got.uid, len: got.state.length, tasks: JSON.parse(got.state).tasks.length} : null); }, 600); })`);
+      const ask = (uid, nn = nonce) => evIn(c, `new Promise(res => { const ch = new BroadcastChannel('kalmido-mini-state'); let got = null; ch.onmessage = e => { if (e.data && e.data.re === 'q${uid}') got = e.data; };
+        ch.postMessage({ask: 'q${uid}', uid: ${uid}, nonce: ${JSON.stringify(nn)}}); setTimeout(() => { ch.close(); res(got ? {uid: got.uid, len: got.state.length, tasks: JSON.parse(got.state).tasks.length} : null); }, 600); })`);
       const me = await ev(`S.me.id`);
       check(await ask(me + 1000) == null, '#2424: another person gets no answer');
+      check(await ask(me, '') == null && await ask(me, 'f'.repeat(32)) == null, '#2875: without the nonce of the main window the same person gets no answer either');
       const a = await ask(me);
       check(a && a.uid === me && a.tasks > 900, '#2424: the same person gets the main window\'s state ' + JSON.stringify(a));
       await cmd('browsingContext.close', {context: c});
@@ -149,7 +156,7 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floo
     // no main window: the own window starts the normal way
     await nav(B + 'static/icon.svg');
     {
-      const [c, m] = await open(`l/${L}`, VIEWS[0][2]);
+      const [c, m] = await open(`l/${L}`, VIEWS[0][2], false);
       console.log(`p2145_b_ui: list window without a main window: usable after ${m.ready} ms, state request ${m.state ?? '-'} ms`);
       check(m.ok && m.snap == null, '#2424: without a main window the list window still shows its content (the normal start) ' + JSON.stringify(m));
       await cmd('browsingContext.close', {context: c});

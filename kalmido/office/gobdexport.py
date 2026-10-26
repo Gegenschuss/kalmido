@@ -240,4 +240,5 @@ def gx_export_get():
     ofx_log(c, oid, "export", target="gobd", detail={"from": frm, "to": to, "counts": counts})
     c.commit()
     fname = f"GoBD_Export_{frm.replace('-', '')}_{to.replace('-', '')}.zip"
-    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{fname}"',
+                                                               "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)

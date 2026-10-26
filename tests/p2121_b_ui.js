@@ -12,6 +12,7 @@ const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2121_b_ui', check, shots: 'P2121B_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -60,7 +61,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await ev(book('out', '10', 'Porto'));
     check(await ready(ev, `document.querySelectorAll('.cb-list .cb-row').length === 2 && /115[.,]50/.test(${bal})`), 'an expense: balance 115.50');
     // undo of the expense = a cancellation
-    await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
+    await undoToast(ev, /Booked as no\. 2/);  // 2.312.0 A (#3283): the expense's own toast, not the income's
     check(await ready(ev, `document.querySelectorAll('.cb-list .cb-row').length === 3 && /125[.,]50/.test(${bal}) && /Cancels no\\. 2/.test(document.querySelector('.cb-list').textContent)`),
       'the undo of a booking cancels it (a counter entry no. 3, nothing deleted)');
     // below zero

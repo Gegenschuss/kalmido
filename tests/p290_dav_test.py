@@ -541,7 +541,7 @@ check(re.search(r"caldav login failed for user#[0-9a-f]{8} ", out) and "user#" +
       and PW not in out and DPW not in out and "wrong-pass" not in out,
       "failed logins are logged without the password")
 # ---------------------------------------------------------------- OIDC settings in the database (#438)
-r = A.put(B + "/api/admin/oidc", json={"issuer": "https://id.example.com/realms/x", "client_id": "kalmido", "admin_domains": "example.com, @corp.example"})
+r = A.put(B + "/api/admin/oidc", json={"issuer": "https://id.example.com/realms/x", "client_id": "kalmido", "admin_domains": "example.com, @corp.example", "password": "password123"})  # 2.306.0 (#2875): admin domains with the password
 check(r.status_code == 200 and r.json()["configured"] and r.json()["admin_domains"] == "corp.example, example.com", "OIDC stored: on, domains")
 check(A.get(B + "/api/auth/info").json()["oidc"]["label"] == "OpenID Connect", "the login button shows")
 r = A.put(B + "/api/admin/oidc", json={"client_secret": "s3cret"})

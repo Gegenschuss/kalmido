@@ -98,7 +98,7 @@ async function pep_dialog(d) {
     if (sb instanceof HTMLElement) { sb.hidden = !(v.can_send); const t = sb.querySelector('span'); if (t) t.textContent = v.can_retry ? tr('Send again') : tr('Send'); }
   };
   const load = async refresh => {
-    try { v = await api('GET', `/api/office/docs/${d.id}/peppol${refresh ? '?refresh=1' : ''}`); draw(); const a = aerr(); if (a) a.textContent = ''; } catch (x) { const a = aerr(); if (a) a.textContent = x.message || tr('unknown'); }
+    try { v = await api(refresh ? 'POST' : 'GET', `/api/office/docs/${d.id}/peppol${refresh ? '/refresh' : ''}`); draw(); const a = aerr(); if (a) a.textContent = ''; } catch (x) { const a = aerr(); if (a) a.textContent = x.message || tr('unknown'); }
   };
   md.addEventListener('click', async e => {
     const b = e.target instanceof Element ? e.target.closest('[data-pepd]') : null; if (!(b instanceof HTMLElement)) return;

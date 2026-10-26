@@ -225,6 +225,18 @@ def dv_supplier_accounts(c, oid, st, node_ids):
     return out
 
 
+def _dup_of_receipt(c, ids):
+    """2.306.0 D2 (#2875): a possible duplicate stays out of the batch only when its older document is a receipt of the same
+    documents space itself -- another upload with the same supplier and number does not take a receipt out."""
+    ids, out = sorted(ids), set()
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        out |= {r[0] for r in c.execute(f"SELECT d.node_id FROM doc_meta d JOIN doc_meta o ON o.node_id=d.dup_of AND o.ws=d.ws "
+                                        f"JOIN rc_receipts r ON r.node_id=d.dup_of WHERE d.node_id IN ({q})", tuple(part))}
+    return out
+
+
 def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     from .books import bk_receipts
     small = bool(s.get("small_business"))
@@ -235,7 +247,7 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     rows, no_cat, no_vat = [], 0, 0
     from flask import has_request_context, request
     from ..docs.dups import dup_open
-    dups = dup_open(c, [rc["node_id"] for rc in receipts])
+    dups = _dup_of_receipt(c, dup_open(c, [rc["node_id"] for rc in receipts]))
     with_dups = has_request_context() and request.args.get("dups") == "1"
     dup_ids = []
     for rc in receipts:

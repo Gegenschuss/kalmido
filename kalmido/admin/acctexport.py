@@ -45,6 +45,7 @@ from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
+from ..life.model import jr_open  # 2.306.0 A (#2885)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -317,9 +318,16 @@ def umz_extra_queries(uid):
 UMZ_DECRYPT = ("absences", "hub_absences"), ("timesheets", "time_sheets")
 
 
-def _umz_plain(c, table, d):
+def _umz_plain(c, table, d, uid=None):
     """A row of the export with its encrypted fields opened (an unreadable value is left out, never the export)."""
     from ..core.orgcrypt import OrgCryptError, oc_dec_fields
+    if uid and table in ("journal", "hub_mails"):  # 2.306.0 A (#2885): sealed with my account key
+        try:
+            if table == "journal":
+                return jr_open(c, uid, d)
+            return oc_dec_fields(c, -int(uid), "hub_mails", d)
+        except OrgCryptError:
+            return {k: v for k, v in d.items() if k not in ("text", "mood", "mood_enc", "from_addr", "from_name", "to_addrs", "subject", "body")}
     if table == "wiki_pages":
         from ..wiki.wkhist import wsb_body_or
         d["body"] = wsb_body_or(c, d)
@@ -408,7 +416,7 @@ def umz_build(c, uid, stream, export_id):
                         d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""))
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
-                    yield _umz_plain(c, table, d)  # 2.148.1 C (#2494)
+                    yield _umz_plain(c, table, d, uid)  # 2.148.1 C (#2494); 2.306.0 A (#2885): + uid
             _put_rows(zf, out, table, rows())
         _put_rows(zf, out, "people", umz_people(c, uid))
         if "msv_links" in have:  # 2.73.0: msv_links comes with part A -- the server accounts, never their token
@@ -625,6 +633,11 @@ def umz_download():
     return Response(umz_stream(path, key, raw["bytes"]), mimetype="application/zip", direct_passthrough=True,
                     headers={"Content-Disposition": f'attachment; filename="{st["file"]}"', "Content-Length": str(raw["bytes"]),
                              "Cache-Control": "no-store"})
+
+
+def umz_forget(uid):
+    """2.306.0 C (#2889): the export folder of a deleted account goes at once (not after UMZ_KEEP_H hours)."""
+    shutil.rmtree(_udir(uid), ignore_errors=True)
 
 
 @app.delete("/api/account/export")

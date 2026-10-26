@@ -254,6 +254,11 @@ const dc_shareOk = () => typeof feat === 'function' && feat('docs') && !S.me?.ki
 // bar, a life task's details and a contact's care line load the module when one is drawn
 const LIFE_MODS = ['contracts', 'home', 'care', 'health', 'travel'];  // 2.172.0 B (#2679): reading moved to the area Reading
 const lifeOn = () => LIFE_MODS.some(m => feat(m));
+// 2.312.0 B (#3264): the notes on health data (Art. 9 GDPR) of the modules health and review (2.306.0 B #2887, moved here
+// from settings.js): the module row, the area switch (areas.js mg_modAreaHtml) and the first-run setup (account.js)
+const MOD_PRIV = {health: N_('Health data is specially protected. Only you see it, unless you share a list.'),
+  review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.')};
+const modPrivHtml = ks => ks.filter(k => MOD_PRIV[k]).map(k => `<small class="modpriv">${ic('info', 's')} ${tr(MOD_PRIV[k])}</small>`).join('');
 function fmtMoney(n) {
   if (n == null) return '';
   let s; try { s = new Intl.NumberFormat(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n); } catch { s = n.toFixed(2); }

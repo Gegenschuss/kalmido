@@ -10,7 +10,7 @@
 // screenshots with P2170_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login, idle} = require('./boot');
+const {boot, sleep, B, login, idle, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2170_ui', check, shots: 'P2170_SHOTS', prefs: [['widget.gtk.overlay-scrollbars.enabled', true], ['ui.useOverlayScrollbars', 1]]});
@@ -217,7 +217,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Delete/.test(b.textContent)));
   check(await until(async () => (await call('GET', `/api/notes/${NID}`)).status === 404), '#442: delete');
   await sleep(150); check(d.activeElement?.id === 'nt-q', 'after Delete the focus is in the notes (search field)');
-  click(w, d.querySelector('#toast button'));
+  await undoToast(w, /Note deleted/);  // 2.312.0 A (#3283)
   // 2.272.0 (#3038): the Undo restores the note from the trash: the same note (same id) comes back
   check(await until(async () => (await call('GET', `/api/lists/${L}/notes`)).notes?.some(n => n.id === NID && n.title === 'Kick-off' && n.body.includes('go live'))), '#442: Undo brings it back');
   w.close();

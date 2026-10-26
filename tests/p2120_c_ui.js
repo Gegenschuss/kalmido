@@ -11,6 +11,7 @@ const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2120_c_ui', check, shots: 'P2120C_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -59,7 +60,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ev(`!document.querySelector('#ofc-set > .fgbar')`), 'no save bar for the field');
     await ev(`(() => { document.querySelector('.dvset')?.scrollIntoView({block: 'start'}); return 1; })()`); await sleep(300);
     await shot('p2120-c-settings.png');
-    await ev(clk('#toast button'));
+    await undoToast(ev, 'Saved');  // 2.312.0 A (#3283)
     check(await ready(ev, `${getJ('/api/office/settings')}.then(j => j.settings.datev_extf.creditor === '')`), 'one undo step brings the old value back');
     await ready(ev, `!!document.querySelector('.dvset input[data-dv="travel"][data-name="hotel"]')`, 60);  // the undo redraws the section
     await ev(setv('.dvset input[data-dv="travel"][data-name="hotel"]', '4676'));

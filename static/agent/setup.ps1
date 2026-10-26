@@ -53,6 +53,13 @@ $MsgEn = @{
   dry_redeem = '  (dry run) trade the code for the agent''s token at {0}/api/agent-setup/redeem (computer {1})'
   refused = 'Kalmido refused the code or is not reachable: {0} (nothing was installed)'
   agent = '  agent: {0}, token stored in {1} (only readable for you)'
+  perm_you = '  permission questions are answered by account id {0} (who made the code); change it: in Kalmido, the agent''s Runtime > Permission questions go to (or KALMIDO_PERM_USER in {1})'
+  perm_kept = '  permission questions: as set before (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in {0})'
+  perm_none = '  permission questions: nobody set, every one is denied; choose a person in Kalmido (the agent''s Runtime > Permission questions go to) or add KALMIDO_PERM_USER=<account id> to {0}'
+  perm_owner = '  permission questions are answered by the agent''s owner'
+  claude_new = '  CLAUDE.md created: {0} (from the template; add your own rules on top)'
+  claude_kept = '  CLAUDE.md exists, left as it is: {0}'
+  dry_claude = '  (dry run) create CLAUDE.md from the template when there is none: {0}'
   s_starter = 'Fetching the starter files'
   dry_files = '  (dry run) the files of {0}/starter_files.txt into {1}'
   nobase = 'Kalmido sent no address for the starter files; use -From DIR'
@@ -98,6 +105,13 @@ $MsgDe = @{
   dry_redeem = '  (Probelauf) den Code gegen das Token des Agenten tauschen unter {0}/api/agent-setup/redeem (Computer {1})'
   refused = 'Kalmido hat den Code abgelehnt oder ist nicht erreichbar: {0} (es wurde nichts installiert)'
   agent = '  Agent: {0}, Token gespeichert in {1} (nur für dich lesbar)'
+  perm_you = '  Rechte-Fragen beantwortet Konto-Id {0} (wer den Code erzeugt hat); ändern: in Kalmido beim Agenten unter Laufzeit > Rechte-Fragen an (oder KALMIDO_PERM_USER in {1})'
+  perm_kept = '  Rechte-Fragen: wie bisher eingestellt (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in {0})'
+  perm_none = '  Rechte-Fragen: niemand eingetragen, jede wird abgelehnt; wähle in Kalmido beim Agenten unter Laufzeit > Rechte-Fragen an eine Person oder trage KALMIDO_PERM_USER=<Konto-Id> in {0} ein'
+  perm_owner = '  Rechte-Fragen beantwortet die Person, der der Agent gehört'
+  claude_new = '  CLAUDE.md angelegt: {0} (aus der Vorlage; eigene Regeln oben ergänzen)'
+  claude_kept = '  CLAUDE.md vorhanden, bleibt unverändert: {0}'
+  dry_claude = '  (Probelauf) CLAUDE.md aus der Vorlage anlegen, wenn keine da ist: {0}'
   s_starter = 'Lade die Starter-Dateien'
   dry_files = '  (Probelauf) die Dateien aus {0}/starter_files.txt nach {1}'
   nobase = 'Kalmido hat keine Adresse für die Starter-Dateien geschickt; nimm -From ORDNER'
@@ -238,13 +252,33 @@ else {
     $msg = ''; try { $msg = ($_.ErrorDetails.Message | ConvertFrom-Json).error } catch { }
     Die (M 'refused' @($(if ($msg) { $msg } else { $_.Exception.Message })))
   }
-  $lines = @("# Kalmido agent $($r.agent.name) ($($r.agent.username)), set up by agent-setup.ps1 -- keep this file private",
+  # 2.306.0 (#2927): the name goes into a comment line: no control characters
+  $AgName = [string]$r.agent.name -replace '[\x00-\x1f\x7f]', ' '
+  $AgUser = [string]$r.agent.username -replace '[\x00-\x1f\x7f]', ' '
+  $lines = @("# Kalmido agent $AgName ($AgUser), set up by agent-setup.ps1 -- keep this file private",
              "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1',
              "KALMIDO_STATE_DIR=$(Join-Path $Inst 'state')")  # one state folder per instance (cursor, approvals, lock)
-  [IO.File]::WriteAllLines($EnvF, $lines)
+  # 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
+  # person who made the code (operator_id), as KALMIDO_PERM_USER; KALMIDO_OWNER_IDS would also narrow who gives orders
+  $keep = @()
+  if (Test-Path -LiteralPath $EnvF) { $keep = @(Get-Content -LiteralPath $EnvF | Where-Object { $_ -match '^KALMIDO_(PERM_USER|OWNER_IDS)=' }) }
+  $op = $r.operator_id
+  if ($keep.Count) { $perm = 'kept' }
+  elseif ($null -ne $op -and "$op" -match '^\d+$') { $perm = "$op"; $keep = @("KALMIDO_PERM_USER=$op") }
+  elseif ($r.agent.team) { $perm = 'none' }
+  else { $perm = 'owner' }
+  [IO.File]::WriteAllLines($EnvF, @($lines + $keep))
+  # 2.306.0 (#2927): the server's version next to the starter files (the MCP server reports it; they have no VERSION file)
+  if ([string]$r.version -match '^\d+(\.\d+){1,3}$') { [IO.File]::WriteAllText((Join-Path $Inst 'VERSION'), "$($r.version)`n") }
   $script:Redeemed = $true
   $StarterBase = [string]$r.starter_base
-  Say (M 'agent' @($r.agent.name, $EnvF))
+  Say (M 'agent' @($AgName, $EnvF))
+  switch ($perm) {
+    'kept' { Say (M 'perm_kept' @($EnvF)) }
+    'none' { Say (M 'perm_none' @($EnvF)) }
+    'owner' { Say (M 'perm_owner') }
+    default { Say (M 'perm_you' @($perm, $EnvF)) }
+  }
 }
 
 # kalmido-setup-step: starter_files
@@ -284,6 +318,27 @@ else {
   [IO.File]::WriteAllText($McpJ, $mcp)
 }
 if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $Dir | Out-Null }
+
+# kalmido-setup-step: claude_md
+# 2.306.0 E (#2927): a CLAUDE.md for the project folder from mcp/CLAUDE.template.md (the rules between its markers) when the
+# folder has none yet -- never overwritten
+$ClaudeMd = Join-Path $Dir 'CLAUDE.md'
+$Tpl = Join-Path $Inst 'CLAUDE.template.md'
+if ((Test-Path -LiteralPath $ClaudeMd) -or (Test-Path -LiteralPath (Join-Path (Join-Path $Dir '.claude') 'CLAUDE.md'))) { Say (M 'claude_kept' @($ClaudeMd)) }
+elseif ($DryRun) { Say (M 'dry_claude' @($ClaudeMd)) }
+elseif (Test-Path -LiteralPath $Tpl) {
+  $t = [IO.File]::ReadAllText($Tpl)
+  $ma = '<!-- kalmido-agent-rules:start -->'; $mb = '<!-- kalmido-agent-rules:end -->'
+  $a = $t.IndexOf($ma); $b = $t.IndexOf($mb)
+  if ($a -ge 0 -and $b -gt $a) {
+    $head = "# Rules for this project`n`n" +
+            "<!-- Created by the Kalmido agent setup. Add your own rules here: what this agent works on, and, to narrow it`n" +
+            "further, the Kalmido account ids allowed to give it orders. The launcher's fixed rules come first in every run and`n" +
+            "this file cannot weaken them. -->`n`n"
+    [IO.File]::WriteAllText($ClaudeMd, $head + $t.Substring($a, $b + $mb.Length - $a) + "`n")
+    Say (M 'claude_new' @($ClaudeMd))
+  }
+}
 
 # kalmido-setup-step: autostart
 Step (M 's_auto')

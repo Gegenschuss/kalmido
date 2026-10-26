@@ -21,7 +21,7 @@ from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
-from ..accounts.login import _user, pend_ip_cap
+from ..accounts.login import _reauth, _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
@@ -611,6 +611,41 @@ def _oidc_vals(b):
     return vals, None
 
 
+# 2.306.0 Fix-1 (#2875 review): every field that decides who becomes an admin through the sign-on (the provider, the client,
+# where the groups come from and the admin rule itself)
+OIDC_ADMIN_KEYS = ("issuer", "client_id", "groups_claim", "admin_group", "admin_domains")
+
+
+def oidc_admin_rule(c, vals=None):
+    """2.306.0 Fix-1 (#2875 review): an admin rule (admin group or admin domains) is in effect, or would be with vals
+    (the environment wins over a stored value)."""
+    vals = vals or {}
+    return any(os.environ.get(dict(OIDC_FIELDS)[k], "").strip()
+               or str(vals[k] if k in vals else gsetting(c, "oidc_" + k) or "").strip() for k in ("admin_group", "admin_domains"))
+
+
+def _oidc_admin_reauth(c, vals, b):
+    """2.306.0 D1 (#2875): a change of who becomes an admin through the sign-on asks for the account password like the
+    other security steps (collab/e2e.py e2e_reauth: an account without one relies on its session). Fix-1 (#2875 review):
+    any field of OIDC_ADMIN_KEYS while an admin rule is set before or after the change. An error response or None;
+    {password_needed: true} = ask and send it again with {password}."""
+    if all(str(vals.get(k, "")).strip() == (gsetting(c, "oidc_" + k) or "").strip() for k in OIDC_ADMIN_KEYS if k in vals):
+        return None
+    if not oidc_admin_rule(c) and not oidc_admin_rule(c, vals):
+        return None
+    return oidc_reauth(c, b)
+
+
+def oidc_reauth(c, b):
+    """2.306.0 Fix-1 (#2875 review): the password step of _oidc_admin_reauth (also for the autocreate switch)."""
+    u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
+    if not u or not u["password_hash"]:
+        return None
+    if not isinstance(b.get("password"), str):
+        return jsonify(error=tr("Confirm with your password"), password_needed=True), 403
+    return _reauth(u, b)
+
+
 def _oidc_alert():
     """The security alert of a changed provider setting (the admins' news)."""
     from ..notify.alerts import aa_now
@@ -632,7 +667,12 @@ def oidc_admin_set():
     from ..accounts.users import need_admin
     need_admin()
     c = db()
-    vals, e = _oidc_vals(body())
+    b = dict(body()) if isinstance(body(), dict) else body()
+    pw = b.pop("password", None) if isinstance(b, dict) else None  # 2.306.0 D1 (#2875): the confirmation, no provider field
+    vals, e = _oidc_vals(b)
+    if e:
+        return e
+    e = _oidc_admin_reauth(c, vals, {} if pw is None else {"password": pw})
     if e:
         return e
     _oidc_store(c, vals)
@@ -745,6 +785,9 @@ def oidc_draft_apply():
     d = _oidc_draft(c)
     if not d or gsetting(c, "oidc_draft_ok") != _oidc_draft_hash(d):
         return err(tr("Check the connection first"), 409)
+    e = _oidc_admin_reauth(c, {k: v for k, v in d.items() if not os.environ.get(dict(OIDC_FIELDS)[k], "").strip()}, body() if isinstance(body(), dict) else {})
+    if e:  # 2.306.0 D1 (#2875): who becomes an admin: with the account password
+        return e
     for k, v in d.items():
         if os.environ.get(dict(OIDC_FIELDS)[k], "").strip():
             continue  # the environment wins (set after the draft)

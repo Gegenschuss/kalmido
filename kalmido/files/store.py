@@ -661,7 +661,7 @@ def fs_purge(c, nid):
     paths = []
     for i in ids:
         for f in fs_on_delete:
-            f(c, i)
+            paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook may return its stored files (relative to ATT_DIR) for after the commit
         paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
     c.execute("DELETE FROM fs_nodes WHERE id=?", (int(nid),))  # ON DELETE CASCADE: children, versions, shares, log
     return ids, paths
@@ -709,7 +709,7 @@ def fs_user_purge(c, uid):
         for nid in roots:
             for i in fs_subtree(c, nid):
                 for f in fs_on_delete:
-                    f(c, i)
+                    paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook's own files go after the commit too
                 paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
             c.execute("DELETE FROM fs_nodes WHERE id=?", (nid,))
     return paths
@@ -738,7 +738,7 @@ def fs_org_purge(c, oid):
         for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE org_id=? AND parent_id IS NULL", (int(oid),)).fetchall():
             for i in fs_subtree(c, nid):
                 for f in fs_on_delete:
-                    f(c, i)
+                    paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook's own files go after the commit too
                 paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
             c.execute("DELETE FROM fs_nodes WHERE id=?", (nid,))
     return paths

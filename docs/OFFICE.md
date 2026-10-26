@@ -214,6 +214,8 @@ rate service.
 invoice and credit note (one row per tax rate), payments received, receipts and travel expenses of the period in one
 list, amounts signed in the office currency; `&zip=1` adds the invoice PDFs / XML (`documents/`) and the receipt files
 (`receipts/`); `&check=1` only counts. The CSV follows the pack's number format (decimal comma = semicolon separated).
+The receipts are the ones the exporting person sees (a hidden folder stays out); a receipt file found infected (strict
+mode: not checked yet) keeps its line in the list without the file (2.306.0).
 
 ## Tabs
 
@@ -2177,8 +2179,10 @@ text. The letter's PDF is attached, the letter is marked as sent with the channe
 button; the day's limits of the office mails apply (like invoices).
 
 Answers find their way back: when you have a **document address** for the documents space of this office (Documents >
-settings > mail address), the mail carries it as Reply-To. An answer to that address becomes a document, and because it
-names the letter's Message-ID (In-Reply-To / References), the document is linked to the letter as its reply. Only a
+settings > mail address), the mail carries a reply address of its own that belongs to this one letter (since 2.312, so
+the recipient never learns your document address). An answer to it becomes a document in that documents space and is
+linked to the letter as its reply; an answer to the document address itself is linked when it names the letter's
+Message-ID (In-Reply-To / References). The reply address stops working when the letter is deleted. Only a
 letter of the same office (the same organisation, or your personal office) is ever linked. Without a document address
 answers go to the company e-mail and are assigned to the letter by hand. A reply without a PDF or image attachment
 creates no document (as every mail to the document address).

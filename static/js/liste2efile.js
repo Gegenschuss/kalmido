@@ -117,8 +117,12 @@ async function le2eFileOpen(aid, lid) {
   let f;
   try { f = await le2eFileDec(lid, await (await le2fFetch(aid)).arrayBuffer()); }
   catch (x) { toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.code === 'file' || x.code === 'list_e2e_key' || x.code === 'list_e2e_locked' ? x.message : tr('Cannot be decrypted')); return; }
-  const url = URL.createObjectURL(new Blob([f.data], {type: f.type})), a = {id: aid, name: f.name, size: f.size, mime: f.type};
-  if (isImg(a) && typeof attLightbox === 'function') { attLightbox(aid, [a], () => url); setTimeout(() => URL.revokeObjectURL(url), 600000); return; }
+  const blob = new Blob([f.data], {type: f.type}), a = {id: aid, name: f.name, size: f.size, mime: f.type};
+  if (isImg(a) && typeof attLightbox === 'function') {  // 2.306.0 D4 (#2875): a data: URL (the CSP allows img-src 'self' data: only, a blob: URL showed nothing)
+    const du = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => res(''); fr.readAsDataURL(blob); });
+    if (du) { attLightbox(aid, [a], () => du); return; }
+  }
+  const url = URL.createObjectURL(blob);
   const el = document.createElement('a');
   el.href = url; el.download = f.name; document.body.appendChild(el); el.click(); el.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);

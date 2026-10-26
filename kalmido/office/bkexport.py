@@ -198,9 +198,9 @@ def bx_zip(c, oid, rows, docs, recs, stem):
                     if size > cap:
                         raise Denied(413, abm_too_big(0, size))
                     z.writestr("documents/" + abm_unique(_zip_part(name), taken["documents"]), data)
-            for nid, row in recs:
+            for nid, row in recs:  # 2.306.0 D2 (#2875): recs = bk_receipts of the signed-in person (fs_role filtered there)
                 try:
-                    data = fs_read(c, nid)
+                    data = fs_read(c, nid)  # sc_guard inside: a file found infected stays out, the list keeps the line
                 except (OSError, Denied):
                     row["file"] = ""
                     continue

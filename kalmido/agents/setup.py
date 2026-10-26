@@ -20,7 +20,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
 from ..api.v1 import API_ON, need_api
-from ..agents.core import AGENT_OFFLINE_S, agent_row
+from ..agents.core import AGENT_OFFLINE_S, agent_row, agent_shares
 
 AINS_CODE_TTL_MIN = 15
 AINS_OS = ("mac", "windows", "linux")
@@ -68,6 +68,27 @@ def ains_host_set(c, tok, host):
         c.execute("UPDATE api_tokens SET host=? WHERE id=?", (host, tok["id"]))
         return True
     return False
+
+
+def _plain(s):
+    """2.306.0 (#2927): a name for the starter's env file comment and its console line: no control characters."""
+    return _AINS_BAD.sub(" ", str(s or ""))
+
+
+def ains_operator(c, a, r):
+    """2.306.0 E (#2927): who answers the permission questions of a team agent (no owner) by default: the person who made the
+    setup code (the starter writes it as KALMIDO_PERM_USER). Only the account id; a personal agent asks its owner anyway."""
+    if a["owner_id"] or not r["created_by"]:
+        return None
+    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND disabled=0", (r["created_by"],)).fetchone()
+    if not u:
+        return None
+    # 2.306.0 (#2927): only someone who reaches the agent can answer in its chat -- a shared list, or (a new agent without
+    # lists yet) a member of the agent's organisation; an admin outside it gets none (the starter then says so)
+    if agent_shares(c, a["user_id"], u["id"]) or not a["org_id"]:
+        return u["id"]
+    m = c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], u["id"])).fetchone()
+    return u["id"] if m else None
 
 
 def ains_code_new(c, aid):
@@ -151,7 +172,7 @@ def ains_admin_machine_del(aid, tid):
 
 @app.post("/api/agent-setup/redeem")
 def ains_redeem():
-    """{code, host?, folder?, os?} -> {token, url, agent, starter_base, version}. No login: the one-time code is the credential."""
+    """{code, host?, folder?, os?} -> {token, url, agent, operator_id, starter_base, version}. No login: the one-time code is the credential."""
     from ..agents.admin import agent_token_new
     keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
@@ -185,8 +206,9 @@ def ains_redeem():
         ver = ains_version()
         print("agent setup: code redeemed for agent", r["agent_id"], "token", tid, flush=True)
         return jsonify(token=tok, url=(PUBLIC_URL or request.host_url).rstrip("/"), version=ver,
-                       agent={"id": a["user_id"], "name": a["display_name"] or a["username"], "username": a["username"]},
-                       starter_base=AINS_STARTER_BASE.replace("{version}", ver or "main"))
+                       agent={"id": a["user_id"], "name": _plain(a["display_name"] or a["username"]), "username": _plain(a["username"]),
+                              "team": not a["owner_id"]},
+                       operator_id=ains_operator(c, a, r), starter_base=AINS_STARTER_BASE.replace("{version}", ver or "main"))
 
 
 @app.post("/api/agent-setup/remove")

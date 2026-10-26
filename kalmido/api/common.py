@@ -12,6 +12,7 @@ from ..core.i18n import tr
 from ..core.db import db, test_seconds, usettings
 from ..core.ctx import me
 from ..core.errors import BadInput, Denied, UnknownFields
+from ..core.ratedb import RATE_SHARED_MIN_S, rate_hit
 
 
 V1_CODES = {400: "invalid", 401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed",
@@ -26,7 +27,8 @@ RATE_WINDOW_S = test_seconds("KALMIDO_TEST_RATE_WINDOW_S", 60)  # 2.149.0 E (#25
 
 def hit_limit(key, limit, window=None):
     """Sliding-window counter: True (= refuse) once `limit` hits of `key` fell into the last `window` seconds (default: a
-    minute, RATE_WINDOW_S)."""
+    minute, RATE_WINDOW_S). 2.306.0 D1 (#2875): a window of RATE_SHARED_MIN_S or more is also counted in the database
+    (core/ratedb.py), over every process of the instance."""
     window = window or RATE_WINDOW_S
     now = time.time()
     with _HITS_LOCK:
@@ -39,6 +41,8 @@ def hit_limit(key, limit, window=None):
         if len(_HITS) > 20000:  # forget idle keys
             for k in [k for k, v in _HITS.items() if not v or now - v[-1] >= window]:
                 _HITS.pop(k, None)
+    if window >= RATE_SHARED_MIN_S:  # 2.306.0 D1 (#2875): the long limits count for every web process (failed count: this one's)
+        return bool(rate_hit(key, limit, window))
     return False
 
 

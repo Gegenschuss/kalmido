@@ -5,11 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -503,5 +505,135 @@ func TestSafeFolderName(t *testing.T) {
 	}
 	if s := safeFolderName(" .. "); s != "Scans" {
 		t.Fatal(s)
+	}
+}
+
+// 2.306.0 D3 (#2875): the single-instance check answers a challenge; the page secret never goes to the port's listener.
+func TestPingInstanceChallenge(t *testing.T) {
+	p, _ := testPage(t)
+	seen := make(chan string, 4)
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.URL.String()
+		_, _ = w.Write([]byte("kalmido-folder-watcher dev 00"))
+	}))
+	defer fake.Close()
+	fport := fake.Listener.Addr().(*net.TCPAddr).Port
+	if pingInstance(fport, p.secret) {
+		t.Fatal("a foreign listener passed the check")
+	}
+	if u := <-seen; strings.Contains(u, p.secret) {
+		t.Fatalf("the secret went to the listener: %s", u)
+	}
+	own := httptest.NewUnstartedServer(nil)
+	p.port = own.Listener.Addr().(*net.TCPAddr).Port
+	own.Config.Handler = p
+	own.Start()
+	defer own.Close()
+	if !pingInstance(p.port, p.secret) {
+		t.Fatal("the own instance is not recognised")
+	}
+	if pingInstance(p.port, strings.Repeat("cd", 24)) {
+		t.Fatal("another secret passed the check")
+	}
+	host := "127.0.0.1:" + strconv.Itoa(p.port)
+	if w := doReq(p, "GET", host, "/hello?n=zz", nil, nil); w.Code != 404 {
+		t.Fatalf("hello without a proper challenge: %d", w.Code)
+	}
+}
+
+// 2.306.0 (#2875): the answer is bound to the port; a listener on another port that passes the challenge on to the real
+// instance does not pass the check.
+func TestPingInstanceBoundToPort(t *testing.T) {
+	p, _ := testPage(t)
+	own := httptest.NewUnstartedServer(nil)
+	p.port = own.Listener.Addr().(*net.TCPAddr).Port
+	own.Config.Handler = p
+	own.Start()
+	defer own.Close()
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(p.port) + r.URL.RequestURI())
+		if err != nil {
+			http.Error(w, err.Error(), 502)
+			return
+		}
+		defer resp.Body.Close()
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+	}))
+	defer relay.Close()
+	if pingInstance(relay.Listener.Addr().(*net.TCPAddr).Port, p.secret) {
+		t.Fatal("a relay on another port passed the check")
+	}
+	if !pingInstance(p.port, p.secret) {
+		t.Fatal("the own instance is not recognised")
+	}
+}
+
+// 2.306.0 (#2875): one engine per settings folder -- the lock file with the PID is the second check next to /hello.
+func TestInstanceLock(t *testing.T) {
+	store, err := openStore(filepath.Join(t.TempDir(), "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, _, err := instanceLock(store)
+	if err != nil {
+		t.Fatalf("first lock: %v", err)
+	}
+	if _, pid, err := instanceLock(store); err != errLocked || pid != strconv.Itoa(os.Getpid()) {
+		t.Fatalf("second lock while held: %v (pid %q)", err, pid)
+	}
+	release()
+	release2, _, err := instanceLock(store)
+	if err != nil {
+		t.Fatalf("lock after release: %v", err)
+	}
+	release2()
+}
+
+// 2.306.0 (#2875): a copy from before /hello on the port is recognised (its log says running, the 404 has the page's
+// headers); a foreign listener, a stopped copy and the own new version are not.
+func TestOldCopyRunning(t *testing.T) {
+	store, err := openStore(filepath.Join(t.TempDir(), "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", pageCSP)
+		w.Header().Set("X-Frame-Options", "DENY")
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer old.Close()
+	oport := old.Listener.Addr().(*net.TCPAddr).Port
+	foreign := httptest.NewServer(http.NotFoundHandler())
+	defer foreign.Close()
+	logf := filepath.Join(store.dir, "log.txt")
+	write := func(s string) {
+		if err := os.WriteFile(logf, []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if oldCopyRunning(store, oport) {
+		t.Fatal("no log: not an own copy")
+	}
+	write("2026-10-25 10:00:00 started 2.300.0 on 127.0.0.1:47807\n2026-10-25 10:00:05 uploaded scan.pdf\n")
+	if !oldCopyRunning(store, oport) {
+		t.Fatal("an older copy of this settings folder is not recognised")
+	}
+	if oldCopyRunning(store, foreign.Listener.Addr().(*net.TCPAddr).Port) {
+		t.Fatal("a foreign listener counts as an older copy")
+	}
+	p, _ := testPage(t)
+	p.store = store
+	own := httptest.NewUnstartedServer(nil)
+	p.port = own.Listener.Addr().(*net.TCPAddr).Port
+	own.Config.Handler = p
+	own.Start()
+	defer own.Close()
+	if oldCopyRunning(store, p.port) {
+		t.Fatal("the new version counts as an older copy")
+	}
+	write("2026-10-25 10:00:00 started 2.300.0 on 127.0.0.1:47807\n2026-10-25 11:00:00 stopped\n")
+	if oldCopyRunning(store, oport) {
+		t.Fatal("a stopped copy counts as running")
 	}
 }

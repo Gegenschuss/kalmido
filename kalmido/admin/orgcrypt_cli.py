@@ -43,6 +43,8 @@ from ..core import orgcrypt as oc
 from ..core.env import env_bool
 from ..core.db import connect, gset, gsetting, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.bgjobs import bgj_add, bgj_fn
+from ..life.model import jr_settle  # 2.306.0 A (#2885)
+from ..hub.hubmail import hbm_settle  # 2.306.0 A (#2885)
 
 # `python -m kalmido.admin.orgcrypt_cli` finds this module already loaded by the package (kalmido/__init__.py ORDER):
 # harmless here (no routes, nothing at import time), so runpy's warning about it is not shown
@@ -408,6 +410,22 @@ def _wkh():
     return wkhist
 
 
+def _priv_rows(c, plain=None, stop=None):
+    """2.306.0 A (#2885): the journal (life/model.py jr_settle) and the private filed mails (hub/hubmail.py hbm_settle) sealed
+    with the account keys, or opened again with plain(sid). -> number of rows changed."""
+    return jr_settle(c, plain=plain, stop=stop) + hbm_settle(c, plain=plain, stop=stop)
+
+
+def priv_rows_count(c):
+    """2.306.0 Fix-2a (#2885): journal rows and private filed mails still sealed with an account key -> {"journal", "hub_mails"}."""
+    pre = oc.PREFIX + "%"
+    mail = " OR ".join(f"{k} LIKE ?" for k in oc.FIELDS["hub_mails"])
+    with system_ctx(c):  # orgcrypt: server-side bulk work over the private spaces (counts only, no content)
+        j = c.execute("SELECT COUNT(*) FROM journal WHERE text LIKE ? OR mood_enc IS NOT NULL", (pre,)).fetchone()[0]  # pg-ok: the prefix has no case
+        m = c.execute(f"SELECT COUNT(*) FROM hub_mails WHERE org_id IS NULL AND ({mail})", [pre] * len(oc.FIELDS["hub_mails"])).fetchone()[0]  # pg-ok: the prefix has no case
+    return {"journal": int(j), "hub_mails": int(m)}
+
+
 def _row_space(r):
     return int(r["org_id"]) if r["org_id"] else oc.oc_user_space(r["owner_id"])
 
@@ -713,6 +731,7 @@ def private_count(c):
                 h = _head(p)
                 if h:
                     out["files"]["enc" if h[:len(oc.MAGIC)] == oc.MAGIC else "plain"] += 1
+    out["rows"] = priv_rows_count(c)  # 2.306.0 Fix-2a (#2885): the journal and the private filed mails
     return out
 
 
@@ -726,8 +745,9 @@ def decrypt_private(c):
     st = {}
     _bud().bud_settle(c, plain=lambda sid: sid < 0)  # 2.72.0 (#1333): budgets of private spaces plain again
     _wkh().wkh_settle(c, plain=lambda sid: sid < 0)  # 2.123.0 A (#2105): texts of private knowledge pages plain again
+    rows = _priv_rows(c, plain=lambda sid: sid < 0)  # 2.306.0 A (#2885): the journal and the private filed mails plain again
     n, bad = files_decrypt(c, all_files(c), only=lambda hid: hid is not None and hid < 0, stats=st)
-    return {"files": n, "failed": bad, "kept": st.get("kept", 0)}
+    return {"files": n, "failed": bad, "kept": st.get("kept", 0), "rows": rows}
 
 
 def before_user_delete(c, uid):
@@ -794,6 +814,7 @@ def encrypt_all(c, stop=None, pause=0.0):
     st = files_settle(c, stop, pause=pause)
     tot["fields"] += _bud().bud_settle(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
     tot["fields"] += _wkh().wkh_settle(c, stop=stop)["changed"]  # 2.123.0 A (#2105): the knowledge pages' texts and history
+    tot["fields"] += _priv_rows(c, stop=stop)  # 2.306.0 A (#2885): the journal and the private filed mails
     tot["fields"] += docs_pass(c, True, stop)["changed"]  # 2.126.0 A (#1971): the documents' values
     tot["fields"] += docs_settle_once(c, stop)["changed"]  # 2.126.0 A (#1970): private ones on the account keys
     tot["files"] += st["sealed"]
@@ -822,6 +843,7 @@ def decrypt_all(c):
         tot["fields"] += fields_pass(c, oid, False, key)
     tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
     tot["fields"] += _wkh().wkh_settle(c, plain=lambda sid: True)["changed"]  # 2.123.0 A (#2105): the knowledge pages plain again
+    tot["fields"] += _priv_rows(c, plain=lambda sid: True)  # 2.306.0 A (#2885): the journal and the private filed mails plain again
     d = docs_pass(c, False)  # 2.126.0 A (#1971): the documents' values plain again
     tot["fields"] += d["changed"]
     tot["failed"] += d["failed"]
@@ -1358,13 +1380,16 @@ def main(argv):
             st = status(c)
             left = sum(o["fields"]["enc"] + o["files"]["enc"] for o in st["orgs"]) + st["private"]["files"]["enc"] - t["kept"]  # 2.64.0 (#1864)
             left += st["docs"]["enc"]  # 2.126.0 A (#1971)
+            left += sum(st["private"]["rows"].values())  # 2.306.0 Fix-2a (#2885): journal / private mails that did not open
             print(TAG, "still encrypted:", left, "(org_encrypt is now 0)")
             if left or t["failed"]:
                 return 1
         elif a.cmd == "decrypt-private":
             t = decrypt_private(c)
             print(TAG, "decrypt-private:", json.dumps(t))
-            left = private_count(c)["files"]["enc"] - t["kept"]  # kept: uploads whose content itself looks sealed
+            pc = private_count(c)
+            left = pc["files"]["enc"] - t["kept"]  # kept: uploads whose content itself looks sealed
+            left += sum(pc["rows"].values())  # 2.306.0 Fix-2a (#2885): journal / private mails that did not open
             print(TAG, "still encrypted in private spaces:", left, "(private_encrypt is now 0)")
             if left > 0 or t["failed"]:
                 return 1
@@ -1376,7 +1401,7 @@ def main(argv):
             if not oc.oc_active(c):
                 print(TAG, "encrypt-private: org_encrypt is 0, nothing is sealed until it is switched on again", flush=True)
                 return 1
-            print(TAG, "encrypt-private:", json.dumps(files_settle(c)))
+            print(TAG, "encrypt-private:", json.dumps({**files_settle(c), "rows": _priv_rows(c)}))  # 2.306.0 A (#2885): + rows
         elif a.cmd in ("decrypt-wiki", "encrypt-wiki"):  # 2.123.0 A (#2105): the switch first, then the pass
             from ..core.db import gset
             on = a.cmd == "encrypt-wiki"

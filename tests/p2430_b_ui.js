@@ -8,7 +8,7 @@
 //   five levels (2.156.0, #1949) stays and the message counts it; subtasks dropped on a section header become standalone tasks there
 //   (order kept); above a row the block lands before it; the multi panel's "Subtasks of…" / "Out of the parent task" and
 //   the phone's selection menu offer the same
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -74,8 +74,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   dnd(w, zone('by'), 'drop'); dnd(w, row(T1), 'dragend');
   check(await until(async () => ((await taskOf(T3)).blockers || []).includes(T1)), '#1330: "Waiting on": Ship waits on the dragged Design');
   check(!d.querySelector('.dgzones'), '#1330: the fields are gone after the drop');
-  await until(() => d.querySelector('#toast button'));
-  d.querySelector('#toast button').click();
+  await undoToast(w, /“Ship” waits on/);  // 2.312.0 A (#3283)
   check(await until(async () => !((await taskOf(T3)).blockers || []).length), '#1330: Undo of the panel drop');
   await until(() => w.eval('!HIST.busy') && row(T2));  // 2.46.1: the undo redraw is over (slow CI runners)
   // 2.46.5: a redraw right after the undo may swallow the first dragstart on slow CI runners: start the drag again

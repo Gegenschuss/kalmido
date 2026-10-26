@@ -278,7 +278,7 @@ def op_contact_restore(c, uid, cid):
     return op_contact(c, uid, cid)
 
 
-def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name=""):
+def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name="", photos=True):
     need_book(c, bid, write=True)
     if len(raw) > VCF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
@@ -299,8 +299,8 @@ def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=Fa
         cards = split_vcards(text)
     since = ctx_max_id(c, bid)  # 2.119.1 A (#2084): the contacts after it are the new ones (likely duplicates in the answer)
     if bg and len(cards) > IMPORT_SYNC_MAX:
-        return lv_import_start(c, uid, bid, cards, since)
-    res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards, photos=15)  # 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
+        return lv_import_start(c, uid, bid, cards, since, photos)
+    res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards, photos=15 if photos else 0)  # 2.306.0 C (#2889): photos=False = no fetching; 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
     c.commit()
     if csv_ok:
         res.update(ctx_import_dupes(c, uid, bid, since))
@@ -325,7 +325,7 @@ def lv_import_public(st):
 IMP_RUNNING_MAX = 4  # 2.126.0 C (#1986): background imports at once in this process
 
 
-def lv_import_start(c, uid, bid, cards, since=None):
+def lv_import_start(c, uid, bid, cards, since=None, photos=True):
     iid = secrets.token_urlsafe(12)
     st = {"import_id": iid, "user_id": uid, "book_id": bid, "state": "running", "total": min(len(cards), CONTACTS_PER_BOOK), "done": 0,
           "created": 0, "updated": 0, "unchanged": 0, "errors": 0, "error": "", "started_at": time.time(), "ended_at": None}
@@ -340,12 +340,12 @@ def lv_import_start(c, uid, bid, cards, since=None):
             raise Denied(429, tr("Too many imports, please wait a few minutes"))
         _IMP[iid] = st
     ctx = c.ctx  # the starter's row-level-security context goes with the thread
-    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards, since), daemon=True).start()
+    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards, since, photos), daemon=True).start()
     with _IMP_LOCK:
         return lv_import_public(st)
 
 
-def lv_import_run(st, ctx, uid, bid, cards, since=None):
+def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
     # 2.138.4 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
     # whole run, each with the starter's row-level-security context; the photo budget and the counts run across the batches.
     cards = cards[:CONTACTS_PER_BOOK]
@@ -358,7 +358,7 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None):
             c.set_ctx(*ctx)
             # batch: a block that hits the book's limit keeps what it stored; photos > 0: a used-up budget keeps old pictures
             part = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards[i:i + IMPORT_BATCH],
-                                 photos=max(1e-3, t_end - time.monotonic()))
+                                 photos=max(1e-3, t_end - time.monotonic()) if photos else 0)
             c.commit()
             c.close()
             c = None
@@ -536,6 +536,7 @@ def _ct_uploads():
 @app.post("/api/books/<int:bid>/import")
 def books_import(bid):
     need_feat("contacts")
+    need_book(db(), bid, write=True)  # 2.306.0 D4 (#2875): the right to the book before any file is unpacked
     bg = request.args.get("background") in ("1", "true")  # 2.41.0 (#1437): ?background=1 (the app): a large file answers 202 {import_id, ...} at once
     preview = request.args.get("preview") in ("1", "true")
     if len(request.files.getlist("files")) + len(request.files.getlist("file")) > 1 or request.files.get("files"):
@@ -554,7 +555,8 @@ def books_import(bid):
     if not raw:
         return err(tr("No file"))
     # 2.119.1 A (#2080): a CSV file too; ?preview=1 answers its columns, the form field mapping = a field per column
-    r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=None if got else request.form.get("mapping"), preview=preview, name=name)
+    r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=None if got else request.form.get("mapping"), preview=preview, name=name,
+                  photos=request.form.get("photos") != "0")  # 2.306.0 C (#2889): "Import contact photos" off = the server fetches no pictures
     if got:
         r["files"] = got[1]
     return (jsonify(r), 202) if "import_id" in r else jsonify(r)

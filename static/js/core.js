@@ -332,6 +332,14 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // offline get a negative temp id that is mapped to the real id during replay. The last server state is
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
+// 2.306.0 B (#2889): the session ended (401 / the login proxy's page): the stored state of the account (cache, tabs, chat
+// windows, session keys) goes like at logout, so the next person on this browser does not find it. Changes still waiting
+// to be sent (outbox, conflicts) keep everything as before: they go out after the next login of the same account.
+async function authGone() {
+  try { outSync(); } catch { /* storage gone */ }
+  if (OUT.q.length || (S.conflicts || []).length) return;
+  await Promise.race([clearLocal(), new Promise(ok => setTimeout(ok, 1500))]);
+}
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
 // 2.126.0 D (#1989): every tab and list window of the browser shares the queue, localStorage is the truth: outSync takes over
 // what the others wrote (an entry keeps its object, known by its key k, so undo steps still find it; one that left the queue
@@ -491,12 +499,13 @@ async function rawFetch0(method, url, body, key) {
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
+    if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) await authGone();  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
     location.reload();  // login session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
-  if ((r.status === 401 || r.status === 403) && j.auth) { authScreen(j); throw new Error('auth'); }  // built-in login
-  if (r.status === 401) { location.reload(); throw new Error('auth'); }
+  if ((r.status === 401 || r.status === 403) && j.auth) { await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
+  if (r.status === 401) { await authGone(); location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.data = j;
     if ((method !== 'GET' || r.status >= 500) && typeof botStartle === 'function') botStartle();  // 2.165.0 (#2613): a refused write or a server error
     if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full

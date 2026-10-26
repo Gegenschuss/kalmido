@@ -310,6 +310,10 @@ class Conn:
 
     def execute(self, sql, args=None):
         self._begin()
+        if args is None and sql.lstrip()[:11].upper() == "ROLLBACK TO":  # 2.306.0 D1 (#2875): a savepoint of the caller's own
+            cur = self._pgx(_raw(sql))  # (tasks/batch.py): set_config is undone with it, the stored context applies again (as savepoint())
+            self._apply_ctx()
+            return cur
         if args is None or (not args and "?" not in sql):
             return self._pgx(sql.replace("%", "%%") if args is not None else _raw(sql), None if args is None else ())
         if isinstance(args, dict):

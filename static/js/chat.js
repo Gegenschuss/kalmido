@@ -469,8 +469,9 @@ async function trd_show(mid, inTh) {
   await askDialog({title: tr('Read by {0}', rb.count), html, ok: tr('Close'), after: md => md.querySelector('[data-cd="no"]')?.remove()});
 }
 // Settings > Notifications: "Send read receipts" (settings.js asks for it when the team chat is on)
+// 2.306.0 C (#2889): + the default as a hint text
 const trd_setHtml = (s, chk, hint) => teamOn() ? `<h4 id="s-trd-h">${tr('Team chat')}</h4><div class="row">${chk('s-trd', s.chat_read_receipts !== '0', tr('Send read receipts'))}</div>
-  ${hint(tr('Others see up to where you have read a conversation, and you see theirs. Off: nobody sees when you read, and you see nobody else either.'))}` : '';
+  ${hint(tr('Others see up to where you have read a conversation, and you see theirs. Off: nobody sees when you read, and you see nobody else either.') + ' ' + tr('Read receipts are on by default.'))}` : '';
 
 // ------------------------------------------------------------------ 2.113.1 (#2059): channels, groups, files
 // Channels anyone opens (for an organisation: open to all its people or invited only; or in the own space with people one

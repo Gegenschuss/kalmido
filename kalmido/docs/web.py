@@ -14,6 +14,7 @@ from ..core.i18n import tr
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
+from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers budget)
 from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
@@ -524,7 +525,6 @@ def docs_thumb(nid):
         raise Denied(404)
     v = fs_version_row(c, nid)
     if v:
-        from ..files.scan import sc_guard
         sc_guard(c, "fs", nid, v["no"])  # 2.148.1 E (#2496): no preview of a version found infected later
     try:
         data = S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, m["thumb"]))  # 2.48.0 review (L3): private ones sealed
@@ -544,7 +544,6 @@ def docs_file(nid):
     v = fs_version_row(c, nid)
     if not v:
         raise Denied(404)
-    from ..files.scan import sc_guard
     sc_guard(c, "fs", nid, v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
@@ -562,6 +561,9 @@ def docs_einvoice(nid):
     inv = S.meta_json(c, m, "extracted", {}).get("_einv")
     if not isinstance(inv, dict):
         raise Denied(404)
+    v = fs_version_row(c, nid)
+    if v:
+        sc_guard(c, "fs", nid, v["no"])  # 2.306.0 D2 (#2875): like the file and the preview, a version found infected later is locked
     fs_log_add(c, nid, "read")
     c.commit()
     r = Response(ei_html(inv, n["name"]), mimetype="text/html")

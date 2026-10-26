@@ -342,7 +342,8 @@ async function swOutboxSend() {
   const rows = (await swReq(db.transaction('ops').objectStore('ops').getAll())).sort((a, b) => a.n - b.n);
   try {
     for (const e of rows) {
-      if (e.uid && e.uid !== uid) continue;  // another user's entry: the app drops it
+      if (!e.uid) { await swReq(db.transaction('ops', 'readwrite').objectStore('ops').delete(e.k)); if (ch) ch.postMessage({del: [e.k], sw: true}); continue; }  // 2.306.0 D4 (#2875): an entry of nobody is dropped, never sent
+      if (e.uid !== uid) continue;  // another user's entry: the app drops it
       // 2.143.0 C2 (#2153): only the app's own write routes are sent again (no API v1, no other origin, no GET)
       if (typeof e.url !== 'string' || !SW_OBX_URL.test(e.url) || !SW_OBX_METHODS.includes(e.method)) break;
       const url = e.url.replace(/\/(-\d+)(?=\/|$)/, (_, n) => '/' + (idm[n] || n));

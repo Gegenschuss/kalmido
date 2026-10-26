@@ -204,8 +204,16 @@ def shf_marks(c, uid, rows, out):
         for n in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND deleted_at IS NULL AND ref_id IN "
                            f"({','.join(str(int(i)) for i in ids)})").fetchall():
             nodes[n["ref_id"]] = n
+    seen = {}  # 2.306.0 D3 (#2875): folder -> may uid see it (fs_role), asked once per folder
+
+    def _sees(pid):
+        if pid not in seen:
+            seen[pid] = bool(fs_role(c, pid, uid))
+        return seen[pid]
     for r, d in zip(rows, out):
         n = nodes.get(r["id"])
+        if n is not None and not _sees(n["parent_id"]):
+            n = None  # 2.306.0 D3 (#2875): folder / node only for who sees the folder
         d["folder_id"] = n["parent_id"] if n is not None else None
         d["fnode"], d["fsort"] = (n["id"], n["sort_no"]) if n is not None else (None, None)  # its node (sorting by hand)
         if n is not None and not d.get("shared_in") and not sh_may(c, uid, r, fold=False):

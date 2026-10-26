@@ -367,7 +367,7 @@ async function oadmOpen(oid, name) {
 // organisation -- nothing else, never its contents (PATCH /api/orgs/{id}/lists/{id}, .../icon). The same pickers as the list
 // dialog; Save = one undo step (name / colour), a picture is set at once like in the list dialog. The owner and the members
 // are told by the server.
-const ole_mark = x => x.icon ? `<img class="licon ole-ic" src="${esc(x.icon)}" alt="" loading="lazy" decoding="async">`
+const ole_mark = x => x.icon && liconOk(x.icon) ? `<img class="licon ole-ic" src="${esc(x.icon)}" alt="" loading="lazy" decoding="async">`
   : x.color ? `<i class="ole-sw" style="background:${cssColor(lp_col({color: x.color}) || x.color)}" aria-hidden="true"></i>` : '';
 function ole_logDetail(r) {
   const d = r.detail || {}, out = [];
@@ -518,6 +518,9 @@ async function logout() {
   try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no Cache Storage */ }  // 2.126.0 D (#1992 O4): the app loads again from the server
   await Promise.race([clearLocal(), new Promise(r => setTimeout(r, 1500))]); location.replace('/');  // 2.143.0 C2 (#2153): the IndexedDB queue is empty before the page goes
 }
+// 2.306.0 B (#2887): the operator's privacy statement / imprint (Settings > Help and the login page); '' = no link
+const legalLinks = (l, cls) => [['privacy_url', N_('Privacy')], ['imprint_url', N_('Imprint')]].filter(([k]) => /^https?:\/\//i.test(l?.[k] || ''))
+  .map(([k, n]) => `<a class="${cls} lglegal" data-legal="${k}" href="${esc(l[k])}" target="_blank" rel="noopener noreferrer">${tr(n)}</a>`).join('');
 // login / first-run setup / "no account" screen (built-in login; with single sign-on the proxy logs in)
 async function authScreen(j) {
   if ($('.authscreen')) return;
@@ -550,7 +553,7 @@ async function authScreen(j) {
         ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
         ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Log in with a passkey')}</button>` : ''}
         ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
-      </form></div>`;
+      </form>${legalLinks(info.legal, 'linkbtn') ? `<p class="aulegal">${legalLinks(info.legal, 'linkbtn')}</p>` : ''}</div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];
     if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || tr('Login failed. Please try again.'); history.replaceState(null, '', location.pathname); }
     el.addEventListener('click', e => {
@@ -875,7 +878,16 @@ function oidcWire(md) {
     if (i.id === 'oi-on') {
       if (!i.checked) return;
       i.disabled = true;
-      try { took(await calReq('POST', '/api/admin/oidc/draft/apply', {}), true); toast(tr('The sign-in uses the new settings')); }
+      // 2.306.0 D1 (#2875): a change of who becomes an admin asks for the account password
+      const apply = async b => { try { return await rawFetch('POST', '/api/admin/oidc/draft/apply', b); } catch (x) { if (x.data?.password_needed) throw x; throw new Error(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); } };
+      try {
+        let j; try { j = await apply({}); } catch (x) {
+          if (!x.data?.password_needed) throw x;
+          const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw new Error(tr('Cancelled|dialog'));
+          j = await apply({password: p.password});
+        }
+        took(j, true); toast(tr('The sign-in uses the new settings'));
+      }
       catch (x) { i.checked = false; i.disabled = false; const r = res(); if (r) r.textContent = x.message; }
       return;
     }
@@ -949,7 +961,7 @@ async function bkDraw(md, j) {
   const hint = t => `<div class="shint">${t}</div>`;
   let h = `<div class="featgrid"><label class="wide"><input type="checkbox" id="bk-on" ${j.on ? 'checked' : ''}><span>${tr('Automatic backups')}<small class="muted">${tr('Every day a copy of the database and all attachments goes into the folder {0} on the server. Copy that folder somewhere else too (another disk, your usual server backup): a backup on the same disk does not help if the disk dies.', `<code>${esc(j.dir)}</code>`)}</small></span></label></div>
     <div class="row"><label for="bk-time">${tr('Time')}</label>${timeIn('bk-time', j.time, {label: tr('Time'), clear: false})}</div>
-    <div class="row"><label for="bk-daily">${tr('Keep')}</label><input type="number" class="aanum" id="bk-daily" min="1" max="365" value="${j.keep_daily}"><span class="muted">${tr('daily')}</span><input type="number" class="aanum" id="bk-weekly" min="0" max="${j.keep_weekly_max || 520}" value="${j.keep_weekly}"><span class="muted">${tr('weekly')}</span></div>
+    <div class="row"><label for="bk-daily">${tr('Keep')}</label><input type="number" class="aanum" id="bk-daily" min="1" max="365" value="${j.keep_daily}"><span class="muted">${tr('daily')}</span><input type="number" class="aanum" id="bk-weekly" min="0" max="${j.keep_weekly_max || 104}" value="${j.keep_weekly}"><span class="muted">${tr('weekly')}</span></div>
     ${j.keep_weekly_max ? hint(tr('Weekly backups are kept for at most {0} weeks (data protection).', j.keep_weekly_max)) : ''}
     <div class="featgrid"><label class="wide"><input type="checkbox" id="bk-enc" ${j.encrypt || j.encrypt_required ? 'checked' : ''} ${j.encrypt_required ? 'disabled' : ''}><span>${tr('Encrypt backups')}<small class="muted">${tr('AES-256 with a passphrase. Without the passphrase an encrypted backup cannot be restored, not even by you or the admin. Write it down somewhere safe (password manager).')}</small></span></label></div>
     ${j.encrypt_required ? hint(tr('This server only writes encrypted backups: set a passphrase (at least 10 characters).')) : j.encrypt ? '' : `<div class="shint cnote bkencnote">${tr('Backups are not encrypted: whoever can read the backup folder can read all data in it.')}</div>`}
@@ -1087,12 +1099,15 @@ async function setupChoices(el, logo) {
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   // 2.144.2 A (#2369): preset '' (modules fit no purpose) matches nothing, so "Start" switches nothing extra off
   const matches = k => !!SETUP_PRESETS[k] && all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
+  // 2.312.0 B (#3264): the note on health data (Art. 9 GDPR) while Home or Review (health, journal) is picked
+  const suPriv = () => modPrivHtml(['a:life', 'a:review'].filter(x => picked.has(x)).flatMap(x => MG_SU_AREA[x]));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
+      <div class="supriv" id="su-priv">${suPriv()}</div>
       ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}
       ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations.')}</p>` : ''}
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
@@ -1112,6 +1127,7 @@ async function setupChoices(el, logo) {
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
     const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = setupCount(picked);
+    const sp = $('#su-priv', el); if (sp) sp.innerHTML = suPriv();  // 2.312.0 B (#3264)
   });
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;

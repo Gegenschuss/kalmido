@@ -1327,13 +1327,15 @@ def bud_import_undo(c, uid, lid, run, b):
     has no trash: like deleting an entry). Entries changed after the import (or with a receipt) are kept and named,
     unless edited = "delete" -> ({deleted, kept: [entries]}, file paths to remove after the commit)."""
     bud_need_on(c, uid)
-    bud_need_list(c, uid, lid, True)
+    role = bud_need_list(c, uid, lid, True)
     if not isinstance(run, str) or not BUD_RUN_RE.match(run):
         raise Denied(404)
     runs = _runs(c, lid)
     it = next((x for x in runs if x["id"] == run), None)
     if it is None:
         raise Denied(404)
+    if it.get("by") != uid and role not in ("owner", "admin"):  # 2.306.0 D4 (#2875): somebody else's import only the owner / an admin takes back
+        raise Denied(403)
     plain, edited = _run_entries(c, lid, run)
     take = plain + ([r["id"] for r in edited] if b.get("edited") == "delete" else [])
     kept = [] if b.get("edited") == "delete" else [entry_out(bud_dec(c, "budget_entries", r)) for r in edited]

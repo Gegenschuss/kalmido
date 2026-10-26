@@ -8,7 +8,8 @@ backup never holds the mails behind it.
 
 A row is taken with SELECT ... FOR UPDATE SKIP LOCKED (two takers never get the same row). While it runs, its beat_at is
 renewed every BGJ_BEAT s: a row whose process is gone (no beat for BGJ_LOST s) is waiting again (at most BGJ_TRIES runs, then
-failed). The payload is sealed with the server key (it may hold a mail with a sign-in link) and emptied when the row is
+failed). The payload is sealed with the server key (it may hold a mail with a sign-in link; 2.306.0 D1 (#2875): a key from
+KALMIDO_SECRET_KEY, which never lives in the database, so a copy of the database alone never opens it) and emptied when the row is
 done; done rows go after BGJ_KEEP_DONE_H hours, failed ones after BGJ_KEEP_FAILED_D days. A kind is a function registered
 with @bgj_fn(kind) that gets the payload's arguments; it runs in the same context as the thread before (own connections,
 no request). Without the database (bgj_add fails) the work runs in a thread as before.
@@ -20,10 +21,12 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from ..core.config import app
+from ..core.config import app, SECRET_KEY
 from ..core.db import connect, iso
 from ..core.pg import system_ctx
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from .login import auth_key
 from .session import GATE, bg_here
@@ -82,18 +85,39 @@ def _dec(v):
     return v
 
 
+_BGJ_KEY = {}
+
+
+def _srv_key():
+    """2.306.0 D1 (#2875): the queue's key from the server key (KALMIDO_SECRET_KEY / its file, never in the database or a
+    backup), HKDF like the other sealed values; None without a server key."""
+    if SECRET_KEY and "k" not in _BGJ_KEY:
+        _BGJ_KEY["k"] = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"kalmido-bgjob", info=b"bg_jobs payload v2").derive(SECRET_KEY)
+    return _BGJ_KEY.get("k")
+
+
+def _db_key(c):
+    with system_ctx(c):  # the sign-in key (settings), never handed out
+        return auth_key(c)
+
+
 def _seal(c, kind, args):
-    """AES-GCM with the server's sign-in key (login.seal's, without its length limit: a mail with HTML is longer), the kind
-    bound as associated data."""
-    with system_ctx(c):  # the server key (settings), never handed out
-        key = auth_key(c)
+    """AES-GCM, the kind bound as associated data. v2: the server key (2.306.0 D1, #2875); v1 (the sign-in key, kept in the
+    database) only on a server without KALMIDO_SECRET_KEY, as before."""
+    k = _srv_key()
+    tag, key = ("v2.", k) if k else ("v1.", _db_key(c))
     n = os.urandom(12)
-    return "v1." + base64.urlsafe_b64encode(n + AESGCM(key).encrypt(n, json.dumps(_enc(list(args))).encode(), b"kalmido-bgjob:" + kind.encode())).decode()
+    return tag + base64.urlsafe_b64encode(n + AESGCM(key).encrypt(n, json.dumps(_enc(list(args))).encode(), b"kalmido-bgjob:" + kind.encode())).decode()
 
 
 def _unseal(c, kind, s):
-    with system_ctx(c):  # the server key (settings), never handed out
-        key = auth_key(c)
+    """Both forms: rows a v1 server queued before the update still run after it."""
+    if s.startswith("v2."):
+        key = _srv_key()
+        if not key:
+            raise ValueError("no server key")
+    else:
+        key = _db_key(c)
     raw = base64.urlsafe_b64decode(s[3:])
     return _dec(json.loads(AESGCM(key).decrypt(raw[:12], raw[12:], b"kalmido-bgjob:" + kind.encode())))
 

@@ -362,7 +362,8 @@ function userModal(u, done) {
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
     ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared projects only with what is assigned to it')}</label></div>
-    <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
+    <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>
+    <div class="shint kidhint" id="u-kidhint" ${u?.kid ? '' : 'hidden'}>${ic('info', 's')} ${tr('For a child under 16, a parent decides: create the account only with the consent of a parent or guardian. Keep its data to what the child needs.')}</div>` : ''}
     ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin)')}</option></select></div>` : ''}
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
     ${!u ? `<div class="row"><label>${tr('Invitation')}</label><label class="chkl"><input type="checkbox" id="u-inv" checked> ${S.mailOut ? tr('Send an invitation by e-mail: the person sets their own password') : tr('Create an invitation link: the person sets their own password')}</label></div>`
@@ -384,7 +385,7 @@ function userModal(u, done) {
   };
   if ($('#u-parents', md)) parDraw();
   md.addEventListener('change', e => { if (e.target.id === 'u-org') $('#u-orgrow', md).hidden = !+e.target.value; });  // 2.46.0 (#1561)
-  md.addEventListener('change', e => { if (e.target.id === 'u-kid') { $('#u-parrow', md).hidden = !e.target.checked; e.target.setAttribute('aria-expanded', e.target.checked);  /* 2.22.0: the child options only once ticked */ if (e.target.checked) { $('#u-admin', md).checked = false; } } });
+  md.addEventListener('change', e => { if (e.target.id === 'u-kid') { $('#u-parrow', md).hidden = !e.target.checked; $('#u-kidhint', md).hidden = !e.target.checked; /* 2.306.0 B (#2887) */ e.target.setAttribute('aria-expanded', e.target.checked);  /* 2.22.0: the child options only once ticked */ if (e.target.checked) { $('#u-admin', md).checked = false; } } });
   md.addEventListener('click', e => { const b = e.target.closest('[data-uorg]'); if (!b) return; const on = b.getAttribute('aria-pressed') !== 'true'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });  // 2.22.0 (#752)
   md.addEventListener('click', e => { const b = e.target.closest('[data-upar]'); if (!b) return; const id = +b.dataset.upar; par.has(id) ? par.delete(id) : par.add(id); b.classList.toggle('on', par.has(id)); b.setAttribute('aria-pressed', par.has(id)); });
   md.addEventListener('click', e => {  // the picture choice is sent with "Save"
@@ -867,13 +868,14 @@ async function odlDelete(o) {
 // the account's delete dialog: its personal office (deleted with its files, or retired by law), agents, organisation
 // calendars, time entries and direct messages
 function ua8PurgeHtml(p) {
-  if (!p) return '';
   const rows = [];
+  p = p || {};
   if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
   else if (p.office === 'delete') rows.push([false, tr('The personal office goes with its files: {0}.', odlCounts(p.office_counts))]);
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
   if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);
   if (p.time_kept) rows.push([false, trn('{0} time entry in projects of an organisation stays, without the name.', '{0} time entries in projects of an organisation stay, without the name.', p.time_kept)]);
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
+  rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }

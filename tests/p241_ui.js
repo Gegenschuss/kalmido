@@ -96,7 +96,8 @@ async function firefox(fn) {
   await until(() => !d.querySelector('#ag-model'));
   let a = await adm(ag.id);
   const srt = o => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
-  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', reset_seq: 0}), 'saved: ' + JSON.stringify(a.runtime));
+  // 2.312.0 (#3266): runtime has perm_user (null = as set up on its computer)
+  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', perm_user: null, reset_seq: 0}), 'saved: ' + JSON.stringify(a.runtime));
   check((await v1(ag.token, 'GET', '/agent')).runtime?.model === 'sonnet', 'the agent reads it');
   // reopen: values shown, Reset now
   w.eval(`agModal(${JSON.stringify(a)}, null)`);

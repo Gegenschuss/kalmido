@@ -112,8 +112,17 @@ if (MW_ON && MW_TASK) {
 // this browser anyway. No answer within 200 ms after the scripts ran (no app window open, a busy one), a change still waiting to be
 // sent, another person: the normal start.
 const MW_SNAP_CH = 'kalmido-mini-state';
-const mw_snapP = MW_ON && typeof BroadcastChannel === 'function' && LS.get('uid', null) != null ? new Promise(res => {
-  const uid = LS.get('uid', null), ask = Math.random().toString(36).slice(2), ch = new BroadcastChannel(MW_SNAP_CH);
+// 2.306.0 D4 (#2875): the channel answers only a window that knows the nonce of this browser tab family: a window opened with window.open copies
+// the opener's sessionStorage, any other same-origin context has none (it starts the normal way)
+function mw_nonce(make) {
+  try {
+    let n = sessionStorage.getItem('kalmido-mwn') || '';
+    if (!n && make) { n = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join(''); sessionStorage.setItem('kalmido-mwn', n); }
+    return n;
+  } catch { return ''; /* private mode: no shared start */ }
+}
+const mw_snapP = MW_ON && typeof BroadcastChannel === 'function' && LS.get('uid', null) != null && mw_nonce(false) ? new Promise(res => {
+  const uid = LS.get('uid', null), ask = Math.random().toString(36).slice(2), ch = new BroadcastChannel(MW_SNAP_CH), nonce = mw_nonce(false);
   const done = j => { ch.onmessage = null; ch.close(); res(j); };
   ch.onmessage = e => {
     const m = e.data; if (!m || m.re !== ask || m.uid !== uid || typeof m.state !== 'string') return;
@@ -121,7 +130,7 @@ const mw_snapP = MW_ON && typeof BroadcastChannel === 'function' && LS.get('uid'
     if (j?.me?.id === uid && Array.isArray(j.lists) && Array.isArray(j.tasks)) done(j);
   };
   setTimeout(() => done(null), 8000);  // the channel does not stay open
-  ch.postMessage({ask, uid});
+  ch.postMessage({ask, uid, nonce});
 }) : null;
 let mw_snapUsed = false;
 async function mw_bootLoad() {  // main.js: instead of load() in an own window
@@ -136,11 +145,11 @@ async function mw_bootSync() {  // main.js, after the first picture: the real st
   td_renderSoon();
 }
 // a booted main window answers (own windows do not: they would serialise the same state once more): its current state, like the offline cache
-if (!MW_ON && typeof BroadcastChannel === 'function') {
+if (!MW_ON && typeof BroadcastChannel === 'function' && mw_nonce(true)) {
   try {
-    const ch = new BroadcastChannel(MW_SNAP_CH);
+    const ch = new BroadcastChannel(MW_SNAP_CH), nonce = mw_nonce(true);
     ch.onmessage = e => {
-      const m = e.data; if (!m || typeof m.ask !== 'string' || !S.booted || !S.me || m.uid !== S.me.id || !S.lpCache || OUT.q.length) return;
+      const m = e.data; if (!m || typeof m.ask !== 'string' || m.nonce !== nonce || !S.booted || !S.me || m.uid !== S.me.id || !S.lpCache || OUT.q.length) return;
       let state;
       try { state = JSON.stringify({...S.lpCache, v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts}, typeof le2eRepl === 'function' ? le2eRepl() : undefined); } catch { return; }
       ch.postMessage({re: m.ask, uid: S.me.id, state});

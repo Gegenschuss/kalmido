@@ -1334,6 +1334,14 @@ class Runner:
         if PERM_RELAY:
             s["hooks"]["PermissionRequest"] = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd,
                                                                             "timeout": PERM_TIMEOUT_S + 60}]}]
+        # kalmido-capability: usage_hook (2.306.0, #2927)
+        # 2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
+        # Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
+        uh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_usage_hook.py")
+        if os.environ.get("KALMIDO_USAGE_HOOK", "1").strip() != "0" and os.path.isfile(uh):
+            ucmd = [{"hooks": [{"type": "command", "command": f'"{sys.executable}" "{uh}"', "timeout": 30}]}]
+            s["hooks"]["Stop"] = ucmd
+            s["hooks"]["SubagentStop"] = ucmd
         return s
 
     def child_env(self, uid, tid):
@@ -1345,26 +1353,35 @@ class Runner:
                    KALMIDO_RUN_LABEL=("chat" if uid else f"task {tid}" if tid else "event"))
         return env
 
+    # kalmido-capability: perm_user_choice (2.312.0, #3266)
+    def perm_user(self):
+        """2.312.0 D (#3266): the person chosen in the agent's settings in Kalmido (GET /api/v1/agent perm_user_id, read again
+        after runtime_changed) instead of KALMIDO_PERM_USER; without a choice (or an older server) KALMIDO_PERM_USER stays."""
+        return (self.agent or {}).get("perm_user_id") or os.environ.get("KALMIDO_PERM_USER")
+
     def perm_uid(self, tid=None):
-        """Who answers a permission question of a task run: KALMIDO_PERM_USER, else the agent's owner."""
-        v = os.environ.get("KALMIDO_PERM_USER") or (self.agent or {}).get("owner_id")
+        """Who answers a permission question of a task run: perm_user() (KALMIDO_PERM_USER), else the agent's owner."""
+        v = self.perm_user() or (self.agent or {}).get("owner_id")
         return int(v) if str(v or "").isdigit() else None
 
     def perm_operators(self):
-        """2.126.0 B (#1973): who may answer a permission question: KALMIDO_PERM_USER, the agent's owner and the account ids
-        in KALMIDO_OWNER_IDS (a team agent without them: nobody; Kalmido not reached: nobody)."""
-        ids = [os.environ.get("KALMIDO_PERM_USER"), (self.agent or {}).get("owner_id")] + (os.environ.get("KALMIDO_OWNER_IDS") or "").split(",")
+        """2.126.0 B (#1973): who may answer a permission question: perm_user() (KALMIDO_PERM_USER), the agent's owner and the
+        account ids in KALMIDO_OWNER_IDS (a team agent without them: nobody; Kalmido not reached: nobody)."""
+        ids = [self.perm_user(), (self.agent or {}).get("owner_id")] + (os.environ.get("KALMIDO_OWNER_IDS") or "").split(",")
         return {int(str(x).strip()) for x in ids if str(x or "").strip().isdigit()}
 
     def run_args(self, args):
         """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
-        if not self.is_claude() or not PERM_RELAY or any(a == "--settings" or a.startswith("--settings=") for a in args):
+        if not self.is_claude() or any(a == "--settings" or a.startswith("--settings=") for a in args):
+            return args
+        hs = self.hook_settings()  # 2.306.0 E (#2927): also without perm_relay when the usage hook is in it
+        if not hs["hooks"]:
             return args
         os.makedirs(self.state_dir, exist_ok=True)
         f = os.path.join(self.state_dir, "run-settings.json")
         tmp = f + ".new"
         with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(self.hook_settings(), fh)
+            json.dump(hs, fh)
         os.replace(tmp, f)
         return args + ["--settings", f]
 
@@ -1986,7 +2003,7 @@ class Runner:
         if self.perm_thread or not PERM_RELAY or not self.is_claude():
             return
         if not self.perm_operators():  # 2.126.0 review (#1973): say it once at start instead of only denying later
-            log("permission questions: no operator known (set KALMIDO_PERM_USER or KALMIDO_OWNER_IDS) - every question is denied")
+            log("permission questions: no operator known (choose one in the agent's settings in Kalmido, or set KALMIDO_PERM_USER or KALMIDO_OWNER_IDS) - every question is denied")
 
         def watch():
             while True:

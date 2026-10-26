@@ -413,10 +413,13 @@ def cer_list(c):
     return (int(v), r) if r else (None, None)
 
 
-def cer_text(s, n):
+def cer_text(s, n, names=()):
     """A text of the browser without data of a person: quoted texts that are no plain names, e-mail addresses, links and
-    long numbers / ids become a placeholder; control characters go."""
+    long numbers / ids become a placeholder; control characters go. 2.306.0 C (#2889): names = the reporting person's display
+    name / login (3+ characters): they become <name> too."""
     s = re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).strip()
+    for nm in sorted({str(x).strip() for x in names if len(str(x or "").strip()) >= 3}, key=len, reverse=True):
+        s = re.sub((r"\b%s\b" if re.fullmatch(r"\w+", nm) else "%s") % re.escape(nm), "<name>", s, flags=re.I)  # 2.306.0 (#2875 review N16)
     s = re.sub(r"\S+@\S+", "<mail>", s)
     s = re.sub(r"(?i)\b(?:https?|blob|data|file):\S*", lambda m: cer_place(m.group(0)) or "<url>", s)
     s = re.sub(r"(['\"`])(.*?)\1", lambda m: m.group(0) if re.fullmatch(r"[\w$.#-]{1,40}", m.group(2)) else m.group(1) + "…" + m.group(1), s)
@@ -464,7 +467,7 @@ def cer_report():
     if not lid or not cer_rate_ok(u["id"]):
         return "", 204
     b = body()
-    msg = cer_text(b.get("msg"), 300)
+    msg = cer_text(b.get("msg"), 300, (u["display_name"], u["username"]))
     if not msg:
         return err(tr("Invalid value: {0}", "msg"))
     place = cer_place(f"{b.get('src') or ''}:{b.get('line') or ''}:{b.get('col') or ''}" if b.get("line") else b.get("src"))

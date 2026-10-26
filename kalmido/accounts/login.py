@@ -69,7 +69,13 @@ def auth_info():
                    org=_org_label(c),  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
                    signup=_signup_info(c),  # 2.23.0 (#711): registration on the login page (None = off)
                    setup_code=setup and _setup_code_required(c),  # 2.45.0 (#1515): the setup page asks for the code from the log
-                   forgot=not setup and _forgot_on())  # 2.49.0 (#1531): the link "Forgot your password?"
+                   forgot=not setup and _forgot_on(),  # 2.49.0 (#1531): the link "Forgot your password?"
+                   legal=_legal(c))  # 2.306.0 B (#2887): the operator's privacy statement / imprint ('' = no link)
+
+
+def _legal(c):
+    from ..core.instance import legal_links  # 2.306.0 B (#2887): local - core.instance imports accounts
+    return legal_links(c)
 
 
 def _forgot_on():

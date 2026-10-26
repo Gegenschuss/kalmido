@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
 from werkzeug.security import generate_password_hash
 
-from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
+from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, PUBLIC_URL, TZ
 from ..core.config import APP_VERSION
 from ..core import config as skfp_cfg  # 2.190.0 B (#2592): the server key for skfp_check
 from ..core.env import env_bool
@@ -173,8 +173,17 @@ def close_db(_):
         c.close()
 
 
+def topic_prefix():
+    """2.306.0 C (#2889): new topics start with the host of PUBLIC_URL (a-z, 0-9, -), fallback "kalmido"; old topics stay."""
+    import re
+    from urllib.parse import urlparse
+    host = (urlparse(PUBLIC_URL).hostname or "").lower()
+    return re.sub(r"[^a-z0-9]+", "-", host).strip("-")[:30] or "kalmido"
+
+
 def random_topic():
-    return "kalmido-" + secrets.token_urlsafe(9).replace("_", "").replace("-", "").lower()
+    # 2.306.0 C (#2889): was "kalmido-" + secrets ...; the export table (kalmido-export.sh) still lists that line
+    return topic_prefix() + "-tasks-" + secrets.token_urlsafe(9).replace("_", "").replace("-", "").lower()
 
 
 def default_uid(c):

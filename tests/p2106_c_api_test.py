@@ -2,8 +2,11 @@
 """2.153.0 API tests, part C (#2029, #2030): a letter sent by e-mail and its answer linked; text blocks. Own container
 (start.sh) with the SMTP sink + IMAP stub (tests/stub_mail.py). Invented names, addresses @example.com only.
  - mail-info: mail server on, the reply address = the person's document address of the office's documents space ('' before)
- - send-mail: a draft goes out to its recipient's e-mail with the PDF attached, Reply-To = the document address, the
-   Message-ID kept on the letter, status sent + channel email; a second send 400; no address / a broken one 400
+ - send-mail: a draft goes out to its recipient's e-mail with the PDF attached, Reply-To = an address bound to the letter
+   (2.312.0 C #3265, not the document address itself), the Message-ID kept on the letter, status sent + channel email; a
+   second send 400; no address / a broken one 400
+ - 2.312.0 C (#3265): an answer to the bound address (even without In-Reply-To) -> a document linked to that letter; a
+   changed token -> nothing; the document address keeps working for answers to older letters
  - the answer (In-Reply-To = that Message-ID) to the document address -> a document linked to the letter (kind reply);
    the same Message-ID arriving in another organisation's or the private documents space -> no link (tenant-matrix: office)
  - text blocks: create, change, delete + restore, samples (de / en, the note); a member 403, another organisation 404,
@@ -169,8 +172,10 @@ r = A.post(B + L, json={"rcpt_name": "Amt für Beispiele", "rcpt_address": "Must
 assert r.status_code == 201, r.text
 L1 = r.json()["id"]
 r = A.get(B + f"{L}/{L1}/mail-draft")
-check(r.ok and r.json()["to"] == "amt@example.com" and r.json()["filename"].endswith(".pdf") and r.json()["reply_address"] == ADDR
-      and "Antrag 7/2026" in r.json()["text"], f"mail-draft prefilled ({r.text[:200]})")
+# 2.312.0 C (#3265): the draft shows the address bound to this letter (was the document address ADDR)
+RT = r.json().get("reply_address", "")
+check(r.ok and r.json()["to"] == "amt@example.com" and r.json()["filename"].endswith(".pdf") and RT.startswith("tasks+l") and RT != ADDR
+      and RT.endswith("@example.test") and "Antrag 7/2026" in r.json()["text"], f"mail-draft prefilled ({r.text[:200]})")
 check(Fr.get(B + f"{L}/{L1}/mail-draft").status_code == 404, "another organisation: mail-draft 404")
 check(Fr.post(B + f"{L}/{L1}/send-mail", json={}).status_code == 404, "another organisation: send-mail 404")
 check(Bo.post(B + f"{L}/{L1}/send-mail", json={}).status_code == 403, "a member: send-mail 403")
@@ -186,7 +191,8 @@ if out:
     m = email.message_from_string(out[-1]["raw"], policy=email.policy.default)
     check(set(out[-1]["to"]) == {"amt@example.com", "copy@example.com"}, f"to + cc ({out[-1]['to']})")
     check(str(m["Message-ID"]) == MID, "the mail's Message-ID = the one on the letter")
-    check(str(m["Reply-To"]) == ADDR, f"Reply-To = the document address ({m['Reply-To']})")
+    check(str(m["Reply-To"]) == RT and ADDR.split("@")[0].split("+")[1] not in out[-1]["raw"],
+          f"2.312.0 C (#3265): Reply-To = the address bound to the letter, the document address is not in the mail ({m['Reply-To']})")
     check(str(m["Subject"]) == "Antrag 7/2026", "subject = the letter's subject")
     att = list(m.iter_attachments())
     check(len(att) == 1 and att[0].get_content_type() == "application/pdf" and att[0].get_content().startswith(b"%PDF")
@@ -210,6 +216,17 @@ check(n1b and until(lambda: n1b in reply_links(L1), 10), "References with the Me
 m1c = deliver(ADDR, "<unknown@example.com>", "Fremde Sache")
 n1c = node_of(m1c)
 check(n1c and n1c not in reply_links(L1), "another Message-ID: no link")
+# 2.312.0 C (#3265): the bound Reply-To: an answer without In-Reply-To is linked to its letter; a changed token goes nowhere
+m4 = deliver(RT, None, "Antwort ohne Bezug")
+n4 = node_of(m4)
+check(n4 and until(lambda: n4 in reply_links(L1), 10), "an answer to the bound address is linked to the letter")
+check(dbx("SELECT org_id FROM fs_nodes WHERE id=?", (n4,)) == [(ORG,)], "and is a document of Alpha")
+loc, dom = RT.split("@")
+bad = loc[:-1] + ("0" if loc[-1] != "0" else "1") + "@" + dom
+m5 = deliver(bad, MID, "Gefälschte Antwort")
+check(node_of(deliver(RT, None, "Danach")), "a later mail to the bound address arrives (the changed one was read before it)")
+check(not dbx("SELECT 1 FROM doc_meta WHERE ext_id LIKE ?", (f"mail:{m5}:%",)) and not dbx("SELECT 1 FROM tasks WHERE title='Gefälschte Antwort'"),
+      "a changed token: no document, no task")
 r = Fr.post(B + "/api/docs/mail", json={"ws": f"org:{BETA}"})
 assert r.ok, r.text
 m2 = deliver(r.json()["address"], MID, "Fremde Antwort")
@@ -268,10 +285,21 @@ out = sent_mails()[n0:]
 FMID = (dbx("SELECT msg_id FROM office_letters WHERE id=?", (FL,)) or [[""]])[0][0]
 if out:
     fm = email.message_from_string(out[-1]["raw"], policy=email.policy.default)
-    check(str(fm["Reply-To"]) == FADDR and "anbei." in fm.get_body(("plain",)).get_content(), "freelancer: own text, Reply-To private address")
+    # 2.312.0 C (#3265): Reply-To = the address bound to the letter (was the private document address FADDR)
+    FRT = str(fm["Reply-To"])
+    check(FRT.startswith("tasks+l") and FRT != FADDR and "anbei." in fm.get_body(("plain",)).get_content(), "freelancer: own text, Reply-To bound to the letter")
+    fn2 = node_of(deliver(FRT, None, "Antwort Schaden 42 ohne Bezug"))
+    check(fn2 and until(lambda: fn2 in reply_links(FL), 10), "freelancer: an answer to the bound address is linked to the letter")
 check(A.get(B + f"{L}/{FL}").status_code == 404, "alice (Alpha) cannot open fiona's letter")
 fn = node_of(deliver(FADDR, FMID, "Antwort Schaden 42"))
 check(fn and until(lambda: fn in reply_links(FL), 10), "freelancer: the answer is linked to the letter of the personal office")
+if out:
+    # 2.312.0 (#3265, review): removing the document address stops the answers to the letter address as well
+    check(Fi.delete(B + "/api/docs/mail?ws=private").ok, "freelancer: document address removed")
+    mx = deliver(FRT, None, "Nach dem Abschalten")
+    check(node_of(deliver(ADDR, None, "Kontrolle danach")), "(control) a later mail to Alpha's document address arrives")
+    check(not dbx("SELECT 1 FROM doc_meta WHERE ext_id LIKE ?", (f"mail:{mx}:%",)) and not dbx("SELECT 1 FROM tasks WHERE title='Nach dem Abschalten'"),
+          "freelancer: without the document address the letter address takes nothing in")
 r = Fi.post(B + BL, json={"starter": "cancel", "lang": "en"})
 check(r.status_code == 201 and r.json()["name"] == "Cancellation", "freelancer: a sample block")
 check([x["id"] for x in Fi.get(B + BL).json()["blocks"]] == [r.json()["id"]], "freelancer: only the own blocks")

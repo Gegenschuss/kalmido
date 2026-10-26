@@ -14,6 +14,7 @@ import re
 from datetime import date, timedelta
 
 from . import rules as RU
+from ..files.store import fs_role  # 2.306.0 D3 (#2875)
 from . import store as S
 
 DSR_KEYS = {"tag": "tag", "tags": "tag", "absender": "sender", "sender": "sender", "von": "sender", "from": "sender",
@@ -164,9 +165,12 @@ def dsr_filters(c, args, where, params, base_where, base_params):
             where.append(cond)
     fol = flat("folder")
     if fol:
-        where.append(_in("n.parent_id", fol, params))
+        fol = [f for f in fol if fs_role(c, int(f))]  # 2.306.0 (#2875 review N15): only folders the caller sees, as with under=
+        where.append(_in("n.parent_id", fol or [0], params))
     under = str(args.get("under") or "")  # 2.199.0 B (#2742): a folder of the sidebar's tree with all its subfolders
     if under.isdigit():
+        if not fs_role(c, int(under)):
+            under = "0"  # 2.306.0 D3 (#2875): only a folder the caller sees narrows the search (else: nothing)
         where.append("n.parent_id IN (WITH RECURSIVE t(id) AS (SELECT id FROM fs_nodes WHERE id = ? UNION ALL "
                      "SELECT x.id FROM fs_nodes x JOIN t ON x.parent_id = t.id WHERE x.kind = 'folder' AND x.deleted_at IS NULL) "
                      "SELECT id FROM t)")

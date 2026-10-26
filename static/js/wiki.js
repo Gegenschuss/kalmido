@@ -546,7 +546,7 @@ async function wk_trashDlg(sp = wk_cur()) {
     let j; try { j = await rawFetch('GET', '/api/wiki/trash?space=' + encodeURIComponent(sp)); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message)}</div>`; return; }
     pages = j.pages || [];
     if (wk_e2e(sp) && typeof wkeOpen === 'function') { const ks = await wkeKeys(sp).catch(() => null); for (const p of pages) if (!await wkeOpen(sp, p, ks).catch(() => false)) p.path = ''; }
-    $('[data-wkt="empty"]', md).classList.toggle('hidden', !pages.length);
+    $('[data-wkt="empty"]', md).classList.toggle('hidden', !pages.length || j.may_empty === false);  // 2.306.0 D3 (#2875): an organisation's admins
     box.innerHTML = (pages.length ? `<div class="members">${pages.map(p => `<div class="mrow wktrow" data-wktid="${p.id}"><span class="n"><b>${p.path ? esc(p.path) : `<span class="muted">${tr('Encrypted page')}</span>`}</b><small class="muted">${esc([tr('Moved to the trash on {0}', fmtWhen(p.deleted_at)), p.files ? trn('{0} file', '{0} files', p.files) + ' · ' + fmtBytes(p.size) : ''].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb"><button type="button" class="btn sm" data-wkt="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-wkt="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')}</div>`
       : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Pages in the trash are deleted for good after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;

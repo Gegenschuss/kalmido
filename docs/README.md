@@ -17,6 +17,7 @@ The [README](../README.md) is the overview of all features. The pages here go in
 - [AGENT-SECURITY.md](AGENT-SECURITY.md) - running an agent safely (threat model)
 - [API.md](API.md) - REST API and webhooks
 - [ASSISTANT.md](ASSISTANT.md) - the optional built-in assistant
+- [PRIVACY-TEMPLATE.md](PRIVACY-TEMPLATE.md) - privacy statement template for operators: what is stored, how long, outside connections, cookies
 - [PRIVACY-ASSISTANT-TEMPLATE.md](PRIVACY-ASSISTANT-TEMPLATE.md) - privacy wording template for operators of the assistant
 
 ## Areas of the app

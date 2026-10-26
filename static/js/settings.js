@@ -259,12 +259,14 @@ function modCountsSync(md) {
   const pma = $('#s-modsall', md); if (pma) pma.checked = pm_allShown();  // 2.171.0 (#2676)
   for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
 }
+// 2.306.0 B (#2887): health and journal entries are special categories of personal data: a plain note in the module row
+// (2.312.0 B #3264: MOD_PRIV / modPrivHtml in lazyload.js, shared with the area switch and the first-run setup)
 // one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
 function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
   const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share projects, assign tasks, comment, or get News and collaboration notifications; shared projects are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
-  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
+  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${modPrivHtml([k])}${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
 // 2.46.6 (#1710): an admin switch that stays next to the own setting says so: "Admin · applies to everyone" + a jump to
 // the same switch under Administration (adSel = the id there)
@@ -500,6 +502,10 @@ function hostHtml(hint) {
     <div class="row"><label for="s-quota">${tr('Storage per person')}</label><input id="s-quota" inputmode="numeric" class="numin" value="${a.storage_quota_mb == null ? '' : esc(String(a.storage_quota_mb))}" placeholder="${esc(String(a.storage_quota_env || 0))}"><span class="muted">${tr('MB (0 = unlimited)')}</span></div>
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
+    <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
+    ${hint(tr('Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
+    <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
     ${hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))}
     <div class="row"><label for="s-maillim">${tr('Per account and day')}</label><input id="s-maillim" inputmode="numeric" class="numin" value="${esc(String(a.mail_day_limit || 30))}"></div>
@@ -532,6 +538,7 @@ function hostWire(md) {
     if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
     if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
     if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
+    if (id === 's-privacy' || id === 's-imprint') { hostSave(md, {[id === 's-privacy' ? 'privacy_url' : 'imprint_url']: e.target.value.trim()}, tr('Saved')); return; }  // 2.306.0 B (#2887)
     if (id === 's-maillim') { const v = +e.target.value; if (!(v >= 1 && v <= 1000)) { toast(tr('Invalid value: {0}', tr('E-mails per day'))); e.target.value = S.about?.mail_day_limit || 30; return; } hostSave(md, {mail_day_limit: v}, tr('Saved')); }
   });
   md.addEventListener('click', async e => {
@@ -548,7 +555,7 @@ function hostWire(md) {
 function settingsModal(focus) {
   if (kd_pinNeed()) return kd_pinAsk(() => settingsModal(focus));  // 2.49.0 (#1551): a child with the parents' PIN
   const s = S.settings;
-  const topicUrl = `${S.ntfyUrl}/${s.ntfy_topic}`;
+  const topicUrl = httpUrl(`${S.ntfyUrl}/${s.ntfy_topic}`);  // 2.306.0 D4 (#2875): only http(s) in the link
   const dev = `<span class="devtag">${tr('This device')}</span>`, hint = t => `<div class="shint">${t}</div>`;
   const chk = (id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`;
   const prio = `<div class="row"><label for="s-pushprio">${tr('How urgent')}</label><select id="s-pushprio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${(s.push_priority || '4') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -1279,7 +1286,7 @@ function aboutHtml(chk, hint) {
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutmarks"><label></label><span class="muted">${tr('Product and company names mentioned in Kalmido are trademarks of their respective owners. Kalmido is an independent project, not affiliated with or endorsed by them.')}</span></div>
-    <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
+    <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}${legalLinks(a.legal, 'btn sm')}</div>`;
   h += sup_aboutHtml();  // 2.74.0 (#338): "Support Kalmido" (self-hosted only)
   return h;
 }
@@ -1308,7 +1315,13 @@ async function adminSwitch(md, el, fromHist) {
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   try {
-    const j = await api('PATCH', '/api/admin/settings', {[key]: on});
+    // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password
+    const pw = key === 'oidc_autocreate' && on;
+    let j; try { j = await (pw ? rawFetch : api)('PATCH', '/api/admin/settings', {[key]: on}); } catch (x) {
+      if (!pw || !x.data?.password_needed) { if (pw) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+      const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
+      j = await api('PATCH', '/api/admin/settings', {[key]: on, password: p.password});
+    }
     if (j && j.version) S.about = j;
   } catch { el.checked = !on; return; }
   if (!fromHist) {  // one history step; undo / redo flip the switch back through the same path (no second question)

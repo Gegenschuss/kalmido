@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"errors"
 	"flag"
 	"fmt"
@@ -152,16 +153,85 @@ func pageSecret(store *Store) string {
 	return s
 }
 
-// pingInstance: is our own program answering on that port with that secret?
+// pingInstance: is our own program answering on that port with that secret? 2.306.0 D3 (#2875): challenge and answer
+// (web.go hello) -- the secret never goes to whatever listens on the port; a foreign program there fails the check.
 func pingInstance(port int, secret string) bool {
-	c := &http.Client{Timeout: 2 * time.Second}
-	resp, err := c.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/s/" + secret + "/ping")
+	c := &http.Client{Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	n := randomHex(32)
+	resp, err := c.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/hello?n=" + n)
 	if err != nil {
 		return false
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
-	return resp.StatusCode == http.StatusOK && strings.HasPrefix(string(b), "kalmido-folder-watcher")
+	f := strings.Fields(string(b))
+	return resp.StatusCode == http.StatusOK && len(f) >= 2 && f[0] == "kalmido-folder-watcher" &&
+		hmac.Equal([]byte(f[len(f)-1]), []byte(helloProof(secret, port, n)))
+}
+
+// oldCopyRunning: 2.306.0 (#2875): a copy from before the lock (no /hello yet) on the port -- our log says a copy of
+// this settings folder started and did not stop, and the port answers /hello like those versions do (404, the page's
+// own headers). Nothing secret goes to the port; a foreign program that mimics it only gets this start to wait.
+func oldCopyRunning(store *Store, port int) bool {
+	if !loggedRunning(store.dir) {
+		return false
+	}
+	c := &http.Client{Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := c.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/hello?n=" + randomHex(32))
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+	return resp.StatusCode == http.StatusNotFound && string(b) == "not found\n" &&
+		resp.Header.Get("Content-Security-Policy") == pageCSP && resp.Header.Get("X-Frame-Options") == "DENY"
+}
+
+// loggedRunning: the last "started" / "stopped" line of log.txt (or log.1.txt after a rotation) is "started".
+func loggedRunning(dir string) bool {
+	for _, n := range []string{"log.txt", "log.1.txt"} {
+		b, err := os.ReadFile(filepath.Join(dir, n))
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(string(b), "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if len(lines[i]) < 20 {
+				continue
+			}
+			msg := lines[i][20:]
+			if strings.HasPrefix(msg, "started ") {
+				return true
+			}
+			if msg == "stopped" {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+var errLocked = errors.New("locked")
+
+const lockName = "instance.lock"
+
+// instanceLock: 2.306.0 (#2875): the second check next to /hello -- an older copy (no /hello yet) or one on another
+// port holds this lock in the settings folder, so no second engine works on the same config, journal and folders.
+// The file holds the PID of the copy that has it. A folder without locks (an error other than "held") does not stop
+// the start.
+func instanceLock(store *Store) (release func(), pid string, err error) {
+	path := filepath.Join(store.dir, lockName)
+	f, err := lockFile(path)
+	if err == errLocked {
+		b, _ := os.ReadFile(path)
+		return nil, strings.TrimSpace(string(b)), err
+	}
+	if err != nil {
+		return func() {}, "", err
+	}
+	_ = f.Truncate(0)
+	_, _ = f.WriteAt([]byte(strconv.Itoa(os.Getpid())+"\n"), 0)
+	return func() { _ = f.Close() }, "", nil
 }
 
 func runService(store *Store, background bool) int {
@@ -190,6 +260,13 @@ func runService(store *Store, background bool) int {
 			time.Sleep(time.Second)
 		}
 	}
+	if err != nil && oldCopyRunning(store, port) {
+		log.Printf("an older copy is running on port %d, not starting a second one", port)
+		if !background {
+			fmt.Println(T(pickLang(systemLang()), "con_old_copy"))
+		}
+		return 0
+	}
 	if err != nil {
 		// another program holds the port: a free one, the page opens there
 		log.Printf("port %d busy (%v), using a free port", port, err)
@@ -200,6 +277,23 @@ func runService(store *Store, background bool) int {
 		port = ln.Addr().(*net.TCPAddr).Port
 	}
 	lang := pickLang(systemLang())
+	release, pid, lerr := instanceLock(store)
+	for i := 1; lerr == errLocked && i < tries; i++ {
+		time.Sleep(time.Second) // the copy that takes over waits for the old one to end
+		release, pid, lerr = instanceLock(store)
+	}
+	if lerr == errLocked {
+		_ = ln.Close()
+		log.Printf("another copy (pid %s) is running for this settings folder, not starting a second one", pid)
+		if !background {
+			fmt.Println(T(lang, "con_other_copy", pid))
+		}
+		return 0
+	}
+	if lerr != nil {
+		log.Printf("instance lock: %v", lerr)
+	}
+	defer release()
 	eng := newEngine(store, log)
 	stop := make(chan struct{})
 	var stopOnce sync.Once
@@ -279,6 +373,7 @@ func runService(store *Store, background bool) int {
 	}
 	shutdown()
 	if after != nil {
+		release() // the copy that takes over (or the uninstall) needs the lock file free
 		after()
 	}
 	log.Printf("stopped")
@@ -291,7 +386,7 @@ func runService(store *Store, background bool) int {
 // uninstallFiles removes the installed copy and the settings folder (keys, journal, log), then unloads the autostart.
 func uninstallFiles(store *Store) {
 	exe := installedPath(store)
-	for _, n := range []string{"config.json", "journal.json", "page-secret", "log.txt", "log.1.txt"} {
+	for _, n := range []string{"config.json", "journal.json", "page-secret", lockName, "log.txt", "log.1.txt"} {
 		_ = os.Remove(filepath.Join(store.dir, n))
 	}
 	removeSelfLater(exe)

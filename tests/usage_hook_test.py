@@ -3,8 +3,8 @@
 A sample transcript (tests/fixtures/claude_transcript.jsonl): one message written on two lines counts once, one report per
 model, synthetic messages and broken lines are skipped, no text of the transcript is ever sent; the state per session (only
 new messages next time, a half-written last line waits), the cost from a price table, the task of the agent's status,
-a task that is gone (report without it), Kalmido unreachable (state kept, sent later), the env file, and a hook that never
-fails (exit 0 on bad input).
+a task that is gone (report without it), Kalmido unreachable (state kept, sent later), the env file, a hook that never
+fails (exit 0 on bad input), and two runs of the same turn at once counted once (2.306.0, #2927).
 usage: usage_hook_test.py"""
 import io
 import json
@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +23,7 @@ import claude_usage_hook as hook  # noqa: E402
 
 from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 REQS = []
-STATE = {"agent": {"status": "idle", "status_task": None}, "bad_task": False}
+STATE = {"agent": {"status": "idle", "status_task": None}, "bad_task": False, "slow": 0}
 TOKEN = "abk_test_hook_token"
 
 
@@ -46,6 +47,8 @@ class Stub(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         b = json.loads(self.rfile.read(n) or b"{}")
         REQS.append({"m": "POST", "p": self.path, "b": b, "auth": self.headers.get("Authorization")})
+        if STATE["slow"]:
+            time.sleep(STATE["slow"])
         if STATE["bad_task"] and "task_id" in b:
             return self._send(400, {"error": {"code": "bad_request", "message": "Invalid value: task_id"}})
         self._send(201, {"id": len(REQS)})
@@ -177,6 +180,35 @@ check(len(p) == 1 and p[0]["b"]["input_tokens"] == 24, f"a second subagent count
 cp = subprocess.run([sys.executable, os.path.join(HERE, "..", "mcp", "claude_usage_hook.py"), "--dry-run", envf],
                     input=json.dumps({**SUBHOOK, "agent_id": "c3"}), capture_output=True, text=True, env=clean_env, timeout=30)
 check(cp.returncode == 0 and "subagent c3" in cp.stdout, f"CLI dry run with SubagentStop input: {cp.stdout} {cp.stderr}")
+
+# 2.306.0 (#2927): launcher --settings and the project settings.json both wire the hook -> two runs for the same turn at
+# once; the state lock makes the second one wait and its message ids count the turn once
+with open(tr, "a", encoding="utf-8") as f:
+    f.write('{"type":"assistant","message":{"id":"msg_10","model":"claude-sonnet-4-5","usage":{"input_tokens":13,"output_tokens":1}}}\n')
+STATE["slow"] = 0.4
+n0 = len(posts())
+ts = [threading.Thread(target=hook.run, args=(HOOK, ENV)) for _ in range(2)]
+for t in ts:
+    t.start()
+for t in ts:
+    t.join(30)
+STATE["slow"] = 0
+p = [r for r in posts()[n0:] if r["b"].get("input_tokens") == 13]
+check(len(p) == 1, f"two hook runs of the same turn at once: counted once ({len(p)} reports)")
+check(os.path.exists(hook.state_path(ENV["KALMIDO_USAGE_STATE_DIR"], "sess-1234abcd") + ".lock"), "lock file next to the state")
+held = hook.StateLock(hook.state_path(ENV["KALMIDO_USAGE_STATE_DIR"], "sess-1234abcd"))
+with held:
+    t0 = time.monotonic()
+    busy = hook.StateLock(held.path[:-5], wait=0.3)
+    try:
+        with busy:
+            got = "lock"
+    except hook.LockBusy:
+        got = "busy"
+    check(got == "busy" and time.monotonic() - t0 < 5, f"a held lock: the other run gives up after its wait ({got})")
+with hook.StateLock(held.path[:-5], wait=0.3):
+    check(True, "released again after the run")
+
 shutil.rmtree(tmp, ignore_errors=True)
 srv.shutdown()
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")

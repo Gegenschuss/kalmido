@@ -787,7 +787,7 @@ unknown = sorted({c for c in reached if c not in API})
 check(not unknown, f"MCP tools call routes the API does not have: {unknown}")
 check(set(TOOL_VARIANTS) <= {t[0] for t in mcp.TOOLS}, "TOOL_VARIANTS: known tools only")
 # every tool has a scope rule that matches the scope of its route(s) in the OpenAPI document is checked against the live
-# server in p2150_api_test.py; here: every tool name in TOOL_SCOPES exists
+# server in p2306_e_mcp_scope_test.py (2.306.0, #2741); here: every tool name in TOOL_SCOPES exists
 check(set(mcp.TOOL_SCOPE) <= {t[0] for t in mcp.TOOLS}, f"TOOL_SCOPES: unknown tools {sorted(set(mcp.TOOL_SCOPE) - {t[0] for t in mcp.TOOLS})}")
 print(f"app routes: {len(APP)} ({len(APP_TO_API)} mapped), API routes: {len(API)} ({len(API) - len(API_ONLY)} with MCP tools), MCP tools: {len(mcp.TOOLS)}")
 print(f"parity: {OKS[0]} ok, {len(FAILS)} failed")

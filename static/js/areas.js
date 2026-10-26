@@ -261,7 +261,7 @@ const MG_DESC = {office: N_('Quotations, invoices and bookkeeping'),  // 2.298.0
   ablage: N_('Folders and files of your own and of your organisation, shared with people and agents, with versions')};  // 2.48.0 (#1207)
 function mg_modAreaHtml(id, partRow) {
   const a = mg_area(id), on = mg_on(id), all = mg_allOn(id), ks = a[3].flatMap(p => p[4]());
-  return `<div class="modrow mgarea ${on ? '' : 'off'} ${on && !all ? 'part' : ''}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${all ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small></span></label>
+  return `<div class="modrow mgarea ${on ? '' : 'off'} ${on && !all ? 'part' : ''}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${all ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small>${modPrivHtml(ks)}</span></label>
     <details class="mopt mgparts"><summary>${tr('Parts: {0}', a[3].map(p => tr(p[2])).join(', '))}</summary><div class="modlist">${ks.map(partRow).join('')}</div></details></div>`;
 }
 function mg_setSync(md) {

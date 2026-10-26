@@ -566,7 +566,10 @@ def _set_members(c, oid, ids):
     roles = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM org_members WHERE org_id=?", (oid,))}
     c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
     for u in sorted(set(ids) & have):
-        org_member_add(c, oid, u, roles.get(u, "member"))
+        if u in roles:
+            org_member_add(c, oid, u, roles[u])
+        else:
+            org_join_or_add(c, oid, u)  # 2.306.0 D1 (#2875): hosted: an invitation
     # 2.36.2 (#1142): the people taken out leave the organisation the same way as with an organisation admin (org_leave):
     # they leave its lists, calendars and address books; their lists of this workspace go to an admin who stays
     _members_gone(c, oid, sorted(set(roles) - set(ids)))
@@ -593,27 +596,73 @@ def _member_ops(c, oid, b):
             ops[k + "_remove"] = sorted(set(ops.get(k + "_remove", [])) | (old - new))
     if not ops:
         return False
-    have = {r[0] for r in c.execute("SELECT id FROM users")}
+    have = {r[0]: r[1] or "user" for r in c.execute("SELECT id, kind FROM users")}
+    had = org_own_admin(c, oid)
     for u in ops.get("members_add", []):
-        if u in have:
-            org_member_add(c, oid, u, "member")
-    gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
-    for u in gone:
-        c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
-    _members_gone(c, oid, gone)
+        if u in have and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone():
+            # 2.306.0 D1 (#2875): hosted: an invitation; Fix-1 (#2875 review): with the admin role when also in admins_add
+            org_join_or_add(c, oid, u, "admin" if have[u] != "agent" and u in ops.get("admins_add", []) else "member")
+    # 2.306.0 D1 (#2875): the new admins first, so the people taken out leave their lists to them (not to the operator)
     for u in ops.get("admins_add", []):
         c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u))
     for u in ops.get("admins_remove", []):  # only an admin becomes a member; guest / read-only / accounting keep their role (#2151)
         c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u))
+    gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
+    for u in gone:
+        c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
+    _members_gone(c, oid, gone)
+    keep_own_admin(c, oid, had)  # 2.306.0 Fix-1 (#2875 review): hosted: demoting the last admin is refused too
     acx_drop()
     return True
+
+
+def _operator_apart():
+    """2.306.0 D1 (#2875, #2687): on a hosted instance the operator stays out of its customers' organisations: it never becomes
+    their admin when the last one goes (409 instead) and puts no existing account into one without the person's consent
+    (an invitation, org_join_or_add). A self-hosted server keeps both as before."""
+    from ..admin.hosting import hosted
+    return hosted()
+
+
+def org_own_admin(c, oid, but=0):
+    """2.306.0 Fix-1 (#2875 review): an active admin of organisation oid who is a person (not `but`), or None."""
+    r = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                  "AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent' AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, but)).fetchone()
+    return r[0] if r else None
+
+
+def keep_own_admin(c, oid, had):
+    """2.306.0 Fix-1 (#2875 review): hosted: a change by the operator that leaves an organisation which had an admin of its own
+    without one is refused (409, rolled back), like the last admin leaving (_members_gone)."""
+    if had and _operator_apart() and org_own_admin(c, oid) is None:
+        c.rollback()
+        raise Denied(409, tr("The last admin of an organisation cannot leave it: make somebody else an admin first"))
+
+
+def org_join_or_add(c, oid, uid, role="member"):
+    """2.306.0 D1 (#2875): the instance admin places an existing account into organisation oid: directly, or on a hosted
+    instance as an invitation the person accepts (accounts/orginvite.py, like an organisation admin's). An agent is placed
+    directly (it accepts nothing). Returns True when only invited."""
+    if _operator_apart() and c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')!='agent'", (uid,)).fetchone():
+        if uid == me():  # 2.306.0 Fix-1 (#2875 review): the operator does not invite itself into a customer's organisation
+            c.rollback()
+            raise Denied(409, tr("On a hosted instance the operator does not join the organisations of its customers"))
+        from .orginvite import ojn_invite
+        ojn_invite(c, oid, uid, role)
+        return True
+    org_member_add(c, oid, uid, role)
+    return False
 
 
 def _members_gone(c, oid, gone):
     """The people taken out of organisation oid leave it (org_leave); no admin left: the operator takes over."""
     if gone:
-        heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
-                          "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
+        own = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                        "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
+        if not own and _operator_apart():  # 2.306.0 D1 (#2875): hosted: the organisation keeps an admin of its own
+            c.rollback()
+            raise Denied(409, tr("The last admin of an organisation cannot leave it: make somebody else an admin first"))
+        heir = (own
                 or c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
         if heir and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, heir)).fetchone():
             org_member_add(c, oid, heir, "admin")  # no admin stays: the operator takes over (like org_member_remove)
@@ -710,9 +759,11 @@ def org_update(oid):
                 c.rollback()
                 return err(tr("Invalid value: {0}", "admins"))
             # 2.143.0 A (#2151): only former admins become members; guest / read-only / accounting keep their role
+            had = org_own_admin(c, oid)
             c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND role='admin'", (oid,))
             for x in b["admins"]:
                 c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
+            keep_own_admin(c, oid, had)  # 2.306.0 Fix-1 (#2875 review): hosted: the organisation keeps an admin of its own
             from ..core.access import acx_drop
             acx_drop()  # 2.143.0 A (#2151, review): the request's cached roles follow
         bump(c)
@@ -1045,7 +1096,7 @@ def org_member_put(oid):
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
         from ..core.access import acx_drop
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
-    elif uid != me() and not g.user["is_admin"]:  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation
+    elif uid != me() and (not g.user["is_admin"] or _operator_apart()):  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation (2.306.0 D1, #2875: also the operator's)
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
         pending = True
@@ -1151,6 +1202,8 @@ def org_member_remove(oid, uid):
             return err(tr("The projects can only go to another active person of the organisation"), 400)
         heir = to
     operator = None
+    if heir is None and _operator_apart():  # 2.306.0 D1 (#2875): a hosted instance's operator never takes a customer's organisation over
+        return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     if heir is None:  # the only admin leaves: the operator (an instance admin) takes the organisation over and is told
         operator = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
         if operator is None:

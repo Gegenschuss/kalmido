@@ -240,6 +240,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMPORT_MAX_TASKS` | `20000` | Tasks per import at most. |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per person in 10 minutes. |
 | `KALMIDO_NTFYIN_TICK` | `20` | Seconds between two rounds of the personal share inboxes. |
+| `KALMIDO_PEPPOL_ALLOW_HOSTS` | `(empty)` | Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0). |
 | `KALMIDO_PUBLIC_LINKS` | `1` | Switch: public read-only links of lists. |
 | `KALMIDO_WEBHOOKS` | `1` | Switch: outgoing webhooks. |
 | `KALMIDO_WEBHOOK_ALLOW_HOSTS` | `(empty)` | Internal hosts webhooks may reach. |
@@ -295,7 +296,9 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | Variable | Default | Meaning |
 |---|---|---|
 | `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses. |
+| `KALMIDO_IMPRINT_URL` | `(empty)` | Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement. |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
+| `KALMIDO_PRIVACY_URL` | `(empty)` | Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins. |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |
 | `KALMIDO_STORAGE_QUOTA_MB` | `(empty)` | Storage per person in MB (empty / 0 = unlimited; admins can set it in the app). |

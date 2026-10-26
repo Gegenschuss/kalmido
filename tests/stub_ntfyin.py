@@ -3,6 +3,7 @@ answers the messages of /data/ntfyin_msgs.json (a list of {topic, id, message, t
 and records every request (path + Authorization) in /data/ntfyin.log."""
 import http.server
 import json
+import time
 import urllib.parse
 
 
@@ -12,7 +13,7 @@ class H(http.server.BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         topic = u.path.strip("/").split("/")[0]
         with open("/data/ntfyin.log", "a") as f:
-            f.write(json.dumps({"path": self.path, "auth": self.headers.get("Authorization")}) + "\n")
+            f.write(json.dumps({"path": self.path, "auth": self.headers.get("Authorization"), "t": time.time()}) + "\n")
         try:
             msgs = [m for m in json.load(open("/data/ntfyin_msgs.json")) if m["topic"] == topic]
         except (OSError, ValueError):
@@ -21,6 +22,10 @@ class H(http.server.BaseHTTPRequestHandler):
         ids = [m["id"] for m in msgs]
         if since in ids:
             msgs = msgs[ids.index(since) + 1:]
+        if topic.startswith("slow-"):  # 2.312.0 C (#3265): a hanging server (answers late, logs the end)
+            time.sleep(12)
+            with open("/data/ntfyin.log", "a") as f:
+                f.write(json.dumps({"path": self.path, "end": True, "t": time.time()}) + "\n")
         if topic.startswith("down-"):
             self.send_response(500)
             self.end_headers()

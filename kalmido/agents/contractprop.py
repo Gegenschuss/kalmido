@@ -280,6 +280,8 @@ def ctr_undo(c, j, rec, back=True):
     r = c.execute("SELECT * FROM comments WHERE id=? AND task_id=? AND user_id=?", (cid, tid, me())).fetchone()
     if r and back and not r["deleted_at"] and not r["edited_at"]:
         n += c.execute("UPDATE comments SET body='', deleted_at=? WHERE id=?", (iso(now_utc()), cid)).rowcount
+        from ..collab.news import news_forget_comment
+        news_forget_comment(c, cid)  # 2.306.0 (#2889 review N21): the News excerpt goes with the text
     elif r and not back and r["deleted_at"]:
         n += c.execute("UPDATE comments SET body=?, deleted_at=NULL WHERE id=?", (p["text"], cid)).rowcount
     elif r is None or (back and r["edited_at"]):

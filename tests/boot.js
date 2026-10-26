@@ -143,7 +143,7 @@ exports.login = async (user, pw = 'password123', o = {}) => {
 // 2.53.0 (#1410): lazy = false (the default) loads the modules the app loads on demand (settings, contacts, office) right after
 // the start, so suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
 // 2.126.0 D (#1989): shared = {store: {}, wins: []}: windows of one browser -- one localStorage, a write fires "storage" in the others
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = 2500, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, shared = null} = {}) {
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, shared = null} = {}) {
   const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons});
   if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons});  // 2.56.1 (#1799)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
@@ -171,7 +171,13 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       exports.dialogBridge(w);
       if (setup) setup(w);  // extra browser APIs for one suite (webpush_ui.js: Notification, PushManager, ...)
     }});
-  await new Promise(r => setTimeout(r, wait));
+  // 2.312.0 A (#3284): without an own `wait` the first drawing is awaited (the loading screen #boot fades out in bootDone(), main.js),
+  // not a fixed 2.5 s: too short on a slow runner. At most 20 s, so an error cannot hang a suite; a page without #boot is done at once.
+  if (wait === null) {
+    const bd = () => { const b = dom.window.document.getElementById('boot'); return !b || b.classList.contains('out'); };
+    for (let i = 0; i < 400 && !bd(); i++) await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 150));
+  } else await new Promise(r => setTimeout(r, wait));
   // 2.98.0: a slow place may still be loading the start scripts after `wait` (appearance_ui saw calendar.js not yet run): up to 15 s more until all ran
   for (let i = 0; i < 150 && dom.window.document.readyState !== 'complete'; i++) await new Promise(r => setTimeout(r, 100));
   if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => console.log('ld_all:', e.message));
@@ -210,4 +216,13 @@ exports.idle = async (w, {quiet = 250, timeout = 15000} = {}) => {
 exports.trackClose = w => {
   const close = w.close.bind(w), realmTE = w.TypeError;
   w.close = () => { if (!closedRealms.includes(realmTE)) closedRealms.push(realmTE); close(); };
+};
+// 2.312.0 A (#3283): the same for the jsdom suites: click the Undo button of the toast with the expected text (string or RegExp). A hidden toast
+// keeps its old button in the DOM, so only the text check says it is the own toast. Returns true when it was clicked.
+exports.undoToast = async (w, text, {timeout = 15000} = {}) => {
+  const re = text instanceof RegExp ? text : new RegExp(String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const b = await exports.until(() => { const t = w.document.querySelector('#toast'); return t && !t.classList.contains('hidden') && re.test(t.textContent) && t.querySelector('button:not(.tx)'); }, {timeout});
+  if (!b) return false;
+  b.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+  return true;
 };

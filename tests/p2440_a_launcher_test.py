@@ -168,7 +168,10 @@ check("--perm-hook" in cmdline and "agent_run.py" in cmdline, "the PermissionReq
 check(r.run_args(["claude", "--settings", "x.json"]) == ["claude", "--settings", "x.json"], "own --settings: left alone")
 check(runner("s3b", [sys.executable, "agent.py"]).run_args(["x"]) == ["x"], "another command: no hook")
 ar.PERM_RELAY = False
-check(r.run_args(["claude"]) == ["claude"], "KALMIDO_PERM_RELAY=0: off")
+# 2.306.0 (#2927): the usage hook stays in the run settings, only the PermissionRequest hook goes
+pa = r.run_args(["claude"])
+with open(pa[-1]) as f:
+    check("PermissionRequest" not in json.load(f)["hooks"], "KALMIDO_PERM_RELAY=0: no PermissionRequest hook")
 ar.PERM_RELAY = True
 henv = dict(os.environ, KALMIDO_PERM_DIR=r.perm_dir(), KALMIDO_PERM_UID="7", KALMIDO_PERM_TIMEOUT="20", KALMIDO_RUN_LABEL="chat")
 

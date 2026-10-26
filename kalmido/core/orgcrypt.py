@@ -100,7 +100,7 @@ FIELDS = {
     "budget_entries": ("amount", "title", "note", "counterpart"),
     "budget_recurring": ("title", "amount"),
     "budget_cats": ("lim",),
-    "hub_mails": ("from_addr", "from_name", "to_addrs", "subject", "body"),  # 2.84.0 A (#1198): filed e-mails
+    "hub_mails": ("from_addr", "from_name", "to_addrs", "subject", "body"),  # 2.84.0 A (#1198): filed e-mails; 2.306.0 A (#2885): private ones with the account key (hub/hubmail.py hbm_seal / hbm_settle)
     "office_agreements": ("cost", "number", "note"),  # 2.92.0 A (#1925): business contracts and insurances
     "office_equipment": ("purchase_net", "new_value", "current_value", "serial_no"),  # 2.92.0 B (#1931): the value of equipment
     # 2.123.0 A (#2105, #2102): the text of knowledge pages in spaces without the lock and of their history; a private page
@@ -143,7 +143,9 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_agreements": N_("Business contracts and insurances"),  # 2.92.0 A (#1925)
                  "office_equipment": N_("Purchase prices and margins"),  # 2.92.0 B (#1931): purchase price, new and current value
                  # 2.123.0 A (#2105, #2102): texts of knowledge pages (spaces without the lock) and their history
-                 "wiki_pages": N_("Texts of knowledge pages and their history"), "wiki_versions": N_("Texts of knowledge pages and their history")}
+                 "wiki_pages": N_("Texts of knowledge pages and their history"), "wiki_versions": N_("Texts of knowledge pages and their history"),
+                 # 2.306.0 A (#2885): the journal with the account key (life/model.py jr_seal, no FIELDS entry: no org_id column)
+                 "journal": N_("Journal and mood")}
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of projects with a lock"),)
@@ -430,6 +432,12 @@ def oc_dec(c, org_id, ctx, value):
 
 def oc_is_enc(value):
     return isinstance(value, str) and value.startswith(PREFIX)
+
+
+def oc_plain_safe(value):
+    """2.306.0 Fix-2a (#2885): a plain value from outside that starts like a sealed one gets an invisible mark (zero-width
+    space) in front, so it is sealed like any other text and never taken for sealed (and emptied) when read."""
+    return "\u200b" + value if oc_is_enc(value) else value
 
 
 def oc_dec_fields(c, org_id, table, row):

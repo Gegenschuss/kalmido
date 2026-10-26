@@ -764,7 +764,7 @@ def umz_export_queries(uid):
         "mailbox": ("SELECT active, imap_host, imap_port, imap_ssl, imap_user, imap_folder, smtp_host, smtp_port, smtp_tls, smtp_user, "
                     "from_addr, from_name, created_at, updated_at FROM hub_mailboxes WHERE owner_id=? AND org_id IS NULL", (uid,)),
         # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
-        "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
+        "journal": ("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),  # 2.306.0 A (#2885): opened by jr_open
         "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
         # 2.140.0 B (#2136): my links of a private device with office equipment (ids only)
         "device_links": ("SELECT task_id, office_id, equipment_id, origin, created_at, updated_at FROM life_device_links WHERE user_id=?", (uid,)),
@@ -806,6 +806,8 @@ def export_json():
     c = db()
     q = umz_export_queries(me())  # 2.73.0 B (#1473): shared with the account export (admin/acctexport.py)
     data = {t: [umz_export_clean(t, dict(r)) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
+    from ..life.model import jr_open
+    data["journal"] = [jr_open(c, me(), r) for r in data["journal"]]  # 2.306.0 A (#2885): my journal in plain
     from ..life.budget import bud_export
     data["budget"] = bud_export(c, me())  # 2.72.0 (#1333): my budgets, decrypted (receipt files stay in data/attachments/)
     data["user"] = user_public(g.user)

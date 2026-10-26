@@ -3,7 +3,7 @@
 'use strict';
 
 // ------------------------------------------------------------------ render: shell
-function render() { return td_rcRun(render0); }  // 2.40.0 (#1430): one lookup cache per render (td_rc)
+function render() { if (typeof bootDone !== 'function') return; return td_rcRun(render0); }  // 2.40.0 (#1430): one lookup cache per render (td_rc); 2.312.0 A (#3285): not before main.js ran (slow load: a late script still missing)
 function render0() {
   if (td_rsT) { clearTimeout(td_rsT); td_rsT = 0; }  // 2.40.0 (#1430): a bundled live render that waits is done by this one
   _kidsIx = null;  // 2.17.0 (#649): one children index per render, built after any change made before it

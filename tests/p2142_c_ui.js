@@ -77,11 +77,11 @@ const until = async (fn, n = 60, ms = 150) => { for (let i = 0; i < n; i++) { co
   check(t2 && t2.length >= 16, 'new topic is a different one');
   const det = d.querySelector('#s-ntfyin details');
   check(det && d.querySelector('#s-niurl') && d.querySelector('#s-nitok')?.type === 'password', 'own server: url + password field');
-  d.querySelector('#s-niurl').value = 'http://127.0.0.1:8099';
+  d.querySelector('#s-niurl').value = 'https://127.0.0.1:8099';  // 2.306.0 (#2875): http:// only for hosts an admin allowed
   d.querySelector('#s-nitok').value = 'tk_ui_secret_token';
   d.querySelector('#s-ntfyin [data-ni="save"]').click();
   await until(() => /set \(hidden\)/.test(d.querySelector('#s-nitok')?.getAttribute('placeholder') || ''));
-  check(d.querySelector('#s-nitok').value === '' && d.querySelector('#s-niurl').value === 'http://127.0.0.1:8099', 'token field empty after saving, server kept');
+  check(d.querySelector('#s-nitok').value === '' && d.querySelector('#s-niurl').value === 'https://127.0.0.1:8099', 'token field empty after saving, server kept');
   check(!(d.querySelector('#s-ntfyin')?.innerHTML || '').includes('tk_ui_secret_token'), 'no token on the page');
   d.querySelector('#s-ntfyin [data-ni="rmtok"]').click();
   await until(() => !d.querySelector('#s-ntfyin [data-ni="rmtok"]'));

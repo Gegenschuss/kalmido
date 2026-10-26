@@ -814,7 +814,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                 "permission_mode": {"type": "string", "enum": ["", "ask", "auto"],
                                                     "description": "2.29.0: actions outside the allow list: ask the person in the chat / the host's safety check decides; empty = host default"},
                                 "reset_seq": {"type": "integer", "description": "Raised by Reset now (event reset)"},
-                                "timezone": {"type": "string"}}})
+                                "perm_user": nul("integer", description="2.312.0 (#3266): the chosen person for its permission questions"),
+                                "timezone": {"type": "string"}}},
+        perm_user_id=nul("integer", description="GET /agent only, 2.312.0 (#3266): who answers its permission questions (a team agent, "
+                         "chosen in its settings and still reaching it); null = the host keeps KALMIDO_PERM_USER / the owner"))
     tot = {"type": "object", "properties": {k: {"type": "integer"} for k in ("tokens", "input", "output", "cache_read", "cache_write", "calls")}
            | {"cost": nul("number")}}
     lim = {"oneOf": [{"type": "null"}, {"type": "object", "properties": {
@@ -995,6 +998,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                 "(ids allow / deny, added when missing); the answer comes as chat_choice (approval) and as reaction (via button)"},
                                                  "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800, "description": "2.30.0 (#1041): seconds a permission "
                                                                 "question (2.35.0: or an approval request) stays open; then it shows as not answered (denied)"},
+                                                 "offer_save": {"type": "boolean", "description": "2.37.0 (#1159): the button \"Save as task\" under the message (the person saves it, never the agent)"},
+                                                 "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file)"},
+                                                 "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"], "description": "2.306.0 F (#2942): with job_id, the kind of this job message (2.96.0 C, #2015)"},
                                                  "approval": {"type": "object", "required": ["title"], "additionalProperties": False,
                                                               "description": "2.35.0 (#1103): an approval request: a card \"Approval needed\" with the buttons yes "
                                                                              "(primary) / no, pinned at the top of the chat and counted at your name until answered "

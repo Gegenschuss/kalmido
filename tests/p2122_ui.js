@@ -138,7 +138,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     w = await boot({user: 'alice', mobile, hash: 'search'}); d = w.document;
     await until(() => d.querySelector('#searchq'));
     const sq = d.querySelector('#searchq'); typeIn(w, sq, 'Wire');
-    await sleep(400); await bobAdds(P); await sleep(5500);
+    await sleep(400); const vs = w.eval('S.v'); await bobAdds(P);
+    await until(() => w.eval('S.viewStale') || w.eval('S.v') !== vs, 60); await idle(w);  // 2.312.0 A (#3284): until the page has the change, not a fixed pause
     const sq2 = d.querySelector('#searchq');
     check(sq2 && d.activeElement === sq2 && sq2.value === 'Wire', `${tag}: search keeps focus and text through a live update`);
     w.close();
@@ -147,7 +148,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     w.eval(`setListView(routeList(), 'overview')`); await until(() => d.querySelector('#view [data-pov="desc-edit"]'));
     click(w, d.querySelector('#view [data-pov="desc-edit"]')); await until(() => d.querySelector('#pov-desc-in'));
     typeIn(w, d.querySelector('#pov-desc-in'), 'Goal: a draft ' + tag);
-    await bobAdds(P); await sleep(5500);
+    const vd = w.eval('S.v'); await bobAdds(P);
+    await until(() => w.eval('S.viewStale') || w.eval('S.v') !== vd, 60); await idle(w);  // 2.312.0 A (#3284)
     check(d.querySelector('#pov-desc-in')?.value === 'Goal: a draft ' + tag && d.activeElement === d.querySelector('#pov-desc-in'), `${tag}: overview description: draft and focus survive a live update`);
     d.querySelector('#pov-desc-in').blur(); w.eval('renderView()');
     check(d.querySelector('#pov-desc-in')?.value === 'Goal: a draft ' + tag, `${tag}: overview description: the draft survives a re-render without focus`);

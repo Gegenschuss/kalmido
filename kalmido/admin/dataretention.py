@@ -2,12 +2,14 @@
 (no routes; the watchdog starts both, see notify/push.py watchdog_tick).
 
 - lgc_tick (kind "logs"): activity, list_activity, fs_log, org_list_log, sheet_changes older than ret_days("logs"), the admin
-  alerts and admin sign-in addresses after a year, finished agent jobs after half a year -- only while ret_on("logs"), else
+  alerts and admin sign-in addresses after a year, finished agent jobs after half a year, the journal of deleted accounts
+  after the backup period (lgc_journal_cut, 2.312.0 B #3264) -- only while ret_on("logs"), else
   the run just counts (dry run, GET /api/admin/retention). The office logs (office_doc_log, office_drive_log,
   office_archive_log) are never touched here (GoBD). Expired sessions, API tokens, invitations / reset links and agent setup
   codes are no data of a person any more and go without the switch.
 - orf_tick (kind "files"): see below.
 - ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily."""
+import os
 import time
 from datetime import timedelta
 
@@ -16,6 +18,7 @@ from ..core.pg import system_ctx
 from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
+from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
 
 LGC_RUN = {"at": 0.0}
 # (table, time column, extra condition, age in days or None = ret_days("logs"))
@@ -65,6 +68,28 @@ def lgc_expired(c, now):
     return out
 
 
+def lgc_journal_cut(now):
+    """2.312.0 B (#3264): the time before which a row of deleted_accounts (admin/backup.py bkr_*) is no longer needed. The
+    journal only deletes again what a restored backup brings back, so a row goes once no backup can hold that account any
+    more: older than the longest backup period (BK_KEEP_WEEKLY_CAP weeks) AND older than every backup still in the backup
+    folder (the rotation keeps the newest backup per day / week "that has one", so a rare backup can be older; safety
+    backups count too). None = the folder cannot be read: nothing goes."""
+    cut = now - timedelta(weeks=BK_KEEP_WEEKLY_CAP)
+    try:
+        names = os.listdir(BK_DIR)
+    except FileNotFoundError:
+        if os.environ.get("KALMIDO_BACKUP_DIR", "").strip():
+            return None  # 2.312.0 (#3264, review): a set backup folder that is missing (mount away) counts as unreadable
+        names = []
+    except OSError:
+        return None
+    for n in names:
+        p = bk_parse_name(n)
+        if p and p["at"] < cut:
+            cut = p["at"]
+    return iso(cut)
+
+
 def lgc_tick(c, force=False):
     """Daily (system context: the logs of every organisation). Returns the number of rows deleted (or counted)."""
     if not force and time.time() - LGC_RUN["at"] < 86400:
@@ -85,6 +110,13 @@ def lgc_tick(c, force=False):
                     counts[table] = lgc_count_del(c, table, col, cond, cut, kill)
             except Exception as e:  # noqa: BLE001  one table must not stop the others
                 print("retention: logs", table, type(e).__name__, flush=True)
+        cut = lgc_journal_cut(now)  # 2.312.0 B (#3264)
+        if cut:
+            try:
+                with c.savepoint():
+                    counts["deleted_accounts"] = lgc_count_del(c, "deleted_accounts", "at", "", cut, kill)
+            except Exception as e:  # noqa: BLE001
+                print("retention: logs deleted_accounts", type(e).__name__, flush=True)
         ret_report(c, "logs", counts, kill)
         c.commit()
     return sum(counts.values())

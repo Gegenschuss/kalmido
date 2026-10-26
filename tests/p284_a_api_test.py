@@ -217,7 +217,8 @@ check(R["m9"] and R["m9"]["client_id"] == BETACO and R["m9"]["org_id"] == ORG2, 
 check(R["m11"] is None, "a guessed token files nothing")
 check(not dbx("SELECT id FROM tasks WHERE tt_id LIKE 'mail:%'"), "no task from a hub mail")
 check(str(R["m1"]["subject"]).startswith("kenc1:") and str(R["m1"]["from_addr"]).startswith("kenc1:"), "texts sealed with the organisation's key")
-check(not str(R["m8"]["subject"]).startswith("kenc1:"), "a private mail stays like the private texts")
+# 2.306.0 (#2885): a private mail is sealed with the account key of its owner (like the private files)
+check(str(R["m8"]["subject"]).startswith("kenc1:") and str(R["m8"]["from_addr"]).startswith("kenc1:"), "a private mail is sealed with the account key")
 d = Bo.get(B + f"/api/hubmail/mails/{R['m2']['id']}").json()
 check(d.get("subject") == "Rechnung 17" and d.get("from_addr") == "acme@example.com", f"forwarded: subject without WG:, original sender ({d.get('subject')}, {d.get('from_addr')})")
 # audit I4: a From with bob's own address is a forward only when the receiving server confirmed his domain

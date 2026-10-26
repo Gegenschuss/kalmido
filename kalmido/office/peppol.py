@@ -23,14 +23,16 @@ document's Peppol view opens or on "refresh" (no polling in the background). Age
 their tokens); they read the status in the document (doc_public "peppol"). Receiving invoices is not part of 2.154."""
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import re
 import urllib.parse
 import uuid
 
-from flask import jsonify, request
+from flask import jsonify
 
+from ..calendars.subscriptions import CalError, cal_allow, cal_allow_parse, cal_host_allowed, cal_http, cal_ip_public
 from ..core.config import app
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import N_, tr
@@ -50,6 +52,7 @@ PEP_FORMAT = {"0088": r"\d{13}", "0208": r"[01]\d{9}", "0192": r"\d{9}", "0007":
               "0204": r"\d{2,12}(-[0-9A-Z]{1,30})?-\d{2}"}
 PEP_PROVIDERS = {"storecove": {"name": "Storecove", "url": "https://api.storecove.com/api/v2", "account": True},
                  "custom": {"name": N_("Own endpoint (URL)"), "url": "", "account": False}}
+PEP_ALLOW_ENV = os.environ.get("KALMIDO_PEPPOL_ALLOW_HOSTS", "")  # 2.306.0 D2 (#2875): internal hosts for every office's own endpoint
 STORECOVE_URL = os.environ.get("KALMIDO_PEPPOL_STORECOVE_URL", "").strip() or PEP_PROVIDERS["storecove"]["url"]  # tests: a stub
 # Storecove names its receiver schemes; the ICD codes they stand for (the rest goes as the ICD code)
 SC_SCHEME = {"9930": "DE:VAT", "0204": "DE:LWID", "0208": "BE:EN", "9925": "BE:VAT", "0088": "GLN", "0106": "NL:KVK", "0190": "NL:OINO",
@@ -185,19 +188,42 @@ def pep_public(c, oid, admin):
     return out
 
 
-def _url_ok(c, u):
-    """https (http only for a host the admin allowed like a calendar host, e.g. a bridge in the own network)."""
+def _url_ok(c, u, uid=None):
+    """https (http only for a host the admin allowed like a calendar host, e.g. a bridge in the own network).
+    2.306.0 D2 (#2875): an internal host only from _pep_hosts -- an office admin of a customer organisation never
+    points the key at the operator's network through the calendar allow list."""
     p = urllib.parse.urlsplit(u)
     if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password or p.query or p.fragment:
         return False
-    if p.scheme == "https":
-        return True
-    from ..calendars.subscriptions import cal_allow, cal_host_allowed
     try:
-        port = p.port or 80
+        port = p.port or {"http": 80, "https": 443}[p.scheme]
     except ValueError:
         return False
-    return cal_host_allowed(cal_allow(c), p.hostname, port)
+    h = p.hostname.lower().strip("[]").rstrip(".")
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        ip = None
+    if cal_host_allowed(_pep_hosts(c, uid), h, port):
+        return True
+    internal = cal_host_allowed(cal_allow(c), h, port) or h in ("localhost", "localhost.localdomain") or \
+        (ip is not None and not cal_ip_public(ip))
+    return p.scheme == "https" and not internal
+
+
+def _pep_hosts(c, uid):
+    """2.306.0 D2 (#2875): hosts an own endpoint may have inside the network: KALMIDO_PEPPOL_ALLOW_HOSTS for every office,
+    the calendar allow list (env + admin setting) only when an instance admin sets the endpoint."""
+    env = frozenset(cal_allow_parse(PEP_ALLOW_ENV)[0])
+    r = c.execute("SELECT is_admin, kind, disabled FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    adm = bool(r and r["is_admin"] and not r["disabled"] and (r["kind"] or "user") != "agent")
+    return frozenset(cal_allow(c) | env) if adm else env
+
+
+def _pep_allow(c, oid):
+    """The allow list for the own endpoint at send time: the one of the person who saved the connection last."""
+    r = c.execute("SELECT updated_by FROM office_peppol WHERE org_id=?", (oid,)).fetchone()
+    return _pep_hosts(c, r["updated_by"] if r else None)
 
 
 def pep_save(c, oid, uid, b):
@@ -217,7 +243,7 @@ def pep_save(c, oid, uid, b):
         new["provider"] = v
     if "endpoint_url" in b:
         v = str(b["endpoint_url"] or "").strip().rstrip("/")
-        if v and (len(v) > 300 or not _url_ok(c, v)):
+        if v and (len(v) > 300 or not _url_ok(c, v, uid)):
             raise BadInput(tr("Invalid value: {0}", "endpoint_url"))
         new["endpoint_url"] = v
     if "account" in b:
@@ -258,11 +284,10 @@ def pep_save(c, oid, uid, b):
 
 
 # ---------------------------------------------------------------- the providers (adapters)
-def _http(c, url, method="GET", data=None, headers=None):
+def _http(c, url, method="GET", data=None, headers=None, allow=frozenset()):
     """(status, json or text) through the SSRF guard of the calendars (a 404 is (404, None))."""
-    from ..calendars.subscriptions import CalError, cal_allow, cal_http
     try:
-        st, _h, raw, _u = cal_http(url, method=method, body=data, headers=headers or {}, allow=cal_allow(c), max_bytes=PEP_MAX_BYTES,
+        st, _h, raw, _u = cal_http(url, method=method, body=data, headers=headers or {}, allow=allow, max_bytes=PEP_MAX_BYTES,
                                    timeout=PEP_TIMEOUT, deadline=PEP_TIMEOUT * 2)
     except CalError as e:
         if e.code == "not_found":
@@ -277,8 +302,8 @@ def _http(c, url, method="GET", data=None, headers=None):
 class _Adapter:
     """send(ubl, sender_id, receiver_id, ref) -> {provider_id, status}; status(provider_id) -> {status, message};
     lookup(receiver_id) -> True / False; check() -> None or PepError."""
-    def __init__(self, c, conf, key):
-        self.c, self.conf, self.key = c, conf, key
+    def __init__(self, c, conf, key, allow=frozenset()):
+        self.c, self.conf, self.key, self.allow = c, conf, key, allow
 
 
 class StorecoveAdapter(_Adapter):
@@ -297,12 +322,12 @@ class StorecoveAdapter(_Adapter):
     def check(self):
         if not str(self.conf.get("account") or "").isdigit():
             raise PepError("config")
-        _http(self.c, f"{STORECOVE_URL}/legal_entities/{self.conf['account']}", headers=self._h())
+        _http(self.c, f"{STORECOVE_URL}/legal_entities/{self.conf['account']}", headers=self._h(), allow=self.allow)
 
     def lookup(self, receiver_id):
         sch, ident = self._rid(receiver_id)
         st, j = _http(self.c, f"{STORECOVE_URL}/discovery/receives", "POST", json.dumps(
-            {"documentTypes": ["invoice"], "network": "peppol", "metaScheme": "iso6523-actorid-upis", "scheme": sch, "identifier": ident}).encode(), self._h())
+            {"documentTypes": ["invoice"], "network": "peppol", "metaScheme": "iso6523-actorid-upis", "scheme": sch, "identifier": ident}).encode(), self._h(), allow=self.allow)
         return isinstance(j, dict) and j.get("code") == "OK"
 
     def send(self, ubl, sender_id, receiver_id, ref):
@@ -312,13 +337,13 @@ class StorecoveAdapter(_Adapter):
         doc = {"legalEntityId": int(self.conf["account"]), "idempotencyGuid": ref,
                "routing": {"eIdentifiers": [{"scheme": sch, "id": ident}], "emails": []},
                "document": {"documentType": "invoice", "rawDocumentData": {"document": base64.b64encode(ubl).decode(), "parse": True, "parseStrategy": "ubl"}}}
-        st, j = _http(self.c, f"{STORECOVE_URL}/document_submissions", "POST", json.dumps(doc).encode(), self._h())
+        st, j = _http(self.c, f"{STORECOVE_URL}/document_submissions", "POST", json.dumps(doc).encode(), self._h(), allow=self.allow)
         if not isinstance(j, dict) or not j.get("guid"):
             raise PepError("answer")
         return {"provider_id": str(j["guid"])[:80], "status": "sent"}
 
     def status(self, provider_id):
-        st, j = _http(self.c, f"{STORECOVE_URL}/document_submissions/{urllib.parse.quote(provider_id, safe='')}/evidence/sending", headers=self._h())
+        st, j = _http(self.c, f"{STORECOVE_URL}/document_submissions/{urllib.parse.quote(provider_id, safe='')}/evidence/sending", headers=self._h(), allow=self.allow)
         if st == 404 or not isinstance(j, dict):
             return {"status": "sent", "message": ""}
         return {"status": "delivered", "message": ""}
@@ -338,22 +363,22 @@ class CustomAdapter(_Adapter):
         return u
 
     def check(self):
-        _http(self.c, self._base() + "/check", headers=self._h())
+        _http(self.c, self._base() + "/check", headers=self._h(), allow=self.allow)
 
     def lookup(self, receiver_id):
-        st, j = _http(self.c, self._base() + "/participants/" + urllib.parse.quote(receiver_id, safe=":"), headers=self._h())
+        st, j = _http(self.c, self._base() + "/participants/" + urllib.parse.quote(receiver_id, safe=":"), headers=self._h(), allow=self.allow)
         return st != 404 and isinstance(j, dict) and bool(j.get("reachable"))
 
     def send(self, ubl, sender_id, receiver_id, ref):
         st, j = _http(self.c, self._base() + "/documents", "POST", ubl, self._h({
             "Content-Type": "application/xml", "X-Peppol-Sender": sender_id, "X-Peppol-Receiver": receiver_id, "Idempotency-Key": ref,
-            "X-Peppol-Test": "1" if self.conf.get("sandbox") else "0"}))
+            "X-Peppol-Test": "1" if self.conf.get("sandbox") else "0"}), allow=self.allow)
         if not isinstance(j, dict) or not j.get("id"):
             raise PepError("answer")
         return {"provider_id": str(j["id"])[:80], "status": _state(j.get("status"), "sent"), "message": str(j.get("message") or "")[:300]}
 
     def status(self, provider_id):
-        st, j = _http(self.c, self._base() + "/documents/" + urllib.parse.quote(provider_id, safe=""), headers=self._h())
+        st, j = _http(self.c, self._base() + "/documents/" + urllib.parse.quote(provider_id, safe=""), headers=self._h(), allow=self.allow)
         if st == 404 or not isinstance(j, dict):
             raise PepError("not_found")
         return {"status": _state(j.get("status"), "sent"), "message": str(j.get("message") or "")[:300]}
@@ -372,7 +397,8 @@ def pep_adapter(c, oid, conf=None):
     key = pep_key(c, oid, conf)
     if conf["provider"] not in ADAPTERS or not key:
         raise PepError("config")
-    return ADAPTERS[conf["provider"]](c, conf, key)
+    # 2.306.0 D2 (#2875): the provider address is the operator's (env); an own endpoint reaches internal hosts only when an instance admin set it
+    return ADAPTERS[conf["provider"]](c, conf, key, cal_allow(c) if conf["provider"] != "custom" else _pep_allow(c, oid))
 
 
 # ---------------------------------------------------------------- documents
@@ -634,13 +660,23 @@ def pep_ubl_get(did):
 
 @app.get("/api/office/docs/<int:did>/peppol")
 def pep_doc_get(did):
-    """The Peppol state of a document: what is missing, the client's id (or a suggestion from its VAT id), the sends.
-    ?refresh=1 fetches the status of a send still on its way from the provider first."""
+    """The Peppol state of a document: what is missing, the client's id (or a suggestion from its VAT id), the sends."""
     c, uid, oid = _ctx()
     r = _doc(c, oid, did)
     if r["kind"] not in ("invoice", "credit"):
         raise Denied(409, tr(PEP_NEED["kind"]))
-    if request.args.get("refresh") == "1" and pep_refresh(c, oid, did):
+    return jsonify(pep_view(c, oid, uid, r))
+
+
+@app.post("/api/office/docs/<int:did>/peppol/refresh")
+def pep_refresh_post(did):
+    """2.306.0 D2 (#2875): fetches the status of a send still on its way from the provider (was GET ?refresh=1, which
+    called the provider with the key and wrote) -> the Peppol view as GET."""
+    c, uid, oid = _ctx()
+    r = _doc(c, oid, did)
+    if r["kind"] not in ("invoice", "credit"):
+        raise Denied(409, tr(PEP_NEED["kind"]))
+    if pep_refresh(c, oid, did):
         c.commit()
     return jsonify(pep_view(c, oid, uid, r))
 

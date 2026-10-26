@@ -48,6 +48,7 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
                          umz_user_conn, umz_write_state)
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
+from ..life.model import jr_seal  # 2.306.0 A (#2885)
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
 UMZ_SOURCE = "Kalmido"  # imports.source of an account import (the list of recent imports shows it as it is)
@@ -1001,6 +1002,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         day = _txt(r.get("day"), 10)
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) and not c.execute("SELECT 1 FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone():
             d = umz_row(c, "journal", r, {"user_id": uid, "day": day, "updated_at": ts}, ts)
+            if d:  # 2.306.0 A (#2885): sealed for the importing person like a new entry
+                d.pop("mood_enc", None)
+                d["text"], d["mood"], d["mood_enc"] = jr_seal(c, uid, d.get("text") or "", d.get("mood"))
             if d and umz_insert(c, "journal", d, rid=False):
                 run.created["journal"].append(day)
                 run.count("journal")

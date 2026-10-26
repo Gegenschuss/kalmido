@@ -56,6 +56,9 @@ if len(set(tags)) != len(tags):
     ERR.append("index.html loads a module twice")
 if tags and tags[-1] != "main.js":
     ERR.append("index.html: main.js (the start-up) must be the last script")
+# 2.312.0 (#3285): render() (render.js) draws only once main.js declared bootDone(); renamed or moved = a blank app
+if not re.search(r"^function bootDone\(", read("static", "js", "main.js"), re.M):
+    ERR.append("static/js/main.js: function bootDone() must stay declared there (render.js waits for it)")
 if shell != tags:
     ERR.append("sw.js SHELL: the static/js/ files differ from index.html (same files, same order)")
 # 2.126.0 D (#1992 O7): every file the service worker precaches exists (addAll fails on a single 404: the new version would

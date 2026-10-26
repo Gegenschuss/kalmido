@@ -384,6 +384,8 @@ def comment_delete(cid):
     files = [a[0] for a in c.execute("SELECT path FROM attachments WHERE comment_id=?", (cid,))]
     c.execute("DELETE FROM attachments WHERE comment_id=?", (cid,))
     c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (iso(now_utc()), cid))
+    from ..collab.news import news_forget_comment
+    news_forget_comment(c, cid)  # 2.306.0 C (#2889)
     bump(c)
     c.commit()
     unlink_files(files)

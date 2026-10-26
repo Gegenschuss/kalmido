@@ -40,7 +40,6 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
-from ..core.orgcrypt import oc_active, oc_enc_fields
 from ..accounts.session import me
 from . import hubmail as H
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -830,14 +829,13 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     from ..files.upsafe import UploadRefused
     from ..admin.hosting import QuotaExceeded
     ts = _now()
-    enc = oc_enc_fields(c, org, "hub_mails", plain)
+    enc, sealed = H.hbm_seal(c, org, uid, ws, plain)  # 2.306.0 A (#2885): private ones sealed, too
     mid = insert_id(c, """INSERT INTO hub_mails(org_id,owner_id,client_id,list_id,ws,message_id,from_addr,from_name,to_addrs,subject,
                           sent_at,body,created_at,direction,send_state) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'out','sending')""",
                     (org, uid, cid, lid, ws, str(m["Message-ID"])[:300], enc["from_addr"], enc["from_name"], enc["to_addrs"],
                      enc["subject"], ts, enc["body"], ts))
     lg = lang(c, uid)
     cn, ln = H._names(c, cid, lid)
-    sealed = bool(org) and oc_active(c)
     folder, eml_id, notes = None, None, []
     try:
         with c.savepoint():

@@ -50,6 +50,7 @@ CH_TICK = _env_int("KALMIDO_CHANNEL_TICK", 5)
 CH_TIMEOUT = 8
 CH_QUEUE_MAX = 200       # waiting messages per channel (more are dropped)
 CH_BATCH = 30
+CH_NOTE_MAX = CH_QUEUE_MAX  # 2.306.0 D3 (#2875): list events collected per request (more would not fit a channel's queue)
 CH_TEXT_MAX = 1500
 CH_TEST_LIMIT = 20       # "Send test" per person within the rate window
 TELEGRAM_API = (os.environ.get("KALMIDO_TELEGRAM_API", "").strip() or "https://api.telegram.org").rstrip("/")
@@ -224,7 +225,7 @@ def chn_result(c, cid, ok, status, code):
         c.execute("UPDATE notify_channels SET fails=0, last_error='', last_at=? WHERE id=?", (ts, cid))
         return
     c.execute("UPDATE notify_channels SET fails=fails+1, last_error=?, last_at=? WHERE id=?",
-              (code + (f" {status}" if status else ""), ts, cid))
+              (code + (f" {int(status) // 100}xx" if status else ""), ts, cid))  # 2.306.0 (#2875 review N13): the class only
     r = c.execute("SELECT fails FROM notify_channels WHERE id=?", (cid,)).fetchone()
     if r and r[0] >= CH_FAIL_MAX:
         c.execute("UPDATE notify_channels SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (ts, cid))
@@ -300,6 +301,9 @@ def chn_note(c, tid, kind, cid=None):
     if not CH_ON or not ev or not has_request_context():
         return
     n = g.setdefault("chn", {})
+    if (tid, ev) not in n and len(n) >= CH_NOTE_MAX:
+        g.chn_dropped = g.get("chn_dropped", 0) + 1  # 2.306.0 (#2875 review N13): counted, logged in chn_flush
+        return  # 2.306.0 D3 (#2875): a bulk change (import) asks the database at most CH_NOTE_MAX times after the request
     e = n.setdefault((tid, ev), {"cid": None})
     if cid:
         e["cid"] = cid
@@ -308,6 +312,8 @@ def chn_note(c, tid, kind, cid=None):
 @app.after_request
 def chn_flush(resp):
     n = g.pop("chn", None) if has_request_context() else None
+    if has_request_context() and g.get("chn_dropped"):
+        print(f"notification channels: {g.pop('chn_dropped')} list events of one request over the limit, not sent", flush=True)
     if n and resp.status_code < 400:
         try:
             c = db()
@@ -538,6 +544,7 @@ def chn_test_do(chid, oid=None):
     c.commit()
     text = chn_text(tr("{0}: test", APP_NAME), tr("Notifications are arriving."), PUBLIC_URL)
     ok, status, code = chn_send(r["kind"], t, text, allow) if t else (False, None, "config")
+    status = f"{int(status) // 100}xx" if status else None  # 2.306.0 D3 (#2875): only the class of the target's answer
     with system_ctx(c):  # the count of the channel (an organisation's too) after its test
         chn_result(c, chid, ok, status, code)
     c.commit()

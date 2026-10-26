@@ -5,7 +5,7 @@
 // tag from the sidebar (right-click menu, count dialog, undo), dialogs follow the visual viewport (Galaxy Fold keyboard),
 // the News inbox (x to remove, swipe on touch, filter "Mentions & assigned to me", which events create News).
 const {boot, errs, sleep, B, login} = require('./boot');
-const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
+const {idle, until} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -92,7 +92,8 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   const ta = d.querySelector('#c-input'); ta.focus(); ta.value = 'typing…';
   check(w.eval('editing()'), 'typing in the comment box counts as editing');
   await call('bob', 'POST', `/api/tasks/${T1}/comments`, {body: 'Second while you type'});
-  await sleep(5500);
+  await until(() => [...d.querySelectorAll('#d-tl .cm')].some(c => /Second while you type/.test(c.textContent)), {timeout: 15000});  // 2.312.0 A (#3284): wait for the comment, not 5.5 s
+  await idle(w);
   check([...d.querySelectorAll('#d-tl .cm')].some(c => /Second while you type/.test(c.textContent)) && d.querySelector('#c-input').value === 'typing…', 'new comment appears while typing, draft kept');
   ta.blur(); w.eval('closeDetail?.()'); await sleep(300);
 

@@ -243,7 +243,9 @@ r = Bo.post(B + "/api/me/channels", json={"kind": "slack", "name": "Broken", "ur
 BR = r.json()["id"]
 for i in range(3):
     r = Bo.post(B + f"/api/me/channels/{BR}/test")
-    check(r.json().get("ok") is False and "500" in r.json().get("error_text", ""), f"a failing test {i + 1}: {r.text[:200]}")
+    # 2.306.0 (#2875): the test names only the class of the target's answer (5xx), not its number
+    check(r.json().get("ok") is False and "5xx" in r.json().get("error_text", "") and "500" not in r.json().get("error_text", "")
+          and r.json().get("status") == "5xx", f"a failing test {i + 1}: {r.text[:200]}")
 ch = [c for c in Bo.get(B + "/api/me/channels").json()["channels"] if c["id"] == BR][0]
 check(ch["enabled"] is False and ch["disabled_reason"] == "failures" and ch["fails"] == 3, f"#2145: off after 3 failures: {ch}")
 ch = Bo.patch(B + f"/api/me/channels/{BR}", json={"enabled": True}).json()

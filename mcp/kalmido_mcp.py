@@ -21,6 +21,7 @@ import base64
 import hmac
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -31,7 +32,21 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.21.0"
+def _server_version():  # 2.306.0 F (#2939): the app's VERSION file next to the mcp folder; a standalone copy has none
+    # 2.306.0 (#2927): a starter set up by agent-setup has the VERSION of its server next to this file (written by the setup)
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in (os.path.join(here, "VERSION"), os.path.join(here, "..", "VERSION")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                v = f.read().strip()
+        except OSError:
+            continue
+        if re.fullmatch(r"\d+(\.\d+){1,3}", v):
+            return v
+    return "0"
+
+
+SERVER_VERSION = _server_version()
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
@@ -2186,6 +2201,12 @@ TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
 TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read")  # 2.200.0 C (#1781)
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
+# 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
+TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
+TOOL_SCOPES["tasks:write"] += ("review_task",)
+TOOL_SCOPES["files:read"] += ("list_documents", "get_document")
+TOOL_SCOPES["files:write"] += ("update_document",)
+TOOL_SCOPES["agent"] += ("confirm_abort",)
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "wiki:read", "wiki:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets; 2.200.0 C (#1781): + wiki

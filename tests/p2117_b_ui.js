@@ -11,6 +11,7 @@ const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2117_b_ui', check, shots: 'P2117B_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -84,8 +85,7 @@ const PDF = '%PDF-1.4\\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Typ
     await ready(ev, `!document.querySelector('.lightbox.pview')`);
     await ev(`(() => { document.querySelector('.modal [data-dma="rm"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal .dma-f') && !!document.querySelector('.modal .dma-none')`), '#2285: removed');
-    check(await ready(ev, `!!document.querySelector('#toast button')`), '#2285: the toast offers undo');
-    await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);
+    check(await undoToast(ev, 'Removed'), '#2285: the toast offers undo');  // 2.312.0 A (#3283): the own toast, then the click
     check(await ready(ev, `document.querySelectorAll('.modal .dma-f').length === 1`), '#2285: undo brings the file back');
     // phone width: big targets, nothing sticks out
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

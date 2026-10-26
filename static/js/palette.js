@@ -306,7 +306,7 @@ function palAll() {
     if (!chatFull()) for (const a of (S.agents || []).filter(x => x.enabled)) add('a:pop-' + a.id, 'action', tr('Chat with {0} as a window', a.name), 'comment', () => chatOpen(a.id, {float: true}));  // 2.29.0 (#363)
   }
   // lists, filters, tags
-  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: l.icon || '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
+  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: liconOk(l.icon) ? l.icon : '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
   for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));

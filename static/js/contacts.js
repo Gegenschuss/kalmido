@@ -605,15 +605,17 @@ function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf sha
       const fs = file ? [file] : [...inp.files], f = fs[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
       const b = (S.books || []).find(x => x.id === bid);
-      const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true});
+      const ph = {};  // 2.306.0 C (#2889): vCard files only (a CSV has no pictures)
+      const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true,
+        check: kind === 'csv' ? null : {label: tr('Import contact photos too'), hint: tr('For photos that are only linked in the file, this server fetches the pictures from the internet.'), out: ph}});
       if (!to) return;
       if (to === 'private') {
         let pb = (S.books || []).find(x => !x.org_id && x.role === 'owner');
         if (!pb) { try { pb = await api('POST', '/api/books', {name: tr('Contacts'), org_id: null}); await load(); } catch { return; } }
         bid = pb.id;
       }
-      if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs);  // 2.146.0 E (#2457): the server reads the vCards of all files
-      else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f); else ctImpRun(bid, f);  // 2.119.1 A (#2080): CSV: the columns first
+      if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs, null, ph.on === false);  // 2.146.0 E (#2457): the server reads the vCards of all files
+      else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f, ph.on === false); else ctImpRun(bid, f, null, ph.on === false);  // 2.119.1 A (#2080): CSV: the columns first
     };
     if (file) inp.onchange(); else inp.click();
   };
@@ -642,7 +644,7 @@ function ctImpPanel() {
   };
   return {el, set};
 }
-function ctImpRun(bid, f, mapping) {
+function ctImpRun(bid, f, mapping, noPhotos) {
   const p = ctImpPanel();
   let fi = null;  // 2.146.0 E (#2457): several files / a ZIP: how many were read, which not
   const done = async j => {
@@ -674,7 +676,7 @@ function ctImpRun(bid, f, mapping) {
       p.set(tr('Import running…') + ' ' + tr('{0} of {1} contacts', st.done, st.total), .3 + .7 * (st.total ? st.done / st.total : 0));
     }
   };
-  x.send((() => { const fd = new FormData(); if (Array.isArray(f)) f.forEach(y => fd.append('files', y)); else fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); return fd; })());
+  x.send((() => { const fd = new FormData(); if (Array.isArray(f)) f.forEach(y => fd.append('files', y)); else fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); if (noPhotos) fd.append('photos', '0'); return fd; })());
 }
 // 2.119.1 A (#2080): a CSV file (Outlook, Google Contacts, a spreadsheet): the server reads it (delimiter, encoding) and suggests
 // a field per column; here the person checks / changes them, then the rows take the vCard import's way (ctImpRun: progress, background)
@@ -687,10 +689,10 @@ const ctx_F = () => {
     ...[['home', 'Home'], ['work', 'Work'], ['other', 'Other']].flatMap(([t, n]) => [['street', 'Street'], ['code', 'Postcode'], ['city', 'City'], ['region', N_('Region')], ['country', 'Country']].map(([p, pn]) => [`adr:${t}:${p}`, ad(n, pn)])),
     ['url', tr('Website')], ['bday', tr('Birthday')], ['anniversary', tr('Anniversary')], ['note', tr('Notes')], ['groups', tr('Groups')]];
 };
-async function ctx_csvMap(bid, f) {
+async function ctx_csvMap(bid, f, noPhotos) {
   let p;
   try { const fd = new FormData(); fd.append('file', f); p = await api('POST', `/api/books/${bid}/import?preview=1`, fd); } catch { return; }
-  if (p.format !== 'csv') { ctImpRun(bid, f); return; }  // a vCard after all
+  if (p.format !== 'csv') { ctImpRun(bid, f, null, noPhotos); return; }  // a vCard after all; 2.306.0 (#2889 review N20): the photo switch applies here too
   const F = ctx_F(), map = [...p.guess];
   const ex = i => p.sample.map(r => r[i]).find(Boolean) || '';
   const md = modal(`<div class="lhdr"><h3>${tr('Import a CSV file…').replace(/…$/, '')}</h3><span class="spacer"></span><button class="iconbtn" data-ctx="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>

@@ -19,6 +19,7 @@ from .hub.mailbox import mbx_loop
 from .integrations.ntfyin import ni_loop
 from .events.model import migrate_family_events
 from .core.env import env_bool
+from .office.model import onc_long_report  # 2.312.0 C (#3265)
 
 
 # 2.42.0 (#828): `python -m kalmido.admin.orgcrypt_cli ...` loads the package too: no background threads in that process
@@ -74,3 +75,11 @@ if env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":
             print("WARNING ntfy inbox NOT started: topic", repr(NTFY_IN["topic"]), "on the public ntfy.sh can be "
                   "published to by anyone. Use an own ntfy with access control or an unguessable topic "
                   "(NTFY_INBOX_TOPIC, 16+ characters).", flush=True)
+if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.312.0 C (#3265): once per instance start, not per web process
+    _c = connect()
+    try:
+        onc_long_report(_c)  # saved number schemes onc_parse no longer reads -> log + admin alert (nothing is changed)
+    except Exception as e:  # noqa: BLE001 - a report, never a reason not to start
+        print("office: number scheme check:", type(e).__name__, flush=True)
+    finally:
+        _c.close()

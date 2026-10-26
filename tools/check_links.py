@@ -4,7 +4,7 @@ file, every #anchor to a heading (GitHub's anchor rules) or an explicit id / nam
 
     python3 tools/check_links.py [-v] [FILE.md ...]      exit 1 on a dead link
 
-Default files: the top-level *.md pages, docs/*.md and examples/**/*.md, not the CHANGELOG (old entries keep their old
+Default files: the top-level *.md pages, docs/*.md, mcp/*.md and examples/**/*.md, not the CHANGELOG (old entries keep their old
 links). Code blocks and inline code are skipped; external links (http, mailto) are not fetched - CI stays offline.
 Standard library only (the CI lint job runs plain Python).
 """
@@ -86,6 +86,7 @@ def default_files():
     files = [os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "*.md"))]
     files += [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "docs", "*.md"))]
     files += [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "examples", "**", "*.md"), recursive=True)]
+    files += [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "mcp", "*.md"))]  # 2.306.0 F (#2942)
     return sorted(f for f in files if os.path.basename(f) not in SKIP)
 
 

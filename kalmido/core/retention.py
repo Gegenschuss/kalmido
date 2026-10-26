@@ -37,6 +37,7 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   chat_files / tchat_files              files    files             chat / team chat files no row names
   terms_files (office/terms.py)         files    30 days fixed     replaced terms PDFs nobody names
   - (admin/dataretention.py lgc_tick)   logs     logs              activity / list / file / sheet logs (expired credentials always)
+  - (admin/dataretention.py lgc_tick)   logs     backups kept      journal of deleted accounts once no backup can hold them (2.312.0 B)
   - (admin/dataretention.py orf_tick)   files    files             orphan files, old file versions
   - (admin/dataretention.py ckd_tick)   chat     chat              agent chat days
   - (admin/backup.py bk_prune)          backups  backups           old safety backups (the daily / weekly rotation always)

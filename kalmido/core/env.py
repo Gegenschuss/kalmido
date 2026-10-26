@@ -209,6 +209,7 @@ VARS = (
     _v("KALMIDO_PUBLIC_LINKS", "1", "Switch: public read-only links of lists.", "integrations"),
     _v("KALMIDO_WEBHOOKS", "1", "Switch: outgoing webhooks.", "integrations"),
     _v("KALMIDO_WEBHOOK_ALLOW_HOSTS", "", "Internal hosts webhooks may reach.", "integrations"),
+    _v("KALMIDO_PEPPOL_ALLOW_HOSTS", "", "Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0).", "integrations"),
     _v("KALMIDO_WEBHOOK_BACKOFF", "60,300,1800,7200", "Seconds between the retries of a failed webhook, comma-separated.", "integrations"),
     _v("KALMIDO_WEBHOOK_TICK", "5", "Seconds between two looks at the webhook queue.", "integrations"),
     _v("KALMIDO_HOOK_IN_PER_MIN", "60", "Incoming webhook calls per hook and minute.", "integrations"),
@@ -274,6 +275,8 @@ VARS = (
     _v("KALMIDO_SUPPORT_EMAIL", "", "Support address shown when the storage is full.", "hosting"),
     _v("KALMIDO_UPLOAD_HOURLY_MB", "1024", "Uploads per person and hour in MB (0 = no limit); over it uploads get 429.", "hosting"),  # 2.281.0 E (#3117)
     _v("KALMIDO_SUPPORT_URL", "", "Support page shown in Settings > Help.", "hosting"),
+    _v("KALMIDO_PRIVACY_URL", "", "Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins.", "hosting"),  # 2.306.0 B (#2887)
+    _v("KALMIDO_IMPRINT_URL", "", "Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement.", "hosting"),  # 2.306.0 B (#2887)
     _v("KALMIDO_OPERATOR_TOKEN_FILE", "", "File with the token of the hosting operator interface (empty = off).", "hosting"),
     _v("KALMIDO_TRASH_DAYS", "30", "Days items stay in the trash.", "hosting"),
     _v("KALMIDO_RETENTION_PURGE", "0", "Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env.", "hosting"),  # 2.223.3 A (#2877)

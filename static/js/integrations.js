@@ -431,7 +431,7 @@ function chn_mailHtml(m) {
   return `<h4 id="s-evmail-h">${tr('E-mail for single events')}</h4>
     <div class="row"><label for="s-evm-assign">${tr('Assigned to me')}</label>${chn_mailSel('s-evm-assign', m.assign)}</div>
     <div class="row"><label for="s-evm-mention">${tr('Mentioned')}</label>${chn_mailSel('s-evm-mention', m.mention)}</div>
-    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Users)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.'))}</div>`;
+    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Users)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
 }
 async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the box #s-chn)
   const box = $('#s-chn', md); if (!box) return;

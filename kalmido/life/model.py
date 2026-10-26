@@ -7,7 +7,8 @@ from dateutil.relativedelta import relativedelta
 from flask import g, has_request_context
 
 from ..core.config import TZ, PUBLIC_URL
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, system_ctx, write_lock
+from ..core import orgcrypt as oc  # 2.306.0 A (#2885)
 from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import lang, N_, tr
 from ..core.db import iso, iso_ms, local_now, now_utc, usettings
@@ -607,9 +608,95 @@ def _wd_care(c, users, S, LG, now):
 
 
 # ---- review + journal
+# 2.306.0 A (#2885): text and mood of the journal are sealed with the account key of the person (space -uid, core/orgcrypt.py)
+# while the private spaces are encrypted (oc_active_for, like private files); the mood then lies in mood_enc (mood NULL).
+# Plain rows stay readable; admin/orgcrypt_cli.py seals the existing rows (start-up pass) and opens them again (the way
+# back: decrypt-private / decrypt-all), jr_settle below.
+JR_TEXT, JR_MOOD = "journal.text", "journal.mood_enc"
+
+
+def jr_sealed(c, uid):
+    """True when new journal entries of uid are stored sealed."""
+    return oc.oc_active_for(c, oc.oc_user_space(uid))
+
+
+def jr_seal(c, uid, text, mood):
+    """(text, mood, mood_enc) as stored: sealed with the account key when the private spaces are encrypted, else plain."""
+    sid = oc.oc_user_space(uid)
+    text = oc.oc_plain_safe(text)  # 2.306.0 Fix-2a (#2885): a text that only looks sealed stays a text
+    if not oc.oc_active_for(c, sid):
+        return text, mood, None
+    key = oc.oc_key(c, sid)
+    if key is None:
+        return text, mood, None
+    return (oc.oc_enc_k(key, sid, JR_TEXT, text), None,
+            oc.oc_enc_k(key, sid, JR_MOOD, str(mood)) if mood is not None else None)
+
+
+def jr_open(c, uid, r, strict=False):
+    """A journal row as a dict with text and mood in plain (mood_enc dropped). strict: OrgCryptError instead of empty."""
+    d = dict(r)
+    sid = oc.oc_user_space(uid)
+    me_ = d.pop("mood_enc", None)
+    try:
+        d["text"] = oc.oc_dec(c, sid, JR_TEXT, d.get("text"))
+        if oc.oc_is_enc(me_) and d.get("mood") is None:  # 2.306.0 Fix-2a (#2885): a plain mood was written later (way back), it wins
+            d["mood"] = int(oc.oc_dec(c, sid, JR_MOOD, me_))
+    except (oc.OrgCryptError, ValueError):
+        if strict:
+            raise
+        # a key that cannot open the entry: shown empty (like a filed mail), never a 500
+        print("journal: an entry cannot be opened", flush=True)
+        d["text"] = "" if oc.oc_is_enc(d.get("text")) else d.get("text")
+        d["mood"] = d.get("mood")
+    return d
+
+
+def _jr_rows(c, uid, where, args, order):
+    return [jr_open(c, uid, r) for r in c.execute(f"SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE {where} ORDER BY {order}", args)]
+
+
+def jr_settle(c, plain=None, stop=None):
+    """Every journal row sealed for its person while the private spaces are encrypted; plain(sid) -> True: opened again
+    (the way back). Commits per person. -> number of rows changed."""
+    n = 0
+    with system_ctx(c):  # orgcrypt: server-side bulk work over the private spaces (no content leaves this function)
+        todo = "" if plain else f" WHERE (text<>'' AND text NOT LIKE '{oc.PREFIX}%') OR mood IS NOT NULL"  # pg-ok: the prefix has no case
+        uids = [r[0] for r in c.execute(f"SELECT DISTINCT user_id FROM journal{todo} ORDER BY user_id").fetchall()]
+    for uid in uids:
+        if stop and stop():
+            break
+        sid = oc.oc_user_space(uid)
+        if plain and plain(sid):
+            seal = False
+        elif oc.oc_active_for(c, sid):
+            seal = True
+        else:
+            continue
+        with system_ctx(c):  # orgcrypt: the journal rows of one person, sealed / opened for their account key
+            for r in c.execute("SELECT day, text, mood, mood_enc FROM journal WHERE user_id=? ORDER BY day", (uid,)).fetchall():
+                if seal:
+                    if not (r["text"] and not oc.oc_is_enc(r["text"])) and r["mood"] is None:
+                        continue  # sealed already (or nothing to seal)
+                elif not (oc.oc_is_enc(r["text"]) or oc.oc_is_enc(r["mood_enc"])):
+                    continue
+                try:
+                    d = jr_open(c, uid, r, strict=True)
+                    # 2.306.0 Fix-2a (#2885): sealing inside the try, one key that cannot be opened never stops the pass
+                    t, m, me_ = jr_seal(c, uid, d["text"], d["mood"]) if seal else (oc.oc_plain_safe(d["text"]), d["mood"], None)
+                except (oc.OrgCryptError, ValueError):  # never overwrite what cannot be opened
+                    print("orgcrypt: a journal entry cannot be opened, left as it is", flush=True)
+                    continue
+                n += c.execute("UPDATE journal SET text=?, mood=?, mood_enc=? WHERE user_id=? AND day=? AND text=? "
+                               "AND mood IS NOT DISTINCT FROM ? AND mood_enc IS NOT DISTINCT FROM ?",  # not changed meanwhile
+                               (t, m, me_, uid, r["day"], r["text"], r["mood"], r["mood_enc"])).rowcount
+        c.commit()
+    return n
+
+
 def journal_get(c, uid, lo, hi):
     return [{"day": r["day"], "text": r["text"], "mood": r["mood"], "updated_at": r["updated_at"]} for r in  # 2.269.0 C (#3017): + updated_at
-            c.execute("SELECT * FROM journal WHERE user_id=? AND day>=? AND day<=? ORDER BY day", (uid, lo, hi))]
+            _jr_rows(c, uid, "user_id=? AND day>=? AND day<=?", (uid, lo, hi), "day")]  # 2.306.0 A (#2885): opened
 
 
 def journal_set(c, uid, day, b):
@@ -620,7 +707,8 @@ def journal_set(c, uid, day, b):
         raise BadInput(tr("Invalid value: {0}", tr("Date")))
     if b.get("expect_updated_at") is not None:  # the phone and the computer of the same person
         write_lock(c, f"journal-{uid}-{day}")
-        r = c.execute("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
+        r = c.execute("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
+        r = jr_open(c, uid, r) if r else None  # 2.306.0 A (#2885)
         if str(b["expect_updated_at"]) != (r["updated_at"] if r else ""):
             raise Conflict("entry", {"day": r["day"], "text": r["text"], "mood": r["mood"], "updated_at": r["updated_at"]} if r else
                            {"day": day, "text": "", "mood": None, "updated_at": ""})
@@ -637,12 +725,13 @@ def journal_set(c, uid, day, b):
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
         return {"day": day, "text": "", "mood": None, "updated_at": ""}
     ts = iso_ms(now_utc())  # 2.269.0 C (#3017): milliseconds, the base of the next save
-    c.execute("""INSERT INTO journal(user_id,day,text,mood,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET
-                 text=excluded.text, mood=excluded.mood, updated_at=excluded.updated_at""", (uid, day, text, mood, ts))
+    st, sm, se = jr_seal(c, uid, text, mood)  # 2.306.0 A (#2885)
+    c.execute("""INSERT INTO journal(user_id,day,text,mood,mood_enc,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET
+                 text=excluded.text, mood=excluded.mood, mood_enc=excluded.mood_enc, updated_at=excluded.updated_at""", (uid, day, st, sm, se, ts))
     return {"day": day, "text": text, "mood": mood, "updated_at": ts}
 
 
-# 2.140.0 C (#2133): history, search, export and mood statistics of the journal (stored as plain text in table journal,
+# 2.140.0 C (#2133): history, search, export and mood statistics of the journal (table journal, sealed since 2.306.0 A,
 # private per person: every query is filtered by user_id, nothing is cached on the server)
 JOURNAL_PAGE = 30
 JOURNAL_STAT_DAYS = (30, 90, 365)
@@ -654,7 +743,7 @@ def _journal_ok(c, uid):
         raise Denied(403)
 
 
-def _journal_where(uid, q=None, mood=None, lo=None, hi=None, before=None):
+def _journal_where(uid, lo=None, hi=None, before=None):
     where, args = ["user_id=?"], [uid]
     if lo:
         where.append("day>=?"), args.append(lo)
@@ -662,12 +751,22 @@ def _journal_where(uid, q=None, mood=None, lo=None, hi=None, before=None):
         where.append("day<=?"), args.append(hi)
     if before:
         where.append("day<?"), args.append(before)
-    if mood:
-        where.append("mood=?"), args.append(mood)
-    if q:
-        like = "%" + q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where.append("LOWER(text) ILIKE ? ESCAPE '\\'"), args.append(like)
     return " AND ".join(where), args
+
+
+def _journal_find(c, uid, f, order, lim=None):
+    """2.306.0 A (#2885): the opened entries of the filters f; text (case-insensitive, literal) and mood are matched here,
+    not in SQL, because a sealed entry has neither in plain in the database (one person's journal: a row per day)."""
+    q, mood = (f.get("q") or "").casefold(), f.get("mood")
+    where, args = _journal_where(uid, f.get("lo"), f.get("hi"), f.get("before"))
+    out = []
+    for d in _jr_rows(c, uid, where, args, order):
+        if (mood and d["mood"] != mood) or (q and q not in (d["text"] or "").casefold()):
+            continue
+        out.append(d)
+        if lim is not None and len(out) >= lim:
+            break
+    return out
 
 
 def _journal_args(b):
@@ -691,10 +790,10 @@ def journal_list(c, uid, b):
     _journal_ok(c, uid)
     f = _journal_args(b)
     lim = as_int(b.get("limit") or JOURNAL_PAGE, "limit", 1, 100)
-    where, args = _journal_where(uid, **f)
-    rows = c.execute(f"SELECT day, text, mood FROM journal WHERE {where} ORDER BY day DESC LIMIT ?", (*args, lim + 1)).fetchall()
+    rows = _journal_find(c, uid, f, "day DESC", lim + 1)  # 2.306.0 A (#2885)
     ent = [{"day": r["day"], "text": r["text"], "mood": r["mood"]} for r in rows[:lim]]
-    return {"entries": ent, "next": ent[-1]["day"] if len(rows) > lim else None}
+    return {"entries": ent, "next": ent[-1]["day"] if len(rows) > lim else None,
+            "sealed": jr_sealed(c, uid)}  # 2.306.0 A (#2885): the privacy line of the page says what is true
 
 
 def journal_stats(c, uid, days):
@@ -705,7 +804,7 @@ def journal_stats(c, uid, days):
         raise BadInput(tr("Invalid value: {0}", "days"))
     today = local_now().date()
     lo = (today - timedelta(days=days - 1)).isoformat()
-    rows = c.execute("SELECT day, text, mood FROM journal WHERE user_id=? AND day>=? AND day<=? ORDER BY day", (uid, lo, today.isoformat())).fetchall()
+    rows = _jr_rows(c, uid, "user_id=? AND day>=? AND day<=?", (uid, lo, today.isoformat()), "day")  # 2.306.0 A (#2885)
     dist = {str(i): 0 for i in range(1, 6)}
     buckets = {}
     for r in rows:
@@ -731,8 +830,7 @@ def journal_export(c, uid, b, fmt):
     _journal_ok(c, uid)
     f = _journal_args(b)
     f.pop("before", None)
-    where, args = _journal_where(uid, **f)
-    rows = c.execute(f"SELECT day, text, mood FROM journal WHERE {where} ORDER BY day", args).fetchall()
+    rows = _journal_find(c, uid, f, "day")  # 2.306.0 A (#2885)
     if fmt == "csv":
         buf = io.StringIO()
         w = csv.writer(buf)
@@ -778,4 +876,5 @@ def review(c, uid, period, day, journal=True):
     out = {"period": period, "from": lo_s, "to": hi_s, "done": done, "open": still, "moved": moved, "next": nxt}
     if journal:
         out["journal"] = journal_get(c, uid, lo_s, hi_s)
+        out["journal_sealed"] = jr_sealed(c, uid)  # 2.306.0 A (#2885)
     return out

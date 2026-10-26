@@ -145,6 +145,7 @@ check(r.status_code == 200 and r.json() == {"ok": True} and len(mails()) == m2, 
 
 # ================================================================== phase 2: two-factor stays required after a reset
 start(SMTP, keep=True)
+dbx("DELETE FROM rate_hits")  # 2.306.0 (#2875): the hourly limits live in the database now (a restart keeps them): a fresh phase
 Bo = sess("bob", "bob-new-pass-1")
 r = Bo.post(B + "/api/me/2fa/totp", json={"password": "bob-new-pass-1"})
 sec = r.json()["secret"].replace(" ", "") if r.ok else ""

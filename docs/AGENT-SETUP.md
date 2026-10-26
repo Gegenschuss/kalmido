@@ -69,6 +69,12 @@ starts the agent at every login (launchd / Task Scheduler / systemd --user). Det
 [AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
+2.306.0 (#2927): for a team agent the person who made the setup code answers its permission questions (`KALMIDO_PERM_USER`
+in `kalmido-agent.env`; 2.312.0: an admin changes it in the agent's *Runtime > Permission questions go to*, no change on
+the computer needed); the setup creates `CLAUDE.md` in the project folder from
+`mcp/CLAUDE.template.md` when there is none (never overwritten), and the launcher reports the usage itself (usage hook as
+Stop / SubagentStop hook in its run settings). The setup prints who answers and where `CLAUDE.md` is.
+
 2.47.3 (#1729): *Remove computer* and *Delete agent* show an uninstall command for each computer (run it there first, then delete; it also works after the agent was deleted).
 
 2.157.0 (#1517): on a Mac set up over SSH (nobody logged in at the screen) the agent starts in the background at once and at every screen login after a restart. After *Remove computer* the launcher stops the agent with one log line and waits quietly until you run the uninstall command.
@@ -108,23 +114,22 @@ Steps:
 1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.
 2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.
 3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).
-4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.
+4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent and write ~/agent/.mcp.json for the runner.
 5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in, and append the behaviour rules from ~/kalmido/mcp/CLAUDE.template.md (the part between its markers).
-6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop and SubagentStop hook.
-7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200, ends after ~9 minutes with empty output, holds events while the agent is paused). Add BASH_DEFAULT_TIMEOUT_MS=600000 and BASH_MAX_TIMEOUT_MS=600000 to the env file (only these two lines; never print the file).
-8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.
-9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.
-10. Prove the service keeps the agent connected WITHOUT this session: close nothing yet, but stop using the agent's token here; wait 5 minutes; then check that Settings > Agents shows the agent as connected (not "not connected" and not "connected, but no service running") and that a mention gets an answer. The setup is not finished before this works.
-11. Finish with the test checklist from the guide (mention, chat, kill switch, the prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.
+6. Create ~/agent/.claude/settings.json from the guide (the hardened profile: defaultMode dontAsk, only the Kalmido MCP tools allowed, no Edit or Write, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop and SubagentStop hook.
+7. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh with --events and the command `claude --mcp-config ~/agent/.mcp.json` (no prompt: the runner starts the agent once per event; runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.
+8. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.
+9. Prove the service keeps the agent connected WITHOUT this session: close nothing yet, but stop using the agent's token here; wait 5 minutes; then check that Settings > Agents shows the agent as connected (not "not connected" and not "connected, but no service running") and that a mention gets an answer. The setup is not finished before this works.
+10. Finish with the test checklist from the guide (mention, chat, kill switch, the prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.
 ```
 
 Claude Code shows every sudo command before it runs it. Log in to Claude Code as the agent user yourself when it asks
-(step 4), then run the test checklist (step 11) together.
+(step 3), then run the test checklist (step 10) together.
 
 **Connecting the agent in Kalmido is not the end of the setup.** An agent that only runs in an open terminal falls
-asleep as soon as nobody types there. Only the service of step 9 (Linux), the LaunchAgent (macOS, below) or a scheduled
+asleep as soon as nobody types there. Only the service of step 7 (Linux; step 9 of path B), the LaunchAgent (macOS, below) or a scheduled
 task (Windows) keeps it awake. *Settings > Agents* says **"connected, but no service running"** when the agent's token
-is used but nothing has collected its events for 10 minutes: that is the sign that step 9 is missing.
+is used but nothing has collected its events for 10 minutes: that is the sign that this service is missing.
 
 ## Path B: do it yourself
 
@@ -133,8 +138,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 ### 1. Create the agent in Kalmido
 
 1. *Settings > Agents > Status > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
-   note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks* and *Comments*; tick only what
-   it needs on top (structure, delete, files, time, export). An agent that may only read cannot answer in the chat or send
+   note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks*, *Comments* and the file store (*Read files* and *Add files*, `files:read` / `files:write`); tick only what
+   it needs on top (structure, delete, task attachments, time, export, calendar, contacts, office, tables, knowledge pages). *Office drafts* is a right you give on purpose (see [AGENTS.md](AGENTS.md#permissions)); `account`, `admin-read`, `private` and `docs:upload` are never available to an agent. An agent that may only read cannot answer in the chat or send
    proposals (2.190.0): keep *Comments* or *Tasks* on for that. With *structure* it can set up a project with custom fields as
    columns; that switches the module *Custom fields* on for the project's owner (2.39.1). Copy the **API token**: it is shown only once. You can
    rotate it later in the agent's dialog (optionally with an expiry); the old token stops at once. Deleting projects or
@@ -149,8 +154,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 
    Both ask first, with a warning: the agent then also sees your private projects, and everything in them becomes input
    for a model.
-4. **Tidy up**: in the same table pick the tidy mode (off, suggest, automatic) and, if several agents are in a project,
-   which one tidies it up. That agent also answers *Tidy up the project…* (2.39.0, the project's menu): it gets the open tasks
+4. **Tidy up**: in the same table pick the tidy mode (off, suggest, automatic) (a project has one agent: the
+   second one is refused with `409`, so that agent is the one that tidies it up). That agent also answers *Tidy up the project…* (2.39.0, the project's menu): it gets the open tasks
    as a `job_request` of kind `cleanup` and answers with one proposal (merge, rename, move, close) that the person
    applies ([AGENTS.md](AGENTS.md#tidy-up-a-list-2390)); the reference launcher runs it like any other event.
 5. *Runtime* in the agent's dialog (admins): model, auto-compact, a nightly fresh restart. The launcher in step 9
@@ -400,8 +405,25 @@ sed -n '/kalmido-agent-rules:start/,/kalmido-agent-rules:end/p' ~/kalmido/mcp/CL
 
 ### 7. Permissions: .claude/settings.json
 
-`~/agent/.claude/settings.json`. `dontAsk` refuses everything that is not allowed, without a prompt, so an injected
-instruction cannot wait for someone to click *Allow*:
+`~/agent/.claude/settings.json`. Two profiles; pick one on purpose and use the same everywhere (this guide,
+[AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings), [AGENTS.md](AGENTS.md#set-up-an-agent), the guide in the app):
+
+| | Hardened | Standard |
+|---|---|---|
+| Mode | `dontAsk`: anything not allowed is refused without a prompt, so an injected instruction cannot wait for someone to click *Allow* | `default`: a tool outside the allow list asks the person in the chat (permission relay, [step 9](#9-autostart-with-the-runtime-launcher)) |
+| Allowed | the Kalmido tools (`mcp__kalmido`), `Read` in the work folder (and only for the loop of step 8: `./bin/events.sh`) | the same, plus narrow `Edit` / `Write` (`WORKFLOW-KALMIDO.md`, `NOTIZEN.md`) and `Bash` for the job tool only (`agent_job.py`) |
+| Working routine and notes | **no**: the agent cannot write `WORKFLOW-KALMIDO.md` and `NOTIZEN.md` | yes |
+| Long work as a job | **no** (the job tool is a program) | yes |
+| Files at the answer (`$KALMIDO_OUTBOX`) | **no** (they need `Write`) | yes, the person confirms the write once (the outbox folder is new for every run, so it cannot be pinned in the file) |
+| Permission question in the chat | **no** (`dontAsk` never asks anyone) | yes |
+
+The hardened profile is the right one for an agent that only reads and writes Kalmido (tasks, comments, chat): it
+cannot change a file or run a program whatever it is told. It also has no notes, no working routine, no jobs, no
+attachments to its answers and no permission questions; if you need one of them, use the standard profile with its
+narrow rules instead of loosening the hardened one rule by rule. In both profiles `WebFetch`, `WebSearch`, reading the
+env file and `Bash(cat:*)` / `Bash(curl:*)` stay denied.
+
+The hardened profile:
 
 ```json
 {
@@ -419,7 +441,27 @@ instruction cannot wait for someone to click *Allow*:
 }
 ```
 
-The Stop and SubagentStop hooks are step 10. Check with `claude` in `~/agent`: `/permissions` lists exactly these rules.
+With the runtime launcher ([step 9](#9-autostart-with-the-runtime-launcher)) the usage hook is already wired for every
+run, so `settings.json` does not need the `hooks` block any more; keep it only for sessions you start without the
+launcher. Wired twice, the hook still counts each turn once.
+
+The standard profile changes these lines (everything else, the hooks included, stays):
+
+```json
+{
+  "permissions": {
+    "defaultMode": "default",
+    "allow": ["mcp__kalmido", "Read(./**)",
+              "Edit(./WORKFLOW-KALMIDO.md)", "Write(./WORKFLOW-KALMIDO.md)", "Edit(./NOTIZEN.md)", "Write(./NOTIZEN.md)",
+              "Bash(python3 ~/kalmido/mcp/agent_job.py:*)"],
+    "deny": ["WebFetch", "WebSearch", "Read(./.env)", "Read(./**/.env)",
+             "Read(~/.config/kalmido/**)", "Bash(cat:*)", "Bash(curl:*)"]
+  }
+}
+```
+
+With the launcher in event mode (`--events`) the agent needs no `./bin/events.sh`; the line `Bash(./bin/events.sh)` is only
+for the loop of [step 8](#8-event-monitor-with-back-off). The Stop and SubagentStop hooks are step 10. Check with `claude` in `~/agent`: `/permissions` lists exactly these rules.
 
 ### 8. Event monitor with back-off
 
@@ -476,6 +518,24 @@ chmod 700 ~/agent/bin/events.sh
 The token goes to curl on stdin, never on its command line. Inside an interactive session the MCP tool
 `wait_for_events` does the same; the script is the one shell command the agent is allowed to run.
 
+**More variables in `agent.env`** (all optional; 2.306.0 lists the ones that were missing here):
+
+| Variable | What it does |
+|---|---|
+| `KALMIDO_POLL` | seconds between the launcher's checks of `GET /api/v1/agent` (runtime settings, pause); default 60 |
+| `KALMIDO_RESTART_DELAY` | seconds the launcher waits before it starts the command again after it ended by itself; default 10 |
+| `KALMIDO_PERM_TEXT` | the permission question in the chat; `{0}` = the tool and its command (default: "**May I run this?** ({0})") |
+| `KALMIDO_PERM_LATE` | the note for an answer that came after the question was denied already |
+| `KALMIDO_PERM_OPERATOR_ONLY` | the note for someone who is not the agent's operator when a step needs a permission |
+| `KALMIDO_APPROVAL_EXPIRED` | the answer to a press on an approval card that has expired |
+| `KALMIDO_APPROVAL_REMINDER` | the reminder after 2 hours; `{0}` = the title of the approval |
+| `KALMIDO_NOTICE_SESSION` | the grey line when a new conversation starts; `{0}` = the time or reason |
+| `KALMIDO_RUN_FAILED` | the chat note when a run failed twice; `{0}` = the reason |
+| `KALMIDO_ABORTED` | the chat note after *Stop*; `{0}` = the tool steps done until then |
+| `KALMIDO_ABORT_JOB` | the chat note when *Stop* is pressed in a job's history (a job is stopped on its card) |
+
+The text variables replace the English default text one to one; write them in the language of the people who chat with the agent.
+
 **Only one collector per agent.** Each event is handed out once per cursor: when the service (step 9) runs, an
 interactive session with the same token must not call `events.sh` / `wait_for_events` as well, or the two take events
 away from each other. Pause the agent with a reason while you work interactively (the service then hands out nothing), or give the interactive session its own
@@ -529,7 +589,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   hands each run its own settings file with a `PermissionRequest` hook (`--settings`; your own settings stay untouched;
   a command with its own `--settings` gets none). No answer in 9 minutes (`KALMIDO_PERM_TIMEOUT`, seconds) is a no; a
   task run asks the agent's owner (or `KALMIDO_PERM_USER`). Only the agent's operator answers (2.126.0): the owner,
-  `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`; when someone else chats with a team agent and a step needs a
+  `KALMIDO_PERM_USER` and the ids in `KALMIDO_OWNER_IDS`. 2.312.0: for a team agent an admin picks the person in
+  *Settings > Agents > (agent) > Runtime > Permission questions go to*; the runner takes it (before `KALMIDO_PERM_USER`)
+  before its next run, no change on the computer needed. When someone else chats with a team agent and a step needs a
   permission, the step is denied and that person gets a short note. `KALMIDO_PERM_RELAY=0` switches it off; it needs a
   permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
 - **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same

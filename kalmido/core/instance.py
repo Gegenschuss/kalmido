@@ -1,5 +1,6 @@
 """Version, update check and instance settings (admins)."""
 import json
+import os
 import re
 import threading
 import time
@@ -15,8 +16,26 @@ from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE, me
-from ..accounts.oidc import oidc_public
+from ..accounts.oidc import oidc_admin_rule, oidc_public, oidc_reauth
 from ..core.access import _COLLAB_ALL, _TIME_ALL, collab_all, time_all
+
+# 2.306.0 B (#2887): privacy statement / imprint of the operator (env or Administration > Server)
+LEGAL_ENV = {"privacy_url": os.environ.get("KALMIDO_PRIVACY_URL", "").strip(), "imprint_url": os.environ.get("KALMIDO_IMPRINT_URL", "").strip()}
+LEGAL_URL_RE = re.compile(r"https?://[^\s\"'<>\\]+")
+
+
+def legal_url_ok(u):
+    return not u or (len(u) <= 500 and bool(LEGAL_URL_RE.fullmatch(u)))
+
+
+def legal_links(c):
+    """2.306.0 B (#2887): {privacy_url, imprint_url} for the login page and Settings > Help (open); '' = no link.
+    Only plain http(s) addresses reach the client (an unusable env value counts as unset)."""
+    out = {}
+    for k, env in LEGAL_ENV.items():
+        u = gsetting(c, k) or env
+        out[k] = u if legal_url_ok(u) else ""
+    return out
 
 
 # ---------------------------------------------------------------- version, update check, instance settings
@@ -50,7 +69,7 @@ def about_info(c, u):
     from ..calendars.subscriptions import CAL_ALLOW_ENV, cal_allow_parse, cal_allow_text, CAL_ON
     from ..admin.backup import BK_ON_ENV
     from ..api.v1 import PUB_ENV
-    d = {"version": APP_VERSION}
+    d = {"version": APP_VERSION, "legal": legal_links(c)}  # 2.306.0 B (#2887): privacy / imprint links in Settings > Help
     if u and u["is_admin"]:
         info = update_state(c)
         latest, cur = semver(info.get("latest")), semver(APP_VERSION)
@@ -153,6 +172,10 @@ def admin_settings():
     need_admin()
     b, c = body(), db()
     old = {k: gsetting(c, k) not in ("0", "") for k in ("collab_all", "time_all", "update_check") + AUTH_SWITCHES}
+    if b.get("oidc_autocreate") is True and not old["oidc_autocreate"]:  # 2.306.0 Fix-1 (#2875 review): new accounts by the admin rule
+        e = oidc_admin_rule(c) and oidc_reauth(c, b)
+        if e:
+            return e
     hosts = None
     if "cal_allow_hosts" in b:  # internal hosts calendar subscriptions may reach (SSRF allow-list)
         v = b["cal_allow_hosts"]

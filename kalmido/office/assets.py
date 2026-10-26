@@ -354,7 +354,7 @@ def ast_value_csv():
     w.writerow([tr("Total"), "", "", "", _de(s["purchase_net"]), _de(s["new_value"]), _de(s["current_value"]), _de(s["afa_year"]), ""])
     w.writerow([bnk_csv_cell(d["disclaimer"])])
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": 'attachment; filename="equipment-value.csv"'})
+                    headers={"Content-Disposition": 'attachment; filename="equipment-value.csv"', "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)
 
 
 @app.get("/api/office/equipment/value.pdf")

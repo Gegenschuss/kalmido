@@ -38,12 +38,14 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
 VERSION = "2.11.0"
 NOTE_MAX = 200
 KEEP_IDS = 200  # message ids remembered per session (Claude Code writes one line per content block of a message)
+LOCK_WAIT_S = 20  # 2.306.0 (#2927): how long a second run of the same session waits for the first (hook timeout 30 s)
 
 
 def load_env(path):
@@ -87,6 +89,62 @@ def save_state(path, st):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"offset": st["offset"], "ids": st["ids"][-KEEP_IDS:]}, f)
     os.replace(tmp, path)
+
+
+class LockBusy(Exception):
+    pass
+
+
+class StateLock:
+    """2.306.0 (#2927): exclusive lock next to a session's state file. The launcher wires this hook with --settings and a
+    project .claude/settings.json may wire it too; Claude Code then runs both for the same turn. The second run waits
+    here, then loads the state the first one saved and its message ids dedupe the turn (counted once)."""
+
+    def __init__(self, path, wait=LOCK_WAIT_S):
+        self.path, self.wait, self.f = path + ".lock", wait, None
+
+    def __enter__(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        self.f = open(self.path, "a+b")
+        deadline = time.monotonic() + self.wait
+        while True:
+            try:
+                _lock(self.f)
+                return self
+            except OSError:
+                if time.monotonic() >= deadline:
+                    self.f.close()
+                    self.f = None
+                    raise LockBusy(self.path)
+                time.sleep(0.05)
+
+    def __exit__(self, *exc):
+        if self.f:
+            try:
+                _unlock(self.f)
+            finally:
+                self.f.close()
+        return False
+
+
+if os.name == "nt":  # pragma: no cover - Windows
+    import msvcrt
+
+    def _lock(f):
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+
+    def _unlock(f):
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _lock(f):
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _unlock(f):
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def read_new(transcript, st):
@@ -205,6 +263,15 @@ def run(hook, env, dry_run=False, out=sys.stdout):
         return []
     sdir = env.get("KALMIDO_USAGE_STATE_DIR") or os.path.join(os.path.expanduser("~"), ".cache", "kalmido-usage")
     sp = state_path(sdir, state_key)
+    try:
+        with StateLock(sp):
+            return _run_locked(transcript, session_id, agent_id, sp, base, token, env, dry_run, out)
+    except LockBusy:
+        print("kalmido usage hook: another run of this session is still busy (its turns are reported by it)", file=sys.stderr)
+        return []
+
+
+def _run_locked(transcript, session_id, agent_id, sp, base, token, env, dry_run, out):
     st = load_state(sp)
     sums, off, ids = read_new(transcript, st)
     prices = {}

@@ -76,6 +76,8 @@ BK_SAFETY_KEEP = 3
 # 2.152.0 B (#2172): weekly backups for at most a year (data protection: backups of deleted data are kept short and
 # documented); older safety backups go after ret_days("backups") (core/retention.py, behind its switch)
 BK_KEEP_WEEKLY_MAX = 52
+# 2.306.0 G (#2946): without the retention switch weekly backups are kept for at most two years
+BK_KEEP_WEEKLY_CAP = 104
 # 2.152.0 B (#2172): hosting: no backup without encryption (off by default, self-hosted installations keep working)
 BK_ENCRYPT_REQUIRED = os.environ.get("KALMIDO_BACKUP_ENCRYPT_REQUIRED", "").strip().lower() in ("1", "true", "yes", "on")
 BK_UPLOAD_TTL = 3600
@@ -543,7 +545,7 @@ def bk_prune(c):
     from ..core.retention import ret_days, ret_on, ret_report
     daily = _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14)
     # 2.152.0 review F3: an older setting above the cap is cut to it only with the switch (an update never deletes by surprise)
-    weekly = _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_MAX if ret_on("backups") else 520, 8)
+    weekly = _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_MAX if ret_on("backups") else BK_KEEP_WEEKLY_CAP, 8)
     items = bk_list()
     keep, days, weeks = set(), [], []
     for x in items:
@@ -1399,7 +1401,7 @@ def bkr_restore_journal(journal):
 # ---- API (admins; CSRF header on every change)
 def bk_weekly_max():
     """2.186.0 C (#2602): weekly backups are capped at BK_KEEP_WEEKLY_MAX only while ret_on("backups") (as bk_prune reads it)."""
-    return BK_KEEP_WEEKLY_MAX if bk_ret_on("backups") else 520
+    return BK_KEEP_WEEKLY_MAX if bk_ret_on("backups") else BK_KEEP_WEEKLY_CAP
 
 
 def bk_state(c):
@@ -1414,7 +1416,7 @@ def bk_state(c):
             "total_bytes": sum(x["size"] for x in items), "free_bytes": aa_disk().get("free"),
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],
             # 2.152.0 B (#2172): the limits the admin view explains
-            "encrypt_required": BK_ENCRYPT_REQUIRED, "keep_weekly_max": BK_KEEP_WEEKLY_MAX if bk_weekly_max() == BK_KEEP_WEEKLY_MAX else None}
+            "encrypt_required": BK_ENCRYPT_REQUIRED, "keep_weekly_max": bk_weekly_max()}  # 2.306.0 G (#2946): always set
 
 
 def need_backups():
@@ -1478,7 +1480,7 @@ def backups_settings():
     for k, lo, hi in (("keep_daily", 1, 365), ("keep_weekly", 0, 520)):
         if k in b and (isinstance(b[k], bool) or not isinstance(b[k], int) or not lo <= b[k] <= hi):
             return err(tr("Invalid value: {0}", k))
-    if "keep_weekly" in b:  # 2.152.0 B (#2172): older clients may still send up to 520 weeks: the server keeps at most a year
+    if "keep_weekly" in b:  # 2.306.0 G (#2946): older clients may still send up to 520 weeks: the server caps them (104, or 52 with the switch)
         b["keep_weekly"] = min(b["keep_weekly"], bk_weekly_max())  # 2.186.0 C (#2602): only with the switch
     if "passphrase" in b:
         pw = b["passphrase"]

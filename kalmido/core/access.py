@@ -611,6 +611,8 @@ def list_role(c, lid, uid=None):
             return None
     if ((org_trips_hidden() and uid == g.user["id"]) or health_hidden(c, uid)) and reading_ids(c, [lid]):
         return None  # 2.172.1 A (#2689): read later: in the app only (not for an agent / an API token, also when asked for an agent)
+    if r[1] == "travel" and r[2] and org_trips_hidden() and uid == g.user["id"]:
+        return None  # 2.306.0 D1 (#2875): an organisation's trip by its id too, like the lists (org_trip_sql, #2680)
     if r[0] == uid:
         role = "owner"
     else:

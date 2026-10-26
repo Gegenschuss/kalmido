@@ -46,69 +46,34 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 
 Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`); `kind=project` is the switch "Progress and status".
 
-| Tool | What it does | REST call |
-|---|---|---|
-| `get_agent` | agent user, enabled state, status, job counts, latest event cursor, runtime settings (2.4.1) | `GET /api/v1/agent` |
-| `list_lists` | visible projects, including their sections `[{id, name}]`, project tags and agent tidy mode | `GET /api/v1/lists` |
-| `list_list_tags` | shared tags of a project | `GET /api/v1/lists/{id}/tags` |
-| `list_tasks` | tasks filtered by project, status, tag, project tag or assignee; `compact: true` = only the fields to scan a list with (id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, list_tags, assignee_id), `false` = full tasks, not given = full up to 25 tasks per page, compact above (`"compact": true` in the result) | `GET /api/v1/tasks` (`?fields=compact`) |
-| `search_tasks` | full-text search | `GET /api/v1/search?q=` |
-| `search_messages` | 2.33.0: full-text search in task comments, team chat channels and your own chats (only what the token may read; snippet + marks, newest first; filters art, sender, room, chat_with, task) | `GET /api/v1/search?scope=messages&q=` |
-| `get_task` | a task plus its comments (reactions, suggestions); 2.2.0: `code` (linked pull requests + CI, commits) and `repo` (the project's repository, a suggested branch) | `GET /api/v1/tasks/{id}` + `/comments` |
-| `create_task` / `update_task` / `complete_task` | change tasks | `POST /api/v1/tasks`, `PATCH /api/v1/tasks/{id}`, `POST .../complete` |
-| `add_comment` | comment, optionally with a structured tidy suggestion | `POST /api/v1/tasks/{id}/comments` |
-| `react` | 👍 / 👎 / ❤️ on a comment (or take one back) | `POST /api/v1/comments/{id}/reactions`, `DELETE .../reactions/{emoji}` |
-| `set_status` | idle / working / waiting / error, a short text and optionally the task it works on ("Claude is writing …" there) | `PUT /api/v1/agent/status` |
-| `list_events` | events after a cursor | `GET /api/v1/agent/events?since=` |
-| `wait_for_events` | long-poll for events (up to 60 s) | `GET /api/v1/agent/events?since=&wait=` |
-| `list_jobs` / `create_job` / `update_job` | jobs shown in the Agents tab | `/api/v1/agent/jobs` |
-| `get_job` / `submit_proposal` | 2.3.0: one job (a proposal job with its input) / answer a `job_request` with a structured proposal ([Proposals](../docs/AGENTS.md#proposals)) | `/api/v1/agent/jobs/{id}`, `.../proposal` |
-| `list_chats` / `send_chat` | chat with people; 2.13.1: `send_chat` takes `files: [{name, base64, mime?}]` (multipart); 2.37.0: `offer_save: true` = the button "Save as task" for the person | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
-| `list_attachments` | 2.13.1: files of a task and its comments (`id`, `name`, `mime`, `size`, `comment_id`) | `GET /api/v1/tasks/{id}/attachments` |
-| `get_attachment` | 2.13.1: one file as base64 + `mime` / `name` / `size` (`source`: `task`, `chat` or (2.15.0) `project` with `list_id`, `max_bytes` default 5 MB, max 20 MB); images also as an MCP image item | `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}` |
-| `read_attachment` | 2.34.0: a task / comment file as text: a PDF's text layer (read on the server, `no_text_layer` for scans; 2.61.0: the text recognised in the background with `source: ocr` when there is one) or a text file, `max_chars` (default and max 200000, `truncated`); images come back as an image | `GET /api/v1/attachments/{id}/text` |
-| `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
-| `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
-| `tidy_task` | tidy a task (projects in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
-| `set_waiting` / `clear_waiting` | 2.1.0: mark a task as waiting on external (`note`, follow-up day `until`) or end it | `PUT` / `DELETE /api/v1/tasks/{id}/waiting` |
-| `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
-| `list_stale_tasks` | 2.34.0: tasks lying idle (no change, comment or time entry for the project's threshold, default 7 days; waiting without a follow-up day) | `GET /api/v1/stale` |
-| `get_time_gaps` | 2.34.0: working days with work on tasks but no tracked time (`user_id` = the person you work for) | `GET /api/v1/time/gaps` |
-| `list_groups` | 2.10.0: groups of people with their members (`mine` = yours) | `GET /api/v1/groups` |
-| `list_list_groups` | 2.10.0: the groups a project is shared with (role, directly or via a folder) | `GET /api/v1/lists/{id}/groups` |
-| `get_day_plan` | 2.10.0: the built-in day plan of your user (preview; `mode` day or fill) | `GET /api/v1/dayplan` |
-| `get_day_review` | 2.10.0: the daily review (done, open, moved, next working day) | `GET /api/v1/dayplan/review` |
-| `report_usage` | 2.1.1: report the agent's model usage (model, tokens, optional cost, task / project / job, short note; numbers only) | `POST /api/v1/agent/usage` |
-| `list_repos` | 2.2.0: repositories connected to a project (never a token) | `GET /api/v1/lists/{id}/repos` |
-| `get_project_overview` | 2.7.1: the overview of a project with progress and status (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
-| `request_merge_approval` | 2.2.0: a *Ready to merge* comment for your pull request (`task_id`, `pr_url`, `summary`); wait for the `reaction` event with `approval: "approved"` before merging | `POST /api/v1/tasks/{id}/comments` with `suggestion.kind = merge_request` |
-| `get_usage` | 2.1.1: the agent's own usage by day, task, project (`list`) or model, with its limit | `GET /api/v1/agent/usage` |
-| `report_plan_usage` | 2.33.0: the plan usage (e.g. 5-hour and weekly window, percent and reset time, an own limit) -- the ring in the chat header; takes Claude Code's `rate_limits` as it is | `PUT /api/v1/agent/quota` |
-| `get_plan_usage` / `clear_plan_usage` | 2.33.0: read / remove that report | `GET` / `DELETE /api/v1/agent/quota` |
-| `list_schedules` | 2.34.0: your planned jobs (people plan them in the app; when one is due you get the event `scheduled_job` and answer in the chat with that person); read-only | `GET /api/v1/agent/schedules` |
-| `read_briefing` | 2.34.0: the morning briefing of a person who may chat with you (only the projects they share with you): due today / overdue, blocked, changed since the last briefing, lying idle; data only | `GET /api/v1/briefing?user_id=` |
-| `read_project_status` | 2.34.0: the status report of a project shared with you for a period (default 7 days): done, in progress, blocked, overdue, next dates, milestones, tracked time + a plain Markdown text | `GET /api/v1/lists/{id}/status-report` |
+The server offers about 320 tools, one or more for nearly every REST route of the agent API. This page is only an overview;
+the complete, tested lists are elsewhere:
 
-2.15.0 (#479): the rest of the REST API as tools. Each needs the permission (scope) of its REST call; `tools/list`
-shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes):
+- [`CLAUDE.template.md`](CLAUDE.template.md): every tool with its parameters, written for the agent (the file an agent reads).
+- [docs/AGENTS.md](../docs/AGENTS.md): events, approvals, proposals and the rules of the agent channel.
+- [docs/API.md](../docs/API.md): the REST calls behind the tools and the permission (scope) of each.
+- `tools/list` of a running server: only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes).
 
-| Tools | Scope | REST calls |
+| Area | Tools (examples) | Scope |
 |---|---|---|
-| `get_me`, `get_list`, `list_members`, `list_sections`, `list_folders`, `list_fields`, `list_templates`, `list_filters`, `list_subtasks`, `get_dependencies`, `list_trash`, `list_tags`, `get_roadmap`, `get_group`, `list_project_files`, `get_timer`, `list_time_entries`, `list_habits`, `list_news`, `list_agents` | read | `GET` routes |
-| `move_task` (project / section / parent + `before_id`, `after_id` or `position` top / bottom), `batch_tasks` (update, complete, reopen, wont_do; delete / restore also need *delete*), `reopen_task`, `skip_occurrence`, `take_task`, `add_subtask`, `add_dependency`, `remove_dependency`, `create_habit`, `update_habit`, `check_in_habit`, `shift_list_dates` | tasks:write | `POST /tasks/{id}/move`, `POST /tasks/batch`, … |
-| `update_comment`, `delete_comment`, `mark_news_read`, `delete_chat_attachment` | comments | `PATCH` / `DELETE /comments/{id}`, `POST /news/read` |
-| `create_list`, `update_list`, `share_list`, `unshare_list`, `share_list_with_group`, `unshare_list_from_group`, `create_section`, `rename_section`, `reorder_sections`, `rename_folder`, `delete_folder`, `create_field`, `update_field`, `create_list_tag`, `update_list_tag`, `delete_list_tag`, `create_template`, `update_template`, `apply_template`, `create_filter`, `update_filter`, `set_project_overview`, `set_project_status`, `add_project_link`, `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`, `delete_milestone` | structure | projects, sections, folders, fields, project tags, templates, filters, overview |
-| `delete_task`, `restore_task`, `empty_trash`, `delete_list`, `delete_section`, `delete_field`, `delete_template`, `delete_filter`, `delete_habit` | delete | `DELETE …`, `POST /tasks/{id}/restore` |
-| `get_attachment` (also `source: project` + `list_id`), `read_attachment` (2.34.0) | attachments:read | `GET /attachments/{id}`, `/attachments/{id}/text`, `/lists/{id}/files/{id}` |
-| `upload_attachment` (`files: [{name, base64, mime?}]`), `delete_attachment`, `upload_project_file`, `delete_project_file` | attachments:write | multipart uploads |
-| `start_timer`, `stop_timer`, `add_time_entry`, `update_time_entry`, `delete_time_entry` | time | `/time/timer`, `/time/entries` |
-| `export_data` | export | `GET /export` |
-| `get_family`, `list_deadline_types`, `list_packing_templates`, `list_kids` (2.19.0) | read | `GET /family`, `/family/deadline-types`, `/family/packing`, `/family/kids` |
-| `add_occasion`, `add_deadline`, `ingredients_to_shopping`, `give_stars`, `add_reward`, `update_reward`, `request_reward`, `decide_reward` (2.19.0) | tasks:write | `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, stars + rewards |
-| `add_shop_areas`, `create_packing_list` (2.19.0) | structure | `/lists/{id}/shop-areas`, `POST /family/packing` |
-| `delete_reward` (2.19.0) | delete | `DELETE /family/rewards/{id}` |
-| `list_event_calendars`, `create_event_calendar`, `update_event_calendar`, `delete_event_calendar`, `share_event_calendar`, `unshare_event_calendar`, `import_ics`, `export_ics`, `list_calendar_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `restore_event`, `reply_to_event`, `add_preparation_task` (also tasks:write), `get_task_events` (2.21.0) | calendar | `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
-| `list_address_books`, `create_address_book`, `update_address_book`, `delete_address_book`, `share_address_book`, `unshare_address_book`, `import_vcards`, `export_vcards`, `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact`, `bulk_contacts` (2.46.1), `link_contact` / `unlink_contact` (also tasks:write) (2.21.0) | contacts | `/address-books…`, `/contacts…`, `/tasks/{id}/contacts` |
+| Projects and tasks | `list_lists`, `list_tasks`, `search_tasks`, `get_task`, `list_subtasks`, `get_dependencies`, `get_project_overview` | `read` |
+| Change tasks | `create_task`, `update_task`, `complete_task`, `move_task`, `batch_tasks`, `set_waiting`, `check_in_habit` | `tasks:write` |
+| Comments and chat | `add_comment`, `react` (`remove: true` takes a reaction back), `send_chat`, `react_to_chat` (`emoji`, `remove`), `list_chats`, `request_chat_approval` | `comments`, `read` |
+| Files of tasks and projects | `list_attachments`, `get_attachment` (`source`: `task`, `chat`, `team` or `project`), `read_attachment`, `upload_attachment` | `attachments:read`, `attachments:write` |
+| File store | the folders and files shared with the agent | `files:read`, `files:write` |
+| Structure | projects, sections, fields, project tags, templates, saved filters, folders | `structure` |
+| Deleting | `delete_task`, `restore_task`, `empty_trash`, `delete_list` and the other `delete_*` | `delete` |
+| Time | `start_timer`, `stop_timer`, `add_time_entry`, `get_time_gaps` | `time`, `read` |
+| Calendar and contacts | events, event calendars, address books, contacts | `calendar`, `contacts` |
+| Agent channel | `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`, `create_job`, `submit_proposal`, `propose_*`, `report_usage` | none (the agent's own channel; a read-only token may not post) |
+| Office drafts | quotation, invoice and letter drafts a person checks and sends | `office` |
+| Further areas | pin board notepads, view arrangements, proposals for old data, tables, knowledge pages | `pinboard`, `layouts`, `import`, `sheets:read` / `sheets:write`, `wiki:read` / `wiki:write` |
+| Export | `export_data` | `export` |
+
+A new agent starts with `read`, `tasks:write`, `comments`, `files:read` and `files:write`; the other scopes (including
+`office`, `pinboard`, `layouts`, `import`, `sheets:*`, `wiki:*`) an admin ticks on purpose. Never for an agent: `account`,
+`admin-read`, `private` and `docs:upload`. A few tools check a scope that depends on the request body (a batch with deletions,
+`export_data`, linking a contact), and answer a plain `403` without `required_scope` when it is missing.
 
 An agent's dangerous requests (deleting a project or a field, emptying the trash, batches of 10+ tasks, moving projects,
 folders, sharing) answer `approval_required` with a waiting job: a person approves it in Kalmido and the agent gets the

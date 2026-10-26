@@ -1,5 +1,6 @@
 """Agent administration and personal agents."""
 import json
+import re
 import secrets
 from datetime import timedelta
 from flask import g, jsonify
@@ -20,12 +21,13 @@ from ..tasks.validation import as_int
 from ..accounts.users import user_forget_conns
 from ..collab.comments import user_names
 from ..core.errors import BadInput
-from ..accounts.users import avatar_upload, need_admin, user_purge
+from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
+from ..accounts.orgs import may_see
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
 from ..integrations.webhooks import need_wh, wh_allow, wh_err_text, wh_log, wh_public, wh_send, wh_url_check
 from ..agents.core import (
     agent_active, agent_emit, AGENT_EVENTS, AGENT_NOTE_MAX, agent_public, agent_row, agent_runtime, is_agent,
-    runtime_clean, RUNTIME_DEFAULTS,
+    perm_user_ok, runtime_clean, RUNTIME_DEFAULTS,
 )
 
 
@@ -52,6 +54,11 @@ def agent_admin_dict(c, a):
             "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]],
             # 2.30.0 (#919): limited to these lists ([] = all), the lists it connects although their people differ
             "list_ids": list_ids_out(a["list_ids"] if "list_ids" in a.keys() else ""), "bridges": agent_bridges_info(c, a["user_id"])}
+
+
+def _agent_name(v):
+    """2.306.0 (#2927): an agent's display name, one line without control characters (it also goes into env file comments)."""
+    return re.sub(r"[\x00-\x1f\x7f]", " ", str(v or "")).strip()[:60]
 
 
 def need_agent_admin(c, aid):
@@ -164,7 +171,7 @@ def admin_agent_create():
             return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
         if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
             return err(tr("Username already exists"), 409)
-        uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
+        uid = create_user(c, username, _agent_name(b.get("display_name")) or username, None, None, False, paperless_access=False)
         make_agent(c, uid)
         c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
         try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
@@ -182,7 +189,10 @@ def admin_agent_create():
             c.execute("UPDATE agents SET proposals=? WHERE user_id=?", (b["proposals"], uid))
         if b.get("runtime") is not None:  # 2.4.1 (#377)
             try:
-                c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(runtime_clean(dict(RUNTIME_DEFAULTS), b["runtime"])), uid))
+                rt0 = runtime_clean(dict(RUNTIME_DEFAULTS), b["runtime"])
+                if rt0["perm_user"] is not None:  # 2.312.0 D (#3266): a new agent reaches nobody yet; chosen when editing it
+                    raise BadInput(tr("Invalid value: {0}", "perm_user"))
+                c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(rt0), uid))
             except BadInput:
                 c.rollback()
                 raise
@@ -208,6 +218,9 @@ def runtime_set(c, a, rt):
     """Validates and stores a (partial) runtime dict of agent a; runtime_changed to the agent when something changed."""
     cur = agent_runtime(a)
     new = runtime_clean(cur, rt)
+    if new["perm_user"] and new["perm_user"] != cur["perm_user"]:  # 2.312.0 D (#3266): only a person who may answer (owner / reached)
+        if not ((new["perm_user"] == me() or may_see(c, me(), new["perm_user"])) and perm_user_ok(c, agent_row(c, a["user_id"]), new["perm_user"])):
+            raise BadInput(tr("Invalid value: {0}", "perm_user"))
     if any(new[k] != cur[k] for k in RUNTIME_DEFAULTS):
         c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(new), a["user_id"]))
         agent_emit(c, a["user_id"], "runtime_changed", {"runtime": {**new, "reset_seq": cur["reset_seq"], "timezone": str(TZ)}})
@@ -254,7 +267,7 @@ def admin_agent_update(aid):
                 c.rollback()
                 return err(tr("A personal agent of another person: only its owner changes it (you can pause it)"), 403)
         if "display_name" in b:
-            c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or
+            c.execute("UPDATE users SET display_name=? WHERE id=?", (_agent_name(b["display_name"]) or
                                                                     agent_row(c, aid)["username"], aid))
         if "note" in b:
             c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
@@ -601,7 +614,7 @@ def my_agent_create():
     if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
         c.rollback()
         return err(tr("Username already exists"), 409)
-    uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
+    uid = create_user(c, username, _agent_name(b.get("display_name")) or username, None, None, False, paperless_access=False)
     make_agent(c, uid)
     c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=?, provider=? WHERE user_id=?",
               (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", str(b.get("provider") or "").strip()[:80], uid))
@@ -665,7 +678,7 @@ def my_agent_update(aid):
             c.rollback()
             raise
     if "display_name" in b:
-        c.execute("UPDATE users SET display_name=? WHERE id=?", ((str(b["display_name"] or "")).strip()[:60] or a["username"], aid))
+        c.execute("UPDATE users SET display_name=? WHERE id=?", (_agent_name(b["display_name"]) or a["username"], aid))
     if "note" in b:
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
@@ -690,6 +703,30 @@ def my_agent_update(aid):
     bump(c)
     c.commit()
     return jsonify(agent_admin_dict(c, agent_row(c, aid)))
+
+
+@app.get("/api/agents/<int:aid>/perm-users")
+def agent_perm_users(aid):
+    """2.312.0 D (#3266): who may answer agent aid's permission questions (the choice in its settings, runtime.perm_user):
+    {team, current, people: [{id, name}]}. A personal agent: its owner only. A team agent: active people it reaches in the
+    chat (perm_user_ok) whom the asking admin sees. Instance admins (agents they see) and the owner; nobody else (404)."""
+    c = db()
+    if is_agent(g.user):
+        raise Denied(404)
+    with system_ctx(c):  # the instance admin reaches agents of every organisation (structure, no content)
+        a = agent_row(c, aid)
+        if not a or not (a["owner_id"] == me() or (not a["owner_id"] and g.user["is_admin"] and admin_sees(c, aid))):
+            raise Denied(404)
+        if a["owner_id"]:
+            ids = [a["owner_id"]]
+        else:
+            its = "SELECT id FROM lists WHERE deleted_at IS NULL AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))"
+            ids = [r[0] for r in c.execute(f"""SELECT user_id FROM list_members WHERE list_id IN ({its})
+                                               UNION SELECT owner_id FROM lists WHERE id IN ({its})""", (aid, aid, aid, aid))]
+            ids = [x for x in ids if x and x != aid and (x == me() or admin_sees(c, x)) and perm_user_ok(c, a, x)]
+        names = user_names(c, ids) if ids else {}
+    people = sorted(({"id": x, "name": names.get(x) or ""} for x in ids), key=lambda p: p["name"].lower())
+    return jsonify(team=not a["owner_id"], current=agent_runtime(a)["perm_user"], people=people)
 
 
 @app.patch("/api/agents/<int:aid>/color")

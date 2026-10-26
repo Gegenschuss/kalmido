@@ -64,7 +64,8 @@ from ..core.access import Denied, acx_of
 from ..core.db import insert_id
 from ..core.i18n import tr
 from ..core.pg import system_ctx
-from .store import (DEPTH_MAX, ROLE_RANK, _free_name, _now, _shares_role, fs_chain, fs_deleted, fs_log_add, fs_role, safe_fs_name)
+from .store import (DEPTH_MAX, ROLE_RANK, _free_name, _now, _shares_role, fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_sql_c,
+                    safe_fs_name)
 
 FSR = {}  # ref_kind -> the registered hooks
 FSR_RESERVED = ("att", "list_file")  # the kinds of link nodes (files/store.py fs_link_target)
@@ -187,6 +188,27 @@ def fs_ref_may_file(c, uid, ref_kind, ref_id):
     return bool(reg and uid) and _role_of(reg["base_role"](c, uid, int(ref_id))) == "edit"
 
 
+def _ref_free_name(c, uid, parent_id, owner_id, org_id, name, skip=None):
+    """2.306.0 D1 (#2875): the free name of a reference node in folder parent_id, resolved against the names uid sees there
+    (the node belongs to the folder's owner, so store._free_name would avoid every name in it: a " (2)" told uid of a node
+    it cannot see; #2496 like a member's node there). Without a person or a folder: _free_name."""
+    if not uid or not parent_id:
+        return _free_name(c, parent_id, owner_id, org_id, name, skip=skip)
+    vis = fs_visible_sql_c(c, uid)
+
+    def taken(nm):
+        return any(x[0] != skip for x in c.execute(f"""SELECT id FROM fs_nodes WHERE parent_id=? AND lower(name)=lower(?)
+                                                      AND deleted_at IS NULL AND id IN {vis}""", (parent_id, nm)).fetchall())
+    if not taken(name):
+        return name
+    stem, dot, ext = name.rpartition(".") if "." in name.strip(".") else (name, "", "")
+    for i in range(2, 1000):
+        nm = f"{stem[:140]} ({i}){dot}{ext}"
+        if not taken(nm):
+            return nm
+    return _free_name(c, parent_id, owner_id, org_id, name, skip=skip)
+
+
 def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     """File the object into folder parent_id (None: into no folder) -- module docstring. Returns the node id or None."""
     reg = _reg(ref_kind)
@@ -229,7 +251,7 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     if n is None:
         nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
                               VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                        (p["id"], "ref", _free_name(c, p["id"], p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"],
+                        (p["id"], "ref", _ref_free_name(c, uid, p["id"], p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"],
                          ref_kind, ref_id, uid, ts, ts))
         fs_log_add(c, nid, "create")
         return nid
@@ -237,7 +259,7 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
         return n["id"]
     c.execute("""UPDATE fs_nodes SET parent_id=?, owner_id=?, org_id=?, name=?, sort_no=NULL, deleted_at=NULL, deleted_by=NULL,
                  updated_at=? WHERE id=?""",
-              (p["id"], p["owner_id"], p["org_id"], _free_name(c, p["id"], p["owner_id"], p["org_id"], nm, skip=n["id"]), ts, n["id"]))
+              (p["id"], p["owner_id"], p["org_id"], _ref_free_name(c, uid, p["id"], p["owner_id"], p["org_id"], nm, skip=n["id"]), ts, n["id"]))
     fs_log_add(c, n["id"], "move", str(p["id"]))
     if was_trash:
         fs_ref_trashed(c, uid, n, True)  # 2.199.0 F (#2742, review): back out of the trash -- the area's too (e.g. a sheet)
@@ -263,7 +285,14 @@ def fs_ref_rename(c, ref_kind, ref_id, name):
     if n is None or not nm or nm == n["name"]:
         return
     c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
-              (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], nm, skip=n["id"]), _now(), n["id"]))
+              (_ref_free_name(c, _actor(), n["parent_id"], n["owner_id"], n["org_id"], nm, skip=n["id"]), _now(), n["id"]))
+
+
+def _actor():
+    """The signed-in person of the request (None outside one, e.g. a background run)."""
+    from flask import g, has_request_context
+    u = getattr(g, "user", None) if has_request_context() else None
+    return u["id"] if u is not None else None
 
 
 def fs_ref_drop(c, ref_kind, ref_id):

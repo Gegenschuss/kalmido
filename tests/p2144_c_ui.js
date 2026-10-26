@@ -40,7 +40,8 @@ const heads = d => [...d.querySelectorAll('#view .group > .ghead')].map(h => h.t
   check(!/Nothing left for today/.test(d.querySelector('#view .dc-today')?.textContent || ''), 'events only: no empty line');
   const OL = (await call('POST', '/api/lists', {name: 'Office', org_id: ORG})).id;
   await call('POST', '/api/tasks', {title: 'Send the offer', list_id: OL, due: t0});
-  await until(() => w.eval('S.tasks.size') > 0 && w.eval(`[...S.tasks.values()].some(t => t.title === 'Send the offer')`));
+  await w.eval('load()');  // 2.312.0 A (#3284): load now, not the 4-s poll (up to 6 s on CI)
+  check(w.eval(`[...S.tasks.values()].some(t => t.title === 'Send the offer')`), 'the new task is loaded');
   w.eval('renderView()'); await sleep(100);
   const blk = d.querySelector('#view .dc-today');
   const evAt = blk.innerHTML.indexOf('dcev'), tkAt = blk.innerHTML.indexOf('Send the offer');
@@ -58,7 +59,8 @@ const heads = d => [...d.querySelectorAll('#view .group > .ghead')].map(h => h.t
   // an overdue task of another workspace is named with it
   const PL = (await call('POST', '/api/lists', {name: 'Home stuff', org_id: null})).id;
   await call('POST', '/api/tasks', {title: 'Pay the rent', list_id: PL, due: day(-2)});
-  await until(() => w.eval(`[...S.tasks.values()].some(t => t.title === 'Pay the rent')`));
+  await w.eval('load()'); w.eval('S.agents = []');  // 2.312.0 A (#3284): load() resets S.agents
+  check(w.eval(`[...S.tasks.values()].some(t => t.title === 'Pay the rent')`), 'the new task is loaded');
   w.eval(`S.settings.workspace = 'org:${ORG}'`);
   const sum = w.eval('hpSummary()').replace(/<[^>]+>/g, '');
   check(w.eval('wsCur()') === 'org:' + ORG && /1 overdue in Private/.test(sum) && !/, 1 overdue,/.test(sum), 'summary: overdue in another workspace named ' + w.eval('wsCur()') + ' ' + sum);

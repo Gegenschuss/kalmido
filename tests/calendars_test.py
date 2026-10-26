@@ -233,8 +233,9 @@ def add_err(url, s=A):
     return r.status_code, r.json().get("code"), r.json().get("error", "")
 
 
+# 2.306.0 (#2875): a redirect to another port is another origin -> refused as redirect (was: followed, then blocked)
 for path, code in (("/huge.ics", "too_large"), ("/huge-nolen.ics", "too_large"), ("/login.html", "not_calendar"),
-                   ("/redir-port.ics", "blocked"), ("/redir-evil.ics", "redirect"), ("/redir-meta.ics", "redirect"),
+                   ("/redir-port.ics", "redirect"), ("/redir-evil.ics", "redirect"), ("/redir-meta.ics", "redirect"),
                    ("/redir-loop.ics", "redirect"), ("/nothing.ics", "not_found")):
     st_, c_, e_ = add_err(STUB + path)
     check(st_ == 400 and c_ == code, f"{path}: refused with {code} (got {st_} {c_} {e_})")

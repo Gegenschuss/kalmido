@@ -3,7 +3,10 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -35,14 +38,20 @@ type Page struct {
 func (p *Page) base() string { return "/s/" + p.secret + "/" }
 func (p *Page) URL() string  { return "http://127.0.0.1:" + strconv.Itoa(p.port) + p.base() }
 
+const pageCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+
 // ServeHTTP checks host, secret and origin before anything else.
 func (p *Page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
-	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	h.Set("Content-Security-Policy", pageCSP)
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
+	if r.URL.Path == "/hello" && r.Method == http.MethodGet && r.Host == "127.0.0.1:"+strconv.Itoa(p.port) {
+		p.hello(w, r) // 2.306.0 D3 (#2875): another start asks whether this is our instance without sending the secret
+		return
+	}
 	if !p.allowed(r) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -84,6 +93,25 @@ func (p *Page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 	}
+}
+
+// helloProof: the answer to a start's challenge n -- proves knowing the page secret without revealing it (2.306.0 D3, #2875).
+// 2.306.0 (#2875): bound to the port the instance listens on, so a listener on another port cannot pass on the answer.
+func helloProof(secret string, port int, n string) string {
+	m := hmac.New(sha256.New, []byte(secret))
+	m.Write([]byte("kalmido-folder-watcher-hello|" + strconv.Itoa(port) + "|" + n))
+	return hex.EncodeToString(m.Sum(nil))
+}
+
+// hello: GET /hello?n=<64 hex> -> "kalmido-folder-watcher <version> <proof>"; nothing else is told without the secret.
+func (p *Page) hello(w http.ResponseWriter, r *http.Request) {
+	n := r.URL.Query().Get("n")
+	if _, err := hex.DecodeString(n); err != nil || len(n) != 64 {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("kalmido-folder-watcher " + version + " " + helloProof(p.secret, p.port, n)))
 }
 
 // allowed: right Host (no DNS rebinding) and the secret path prefix.

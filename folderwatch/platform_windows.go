@@ -108,3 +108,21 @@ func removeSelfLater(path string) {
 		CmdLine: `cmd /c ping -n 4 127.0.0.1 >nul & del /f /q "` + path + `"`}
 	_ = c.Start()
 }
+
+// lockFile: the file opened without write sharing (released when the process ends). 2.306.0 (#2875): one engine per
+// settings folder, also next to an older copy that does not answer /hello.
+func lockFile(path string) (*os.File, error) {
+	p, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+	h, err := syscall.CreateFile(p, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, nil,
+		syscall.OPEN_ALWAYS, syscall.FILE_ATTRIBUTE_NORMAL, 0)
+	if err != nil {
+		if err == syscall.Errno(32) { // ERROR_SHARING_VIOLATION
+			return nil, errLocked
+		}
+		return nil, err
+	}
+	return os.NewFile(uintptr(h), path), nil
+}

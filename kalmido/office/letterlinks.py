@@ -12,7 +12,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.i18n import N_, lang, tr
-from ..core.orgcrypt import oc_dec_fields
+from ..core.orgcrypt import oc_dec_fields, oc_is_enc
 from ..personal.timetrack import BadInput
 from .model import pb_owner
 
@@ -658,6 +658,8 @@ def ltl_followup_tick(c, force=False):
                 try:
                     subject = oc_dec_fields(c, oid, "office_letters", r).get("subject") or ""
                 except Exception:  # noqa: BLE001 (no key: a title without the subject)
+                    subject = ""
+                if oc_is_enc(r["subject"]):  # 2.306.0 D2 (#2875): a sealed subject is not copied into a plain task (neutral title)
                     subject = ""
                 lg = lang(c, pid)
                 inbox = my_inbox(c, pid)

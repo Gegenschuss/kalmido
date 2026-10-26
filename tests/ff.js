@@ -85,3 +85,16 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     await sleep(500); fs.rmSync(prof, {recursive: true, force: true});
   }
 };
+
+// 2.312.0 A (#3283): click the Undo button of the toast with the EXPECTED text. A hidden toast keeps its old button in the DOM
+// (events.js toast(): only .hidden) and the server saves before the app has the answer, so an older toast's Undo can still be there:
+// wait until #toast is shown, carries `text` (string or RegExp) and has its Undo button, only then click. opts.after: an expression to
+// wait for after the click (e.g. the redraw); opts.n: tries of 250 ms. Returns true when the click and the `after` wait worked.
+module.exports.undoToast = async (ev, text, {after = null, n = 60} = {}) => {
+  const re = text instanceof RegExp ? text : new RegExp(String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const ready = async expr => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  const t = `(() => { const t = document.querySelector('#toast'); return !!t && !t.classList.contains('hidden') && ${re}.test(t.textContent) && !!t.querySelector('button:not(.tx)'); })()`;
+  if (!await ready(t)) return false;
+  await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
+  return after ? ready(after) : true;
+};

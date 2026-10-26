@@ -20,10 +20,11 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import IntegrityError, insert_id, system_ctx, write_lock
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..accounts.session import me
+from ..accounts.orgs import is_org_admin  # 2.306.0 D3 (#2875)
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -601,8 +602,17 @@ def wiki_trash_list():
                      f"LEFT JOIN wiki_files f ON f.page_id=p.id WHERE p.deleted_at IS NOT NULL AND p.{w.replace(' AND ', ' AND p.')} "
                      "GROUP BY p.id, p.path, p.deleted_at ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", a).fetchall()
     return jsonify(space=wiki_space_key(oid), days=wiki_trash_days(), purge_on=ret_on("trash"),  # 2.223.3 A (#2877)
+                   may_empty=_wkp_may_empty(c, uid, oid),  # 2.306.0 D3 (#2875)
                    pages=[{"id": r["id"], "path": r["path"], "deleted_at": r["deleted_at"], "files": r["n"], "size": int(r["size"])}
                           for r in rows])
+
+
+WKP_ADMIN_ONLY = N_("Only admins of the organisation can empty its trash.")
+
+
+def _wkp_may_empty(c, uid, oid):
+    """2.306.0 D3 (#2875): empty the whole trash of a space: the private one its person, an organisation's only its admins."""
+    return not oid or is_org_admin(c, uid, oid)
 
 
 @app.post("/api/wiki/purge")
@@ -616,6 +626,8 @@ def wiki_purge_many():
     w, a = wiki_space_sql(oid, uid)
     ids = b.get("ids")
     if b.get("all") is True:
+        if oid and not _wkp_may_empty(c, uid, oid):
+            raise Denied(403, tr(WKP_ADMIN_ONLY))  # 2.306.0 D3 (#2875): an organisation's whole trash only by its admins
         ids = [r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w}", a)]
     elif not isinstance(ids, list) or len(ids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
@@ -623,8 +635,15 @@ def wiki_purge_many():
     if ids:
         q = ",".join("?" * len(ids))
         mine = {r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({q}) AND deleted_at IS NOT NULL AND {w}", [*ids, *a])}
+        if oid and b.get("all") is not True and len(mine) > 1 and not _wkp_may_empty(c, uid, oid):
+            # 2.306.0 (#2875 review N12): several pages at once = emptying the trash by hand; one's own single page stays allowed
+            raise Denied(403, tr(WKP_ADMIN_ONLY))
     done, files = wiki_purge(c, mine)
     if done:
+        if oid:  # 2.306.0 D3 (#2875): the organisation's admins see it in the history of its projects (no page names)
+            c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) "
+                      "VALUES(?,?,?,?,?,?,?,?,?)", (oid, None, f"Wiki ({len(done)})", "purge", uid, None, None, iso(now_utc()),
+                                                    json.dumps({"kind": "wiki", "pages": len(done)})))
         bump(c)
     c.commit()
     unlink_files(files)  # after the commit

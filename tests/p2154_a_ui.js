@@ -12,6 +12,7 @@ const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {undoToast} = require('./ff');
 const firefox = require('./ff')({tag: 'p2154_a_ui', check, shots: 'P2154A_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
@@ -93,7 +94,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `${ids}.then(a => !a.includes(${SID}) && a.length === 3)`, 80), 'split: the stack left the list, two documents came');
     check(await ev(`!document.querySelector('.dsp-md') && !document.querySelector('.dc-md')`), 'the dialogs closed');
     check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 20), 'the toast names it ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
-    await ev(`(() => { document.querySelector('#toast button')?.click(); return 1; })()`);
+    await undoToast(ev, /split into 2 documents/);  // 2.312.0 A (#3283)
     check(await ready(ev, `${ids}.then(a => a.includes(${SID}) && a.length === 2)`, 80), 'undo: the stack is back, the parts went');
     // link the letter with the task
     await nav(B + `#docs/${ONE}`);

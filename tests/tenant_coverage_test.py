@@ -221,6 +221,7 @@ ROUTES = {
     "POST /api/v1/agent/jobs": "agent", "PATCH /api/v1/agent/jobs/{}": "agent", "GET /api/agents": "agent",
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
+    "GET /api/agents/{}/perm-users": "agent",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
     "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
@@ -509,6 +510,7 @@ ROUTES = {
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875): the status fetch moved off the GET
     # 2.47.0 (#1215): the parts of a quotation
     "POST /api/office/docs/{}/parts": "office", "PATCH /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/parts/{}": "office",
     "PUT /api/office/docs/{}/parts/{}/items": "office",
