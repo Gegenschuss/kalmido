@@ -34,7 +34,10 @@ def ms_client_in_use(c, cid):
     with system_ctx(c):
         return any((t in CL_HOLD or d in ("a", "r")) and c.execute(
             f"SELECT 1 FROM {t} x WHERE x.{col}=?" + (f" AND {CL_HOLD_WHERE[t]}" if t in CL_HOLD_WHERE and d not in ("a", "r") else "")
-            + " LIMIT 1", (cid,)).fetchone() for t, col, d in ofm_fk_refs(c, "clients") if t != "clients")
+            + " LIMIT 1", (cid,)).fetchone() for t, col, d in ofm_fk_refs(c, "clients") if t != "clients") or bool(
+            # 2.239.0 D (#2874): a signed data protection sheet (processing agreement, consent) is a record that has to stay
+            c.execute("SELECT 1 FROM office_privacy_sheets WHERE client_id=? AND (status='signed' OR signed_node_id IS NOT NULL) LIMIT 1",
+                      (cid,)).fetchone())
 
 
 def ms_cl_ids(b, k="ids"):

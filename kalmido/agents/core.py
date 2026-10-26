@@ -689,7 +689,15 @@ def tidy_tick(c):
 # the host's launcher applies it (docs/AGENTS.md "Runtime settings", mcp/agent_launcher.sh). "Reset now" raises reset_seq
 # and sends the event reset: the host restarts the agent with a fresh session.
 RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "",
+                    "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                     "perm_user": None}  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
+# 2.233.0 B (#3189): when the host ends a chat conversation with a summary and starts a fresh one (the "interim summary"):
+# at a session size (small / medium / large; handed out as MB of the session file and as context tokens), after so many
+# runs, after so many minutes of pause (0 = never; counts only from the small size on). The daily summary is the fresh
+# session at nightly_reset (same key, no second field). Defaults = what the reference hosts did before.
+ROTATE_SIZES = {"small": (0.4, 80000), "medium": (0.8, 150000), "large": (1.5, 250000)}
+ROTATE_RUNS_RANGE = (10, 500)
+ROTATE_IDLE_RANGE = (5, 1440)
 # 2.29.0 (#1029): how the agent's host handles actions outside its allow list: ask = asks the person in the chat every time,
 # auto = the host's safety check decides (risky things stay blocked); '' = the host's own default
 PERMISSION_MODES = ("", "ask", "auto")
@@ -753,6 +761,16 @@ def runtime_clean(cur, b):
         if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v <= 0):
             raise BadInput(tr("Invalid value: {0}", "perm_user"))
         out["perm_user"] = v
+    if "rotate_size" in b:  # 2.233.0 B (#3189)
+        if b["rotate_size"] not in ROTATE_SIZES:
+            raise BadInput(tr("Invalid value: {0}", "rotate_size"))
+        out["rotate_size"] = b["rotate_size"]
+    for k, (lo, hi), off in (("rotate_runs", ROTATE_RUNS_RANGE, False), ("rotate_idle_min", ROTATE_IDLE_RANGE, True)):
+        if k in b:
+            v = b[k]
+            if isinstance(v, bool) or not isinstance(v, int) or not (lo <= v <= hi or (off and v == 0)):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
     return out
 
 
@@ -960,6 +978,8 @@ def job_dict(c, j, names=None):
     viewer = g.user["id"] if has_request_context() and getattr(g, "user", None) else None
     if t and viewer and viewer != j["agent_id"] and not task_visible(c, j["task_id"], viewer, full=True):
         t = None  # 2.306.0 D3 (#2875): the task's title / list only for who sees the task (the job itself stays visible)
+    if t and viewer and viewer == j["agent_id"] and not _jd_sees(c, j["task_id"], t["list_id"], j["agent_id"]):
+        t = None  # 2.223.7 D (#2941): the agent no longer sees the task (share withdrawn): the job stays, without its title / list
     return {"id": j["id"], "agent_id": j["agent_id"], "agent_name": names.get(j["agent_id"], ""), "task_id": j["task_id"],
             "task_title": t["title"] if t else None, "list_id": t["list_id"] if t else None, "user_id": j["user_id"],
             "title": j["title"], "state": j["state"], "log": j["log"], "action": j["action"], "action_by": j["action_by"],

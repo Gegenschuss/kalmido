@@ -19,6 +19,9 @@ from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 
 TP_TICK = {"at": 0.0}
+# 2.239.0 D (#2874): nor a client with a signed data protection sheet (clients_bulk.ms_client_in_use), on top of cl_hold_sql()
+TP_PRIVACY_HOLD = (" AND NOT EXISTS (SELECT 1 FROM office_privacy_sheets x WHERE x.client_id=clients.id"
+                   " AND (x.status='signed' OR x.signed_node_id IS NOT NULL))")
 # (count key, table, extra condition): the plain areas, one DELETE each (their child rows go by ON DELETE CASCADE)
 TP_PLAIN = (
     ("sheets", "sheets", ""),  # columns, rows, cells, changes, links cascade
@@ -115,7 +118,7 @@ def tp_tick(c, force=False):
         for key, table, extra in TP_PLAIN:
             if extra is None:  # 2.223.3 (#2878): clients -- the same hold rule as deleting a client
                 from ..team.clients import cl_hold_sql
-                extra = cl_hold_sql()
+                extra = cl_hold_sql() + TP_PRIVACY_HOLD
             kp = []  # 2.272.0 F (#3026, review M3): one savepoint per area, a failing one is counted, the rest goes on
             try:
                 with c.savepoint():

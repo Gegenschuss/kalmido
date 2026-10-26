@@ -1410,6 +1410,7 @@ function agModal(a, done, o = {}) {
     <div class="foot stfoot"><div class="calerr" role="alert" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   if (a && typeof oa_switchLoad === 'function') oa_switchLoad(md);  // 2.51.0 A (#1348)
   if (a) agPuLoad(md, a);  // 2.312.0 D (#3266)
+  if (a && typeof agz_wire === 'function') agz_wire(md, a, `/api/admin/agents/${a.id}`);  // 2.233.0 B (#3189)
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked; });  // 2.4.1 (#377)
   md.addEventListener('change', e => { if (e.target.id === 'ag-owner') { const h = $('#ag-ownhint', md); if (h) h.textContent = e.target.value ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for projects with several people; the owner of a project decides who may address it.'); } });
   api('GET', '/api/users').then(j => { const box = $('#ag-ownrow', md); if (box && md.isConnected) { const cur = $('#ag-owner', md)?.value; box.innerHTML = ownerSel(j.users.filter(u => u.kind !== 'agent' && !u.disabled)); if (cur !== undefined) $('#ag-owner', md).value = cur; } }).catch(() => {});  // 2.28.0 (#965): whose personal agent
@@ -1588,7 +1589,7 @@ function agRtFields(a) {
     <div class="shint">${tr('Model: e.g. opus, sonnet or a full model id. Permissions: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
     ${a ? `<div class="row"><label for="ag-pu">${tr('Permission questions go to')}</label><select id="ag-pu" disabled><option value="">${esc(tr('As set up on its computer'))}</option></select></div>
     <div class="shint" id="ag-puhint">${a.owner ? tr('A personal agent asks its owner.') : tr('Who answers when it asks for permission in the chat. Only people it reaches in a shared project; its computer takes the choice before its next run.')}</div>` : ''}
-    ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button></div>` : ''}`;
+    ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button>${!a.owner || a.owner.id === S.me?.id ? `<button class="btn sm" type="button" data-m="aw">${ic('cog', 's')} ${tr('Work style and notifications')}</button>` : ''}</div>` : ''}`;  // 2.236.0 A (#2904-#2911): aw = the owner of a personal agent / any admin of a team agent
 }
 function agRtBody(md) {
   const pct = $('#ag-acp', md).value.trim(), ac = $('#ag-ac', md).checked;

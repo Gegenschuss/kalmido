@@ -813,7 +813,7 @@ def export_json():
     from ..admin.acctexport import umz_clean
     c = db()
     q = umz_export_queries(me())  # 2.73.0 B (#1473): shared with the account export (admin/acctexport.py)
-    data = {t: [umz_export_clean(t, dict(r)) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
+    data = {t: [d for d in (umz_clean(t, r) for r in c.execute(sql, args)) if d is not None] for t, (sql, args) in q.items()}
     from ..life.model import jr_open
     data["journal"] = [jr_open(c, me(), r) for r in data["journal"]]  # 2.306.0 A (#2885): my journal in plain
     from ..life.budget import bud_export

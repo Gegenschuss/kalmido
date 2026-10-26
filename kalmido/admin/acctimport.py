@@ -54,6 +54,8 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import jr_seal  # 2.306.0 A (#2885)
+from ..accounts.orginvite import ojn_invite  # 2.278.0 A (#3095)
+from ..collab.e2e import e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
 UMZ_SOURCE = "Kalmido"  # imports.source of an account import (the list of recent imports shows it as it is)

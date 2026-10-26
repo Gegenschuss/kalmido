@@ -1293,6 +1293,16 @@ function vpSet(md, v) {
   const upd = () => { const el = $('#s-vpinfo', md); if (el) el.textContent = vpInfo(); };
   addEventListener('resize', upd, {once: true}); requestAnimationFrame(() => requestAnimationFrame(upd));
 }
+// 2.233.0 C (#3196): chat bubble colours of people / agents (the same palette as the accent; own messages keep the accent), with a live preview
+function lkChatHtml() {
+  const on = (k, v) => `data-look="${k}" data-v="${v}" aria-pressed="${lookCur(k) === v}" class="${lookCur(k) === v ? 'on' : ''}"`;
+  const pick = (k, id) => `<div class="lkopts lkacc" id="${id}" role="group" aria-label="${esc(tr(k === 'chatHuman' ? 'Messages from people' : 'Messages from agents'))}">${LOOK[k].map(([v, n, d, l]) => `<button ${on(k, v)} style="--sw-d:${d || 'var(--bg3)'};--sw-l:${l || 'var(--bg3)'}" title="${tr(n)}"><i class="lksw${d ? '' : ' lkswd'}"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>`;
+  return `<h4>${tr('Chat')}</h4>
+    <div class="shint">${tr('Own messages keep the accent color.')}</div>
+    <div class="lkcpv" inert aria-hidden="true"><div class="cmsg ag"><div class="cbub">${tr('Can you take a look at this?')}</div></div><div class="cmsg ag agc"><div class="cbub">${tr('Done, it is in the list.')}</div></div><div class="cmsg me"><div class="cbub">${tr('Thanks!')}</div></div></div>
+    <h5 class="lkch">${tr('Messages from people')}</h5>${pick('chatHuman', 's-chatHuman')}
+    <h5 class="lkch">${tr('Messages from agents')}</h5>${pick('chatAgent', 's-chatAgent')}`;
+}
 const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus
   const p = $('#s-lookin', md); if (!p) return;

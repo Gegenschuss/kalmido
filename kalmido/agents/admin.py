@@ -24,11 +24,12 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
 from ..accounts.orgs import may_see
+from ..agents.workstyle import WS_NEW
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
 from ..integrations.webhooks import need_wh, wh_allow, wh_err_text, wh_log, wh_public, wh_send, wh_url_check
 from ..agents.core import (
     agent_active, agent_emit, AGENT_EVENTS, AGENT_NOTE_MAX, agent_public, agent_row, agent_runtime, is_agent,
-    perm_user_ok, runtime_clean, RUNTIME_DEFAULTS,
+    perm_user_ok, runtime_clean, RUNTIME_DEFAULTS, runtime_derived,
 )
 
 

@@ -354,6 +354,7 @@ def state():
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
         trash_purge=ret_on("trash"),  # 2.223.3 A (#2877): False = the trash runs only count, nothing is deleted after the period
+        max_file_mb=MAX_FILE_MB,  # 2.273.0 D (#3051): the upload limit per file (the client checks before it sends)
         max_depth=MAX_DEPTH,  # 2.156.0 A (#1949): the levels of tasks (dragging, mind map, detail read it)
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},
         languages=languages(),

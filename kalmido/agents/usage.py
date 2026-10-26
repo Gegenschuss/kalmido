@@ -1095,6 +1095,14 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "offer_save": {"type": "boolean", "description": "2.37.0 (#1159): the button \"Save as task\" under the message (the person saves it, never the agent)"},
                                                  "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file)"},
                                                  "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"], "description": "2.306.0 F (#2942): with job_id, the kind of this job message (2.96.0 C, #2015)"},
+                                                 "limit": {"type": "boolean", "description": "2.236.0 B (#2909): this message reports a limit (a one-way "
+                                                           "step, a refusal, a stop, an error): with the work style push \"limits\" only such messages, "
+                                                           "approval requests and permission questions push"},
+                                                 "next_step": {"type": "string", "maxLength": 80, "description": "2.236.0 B (#2911): the next step as ONE "
+                                                               "answer button at the end (id next, next: true; after your choices, at most 8 in all). "
+                                                               "Dropped (the message stays, the answer says next_step_dropped off | repeat | conflict | "
+                                                               "full) when next_step is off in the work style, the same text was a next button in the "
+                                                               "last 20 messages, with approval / permission / multi, or with 8 choices already"},
                                                  "approval": {"type": "object", "required": ["title"], "additionalProperties": False,
                                                               "description": "2.35.0 (#1103): an approval request: a card \"Approval needed\" with the buttons yes "
                                                                              "(primary) / no, pinned at the top of the chat and counted at your name until answered "

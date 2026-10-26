@@ -480,8 +480,9 @@ function sessGuard(me) {
   if (Array.isArray(was) && was.some(id => !ids.includes(id))) outDrop();  // removed from an organisation
   LS.set('orgIds', ids);
 }
-// the session is gone (401 / account disabled at /api/state): both go before the sign-in page
-function sessGone() { return Promise.race([Promise.all([wkoDrop(), outDrop()]), new Promise(ok => setTimeout(ok, 3000))]); }
+// the session is gone (401 / account disabled at /api/state): the knowledge pages' copy goes before the sign-in page.
+// 2.306.0 B (#2889): the outbox stays (authGone keeps what waits; it goes out after the next login of the same account)
+function sessGone() { return Promise.race([wkoDrop(), new Promise(ok => setTimeout(ok, 3000))]); }
 function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
@@ -528,6 +529,7 @@ async function rawFetch0(method, url, body, key) {
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
+  if (url === '/api/state' && (r.status === 401 || (r.status === 403 && j.auth))) await sessGone();  // 2.238.0 B (#2872)
   if ((r.status === 401 || r.status === 403) && j.auth) { await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { await authGone(); location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.data = j;

@@ -254,6 +254,7 @@ VARS = (
     _v("KALMIDO_AI_MAX_CHARS", "24000", "Characters of input text per assistant call.", "agents"),
     _v("KALMIDO_AI_MAX_TOKENS", "1500", "Answer tokens per assistant call.", "agents"),
     _v("KALMIDO_EMBED_URL", "", "Address of the optional embedding service (related tasks, meaning search; empty = off); task titles and descriptions are sent to it.", "agents"),
+    _v("KALMIDO_EMBED_EXTERNAL", "0", "Switch: allow an embedding service on another host (task titles and descriptions go there).", "agents"),
     _v("KALMIDO_EMBED_IDLE", "15", "Seconds between two looks of the embedding pass when nothing waits.", "agents"),
     _v("KALMIDO_EMBED_BUSY", "2", "Seconds between two batches of a backlog.", "agents"),
     _v("KALMIDO_EMBED_DOWN", "60", "Seconds of pause after the embedding service failed.", "agents"),

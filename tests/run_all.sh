@@ -2208,7 +2208,6 @@ fresh; run p22237_b_participant "$PY" p22237_b_participant_test.py "$KALMIDO_TES
 fresh; run p2276_c_ui node p2276_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.276.0 A (#3039): the office for the first day: Quotes & invoices first, Money folded until used, menu point Receipts
 fresh; run p2276_a_ui node p2276_a_ui.js "$KALMIDO_TEST_DATA"
-<<<<<<< HEAD
 # 2.306.0 E (#2927, #2741): team agent setup names who answers permission questions; every MCP tool has its route's scope
 fresh; run p2306_e_team_agent_setup "$PY" p2306_e_team_agent_setup_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2306_e_mcp_scope "$PY" p2306_e_mcp_scope_test.py "$KALMIDO_TEST_DATA"
@@ -2340,10 +2339,8 @@ now wed 10:00; fresh; run p2240_c_freebusy "$PY" p2240_c_freebusy_test.py "$KALM
 fresh; run p2240_a_mail "$PY" p2240_a_mail_test.py "$KALMIDO_TEST_DATA"  # 2.240.0 A (#2883)
 fresh; run p2240_a_assistant "$PY" p2240_a_assistant_test.py "$KALMIDO_TEST_DATA"  # 2.240.0 A (#2884)
 shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new suites go here, at the end
-=======
 # 2.319 A (#3287): a click on a page in the knowledge tree keeps the space, the folders above and its own folder open (also while it loads, one workspace too)
 fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO_TEST_DATA"
->>>>>>> 912572134 (2.319 A (#3287): knowledge tree stays open on a page click; test p2319_a_wiki_tree_open_ui; changelog fragment)
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

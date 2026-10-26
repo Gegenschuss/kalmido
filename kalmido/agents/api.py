@@ -24,6 +24,7 @@ from ..agents.core import (
 )
 from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
+from ..agents.workstyle import ws_public
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -42,6 +43,7 @@ def agent_self(c, aid):
             # 2.312.0 D (#3266): who answers its permission questions (a team agent, chosen in its settings, still allowed);
             # null = the host keeps KALMIDO_PERM_USER / the owner
             "perm_user_id": perm_user_of(c, a),
+            "work_style": ws_public(c, a),  # 2.236.0 (#2904-#2911): how it works and reports (agents/workstyle.py)
             # 2.46.6 (#1715): the language the launcher's rules block asks for (the owner's for a personal agent, else its own)
             "lang": lang_of(usettings(c, p["owner_id"] or aid))}
 

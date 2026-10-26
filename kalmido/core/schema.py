@@ -3579,6 +3579,35 @@ MIGRATIONS = [
     # 2.306.0 A (#2885): the mood of a sealed journal entry (life/model.py jr_seal; mood is NULL then). Older versions show a
     # sealed entry without its mood and its text as the sealed value (the way back first: orgcrypt_cli decrypt-private)
     ("journal", "mood_enc", "ALTER TABLE journal ADD COLUMN IF NOT EXISTS mood_enc TEXT"),
+    # 2.273.0 F2 (#3048): the last file import of a contact / event (imp_at = its updated_at after that write, imp_rev = the
+    # file's REV / LAST-MODIFIED): "newer here" then means changed here after that import. Older versions ignore them
+    ("contacts", "imp_at", "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS imp_at TEXT"),
+    ("contacts", "imp_rev", "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS imp_rev TEXT"),
+    ("events", "imp_at", "ALTER TABLE events ADD COLUMN IF NOT EXISTS imp_at TEXT"),
+    ("events", "imp_rev", "ALTER TABLE events ADD COLUMN IF NOT EXISTS imp_rev TEXT"),
+    # 2.299.0 D (#3193): the fixed check of a receipt (receipts/rchecks.py): rchk = the codes of its hints ("." none, "" not
+    # checked yet), rchk_at = the state they were made for, rchk_ok = the codes a person hid. Plain codes, no content; older
+    # versions never read them
+    ("doc_meta", "rchk", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS rchk TEXT NOT NULL DEFAULT ''"),
+    ("doc_meta", "rchk_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS rchk_at TEXT NOT NULL DEFAULT ''"),
+    ("doc_meta", "rchk_ok", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS rchk_ok TEXT NOT NULL DEFAULT ''"),
+    # 2.236.0 (#2904-#2911): how an agent works and reports (JSON, agents/workstyle.py; '' = made before 2.236.0, today's pushes).
+    # Older versions ignore it
+    ("agents", "work_style", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS work_style TEXT NOT NULL DEFAULT ''"),
+    # 2.236.0 C (#2906): the order of the agent's queue it set last (JSON list of task ids, agents/workqueue.py). Older versions ignore it
+    ("agents", "queue_order", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS queue_order TEXT NOT NULL DEFAULT ''"),
+    # 2.239.0 D (#2874): the name of the project a booked receipt was assigned to when that project was deleted for good
+    # (receipts/suggest.py olk_keep_project; list_id is emptied by its foreign key). Older versions ignore it
+    ("rc_receipts", "list_name", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS list_name TEXT"),
+    # 2.239.0 D (#2874): the newest reply mail to a data protection sheet that was not filed (sealed JSON {at, from, subject,
+    # text}; office/privacy.py dsb_reply_note) -- the customer's text no longer lies in the office log. Older versions ignore it
+    ("office_privacy_sheets", "reply", "ALTER TABLE office_privacy_sheets ADD COLUMN IF NOT EXISTS reply TEXT"),
+    # 2.240.0 (#2884): an organisation's switch "Assistant may read the comments of other members" (assistant/web.py; 0 = the
+    # assistant gets only the task and the asking person's own comments). 2.240.0 (#2867): "Content of our projects to personal
+    # channels" (notify/channels.py; 0 = Slack / Matrix / Telegram / Signal get a neutral text for the organisation's lists).
+    # Admins only; older versions ignore both
+    ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
+    ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
