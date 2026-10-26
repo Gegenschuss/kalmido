@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.7] - 2026-10-26
+
+### Fixed
+- CI of 2.307.6: p2106_c_ui put its stand-in letter editor into the page view, and a late redraw of the office view replaced it, so the text field was gone ("Cannot read properties of null (reading 'focus')"). The stand-in now sits beside the view, and the test checks that it is still there. No shared cause with the earlier red UI suites (p294_b_ui was a toast timing issue).
+
 ## [2.307.6] - 2026-10-26
 
 ### Fixed
@@ -8335,7 +8340,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.6...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.7...HEAD
+[2.307.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.7
 [2.307.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.6
 [2.307.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.5
 [2.307.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.4
