@@ -8,8 +8,10 @@
      own routes (its rights). A locked space works the same: the ids come from the text decrypted here.
    - Read mode: an open checkbox line "- [ ] …" gets a + button (several: "Open items as tasks"): the line becomes a task
      with the quick add syntax (date, #tags, !priority), in a list to choose (default: the basket); the line then ends with
-     #<id> (the task link of the pages, which shows the task's state). Ticking in the page never changes the task.
-     Tasks + the page text = ONE undo step.
+     #<id> (the task link of the pages, which shows the task's state). Tasks + the page text = ONE undo step.
+   - 2.350.0 C (#3148): with the right to write the page, a checkbox ticks in read mode: the line's [ ] / [x] is saved like a
+     typed change (history, conflict, offline, a locked space); a line with #123 ticks the task along (done / reopened, only
+     with the right to that task) and shows ticked while the task is done. Right click / a long press: "Create as task".
    Classic script sharing the global scope with wiki.js (lazyload.js: module "wiki"). */
 'use strict';
 
@@ -60,10 +62,13 @@ function wem_put(p, h, ems) {
   });
   // the state of a linked task (#123): done = struck through (shown only; the page text does not change)
   h = h.replace(/class="tref" data-tref="(\d+)"/g, (m, id) => taskById(+id)?.status === 2 ? `class="tref wemdone" data-tref="${id}"` : m);
-  return wem_cbHtml(p, h);
+  return wem_tickHtml(p, wem_cbHtml(p, h));  // 2.350.0 C (#3148)
 }
 // ---- open checkbox lines -> tasks
-function wem_cbLines(body) {  // the open "- [ ] …" lines as renderMd draws them (no frontmatter, no code blocks), in order
+function wem_cbLines(body) { return wem_cbAll(body).filter(L => !L.on); }  // the open "- [ ] …" lines
+// 2.350.0 C (#3148): every checkbox line as renderMd draws them (no frontmatter, no code blocks), in order: i = its line in
+// the text, on = [x], tid = the task linked in it (#123)
+function wem_cbAll(body) {
   const ls = String(body || '').split('\n'), out = [];
   let i = 0, code = false;
   if (/^---[ \t]*\r?$/.test(ls[0] || '')) { const e = ls.findIndex((l, k) => k > 0 && /^---[ \t]*\r?$/.test(l)); if (e > 0) i = e + 1; }
@@ -72,10 +77,68 @@ function wem_cbLines(body) {  // the open "- [ ] …" lines as renderMd draws th
     if (/^\s*```/.test(ln)) { code = !code; continue; }
     if (code || /^\s*>/.test(ln)) continue;
     const m = /^\s*[-*]\s+\[( |x|X)\]\s*(.*)/.exec(ln);
-    if (m && m[1] === ' ') out.push({raw: ln, text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2])});
+    if (m) out.push({i, raw: ln, on: m[1] !== ' ', text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2]), tid: +((WEM_TREF_RE.exec(m[2]) || [''])[0].slice(1)) || 0});
   }
   return out;
 }
+// ---- 2.350.0 C (#3148): checkboxes tick in read mode
+const wem_mayTick = p => WK.idx[p.space]?.mayWrite !== false;  // the page's own rule for "Edit" (wiki.js wk_pageHtml)
+const wem_tidDone = L => !!L.tid && taskById(L.tid)?.status === 2;
+function wem_tickHtml(p, h) {
+  const all = wem_cbAll(p.body), re = /<li class="cb (?:on)?">(<input type="checkbox" disabled ?(?:checked)?>)/g;
+  if (!all.length || (h.match(re) || []).length !== all.length) return h;  // the drawing does not match the text: stays read only
+  const may = wem_mayTick(p);
+  let k = 0;
+  return h.replace(re, () => {
+    const L = all[k++], on = L.on || wem_tidDone(L);  // a done task shows its line ticked (the text stays as it is)
+    return `<li class="cb ${on ? 'on' : ''}"${may ? ` data-wkcbl="${k - 1}"` : ''}><input type="checkbox" ${may ? `data-wkcb="${k - 1}" aria-label="${esc(L.text || tr('Checkbox'))}"` : 'disabled'}${on ? ' checked' : ''}>`;
+  });
+}
+let WEM_TQ = Promise.resolve();  // the saves of ticks, one after the other (each sends the newest text)
+const wem_tickWait = () => WEM_TQ;
+async function wem_tick(p, k, on, cb) {
+  const L = wem_cbAll(p.body)[k];
+  if (!L) { viewSafeRender(); return; }
+  const ls = String(p.body).split('\n');
+  ls[L.i] = L.raw.replace(/^(\s*[-*]\s+\[)[ xX](\])/, `$1${on ? 'x' : ' '}$2`);
+  cb.closest('li')?.classList.toggle('on', on);
+  if (ls[L.i] !== L.raw) { p.body = ls.join('\n'); WEM_TQ = WEM_TQ.then(() => wem_tickSave(p)).catch(() => {}); }
+  const t = L.tid ? taskById(L.tid) : null;  // the linked task along, with my rights on it (else only the checkbox)
+  if (t && canEdit(t) && (on ? t.status === 0 : t.status === 2)) { try { await toggleTask(t.id); } catch { /* api() said why */ } }
+}
+// saved like a typed change (wiki.js wk_flush): the outbox offline, a conflict asks, a locked space seals it
+async function wem_tickSave(p) {
+  const url = '/api/wiki/pages/' + p.id, patch = {body: p.body, expect_updated_at: p.updated_at};
+  if (p._off || OUT.q.some(x => x.url === url)) { await wko_queue(p, patch); return; }
+  try {
+    const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', url, patch, p.space) : await rawFetch('PATCH', url, patch);
+    Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
+    wko_keep(p.space, r);
+    wk_savedHint(tr('Saved'));
+  } catch (e) {
+    if (e.status === 409 && e.data?.page) { await wk_conflict(p, e.data.page, patch); return; }
+    if (e instanceof Offline) { await wko_queue(p, patch); return; }
+    toast(e.message); viewSafeRender();
+  }
+}
+// right click / a long press on a checkbox line: its menu
+function wem_tickMenu(p, li) {
+  const all = wem_cbAll(p.body), j = +li.dataset.wkcbl, L = all[j]; if (!L) return false;
+  const k = all.slice(0, j).filter(x => !x.on).length, items = [];
+  if (!L.on && !L.has && L.text && wem_mayTask(p)) items.push({label: tr('Create as task'), icon: 'plus', fn: () => wem_cbDlg(p, [k])});
+  if (L.tid && taskById(L.tid)) items.push({label: tr('Open task'), icon: 'check', fn: () => openDetail(L.tid)});
+  if (!items.length) return false;
+  menu(li, items);
+  return true;
+}
+document.addEventListener('change', e => {
+  const cb = /** @type {any} */ (e.target).closest?.('input[data-wkcb]'); if (!cb || !$('#wk-md')?.contains(cb)) return;
+  const p = WK.pg; if (p) wem_tick(p, +cb.dataset.wkcb, cb.checked, cb);
+});
+document.addEventListener('contextmenu', e => {
+  const li = /** @type {any} */ (e.target).closest?.('li[data-wkcbl]'); if (!li || !$('#wk-md')?.contains(li) || !WK.pg) return;
+  if (wem_tickMenu(WK.pg, li)) e.preventDefault();
+});
 const wem_mayTask = p => WK.idx[p.space]?.mayWrite !== false && S.me?.kind !== 'agent' && typeof createTask === 'function';
 function wem_cbHtml(p, h) {
   if (!wem_mayTask(p)) return h;
@@ -94,7 +157,7 @@ function wem_lists() {
   return [ib, ...sideOrder().filter(l => l && !l.is_inbox && !l.archived && canEditList(l.id))].filter(Boolean);
 }
 async function wem_cbDlg(p, ks) {
-  await wk_flush();
+  await wk_flush(); await wem_tickWait();  // 2.350.0 C (#3148): a tick still on the way first
   const all = wem_cbLines(p.body), pick = ks.map(k => all[k]).filter(L => L && !L.has && L.text);
   if (!pick.length) return;
   const ls = wem_lists(), lock = wk_e2e(p.space);
@@ -103,7 +166,7 @@ async function wem_cbDlg(p, ks) {
   const md = modal(`<h3>${ic('check', 's')} ${esc(tr('Create tasks'))}</h3>
     ${pick.length > 1 ? `<ul class="wemcbl">${pick.map((L, i) => `<li><label><input type="checkbox" data-wemi="${i}" checked> <span>${esc(L.text)}</span></label></li>`).join('')}</ul>` : `<p class="wemcb1">${esc(pick[0].text)}</p>`}
     <div class="row"><label for="wem-list">${esc(tr('Project'))}</label><select id="wem-list">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>
-    <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.'))}</p>
+    <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.'))}</p>
     <p class="shint keep wemlock" ${lockHint(ls[0]?.id) ? '' : 'hidden'}>${ic('lock', 's')} ${esc(tr('This page is end-to-end encrypted, the chosen project is not: the task titles are stored without that lock.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-m="ok">${ic('plus', 's')} ${esc(tr('Create tasks'))}</button></div>`);
   md.classList.add('wemdlg');

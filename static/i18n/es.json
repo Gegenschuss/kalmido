@@ -7761,7 +7761,6 @@
   "File not available": "Archivo no disponible",
   "Create as task": "Crear como tarea",
   "Open items as tasks": "Crear los puntos abiertos como tareas",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Fechas, #etiquetas y !prioridad como en la entrada rápida. Marcarla en la página no cambia la tarea.",
   "Insert picture or file": "Insertar imagen o archivo",
   "Files cannot be added to a page of a locked space yet": "Las páginas de un espacio con candado aún no admiten archivos",
   "{0} file attached": ["{0} archivo adjuntado", "{0} archivos adjuntados"],
@@ -14310,5 +14309,6 @@
   "Idea": "Idea",
   "Import running · {0} %": "Importación en curso · {0} %",
   "The import goes on in the background.": "La importación continúa en segundo plano.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "El progreso aparece en Conocimiento en la barra y arriba en las páginas de conocimiento."
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "El progreso aparece en Conocimiento en la barra y arriba en las páginas de conocimiento.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Fechas, #etiquetas y !prioridad como en la entrada rápida. Marcarla en la página también marca la tarea."
 }

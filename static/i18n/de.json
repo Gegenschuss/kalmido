@@ -7741,7 +7741,6 @@
   "File not available": "Datei nicht verfügbar",
   "Create as task": "Als Aufgabe anlegen",
   "Open items as tasks": "Offene Punkte als Aufgaben anlegen",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite ändert die Aufgabe nicht.",
   "Insert picture or file": "Bild oder Datei einfügen",
   "Files cannot be added to a page of a locked space yet": "Seiten in einem verschlüsselten Arbeitsbereich können noch keine Dateien aufnehmen",
   "{0} file attached": ["{0} Datei angehängt", "{0} Dateien angehängt"],
@@ -14310,5 +14309,6 @@
   "Idea": "Idee",
   "Import running · {0} %": "Import läuft · {0} %",
   "The import goes on in the background.": "Der Import läuft im Hintergrund weiter.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten."
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite hakt auch die Aufgabe ab."
 }

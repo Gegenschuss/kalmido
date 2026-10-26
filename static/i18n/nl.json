@@ -7761,7 +7761,6 @@
   "File not available": "Bestand niet beschikbaar",
   "Create as task": "Als taak aanmaken",
   "Open items as tasks": "Open punten als taken aanmaken",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina wijzigt de taak niet.",
   "Insert picture or file": "Afbeelding of bestand invoegen",
   "Files cannot be added to a page of a locked space yet": "Pagina's in een ruimte met slot kunnen nog geen bestanden opnemen",
   "{0} file attached": ["{0} bestand bijgevoegd", "{0} bestanden bijgevoegd"],
@@ -14310,5 +14309,6 @@
   "Idea": "Idee",
   "Import running · {0} %": "Import loopt · {0} %",
   "The import goes on in the background.": "De import loopt op de achtergrond door.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "De voortgang staat bij Kennis in de balk en bovenaan de kennispagina's."
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "De voortgang staat bij Kennis in de balk en bovenaan de kennispagina's.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina vinkt ook de taak af."
 }
