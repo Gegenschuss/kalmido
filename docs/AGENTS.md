@@ -751,6 +751,9 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `work_style_changed` | 2.236.0: the owner (an admin for a team agent) changed the agent's [work style](#work-style) | `work_style` (with `state`) |
 | `rules_changed` | 2.235.0: the owner (an admin for a team agent) added, reworded, paused, resumed or deleted one of the agent's [standing rules](#standing-rules) (never for the agent's own `add_rule`) | `change` (`added` / `edited` / `paused` / `resumed` / `deleted`), `rules` (the active ones) |
 | `data_lock_changed` | 2.235.0: the owner (an admin for a team agent) changed [what the agent never sees](#data-the-agent-never-sees) | `data_lock` |
+| `control_changed` | 2.235.0: the owner (an admin for a team agent) changed the agent's [control level](#control-level) | `control` |
+| `approval_expired` | 2.235.0: an approval card of the agent passed the [deadline for approvals](#control-level) | `message_id`, `user_id`, `outcome` (`rejected` / `approved` / `asked_again`), `then`, `approval_request` `{title, what, step}` |
+| `decision_undone` | 2.235.0: the owner took one of the agent's own decisions back (*Control* > history > Undo) | `decision` `{id, kind, title, method, path, target_id}`, `user` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a project's team chat (the agent is a member of the channel of every project shared with it); 2.46.1: in a project where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply, attachments, thread_of}` (2.139.0: an attachment with `voice: true` is a voice message, `duration_ms` its length; Kalmido does not transcribe), `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`); 2.139.0 (#2127): `thread_of` set = the message answers in a thread: answer in that thread (`thread_of`) |
@@ -2596,6 +2599,64 @@ The agent reads WHAT is locked, never the names of what it cannot see: `GET /api
 and the event `data_lock_changed` (`data.data_lock`, the same object) when the owner changes it. Nothing to do for the
 agent: do not ask for or work around locked data. The reference runner treats the event as information (no run,
 capability `data_lock_info`).
+## Control level
+
+*Since 2.235.0 (#2891 #2900 #2901).* How much the agent may do without asking, set by the same people as the
+[work style](#work-style) in the agent's settings (section *Control*, `GET/PATCH /api/agents/{id}/control`, everyone else
+404). It applies to agents only; people keep their roles and the approvals of takeover and release. **The server enforces
+it**: every write of the agent's token under `/api/v1/` has a class - `meta` (its own channel `/agent/...`: status,
+typing, chat and approval cards, jobs, proposals; always allowed), `routine` (create tasks and subtasks, plan them = only
+`due` / `due_time` / `start`, comment, tick off / reopen, reactions), `one_way` (every `DELETE` and the delete actions:
+emptying the trash, deleting folders, undoing an import, a batch with `action: delete`) or `change` (everything else).
+
+| Level | Allowed without a card |
+|---|---|
+| `approve_all` *Approve everything* (a new agent) | only `meta` |
+| `routine` *Routine free* | `meta` + `routine` |
+| `free` *Free run with a goal* (with `goal`, free text) | `meta` + `routine` + `change` |
+
+A project can have its own level (`projects`), which wins over the agent's. A personal agent never gets more in a project
+than its owner's own rights there (owner / admin = `free`, member who edits = `routine`, reading / commenting =
+`approve_all`). One-way steps (`one_way.fixed`: deleting, anything that costs money, login and registration, migrations
+without a way back; plus the owner's own items, `one_way.custom`) need a card on **every** level; Kalmido enforces deleting,
+the others happen outside Kalmido and are the agent's rule. **An agent made before 2.235.0** has no level (`control.level`
+null, `chosen: false`): it works as before, without any of these checks, until its owner picks one.
+
+A write the level does not allow answers `409`:
+
+```
+{"error": {"code": "approval_required", "message": "...", "step": "change", "level": "routine", "project_id": 12,
+           "approval": {"method": "PATCH", "path": "/api/v1/tasks/345", "header": "X-Kalmido-Approval"}}}
+```
+
+The way to the approval: an approval card in the chat with the person (`POST /api/v1/agent/chats/{uid}`, MCP
+`request_chat_approval`) whose `approval.step` names exactly that request - `{"method": "PATCH", "path":
+"/api/v1/tasks/345"}` (a path without `/api/v1` is completed). Optional `approval.recommend` (`yes` / `no`, your
+recommended answer) and `approval.one_way: true` (a one-way step of the owner's list). After the person's **Yes** send the
+same request again with the header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the call). It works
+**once**, only for that method and path, only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx /
+5xx) gives the approval back. Otherwise `409 approval_invalid`. For a team agent the person who said Yes must be allowed to
+change that project themselves.
+
+**History and Undo.** Every step the agent takes without a card (on `routine` / `free`) and every approved step is one
+line in the history of its settings (the newest 50), with *Undo* where the server can: a created task goes to the trash,
+a planned task gets its old dates, a ticked-off task is open again, a comment is deleted. The agent gets
+`decision_undone`.
+
+**Deadline for approvals** (`deadline` in seconds, null = none; the owner picks 1 h, 4 h, 1 day or 3 days): an approval
+card left unanswered that long ends by itself, as `then` says - `reject` (default; the card shows *expired*),
+`ask_again` (one more push to the person, after the same time again: rejected) or `recommend` (the card's
+`approval.recommend` is taken; never for a one-way step - those are rejected). The agent gets `approval_expired`.
+
+```
+GET /api/v1/agent -> {…, "control": {"level": "routine", "chosen": true, "enforced": true, "goal": "",
+    "projects": [{"list_id": 12, "level": "free", "effective": "routine"}],
+    "one_way": {"fixed": [{"id": "delete", "text": "Deleting"}, …], "custom": ["Send invoices"]},
+    "deadline": 14400, "then": "reject", "approval_header": "X-Kalmido-Approval"}}
+```
+
+The reference starters put level, goal, project levels, one-way steps and the way to an approval into the rules block in
+front of every prompt and read `control_changed` at once (capability `control_rules`).
 
 ## Teaching the agent
 

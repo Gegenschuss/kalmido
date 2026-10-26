@@ -71,6 +71,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: team_listen (2.46.1: team chat messages of lists the agent listens in on, in mcp/agent_run.py)
 # kalmido-capability: team_thread (2.139.0: a team chat message in a thread is answered in that thread, in mcp/agent_run.py)
 # kalmido-capability: rules_block (2.46.6: the fixed rules of mcp/agent_rules.md in front of every prompt, in mcp/agent_run.py)
+# kalmido-capability: control_rules (2.235.0: the control level, goal and one-way steps in the rules block, in mcp/agent_run.py)
 # kalmido-capability: workflow_file (2.46.6: WORKFLOW-KALMIDO.md, asked for once, in mcp/agent_run.py)
 # kalmido-capability: job_wake (2.46.6: a wake run after a job, a lost job continued once; mcp/agent_run.py + agent_job.py)
 # kalmido-capability: job_names (2.59.0: a name per job, part jobs name their leader; mcp/agent_job.py)

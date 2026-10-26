@@ -339,6 +339,15 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
 
+### Control level (2.235.0)
+- **Keep to your control level**: `get_agent` gives `control` (level `approve_all` / `routine` / `free`, `goal`, project
+  levels, one-way steps, deadline), again with `control_changed`. `null` level = none chosen: work as before.
+- A write the level does not allow answers `409 approval_required`: ask with `request_chat_approval` and `step`
+  {method, path} of exactly that call (`recommend` yes / no when you have a view, `one_way` true for a one-way step);
+  after the Yes call `use_approval` with the card's message id and repeat the call once. Never work around a refusal.
+- One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
+  a card first, on every level, also when they happen outside Kalmido.
+
 ### Work style (2.236.0)
 - **Read your work style and keep to it**: `get_agent` gives `work_style` (set by your owner; for a team agent an admin),
   again with the event `work_style_changed`. Budget (`budget_state`, at the limit Kalmido pauses you): finish the step,
@@ -616,6 +625,9 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `work_style_changed`: your owner (an admin for a team agent) changed your work style (2.236.0: read `work_style` anew)
 - `rules_changed`: your owner (an admin for a team agent) changed your standing rules (2.235.0: `rules` = the active ones)
 - `data_lock_changed`: your owner changed what you never see (2.235.0: `data_lock`, information only)
+- `control_changed`: your owner changed your control level (2.235.0: read `control` anew with get_agent)
+- `approval_expired`: one of your approval cards passed the deadline (2.235.0: `outcome` rejected / approved / asked_again)
+- `decision_undone`: your owner took one of your own decisions back (2.235.0: do not repeat it; ask if unclear)
 - `reset`: an admin pressed Reset now (start a fresh session)
 - `team_message`: someone @mentioned you in a project's team chat (2.46.1: or any person's message there in a project where you listen in, `mentioned: false`)
 - `task_added`: a task was created in / moved into a project where you listen in
