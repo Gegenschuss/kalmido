@@ -449,7 +449,7 @@ TOOLS = [
     ("add_rule", "2.235.0 (#2903): save a standing rule when the person you work for tells you \"from now on always ...\" (or "
                  "\"never again ...\", \"in future ...\"): text = the rule in one short sentence in their words (at most 500 "
                  "characters), source = the chat message (kind chat, id = its message id) or the comment (kind comment, id = the "
-                 "comment id) it came from; it must be visible to you (else 404). The same text again returns the existing rule "
+                 "comment id) it came from; it must be visible to you and written by a person who may address you there (else 404). The same text again returns the existing rule "
                  "(duplicate: true). At most 100 rules. Then confirm it in ONE line (e.g. \"Saved as a standing rule: ...\").",
      _obj({"text": {"type": "string", "minLength": 1, "maxLength": 500},
            "source": _obj({"kind": {"type": "string", "enum": ["chat", "comment"]}, "id": {"type": "integer"}}, ["kind", "id"])},

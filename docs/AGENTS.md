@@ -2551,10 +2551,12 @@ one line.
 
 - `POST /api/v1/agent/rules {"text": "...", "source": {"kind": "chat" | "comment", "id": N}}` (MCP `add_rule`) saves a
   rule. The source must be a chat message of a person to the agent (in a conversation it still has) or a comment it can
-  see, never its own; anything else = 404. The same text as an existing rule returns that rule (200,
+  see, written by a person who may address the agent in that project (never its own, another agent's or a guest's through
+  an approval link); anything else = 404. The same text as an existing rule returns that rule (200,
   `duplicate: true`), a new one 201. At most 100 rules per agent, 500 characters each (400 beyond).
 - `GET /api/v1/agent/rules` (MCP `get_rules`) lists all rules with `state` `active` / `paused` and `source`
-  `{kind, id, task_id, user_id, excerpt}` (`kind` `manual` = added by a person).
+  `{kind, id, task_id, user_id, excerpt}` (`kind` `manual` = added by a person). The `excerpt` is empty once the source
+  was deleted (the stored copy goes too) or the agent no longer sees it (e.g. a data lock); the rule itself stays.
 - `GET /api/v1/agent` carries `rules`: only the **active** ones `[{id, text, created_at, source}]`, oldest first. A
   person's change sends the event `rules_changed` with the same list.
 - Owner routes (the owner of a personal agent, an instance admin for a team agent, everyone else 404):
@@ -2585,7 +2587,8 @@ team agent, an instance admin locks data for one agent in its settings (section 
 - **Tags**: tasks with one of these tags (a personal tag or a project tag), with all their subtasks.
 
 The server enforces it in **every** read path of the agent with one check (lists, tasks, search, filters, calendar,
-comments, attachments, the roadmap, events, the chat context): a locked project or task does not exist for the agent
+comments, attachments, the roadmap, events, the chat context, the input of proposal requests such as *Sort the basket*,
+*Plan my day* or *Break down*, also in `GET /api/v1/agent/jobs/{id}`): a locked project or task does not exist for the agent
 (404, also for writes, so nothing tells it that the data is there) and no event about it is queued. The lock only ever
 narrows what the agent sees; sharing and the organisation boundary stay as they are. The people see everything as before.
 
