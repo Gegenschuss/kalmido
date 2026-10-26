@@ -11,6 +11,10 @@ export, nobody could open them -- and nothing goes into a target space with the 
 public read links of pages do not (their token belongs to the old server, like the upload links of folders). Tables: formulas, file and person cells
 and the chart are rewritten to the new ids (FINISH); a reference that did not come along points at nothing (shows "ref").
 Video sign-offs: links, versions and comments (the approval links themselves are not in the export).
+2.353.0 C (#2829): the areas' trees (knowledge folders, the tables' folders) come with the store: an area's root goes into the
+target's own root of that area (store/area_roots.json; a knowledge folder of the same name below it is used), else it is made
+and marked; page / table reference nodes point at the new rows. An archive without the marks rebuilds the knowledge tree from
+the pages' paths as before; a target whose knowledge pages have the lock gets no knowledge tree.
 Into the private space (#1941) every part goes into the person's own space (org_id NULL, owner = the person): the app has a
 private file store, private documents, private pages, tables and sign-offs."""
 import json
@@ -23,6 +27,7 @@ from .orgimport import OiT
 from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
+from ..files.fsroots import fs_area_root, fs_area_ws  # 2.353.0 C (#2829)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -62,9 +67,62 @@ def _not_agent(c, uid):
 
 
 # ---- file store --------------------------------------------------------------------------------------------------------
+# 2.353.0 C (#2829): reference nodes of the areas' trees that come along (their ref_id is set in _finish_store, once the
+# pages / tables are in; a node whose page / table did not come along goes again)
+_REF_KINDS = {"wiki": "wiki_pages", "sheet": "sheets"}
+
+
+def _areas(run, ctx):
+    """2.353.0 C (#2829): {archive node id: area} of the nodes in an area's tree (store/area_roots.json; an older archive
+    has none), {archive root id: area}."""
+    st = _st(run)
+    if "area_of" not in st:
+        oi = ctx.data.get("oi") or {}
+        roots = {_oidi(r.get("node_id")): str(r.get("area") or "") for r in oi.get("store/area_roots.json") or []
+                 if _oidi(r.get("node_id")) and re.fullmatch(r"[a-z][a-z0-9_]{0,19}", str(r.get("area") or ""))}
+        par = {_oidi(r.get("id")): _oidi(r.get("parent_id")) for r in oi.get("store/nodes.json") or []}
+        out = {}
+        for nid in par:
+            chain, x = [], nid
+            while x and x not in out and x not in roots and x not in chain and len(chain) < 200:
+                chain.append(x)
+                x = par.get(x)
+            a = out.get(x) or roots.get(x)
+            for y in chain:
+                out[y] = a
+        out.update(roots)
+        st.update(area_of=out, roots=roots, merged=set(), new_roots={}, refs=[])
+    return st
+
+
 def _node(c, run, src, d, ctx):
-    if d.get("kind") not in ("folder", "file", "link", "page"):
+    if d.get("kind") not in ("folder", "file", "link", "page", "ref"):
         return None
+    st = _areas(run, ctx)
+    sid = _oidi(src.get("id"))
+    area = st["area_of"].get(sid)
+    if area == "wiki" and _wiki_locked(c, ctx):
+        return False  # the target's knowledge pages have the lock: their pages stay out (_page), so does the tree
+    if sid in st["roots"]:  # an area's root: the target's own root of that area when it has one (never a second root)
+        have = fs_area_root(c, ctx.uid, ctx.space, area, "", create=False)
+        if have:
+            run.put("fs_nodes", sid, have)
+            st["merged"].add(have)
+            return False
+        st["new_roots"][sid] = area
+        d["parent_id"] = None
+    elif area == "wiki" and d["kind"] == "folder" and run.m("fs_nodes", src.get("parent_id")) in st["merged"]:
+        have = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND name=? AND deleted_at IS NULL",
+                         (run.m("fs_nodes", src.get("parent_id")), d.get("name"))).fetchone()
+        if have:  # a knowledge folder's names are exact (wiki/wkfolder.py): the target's folder of that name takes it
+            run.put("fs_nodes", sid, have[0])
+            st["merged"].add(have[0])
+            return False
+    if d["kind"] == "ref":
+        if src.get("ref_kind") not in _REF_KINDS or not area:
+            return None
+        d["ref_id"] = None
+        st["refs"].append((sid, src["ref_kind"], src.get("ref_id")))
     if not ctx.space:
         d["owner_id"], d["org_access"] = ctx.uid, ""
     if d["kind"] == "link":  # a task / project file shown in the store: only when that file came along
@@ -73,8 +131,23 @@ def _node(c, run, src, d, ctx):
         if not ref:
             return None
         d["ref_id"] = ref
-    else:
+    elif d["kind"] != "ref":
         d["ref_kind"] = None
+    return d
+
+
+def _area_root(c, run, src, d, ctx):
+    """2.353.0 C (#2829): the mark of an area's root made by this import (a root put into the target's own one: nothing)."""
+    st = _areas(run, ctx)
+    sid = _oidi(src.get("node_id"))
+    nid = run.m("fs_nodes", sid)
+    if sid not in st["new_roots"] or not nid:
+        return False
+    ws = fs_area_ws(ctx.space, ctx.uid)
+    d.update(ws=ws, area=st["new_roots"][sid], org_id=ctx.space or None, owner_id=None if ctx.space else ctx.uid, node_id=nid)
+    if c.execute("SELECT 1 FROM fs_area_roots WHERE ws=? AND area=?", (ws, d["area"])).fetchone():  # a mark whose folder is gone
+        c.execute("UPDATE fs_area_roots SET node_id=?, updated_at=? WHERE ws=? AND area=?", (nid, d["updated_at"], ws, d["area"]))
+        return False
     return d
 
 
@@ -427,7 +500,19 @@ def _finish_wiki(c, run, oi):
         wks_index(c, nid, p["org_id"], p["owner_id"], text, p["updated_at"])
 
 
+def _finish_refs(c, run):
+    """2.353.0 C (#2829): the reference nodes point at the new page / table; one whose page / table did not come along (a
+    locked page, the trash) goes again."""
+    for sid, kind, ref in _st(run).get("refs") or []:
+        nid, new = run.m("fs_nodes", sid), run.m(_REF_KINDS[kind], ref)
+        if nid and new and not c.execute("SELECT 1 FROM fs_nodes WHERE ref_kind=? AND ref_id=? AND kind='ref'", (kind, new)).fetchone():
+            c.execute("UPDATE fs_nodes SET ref_id=? WHERE id=?", (new, nid))
+        elif nid:
+            c.execute("DELETE FROM fs_nodes WHERE id=? AND kind='ref' AND ref_id IS NULL", (nid,))
+
+
 def _finish_store(c, run, oi):
+    _finish_refs(c, run)
     for r in oi.get("store/nodes.json") or []:  # a version that could not be taken over: the newest one that came along counts
         nid = run.m("fs_nodes", r.get("id"))
         if not nid or r.get("kind") != "file":
@@ -484,6 +569,7 @@ SPECS = [
     # file store: nodes (parents late), versions, shares, history
     OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes"},
         label=N_("File store"), prep=_node),
+    OiT("store/area_roots.json", "fs_area_roots", rid=False, key=("ws", "area"), prep=_area_root),  # 2.353.0 C (#2829)
     OiT("store/versions.json", "fs_versions", refs={"node_id": "fs_nodes"}, need=("node_id",), people=_P, space=(), prep=_version),
     OiT("store/shares.json", "fs_shares", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "member", **_P}, space=(),
         prep=_share),

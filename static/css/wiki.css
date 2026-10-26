@@ -118,3 +118,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkmore{flex:none}
 .wkdlist .wkrow{border-bottom:1px solid var(--line)}
 .wkdlist .wkrow>.wkitem{border-bottom:0}
+/* 2.353.0 C (#2829): Select in the knowledge lists -- the file store's boxes (.absel) at the row's top (an open folder stays one row) */
+.wkselrow{align-items:flex-start}
+.wkselrow>.absel{min-height:2.5rem}
+.wkselbar{margin-bottom:.75rem}
