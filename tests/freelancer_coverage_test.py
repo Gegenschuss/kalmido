@@ -505,6 +505,8 @@ ROUTES = {
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",
     "GET /api/orgs/{}/export/file": "office", "GET /api/orgs/{}/lists": "orgadmin",
+    "GET /api/orgs/{}/out-requests": "orgadmin", "POST /api/orgs/{}/out-requests": "orgadmin",  # 2.361.2 (#2923)
+    "POST /api/orgs/{}/out-requests/{}": "orgadmin",
     # 2.223.2 C (#2871): the step-up before a download (POST -> a one-time ticket; p22232_c_offsite_test.py, freelancer too)
     "POST /api/orgs/{}/export/file": "office", "POST /api/retention/me/export.zip": "office", "POST /api/retention/org/{}/export.zip": "orgadmin",
     "PATCH /api/admin/orgs/{}": "orgadmin", "PATCH /api/orgs/{}": "orgadmin", "PATCH /api/orgs/{}/lists/{}": "orgadmin",

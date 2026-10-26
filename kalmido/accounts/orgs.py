@@ -448,7 +448,7 @@ def list_org_set(c, lid, v):
     if (oid or None) == (list_org(c, lid) or None):
         return False
     from .orgout import org_out  # 2.148.1 B (#2483): out of an organisation only through its admin (logged, admins told)
-    org_out(c, lr["org_id"], oid, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
+    org_out(c, lr["org_id"], oid, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid, obj=lid)  # 2.361.2 (#2923): obj
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
@@ -496,7 +496,7 @@ def ws_private_for(c, lid):
     if ag:
         raise Denied(409, tr("{0} works in another workspace ({1}): an agent joins only projects of its own workspace", ag["display_name"] or ag["username"], _org_name(c, oid)))
     from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
-    org_out(c, oid, None, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid)
+    org_out(c, oid, None, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid, obj=lid)  # 2.361.2 (#2923): obj
     c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lid,))
     c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lid,))  # 2.172.1 (#2689): no longer the organisation's read-later project
     from ..admin.orgcrypt_cli import oc_settle_kick
@@ -958,6 +958,13 @@ def org_visibility():
 # ---------------------------------------------------------------- 2.28.0 (#935): my organisations, their admins
 def _need_org_admin(c, oid):
     """The current person administers organisation oid (404 when not even a member)."""
+    if org_need_person(c, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+
+
+def org_need_person(c, oid):
+    """2.361.2 (#2923, was the start of _need_org_admin): the current person (no agent: 403) is in organisation oid (404
+    otherwise; a retired one 409) -> their role."""
     from ..agents.core import is_agent
     if is_agent(g.user):
         raise Denied(403, tr("Agents cannot use this endpoint"))
@@ -968,8 +975,7 @@ def _need_org_admin(c, oid):
     role = org_role(c, me(), oid)
     if not role:
         raise Denied(404)
-    if role != "admin":
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    return role
 
 
 def org_mine_dict(c, r, uid):

@@ -584,7 +584,10 @@ async function api(method, url, body) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
       if (method !== 'GET') toast(tr('Offline: only works again with a connection'));
-    } else if (e.message !== 'auth' && !e.shown) toast(e.message);
+    } else if (e.message !== 'auth' && !e.shown) {
+      if (e.data?.out_request && typeof oor_ask === 'function') toast(e.message, () => oor_ask(e.data.out_request), 10000, tr('Ask an admin'));  // 2.361.2 (#2923)
+      else toast(e.message);
+    }
     throw e;
   }
 }

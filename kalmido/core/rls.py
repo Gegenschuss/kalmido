@@ -73,6 +73,7 @@ TABLES = (
     "video_reviews", "video_versions", "video_comments",  # 2.99.1 A (#1959): video sign-offs (NULL = private, the app checks owner / task / list / client)
     "office_pay_props",  # 2.51.0 A (#1350): payment suggestions of agents
     "task_bell",  # 2.53.0 C (#1424): the bell of one task per person (NULL = a private list's task)
+    "org_out_requests",  # 2.361.2 (#2923): a member's request to get something back (the app shows it to its admins / the person)
     "time_sheets",  # 2.125.0 B (#2119): monthly timesheets (NULL = a person without organisation, the app checks user_id)
     "nl_conns", "nl_segments", "nl_members", "nl_runs",  # 2.55.0 E (#1455): the newsletter connection (NULL = a person's own)
     "nl_suppress", "nl_consent_log",  # 2.152.0 D (#2170): suppression list + consent log (hash only)

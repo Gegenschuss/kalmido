@@ -102,6 +102,7 @@ ORDER = (
     "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
+    "accounts.orgoutreq",  # 2.361.2 (#2923): a member asks back what they brought into an organisation
     "accounts.useradmin",  # 2.88.0 (#1980)
     "accounts.orgretain",  # 2.152.0 A (#2164 #2167)
     "lists.templates",

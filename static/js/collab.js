@@ -235,6 +235,10 @@ function newsText(it, U) {
       lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
+      outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
+      outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),
+      outno: tr('{0} declined to give {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
       rename: tr('{0} renamed the project {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
@@ -440,6 +444,12 @@ async function newsOpen(i, opts) {
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'orgjoin') { ojn_open(it.data || {}); return; }  // 2.148.1 A (#2480): accept or decline
+  if (it.kind === 'orglist' && it.data?.action === 'outreq' && it.data.org_id && typeof oadmOpen === 'function') { oadmOpen(it.data.org_id, it.data.org || ''); return; }  // 2.361.2 (#2923): release / decline
+  if (it.kind === 'orglist' && it.data?.action === 'outok' && it.data.obj) {  // 2.361.2 (#2923): to the thing, its menu moves it
+    const k = it.data.kind, o = it.data.obj;
+    if (k === 'list' && listById(o)) go('l/' + o); else if (k === 'sheet') go('sheets/' + o); else if (k === 'file') go('ablage/' + o);
+    return;
+  }
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)
   if (it.kind === 'lytpl') { lyv_offerOpen(it.data?.offer); return; }  // 2.55.0 (#1068)
   if (it.kind === 'dispo') { if (workloadOn()) { WLV.tab = dp_on() ? 'dispo' : 'wl'; go('workload'); } return; }  // 2.50.0 (#1194)

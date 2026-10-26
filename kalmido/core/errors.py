@@ -10,9 +10,10 @@ from ..core.i18n import tr
 
 # Permission checks raise Denied: 404 hides that a thing exists, 403 = view only / switched off, 409 = a module is off.
 class Denied(Exception):
-    def __init__(self, code=404, msg=None):
+    def __init__(self, code=404, msg=None, data=None):
         super().__init__(code)
         self.code, self.msg = code, msg
+        self.data = data  # 2.361.2 (#2923): more fields of the JSON answer (dict), next to "error"
 
     def text(self):
         # 2.298.0 C (#3187): a bare 404 says what probably happened instead of "unknown"

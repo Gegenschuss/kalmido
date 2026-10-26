@@ -4,7 +4,7 @@ import os
 import time
 from typing import NamedTuple, Optional
 
-from flask import g, has_request_context
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
@@ -23,6 +23,8 @@ from .dlock import dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 
 
 @app.errorhandler(Denied)
 def denied(e):
+    if e.data:  # 2.361.2 (#2923): e.g. what a member can ask the admins for
+        return jsonify({**e.data, "error": e.text()}), e.code
     return err(e.text(), e.code)
 
 

@@ -160,7 +160,7 @@ FSM_BOOKED_STAYS = N_("A booked receipt stays in the books of its workspace: it 
 def fsm_plan(c, uid, b, to, dry):
     """Everything the move would do (no change): {roots: [(row, parent, owner, name)], moved, stay, notes, block, code}."""
     from ..accounts.orgs import is_org_admin
-    from ..accounts.orgout import OO_ADMIN_ONLY, org_out_ok
+    from ..accounts.orgout import OO_ADMIN_ONLY, oo_denied, oo_into_note, org_out_ok
     items = fsm_items(b)
     base = fsm_parent(b.get("parent"))
     chosen = {i for i, _, _ in items}
@@ -185,8 +185,9 @@ def fsm_plan(c, uid, b, to, dry):
     for n, parent, name in roots:
         moved, stay = fsm_walk(c, c.execute("SELECT * FROM fs_nodes WHERE id=?", (n["id"],)).fetchone())
         plan.setdefault("root_of", {}).update({r["id"]: n["id"] for r in moved + stay})  # 2.273.0 B (#3042): for the memo
-        if not plan["block"] and src and not org_out_ok(c, src, to):  # 2.148.1 B (#2483): out of an organisation only by its admin
+        if not plan["block"] and src and not org_out_ok(c, src, to, "file", n["id"]):  # 2.148.1 B (#2483): out of an organisation only by its admin
             plan["block"], plan["code"] = tr(OO_ADMIN_ONLY), 403
+            plan["deny"] = oo_denied(c, src, to, "file", n["id"]).data  # 2.361.2 (#2923): the maker can ask an admin
         if not plan["block"] and not admin and any(r["owner_id"] != uid and not (src and r["created_by"] == uid)
                                                     for r in moved + stay):  # review 2.96 (L5): also what stays behind
             plan["block"], plan["code"] = (tr("Only the owner or an admin of the organisation can move this out of it") if src
@@ -261,6 +262,7 @@ def fsm_plan(c, uid, b, to, dry):
                              "{0} shares end (people, groups or agents outside the target)", shares))
         if opened:
             notes.append(trn("{0} opening to the whole organisation ends", "{0} openings to the whole organisation end", opened))
+        notes.append(oo_into_note(c, src, to))  # 2.361.2 (#2923): the way back (empty unless a member moves it in)
         lost = sum(1 for r in c.execute(f"SELECT list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", big)
                    if not fsm_list_ok(c, r[0], to, uid))
         if lost:
@@ -515,15 +517,15 @@ def files_move_space():
     plan = fsm_plan(c, uid, b, to, dry)
     if dry:
         return jsonify(smv_answer(plan["notes"], plan["block"], files=plan["files"], folders=plan["folders"], size=plan["size"],
-                                  shares=plan["shares"]))
+                                  shares=plan["shares"], **(plan.get("deny") or {})))
     if plan["block"]:
         c.rollback()  # a documents folder the plan made
-        raise Denied(plan["code"], plan["block"])
+        raise Denied(plan["code"], plan["block"], data=plan.get("deny"))
     src, ts = plan["src"], _now()
     new_paths, old_paths, out = [], [], []
     try:
         from ..accounts.orgout import org_out  # 2.148.1 B (#2483): logged, the organisation's other admins told
-        org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]))
+        org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]), obj=[n["id"] for n, _, _, _ in plan["roots"]])
         ids = [r["id"] for r, _ in plan["moved"]]
         for i in range(0, len(ids), 500):  # the recognition queues skip locked rows: none starts until the commit
             part = ids[i:i + 500]
