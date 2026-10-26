@@ -355,6 +355,84 @@ AREAS["agreements"] = {"folder": _folder, "item": _ag_item, "role": _ag_role, "a
                        "top": "view", "agent_org": False}
 
 
+# --- 2.351.0 F (#2823, #2749, review N6): the other new reference kinds -- a receipt (office_receipt), an address book
+# (address_book), a framework contract's PDF (contract_file); role = GET /api/files/refs/<kind>/<id>, agent_role = the node
+# over /api/v1. A receipt: no organisation case here (an organisation's receipt is the documents space's, members see it
+# without a folder; the receipts lock through a share: p2351_a_officetree_test.py (d)); a contract's PDF: reading only (top
+# view, like contracts & insurance), an organisation's agent needs an office group (agent_org False).
+RF_NODE, RF_CL, RF_N = {}, {}, [0]
+
+
+def _rf_pdf(text):
+    """A one-page PDF with a text layer (hand-written, no library)."""
+    stream = f"BT /F1 12 Tf 40 700 Td ({text}) Tj ET".encode()
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+            b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream", b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    x = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offs)
+    return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, x)
+
+
+def _rf_file(s, kind, rid, folder):
+    r = s.post(B + "/api/files/refs", json={"ref_kind": kind, "ref_id": rid, "parent_id": folder})
+    assert r.ok, r.text
+    RF_NODE[(kind, rid)] = r.json()["node"]["id"]
+    return rid
+
+
+def _rc_item(s, ws, folder):
+    s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+    RF_N[0] += 1  # a new text each time: the same bytes would be a duplicate
+    r = s.post(B + "/api/docs", data={"ws": ws}, files={"files": (f"receipt-{RF_N[0]}.pdf", _rf_pdf(f"Receipt {RF_N[0]}"), "application/pdf")})
+    assert r.status_code == 201, r.text
+    did = r.json()["ids"][0]
+    assert s.patch(B + f"/api/docs/{did}", json={"amount": "19.00", "date": time.strftime("%Y-%m-%d")}).ok
+    r = s.put(B + f"/api/docs/{did}/receipt", json={"category": "Material"})
+    assert r.ok, r.text
+    return _rf_file(s, "office_receipt", did, folder)
+
+
+def _bk_item(s, ws, folder):
+    s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+    r = s.post(B + "/api/books", json={"name": f"Book in {folder}", "org_id": int(ws[4:]) if ws.startswith("org:") else None})
+    assert r.ok, r.text
+    return _rf_file(s, "address_book", r.json()["id"], folder)
+
+
+def _cf_item(s, ws, folder):
+    s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+    key = (id(s), ws)
+    if key not in RF_CL:
+        r = s.post(B + "/api/clients", json={"name": "Frame Client", "email": "frame@example.com", **({"org_id": int(ws[4:])} if ws.startswith("org:") else {})})
+        assert r.ok, r.text
+        r = s.post(B + "/api/office/contracts", json={"name": "Frame Example", "client_id": r.json()["id"]})
+        assert r.status_code in (200, 201), r.text
+        RF_CL[key] = r.json()["id"]
+    RF_N[0] += 1
+    r = s.post(B + f"/api/office/contracts/{RF_CL[key]}/files", files={"file": (f"frame-{RF_N[0]}.pdf", _rf_pdf(f"Frame {RF_N[0]}"), "application/pdf")})
+    assert r.status_code == 201, r.text
+    return _rf_file(s, "contract_file", r.json()["id"], folder)
+
+
+def _rf_area(kind, item, **kw):
+    def role(s, rid):
+        r = s.get(B + f"/api/files/refs/{kind}/{rid}")
+        return r.json().get("role") if r.ok else None
+    return {"folder": _folder, "item": item, "role": role, "agent_role": lambda h, rid: _fs_agent_role(h, RF_NODE[(kind, rid)]),
+            "move_out": lambda s, ws, rid, f: s.post(B + "/api/files/refs", json={"ref_kind": kind, "ref_id": rid, "parent_id": f}).raise_for_status(),
+            **kw}
+
+
+AREAS["office_receipt"] = _rf_area("office_receipt", _rc_item, org=False)
+AREAS["address_book"] = _rf_area("address_book", _bk_item)
+AREAS["contract_file"] = _rf_area("contract_file", _cf_item, top="view", agent_org=False)
+
+
 def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id=None, tag=""):
     """The cases of one area in one workspace. other = a person of the workspace without a role of their own (None in a
     private space without people: only the agent's cases)."""
@@ -401,7 +479,8 @@ for s_, ag_ in ((A, AG), (Fr, FAG)):
           "office: the agent's switch and the area's agents switch on")
 for area, f in AREAS.items():
     oo, ooid = f.get("org_other", (Bo, BOB))  # 2.200.0 B (#2747): the knowledge area: a guest (members read every page)
-    parity(area, f, f"org:{ORG}", A, oo, ooid, *((AGH, AG) if f.get("org_agent", True) else (None, None)), tag="organisation")
+    if f.get("org", True):  # 2.351.0 F (#2823): a receipt has no organisation case (above)
+        parity(area, f, f"org:{ORG}", A, oo, ooid, *((AGH, AG) if f.get("org_agent", True) else (None, None)), tag="organisation")
     parity(area, f, "private", A, Bo, BOB, tag="private with a person")
     parity(area, f, "private", Fr, None, None, FAGH, FAG, tag="freelancer")  # freelancer-matrix: files (no organisation)
 
