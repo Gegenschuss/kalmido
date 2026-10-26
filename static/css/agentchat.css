@@ -448,7 +448,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */
 .chath.chh2{gap:.5rem;padding:.375rem .5rem .375rem .75rem;min-height:0}
 .chath.chh2 .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
-.chath.chh2 .chn{display:flex;flex-direction:column;justify-content:center;flex:1 1 auto;min-width:0;row-gap:0;column-gap:0}
+.chath.chh2 .chn{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;text-align:left;flex:1 1 auto;min-width:0;row-gap:0;column-gap:0}
 .chath.chh2 .chn::before{content:none}
 .chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:1.25}
 .chath.chh2 .chnm b{flex:0 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
