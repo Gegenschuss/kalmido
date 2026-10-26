@@ -5,6 +5,308 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.318.3] - 2026-10-26
+
+Package 2.210 (Knowledge and documents: display, right-click menu, sharing).
+### Added
+- Right click (computer) or long press (phone) on a folder opens the same menu as its "…" button, in the file store and in Knowledge (sidebar, folder list, phone tree); rows without a menu keep the browser's menu (#2757).
+- Knowledge folders: the "…" at the top of the open folder opens the folder's menu (as in 2.200: New page, New folder, Rename, Move to, Share, Move to the trash with Undo); New page in that menu opens the dialog in the folder instead of creating a page named like the folder (#2757).
+- Documents: the document sheet has "Share…" and "Link for external people…" for the owner, the same dialogs as the file store; shared documents show a "Shared" mark on the card (#2761).
+### Changed
+- Knowledge: page names may be up to 500 characters and 32 folder levels (before 200 / 12) (#2755).
+- Knowledge import (ZIP): too long or too deep names are shortened instead of skipped, links to them follow; the report lists shortened and skipped names separately and names the target space when it is not the one shown; UTF-8 names in ZIPs without the UTF-8 mark (Mac archives) keep their umlauts (#2755).
+### Fixed
+- Knowledge on the phone: a folder that is also a page can be opened with its own arrow without opening the page, so pages below it are reachable again; spaces over 5000 pages say so (#2755).
+
+Package 2.237.0 (Office security: rights, period lock, incoming e-invoices, organisation import).
+### Changed
+- Office rights now also apply beside the office area: making a document a receipt, taking over recognised values and answering receipt suggestions need receipts edit; the DATEV copy when sending an invoice, and the meals / travel reports as CSV or PDF need the special right "export"; letters list clients only with quotes view, start only from letter templates and save as template only with documents edit; bank matching with invoices, invoices from times, the DATEV master data import of debtors and the procedure documentation follow the areas of their data (#2861).
+- Incoming e-invoices (XRechnung / ZUGFeRD) no longer become booked receipts on their own: Office > Bookkeeping lists them under "E-invoices to check" with a one-tap "Take over" (#2865).
+- Scan inbox keys run out after a year (older keys a year after they were made) and are revoked when the password is reset or changed; the settings show the end date (#2865).
+- Organisation import: authors, deciders and approvers are only the importing person, other ticked people keep membership and sharing; the undo is for current admins of the target only and stops before removing anything when office entries were finalised or locked since; imported documents, approvals, day closings and locked months carry an "imported" log entry (#2870).
+### Fixed
+- The month lock and finalisation also hold for a new version of a receipt file (upload of the same name, API), bulk restore, splitting and unsplitting a document stack and the test phase deletion of invoices, which is now for office admins only (#2864).
+
+Package 2.296.0 (Office PDFs: errors and standards, audit #1210).
+### Fixed
+- Office PDFs: the footer is never cut any more - one footer for quotations, invoices, templates, letters and entertainment receipts; long entries (shareholders) move below the columns, IBAN / e-mail never break inside a word, at least 6.5 pt (#3164)
+- Letters and documents from templates print the same footer columns as quotations (register court, managing directors, bank) (#3164)
+- Blocks taller than a page (long introduction, rights, closing text, position details, payment text) split line by line; no more empty first pages or pages holding only a reference line (#3166)
+- Quantity and position columns grow with their widest entry ("12,5 Personentage", English timesheet dates), long category headings and info labels wrap, the sender line keeps street and town for multi-line company names, the signature shows every name line, letters print every address line and warn when the address window is too small (#3170)
+- Delivery notes get their own closing (receipt confirmation, setting "Delivery note closing") instead of the payment request (#3167)
+- Special characters: NFC, invisible characters dropped, Latin letters outside the font transliterated instead of "?"; document title and author stored as UTF-16 in the PDF info (#3171)
+- 16-bit grey logos are scaled instead of turning white; a light brand colour is printed as a darker variant for text, with a hint in the settings (#3172)
+- Reminders: "days" instead of "working days", the fee by default only from level 2, the number label follows the level, the table head of the open invoices repeats on every page (#3174)
+- Entertainment receipts break pages, carry the footer with page count and a signature line; the company-name hint only above 250 EUR (#3176)
+- Template documents and letters from templates: empty variables are left out cleanly (optional parts `[[ … ]]`, no double spaces or stray punctuation), named before finishing or sending, shown in red in the draft PDF; new variables net / gross total and payment term (#3165)
+- A taxed invoice that still carried an old "no VAT" note (switched back to "with VAT") is no longer written as a zero-tax e-invoice (review of #3168)
+### Changed
+- Invoices: tax-exempt positions are their own e-invoice category (E) with the exemption reason from the office settings (required before finalising, printed beside the totals); "not taxable" invoices use category O (#3169, #3173)
+- Invoices name the client's VAT ID and the buyer reference / Leitweg-ID in the head; reverse charge checks the VAT IDs (EU case), separate notes for domestic (§ 13b) and EU (Art. 196); foreign addresses end with the country name in capitals (#3168)
+- Tax rows show their taxable amount ("MwSt. 19 % auf 9.570,00 €"), credit notes are titled "Rechnungskorrektur" / "Invoice correction" and carry the date of the corrected invoice in the XML (BT-26), the GiroCode asks for the open amount, surcharge units are translated (#3175, #3173)
+- Dates and amounts follow the document language (French "1 234,50 €", English "24 October 2026") (#3175)
+- Own letterhead: the upload refuses PDFs that would break PDF/A-3 (fonts not embedded, CMYK colours, LZW) with a clear reason; letterheads uploaded earlier show a hint (#3177)
+- Finalised office PDFs and e-invoice XML are checked against their stored SHA-256 before delivery; a changed file is never sent (GoBD) (#3177)
+- Tests: layout check for all office PDF writers (tests/pdfcheck.py), veraPDF also for logo, 16-bit logo, letterhead, draft mark and special characters, KoSIT for tax-exempt invoices (#3178)
+
+Package 2.250.0 (UX audit: find search, palette and views).
+
+### Added
+- Search and the command palette find the office: clients (name, contact person, customer number) and quotations / invoices (number, client, project) in a group "Office"; a tap opens the client or the document. Office hits follow the office rights exactly (area "Quotes & invoices", workspace, organisation role); agents' API unchanged. (#2992)
+- Command palette: every page of the office bar as a "Go to" target (cash book, bank, accounting, invoices, receipts …; "open items" finds the invoices), "Add agent", "Add client", "Add invoice", and the settings sections (language, tokens, members …) while typing. (#2993)
+- "Enter an absence" in the command palette and the settings search, also found by vacation, sick, day off; it opens the absence sheet directly. (#2996)
+
+### Changed
+- The command palette lists every target once (no more "Office & finance" next to "Office", "Time tracking" next to "Time" …). (#2993)
+- The workload page is now called "Workload & absences". (#2996)
+- Settings search: section titles and field names first, at most one explanation per section, cut at word boundaries, synonyms (logo, members, vacation), and the jump target lights up briefly. (#2994)
+- "+ N more views" under "Plan" in the sidebar unfolds in place with ticks and a "Customize…" link instead of opening the settings. (#2995)
+- Accounts added by an admin start with the full sidebar (Tomorrow, Next 7 days, Now doable), like a self-set-up account; existing accounts are unchanged. (#2995)
+
+### Fixed
+- Settings search: "Logo" no longer finds "Sign out"; title and text no longer run together. (#2994)
+
+Package 2.233.0 (Chat: collect suggestions and chat settings).
+### Added
+- Agent chat: older answer suggestions are no longer lost when newer messages arrive - they wait in "Earlier suggestions" above the message box (source and time, up to 10, for 24 h); tap to send, pen to put the text into the message box, X to dismiss on every device (#2848).
+- Agent chat: "Chat settings" in the chat menu, per agent and person, saved on the server for all devices: suggestions only newest / collect (default) / keep at the message, job results in full or as one line, pin approvals on / off, notices in full or as one line (#2848).
+- Agents: runtime section "Interim summary" in the agent settings (administration and own agent) - session size (small / medium / large), after so many messages, after so many minutes of pause, and the daily summary time (the former nightly restart); defaults are the former fixed values (#3189).
+- Settings > Appearance > Chat: a colour from the accent palette for messages from people and for messages from agents, with a preview; saved to the account, own messages keep the accent colour (#3196).
+- API: chat `choice_state` "collected", the event `chat_choice` carries `collected: true`, `GET/PUT /api/agents/{id}/chat-prefs`; `GET /api/v1/agent` runtime carries `rotate_size`, `rotate_runs`, `rotate_idle_min` plus `rotate_mb` / `rotate_tokens` / `rotate_idle_mb` (#2848, #3189).
+### Changed
+- The logo plate in the app follows the accent colour (or the active workspace colour); sign-in screen, favicon and app icon keep the brand colour (#3195).
+- The event runner `mcp/agent_run.py` follows the runtime's interim summary limits (pause default now 45 instead of 120 minutes); `KALMIDO_SESSION_*` apply only with older servers (#3189).
+
+Package 2.238.0 (Security: folder references, offline knowledge pages, importer limits).
+### Changed
+- Files: office documents and sheets filed in folders keep their area's rules on the file way too: office switched off, kids' accounts, agent switches and token scopes (office, sheets:read) apply to content and text; guests and accounting members get at most what the office gives them; passing a folder share on or extending its end needs edit rights; restoring a folder checks the filed documents; opening a filed office document is logged in the office log (#2863)
+- Knowledge pages: the offline copy and the offline queue belong to one sign-in: a new session elsewhere, a lost session or 14 days without an online sync clear the copy; leaving an organisation clears the queue. The service worker keeps only the app shell (#2872)
+- Import: the per-import task limit now applies while a file is read (Markdown, ClickUp checklists, Notion pages and ZIPs inside a Notion export share one size budget); ZIP entries too large by their header are skipped without unpacking (#2873)
+- Agents: filed office documents need the scope office, the agent's office switch and agents_read; filed sheets need sheets:read (docs/AGENTS.md, agent template; #3225)
+- After the update the offline copy of the knowledge pages is dropped once and loaded anew (#2872)
+
+Package 2.273.0 (Import, move, contacts, documents, backup: nothing gets lost silently - Audit L).
+
+### Changed
+- Account import: the preview, the result and the import record name every area of the export that stays on the old server (tables, knowledge pages, mails, video reviews, bookmarks, history, other settings, trashed tasks …) with counts, derived from the file instead of a fixed list; appearance, working days and code snippets now come over (#3030).
+- Moving a task to another project or indenting it says what it ends (people coming along, assignee, further projects, subtasks left behind); Undo or moving it back within a day brings it all back (#3042).
+- Dry runs of wiki, office and files moves name the shares, trash pages, history and draft links that end; leaving an organisation says that assignments end (#3042, #3051).
+- "Recognise again" on a document asks first when values were set by hand and says which ones it kept (#3047).
+- After "Export as CSV" a note says what a list CSV does not contain (comments, attachments, repeats, reminders, dependencies) (#3051).
+- After a restore a dialog names the queued background jobs that were not restored and that devices with unsent changes may report conflicts (#3051).
+
+### Fixed
+- A project's workspace change, a table move and a files move keep what they end (client, shares, openings, readers' assignments, trash below folders) and restore it on the way back (#3042).
+- Office moves read under their lock: no double client copy, a colleague's draft is no longer overwritten; Undo also takes back positions added in the target. Locked wiki moves refuse a page changed meanwhile (#3042).
+- Documents: due date, amount and currency set by hand survive "Recognise again" and new file versions; archive number "next" no longer fails or drops the other fields when two saves run at once (#3047).
+- Contacts and calendar import: only fields in the file change, a contact or event changed here later is not turned back (counted), events without attendees keep theirs. CardDAV If-Match, bulk contact changes and their undo, and merges no longer overwrite changes made in between (#3048).
+- Backups name files that vanished while the backup was written instead of skipping them silently; a restore that stops midway no longer leaves tables empty; a failed way back names the safety backup to restore (#3050).
+- TickTick import no longer puts tasks into archived or deleted lists of the same name; a Kalmido CSV imported again no longer carries the formula-guard apostrophe; office bank import keeps the full purpose text; deleting an office document clears the references other documents hold to it (#3051).
+- Task uploads use the server's size limit, name the total limit, no longer attach a file twice on a second tap and leave no orphan files when they fail (#3051).
+- Sprint edits and removal, section reordering, one date of a repeating event and the DATEV undo (keeps suppliers changed since) are safe against parallel changes; "checklist to subtasks" keeps the text just typed; the automatic reload waits for any unsaved text (#3051).
+- Moving back restores assignees and "also in" links only where the person may still be assigned and the mover may write; files moved back skip shares of deleted groups; move memos are deleted after two days (#3042).
+- Contacts and calendar import compare "newer wins" against the last import (new nullable columns contacts/events imp_at, imp_rev), honour REV time zones and keep photo links on re-import; contact merges lock per contact; deleting the first quotation keeps its version chain (#3048, #3051).
+- Undoing a document value back to the recognised one no longer pins it as set by hand; the archive number lock is held only for the write (#3047).
+
+Package 2.280.0 (Lean start state and live updates, knowledge start without all texts - Audit Q).
+### Changed
+- A change made by someone else (time entry, knowledge page, settings, a list's sections or the sidebar order) no longer makes every open app reload the whole state; the apps take a small delta, comments and chats follow with a small delta too (#3109).
+- Full reloads only reach the people who see the changed list; reordering the sidebar writes only the lists that really moved (#3109).
+- The automatic reload of the state is braked on the server when one account asks for it again within a few seconds (#3109).
+- The start state leaves out notes longer than 200 characters (about 80 % smaller with long notes); the task panel loads the note when it is opened. Offline an unloaded note shows "Only available online." instead of an empty field, so it is never saved empty (#3108).
+- After a server restart the apps continue with small deltas instead of all loading the whole state at once; list progress is computed over the needed columns only (#3108).
+- The start state and the time report read repositories, notification limits, group shares and list roles of all visible lists in a few queries instead of a few per list; the weekly time report needs about a quarter of the database statements, independent of the number of lists (#3116).
+- Knowledge pages no longer download every page text at app start: a space syncs into the offline copy when it is opened, in pages of 500 texts (#3114).
+- Knowledge search writes nothing in the request: pages with an outdated word index are read in memory and indexed by a background job; renaming a big knowledge folder needs a few statements per 500 pages instead of per page (#3114).
+
+Package 2.299.0 (Receipts assistant: MT940, bank rules, bookings without a receipt, receipt checks, receipts read by an agent).
+### Added
+- Bank: MT940 / MT942 statements are imported like CAMT (Sparkasse, Volksbank, Deutsche Bank, Commerzbank styles; sub-fields ?20-?33, SEPA tags EREF+/SVWZ+, Latin-1 and UTF-8, several statements per file, pending MT942 bookings), also as several files or a ZIP; opening and closing balances go to the cash flow; the household budget reads them too (#3190).
+- Bank rules: bookings of a new statement are marked private, ignored or "No receipt needed" by rule (counterpart, IBAN, purpose word, amount range, direction); the most specific rule wins, a tie marks nothing, locked months stay untouched, every mark shows "by rule" and can be undone; category rules suggest the receipt category. Invoices and receipts are never matched by a rule (#3191).
+- Learned rules: the second time the same counterpart gets the same mark, the bank list asks "Always like this?" - one tap makes the rule and applies it; "No" is remembered (#3191).
+- Office settings > Data: section "Bank rules" (hits, on / off, edit, undo a rule's marks, delete with undo) and the reminder for bookings without a receipt (#3191, #3192).
+- Bank: new view "Without receipt" - payments without a receipt (income without an invoice as second filter), month and account filter; upload, drag or choose the receipt right on the booking; "No receipt needed" for bank fees or tax payments, once or remembered as a rule (#3192).
+- Office start page counts bank bookings without a receipt; an optional weekly or monthly reminder task completes itself once the list is empty (#3192).
+- Receipts: a fixed check of the required invoice details (section 14 UStG, small amounts up to 250 EUR), the arithmetic (net + VAT = gross per rate and in total), the VAT rate and the format of VAT IDs (German check digit) and tax numbers - hints only, never blocking; folded below the recognised values, "Hide hints" is one undo step; all receipts can be filtered "Only with hints" (#3193).
+- Receipts: "Read with an agent" - a connected agent of the person reads the receipt (image / PDF, where the agent runs, also with a local model) and proposes supplier, amounts, VAT, date, positions and category; the values show as "Read by the agent" with Take over / Discard (one undo step), the receipt check runs over them. Kalmido itself calls no model and sends nothing out (#3194).
+- Agents: proposal kind receipt_read in the agent API, MCP, starter (sh / ps1) and docs; documents of the API carry the receipt check hints as `checks` (#3194, #3193, #3202).
+
+Package 2.282.0 (sign-ins behind a shared address).
+### Changed
+- Sign-in behind one shared address (office, NAT): 20 failed logins from one address no longer lock out everyone there. Sign-ins from that address are still checked, only slowed down (about 2.5 s, the same for right and wrong passwords); a name that signed in from this address in the last 30 days and a signed-in person confirming the password are not slowed down. 5 failures of the same name from one address and 100 of one name from all addresses still refuse. At most two slowed-down sign-ins per address wait at once. The same applies to the second factor, passkey sign-in, password change, two-factor settings and restoring a backup (#3111)
+- CalDAV / CardDAV: failed app passwords lock only the account at that address (10 in 15 minutes); 30 failures from one address only raise an admin alert, so an old phone in the office no longer locks out colleagues (#3111)
+- Admin alerts: the address alert says "slowed down" instead of "refused" and that behind a shared address everyone there is affected (#3111)
+
+Package 2.278.0 (org export and move: archive only for its starter, billed time and ids, joining by invitation, key bundle - Audit R).
+### Fixed
+- Organisation export archive: only the admin who started it can download or delete it (it is filtered by their rights); other admins see "The export of X is available" instead of the buttons and may replace it only when X no longer manages the organisation (#3093).
+- Organisation import: people who already have an account on this server are invited (they join only by accepting) instead of being added directly; their role from the export is a suggestion the admin confirms; until they accept, their content stays with the importing admin and no project is shared with them (#3095).
+- Org and account import keep billed time entries billed: on the new invoice when it comes along, otherwise not billable - never open again; billed receipts point to the new invoice (#3094).
+- Org import maps chat threads, document duplicates and receipt invoices to the new ids instead of keeping the old ones (#3094).
+- Rows the import cannot take over are named in the report, once per area with their number (#3094).
+- Account move: your own encryption key bundle comes along; locked notes and your encrypted files open with your passphrase from before on the new server (a locked note is sealed again with its new ids on the next save). If you already have keys on the target, they stay and the import says the old encrypted content stays unreadable (#3091).
+- Browser-encrypted projects are no longer taken over as unreadable ciphertext: the preview and the report name them; preview, manifest and docs now say honestly what stays readable (#3091).
+### Added
+- Import preview: a person of the export without an e-mail address can be matched by the exact user name of an account you can see; organisation imports show a role choice (Member / Admin) per person (#3094, #3095).
+
+Package 2.236.0 (Agent settings: how it works and reports).
+### Added
+- Agent settings "Work style and notifications" (gear on your personal agent in Settings > Agents, in the agent dialog of the administration and in the chat header's mode menu): budget, working hours and quiet hours, tasks at once with the queue, priority rule, report style, when the agent may disturb, where results go, next step as a button. Each field saves itself (#2904-#2911).
+- Budget per day or week (tokens or cost) set by the owner of a personal agent, on top of the admin limits: one notice at the chosen percentage, the agent pauses at the limit until the next period (#2904).
+- Quiet hours for an agent's messages: it keeps working, pushes are held and one summary push comes when the quiet hours end; working hours "office hours only" - the reference starters start no session outside them (#2905).
+- Agent queue: the open tasks assigned to an agent in its order, at most N active at once, the rest waiting with their place; the owner's priority rule goes with every assignment (`GET/PUT /api/v1/agent/queue`, MCP `get_queue` / `set_queue_order`, event `assigned` carries `queue` and `priority_rule`) (#2906, #2907).
+- When the agent may disturb: only at limits (approvals, permission questions, messages with `limit: true`), every result, or never; new agents start with "only at limits", existing agents keep their pushes until changed (#2909).
+- Chat messages of agents take `next_step`: the next step as one button at the end of the answer, never the same one twice, switch in the work style (#2911).
+- Agents read the work style in `GET /api/v1/agent` (`work_style`, with `state` and `budget_state`) and the event `work_style_changed`; rules template, in-app rules and agent docs follow report style, result place and next step (#2908, #2910).
+### Fixed
+- Usage notices of a personal agent also reach its owner when the owner is not an admin (#2904).
+
+Package 2.239.0 (Privacy: export, deletion, logs, heirs on account deletion).
+### Added
+- Account export (Settings > Account) also holds what you wrote outside your own lists: comments and channel messages, tasks you created or are assigned to in other lists, reactions, notifications, sessions and push devices (without secrets) and your profile picture; the "not included" list names what stays out (#2882).
+### Changed
+- Server log: IP addresses are shortened by default and accounts appear as "user #id" instead of names; `KALMIDO_LOG_FULL_IP=1` restores the full address (needed for fail2ban). Database errors are logged without the rejected values. The public docker-compose.yml limits the log to 3 x 10 MB (#2888).
+- `/api/export.json` and `/api/v1/export` leave out webhook addresses, server-side settings and secret columns, like the account export; the API text says what they hold (#2882).
+- people.json in the account export uses a salted hash per export instead of a plain e-mail hash; older files still import (#2882).
+- Deleting an account hands an organisation's projects, calendars, feeds and section templates only to an admin or member; with only guests or accounting people left the deletion is refused before anything changes. Admin alerts name a deleted account by its number (#2866, #2888).
+- An organisation admin's deletion check now sees agents' projects and chats, every personal office table, focus sessions and notes (#2866).
+- A retired organisation without former admins: instance admins get only its retention export, never the full organisation export (#2943).
+### Fixed
+- Retention: the personal retention export no longer includes receipts of organisation projects; a manual organisation delete recomputes the retention period; payments, procedure documentation, confirmed sign-offs, unbooked receipts and e-invoices retire an organisation instead of deleting it (#2874).
+- Retention: a client with a signed data protection sheet is archived instead of deleted, closed logbook months outlive their vehicle, booked receipts keep the name of a deleted project, clean-up runs keep office records' logs and file versions, the orphan sweep waits at least an hour, replies to data protection sheets stay with the sheet and mailed signature links expire (#2874).
+
+Package 2.223.2 (Security: immediate fixes from audit D).
+### Fixed
+- Security (#2859): a retired organisation can no longer be entered through an invitation that was open when it was retired. Retiring removes its open invitations, a membership row left in a retired organisation grants no access, and changes to a retired organisation answer 409. Former admins can still export it.
+- Security (#2860): only an admin can give an office person "Previous access" (Settings > Office > Rights); group managers no longer see the option. Office rights groups end when a person or agent leaves the organisation, so coming back starts without the old groups.
+- Security (#2862): an office agent acts for another person than its owner (`requested_by`) only after that person asked it (chat, mention, assignment, request in the app; last 48 hours), else 403. An organisation's agent without an office group reaches only quotes, services, text blocks and framework contracts; letters, bank and pipeline need a group. Payment suggestions through an agent follow the person's previous access (admins only). The event `letter_draft_requested` is marked `origin: "document"`, `untrusted: true`.
+- Security (#2869): the creator of a closed team channel who left it can no longer reopen it, rejoin it or add people; leaving a channel also drops its read mark.
+- Security (#2871): off-site backup (Settings > Administration > Server > Off-site backup): a new address drops the stored credentials unless new ones come along; changing the target, *Test connection* and *Upload now* ask for the password (and second factor) once more, a login-provider account confirms there; on a hosted instance only public https addresses are allowed (checked on saving and on every connection). The retention ZIP downloads and the export of the own office ask for the password the same way (one-time download ticket). A restore keeps the current off-site settings.
+- Hosted instances: an off-site backup target already saved with a non-public address (http, private network, 100.64/10) is refused from this version on ("blocked"); changing the address drops the stored access data (#2871)
+
+Package 2.223.7 (Agent boundaries: high findings of audit I).
+
+### Changed
+- Agents see only the people of the projects shared with them plus their owner (personal / freelancer agent) or the admins of their organisation (team agent), no longer the whole organisation, and on a server without organisations not everyone: groups, absences, mentions, event attendees and share requests follow; as a participant only the owner, and the full members once a task is its own (#2917, #2941).
+- Participants (people and agents) no longer see a project's notepads, member overview, milestones, status history or project files; the current status stays (#2918).
+- Agent proposals for another project only reach projects shared with the agent; unshared, budget and read-later projects answer 404 before the body is checked, without the project name in the job (#2919).
+- Agent disposition: bookings of projects the agent does not read show as "Booked" without title, job or ids; only people sharing a project with the agent; personal and freelancer agents get 404 on `/dispo` (the owner's private disposition), reading never creates an office row (#2921).
+- Event `offer_accepted` only reaches agents whose office groups allow offers, `list_id` only for a project the agent sees (#2670).
+
+### Fixed
+- Agent leftovers: jobs, plans, deploy checklists (also after an approver's decision), document folder paths and blocker / error counts show only what the agent sees now (#2941).
+
+Package 2.240.0 (Privacy: outside services, notification channels, free / busy).
+### Added
+- Settings > Workspaces > organisation (admins): two privacy switches, both off by default - "The assistant may read the comments of other members" and "Send the content of our projects to personal forwardings"; members get a note in News when the assistant switch is turned on (#2884, #2867)
+- Calendars window > Holidays and absences: new choice "Show my free / busy times" - only my organisations' calendars (default), all my calendars, or nobody (#2868)
+- Settings > Videos: "Load YouTube and Vimeo videos without asking", and a "Do not ask again" box under the video placeholder (#2886)
+- New environment switches `KALMIDO_SMTP_INSECURE`, `KALMIDO_IMAP_KEEP` and `KALMIDO_EMBED_EXTERNAL` (docs/ENV.md) (#2883, #2884)
+### Changed
+- The admin mail server (`KALMIDO_SMTP_*`, `KALMIDO_IMAP_*`) is reached with a checked TLS certificate and host name; a server with an own certificate or an IP address as host needs `KALMIDO_SMTP_INSECURE=1` after the update, otherwise mails (password reset, invitations) are not sent (#2883)
+- Mails taken in from the instance mailbox are deleted there after a complete import (UID EXPUNGE where the server supports it); mails not taken in whole stay, `KALMIDO_IMAP_KEEP=1` keeps the old behaviour (only marked read) (#2883)
+- The built-in assistant reads only the task and the asking person's own comments in an organisation's lists unless the organisation allows more; list members are told when the assistant is enabled for a list (#2884)
+- An embedding service for related tasks on another host is used only with `KALMIDO_EMBED_EXTERNAL=1`; Administration > Server says where titles and descriptions go (#2884)
+- Personal notification channels (Slack, Matrix, Telegram, Signal) get nothing from health, budget, read-later lists or an organisation's trips; from an organisation's projects, and wherever the source is unknown, only a short note with the link arrives; the daily summary there shows only the counts (#2867)
+- Free / busy in the event editor shows a colleague only the calendars, invitations and absences of the organisations you share; answers are limited per person (#2868)
+- Video sign-offs no longer contact YouTube, Vimeo or another host on their own: a plain placeholder with "Load video" comes first; the public customer page always asks and offers an "Open the video" link without JavaScript (#2886)
+- Instance mailbox: a mail server without UIDPLUS removes, after the import, every mail of the folder marked as deleted (EXPUNGE); keep them with KALMIDO_IMAP_KEEP=1 (#2883)
+### Fixed
+- Mail error logs no longer contain addresses (#2883)
+- Channels of disabled accounts stop, a forwarding of a disabled organisation admin shows why it is off (#2867)
+
+Package 2.306 (bundle of 2.241 privacy, 2.242 hardening, 2.243 agent setup and docs).
+
+Package 2.241 in 2.306 (Privacy: legal links, sensitive areas, small items of the privacy audit).
+### Added
+- Privacy statement and imprint: `KALMIDO_PRIVACY_URL` / `KALMIDO_IMPRINT_URL` or Administration > Server; linked under the login form and in Settings > Help (#2887).
+- New `docs/PRIVACY-TEMPLATE.md` for operators: stored data, retention periods, outside connections, cookies (#2887).
+- Consent notes for child accounts (person dialog) and for health / journal data (module list) (#2887).
+- Contact import: tick box "Import contact photos" (on by default) with a note that the server fetches them (#2889).
+- Notes for the ntfy share inbox, e-mail forwarding, read receipts and account deletion (#2889).
+### Changed
+- Journal entries and their mood are stored encrypted with the key of the private space, like private files, when private spaces are encrypted; e-mails filed in the private space as well. Existing entries are sealed on start; `orgcrypt_cli decrypt-private` opens them again (needed before going back to a version before 2.306) (#2885).
+- The journal's privacy line says whether it is stored encrypted on the server (#2885).
+- `orgcrypt_cli decrypt-private` / `decrypt-all` report journal entries and private mails that stay sealed and exit with an error (#2885).
+- An ended session clears the account's data stored in the browser like logging out, unless changes still wait to be sent (#2889).
+- New ntfy topics start with the server's host name; the account list no longer shows other people's topics (#2889).
+- Weekly backups are kept for at most 104 weeks (52 with the retention switch); a stored longer value is cut and the next run deletes older weekly backups (#2946).
+- Deleting a comment removes its excerpt from News; browser error reports leave out the reporting person's name; deleting an account removes its export folder at once (#2889).
+
+Package 2.242 in 2.306 (Hardening: low findings of audit D).
+### Changed
+- Core: queued background mails are sealed with a key derived from the server key (queued rows of older versions still run); sign-in failures and the hourly / daily limits count across all web processes (#2875).
+- Hosted instances: the operator neither takes over a customer's organisation when its last admin leaves nor adds existing accounts without their consent (they get an invitation) (#2875).
+- Changing the sign-on admin domains / group asks for the account password (#2875).
+- Sign-on: changing the provider, client or groups claim, or turning on account creation, also asks for the password while an admin rule is set (#2875).
+- Hosted instances: an organisation always keeps an admin of its own, also when members or roles are edited; adding someone as admin through an invitation keeps the role (#2875).
+- Office: an own Peppol endpoint inside the network needs an instance admin or `KALMIDO_PEPPOL_ALLOW_HOSTS`; redirects keep credentials on the same origin; the Peppol status refresh is a button (#2875).
+- Knowledge: only organisation admins empty an organisation's whole trash; permanent deletions show in the organisation's history (#2875).
+- Own ntfy and Git servers use https unless an admin allowed the host; agent jobs for a person need access to the task (#2875).
+- Stricter sharing checks for travel lists, tables and document folders, e-invoice views, link names and section templates (#2875).
+- Read-later lists and organisation trips can no longer get a public link; existing public links of such lists stop working (#2875).
+### Fixed
+- Office: one receipt is matched to one bank booking even when two arrive at the same time; a DATEV duplicate stays out only when its original is a receipt; a personal office with its own Peppol connection moves into an organisation (#2875).
+- Organisation export with a locked office file version; a document preview is kept when a deletion fails (#2875).
+- The ntfy share inbox can always be switched off; its server address is checked only when it changes or the inbox is switched on (#2875).
+- Office number schemes allow at most four text building blocks (#2875).
+- Folder watcher: only one copy works per settings folder, also next to an older version that is still running (#2875).
+
+Package 2.243 in 2.306 (Agent setup and docs: team agent, scopes, guide).
+### Added
+- One-command agent setup: for a team agent the person who made the setup code answers its permission questions (`KALMIDO_PERM_USER`); the script says so and creates `CLAUDE.md` from the template when the folder has none (#2927).
+- The launcher hands every run the usage hook, so Usage and usage limits work after the one-command setup (`KALMIDO_USAGE_HOOK=0` turns it off) (#2927).
+- The setup places the server's version next to the starter files, so the MCP server reports it; agent names are stored without line breaks (#2927).
+### Changed
+- MCP: nine tools ask for the scope of their route and are hidden from tokens without it; a test compares every tool with the OpenAPI document (#2741).
+- Agent docs: default permissions, legacy `write`, plain 403s without `required_scope`, complete scope tables and the office exception from "only shared" (#2929, #2942).
+- Two permission profiles (hardened, standard) described the same in the guides and in the app; the setup prompt uses event mode without a loop prompt; the Windows steps create their folders and files (#2930, #2933).
+- `mcp/README.md` is a short overview; the MCP server reports the app's version; the link check also covers `mcp/*.md` (#2939, #2942).
+
+Package 2.308.0 (flaky suites fixed).
+### Changed
+- Agents: the tidy-up of a task that is still waiting for its quiet time (new, or changed again since its event) is refused (409, try again later) instead of tidying over the person's work; a change in the event's own second counts as a change (#3274).
+### Fixed
+- Office: one click on "New quotation" could open two dialogs, because the quotation list wired its click handlers twice (#3251).
+- The keyboard focus stays where it was when the sidebar is redrawn, e.g. when the office's folders arrive (#3273).
+- Folding a section is saved even when the app reloads its data in the same moment (#3204).
+- An account or organisation import step right after the previous one no longer fails with "already running", "too many imports" or "interrupted" (#3261, #3253).
+- Tests: 23 flaky suites wait for real states instead of fixed times and are back in every run; their lines in tests/skip.txt are gone (#3249-#3263, #3271-#3276, #3203, #3238).
+
+Bundle 2.305 (the 16 parked packages 2.223.7, 2.223.2, 2.210, 2.278, 2.273, 2.280, 2.299, 2.282, 2.237, 2.296, 2.250, 2.233, 2.238, 2.236, 2.239, 2.240 merged and checked together).
+### Fixed
+- Sign-in: far above the address counter (200 failed sign-ins in 15 minutes) an address is refused again for names it never signed in with, now that the server log shortens addresses by default; a wrong KALMIDO_LOGIN_SLOW_S no longer stops the server
+- Office search: clients in the trash are no longer found
+- Import undo: a closed logbook month that holds an imported vehicle gives a clear "locked" answer instead of a database error
+
+Package 2.312.0 (Privacy and hardening rest of 2.306, UI test hardening).
+
+### Added
+- Agents: for a team agent an admin picks who answers its permission questions in *Settings > Agents > (agent) > Runtime > Permission questions go to*; the runner takes the choice at its next start or right after the change (before `KALMIDO_PERM_USER`, which stays the fallback). Personal agents (also without an organisation): always the owner. New field `perm_user_id` in `GET /api/v1/agent` (#3266)
+- Office: a mailed letter carries a reply address bound to that letter; answers to it are linked to the letter, the personal document address is no longer handed out and the bound address stops with the letter or the document address (#3265)
+- Privacy: the note on health and journal data now also shows on the area switches Home and Review in *Settings > Modules* and in the first-run setup (#3264)
+- Privacy template: people without an account (customer reports in the portal, sign-offs): who is the controller, how access and erasure work (#3264)
+
+### Changed
+- Privacy: the journal of deleted accounts is cleaned up by the log retention run (switch "logs") once no backup can hold the account any more: older than 104 weeks and older than every backup in the backup folder; an unreadable or missing set backup folder deletes nothing (#3264)
+- Integrations: the ntfy share inbox polls several people at the same time, so one slow server no longer delays the others; an existing own ntfy server over http:// shows a hint in *Settings > Notifications* how to secure it (nothing is switched off) (#3265)
+- Sign-in: an address an account signed in from is known to every web process for the rate limits (#3265)
+- Office: saved number schemes with more than four text blocks are reported at start (log + admin message) instead of being ignored silently (#3265)
+- Tests: UI suites wait for their own undo message before they press Undo (`undoToast` in tests/ff.js and tests/boot.js) and for the page state instead of fixed pauses; `boot()` waits for the first drawing (#3283 #3284)
+
+### Fixed
+- A very slow connection no longer throws an error in the first drawing before all start scripts have loaded (`render()` waits for the start-up, checked by tools/check_layout.py) (#3285)
+
+Bundle 2.305-2.319 (2.308 flaky suites, 2.312 with 2.306, the bundle 2.305 and the 2.319 knowledge tree fix merged and checked together).
+### Added
+- Appearance: the labels under the icons of the app bar can be turned off (Settings > Appearance > App bar, on by default, saved with the other appearance settings): then the bar shows only the icons and gets narrower, the name of an area shows as a tooltip and stays readable for screen readers (#3288).
+### Changed
+- Offline: when the session ends (401 at the start state), the offline copy of the knowledge pages goes at once; changes still waiting to be sent stay and go out after the next sign-in of the same account, as everywhere else since 2.306 (#2872, #2889).
+
+Package 2.319.0 A (knowledge tree stays open).
+### Fixed
+- Knowledge pages: a click on a page in the sidebar tree no longer folds the tree up - the space, the folders above and the page's own folder stay open and the page is marked, also while it loads (#3287).
+
 ## [2.318.1] - 2026-10-26
 
 ### Fixed
@@ -8395,7 +8697,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.318.3...HEAD
+[2.318.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.3
 [2.318.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.1
 [2.318.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.0
 [2.317.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.317.0
