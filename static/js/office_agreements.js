@@ -33,7 +33,8 @@ function agrRow(a) {
   const sub = [a.provider, a.number, a.archived ? tr('Archived') : ''].filter(Boolean).map(esc).join(' · ');
   const sum = a.monthly != null ? `<span class="rksum agr-sum"><span>${ofcMoney(a.monthly)} <small class="muted">${tr('per month')}</small></span>${a.per !== 'month' ? `<small class="muted">${ofcMoney(a.cost)} ${esc(agrPer(a.per))}</small>` : ''}</span>` : '';
   const doc = a.doc ? `<a class="iconbtn agr-doc" href="#docs/${a.doc.id}" aria-label="${esc(tr('Open document {0}', a.doc.name))}" title="${esc(a.doc.name)}">${ic('file', 's')}</a>` : '';
-  return `<li class="agr-li${a.archived ? ' agr-arch' : ''}"><button type="button" class="ofcrow" data-agr="open" data-id="${a.id}"><span class="ofcn"><b>${esc(a.name)}</b>${sub ? `<small class="muted">${sub}</small>` : ''}<small class="agr-dl">${agrDeadline(a)}</small></span>${sum}${ic('chev', 's')}</button>${doc}</li>`;
+  const fold = !a.archived && typeof fsr_fileMenu === 'function' ? `<button type="button" class="iconbtn agr-fold" data-agrfold="${a.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(a.name)}">${ic('folder', 's')}</button>` : '';  // 2.351.0 B (#2749)
+  return `<li class="agr-li${a.archived ? ' agr-arch' : ''}"><button type="button" class="ofcrow" data-agr="open" data-id="${a.id}"><span class="ofcn"><b>${esc(a.name)}</b>${sub ? `<small class="muted">${sub}</small>` : ''}<small class="agr-dl">${agrDeadline(a)}</small></span>${sum}${ic('chev', 's')}</button>${doc}${fold}</li>`;
 }
 function agrHtml() {
   if (AGR.oid !== OFC.info?.org_id) Object.assign(AGR, {oid: OFC.info?.org_id, data: null, err: null, opened: null});  // another office area
@@ -192,4 +193,9 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const t = e.target.closest?.('[data-agr="arch"]'); if (!t) return;
   AGR.arch = t.checked; AGR.data = null; ofcDraw();
+});
+// 2.351.0 B (#2749): a contract into a folder of the office's file tree (office_cfiles.js fsr_fileMenu)
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-agrfold]'); if (!b) return;
+  const a = (AGR.data?.items || []).find(x => x.id === +b.dataset.agrfold); if (a) fsr_fileMenu(b, 'office_agreement', a.id, a.name);
 });

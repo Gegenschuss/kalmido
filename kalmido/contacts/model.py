@@ -80,10 +80,16 @@ def obk_org_role(c, uid, oid, org_role):
     return org_role if r and collab_all() and org_role in BOOK_ROLES else None
 
 
-def book_role(c, uid, b, trash=False):
-    """2.143.0 A (#2151): read-only in the book's organisation -> view. 2.272.0 E1 (#3038): a book in the trash only with trash."""
-    role = _book_role(c, uid, b, trash)
-    return _bk_ro(c, uid, b["org_id"] if role and "org_id" in b.keys() else None, role)
+def book_role(c, uid, b, trash=False, fold=True):
+    """2.143.0 A (#2151): read-only in the book's organisation -> view. 2.272.0 E1 (#3038): a book in the trash only with trash.
+    2.351.0 B (#2749): fold = also the role its folder gives (contacts/ctfolder.py; never 'owner'), the higher one counts."""
+    role = _bk_ro(c, uid, b["org_id"] if b is not None and "org_id" in b.keys() else None, _book_role(c, uid, b, trash))
+    if fold and b is not None and BOOK_RANK.get(role, 0) < BOOK_RANK["edit"] and not ("deleted_at" in b.keys() and b["deleted_at"]):
+        from .ctfolder import CTF_BOOK, ctf_node_role  # a later module (ORDER)
+        fr = ctf_node_role(c, uid, CTF_BOOK, b["id"])
+        if BOOK_RANK.get(fr, 0) > BOOK_RANK.get(role, 0):
+            role = fr
+    return role
 
 
 def _bk_ro(c, uid, oid, role):
@@ -130,7 +136,7 @@ def need_book(c, bid, write=False, manage=False, uid=None, trash=False):
     return b, role
 
 
-def my_book_ids(c, uid):
+def my_book_ids(c, uid, fold=True):
     out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,))
            if acx_org_ok(c, uid, r[1])}
     from ..accounts.orgs import user_orgs
@@ -154,6 +160,11 @@ def my_book_ids(c, uid):
     if out and "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151)
         orgs = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({','.join(str(int(k)) for k in out)})")}
         out = {k: _bk_ro(c, uid, orgs.get(k), v) for k, v in out.items()}
+    if fold:  # 2.351.0 B (#2749): + the books a folder opens to uid (the higher role counts)
+        from .ctfolder import CTF_BOOK, ctf_reached
+        for k, v in ctf_reached(c, uid, CTF_BOOK).items():
+            if BOOK_RANK.get(v, 0) > BOOK_RANK.get(out.get(k), 0):
+                out[k] = v
     return out
 
 
@@ -267,16 +278,33 @@ def contact_visible(c, cid, uid, trash=False):
     if not r or not contacts_on(c, uid) or (r["deleted_at"] and not trash):
         return None
     b = c.execute("SELECT * FROM books WHERE id=?", (r["book_id"],)).fetchone()
-    return r if book_role(c, uid, b) else None
+    return r if book_role(c, uid, b) or _ct_fold(c, uid, r) else None
 
 
-def need_contact(c, cid, write=False, uid=None, trash=False):
+def _ct_fold(c, uid, r):
+    """2.351.0 B (#2749): the role the folder of contact row r gives uid (a contact filed on its own; not in the trash)."""
+    if r["deleted_at"]:
+        return None
+    from .ctfolder import CTF_CONTACT, ctf_node_role
+    return ctf_node_role(c, uid, CTF_CONTACT, r["id"])
+
+
+def need_contact(c, cid, write=False, uid=None, trash=False, own=False):
+    """2.351.0 B (#2749): the role is the higher one of the address book's and the contact's own folder; own = only the
+    address book's role (its own or its folder's) counts (deleting the contact, moving it into another book: never through
+    the contact's own folder alone)."""
     uid = uid or me()
     r = contact_visible(c, cid, uid, trash)
     if not r:
         raise Denied(404)
     b = c.execute("SELECT * FROM books WHERE id=?", (r["book_id"],)).fetchone()
     role = book_role(c, uid, b)
+    if not own and BOOK_RANK.get(role, 0) < BOOK_RANK["edit"]:
+        fr = _ct_fold(c, uid, r)
+        if BOOK_RANK.get(fr, 0) > BOOK_RANK.get(role, 0):
+            role = fr
+    if own and not role:
+        raise Denied(403, tr("You can only read this address book"))
     if write and role not in ("owner", "edit"):
         raise Denied(403, tr("You can only read this address book"))
     return r, role
@@ -871,6 +899,9 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
         c.execute("UPDATE contacts SET search=? WHERE id=?",
                   (search_text({**dict(r), **{k: _jl(r[k]) for k in ("emails", "phones", "addresses", "groups")}}), cid))
+        if "fn" in f or "org" in f:  # 2.351.0 B (#2749): the name on its folder node
+            from .ctfolder import CTF_CONTACT, ctf_renamed
+            ctf_renamed(c, CTF_CONTACT, cid, r["fn"] or r["org"])
     if bulk is not None:
         if bulk.get("occ"):
             occ_sync(c, cid)
@@ -923,15 +954,27 @@ def contact_brief(r):
             "photo": bool(r["photo"]), "bday": r["bday"], "groups": _jl(r["groups"])}
 
 
-def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, trash=False):
+def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, trash=False, folder=None):
+    """2.351.0 B (#2749): + the contacts filed on their own in a folder that gives uid a role (not in the trash view, not
+    with a book filter); folder = (book ids, contact ids) filed in one folder (ctfolder.ctf_folder_ids): only those."""
     ids = my_book_ids(c, uid)
     if book is not None:
         ids = {k: v for k, v in ids.items() if k == book}
-    if not ids:
+    one = []
+    if book is None and not trash:
+        from .ctfolder import CTF_CONTACT, ctf_reached
+        one = [int(k) for k in ctf_reached(c, uid, CTF_CONTACT)]
+    if folder is not None:
+        ids = {k: v for k, v in ids.items() if k in set(folder[0])}
+        mine = set(folder[1])
+        one = [k for k in one if k in mine] + [k for k in mine if contact_visible(c, k, uid)]
+    if not ids and not one:
         return [], 0
-    qs = ",".join("?" * len(ids))
     # 2.272.0 E1 (#3038): trash = the contacts in the trash (newest first), else the live ones
-    where, args = f"book_id IN ({qs}) AND kind!='group' AND deleted_at IS {'NOT ' if trash else ''}NULL", list(ids)
+    inb = f"book_id IN ({','.join('?' * len(ids))})" if ids else "FALSE"
+    if one:
+        inb = f"({inb} OR id IN ({','.join(str(int(x)) for x in sorted(set(one)))}))"
+    where, args = f"{inb} AND kind!='group' AND deleted_at IS {'NOT ' if trash else ''}NULL", list(ids)
     for w in [x for x in re.split(r"\s+", (q or "").lower().strip()) if x][:6]:
         where += " AND search ILIKE ? ESCAPE '\\'"
         args.append("%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")

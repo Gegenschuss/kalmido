@@ -1220,7 +1220,7 @@ function parseHash() {
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
   if (a === 'job' && +b) return {mod: 'agents', key: 'agents', job: +b};  // 2.36.2 (#1141): one job, unfolded with its history
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
-  if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
+  if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null, ...((b === 'f' || b === 'b') && +h.split('/')[2] ? {[b === 'f' ? 'ctf' : 'ctb']: +h.split('/')[2]} : {})};  // 2.21.0 (#658); 2.351.0 B (#2749): contacts/f/<folder>, contacts/b/<book>
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
   if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub'};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js)
   if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"

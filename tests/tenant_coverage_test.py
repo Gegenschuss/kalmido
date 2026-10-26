@@ -113,6 +113,8 @@ KINDS = {
     # workspace, a stranger and a stranger's agent 404, an agent of another organisation never, leaving / moving ends the share
     # 2.199.0 C (#2742): the tables' folders (sheets/shfolder.py): another organisation's folders are not listed, adding into
     # them 404, a table never filed across workspaces
+    "contacts_folder": ("matrix", "p2351_b_contacts_tree_test.py: the address book's folders of another organisation: 404 (add), "
+                                  "a book / contact never filed across the organisations, its contact 404 (2.351.0 B, #2749)"),
     "sheet_folder": ("matrix", "p2199_c_sheets_test.py: a folder of another organisation: 404 (add), not in the tree; a table "
                                "is never filed into another workspace's folder (404 / 409)"),
     "sheet_share": ("matrix", "p2124_c_api_test.py: shares of a table of another organisation / person: 404 for the stranger "
@@ -967,6 +969,7 @@ ROUTES = {
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
     "GET /api/sheets/folders": "sheet_folder", "POST /api/sheets/folders": "sheet_folder",  # 2.199.0 C (#2742)
+    "GET /api/contacts/folders": "contacts_folder", "POST /api/contacts/folders": "contacts_folder",  # 2.351.0 B (#2749)
     # 2.125.0 B (#2119): monthly timesheets (p2125_b_api_test.py)
     "GET /api/time/sheets": "timesheet", "POST /api/time/sheets": "own", "POST /api/time/sheets/decide": "timesheet",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)

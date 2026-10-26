@@ -250,6 +250,7 @@ ORDER = (
     "contacts.orgbooks",  # 2.52.0 C (#1438): address books an organisation owns
     "contacts.ctxlist",  # 2.119.1 A (#2080 #2084 #2085): CSV import / export, duplicate hint, managing the groups
     "contacts.history",  # 2.119.1 B (#2083): the history on a contact's card
+    "contacts.ctfolder",  # 2.351.0 B (#2749): address books and contacts in folders (reference kinds, the folder tree)
     "life.model",
     "life.bookmarks",  # 2.97.0 A (#1950): bookmarks with a preview, tags and search (Karakeep fills the same store)
     "life.karakeep",
@@ -346,6 +347,7 @@ ORDER = (
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
     "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)
     "office.contractfiles",  # 2.117.0 B (#2285): PDF files of a framework contract (upload, view, replace, trash)
+    "office.agrref",  # 2.351.0 B (#2749): framework contract PDFs and contracts & insurance in folders (reference kinds)
     "office.assets",  # 2.92.0 B (#1931): equipment value: purchase, depreciation, current value, insurance list
     "office.bpread",  # 2.120.0 E (#2091): the PDF reader of the own letterhead (no routes, no kalmido imports)
     "office.letterhead",  # 2.120.0 E (#2091): the own letterhead behind the office documents (upload, margins, preview)

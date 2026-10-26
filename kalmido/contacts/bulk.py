@@ -353,6 +353,8 @@ def op_contacts_bulk(c, uid, b):
     if action == "purge":
         bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
         for blk in bk_blocks(ids, 500):
+            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='contact' AND ref_id IN ({bk_in(blk)}) AND ref_id IN "
+                      f"(SELECT id FROM contacts WHERE deleted_at IS NOT NULL)", blk)  # 2.351.0 B (#2749): their folder nodes
             c.execute(f"DELETE FROM contacts WHERE id IN ({bk_in(blk)}) AND deleted_at IS NOT NULL", blk)
         bump(c)
         c.commit()

@@ -21,7 +21,7 @@ function dmaListHtml(items, cid) {
   const adm = ofcAdmin();
   const rows = items.map(f => `<li class="dma-f" data-fid="${f.id}"><button type="button" class="dma-open" data-dma="view" data-fid="${f.id}" title="${esc(tr('Open'))}">${ic('file', 's')}<span class="dma-n">${esc(f.name)}</span><small class="muted">${esc(fmtSize(f.size))}</small></button>
       <span class="dma-d">${dateIn('dma-date-' + f.id, f.date, {label: tr('Date'), clear: false, ro: !adm, attrs: `data-dma="date" data-fid="${f.id}"`})}</span>
-      ${adm ? `<span class="dma-acts"><button type="button" class="iconbtn" data-dma="replace" data-fid="${f.id}" title="${esc(tr('Replace'))}" aria-label="${esc(tr('Replace'))}: ${esc(f.name)}">${ic('upload', 's')}</button><button type="button" class="iconbtn" data-dma="rm" data-fid="${f.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('trash', 's')}</button></span>` : ''}</li>`).join('');
+      ${adm ? `<span class="dma-acts"><button type="button" class="iconbtn" data-dma="file" data-fid="${f.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(f.name)}">${ic('folder', 's')}</button><button type="button" class="iconbtn" data-dma="replace" data-fid="${f.id}" title="${esc(tr('Replace'))}" aria-label="${esc(tr('Replace'))}: ${esc(f.name)}">${ic('upload', 's')}</button><button type="button" class="iconbtn" data-dma="rm" data-fid="${f.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('trash', 's')}</button></span>` : ''}</li>`).join('');
   const pend = cid ? '' : DMA.pending.map((f, i) => `<li class="dma-f"><span class="dma-open">${ic('file', 's')}<span class="dma-n">${esc(f.name)}</span><small class="muted">${esc(tr('is attached when you save'))}</small></span><span class="dma-acts"><button type="button" class="iconbtn" data-dma="unpick" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('x', 's')}</button></span></li>`).join('');
   const list = rows || pend ? `<ul class="dma-list" role="list">${rows}${pend}</ul>` : `<p class="muted dma-none">${tr('No PDF attached yet')}</p>`;
   return list + (adm ? `<button type="button" class="btn sm dma-up" data-dma="up">${ic('upload', 's')}<span>${tr('Upload PDF')}</span></button>` : '');
@@ -96,3 +96,27 @@ document.addEventListener('change', async e => {
     toast(tr('Saved'), async () => { await api('PATCH', dmaUrl(cid, fid), {date: old}); dmaLoad(md); });
   } catch (x) { dmaErr(md, x.message); }
 });
+// 2.351.0 B (#2749): a framework contract's PDF / a contract & insurance into a folder of the office's file tree (a
+// reference node: it shows in the file store and is shared there, the file stays where it is). kind = 'contract_file' |
+// 'office_agreement'; the office's file tree: a personal office = the person's private tree, else the organisation's
+const fsr_space = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);
+async function fsr_fileMenu(anchor, kind, id, name) {
+  let cur = null, fs = [];
+  try { [cur, fs] = await Promise.all([api('GET', `/api/files/refs/${kind}/${id}`).then(j => j.node), api('GET', '/api/files/folders').then(j => j.folders || [])]); } catch { return; }
+  const org = fsr_space();
+  fs = fs.filter(f => (f.org_id || null) === org && (org || f.owner_id === S.me?.id) && f.id !== cur?.parent_id);
+  const was = cur?.parent_id ?? null, put = v => api('POST', '/api/files/refs', {ref_kind: kind, ref_id: id, parent_id: v});
+  const move = async v => { try { await put(v); } catch { return; }
+    offerUndo(tr('“{0}” moved', name), histAdd({label: tr('Move “{0}”', name), undo: async () => { await put(was); return {skipped: []}; }, redo: async () => { await put(v); return {skipped: []}; }})); };
+  const items = [cur ? {label: tr('Open folder'), icon: 'folder', fn: () => go('ablage/' + cur.parent_id)} : null,
+    cur ? {label: tr('Share…'), icon: 'users', fn: () => fs_shareDialog(cur.id, {office: true, onChange: () => {}})} : null,
+    cur ? {label: tr('No folder'), icon: 'up', fn: () => move(null)} : null, cur && fs.length ? '-' : null,
+    ...fs.map(f => ({label: f.path, icon: 'folder', fn: () => move(f.id)}))].filter(Boolean);
+  if (!items.length) { toast(tr('No folder yet: create one in the files first')); return; }
+  menu(anchor, items, null, null, tr('Move to folder…'));
+}
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-dma="file"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const f = (DMA.items || []).find(x => x.id === +b.dataset.fid); if (f) fsr_fileMenu(b, 'contract_file', f.id, f.name);
+}, true);

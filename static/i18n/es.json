@@ -14310,5 +14310,11 @@
   "The import goes on in the background.": "La importación continúa en segundo plano.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "El progreso aparece en Conocimiento en la barra y arriba en las páginas de conocimiento.",
   "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Fechas, #etiquetas y !prioridad como en la entrada rápida. Marcarla en la página también marca la tarea.",
-  "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Para dinero fuera de Kalmido en {0}. Cuenta en el saldo del mes y en el saldo de la cuenta; los ingresos y gastos no cambian."
+  "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Para dinero fuera de Kalmido en {0}. Cuenta en el saldo del mes y en el saldo de la cuenta; los ingresos y gastos no cambian.",
+  "Shared contacts": "Contactos compartidos",
+  "All contacts": "Todos los contactos",
+  "A shared address book works like sharing it in the address book: its contacts can be read or changed as the role says. Agents only see what is shared with exactly them.": "Una libreta compartida funciona como compartirla en la libreta de direcciones: sus contactos se pueden leer o cambiar según el rol. Los agentes solo ven lo que se comparte exactamente con ellos.",
+  "Person or agent": "Persona o agente",
+  "Open folder": "Abrir carpeta",
+  "No folder yet: create one in the files first": "Aún no hay carpetas: crea primero una en los archivos"
 }

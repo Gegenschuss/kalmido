@@ -7,7 +7,7 @@ folders of the file store (fs_nodes / fs_shares), a folder share works like a fi
  4. the same in a private space -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
 An area is one entry of AREAS (functions, below); 2.199 B (office) / C (sheets) fill their sections, 2.200 (knowledge),
 2.201 (lists / projects), 2.202 (address books, contracts) add theirs. Invented names only.
-freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki
+freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki  freelancer-matrix: pim
 usage: folder_parity_test.py <datadir>"""
 import base64
 import os
@@ -26,7 +26,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FEAT = "cal,comments,collab,files,docs,office,clients,sheets,wiki"  # 2.200.0 B (#2747): + wiki
+FEAT = "cal,comments,collab,files,docs,office,clients,sheets,wiki,contacts"  # 2.200.0 B (#2747): + wiki; 2.351.0 B (#2749): + contacts
 
 if not os.environ.get("FOLDERPAR_NOSTART"):
     env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
@@ -48,7 +48,7 @@ A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 
 
 def agent(s, name, org=None):
-    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read", "office", "sheets:read", "wiki:read"], **({"org_id": org} if org else {})})
+    r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": ["read", "files:read", "office", "sheets:read", "wiki:read", "contacts"], **({"org_id": org} if org else {})})
     assert r.ok, r.text
     return r.json()["id"], {**H, "Authorization": "Bearer " + r.json()["token"]}
 
@@ -241,6 +241,80 @@ AREAS["wiki"] = {"folder": _wk_folder, "item": _wk_item, "role": _wk_role, "agen
                  "org_other": (Gi, GINA)}
 
 
+# --- area: address book (2.351.0 B, #2749) ---
+# folder = a folder of the address book (POST /api/contacts/folders: below the workspace's root "Address book"), item = a
+# contact of a book of the workspace filed on its own (POST /api/files/refs, ref_kind contact), role = GET /api/contacts/<id>
+# "role" (owner = edit), agent_role = the same over /api/v1/contacts (scope contacts), move_out = the node into another folder.
+CT_BOOK, CT_N = {}, [0]
+
+
+def _ct_folder(s, ws, name, parent=None):
+    r = s.post(B + "/api/contacts/folders", json={"name": name, "space": ws, **({"parent_id": parent} if parent else {})})
+    assert r.status_code == 201, r.text
+    return r.json()["folder"]["id"]
+
+
+def _ct_item(s, ws, folder):
+    k = (id(s), ws)
+    if k not in CT_BOOK:
+        r = s.post(B + "/api/books", json={"name": f"Book {ws}", "org_id": int(ws[4:]) if ws.startswith("org:") else None})
+        assert r.ok, r.text
+        CT_BOOK[k] = r.json()["id"]
+    CT_N[0] += 1
+    r = s.post(B + "/api/contacts", json={"book_id": CT_BOOK[k], "fn": f"Person {CT_N[0]} Example"})
+    assert r.ok, r.text
+    cid = r.json()["id"]
+    r = s.post(B + "/api/files/refs", json={"ref_kind": "contact", "ref_id": cid, "parent_id": folder})
+    assert r.ok, r.text
+    return cid
+
+
+def _ct_role(s, cid):
+    r = s.get(B + f"/api/contacts/{cid}")
+    x = r.json().get("role") if r.ok else None
+    return "edit" if x == "owner" else x
+
+
+def _ct_agent_role(h, cid):
+    r = requests.get(B + f"/api/v1/contacts/{cid}", headers=h)
+    x = r.json().get("role") if r.ok else None
+    return "edit" if x == "owner" else x
+
+
+AREAS["contacts"] = {"folder": _ct_folder, "item": _ct_item, "role": _ct_role, "agent_role": _ct_agent_role,
+                     "move_out": lambda s, ws, item, f: s.post(B + "/api/files/refs", json={"ref_kind": "contact", "ref_id": item,
+                                                                                           "parent_id": f}).raise_for_status()}
+# --- area: contracts & insurance (2.351.0 B, #2749) ---
+# folder = a folder of the file store, item = a contract of the office of ws (an organisation's / a personal office =
+# private) filed by a reference node (ref_kind office_agreement), role = GET /api/files/refs/office_agreement/<id> "role".
+# A folder gives READING only (top: an edit share is view -- the office keeps every change, office/agrref.py cap); an
+# organisation's agent also needs an office group for the area (agent_org False: its cases run with the freelancer's agent).
+AG_NODE, AG_N = {}, [0]
+
+
+def _ag_item(s, ws, folder):
+    s.patch(B + "/api/settings", json={"workspace": ws, "features": FEAT})
+    AG_N[0] += 1
+    r = s.post(B + "/api/office/agreements", json={"kind": "insurance", "name": f"Insurance {AG_N[0]}", "task": 0})
+    assert r.status_code == 201, r.text
+    aid = r.json()["id"]
+    r = s.post(B + "/api/files/refs", json={"ref_kind": "office_agreement", "ref_id": aid, "parent_id": folder})
+    assert r.ok, r.text
+    AG_NODE[aid] = r.json()["node"]["id"]
+    return aid
+
+
+def _ag_role(s, aid):
+    r = s.get(B + f"/api/files/refs/office_agreement/{aid}")
+    return r.json().get("role") if r.ok else None
+
+
+AREAS["agreements"] = {"folder": _folder, "item": _ag_item, "role": _ag_role, "agent_role": lambda h, aid: _fs_agent_role(h, AG_NODE[aid]),
+                       "move_out": lambda s, ws, item, f: s.post(B + "/api/files/refs", json={"ref_kind": "office_agreement", "ref_id": item,
+                                                                                             "parent_id": f}).raise_for_status(),
+                       "top": "view", "agent_org": False}
+
+
 def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id=None, tag=""):
     """The cases of one area in one workspace. other = a person of the workspace without a role of their own (None in a
     private space without people: only the agent's cases)."""
@@ -258,11 +332,12 @@ def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id
         check(f["role"](other, i1) == "view" and f["role"](other, i2) == "view", f"{pre}: view on the content and in the subfolder")
         i3 = f["item"](owner, ws, sub)
         check(f["role"](other, i3) == "view", f"{pre}: view on what is added later")
-        check(owner.patch(B + f"/api/files/shares/{sid}", json={"role": "edit"}).ok and f["role"](other, i2) == "edit", f"{pre}: share edit = edit")
+        top = f.get("top", "edit")  # 2.351.0 B (#2749): an area whose folders give reading only (contracts & insurance)
+        check(owner.patch(B + f"/api/files/shares/{sid}", json={"role": "edit"}).ok and f["role"](other, i2) == top, f"{pre}: share edit = {top}")
         f["move_out"](owner, ws, i1, away)
-        check(f["role"](other, i1) is None and f["role"](other, i2) == "edit", f"{pre}: moved out = no role, the rest stays")
+        check(f["role"](other, i1) is None and f["role"](other, i2) == top, f"{pre}: moved out = no role, the rest stays")
         check(owner.delete(B + f"/api/files/shares/{sid}").ok and f["role"](other, i2) is None and f["role"](other, i3) is None, f"{pre}: withdrawn = no role")
-    if agent_h:
+    if agent_h and (f.get("agent_org", True) or not ws.startswith("org:")):
         if ws.startswith("org:"):
             owner.patch(B + f"/api/files/nodes/{root}", json={"org_access": "view"})
         check(f["agent_role"](agent_h, i2) is None, f"{pre}: the agent without a share: nothing (also with organisation access)")
