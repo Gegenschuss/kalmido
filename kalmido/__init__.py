@@ -144,6 +144,9 @@ ORDER = (
     "agents.schedules",  # 2.34.0 (#272)
     "agents.workstyle",  # 2.236.0 (#2904-#2911)
     "agents.workqueue",  # 2.236.0 C (#2906 #2907)
+    "agents.control",  # 2.235.0 A (#2891 #2900 #2901)
+    "agents.datalock",  # 2.235.0 B (#2902)
+    "agents.agentrules",  # 2.235.0 C (#2903)
     "agents.admin",
     "agents.api",
     "agents.proposals",

@@ -36,7 +36,9 @@ function aw_queueHtml(q) {
 }
 function aw_html(ws, st) {
   const off = ws.budget_period === '', office = ws.work_mode === 'office', quiet = ws.quiet_mode === 'on';
-  return `<h4 id="aw-h-budget">${tr('Budget')}</h4>
+  // 2.235.0 (#2891 #2902 #2903): the sections Control / Data the agent never sees / Standing rules (agentcontrol.js, agentlock.js, agentrules.js)
+  return `<div id="aw-control"></div><div id="aw-lock"></div><div id="aw-rules"></div>
+    <h4 id="aw-h-budget">${tr('Budget')}</h4>
     <div class="row"><label for="aw-budget_period">${tr('Period')}</label>${aw_sel('budget_period', ws.budget_period)}</div>
     <div class="awsub" id="aw-budget" ${off ? 'hidden' : ''}>
       <div class="row"><label for="aw-budget_metric">${tr('Measured in')}</label>${aw_sel('budget_metric', ws.budget_metric)}</div>
@@ -95,6 +97,7 @@ async function awOpen(agent) {
   const $b = s => $(s, md), show = m => { const e = $b('#aw-err'); e.textContent = m || ''; e.hidden = !m; };
   const stateDraw = b => { const e = $b('#aw-bstate'); if (e) e.innerHTML = aw_budgetLine(b); };
   stateDraw(j.budget_state);
+  awc_mount(md, agent); awl_mount(md, agent); awr_mount(md, agent);  // 2.235.0 A-C: each draws into its container
   aw_queue(base).then(q => { const e = $b('#aw-queue'); if (e) e.innerHTML = aw_queueHtml(q); });  // 404 / error: no list
   const reveal = () => {
     $b('#aw-budget').hidden = ws.budget_period === ''; $b('#aw-office').hidden = ws.work_mode !== 'office'; $b('#aw-quiet').hidden = ws.quiet_mode !== 'on';

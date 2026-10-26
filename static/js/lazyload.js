@@ -25,7 +25,7 @@ const LD_MODS = {
     'office_letters', 'office_letterlinks', 'office_lettermail',  // 2.153.0 (#2028-#2030)
     'office_rights'],  // 2.187.0 A (#2476): the page "Rights" of the office's settings
   // 2.65.0 (#1823): more areas load on first use (the start loads about a third less)
-  agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork'],  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
+  agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'],  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
   wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
