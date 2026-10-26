@@ -306,6 +306,7 @@ check(A.post(B + f"{D}/{INV3}/payments", json={"amount": 1}).status_code == 409,
 check(A.get(B + D + "?kind=credit").json()["docs"][0]["kind"] == "credit", "list of credit notes")
 
 # ---------------------------------------------------------------- reminders
+dbxm.overdue(DATA, [IID])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [INV2], "level": 1})
 check(r.status_code == 400, "a paid invoice cannot be reminded of (400)")
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID], "level": 9})

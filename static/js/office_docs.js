@@ -251,9 +251,9 @@ function ofdRefsHtml(d, t) {
 function ofdFeeHtml(d, adm) {
   if (d.kind === 'invoice') return (d.fee_reminders || []).length ? `<p class="ofdfeeinfo muted">${esc(tr('Reminder fee still open: {0}', d.fee_reminders.map(f => `${f.number} (${ofdMoney(f.fee, d)})`).join(', ')))}</p>` : '';
   if (d.kind !== 'reminder' || !d.locked || !(+d.fee > 0)) return '';
-  const st = d.fee_state || '', txt = {'': N_('open'), waived: N_('waived'), paid: N_('paid|fee')}[st] || st;
+  const st = d.fee_state || '', txt = {'': N_('open'), waived: N_('waived'), paid: N_('paid|fee'), cancelled: N_('cancelled with the invoice')}[st] || st;  // 2.355.0 D (#2846): + cancelled (final)
   const btn = (v, label) => `<button type="button" class="btn sm" data-ofd="fee" data-st="${v}">${esc(tr(label))}</button>`;
-  return `<div class="ofdfeeinfo"><span>${esc(tr('Reminder fee {0}: {1}', ofdMoney(d.fee, d), tr(txt)))}</span>${adm ? (st ? btn('', N_('Open again')) : btn('waived', N_('Waive fee')) + btn('paid', N_('Fee paid'))) : ''}</div>`;
+  return `<div class="ofdfeeinfo"><span>${esc(tr('Reminder fee {0}: {1}', ofdMoney(d.fee, d), tr(txt)))}</span>${adm && st !== 'cancelled' ? (st ? btn('', N_('Open again')) : btn('waived', N_('Waive fee')) + btn('paid', N_('Fee paid'))) : ''}</div>`;
 }
 function ofdPaymentsHtml(d, adm) {
   const ps = d.payments || [];
@@ -336,7 +336,10 @@ function ofdAutoHtml(d, t) {
 function ofdTotalsHtml(d, t, adm) {
   const L = t.labels || {};
   if (ofdIsInv(d)) {  // 2.38.0: invoice sums are exact strings; subtotal, tax per rate, total, paid / open
-    const rows = d.kind === 'reminder' ? [[tr('Amount outstanding'), ofdMoney(t.net || 0, d), 'net'], ...(+t.fee ? [[tr('Reminder fee'), ofdMoney(t.fee, d), 'tax']] : []), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']]
+    // 2.355.0 D (#2846): + default interest per invoice and the flat fee (the same rows as the PDF)
+    const rmx = d.kind === 'reminder' ? [...(t.lines || []).filter(l => l.kind === 'ref' && +l.interest > 0).map(l => [tr('Default interest {0}: {1} % p.a., {2} days|document', l.number || '', fmtNum(+t.interest_rate || 0, 2), l.interest_days || 0), l.interest_text || ofdMoney(l.interest, d), 'tax']),
+      ...(+t.flat_fee > 0 ? [[tr('Flat fee for late payment (section 288 (5) BGB)|document'), t.flat_fee_text || ofdMoney(t.flat_fee, d), 'tax']] : [])] : [];
+    const rows = d.kind === 'reminder' ? [[tr('Amount outstanding'), ofdMoney(t.net || 0, d), 'net'], ...rmx, ...(+t.fee ? [[tr('Reminder fee'), ofdMoney(t.fee, d), 'tax']] : []), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']]
       : [[tr('Subtotal'), ofdMoney(t.net || 0, d), 'net'], ...(t.tax_lines || []).map(x => [x.label, x.amount_text || ofdMoney(x.amount, d), 'tax']), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']];
     if (d.kind === 'invoice' && d.locked && (+d.paid || +d.credits)) rows.push([tr('Amount outstanding'), ofdMoney(d.open || 0, d), 'open']);
     return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
@@ -381,7 +384,7 @@ async function kvaToInvoice(d, row) {
 const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
   finalize: N_('finalised'), unlock: N_('finalising undone'), duplicate: N_('created as a copy'), cashflow: N_('cash flow choice changed'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
   export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded'),
-  payment: N_('payment recorded'), payment_delete: N_('payment reversed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again'), recovery_key: N_('recovery key shown'),
+  payment: N_('payment recorded'), payment_delete: N_('payment reversed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again / cancelled'), recovery_key: N_('recovery key shown'),
   agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)'), from_sheet: N_('created from a table'), restore: N_('restored|office log')};  // 2.113.2 (#2253): + restore  // 2.89.0 (#1916, D): + from_sheet  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
 const ofdActText = a => tr(OFD_ACTIONS[a] || a);
 const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
@@ -929,8 +932,10 @@ async function ofdReminderDialog() {
   try { rows = (await api('GET', '/api/office/docs?kind=invoice')).docs.filter(r => ['issued', 'sent', 'partial', 'overdue'].includes(r.state)); } catch (x) { toast(x.message || tr('unknown')); return; }
   if (!rows.length) { toast(tr('No open invoices')); return; }
   const s = OFC.info?.settings || {};
-  const list = `<ul class="ofdpick" role="list">${rows.map(r => `<li><label class="chkl"><input type="checkbox" data-rid="${r.id}" data-cid="${r.client_id || ''}" ${r.state === 'overdue' ? 'checked' : ''}> <span class="ofcn"><b>${esc(r.number)}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.due_date ? tr('due {0}', fmtDateLoc(r.due_date)) : '', r.status_text, tr('open: {0}', r.open_text || r.open)].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>`;
-  const md0 = ofdDlg(tr('Create reminder'), `<p class="muted ofchint">${tr('Pick the open invoices of one client.')}</p>${list}<p class="ofdwarn" id="ofd-r-warn" hidden></p>` + ofdF('r-level', tr('Reminder level'), ofcSel('ofd-r-level', 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))
+  // 2.355.0 D (#2846): only invoices past their due date can be reminded of (the server answers 409); the others stay visible, greyed out
+  const day0 = today(), early = r => !!r.due_date && r.due_date >= day0;
+  const list = `<ul class="ofdpick" role="list">${rows.map(r => `<li><label class="chkl"><input type="checkbox" data-rid="${r.id}" data-cid="${r.client_id || ''}" ${r.state === 'overdue' && !early(r) ? 'checked' : ''} ${early(r) ? 'disabled' : ''}> <span class="ofcn"><b>${esc(r.number)}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.due_date ? tr('due {0}', fmtDateLoc(r.due_date)) : '', early(r) ? tr('not yet overdue') : r.status_text, tr('open: {0}', r.open_text || r.open)].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>`;
+  const md0 = ofdDlg(tr('Create reminder'), `<p class="muted ofchint">${tr('Pick the overdue invoices of one client.')}</p>${list}<p class="ofdwarn" id="ofd-r-warn" hidden></p>` + ofdF('r-level', tr('Reminder level'), ofcSel('ofd-r-level', 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))
     + ofdF('r-fee', tr('Reminder fee'), `<input id="ofd-r-fee" inputmode="decimal" class="numin" value="${esc(ofdNumIn(0))}" maxlength="10">`) + ofdF('r-days', tr('Payment deadline'), `<span class="lacts"><input id="ofd-r-days" inputmode="numeric" class="numin" value="${esc(String(s.reminder_deadline_days ?? 10))}" maxlength="3"><span class="muted">${tr('days')}</span></span>`),
     tr('Create'), async md => {
       const picked = [...md.querySelectorAll('[data-rid]:checked')];
@@ -939,12 +944,11 @@ async function ofdReminderDialog() {
       const j = await ofdRefCall('reminder', ref => rawFetch('POST', '/api/office/docs/reminder', {doc_ids: picked.map(x => +x.dataset.rid), level: +$('#ofd-r-level', md).value, fee: ofcNum($('#ofd-r-fee', md).value), deadline_days: ofcNum($('#ofd-r-days', md).value), client_ref: ref}));
       OFD.list = null; OFD.kind = 'reminder'; OFD.doc = j; go(`office/offers/${j.id}`);
     });
-  // 2.40.0 (#1368 point 7): hints only, no block: a high fee (private clients: only the actual costs, usually 2-5 €) and invoices not yet due
+  // 2.40.0 (#1368 point 7): a hint, no block: a high fee (private clients: only the actual costs, usually 2-5 €); 2.355.0 D (#2846): invoices not yet due can no longer be picked
   const warn = () => {
     const w = $('#ofd-r-warn', md0); if (!w) return;
-    const fee = ofcNum($('#ofd-r-fee', md0).value) || 0, day0 = today();
-    const notDue = [...md0.querySelectorAll('[data-rid]:checked')].map(x => rows.find(r => r.id === +x.dataset.rid)).filter(r => r && (!r.due_date || r.due_date >= day0));
-    const msg = [fee > 5 ? tr('Private clients may only be charged the actual costs of a reminder (usually 2 to 5 €).') : '', notDue.length ? tr('Not yet due: {0}. A reminder usually follows the due date.', notDue.map(r => r.number).join(', ')) : ''].filter(Boolean);
+    const fee = ofcNum($('#ofd-r-fee', md0).value) || 0;
+    const msg = [fee > 5 ? tr('Private clients may only be charged the actual costs of a reminder (usually 2 to 5 €).') : ''].filter(Boolean);
     w.innerHTML = msg.map(esc).join('<br>'); w.hidden = !msg.length;
   };
   // 2.296.0 D (#3174): the office's fee is the default from level 2 on (level 1 is the friendly payment reminder, no fee); a typed fee stays

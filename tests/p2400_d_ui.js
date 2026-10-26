@@ -35,7 +35,9 @@ const TEST_IBAN = 'DE02120300000000202051';
   const mk = async () => { const i = await call('POST', '/api/office/docs', {kind: 'invoice', client_id: CL, service_from: '2026-05-01', items: [{title: 'Beratung', qty: 1, rate: 100}]}); const f = await call('POST', `/api/office/docs/${i.id}/finalize`); return f; };
   const inv = await mk();
   check(inv.http === 200 && inv.locked, 'an invoice finalised ' + inv.http + ' ' + JSON.stringify(inv.error || ''));
-  const open2 = await mk();
+  const open2 = await mk(), open3 = await mk();  // 2.355.0 D (#2846): open3 stays not yet due
+  // 2.355.0 D (#2846): reminders only for overdue invoices
+  execFileSync('python3', ['-c', 'import sys, dbx; dbx.overdue(sys.argv[1], sys.argv[2:])', DATA, String(inv.id), String(open2.id)], {cwd: __dirname});
   const rem = await call('POST', '/api/office/docs/reminder', {doc_ids: [inv.id], level: 2, fee: 5});
   check(rem.http === 201, 'a reminder ' + rem.http);
   await call('POST', `/api/office/docs/${rem.id}/finalize`);
@@ -69,7 +71,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   md.querySelector('[data-m="close"]')?.click();
   w.close();
 
-  // ================= #1368 7: the reminder dialog warns (high fee, not yet due)
+  // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
@@ -84,7 +86,10 @@ const TEST_IBAN = 'DE02120300000000202051';
   if (cb) { cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); }
   const fee = d.querySelector('#ofd-r-fee'); fee.value = '15'; fee.dispatchEvent(new w.Event('input', {bubbles: true}));
   const wt = d.querySelector('#ofd-r-warn');
-  check(wt && !wt.hidden && /actual costs/.test(wt.textContent) && /Not yet due/.test(wt.textContent), '#1368 7: hints for a high fee and an invoice not yet due: ' + (wt?.textContent || ''));
+  check(wt && !wt.hidden && /actual costs/.test(wt.textContent), '#1368 7: hint for a high fee: ' + (wt?.textContent || ''));
+  // 2.355.0 D (#2846): an invoice not yet due can no longer be picked (it was a hint before)
+  const cb3 = d.querySelector(`[data-rid="${open3.id}"]`);
+  check(cb3 && cb3.disabled && !cb3.checked && /not yet overdue/.test(cb3.closest('label')?.textContent || ''), '#2846: the invoice not yet due is greyed out: ' + (cb3?.closest('label')?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   fee.value = '0'; fee.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!/actual costs/.test(wt?.textContent || ''), '#1368 7: no fee hint at 0');
   d.querySelector('.modal [data-m="close"]')?.click();

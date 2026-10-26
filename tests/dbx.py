@@ -230,6 +230,17 @@ def q(path, sql, args=()):
     return connect(path).execute(sql, args).fetchall()
 
 
+def overdue(path, ids, days=1):
+    """2.355.0 D (#2846): reminders need invoices past their due date; moves the due date of the finalised invoices ids
+    days into the past (the suites' fresh invoices are due in 14 days; 1 day stays within the dunning grace days, so the
+    watchdog suggests nothing on its own)."""
+    from datetime import timedelta
+    import testclock
+    ids = [int(i) for i in ids]
+    q(path, "UPDATE office_docs SET due_date=? WHERE id IN (" + ",".join("?" * len(ids)) + ")",
+      [(testclock.today() - timedelta(days=days)).isoformat()] + ids)
+
+
 if __name__ == "__main__":
     rows = connect(sys.argv[1]).execute(sys.argv[2], json.loads(sys.argv[3]) if len(sys.argv) > 3 else ()).fetchall()
     print(json.dumps([dict(zip(r.keys(), r)) for r in rows]))

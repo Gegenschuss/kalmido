@@ -179,6 +179,7 @@ dbx("INSERT INTO time_entries(user_id, list_id, task_title, start, \"end\", seco
 r = A.post(B + D + "/from-time", json={"client_id": CL, "from": Y5, "to": T0})
 check(r.status_code == 201 and r.json().get("list_id") == LP, "an invoice from one project's hours belongs to it " + r.text[:200])
 # a reminder never gets one
+dbxm.overdue(DATA, [PI])  # 2.355.0 D (#2846): reminders only for overdue invoices
 REM = A.post(B + D + "/reminder", json={"doc_ids": [PI], "level": 1}).json().get("id")
 check(REM and proj(A, REM, {"list_id": LP}).status_code == 400, "a reminder: 400")
 

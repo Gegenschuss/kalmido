@@ -23,6 +23,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import testclock  # noqa: E402
+import dbx as dbxm  # noqa: E402  # 2.355.0 D (#2846)
 from freelancer_fixture import freelancer  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -183,6 +184,7 @@ def agent_chain(s, hd, uid, client, tag):
     s.patch(B + f"{D}/{inv}", json={"service_from": TODAY, "service_to": TODAY})
     r = s.post(B + f"{D}/{inv}/finalize")
     check(r.ok, f"{tag}: the person finalises the invoice " + r.text[:200])
+    dbxm.overdue(DATA, [inv])  # 2.355.0 D (#2846): reminders only for overdue invoices
     r = ag("POST", "/reminders", hd, json={"invoice_ids": [inv], "level": 1})
     check(r.status_code == 201, f"{tag}: the agent's reminder draft " + r.text[:200])
     rem = r.json()["doc"]["id"] if r.status_code == 201 else 0

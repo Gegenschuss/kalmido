@@ -122,6 +122,11 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
                      # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
                      "dunning_suggest": 1, "dunning_grace_days": 7, "girocode": 1,
+                     # 2.355.0 D (#2846): default interest (section 288 BGB: base rate + 5 points, + 9 for businesses) and the
+                     # 40 EUR flat fee (section 288 (5), businesses only) on reminders, both off by default; the base rate in percent
+                     # (Bundesbank, valid from 1 July 2026: 1.52; set by hand each half year, never fetched); who counts as a
+                     # business: "auto" (a client with a VAT ID, buyer reference or Peppol ID), "business" or "consumer" (all clients)
+                     "dunning_interest": 0, "dunning_flat_fee": 0, "base_rate": 1.52, "dunning_client_kind": "auto",
                      # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
                      # switched); empty = everything the country pack offers is on, so offices from before stay as they were
                      "features_off": [],
@@ -449,6 +454,14 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = dk_packs_clean(v)
         elif k in ("dunning_suggest", "girocode"):  # 2.147.1 B (#2054)
             out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k in ("dunning_interest", "dunning_flat_fee"):  # 2.355.0 D (#2846)
+            out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k == "base_rate":  # 2.355.0 D (#2846): percent, may be negative (as in 2013-2022)
+            out[k] = round(_num(v, k, -10, 30), 2)
+        elif k == "dunning_client_kind":  # 2.355.0 D (#2846)
+            if v not in ("auto", "business", "consumer"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
         elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches

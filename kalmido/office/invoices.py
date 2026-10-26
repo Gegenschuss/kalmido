@@ -192,6 +192,7 @@ def inv_refresh_paid(c, oid, did):
         # 2.190.0 D (#2496): covered by credit notes alone = cancelled like one full credit note (paid needs a payment)
         c.execute("UPDATE office_docs SET status='cancelled', paid_at=NULL, updated_at=? WHERE id=? AND org_id=?", (ts, did, oid))
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "cancelled"}})
+        inv_cancel_fees(c, oid, did)  # 2.355.0 D (#2846)
     elif gross > 0 and p["paid"] and (p["paid"] + p["credits"] >= gross or abs_skonto_covered(c, oid, r, p["credits"])):
         if r["status"] != "paid":
             c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
@@ -330,6 +331,7 @@ def inv_after_finalize(c, oid, uid, r):
             if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
                 c.execute("UPDATE office_docs SET status='cancelled', updated_at=? WHERE id=? AND org_id=?", (ts, inv_["id"], oid))
                 ofx_log(c, oid, "status", doc_id=inv_["id"], detail={"before": {"status": inv_["status"]}, "after": {"status": "cancelled"}, "credit_id": r["id"]})
+                inv_cancel_fees(c, oid, inv_["id"])  # 2.355.0 D (#2846)
             else:
                 inv_refresh_paid(c, oid, inv_["id"])
     hook = _f2("epdf_store")
@@ -598,19 +600,95 @@ def inv_reminder_totals(c, oid, r, pack=None):
     cur = r["currency"]
     ids = _j(_col(r, "ref_doc_ids") or "[]", [])
     if ofx_locked(r):
-        lines = [ln for ln in _j(r["totals"], {}).get("lines", []) if ln.get("kind") == "ref"]
+        frozen = _j(r["totals"], {})
+        lines = [ln for ln in frozen.get("lines", []) if ln.get("kind") == "ref"]
+        extra = {"interest": money(dec(frozen.get("interest") or 0)), "flat_fee": money(dec(frozen.get("flat_fee") or 0)),
+                 "interest_rate": frozen.get("interest_rate") or "", "business": frozen.get("business")}
     else:
         lines = inv_reminder_rows(c, oid, ids) if ids else []
+        extra = inv_reminder_interest(c, oid, r, lines)
     total = sum((money(dec(ln["open"])) for ln in lines), Decimal(0))
     fee = money(dec(_col(r, "reminder_fee") or 0))
-    gross = total + fee
+    gross = total + fee + extra["interest"] + extra["flat_fee"]  # 2.355.0 D (#2846): + default interest and flat fee (0 when off)
     for ln in lines:
         ln["open_text"] = fmt_money(ln["open"], lang, cur)
-    return {"lang": lang, "currency": cur, "fx_rate": None, "fx_note": "", "vat_mode": "novat", "raw_mode": "none", "lines": lines,
+        if dec(ln.get("interest") or 0) > 0:
+            ln["interest_text"] = fmt_money(ln["interest"], lang, cur)
+    return {"interest": dstr(extra["interest"]), "interest_text": fmt_money(extra["interest"], lang, cur), "interest_rate": extra["interest_rate"],
+            "flat_fee": dstr(extra["flat_fee"]), "flat_fee_text": fmt_money(extra["flat_fee"], lang, cur), "business": extra["business"],
+            **{"lang": lang, "currency": cur, "fx_rate": None, "fx_note": "", "vat_mode": "novat", "raw_mode": "none", "lines": lines,
             "net": dstr(total), "net_text": fmt_money(total, lang, cur), "fee": dstr(fee), "fee_text": fmt_money(fee, lang, cur), "tax_lines": [],
             "tax": "0.00", "tax_total": "0.00", "gross": dstr(gross), "gross_text": fmt_money(gross, lang, cur), "costs": "0.00", "margin": "0.00",
             "vat_note": "", "labels": {"net": "", "gross": "", "discount": ""}, "level": int(_col(r, "reminder_level") or 1),
-            "deadline_days": int(_col(r, "reminder_deadline_days") or 0), "raw_amount": "0.00", "producing_days": 0, "discount": "0.00"}
+            "deadline_days": int(_col(r, "reminder_deadline_days") or 0), "raw_amount": "0.00", "producing_days": 0, "discount": "0.00"}}
+
+
+def inv_reminder_extra_rows(t, lang, cur):
+    """2.355.0 D (#2846): the rows of the reminder's totals for the default interest (one per invoice: rate, days) and
+    the flat fee; the same in the PDF and (as data) in the editor."""
+    rows = []
+    rate = str(t.get("interest_rate") or "").replace(".", "," if lang != "en" else ".")
+    for ln in t.get("lines") or []:
+        if dec(ln.get("interest") or 0) > 0:
+            rows.append([tr("Default interest {0}: {1} % p.a., {2} days|document", ln.get("number") or "", rate, ln.get("interest_days") or 0, lg=lang),
+                         ln.get("interest_text") or fmt_money(ln["interest"], lang, cur)])
+    if dec(t.get("flat_fee") or 0) > 0:
+        rows.append([tr("Flat fee for late payment (section 288 (5) BGB)|document", lg=lang), t.get("flat_fee_text") or fmt_money(t["flat_fee"], lang, cur)])
+    return rows
+
+
+FLAT_FEE_EUR = Decimal("40.00")  # 2.355.0 D (#2846): section 288 (5) BGB, per invoice, EUR only
+
+
+def inv_reminder_business(c, oid, r, s):
+    """2.355.0 D (#2846): does the client of reminder r count as a business (section 288 (2) + (5) BGB)? The office's
+    choice "business" / "consumer", or "auto": a client with a VAT ID, buyer reference or Peppol ID. Without a client:
+    a consumer (the cautious reading: the lower rate, no flat fee)."""
+    kind = s.get("dunning_client_kind") or "auto"
+    if kind in ("business", "consumer"):
+        return kind == "business"
+    if not r["client_id"]:
+        return False
+    cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
+    return cl is not None and any(((cl[k] if k in cl.keys() else "") or "").strip() for k in ("vat_id", "buyer_reference", "peppol_id"))
+
+
+def inv_reminder_interest(c, oid, r, lines, s=None):
+    """2.355.0 D (#2846): the default interest and the flat fee of a reminder draft (settings dunning_interest /
+    dunning_flat_fee, both off by default). Interest per invoice: its open amount x (base rate + 5 points, a business
+    + 9) per year, for the days from the day after its due date up to the reminder's date (exact days / 365), rounded
+    to the cent; the flat fee 40 EUR per invoice for a business (EUR invoices only). Writes interest / interest_days /
+    flat_fee into the lines (so a finalised reminder keeps them) and returns {interest, flat_fee, interest_rate, business}."""
+    s = s if s is not None else office_settings(c, oid)
+    out = {"interest": Decimal(0), "flat_fee": Decimal(0), "interest_rate": "", "business": None}
+    on_i, on_f = int(s.get("dunning_interest") or 0), int(s.get("dunning_flat_fee") or 0)
+    if not (on_i or on_f) or not lines:
+        return out
+    biz = inv_reminder_business(c, oid, r, s)
+    out["business"] = biz
+    rate = dec(str(s.get("base_rate") if s.get("base_rate") not in (None, "") else 0)) + (9 if biz else 5)
+    try:
+        day = date.fromisoformat(r["date"] or local_now().date().isoformat())
+    except ValueError:
+        day = local_now().date()
+    if on_i and rate > 0:
+        out["interest_rate"] = dstr(rate)
+        for ln in lines:
+            try:
+                days = (day - date.fromisoformat(ln.get("due_date") or "")).days
+            except ValueError:
+                continue
+            if days <= 0:
+                continue
+            i = money(money(dec(ln["open"])) * rate / 100 * days / 365)
+            if i > 0:
+                ln["interest"], ln["interest_days"] = dstr(i), days
+                out["interest"] += i
+    if on_f and biz and (r["currency"] or "EUR") == "EUR":
+        for ln in lines:
+            ln["flat_fee"] = dstr(FLAT_FEE_EUR)
+            out["flat_fee"] += FLAT_FEE_EUR
+    return out
 
 
 def inv_check_reminder(c, oid, ids, rows):
@@ -624,6 +702,16 @@ def inv_check_reminder(c, oid, ids, rows):
         keys.add((who, r["currency"]))
     if len(keys) > 1:
         raise BadInput(tr("A reminder covers invoices of one client in one currency only"))
+
+
+def inv_check_reminder_due(rows, today=None):
+    """2.355.0 D (#2846): only invoices past their due date can be reminded of (like the state "overdue" and the
+    suggestion run); one without a due date (old imports) counts as due. 409 names the invoices not yet due."""
+    day0 = today or local_now().date().isoformat()
+    early = [ln for ln in rows if ln.get("due_date") and ln["due_date"] >= day0]
+    if early:
+        raise Denied(409, tr("Not yet overdue: {0}. A reminder can follow once the due date has passed.",
+                             ", ".join(str(ln.get("number") or ln.get("id")) for ln in early[:10])))
 
 
 def inv_reminder_default_fee(s, level):
@@ -653,6 +741,7 @@ def inv_make_reminder(c, oid, uid, b):
     # ones never share one (inv_reminder_rows)
     write_lock(c, f"office_dunning_{int(oid)}")  # 2.147.1 (#2054, review): the same lock as the suggestion run (no second draft at once)
     inv_check_reminder(c, oid, ids, rows)
+    inv_check_reminder_due(rows)
     level = b.get("level", 1)
     if level not in REMINDER_LEVELS:
         raise BadInput(tr("Invalid value: {0}", "level"))
@@ -812,6 +901,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             "{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang != "en" else "."))
     if kind == "reminder":
         rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
+        rows += inv_reminder_extra_rows(t, lang, cur)  # 2.355.0 D (#2846): default interest + flat fee (empty when off)
         if dec(t.get("fee") or 0) > 0:
             rows.append([L.get("reminder_fee", tr("Reminder fee|document", lg=lang)), t.get("fee_text") or ""])
         rows.append([L.get("reminder_total", tr("Total amount due|document", lg=lang)), tot["gross_text"]])  # 2.40.0 (#1368)
@@ -1415,7 +1505,25 @@ def inv_mail_status():
 
 
 # ---------------------------------------------------------------- 2.40.0 (#1368 points 8 + 9): reminder fee as an open item, settled reminders
-FEE_STATES = ("", "waived", "paid")
+FEE_STATES = ("", "waived", "paid")  # what a person sets; 2.355.0 D (#2846): "cancelled" only comes with the invoice (inv_cancel_fees)
+
+
+def inv_cancel_fees(c, oid, did):
+    """2.355.0 D (#2846): invoice did was just cancelled: the open fee of every finalised reminder naming it is cancelled
+    with it once all invoices of that reminder are cancelled (a reminder over a second, still open invoice keeps its fee).
+    The reminder document stays unchanged (GoBD); the change is logged like a person's (reminder_fee, auto 1)."""
+    for x in c.execute("SELECT id, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "
+                       "AND reminder_fee > 0 AND COALESCE(reminder_fee_state, '') = '' AND ref_doc_ids LIKE ?",  # pg-ok: digits only
+                       (oid, f"%{int(did)}%")).fetchall():
+        ids = [int(i) for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()]
+        if int(did) not in ids:
+            continue
+        if c.execute("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(ids)) + ") AND status<>'cancelled'",
+                     [oid] + ids).fetchone()[0]:
+            continue
+        c.execute("UPDATE office_docs SET reminder_fee_state='cancelled' WHERE id=? AND org_id=?", (x["id"], oid))
+        ofx_log(c, oid, "reminder_fee", doc_id=x["id"], detail={"before": "", "after": "cancelled", "fee": dstr(money(dec(x["reminder_fee"]))),
+                                                                "invoice_id": int(did), "auto": 1})
 
 
 def fd_reminder_extra(c, oid, rows):
@@ -1480,6 +1588,8 @@ def fd_fee_post(did):
     if st not in FEE_STATES:
         raise BadInput(tr("Invalid value: {0}", "state"))
     before = _col(r, "reminder_fee_state") or ""
+    if before == "cancelled" and st != before:  # 2.355.0 D (#2846): cancelled with its invoice, for good
+        raise Denied(409, tr("This fee was cancelled together with its invoice"))
     if st != before:
         c.execute("UPDATE office_docs SET reminder_fee_state=? WHERE id=? AND org_id=?", (st, did, oid))
         ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"])))})

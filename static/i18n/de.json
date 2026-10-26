@@ -14389,5 +14389,22 @@
   "Step: {0}": "Schritt: {0}",
   "One-way step – cannot be undone": "Einbahn-Schritt – lässt sich nicht rückgängig machen",
   "The agent recommends: {0}": "Empfehlung des Agenten: {0}",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite ändert die Aufgabe nicht."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite ändert die Aufgabe nicht.",
+  "Not yet overdue: {0}. A reminder can follow once the due date has passed.": "Noch nicht überfällig: {0}. Eine Mahnung ist erst nach dem Fälligkeitsdatum möglich.",
+  "not yet overdue": "noch nicht überfällig",
+  "Pick the overdue invoices of one client.": "Die überfälligen Rechnungen eines Kunden auswählen.",
+  "cancelled with the invoice": "mit der Rechnung storniert",
+  "reminder fee waived / paid / open again / cancelled": "Mahngebühr erlassen / bezahlt / wieder offen / storniert",
+  "This fee was cancelled together with its invoice": "Diese Gebühr wurde zusammen mit ihrer Rechnung storniert",
+  "Default interest {0}: {1} % p.a., {2} days|document": "Verzugszinsen {0}: {1} % p. a., {2} Tage",
+  "Flat fee for late payment (section 288 (5) BGB)|document": "Verzugspauschale (§ 288 Abs. 5 BGB)",
+  "Default interest on reminders (base rate + 5 points, businesses + 9)": "Verzugszinsen auf Mahnungen (Basiszinssatz + 5 Punkte, Geschäftskunden + 9)",
+  "40 EUR flat fee on reminders to businesses (per invoice)": "40-Euro-Pauschale auf Mahnungen an Geschäftskunden (je Rechnung)",
+  "Base rate": "Basiszinssatz",
+  "published by the Bundesbank each 1 January and 1 July; please update it then": "veröffentlicht die Bundesbank zum 1. Januar und 1. Juli; bitte dann anpassen",
+  "Clients count as": "Kunden gelten als",
+  "businesses if they have a VAT ID, buyer reference or Peppol ID": "Geschäftskunden, wenn USt-IdNr., Leitweg-ID oder Peppol-ID hinterlegt ist",
+  "all businesses": "alle Geschäftskunden",
+  "all consumers": "alle Verbraucher",
+  "decides the interest rate and the flat fee": "bestimmt Zinssatz und Pauschale"
 }

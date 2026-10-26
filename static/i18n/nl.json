@@ -14389,5 +14389,22 @@
   "Step: {0}": "Stap: {0}",
   "One-way step – cannot be undone": "Eenrichtingsstap – kan niet ongedaan worden",
   "The agent recommends: {0}": "De agent raadt aan: {0}",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina wijzigt de taak niet."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina wijzigt de taak niet.",
+  "Not yet overdue: {0}. A reminder can follow once the due date has passed.": "Nog niet achterstallig: {0}. Een herinnering kan pas na de vervaldatum.",
+  "not yet overdue": "nog niet achterstallig",
+  "Pick the overdue invoices of one client.": "Kies de achterstallige facturen van één klant.",
+  "cancelled with the invoice": "geannuleerd met de factuur",
+  "reminder fee waived / paid / open again / cancelled": "aanmaningskosten kwijtgescholden / betaald / weer open / geannuleerd",
+  "This fee was cancelled together with its invoice": "Deze kosten zijn samen met de factuur geannuleerd",
+  "Default interest {0}: {1} % p.a., {2} days|document": "Wettelijke rente {0}: {1} % per jaar, {2} dagen",
+  "Flat fee for late payment (section 288 (5) BGB)|document": "Vaste vergoeding voor te late betaling (art. 288 (5) BGB)",
+  "Default interest on reminders (base rate + 5 points, businesses + 9)": "Wettelijke rente op herinneringen (basisrente + 5 punten, bedrijven + 9)",
+  "40 EUR flat fee on reminders to businesses (per invoice)": "Vaste vergoeding van 40 EUR op herinneringen aan bedrijven (per factuur)",
+  "Base rate": "Basisrente",
+  "published by the Bundesbank each 1 January and 1 July; please update it then": "gepubliceerd door de Bundesbank op 1 januari en 1 juli; pas het dan aan",
+  "Clients count as": "Klanten gelden als",
+  "businesses if they have a VAT ID, buyer reference or Peppol ID": "bedrijven als ze een btw-nummer, kopersreferentie of Peppol-ID hebben",
+  "all businesses": "allemaal bedrijven",
+  "all consumers": "allemaal consumenten",
+  "decides the interest rate and the flat fee": "bepaalt de rente en de vaste vergoeding"
 }

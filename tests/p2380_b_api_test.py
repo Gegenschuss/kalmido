@@ -238,6 +238,7 @@ check(x.ok and xt(x.content, "rsm:ExchangedDocument/ram:TypeCode") == "381"
       and xt(x.content, MS + "ram:GrandTotalAmount") == "40963.25", "credit note XML: 381, positive total, BT-25 = the invoice")
 check(ein.ein_check(x.content) == [], f"credit note ein_check: {ein.ein_check(x.content)}")
 check(f'filename="credit-{r.json()["number"]}.xml"' in x.headers["Content-Disposition"], "credit note XML named credit-<number>.xml")
+dbxm.overdue(DATA, [INX])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + D + "/reminder", json={"doc_ids": [INX], "level": 1, "fee": 5, "deadline_days": 10})
 check(r.status_code == 201, "reminder made " + r.text[:160])
 RM = r.json()["id"]
