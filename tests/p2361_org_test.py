@@ -105,6 +105,8 @@ check(r.ok and r.json().get("transferred") == 1 and r.json().get("back") == 1, f
 mine = lists(Ca)
 check(OWN in mine and not mine[OWN].get("org_id"), f"carol keeps her brought-in project, private now ({mine.get(OWN, {}).get('org_id')})")
 check(BORN not in mine and BORN in lists(Bo), "the project made in Alpha went to Bob")
+mo = [x for x in news(Bo, "orglist") if x["data"].get("action") == "moveout"]
+check(mo and mo[0]["data"].get("name") == "Carols own", f"review: Bob (admin) is told the project left Alpha ({[x['data'] for x in mo]})")
 
 # removed by an admin: the person keeps what they brought in, and is told
 r = Da.post(B + "/api/lists", json={"name": "Daves own", "org_id": None})

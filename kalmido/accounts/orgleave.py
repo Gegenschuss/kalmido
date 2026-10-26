@@ -82,7 +82,7 @@ def olv_info(c, oid, uid, heir):
 def olv_leave_info(oid):
     """2.361.0 (#2922): the preview of leaving organisation oid (?uid = a member an admin removes; default: me) -- olv_info.
     The heir is the one org_member_remove would choose: the removing admin, else the organisation's first other admin."""
-    from .orgs import _need_org_admin, org_role
+    from .orgs import _need_org_admin, _operator_apart, org_role
     c = db()
     try:
         uid = int(request.args.get("uid") or me())
@@ -97,6 +97,11 @@ def olv_leave_info(oid):
     heir = me() if uid != me() else (c.execute(
         "SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 "
         "AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
+    if uid != me() and request.args.get("to", "").isdigit():  # review: the admin hands the lists to another member (?to=, as the removal)
+        heir = int(request.args["to"])
+    if heir is None and not _operator_apart():  # review: the only admin leaves: the operator takes over (as org_member_remove)
+        heir = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
+                          (uid,)).fetchone() or [None])[0]
     return jsonify(olv_info(c, oid, uid, heir))
 
 
@@ -183,10 +188,12 @@ def olv_delete_notice(oid):
 @app.delete("/api/admin/orgs/<int:oid>/delete-notice")
 def olv_delete_notice_off(oid):
     """2.361.0 (#2920): the deletion announced for oid is called off; the members get a News item (orgdelnotice, day empty)."""
-    from .orgs import _need_admin
+    from .orgs import _need_admin, instance_mode, _no_change
     _need_admin()
     c = db()
     with system_ctx(c):
+        if instance_mode(c) != "workspaces":
+            _no_change()
         r = c.execute("SELECT name, delete_notice FROM orgs WHERE id=? AND personal_of IS NULL", (oid,)).fetchone()
         if not r:
             return err(tr("Not found"), 404)
