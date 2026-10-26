@@ -32,7 +32,7 @@ async function ab_load() {
   try {
     const j = await api('GET', (r.nid ? `/api/files?parent=${r.nid}` : `/api/files?space=${encodeURIComponent(ab_curSpace())}`) + dq);
     if (seq !== AB.seq) return;
-    AB.data = j; AB.dkey = key; AB.err = '';
+    AB.data = j; AB.dkey = key; AB.err = ''; AB.dq = dq;  // 2.353.0 D (#2759): dq = loaded with the documents' fields
     if (AB.pt[key] && !AB.pt[key].busy) Object.assign(AB.pt[key], {items: (j.items || []).filter(n => n.kind === 'folder'), stale: false});  // 2.152.3 B (#2621): the panel's copy follows
   } catch (x) {
     if (seq !== AB.seq) return;

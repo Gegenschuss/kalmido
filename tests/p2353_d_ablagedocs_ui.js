@@ -92,7 +92,7 @@ const up = async (url, field, name, text, extra = {}) => {
   d.querySelector(`[data-abid="${PLAIN}"] [data-ab="menu"]`)?.click();
   check(await until(() => menuItems(d).includes('Recognition…')), 'a folder: Recognition… in its menu');
   pick(d, 'Recognition…')?.click();
-  check(await until(() => menuItems(d).includes('On') && menuItems(d).includes('As the folder above')), 'Recognition…: As the folder above / On / Off');
+  check(await until(() => ['As the folder above', 'On', 'Off'].every(l => pick(d, l))), 'Recognition…: As the folder above / On / Off (with their hints)');
   pick(d, 'On')?.click();
   check(await until(async () => (await call('GET', `/api/files?parent=${PLAIN}`)).node?.recog_on === true), 'On: the folder recognises');
   w.close();

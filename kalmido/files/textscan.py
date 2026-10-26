@@ -507,8 +507,9 @@ def ts_files_find(c, uid, raw, space=""):
     if ON and S.index_words(raw):
         for nid in S.search_ids(c, docs, raw) or ():
             hit.setdefault(nid, "text")
-    for nid in _doc_label_hits(c, docs, raw):  # 2.353.0 D (#2759): sender, document type, tags of the documents
-        hit.setdefault(nid, "doc")
+    for nid in _doc_label_hits(c, docs, raw):  # 2.353.0 D (#2759): sender, document type, tags of the documents (before "text":
+        if hit.get(nid) != "name":              # the word index holds the sender too)
+            hit[nid] = "doc"
     ids = sorted(hit, reverse=True)[:SEARCH_MAX]
     rows = c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))})", tuple(ids)).fetchall() if ids else []
     return sorted(rows, key=lambda r: -r["id"]), hit

@@ -34,7 +34,11 @@ function abd_card(n) {
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
   return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}</li>`;
 }
-const abd_cardsHtml = d => `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
+const abd_cardsHtml = d => {
+  if (!AB.dq && !AB.loading) { AB.key = ''; setTimeout(ab_load, 0); }  // loaded as a list before this file was there: again with the documents' fields
+  return abd_cardsHtml2(d);
+};
+const abd_cardsHtml2 = d => `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
 
 // ---- recognition: the line above a folder's list, the menu items, the switch
 function abd_recogLine(d) {
@@ -47,7 +51,7 @@ function abd_recogLine(d) {
 }
 function abd_menuItems(n) {
   if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true})}] : [];
-  if (n.kind === 'folder') return [{label: tr('Recognition…'), icon: 'sparkle', fn: () => abd_recogMenu(n)}];
+  if (n.kind === 'folder') return [{label: tr('Recognition…'), icon: 'sparkle', fn: () => setTimeout(() => abd_recogMenu(n), 0)}];  // after this menu closed
   if (n.kind !== 'file') return [];
   if (n.doc) return [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true})}];
   return [{label: tr('Recognise'), icon: 'sparkle', fn: () => abd_recognise(n)}];  // a file outside a recognising folder
