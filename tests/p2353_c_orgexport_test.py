@@ -234,16 +234,14 @@ check(not dbx("SELECT 1 FROM fs_nodes WHERE org_id=?", (GAM,)) and not dbx("SELE
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- into an organisation with its own knowledge root
-# 2.353.0 (#2829, review): the target's folder differs in case only - knowledge names are case-blind (wkf_name), it takes the archive's
-r = A.post(B + "/api/wiki/folders", json={"space": f"org:{DEL}", "name": "handbuch"})
+r = A.post(B + "/api/wiki/folders", json={"space": f"org:{DEL}", "name": "Handbuch"})
 check(r.status_code == 201, "the target's own knowledge folder " + r.text[:160])
 DHB, DROOT = r.json()["folder"]["id"], root_of(f"o{DEL}", "wiki")
 iid, _ = imp(A, OX, RK, DEL)
 check(root_of(f"o{DEL}", "wiki") == DROOT, "the target's knowledge root stays the root")
 dk = kids(DROOT)
 check(len(tops(DEL, one("SELECT name FROM fs_nodes WHERE id=?", (DROOT,))["name"])) == 1, "no second knowledge root")
-check(dk.get("handbuch", {}).get("id") == DHB and "Handbuch" not in dk and "Leer" in dk,
-      f"the folder of the same name (other case) takes the archive's {sorted(dk)}")
+check(dk.get("Handbuch", {}).get("id") == DHB and "Leer" in dk, f"the folder of the same name takes the archive's {sorted(dk)}")
 check({"Eins", "Zwei"} <= set(kids(DHB)), "the pages lie in the target's folder")
 r = A.get(B + "/api/wiki", params={"space": f"org:{DEL}"})
 check(r.ok and root_of(f"o{DEL}", "wiki") == DROOT and {"Eins", "Zwei"} <= set(kids(DHB)), "the index keeps it so")

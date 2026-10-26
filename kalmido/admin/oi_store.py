@@ -117,9 +117,9 @@ def _node(c, run, src, d, ctx):
         if area == "wiki" and ctx.space:
             d["org_access"] = "edit"  # 2.353.0 (#2829, review): like wkf_root, not the archive's value
     elif area == "wiki" and d["kind"] == "folder" and run.m("fs_nodes", src.get("parent_id")) in st["merged"]:
-        have = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL",
+        have = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND name=? AND deleted_at IS NULL",
                          (run.m("fs_nodes", src.get("parent_id")), d.get("name"))).fetchone()
-        if have:  # the target's folder of that name takes it (case-blind like wkf_name, 2.353.0 review)
+        if have:  # names are exact (wiki/wkfolder.py, the index's path check): the target's folder of that name takes it
             run.put("fs_nodes", sid, have[0])
             st["merged"].add(have[0])
             return False
