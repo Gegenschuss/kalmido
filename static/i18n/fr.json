@@ -7781,7 +7781,6 @@
   "Correction": "Correction",
   "Edit correction": "Modifier la correction",
   "New correction": "Nouvelle correction",
-  "For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.": "Pour l’argent hors de Kalmido en {0}. Ne compte que dans le solde du compte ; les valeurs calculées restent inchangées.",
   "e.g. cash payment": "p. ex. paiement en espèces",
   "Correction deleted": "Correction supprimée",
   "Correction changed": "Correction modifiée",
@@ -14310,5 +14309,6 @@
   "Import running · {0} %": "Import en cours · {0} %",
   "The import goes on in the background.": "L’import continue en arrière-plan.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "L’avancement s’affiche à Savoir dans la barre et en haut des pages de savoir.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page coche aussi la tâche."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page coche aussi la tâche.",
+  "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Pour l’argent hors de Kalmido en {0}. Compte dans le solde du mois et dans le solde du compte ; les entrées et sorties restent inchangées."
 }

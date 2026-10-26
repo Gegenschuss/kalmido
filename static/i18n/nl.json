@@ -7781,7 +7781,6 @@
   "Correction": "Correctie",
   "Edit correction": "Correctie bewerken",
   "New correction": "Nieuwe correctie",
-  "For money outside Kalmido in {0}. Counts only in the account balance; the computed values stay as they are.": "Voor geld buiten Kalmido in {0}. Telt alleen mee in het rekeningsaldo; de berekende waarden blijven zoals ze zijn.",
   "e.g. cash payment": "bijv. contante betaling",
   "Correction deleted": "Correctie verwijderd",
   "Correction changed": "Correctie gewijzigd",
@@ -14310,5 +14309,6 @@
   "Import running · {0} %": "Import loopt · {0} %",
   "The import goes on in the background.": "De import loopt op de achtergrond door.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "De voortgang staat bij Kennis in de balk en bovenaan de kennispagina's.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina vinkt ook de taak af."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina vinkt ook de taak af.",
+  "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Voor geld buiten Kalmido in {0}. Telt mee in het saldo van de maand en in het rekeningsaldo; inkomsten en uitgaven blijven zoals ze zijn."
 }

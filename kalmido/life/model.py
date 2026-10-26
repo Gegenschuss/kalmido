@@ -468,7 +468,10 @@ def life_overview(c, uid, oid=None):
         on &= set(LIFE_ORG_MODS)
     today = local_now().date()
     out = {"modules": [m for m in LIFE_MODS if m in on], "space": f"org:{oid}" if oid else "private"}
-    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND fam!=''", (uid, uid))
+    # 2.330 (#3295): only the tasks of the space shown -- the private space never shows an organisation's contracts
+    # (Office > Contracts puts their deadlines into an organisation list), devices, upkeep, health or read-later items
+    sp_sql = "list_id IN (SELECT id FROM lists WHERE COALESCE(org_id,0)=?)"
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND {sp_sql} AND deleted_at IS NULL AND status=0 AND fam!=''", (uid, uid, oid or 0))
     lists = {d["id"]: d for d in visible_lists(c, uid)}
     by = {}
     for t in rows:
@@ -513,10 +516,10 @@ def life_overview(c, uid, oid=None):
         out["travel"] = {"trips": trips}
     if "reading" in on and not org_trips_hidden():  # 2.172.1 A (#2689): read later: in the app only (not for an agent / an API token)
         from ..life.karakeep import kk_public
-        rl = [l for l in lists.values() if l.get("life") == "reading" and not l["archived"]]
+        rl = [l for l in lists.values() if l.get("life") == "reading" and not l["archived"] and (l.get("org_id") or None) == (oid or None)]
         items = [{"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "url": t.get("url") or ""}
-                 for t in load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND parent_id IS NULL AND "
-                                        "list_id IN (SELECT id FROM lists WHERE life='reading' AND archived=0)", (uid, uid))]
+                 for t in load_tasks(c, f"list_id IN {vis_sql()} AND {sp_sql} AND deleted_at IS NULL AND status=0 AND parent_id IS NULL AND "
+                                        "list_id IN (SELECT id FROM lists WHERE life='reading' AND archived=0)", (uid, uid, oid or 0))]  # 2.330 (#3295)
         out["reading"] = {"lists": [l["id"] for l in rl], "items": items[:100], "count": len(items), "karakeep": kk_public(c, uid)}
     return out
 
