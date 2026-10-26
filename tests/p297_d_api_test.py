@@ -180,6 +180,11 @@ hist = dbx("SELECT detail FROM space_moves WHERE kind='wiki' AND obj_id=? ORDER 
 check(hist and "e2e1:" not in hist[0]["detail"] and json.loads(hist[0]["detail"]).get("to") == "Moved/Secret", "history: no ciphertext " + str(hist[:1]))
 
 # ================================================================ the way back (undo) into the space with the lock
+# 2.361.2 (#2923): out of Alpha only after an admin released carol's request (refused first, with what to ask for)
+r = mv(Ca, pages=[SEC], space=SP, to="private", dry=1)
+check(r.ok and r.json().get("block") and (r.json().get("out_request") or {}).get("id") == SEC, "#2923: dry run without a release: block + out_request " + r.text[:300])
+_rq = Ca.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": SEC}).json().get("id")
+check(A.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: alice releases carol's page")
 r = mv(Ca, pages=[SEC], space=SP, to="private", dry=1)
 e = r.json().get("e2e") or {}
 check(r.ok and r.json().get("block") is None and (e.get("to") or {}).get("gen") == 1 and not any(

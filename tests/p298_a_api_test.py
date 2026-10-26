@@ -284,6 +284,9 @@ check(Ca.get(B + f"/api/polls/{TP}").status_code == 200, "now every member reads
 check(Bo.post(B + f"/api/polls/{TP}/move-space", json={"to": SP}).status_code == 409, "same workspace: 409")
 check(Bo.post(B + f"/api/polls/{TP}/move-space", json={"to": f"org:{OP['org_id'] + 999}"}).status_code == 409, "a foreign organisation: 409")
 check(requests.post(B + f"/api/polls/{TP}/move-space", headers=AGH, json={"to": "private"}).status_code in (401, 403), "agents: 403")
+check(Bo.post(B + f"/api/polls/{TP}/move-space", json={"to": "private"}).status_code == 403, "#2923: not out again without a release")
+_rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "poll", "id": TP}).json().get("id")  # 2.361.2 (#2923): released first
+check(A.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's poll")
 r = Bo.post(B + f"/api/polls/{TP}/move-space", json={"to": "private"})
 check(r.ok and r.json()["space"] == "private" and Ca.get(B + f"/api/polls/{TP}").status_code == 404, "moved back: private again")
 

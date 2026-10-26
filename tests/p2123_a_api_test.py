@@ -156,6 +156,9 @@ check(r.ok and A.get(B + f"/api/wiki/pages/{MV}").json().get("body") == "Text de
       and raw(MV).startswith("kenc1:"), "#2105: private -> organisation: sealed for the organisation, a member reads it " + r.text[:200])
 vv = vers(A, MV) or []
 check(vv and A.get(B + f"/api/wiki/pages/{MV}/versions/{vv[-1]['id']}").ok, "#2102: the versions moved along (readable in the organisation) " + str(vv)[:200])
+# 2.361.2 (#2923): a member takes a page out of the organisation only after an admin released the request
+rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": MV}).json().get("id")
+check(A.post(B + f"/api/orgs/{ORG}/out-requests/{rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's request")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": SP, "to": "private", "dest": ""})
 check(r.ok and Bo.get(B + f"/api/wiki/pages/{MV}").json().get("body", "").endswith("zweite Fassung")
       and A.get(B + f"/api/wiki/pages/{MV}").status_code == 404, "#2105: and back into the private space " + r.text[:200])
