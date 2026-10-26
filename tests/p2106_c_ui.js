@@ -43,8 +43,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // a stand-in for the letter editor of part A: the text field + the tool and action buttons
   const box = d.createElement('div'); box.id = 'ltmtest';
   box.innerHTML = `<textarea id="lt-body">Sehr geehrte Damen und Herren,\n\nENDE</textarea><div class="tools">${hook('tools', draft)}</div><div class="acts">${hook('actions', draft)}</div>`;
-  d.querySelector('#view').appendChild(box);
+  // 2.307.6 (CI): on the body, not in #view - a late redraw of the office view replaced #view's content and took the stand-in
+  // with it (#lt-body null); the click and focusin handlers of part C sit on the document, they reach it there as well
+  d.body.appendChild(box);
   check(await until(() => !d.querySelector('#ltmtest [data-ltm-slot]')), 'the e-mail slot resolves');
+  check(d.querySelector('#ltmtest #lt-body'), 'the stand-in is still on the page');
   check(!d.querySelector('#ltmtest [data-ltm="mail"]'), 'no mail server: no "Send by e-mail"');
 
   // ================= insert at the cursor
