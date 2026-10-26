@@ -134,6 +134,19 @@ with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), t
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
 
+*Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
+sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20
+newest documents in no folder and **More…** (the full list). The folders of an area are the ones below its own root
+folder in the workspace's file tree (named like the area, made with the first *New folder…* at the area) plus every
+other folder of the workspace holding a document of the area (shown with its path, only with the area's documents) -
+nothing filed before is moved. Menu of the area: *Open*, *New folder…*; of a folder: *Open*, *New folder…*, *Share…*
+(the common share dialog), *Rename…*, *Move to the trash*; of a document: *Open*, *Move…*, *Take out of the folder*.
+Documents (also the rows of the quotes list) are dragged onto a folder on a computer; on a phone the same tree uses
+*Move…*. Client, project and year are filters at the top of the quotes list (they replace the automatic groups of
+2.199). A folder share gives reading / editing of the document only: releasing, sending, payments and locks stay with
+the office groups; receipts keep the receipts lock and stay in place while their retention period runs. Routes:
+`GET /api/office/{docs|gen-docs|letters|receipts}/tree`, `POST …/tree/folders`.
+
 ## Settings: areas, every field saves itself
 
 *Since 2.113.*
