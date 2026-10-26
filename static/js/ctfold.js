@@ -38,7 +38,7 @@ function ctf_panelTree() {
   for (let f = at ? ctf_folder(at) : null, g = 0; f && g < 40; f = ctf_folder(f.parent_id), g++) path.push(f.id);
   const item = (x, par) => ({k: 'ct:' + x.kind[0] + x.id, name: x.name, icon: x.kind === 'book' ? 'book' : 'user', kids: false,
     go: x.kind === 'book' ? 'contacts/b/' + x.id : 'contacts/' + x.id, on: x.kind === 'book' ? r.ctb === x.id : r.mod === 'contacts' && r.contact === x.id,
-    ns: 'ct', id: x.kind[0] + x.id, par, drag: x.role === 'edit', menu: true});
+    ns: 'ct', id: x.kind[0] + x.id, par, drag: !!x.may_file, menu: true});
   const fold = f => ({k: 'ct:f' + f.id, name: f.name, icon: f.shared ? 'users' : 'folder', go: 'contacts/f/' + f.id, on: at === f.id, ns: 'ct', id: 'f' + f.id,
     par: f.parent_id === ctf_space(f.space)?.root ? 'r:' + f.space : 'f' + f.parent_id, drag: ctf_canW(f), drop: ctf_canW(f), menu: true,
     kids: ctf_kids(f.space, f.id).length > 0 || ctf_items(f.id).length > 0, open: path.includes(f.id) && f.id !== at,
@@ -146,9 +146,9 @@ function ctf_menuItems(id) {
   }
   const x = ctf_itemOf(id); if (!x) return [];
   return [{label: tr('Open'), icon: x.kind === 'book' ? 'book' : 'user', fn: () => go(x.kind === 'book' ? 'contacts/b/' + x.id : 'contacts/' + x.id)},
-    x.role === 'edit' ? {label: tr('Move to folder…'), icon: 'folder', fn: () => ctf_moveDlg(x.kind, x.id, x.name, x.space)} : null,
-    x.role === 'edit' ? {label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)} : null,
-    x.role === 'edit' ? {label: tr('Out of the folder'), icon: 'up', fn: () => ctf_place(x.kind, x.id, x.name, null)} : null];
+    x.may_file ? {label: tr('Move to folder…'), icon: 'folder', fn: () => ctf_moveDlg(x.kind, x.id, x.name, x.space)} : null,
+    x.may_file ? {label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)} : null,
+    x.may_file ? {label: tr('Out of the folder'), icon: 'up', fn: () => ctf_place(x.kind, x.id, x.name, null)} : null];
 }
 sbb_treeReg('ct', {
   move: (id, into) => {
@@ -170,15 +170,15 @@ document.addEventListener('click', e => {
   if (b.dataset.ctf === 'clear') go('contacts'); else if (b.dataset.ctf === 'share' && CT.folder) ctf_share(CT.folder);
 });
 // the menu items of a contact's card and of an address book (contacts.js): file it, share it in its folder
-// filing needs the right to change the address book (a folder share is not enough); sharing: 'edit' on the contact
+// filing and sharing need the right to manage the address book (its owner; neither a folder nor a book share is enough)
 function ctf_cardItems(c) {
   const b = ctBook(c.book_id), x = ctf_nodeOf('contact', c.id);
-  if (!b || !ctWrite(b) || b.imported) return x?.role === 'edit' ? [{label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)}] : [];
+  if (!b || b.role !== 'owner' || b.imported) return [];
   return [{label: tr('Move to folder…'), icon: 'folder', fn: () => ctf_moveDlg('contact', c.id, c.fn || c.org || '?', b.org_id ? 'org:' + b.org_id : 'private')},
-    x?.role === 'edit' ? {label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)} : null];
+    x ? {label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)} : null];
 }
 function ctf_bookItems(b, anchor) {
-  if (!ctWrite(b) || b.imported) return [];
+  if (b.role !== 'owner' || b.imported) return [];
   const sp = b.org_id ? 'org:' + b.org_id : 'private';
   return [{label: tr('Move to folder…'), icon: 'folder', fn: () => ctf_moveDlg('book', b.id, b.name, sp, anchor)}];
 }

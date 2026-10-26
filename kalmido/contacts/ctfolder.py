@@ -11,7 +11,8 @@ Rights: book_role / need_contact (contacts/model.py) = the address book's own ro
 role) OR the role a folder gives (fs_ref_node_role: shares with people / groups, agents only through a share with exactly
 them; never organisation access nor the folder's ownership); the higher one counts, a folder never gives 'owner' and never
 narrows a share. A book in a folder gives its role on all its contacts (also the ones added later); a contact in a folder
-only that contact. Filing needs 'edit' from the address book itself (fsref.fs_ref_may_file: a folder share is not enough).
+only that contact. Filing needs the right to manage the address book (its owner, an organisation book's admins; fsref.fs_ref_may_file: neither a
+folder share nor a book share with edit is enough -- they cannot share the book either).
 A book through a folder works like a share of the book (book_members): its contacts are read / changed / deleted as the role
 says; the book's settings, sharing and deleting stay with its owner. A contact through its own folder only: reading and
 changing its fields -- deleting it or moving it into another address book stay with who has a role on the book.
@@ -33,8 +34,8 @@ from ..core.pg import system_ctx
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
 from ..accounts.session import me
-from ..files.fsref import (fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register, fs_ref_rename,
-                           fs_ref_role, fs_ref_token_lacks)
+from ..files.fsref import (fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_may_file, fs_ref_register,
+                           fs_ref_rename, fs_ref_role, fs_ref_token_lacks)
 from ..files.fsroots import fs_area_folder_name, fs_area_root
 from ..files.store import _now, _place, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
 from .model import book_role, contacts_on, render_vcard
@@ -66,9 +67,12 @@ def _book_space(c, b):
 
 
 def _own_role(c, uid, b):
-    """The book's own role (no folder): 'owner' counts as 'edit' here."""
+    """The book's own role (no folder) as the folder system's base role: only who manages the book (its owner, an
+    organisation book's admins) has 'edit' -- filing it and sharing its folder pass it on, which a book share does not allow
+    (a member who may change it shares it as little as before); a member's role counts as 'view' here (their own access to
+    the contacts stays book_role's)."""
     r = book_role(c, uid, b, fold=False)
-    return "edit" if r in ("owner", "edit") else r
+    return "edit" if r == "owner" else ("view" if r in ("edit", "view") else None)
 
 
 def _book_base(c, uid, bid):
@@ -226,7 +230,7 @@ def _space_of(c, uid, v):
 @app.get("/api/contacts/folders")
 def contacts_folders():
     """The address book's folders per workspace: {spaces: [{space, root, can_add}], folders: [{id, parent_id, name, sort_no,
-    role (owner | edit | view), shared, space}], items: [{node, parent_id, sort_no, kind (book | contact), id, name, role}]} --
+    role (owner | edit | view), shared, space}], items: [{node, parent_id, sort_no, kind (book | contact), id, name, role, may_file (move / share it)}]} --
     only the folders uid sees and the books / contacts uid may open (a book or contact in no folder is not listed)."""
     need_feat("contacts")
     c = db()
@@ -258,7 +262,7 @@ def contacts_folders():
                 if role:
                     items.append({"node": r["id"], "parent_id": r["parent_id"], "sort_no": r["sort_no"], "role": role,
                                   "kind": "book" if r["ref_kind"] == CTF_BOOK else "contact", "id": r["ref_id"], "name": r["name"],
-                                  "space": key})
+                                  "space": key, "may_file": fs_ref_may_file(c, uid, r["ref_kind"], r["ref_id"])})
     return jsonify(spaces=spaces, folders=folders, items=items)
 
 

@@ -32,6 +32,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.access import Denied, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
+from ..files.fsref import fs_ref_rename
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, pb_owner
 
@@ -475,6 +476,8 @@ def agr_patch(aid):
         row["updated_at"] = iso(now_utc())
         enc = oc_enc_fields(c, oid, "office_agreements", row)
         c.execute(f"UPDATE office_agreements SET {','.join(k + '=?' for k in enc)} WHERE id=? AND org_id=?", list(enc.values()) + [aid, oid])
+        if row.get("name"):
+            fs_ref_rename(c, "office_agreement", aid, row["name"])  # 2.351.0 B (#2749): the name on its folder node (office/agrref.py)
     _save_task(c, oid, uid, aid, b, revive=revive, new_end="ends" in row and row["ends"] != cur.get("ends"))
     bump(c)
     c.commit()

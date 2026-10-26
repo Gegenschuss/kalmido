@@ -57,8 +57,9 @@ const openRow = async (d, name) => { const a = rowOf(d, name)?.querySelector('[d
   const BR = await until(() => rowOf(d, 'Private people'));
   check(BR && BR.dataset.sbbid === 'b' + BK && BR.dataset.sbbpar === 'f' + FR, 'the filed book inside its folder');
   // the folder opens as the list's filter
-  check(R1.querySelector('.sbbtn').dataset.go === 'contacts/f/' + FR, 'the folder opens #contacts/f/<id>');
-  R1.querySelector('.sbbtn').click();
+  const R1b = rowOf(d, 'Friends');  // drawn again after opening it
+  check(R1b.querySelector('.sbbtn').dataset.go === 'contacts/f/' + FR, 'the folder opens #contacts/f/<id>');
+  R1b.querySelector('.sbbtn').click();
   check(await until(() => d.querySelector('#view .ctfbar') && [...d.querySelectorAll('#view .ctrow .ctn b')].map(x => x.textContent).join() === 'Paula Example'),
     'the folder filters the list: the bar and the book\'s contact ' + w.eval('JSON.stringify({r: S.route, f: CT.folder, n: CT.items && CT.items.length, h: location.hash})') + ' ' + (d.querySelector('#view')?.innerHTML || '').slice(0, 400));
   d.querySelector('#view [data-ctf="clear"]')?.click();

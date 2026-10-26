@@ -155,6 +155,12 @@ check(A.put(B + f"/api/books/{BK}/members", json={"user_id": uid["bob"], "role":
 check(role(Bo, P1) == "edit", "book share view + folder edit = edit (the higher one)")
 check(A.patch(B + f"/api/files/shares/{S1}", json={"role": "view"}).ok and A.put(B + f"/api/books/{BK}/members", json={"user_id": uid["bob"], "role": "edit"}).ok
       and role(Bo, P1) == "edit", "book share edit + folder view = edit: nothing gets narrower")
+BF = folder(Bo, "Bob's folder")
+BK3 = book(A, "Shared directly")
+P3 = contact(A, BK3, "Rita Direct")
+check(A.put(B + f"/api/books/{BK3}/members", json={"user_id": uid["bob"], "role": "edit"}).ok and role(Bo, P3) == "edit", "a book share with edit")
+check(place(Bo, "address_book", BK3, BF).status_code == 403 and place(Bo, "contact", P3, BF).status_code == 403,
+      "a book share with edit cannot file the book / its contact into an own folder (it would pass the book on)")
 check(A.delete(B + f"/api/books/{BK}/members/{uid['bob']}").ok, "book share withdrawn")
 check(A.delete(B + f"/api/files/shares/{S1}").ok and role(Bo, P1) is None, "folder share withdrawn = no role")
 

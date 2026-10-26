@@ -132,6 +132,8 @@ check(Bo.get(B + O + f"/agreements/{AG1}").status_code in (403, 404) and Bo.patc
 check(place(Bo, "office_agreement", AG1, None).status_code in (403, 404), "bob cannot take it out of the folder")
 check(A.delete(B + O + f"/agreements/{AG1}").ok and content(Bo, NAG) in (403, 404), "a deleted contract gives nothing")
 check(A.post(B + O + f"/agreements/{AG1}/restore").ok and isinstance(content(Bo, NAG), bytes), "restored: back")
+check(A.patch(B + O + f"/agreements/{AG1}", json={"name": "Liability insurance 2027"}).ok and
+      A.get(B + f"/api/files/nodes/{NAG}").json().get("name") == "Liability insurance 2027", "renamed: its node follows")
 check(A.delete(B + f"/api/files/shares/{S1}").ok and content(Bo, NAG) in (403, 404), "share withdrawn = nothing")
 
 # ================================================================ an organisation's agent: share + the office's switches

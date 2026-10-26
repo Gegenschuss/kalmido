@@ -329,6 +329,9 @@ APP_ONLY = [
      "stay with people like the file store's folders; an agent reads a filed document with read_file (kind ref) or "
      "get_office_document",
      ("=GET /api/sheets/folders", "=POST /api/sheets/folders", "=PATCH /api/fsref/office_doc/{}", "=PUT /api/fsref/office_doc/{}/items")),
+    ("2.351.0 B (#2749): the address book's folders (the panel's tree, a new folder) stay with people like the tables' folders; "
+     "an agent reads a filed address book / contact over /api/v1/contacts or read_file (kind ref)",
+     ("=GET /api/contacts/folders", "=POST /api/contacts/folders")),
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
