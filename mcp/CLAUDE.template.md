@@ -339,10 +339,6 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
 
-### Data you never see (2.235.0)
-- `get_agent` gives `data_lock`: areas, project ids and the number of tags your owner locked for you. Kalmido hides them
-  from you everywhere (404, no events). Never ask for that data or try to reach it another way (copies, other people).
-
 ### Work style (2.236.0)
 - **Read your work style and keep to it**: `get_agent` gives `work_style` (set by your owner; for a team agent an admin),
   again with the event `work_style_changed`. Budget (`budget_state`, at the limit Kalmido pauses you): finish the step,
@@ -365,6 +361,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   ones, which do not apply), again with the event `rules_changed`. Your owner (an admin for a team agent) rewords, pauses
   and deletes them in your settings; only they change a rule, you never reword or drop one yourself.
 <!-- kalmido-agent-rules:end -->
+
+### Data you never see (2.235.0)
+- `get_agent` gives `data_lock`: areas, project ids and the number of tags your owner locked for you. Kalmido hides them
+  from you everywhere (404, no events). Never ask for that data or try to reach it another way (copies, other people).
 
 ### An inquiry becomes a project, setting up (2.51.0)
 - A customer inquiry in the chat (text or a mail as attachment): answer with ONE proposal `propose_to_person` kind
