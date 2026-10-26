@@ -1811,6 +1811,15 @@ needs the edit right on them. Moving
 such a node (or a folder holding one), putting it into the trash or filing an object needs the edit right of its area -- a
 folder share alone answers `403` (2.199.0 F). Lists sort folders first, then by hand (`sort_no`, `null` = by name after the sorted ones), then by name.
 
+**Address books, contacts and contracts in folders (2.351.0, #2749):** `ref_kind: "address_book"` (a whole address book:
+your role covers all its contacts, also in `GET /api/v1/contacts` and `/api/v1/address-books`) and `"contact"` (only that
+contact; you may read / change its fields, deleting it stays with a role on its address book) need the scope `contacts`
+and read as vCard (`text/vcard`). `"contract_file"` (the PDF of a framework contract) and `"office_agreement"` (a contract or
+insurance, read as a short text) need the scope `office` and the office's agent switches for that area (in an organisation:
+an office rights group with Framework contracts / Contracts & insurance); a folder gives them reading only, every change
+stays in the office. An address book can also be shared with you directly (its members:
+`PUT /api/v1/address-books/{id}/members/{user_id}`).
+
 2.84.0 (#1198): mails filed with clients and projects keep their `.eml` and attachments in the folder *E-Mails* of the file
 store; an agent reaches them only when a person shares such a folder with it. The filed mails themselves (headers, text,
 assigning) have no agent route yet.
