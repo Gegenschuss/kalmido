@@ -197,6 +197,9 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   check(w.eval('E2E.badPub') === false, 'dm: matching again');
   // 2.42.0 (#909 review): the server reports the DM as plain without a "switched off" notice -> warning, plain only after a yes
   check(w.eval(`LS.get('e2eOn:' + S.me.id + ':${room.id}', null)`) !== null, 'dm: this browser remembers the encrypted DM');
+  // CI of 2.318.0: the change poll held - a poll's loadRoom took e2e back from the server, the text went out encrypted unasked
+  await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
+  await sleep(1500);  // a room load of the last poll lands first
   w.eval(`S.tc.room.e2e = false; e2eRoomDecrypt(${room.id}); renderView()`);
   check(w.eval(`!!E2E.down[${room.id}]`) && !!d.querySelector('.e2ewarn [data-e2e="dm-down-ok"]'), 'dm: a silent downgrade shows a warning');
   const n0 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
@@ -207,6 +210,7 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   await w.eval('window.__snd');
   const n1 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
   check(!!ask && n1 === n0, 'dm: asked first, nothing sent without the confirmation');
+  w.eval('td_polling = false');
   // switched off by a person (notice in the conversation): no warning, the marker goes
   const off = await call('POST', `/api/team/rooms/${room.id}/e2e`, {on: false}, CKB);
   await w.eval(`loadRoom(${room.id})`);

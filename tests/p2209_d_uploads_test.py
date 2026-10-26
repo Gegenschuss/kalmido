@@ -198,7 +198,8 @@ check(sql("SELECT org_id FROM file_text WHERE kind='att' AND ref_id=?", (AT1,)) 
 
 # ---------------------------------------------------------------- 4. exports leave out locked files and list them
 sql("UPDATE upload_scan SET state='infected', sig='Test-Signatur' WHERE kind='att' AND ref_id=?", (AT2,), write=True)  # unchecked since its upload
-out = in_app(f"import io, json, zipfile\nfrom kalmido.admin.orgexport import ox_build\nb = io.BytesIO()\nm = ox_build(c, {ORG}, b, None)\n"
+# 2.223.3 B (#2880): the export holds the lists the exporting admin sees - Alice's own unshared "Belege Alpha" needs by=Alice
+out = in_app(f"import io, json, zipfile\nfrom kalmido.admin.orgexport import ox_build\nb = io.BytesIO()\nm = ox_build(c, {ORG}, b, {{'id': {ALICE}}})\n"
              "z = zipfile.ZipFile(io.BytesIO(b.getvalue()))\n"
              "print('ox', json.dumps({'names': [n for n in z.namelist() if n.startswith('files/')], 'locked': m.get('locked_files')}))")
 try:

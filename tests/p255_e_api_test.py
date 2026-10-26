@@ -221,6 +221,9 @@ check(r.status_code == 400 and "access data" in r.text, f"another address withou
 check(not [x for x in nl_log() if x["port"] == 8087], "nothing was sent to the other address")
 r = Bo.put(B + "/api/newsletter", json={"ws": WA, "auto": True})
 check(r.ok and r.json()["conn"]["auto"] is True, "planned sync on, without typing the access data again")
+# 2.318.0 CI: off again - a never synced "auto" connection is due at once, the watchdog's own run took the 2 adds of run 1
+r = Bo.put(B + "/api/newsletter", json={"ws": WA, "auto": False})
+check(r.ok and r.json()["conn"]["auto"] is False, "planned sync off again (no watchdog run between the test's runs)")
 
 # ---- consent
 r = Bo.put(B + "/api/newsletter/consent", json={"ids": [C1, C3], "status": "yes"})

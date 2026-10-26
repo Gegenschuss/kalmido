@@ -22,6 +22,7 @@ JS_START = re.compile(r"""^(?:if \((?:!process\.env\.\w*NOSTART(?: && !process\.
 PY_START = re.compile(r"""^(?:\w+ = )?subprocess\.run\(\["bash", os\.path\.join\(N, "start\.sh"\)""")
 PY_GUARD = re.compile(r"""^if not os\.environ\.get\(["']\w*NOSTART["']\):\s*$""")
 JS_TALK = re.compile(r"^\(async|^(?:fetch|boot|login|call|api|v1)\s*\(")  # CommonJS: no top-level await
+KEEP = re.compile(r"(?<!\w)KEEP(?!\w)")  # the env var KEEP, not names like LS_KEEP (p2240_ui, #3270)
 PY_TALK = re.compile(r"requests\.|urlopen|\bsess\(|\blogin\(|\.(?:get|post|put|patch|delete)\(B")
 
 
@@ -55,7 +56,7 @@ def qualifies(fname):
     lines = code_lines(path)
     js = fname.endswith(".js")
     strip = (lambda x: x.split("//")[0]) if js else (lambda x: x.split("#")[0])
-    if any("KEEP" in strip(x) for _, x in lines):
+    if any(KEEP.search(strip(x)) for _, x in lines):
         return "uses KEEP"
     first = next((i for i, x in lines if "start.sh" in strip(x)), None)
     if first is None:
