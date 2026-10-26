@@ -27,6 +27,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, agent_usable, is_agent, lst_brief, need_agent
+from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 
 SCHED_FREQS = ("daily", "weekdays", "weekly", "monthly")
 SCHED_MAX = 20                 # plans per person and agent
@@ -275,7 +276,6 @@ def ast2_sched_triage(c, r, a, now, manual):
     import json
     from ..agents.core import JOB_TITLE_MAX, job_dict
     from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, prop_input
-    from ..agents.datalock import dl_job_input
     from ..agents.usage import usage_block
     from ..collab.liste2eguard import le2b_list_locked
     aid, uid = r["agent_id"], r["user_id"]
