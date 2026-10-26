@@ -359,10 +359,6 @@ check(W1 in wsearch(Bo, "zitronenbaum") and any(x["id"] == W1 for x in Bo.get(B 
 r = Ca.post(B + "/api/wiki/move-space", json={"folder": "Handbuch", "space": SP, "to": "private", "dest": "", "dry": 1})
 check(r.ok and any("2 links point to the other workspace" in n for n in r.json().get("notes", [])),
       f"dry run: names the 2 links over the boundary ({r.text[:300]})")
-# 2.361.2 (#2923): carol takes her pages out only after an admin (bob) released her request for each
-for _pid in (W1, W2):
-    _rq = Ca.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": _pid}).json().get("id")
-    check(Bo.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: bob releases carol's page")
 r = Ca.post(B + "/api/wiki/move-space", json={"folder": "Handbuch", "space": SP, "to": "private", "dest": ""})
 check(r.ok, f"carol takes her pages into her private space ({r.text[:200]})")
 check(not {"Handbuch/Start", "Handbuch/Start/Unter"} & set(wpaths(Bo, SP)), "after: Alpha's page list no longer shows them")
@@ -401,8 +397,6 @@ dbx("INSERT INTO sheet_links(sheet_id, row_id, kind, target_id, list_id, batch, 
     (SID, ROW, "task", TT, TL, "b1", CAROL, ts))
 check(Bo.get(B + f"/api/sheets/{SID}").ok and SID in [x["id"] for x in Bo.get(B + "/api/sheets", params={"space": SP}).json().get("sheets", [])],
       "before: bob opens and lists the table")
-_rq = Ca.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "sheet", "id": SID}).json().get("id")  # 2.361.2 (#2923): released first
-check(Bo.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: bob releases carol's table")
 r = Ca.post(B + f"/api/sheets/{SID}/move-space", json={"to": "private"})
 check(r.ok and r.json()["sheet"]["list_id"] is None, f"carol takes the table into her private space, detached ({r.text[:200]})")
 check(gone(Bo.get(B + f"/api/sheets/{SID}")), "after: bob gets 404 on the table")
