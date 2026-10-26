@@ -419,13 +419,28 @@ TOOLS = [
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
                   "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
-                  "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed.",
+                  "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
+                  "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule).",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
     ("get_queue", "2.236.0 (#2906 #2907): your queue -- the open tasks assigned to you that you see: {max_parallel, priority_rule, "
                   "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "
                   "due}]}. Your order (set_queue_order) first, the rest by priority, due date, creation. Work on the active ones only "
                   "(max_parallel 0 = no limit) and choose the next task from it by priority_rule, the owner's rule in their words.",
      _obj({}), lambda api, a: api.call("GET", "/agent/queue")),
+    ("get_rules", "2.235.0 (#2903): your standing rules (\"from now on always ...\" instructions you saved), active and paused: "
+                  "{data: [{id, text, state: active | paused, created_at, source: {kind: chat | comment | manual, id, task_id, user_id, "
+                  "excerpt}}], max, text_max}. Follow the active ones in every run; paused ones do not apply. Your owner (an admin "
+                  "for a team agent) rewords, pauses and deletes them in your settings (event rules_changed).",
+     _obj({}), lambda api, a: api.call("GET", "/agent/rules")),
+    ("add_rule", "2.235.0 (#2903): save a standing rule when the person you work for tells you \"from now on always ...\" (or "
+                 "\"never again ...\", \"in future ...\"): text = the rule in one short sentence in their words (at most 500 "
+                 "characters), source = the chat message (kind chat, id = its message id) or the comment (kind comment, id = the "
+                 "comment id) it came from; it must be visible to you (else 404). The same text again returns the existing rule "
+                 "(duplicate: true). At most 100 rules. Then confirm it in ONE line (e.g. \"Saved as a standing rule: ...\").",
+     _obj({"text": {"type": "string", "minLength": 1, "maxLength": 500},
+           "source": _obj({"kind": {"type": "string", "enum": ["chat", "comment"]}, "id": {"type": "integer"}}, ["kind", "id"])},
+          ["text", "source"]),
+     lambda api, a: api.call("POST", "/agent/rules", body={"text": a["text"], "source": a["source"]})),
     ("set_queue_order", "2.236.0 (#2906): set the order of your queue: order = task ids (only your own open tasks you see, at most "
                         "500; an unknown / foreign id = 400). The tasks not named follow in the default order. Returns the queue.",
      _obj({"order": {"type": "array", "maxItems": 500, "items": {"type": "integer"}}}, ["order"]),
@@ -2179,7 +2194,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
 TOOL_SCOPES = {
-    "agent": ("get_agent", "get_queue", "set_queue_order", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
+    "agent": ("get_agent", "get_queue", "set_queue_order", "get_rules", "add_rule", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",

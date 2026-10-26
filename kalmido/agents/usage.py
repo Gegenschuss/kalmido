@@ -36,6 +36,7 @@ from ..agents.safety import access_cleanup
 from ..agents.admin import need_agent_admin
 from ..agents.workstyle import ws_get
 from ..agents.workqueue import wq_spec
+from ..agents.agentrules import ar_spec  # 2.235.0 C (#2903)
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
 
 
@@ -834,6 +835,7 @@ def v1_list_tag_delete(lid, tag_id):
 def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     """2.0.0 additions to the OpenAPI document."""
     wq_spec(paths, schemas, op, ok, errs, ref)  # 2.236.0 C (#2906 #2907): the agent queue (here, not in api/openapi: no upward import)
+    ar_spec(paths, schemas, op, ok, errs, ref)  # 2.235.0 C (#2903): the agent's standing rules
     ev = {"type": "object", "properties": {"id": {"type": "string"}, "seq": {"type": "integer"}, "event": {"type": "string", "enum": list(AGENT_EVENTS)},
                                            "created_at": {"type": "string", "format": "date-time"}, "agent_id": {"type": "integer"},
                                            "actor": {"oneOf": [{"type": "null"}, {"type": "object"}]}, "via": {"type": "string"},

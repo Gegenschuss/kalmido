@@ -444,6 +444,7 @@ class Stream:
         self.tools, self.context_tokens = 0, 0  # 2.44.0 (#1448 / #1446): tool calls seen, size of the conversation
         self.timed_out, self.err_tail = False, []
         self.aborted = False  # 2.144.0 (#2412): ended by Stop in the chat
+        self.rules_added = False  # 2.235.0 C (#2903): the run saved a standing rule (add_rule) -> read GET /api/v1/agent again
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
     def feed(self, line):
@@ -474,6 +475,8 @@ class Stream:
                     self.text = self.last_text = str(blk["text"]).strip()
                 elif blk.get("type") == "tool_use":
                     self.tools += 1
+                    if str(blk.get("name") or "").endswith("add_rule"):
+                        self.rules_added = True
                     if self.text:
                         self.pending, self.text = self.text, ""
         elif t == "rate_limit_event":
@@ -603,7 +606,21 @@ def rules_block(agent=None):
                "assignments reach you as Kalmido events (Kalmido lets only people who may use you write to you)"
                + (f", and of them only from the account ids {', '.join(ids)}." if ids else "."))
         language = "answer in the language of the person you answer" + (f" (if that is unclear: {lang})." if lang else ".")
-    return text.replace("{{WHO}}", who).replace("{{LANGUAGE}}", language)
+    return text.replace("{{WHO}}", who).replace("{{LANGUAGE}}", language) + standing_rules_block(agent)
+
+
+# kalmido-capability: standing_rules (2.235.0, #2903)
+def standing_rules_block(agent):
+    """2.235.0 C (#2903): the agent's ACTIVE standing rules (GET /api/v1/agent "rules", the event rules_changed) under the
+    fixed rules: what it was told "from now on always ..." and its owner keeps in Kalmido (paused ones are not sent). An older
+    server sends no "rules": nothing is added."""
+    rules = [r for r in ((agent or {}).get("rules") or []) if isinstance(r, dict) and str(r.get("text") or "").strip()]
+    if not rules:
+        return ""
+    lines = [f"- {' '.join(str(r['text']).split())} (rule {r.get('id')}, since {str(r.get('created_at') or '')[:10]})" for r in rules]
+    return ("\n\n## Standing rules (kept in Kalmido, changed only there)\n\nFollow them in every run, unless a fixed rule above "
+            "forbids it. A new \"from now on always ...\" of the person you work for: save it with add_rule (source = that message "
+            "or comment) and confirm it in ONE line.\n\n" + "\n".join(lines))
 
 
 
@@ -1524,6 +1541,10 @@ class Runner:
             self.mark_approval(ev)
             if ev.get("_drop"):
                 continue
+            if ev.get("event") == "rules_changed":  # 2.235.0 C (#2903): information, no run (the next prompt has them)
+                self.agent["rules"] = (ev.get("data") or {}).get("rules") or []
+                log("standing rules changed")
+                continue
             if ev.get("event") == "work_style_changed":  # 2.236.0 (#2905): information, no run
                 self.agent["work_style"] = (ev.get("data") or {}).get("work_style") or self.agent.get("work_style")
                 log("work style changed")
@@ -1656,6 +1677,8 @@ class Runner:
         for n in (1, 2):
             sess = self.state.data["sessions"].get(key) if key else None
             st, rc = self._exec(self.run_args(args + (["--resume", sess["id"]] if sess else [])), prompt, uid, what, tid)
+            if st is not None and st.rules_added:  # 2.235.0 C (#2903): its own new rule is in the next prompt's rules block
+                self.refresh_agent()
             if st is not None and st.aborted:  # 2.144.0 (#2412): stopped by the person, never a second try
                 return st, rc, "stopped"
             if st is not None and (result_text(st) or rc == 0):

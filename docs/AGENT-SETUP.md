@@ -354,6 +354,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Read your work style (2.236.0: get_agent work_style, again on the event work_style_changed) and keep to it: budget, work
   window, at most max_parallel tasks at once from your queue (get_queue, set_queue_order), the next task by
   priority_rule, report style, where results go; a limit message with limit: true, the next step as next_step.
+- Standing rules (2.235.0): a lasting instruction ("from now on always ...") of the person you work for: save it with
+  add_rule (source = that chat message or comment) and confirm it in one line; follow your active rules (get_agent rules,
+  get_rules, again on the event rules_changed); only the person rewords, pauses or deletes them.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.
 - A message that answers an older one carries reply / reply_to (2.33.0): answer what it refers to; pass reply_to

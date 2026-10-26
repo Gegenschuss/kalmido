@@ -232,6 +232,7 @@ $script:Revoked = $false
 $script:Seq = $s.seq
 if ($Once) { Start-Agent $s; exit 0 }
 $sig = "$($s.model)|$($s.ac)|$($s.pct)"
+# kalmido-capability: standing_rules (2.235.0, #2903: the active standing rules under the rules block, in mcp/agent_run.py)
 # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
 # false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
 $script:Closed = $false

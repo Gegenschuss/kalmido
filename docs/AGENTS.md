@@ -25,6 +25,7 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Behaviour rules template](#behaviour-rules-template) (2.13.1)
 - [Runtime settings](#runtime-settings) (2.4.1)
 - [Work style](#work-style) (2.236.0: budget, work and quiet window, queue, priority rule, report style, pushes, next step)
+- [Standing rules](#standing-rules) (2.235.0: "from now on always ..." with date and source, editable and pausable)
 - [Teaching the agent](#teaching-the-agent) (2.46.6)
 - [Proposals](#proposals) (2.3.0)
 - [Day plans](#day-plans) (2.10.0)
@@ -747,6 +748,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `wake` | `POST …/wake` ([Wake endpoint](#wake-endpoint-for-agents-without-an-event-loop)) | `task` and `list` (or none), `user`, `source`: `task` or `chat` |
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `work_style_changed` | 2.236.0: the owner (an admin for a team agent) changed the agent's [work style](#work-style) | `work_style` (with `state`) |
+| `rules_changed` | 2.235.0: the owner (an admin for a team agent) added, reworded, paused, resumed or deleted one of the agent's [standing rules](#standing-rules) (never for the agent's own `add_rule`) | `change` (`added` / `edited` / `paused` / `resumed` / `deleted`), `rules` (the active ones) |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a project's team chat (the agent is a member of the channel of every project shared with it); 2.46.1: in a project where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply, attachments, thread_of}` (2.139.0: an attachment with `voice: true` is a voice message, `duration_ms` its length; Kalmido does not transcribe), `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`); 2.139.0 (#2127): `thread_of` set = the message answers in a thread: answer in that thread (`thread_of`) |
@@ -2532,6 +2534,39 @@ on at `work_resumes_at`; the events stay where they are. The reference starters 
 no session outside the window, `agent_run.py` (event mode) keeps the events in its queue on disk, shows the status
 *paused* with the time it goes on, and reads `work_style_changed` at once (no run for it).
 
+## Standing rules
+
+*Since 2.235.0 (#2903).*
+
+A lasting instruction ("from now on always ...", "never again ...") becomes a **standing rule** of the agent: Kalmido
+keeps it with its date and source, the owner sees it in the agent's settings (*Work style and notifications* >
+*Standing rules*) and can reword, pause, resume or delete it, or add one by hand. Kalmido never reads the messages for
+such instructions (it calls no language model): the agent recognises them itself, saves the rule and confirms it in
+one line.
+
+- `POST /api/v1/agent/rules {"text": "...", "source": {"kind": "chat" | "comment", "id": N}}` (MCP `add_rule`) saves a
+  rule. The source must be a chat message of a person to the agent (in a conversation it still has) or a comment it can
+  see, never its own; anything else = 404. The same text as an existing rule returns that rule (200,
+  `duplicate: true`), a new one 201. At most 100 rules per agent, 500 characters each (400 beyond).
+- `GET /api/v1/agent/rules` (MCP `get_rules`) lists all rules with `state` `active` / `paused` and `source`
+  `{kind, id, task_id, user_id, excerpt}` (`kind` `manual` = added by a person).
+- `GET /api/v1/agent` carries `rules`: only the **active** ones `[{id, text, created_at, source}]`, oldest first. A
+  person's change sends the event `rules_changed` with the same list.
+- Owner routes (the owner of a personal agent, an instance admin for a team agent, everyone else 404):
+  `GET` / `POST /api/agents/{id}/rules`, `PATCH /api/agents/{id}/rules/{rule}` (`text`, `state`), `DELETE ...`.
+  The settings show the excerpt and the link to the source only to a person who may see it themselves.
+
+```
+POST /api/v1/agent/rules {"text": "Always write invoices in English", "source": {"kind": "chat", "id": 812}}
+-> 201 {"rule": {"id": 3, "text": "Always write invoices in English", "state": "active", "source": {"kind": "chat",
+   "id": 812, "task_id": null, "user_id": 2, "excerpt": "From now on always write invoices in English"}, ...},
+   "duplicate": false}
+```
+
+The reference starters put the active rules under their fixed rules block in every prompt (capability
+`standing_rules`; `agent_run.py` reads `rules_changed` at once, no run for it, and reads `GET /api/v1/agent` again after
+a run that called `add_rule`).
+
 ## Teaching the agent
 
 *Since 2.46.6.*
@@ -3295,7 +3330,7 @@ those the token's scopes allow). `tests/agent_docs_coverage_test.py` checks that
 endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
-`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,

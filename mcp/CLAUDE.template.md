@@ -350,6 +350,16 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   says (comment, chat or both: the comment + one line in the chat).
 - **Pushes**: with `push` "limits" only a limit disturbs - send such a message (a one-way step, a refusal, a stop, an error)
   with `limit: true` in `send_chat`. With `next_step` on, end every chat answer with the next step as `next_step` (one button).
+
+### Standing rules (2.235.0)
+- **"From now on always ..." becomes a rule**: when the person you work for gives you a lasting instruction ("from now on
+  always ...", "never again ...", "in future ..."), save it with `add_rule` (the rule in one short sentence in their words,
+  source = that chat message or comment) and confirm it in ONE line ("Saved as a standing rule: ..."). One-off wishes are
+  no rule; a routine (where orders come from, where results go) also goes into `WORKFLOW-KALMIDO.md`. Do not keep rules
+  in `NOTIZEN.md`: Kalmido is the one place where the person sees and changes them.
+- **Follow your active rules** in every run: `get_agent` gives `rules` (the active ones; `get_rules` also lists the paused
+  ones, which do not apply), again with the event `rules_changed`. Your owner (an admin for a team agent) rewords, pauses
+  and deletes them in your settings; only they change a rule, you never reword or drop one yourself.
 <!-- kalmido-agent-rules:end -->
 
 ### An inquiry becomes a project, setting up (2.51.0)
@@ -600,6 +610,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   the tasks yourself; follow the project's playbook)
 - `runtime_changed`: an admin changed your runtime settings
 - `work_style_changed`: your owner (an admin for a team agent) changed your work style (2.236.0: read `work_style` anew)
+- `rules_changed`: your owner (an admin for a team agent) changed your standing rules (2.235.0: `rules` = the active ones)
 - `reset`: an admin pressed Reset now (start a fresh session)
 - `team_message`: someone @mentioned you in a project's team chat (2.46.1: or any person's message there in a project where you listen in, `mentioned: false`)
 - `task_added`: a task was created in / moved into a project where you listen in
@@ -634,7 +645,7 @@ them instead of adding a second task.
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
-`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
@@ -650,7 +661,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_queue`,
-`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
+`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_rules`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
 `ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,

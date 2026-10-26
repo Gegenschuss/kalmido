@@ -223,3 +223,32 @@ def ar_route_delete(aid, rid):
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+def ar_spec(paths, schemas, op, ok, errs, ref):
+    """OpenAPI of the agent's standing rules (2.235.0 C, #2903; called from agents/usage.py agent_spec)."""
+    AG = "Agents"
+    src = {"type": "object", "properties": {
+        "kind": {"type": "string", "enum": ["chat", "comment", "manual"], "description": "a chat message of a person to you, a comment, or added by a person in your settings"},
+        "id": {"type": ["integer", "null"], "description": "the chat message / comment id"},
+        "task_id": {"type": ["integer", "null"], "description": "the task of a comment"},
+        "user_id": {"type": ["integer", "null"], "description": "the person of the chat / the author of the comment"},
+        "excerpt": {"type": "string", "description": "the start of the source text, taken at creation"}}}
+    schemas["AgentRule"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "text": {"type": "string"}, "state": {"type": "string", "enum": list(AR_STATES), "description": "only active rules apply"},
+        "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"},
+        "created_by": {"type": ["integer", "null"]}, "source": src}}
+    paths["/agent/rules"] = {
+        "get": op("2.235.0 (#2903): your standing rules, active and paused (only the active ones apply; they also come in GET /agent "
+                  "rules and with the event rules_changed)", AG,
+                  ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("AgentRule")}, "max": {"type": "integer"},
+                                                       "text_max": {"type": "integer"}}}) | errs("403")),
+        "post": op("2.235.0 (#2903): save a standing rule you recognised (\"from now on always ...\") with its source: a chat message of a "
+                   "person to you or a comment you can see (else 404). The same text as an existing rule returns that one (200, "
+                   "duplicate: true). At most 100 rules, 500 characters each. Confirm it in ONE line", AG,
+                   ok({"type": "object", "properties": {"rule": ref("AgentRule"), "duplicate": {"type": "boolean"}}}, code="201")
+                   | ok({"type": "object", "properties": {"rule": ref("AgentRule"), "duplicate": {"type": "boolean"}}}) | errs("400", "403", "404"),
+                   scope="write", body={"type": "object", "required": ["text", "source"], "additionalProperties": False, "properties": {
+                       "text": {"type": "string", "minLength": 1, "maxLength": AR_TEXT_MAX},
+                       "source": {"type": "object", "required": ["kind", "id"], "additionalProperties": False, "properties": {
+                           "kind": {"type": "string", "enum": list(AR_KINDS)}, "id": {"type": "integer"}}}}})}
