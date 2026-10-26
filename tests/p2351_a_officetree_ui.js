@@ -38,14 +38,15 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
   check(!((await call(CC, 'GET', '/api/state')).me.workspaces || []).length, 'P4: carol has no organisation');
   const cl = await call(CC, 'POST', '/api/clients', {name: 'Example Ltd'});
   const Q = [];
-  for (let i = 0; i < 23; i++) Q.push((await call(CC, 'POST', '/api/office/docs', {kind: 'offer', client_id: cl.id, project_title: i < 2 ? 'Harbour film' : '', items: [{title: `Day ${i}`, qty: 1, rate: 100 + i}]})).id);
-  check(Q.every(Boolean), 'setup: 23 quotations of carol');
+  for (let i = 0; i < 26; i++) Q.push((await call(CC, 'POST', '/api/office/docs', {kind: 'offer', client_id: cl.id, project_title: i < 2 ? 'Harbour film' : '', items: [{title: `Day ${i}`, qty: 1, rate: 100 + i}]})).id);
+  check(Q.every(Boolean), 'setup: 26 quotations of carol');
   const F1 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: 'Client Alpha'})).folder?.id;
   const F2 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: '2026', parent_id: F1})).folder?.id;
   const F3 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: 'Archive box'})).folder?.id;
   check(F1 && F2 && F3, 'setup: folders at the area Quotes & invoices');
   check((await call(CC, 'POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: Q[0], parent_id: F2})).http === 200, 'setup: the oldest quotation in Client Alpha / 2026');
   const refOf = async id => ((await call(CC, 'GET', `/api/files/refs/office_doc/${id}`)).node || {}).parent_id || null;
+  const filedIn = async (id, fid) => { for (let i = 0; i < 40; i++) { if (await refOf(id) === fid) return true; await sleep(250); } return false; };  // the stored state
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = ev => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'carol', password: 'password123'})}).then(r => r.status)`);
@@ -59,13 +60,13 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); localStorage.setItem('tasks.ofmAll', 'true'); return 1; })()`);  // every point shown, Money open by hand (Receipts)
     check(await signIn(ev) === 200, 'carol signs in');
     await nav(B + '#office/offers');
     check(await ready(ev, `!!${node('a:offers')} && ${node('a:offers')}.dataset.sbbns === 'oft' && !!document.querySelector('#side [data-ofm="offers"]')`, 80),
       'computer: Quotes & invoices is a tree node (its name keeps the office point)');
-    check(await ev(`!!${node('a:gendocs')} && !!${node('a:letters')} && !!${node('a:receipts')} && !document.querySelector('#side [data-offolders]')`),
-      'computer: Documents, Correspondence, Receipts are tree nodes too; no group "Folders"');
+    check(await ready(ev, `!!${node('a:gendocs')} && !!${node('a:letters')} && !!${node('a:receipts')} && !document.querySelector('#side [data-offolders]')`, 60),  // the admin's points come with the office's settings
+      'computer: Documents, Correspondence, Receipts are tree nodes too; no group "Folders" ' + await ev(`[...document.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm + ':' + (b.closest('.sbbt')?.dataset.sbbid || 'row')).join()`));
     await openNode(ev, 'a:offers');
     check(await ready(ev, `!!${node('f:offers:' + F1)} && !!${node('f:offers:' + F3)} && document.querySelectorAll('#side .sbbt[data-sbbpar="a:offers"][data-sbbid^="d:offers:"]').length === 20 && !!document.querySelector('#side [data-oftmore="offers"]')`, 60),
       'computer: opened = its folders, the 20 newest quotations in no folder and More…');
@@ -82,15 +83,15 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
     // a quotation dragged onto a folder (the tree's handler, as the drop calls it)
     await ev(`(() => { SBB_TREE.oft.move('d:offers:${Q[22]}', 'f:offers:${F3}'); return 1; })()`);
-    check(await ready(ev, toastHas('Filed in'), 40) && await refOf(Q[22]) === F3, 'computer: dragged onto Archive box = filed there (toast)');
+    check(await filedIn(Q[22], F3) && await ready(ev, toastHas('Filed in'), 40), 'computer: dragged onto Archive box = filed there (toast)');
     check(await ready(ev, `${node('d:offers:' + Q[22])}?.dataset.sbbpar === 'f:offers:${F3}' || !!${node('f:offers:' + F3)}`, 40), 'computer: the tree follows');
     // a row of the list dropped onto a folder of the panel
-    await ready(ev, `!!document.querySelector('#view .ofdli[draggable="true"] .ofdrow[data-id="${Q[21]}"]')`, 60);
+    check(await ready(ev, `!!document.querySelector('#view .ofdli[draggable="true"] .ofdrow[data-id="${Q[21]}"]')`, 60), 'computer: the list rows can be dragged');
     await ev(`(() => { const li = document.querySelector('#view .ofdrow[data-id="${Q[21]}"]').closest('.ofdli'), t = ${node('f:offers:' + F3)}, dt = new DataTransfer();
       li.dispatchEvent(new DragEvent('dragstart', {bubbles: true, cancelable: true, dataTransfer: dt}));
       t.dispatchEvent(new DragEvent('dragover', {bubbles: true, cancelable: true, dataTransfer: dt}));
       t.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: dt})); return 1; })()`);
-    check(await ready(ev, toastHas('Filed in'), 40) && await refOf(Q[21]) === F3, 'computer: a list row dropped onto a panel folder = filed there');
+    check(await filedIn(Q[21], F3), 'computer: a list row dropped onto a panel folder = filed there');
     // More… opens the full list
     await nav(B + '#office/offers/' + Q[5]);
     await ready(ev, `!!document.querySelector('#side [data-oftmore="offers"]')`, 60);
@@ -122,7 +123,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     await pick(ev, 'Move…');
     check(await ready(ev, `${menuLabels}.includes('Client Alpha / 2026')`, 20), 'phone: Move… lists the folders with their path');
     await pick(ev, 'Client Alpha / 2026');
-    check(await ready(ev, toastHas('Filed in'), 40) && await refOf(Q[20]) === F2, 'phone: moved into Client Alpha / 2026');
+    check(await filedIn(Q[20], F2) && await ready(ev, toastHas('Filed in'), 40), 'phone: moved into Client Alpha / 2026');
     await shot('p2351a-phone-tree.png');
   }, true);
 

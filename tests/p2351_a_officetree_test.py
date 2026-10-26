@@ -297,5 +297,5 @@ check(Ol.post(B + f"{O}/docs/tree/folders", json={"name": "Intruder", "parent_id
       "(h) no folder inside alpha's folder")
 check(file_in(Ol, "office_doc", Q, F1)[0] in (403, 404), "(h) nor files alpha's quotation")
 
-print(f"p2351_a_officetree: {len(OKS)} ok, {len(FAILS)} failed")
+print(f"p2351_a_officetree: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
