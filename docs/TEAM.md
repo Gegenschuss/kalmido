@@ -440,11 +440,12 @@ private space into an organisation and moving inside one organisation work as be
 moves freely in the own private space.
 
 **The way back for members (2.361.2).** Whoever brought something into an organisation or made it there (a project they own,
-a table or a file / folder they made) and is no admin gets *Ask an admin* instead of a plain refusal -- in the move dialog
+a table, file / folder, knowledge page, office client or draft, video sign-off they made, a poll or bookmark of theirs) and is no admin gets *Ask an admin* instead of a plain refusal -- in the move dialog
 and in the message. The organisation's admins get a News item and find the request at the top of *Settings > Workspaces >
 Projects of the organisation*: *Release* or *Decline* is one click. After a release the member moves that one thing into
 their private space with the usual dialog (which still lists what the move ends) within 14 days; the release is used up
-by that move. Releases, declines and the move itself are in the project history; nothing goes back silently. The dry run
+by that move. Knowledge pages, office clients and drafts, video sign-offs, polls and bookmarks no longer let their
+maker take them out without an admin (before 2.361.2 they did, unlogged). Releases, declines and the move itself are in the project history; nothing goes back silently. The dry run
 of a move into an organisation tells a member up front that the way back needs an admin.
 
 ## File requests: clients upload into a folder
