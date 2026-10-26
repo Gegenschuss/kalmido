@@ -942,6 +942,9 @@ ROUTES = {
     # 2.236.0 (#2904-#2911): the work style of an agent (owner / instance admin, else 404); C (#2906): its queue (p2236_c_queue_test.py)
     "GET /api/agents/{}/work-style": "agents", "PATCH /api/agents/{}/work-style": "agents", "GET /api/agents/{}/queue": "agents",
     "GET /api/v1/agent/queue": "agents", "PUT /api/v1/agent/queue": "agents",
+    # 2.235.0 C (#2903): the standing rules of an agent (the agent itself; owner / instance admin, else 404; p2235_c_rules_api_test.py)
+    "GET /api/v1/agent/rules": "agents", "POST /api/v1/agent/rules": "agents", "GET /api/agents/{}/rules": "agents",
+    "POST /api/agents/{}/rules": "agents", "PATCH /api/agents/{}/rules/{}": "agents", "DELETE /api/agents/{}/rules/{}": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
