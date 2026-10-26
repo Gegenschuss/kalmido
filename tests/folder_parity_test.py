@@ -35,7 +35,7 @@ if not os.environ.get("FOLDERPAR_NOSTART"):
     time.sleep(0.8)
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "collab"]})
+A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "collab", "contacts"]})  # 2.351.0 B (#2749): + contacts (the agents' module)
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEAT})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bob", "display_name": "Bob",

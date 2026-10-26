@@ -38,7 +38,7 @@ s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
+A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments", "contacts"]})  # agents: contacts on
 A.patch(B + "/api/settings", json={"lang": "en"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 SP = f"org:{ORG}"
@@ -202,12 +202,14 @@ OF = folder(A, "Crew", SP)
 check(place(A, "address_book", OB, OF).ok, "an organisation book into an organisation folder")
 AG, ag = agent("crewbot", org=ORG)
 NG, ng = agent("nocontacts", scopes=("read", "write"), org=ORG)
-check(ag.get(V + f"/contacts/{O1}").status_code == 404, "agent: nothing without a share")
+r = ag.get(V + f"/contacts/{O1}")
+check(r.status_code == 404, f"agent: nothing without a share {r.status_code} {r.text[:200]}")
 check(A.patch(B + f"/api/files/nodes/{OF}", json={"org_access": "view"}).ok and ag.get(V + f"/contacts/{O1}").status_code == 404,
       "agent: organisation access gives nothing")
 fshare(A, OF, agent_id=AG, role="view")
 fshare(A, OF, agent_id=NG, role="view")
-check(ag.get(V + f"/contacts/{O1}").ok and ag.patch(V + f"/contacts/{O1}", json={"note": "x"}).status_code == 403, "agent: view through its share")
+r = ag.get(V + f"/contacts/{O1}")
+check(r.ok and ag.patch(V + f"/contacts/{O1}", json={"note": "x"}).status_code == 403, f"agent: view through its share {r.status_code} {r.text[:200]}")
 check(ng.get(V + f"/contacts/{O1}").status_code in (403, 404), "an agent token without the scope contacts: never")
 r = ag.get(V + "/address-books")
 check(r.ok and any(b["id"] == OB for b in r.json()["data"]), "agent: the book in its list")
