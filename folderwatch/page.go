@@ -6,8 +6,8 @@ const pageHTML = `<!doctype html>
 {{if .Reload}}<meta http-equiv="refresh" content="4;url={{.Base}}">{{else if eq .Page "status"}}<meta http-equiv="refresh" content="10">{{end}}
 <title>{{t .L "app"}}</title>
 <style>
-:root{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--line:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--accent:#6d4bd8;--accent-ink:#ffffff;--ok:#2f9e44;--wait:#8a6200;--err:#b3372f;color-scheme:light}
-@media (prefers-color-scheme: dark){:root{--bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--line:#2a2c31;--text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--accent:#a78bfa;--accent-ink:#1a1033;--ok:#51cf66;--wait:#d6a54a;--err:#ef7068;color-scheme:dark}}
+:root{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--line:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--accent:#187381;--accent-ink:#ffffff;--ok:#2f9e44;--wait:#8a6200;--err:#b3372f;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--line:#2a2c31;--text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--accent:#4fb3c1;--accent-ink:#04201f;--ok:#51cf66;--wait:#d6a54a;--err:#ef7068;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:0.9375rem/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:46rem;margin:0 auto;padding:2rem 1.25rem 3rem}

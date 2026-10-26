@@ -2,13 +2,13 @@
 """2.136.0 (#2193): the Kalmido icon set, the bot figure (replaces the heron of 2.18.0, #394).
 
 One source of truth for every icon file: a soft rounded body with two eyes (a line and a dot) and an antenna; the app
-icon is white on the violet plate (#6d4bd8, the app accent) with a white antenna (2.152.3, #2667: a dark one vanished on the dark macOS 26 tile). The paths come 1:1 from the final design
+icon is white on the petrol plate (#1a7f8e, the brand colour since 2.300.0, #3198; violet #6d4bd8 before) with a white antenna (2.152.3, #2667: a dark one vanished on the dark macOS 26 tile). The paths come 1:1 from the final design
 files (kalmido-bot.zip, 18.10.2026). This script writes the SVGs and renders all PNGs from them with
 rsvg-convert + ImageMagick (metadata and time chunks stripped), so the same drawing gives byte-identical files:
 
-  static/icon.svg               app icon, 100 x 100 grid, rounded violet plate (also the "Kalmido" list-icon preset)
-  static/icon-light.svg         light variant (light plate, dark figure, violet antenna)
-  static/logo-white.svg         the figure alone in white on transparent (eyes cut out), violet antenna
+  static/icon.svg               app icon, 100 x 100 grid, rounded petrol plate (also the "Kalmido" list-icon preset)
+  static/icon-light.svg         light variant (light plate, dark figure, petrol antenna)
+  static/logo-white.svg         the figure alone in white on transparent (eyes cut out), light petrol antenna
   static/icon-192.png / -512    manifest icons, purpose "any" (rounded plate, transparent corners)
   static/icon-maskable-512.png  manifest icon, purpose "maskable": plate full-bleed, figure inside the inner 80 % circle
   static/apple-touch-icon.png   180 px, square and opaque (iOS rounds the corners itself; design file icon-ios-180)
@@ -35,9 +35,9 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PLATE, WHITE, INK = "#6d4bd8", "#FFFFFF", "#18171D"   # violet plate, the figure, the antenna on the plate
+PLATE, WHITE, INK = "#1a7f8e", "#FFFFFF", "#18171D"   # 2.300.0 (#3198): petrol plate (was violet #6d4bd8), the figure, the antenna on the plate
 LIGHT_PLATE, LIGHT_BODY = "#F1F0F5", "#2B2A31"         # light variant
-ANT_DARK = "#a78bfa"                                   # antenna on dark plates (lockups), the accent of the dark theme
+ANT_DARK = "#4fb3c1"                                   # antenna on dark plates (lockups), the accent of the dark theme (2.300.0: light petrol)
 WORD_INK, WORD_LIGHT = "#18171D", "#EEEDF3"            # word mark on light / on dark backgrounds
 
 # the figure on the 100 x 100 grid (design file): body, eyes (a line and a dot), antenna

@@ -30,7 +30,7 @@ for n in ("icon.svg", "favicon.svg"):
     m = ANT.search(s)
     check(m and not dark(m.group(1) if len(m.group(1)) == 7 else "#" + "".join(c * 2 for c in m.group(1)[1:])),
           f"{n}: the antenna is light, not black")
-    check(s.count('stroke="#6d4bd8"') == 2, f"{n}: both eyes are painted in the accent #6d4bd8")
+    check(s.count('stroke="#1a7f8e"') == 2, f"{n}: both eyes are painted in the brand petrol #1a7f8e")  # 2.300.0 (#3198): was violet #6d4bd8
     check("18171D" not in s, f"{n}: no black left")
 for n in ("static/js/icons.js", "static/index.html"):
     s = read(*n.split("/"))

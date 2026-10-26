@@ -14,10 +14,12 @@
 @font-face{font-family:"Atkinson Hyperlegible";src:url("/static/fonts/AtkinsonHyperlegible-Italic.woff2") format("woff2");font-weight:400;font-style:italic;font-display:swap}
 @font-face{font-family:"Atkinson Hyperlegible";src:url("/static/fonts/AtkinsonHyperlegible-BoldItalic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}
 :root{
-  /* 2.8.0 "Leitstand" (#434): neutral greys, violet accent (2.11.0, was raspberry), status colours for agents and work */
+  /* 2.8.0 "Leitstand" (#434): neutral greys, petrol accent (2.300.0; violet 2.11.0, raspberry before), status colours for agents and work */
   --bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--bg4:#2c2e33;--line:#212328;--line2:#2a2c31;
   --text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--faint:#8a8d95;--ok-t:#51cf66;
-  --acc-d:#a78bfa;--acc-ink-d:#1a1033;--acc-l:#6d4bd8;--acc-ink-l:#ffffff;--accent:var(--acc-d);--accent-ink:var(--acc-ink-d);
+  /* 2.300.0 (#3198): petrol is the brand colour and the default accent (violet before, now :root[data-accent="violet"]); the light
+     value is a shade darker than the logo plate #1a7f8e so accent text keeps WCAG AA on --bg3 and the paper theme */
+  --acc-d:#4fb3c1;--acc-ink-d:#04201f;--acc-l:#187381;--acc-ink-l:#ffffff;--accent:var(--acc-d);--accent-ink:var(--acc-ink-d);
   --accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));
   --p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--ok:#51cf66;--danger:#ef7068;
   --st-ready:#51cf66;--st-work:#4dabf7;--st-wait:#fcc419;--st-wait-t:#fcc419;--st-off:#8d9096;--st-err:#ef7068;--wait-soft:#2a2410;
@@ -38,8 +40,10 @@
 /* font per device; the mono details (dates, times, counters, tags, kbd) always stay Geist Mono */
 :root[data-font="system"]{--sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 :root[data-font="atkinson"]{--sans:"Atkinson Hyperlegible",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-/* accent per device (2.11.0: violet is the default in :root; raspberry, the 2.8.0 default, and mint have their own rules): dark value + ink (text on an accent fill), light value + ink; all pairs WCAG AA (>= 4.5:1)
+/* accent per device (2.300.0, #3198: petrol is the default in :root, :root[data-accent="petrol"] only names it; violet, the 2.11.0 default,
+   raspberry, the 2.8.0 default, and mint have their own rules): dark value + ink (text on an accent fill), light value + ink; all pairs WCAG AA (>= 4.5:1)
    against --bg/--bg2/--bg3 of their theme (tests/appearance_ui.js checks every combination) */
+:root[data-accent="petrol"]{--acc-d:#4fb3c1;--acc-ink-d:#04201f;--acc-l:#187381;--acc-ink-l:#ffffff}
 :root[data-accent="mint"]{--acc-d:#2dd4bf;--acc-ink-d:#04201c;--acc-l:#0a766b;--acc-ink-l:#ffffff}
 :root[data-accent="sky"]{--acc-d:#38bdf8;--acc-ink-d:#03202e;--acc-l:#0b6aa2;--acc-ink-l:#ffffff}
 :root[data-accent="raspberry"]{--acc-d:#f472b6;--acc-ink-d:#2a0716;--acc-l:#be185d;--acc-ink-l:#ffffff}
@@ -3387,7 +3391,7 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] svg.kword,:root:not([data-theme]) svg.kword{color:#18171D} }
 .sbrand .sbtxt > span:has(> svg.kword),.alogo b:has(> svg.kword){display:flex;align-items:center;min-height:1.2em}
 .authscreen .alogo svg.logo{width:2.125rem;height:2.125rem}
-.authscreen .alogo svg.logo,#app .authscreen .alogo svg.logo{color:#6d4bd8}  /* 2.233.0 C (#3195): sign-in keeps the brand colour */
+.authscreen .alogo svg.logo,#app .authscreen .alogo svg.logo{color:#1a7f8e}  /* 2.233.0 C (#3195): sign-in keeps the brand colour; 2.300.0 (#3198): petrol */
 /* P20: settings search (every tab), the phone's tab row shows that it scrolls */
 .shdr{position:relative}
 .ssearch{display:flex;align-items:center;gap:.375rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);color:var(--muted);min-width:0;flex:0 1 14rem}
@@ -6425,7 +6429,7 @@ html.mini-chat body.in-team .tcview{flex:1;height:auto}
 #top h1 .wsbadge{flex:none}
 #top.tl4 .wsbadge span{display:none}
 @media (max-width:599px){ .wsbadge{max-width:7.5rem;padding:.0625rem .4375rem;margin-left:.375rem} }
-/* 2.49.0 A (#1553) the login page (also invitation, setup, new password, sign-in link): a soft violet gradient, a glow that
+/* 2.49.0 A (#1553) the login page (also invitation, setup, new password, sign-in link): a soft gradient in the accent colour, a glow that
    pulses (CSS) and follows the mouse (account.js lg_decor sets --lgx/--lgy), a calmer card, a greeting, the line under the card */
 .modal.authscreen{--lg-g1:color-mix(in srgb,var(--accent) 16%,transparent);--lg-g2:color-mix(in srgb,color-mix(in srgb,var(--accent) 45%,#000) 24%,transparent);--lg-glow:color-mix(in srgb,var(--accent) 22%,transparent);--lg-card:color-mix(in srgb,var(--bg2) 92%,transparent);--lg-shadow:0 1.875rem 5rem rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06)}
 :root[data-theme="light"] .modal.authscreen{--lg-g1:color-mix(in srgb,var(--accent) 12%,transparent);--lg-g2:color-mix(in srgb,var(--accent) 9%,transparent);--lg-glow:color-mix(in srgb,var(--accent) 15%,transparent);--lg-card:color-mix(in srgb,#fff 94%,transparent);--lg-shadow:0 1.875rem 4.375rem rgba(60,40,120,.14),0 0 0 1px rgba(20,10,60,.06)}

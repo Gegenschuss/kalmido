@@ -94,7 +94,7 @@ def invite_mail(c, u, link, kind, inviter):
     e = html.escape
     name = u["display_name"] or u["username"]
     host = PUBLIC_URL.split("://", 1)[-1].rstrip("/")
-    acc, ink, bg, card, muted = "#6d4bd8", "#1b1730", "#f4f2fb", "#ffffff", "#6b6680"
+    acc, ink, bg, card, muted = "#1a7f8e", "#14272b", "#eef5f6", "#ffffff", "#5f6b6e"  # 2.300.0 (#3198): petrol (was violet)
     from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
     org = (org_names(c, u["id"]) or [""])[0]
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
