@@ -49,7 +49,8 @@ if (process.env.P2233C_NOSTART !== '1') execFileSync('bash', [path.join(__dirnam
       // the text stays the normal text colour (contrast)
       // the settings pane: two palettes + the preview with three bubbles
       const pane = await ev(`(() => { const d = document.createElement('div'); d.innerHTML = lkChatHtml(); return {g: d.querySelectorAll('.lkacc').length, pv: d.querySelectorAll('.lkcpv .cbub').length, on: [...d.querySelectorAll('.lkacc button.on')].map(b => b.dataset.v), n: d.querySelectorAll('#s-chatHuman button').length}; })()`);
-      check(pane.g === 2 && pane.pv === 3 && pane.on.join() === 'orange,sky' && pane.n === 8, theme + ': settings block ' + JSON.stringify(pane));
+      // 2.300.0 (#3198): default + 8 accents (petrol added)
+      check(pane.g === 2 && pane.pv === 3 && pane.on.join() === 'orange,sky' && pane.n === 9, theme + ': settings block ' + JSON.stringify(pane));
       // back to default: the old look returns
       await ev(`(() => { lookSet('chatHuman', 'default'); lookSet('chatAgent', 'default'); return 1; })()`);
       const d3 = await settle(ev, d => same(d.h, d0.h) && same(d.a, d0.a));
