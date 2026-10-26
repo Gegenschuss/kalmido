@@ -22,17 +22,18 @@ from .session import me
 from .orgretain import Nn_
 
 
-# what of person uid stays in organisation oid when they leave it (and goes when it is deleted): (key, words, count query)
+# what of person uid stays in organisation oid when they leave it (and goes when it is deleted): (key, words, count query);
+# whose = who made it (created_by: an organisation's file, page, table or video has no private owner)
 OLV_STAYS = (
     ("files", Nn_("{0} file", "{0} files"),
-     "SELECT COUNT(*) FROM fs_nodes WHERE org_id=? AND owner_id=? AND kind='file' AND deleted_at IS NULL"),
+     "SELECT COUNT(*) FROM fs_nodes WHERE org_id=? AND created_by=? AND kind='file' AND deleted_at IS NULL"),
     ("wiki_pages", Nn_("{0} knowledge page", "{0} knowledge pages"),
-     "SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND owner_id=? AND deleted_at IS NULL"),
-    ("tables", Nn_("{0} table", "{0} tables"), "SELECT COUNT(*) FROM sheets WHERE org_id=? AND owner_id=? AND deleted_at IS NULL"),
+     "SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
+    ("tables", Nn_("{0} table", "{0} tables"), "SELECT COUNT(*) FROM sheets WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("bookmarks", Nn_("{0} bookmark", "{0} bookmarks"), "SELECT COUNT(*) FROM bookmarks WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
     ("polls", Nn_("{0} poll", "{0} polls"), "SELECT COUNT(*) FROM sched_polls WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
     ("videos", Nn_("{0} video review", "{0} video reviews"),
-     "SELECT COUNT(*) FROM video_reviews WHERE org_id=? AND owner_id=? AND deleted_at IS NULL"),
+     "SELECT COUNT(*) FROM video_reviews WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("drafts", Nn_("{0} office draft", "{0} office drafts"),
      "SELECT COUNT(*) FROM office_docs WHERE org_id=? AND created_by=? AND status='draft'"),
     ("clients", Nn_("{0} client", "{0} clients"), "SELECT COUNT(*) FROM clients WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
@@ -160,7 +161,7 @@ def olv_delete_notice(oid):
     c = db()
     b = body()
     try:
-        days = int(b.get("days") or OLV_NOTICE_DAYS)
+        days = int(b.get("days", OLV_NOTICE_DAYS))
     except (TypeError, ValueError):
         days = 0
     if not 1 <= days <= 90:
