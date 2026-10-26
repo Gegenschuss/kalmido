@@ -104,4 +104,18 @@ check(F.patch(B + f"/api/agents/{FA}/data-lock", json={"tags": ["privat", "later
 txt = requests.get(V + f"/agent/jobs/{J}", headers=FH).text
 check("ZQXLATER" not in txt and "ZQXPLAIN" in txt, f"after the lock GET /agent/jobs leaves it out {txt[:300]}")
 check("ZQXMAIL" in F.get(B + f"/api/tasks/{I_MAIL}").text, "the owner still sees the e-mail task")
+
+# ---------------------------------------------------------------- finding 2: many locked e-mails (more than inline) stay hidden
+r = F.put(B + f"/api/lists/{P}/members", json={"user_id": FA, "role": "edit"})
+check(r.ok, f"project shared with the agent {r.status_code} {r.text[:120]}")
+dbx("""INSERT INTO tasks(list_id, title, created_by, created_at, updated_at, tt_id)
+       SELECT list_id, 'ZQXMANY ' || g, created_by, created_at, updated_at, 'mail:<m' || g || '@example.com>'
+       FROM tasks, generate_series(1, 700) g WHERE id=?""", (D_OK,))
+MANY = dbx("SELECT id FROM tasks WHERE title LIKE 'ZQXMANY %' ORDER BY id")
+check(len(MANY) == 700, f"700 e-mail tasks ({len(MANY)})")
+txt = requests.get(V + f"/tasks?list_id={P}", headers=FH).text
+check("ZQXPLAIN" in txt and "ZQXMANY" not in txt and "ZQXMAIL" not in txt, f"700 locked e-mails: none in the list {txt[:200]}")
+check(requests.get(V + f"/tasks/{MANY[-1][0]}", headers=FH).status_code == 404, "one of them: 404")
+r = requests.patch(V + f"/tasks/{MANY[0][0]}", headers=FH, json={"title": "x"})
+check(r.status_code == 404, f"a write on one of them: 404 {r.status_code}")
 sys.exit(done("p2235_b2_jobs"))

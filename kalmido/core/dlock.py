@@ -19,6 +19,7 @@ DL_SWITCH = ("mail",) + DL_LIST_AREAS
 DL_AREAS = DL_ALWAYS + DL_SWITCH
 DL_DEFAULT = {"mail": True, "contracts": False, "home": False, "travel": False}  # private e-mails locked for every agent
 DL_LISTS_MAX, DL_TAGS_MAX, DL_TAG_LEN = 200, 50, 50
+DL_INLINE_MAX = 500  # 2.235.0 B2 (#2902): locked task ids written inline into a query, more = one array constant
 
 
 def dl_tag(t):
@@ -110,18 +111,19 @@ def dl_task_ids(c, uid):
     if cache is not None and uid in cache:
         return cache[uid]
     from .access import acx_lists_sql
-    cond, args = [], [int(uid), int(uid)]
+    # 2.235.0 B2 (#2902): one base query per kind (the mail part can use the partial index tasks_mail_list), scoped once
+    base, args = [], [int(uid), int(uid)]
     if d["_mail"]:
-        cond.append("(t.tt_id LIKE 'mail:%' AND l.org_id IS NULL)")
+        base.append("SELECT t.id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.tt_id LIKE 'mail:%' AND l.org_id IS NULL"
+                    " AND t.list_id IN (SELECT id FROM s)")
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
-        cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")
-        cond.append(f"EXISTS (SELECT 1 FROM task_list_tags y JOIN list_tags z ON z.id=y.tag_id WHERE y.task_id=t.id AND lower(z.name) IN ({q}))")
+        base.append(f"SELECT x.task_id FROM task_tags x JOIN tasks t ON t.id=x.task_id WHERE lower(x.tag) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
+        base.append(f"SELECT y.task_id FROM task_list_tags y JOIN list_tags z ON z.id=y.tag_id JOIN tasks t ON t.id=y.task_id"
+                    f" WHERE lower(z.name) IN ({q}) AND t.list_id IN (SELECT id FROM s)")
         args += list(d["_tags"]) * 2
-    rows = c.execute(f"""WITH RECURSIVE r(id) AS (
-                           SELECT t.id FROM tasks t JOIN lists l ON l.id=t.list_id
-                           WHERE t.list_id IN {acx_lists_sql(req=False)} AND ({' OR '.join(cond)})
-                           UNION SELECT t.id FROM tasks t JOIN r ON t.parent_id=r.id)
+    rows = c.execute(f"""WITH RECURSIVE s(id) AS {acx_lists_sql(req=False)}, b(id) AS ({' UNION '.join(base)}),
+                           r(id) AS (SELECT id FROM b UNION SELECT t.id FROM tasks t JOIN r ON t.parent_id=r.id)
                          SELECT id FROM r""", args).fetchall()
     out = frozenset(r[0] for r in rows)
     if cache is not None:
@@ -133,12 +135,20 @@ def dl_task_sql(c, uid, a=""):
     """SQL condition (no ? params, starting with AND) on the tasks alias a ("t." / "") that leaves out the tasks locked for
     agent uid; "" when none is."""
     ids = dl_task_ids(c, uid)
+    if len(ids) > DL_INLINE_MAX:  # 2.235.0 B2 (#2902): many ids (a basket full of e-mails) = one array constant, not thousands
+        return f" AND NOT ({a}id = ANY(CAST('{{{','.join(str(int(x)) for x in sorted(ids))}}}' AS BIGINT[])))"
     return f" AND {a}id NOT IN ({','.join(str(x) for x in sorted(ids))})" if ids else ""
 
 
 def dl_task_hidden(c, tid, uid):
-    """THE task check: is task tid locked for account uid (by itself or a parent)?"""
-    return bool(tid) and int(tid) in dl_task_ids(c, uid)
+    """THE task check: is task tid locked for account uid (by itself or a parent)? 2.235.0 B2 (#2902): a GET asks the cached
+    set (many checks in one read); a write or a run without a request (loops: cleanup, batch, the burst guard, events) asks
+    for this one task and its parents only - always current, no query over all lists per task."""
+    if not tid or not dl_of(c, uid):
+        return False
+    if has_request_context() and request.method in ("GET", "HEAD"):
+        return int(tid) in dl_task_ids(c, uid)
+    return int(tid) in dl_tasks_locked(c, uid, [tid])
 
 
 def dl_tasks_locked(c, uid, tids):

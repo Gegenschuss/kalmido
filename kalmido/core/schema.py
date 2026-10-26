@@ -3626,6 +3626,7 @@ CREATE INDEX IF NOT EXISTS pomos_user ON pomos(user_id);
 CREATE INDEX IF NOT EXISTS filters_user ON filters(user_id);
 CREATE INDEX IF NOT EXISTS task_tags_user ON task_tags(user_id, tag);
 CREATE UNIQUE INDEX IF NOT EXISTS tasks_tt_user ON tasks(created_by, tt_id) WHERE tt_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tasks_mail_list ON tasks(list_id) WHERE tt_id LIKE 'mail:%';  -- 2.235.0 B2 (#2902): the e-mail lock of agents (core/dlock.py)
 CREATE INDEX IF NOT EXISTS comments_task ON comments(task_id);
 CREATE INDEX IF NOT EXISTS activity_task ON activity(task_id, id);
 CREATE INDEX IF NOT EXISTS attachments_comment ON attachments(comment_id) WHERE comment_id IS NOT NULL;
