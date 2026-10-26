@@ -74,7 +74,7 @@ def _wiki_cut(part, n):
     """A part shortened to n characters: its start and end kept, a short hash of the whole in the middle (unique, stable)."""
     if len(part) <= n:
         return part
-    h = hashlib.sha1(part.encode()).hexdigest()[:6]
+    h = hashlib.sha1(part.encode(), usedforsecurity=False).hexdigest()[:6]
     if n < 10:  # 2.210 (#2755, review): too little room for start + hash + end: the hash alone, never longer than n
         return h[:max(1, n)]
     keep = max(2, n - len(h) - 2)

@@ -42,7 +42,7 @@ def rck_stamp(m, r):
     """The state the hints are made for: the values they read (not only times: two changes may fall in one second)."""
     v = [RCK_VER, m["updated_at"], m["extracted"], m["amount"], m["doc_date"], m["currency"], m["sender_id"], m["type_id"]]
     v += [r["set_at"], r["category"], r["vat_pct"]] if r else []
-    return hashlib.sha1("\x1f".join("" if x is None else str(x) for x in v).encode()).hexdigest()[:20]
+    return hashlib.sha1("\x1f".join("" if x is None else str(x) for x in v).encode(), usedforsecurity=False).hexdigest()[:20]  # a change stamp, not security
 
 
 def rck_fields(c, m, r):
