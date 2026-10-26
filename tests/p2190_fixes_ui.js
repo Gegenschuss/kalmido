@@ -51,7 +51,8 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   d.querySelector('#toast button').click();
   check(await until(async () => !(await secsOf()).some(x => x.name === 'Phase 2') && (await call('GET', `/api/tasks/${T2}`)).section_id === A), 'Undo: back in "Doing", the section removed');
   // the empty section's zone (jsdom)
-  await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`));
+  // CI of 2.307.4: wait for the undo's reload (the row back under "Doing"), a drag of the stale row sends the old section as _prev (#3028) = conflict
+  await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(A)); await sleep(100);
   dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart');
   const ez = d.querySelector(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name takes the drop
   check(dnd(w, ez, 'dragover').defaultPrevented, 'the empty section\'s name takes a task');
