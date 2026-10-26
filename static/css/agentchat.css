@@ -470,7 +470,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 #pop .menu-list button.minfo:disabled{opacity:1;color:var(--text2)}
 /* 2.350.0 A (#2793): the narrow chat panel / window on the desktop: icon Send, the tools behind the plus like the phone
    (#2788), so the box keeps its width */
-@media (min-width:900px){
+@media (min-width:56.25rem){
   #achat .chcomp > .btn.pri{width:2.75rem;padding:0}
   #achat .chcomp > .btn.pri > span{display:none}
   #achat .chcomp{position:relative}
