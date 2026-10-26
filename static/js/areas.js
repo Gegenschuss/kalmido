@@ -560,8 +560,8 @@ function sbb_officeHtml() {
   return OFM_GROUPS.map(g => {
     const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
     const more = g[0] === 'money' && ofm_hidden().length ? `<button type="button" class="srow smod sbbi ofmmore" data-act="ofm-more">${ic('dots')}<span class="n">${esc(tr('Show more'))}</span></button>` : '';  // 2.276.0 A (#3039)
-    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('') + more}</div>`;
-  }).join('') + (typeof ofd_panelFolders === 'function' ? ofd_panelFolders() : '')  // 2.199.0 B (#2742): the office's folders + automatic groups
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('') + more}</div>`;
+  }).join('')  // 2.351.0 A (#3312): a document area opens as a tree (office_tree.js: its folders, 20 newest, More…); no group "Folders"
     + (typeof ctf_panelHtml === 'function' ? ctf_panelHtml() : '');  // 2.351.0 B (#2749): the address book's folders (ctfold.js, on its page)
 }
 // the office's points can change after the sidebar was drawn (the office loads lazily, its role arrives): a draw of an office

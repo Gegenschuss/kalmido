@@ -14034,8 +14034,6 @@
   "{0} entry stays, one level up: {1}": ["{0} item blijft bewaard, een niveau hoger: {1}", "{0} items blijven bewaard, een niveau hoger: {1}"],
   "The share applies to this document.": "Het delen geldt voor dit document.",
   "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Mappen geven toegang tot documenten, niet tot kantoorhandelingen (vrijgeven en versturen, betalingen, vastleggen, export): die blijven bij de kantoorgroepen.",
-  "By client": "Per klant",
-  "By year": "Per jaar",
   "The folder holds documents you may not edit": "De map bevat documenten die je niet mag bewerken",
   "The folder holds documents you may not share with this role": "De map bevat documenten die je niet met dit recht mag delen",
   "No rights to the document": "geen rechten op het document",
@@ -14316,5 +14314,8 @@
   "A shared address book works like sharing it in the address book: its contacts can be read or changed as the role says. Agents only see what is shared with exactly them.": "Een gedeeld adresboek werkt zoals delen in het adresboek: de contacten zijn te lezen of te wijzigen volgens de rol. Agents zien alleen wat precies met hen gedeeld is.",
   "Person or agent": "Persoon of agent",
   "Open folder": "Map openen",
-  "No folder yet: create one in the files first": "Nog geen map: maak er eerst een aan bij de bestanden"
+  "No folder yet: create one in the files first": "Nog geen map: maak er eerst een aan bij de bestanden",
+  "More…": "Meer…",
+  "Documents stay in their own area": "Documenten blijven in hun eigen onderdeel",
+  "Sent letter": "Verzonden brief"
 }

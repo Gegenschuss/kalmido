@@ -291,6 +291,8 @@ ORDER = (
     "office.einvoice_in",  # 2.146.0 A (#2451): incoming e-invoices (UBL / CII, embedded in ZUGFeRD PDFs; no routes, used by docs.store)
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "office.docref",  # 2.199.0 B (#2742): quotations / invoices filed in folders (reference kind office_doc, the folder routes)
+    "office.oftref",  # 2.351.0 A (#2823): generated documents, letters, receipts filed in folders (reference kinds)
+    "office.oftree",  # 2.351.0 A (#3312): the office's document areas as trees in the panel (folders + 20 newest)
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.olock",  # 2.152.0 C (#2168 #2169): legal retention locks (booked receipts, logbook)

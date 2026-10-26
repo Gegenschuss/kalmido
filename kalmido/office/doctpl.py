@@ -32,6 +32,7 @@ from ..core.errors import BadInput
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
+from .oftref import GD_KIND, oft_renamed  # 2.351.0 A (#2823)
 
 DT_KINDS = (("contract", N_("Contract")), ("confirmation", N_("Order confirmation")), ("nda", N_("Non-disclosure agreement")),
             ("other", N_("Other")), ("letter", N_("Letter")))  # 2.153.0 (#2028): letter templates (office/letters.py)
@@ -928,6 +929,8 @@ def dt_doc_patch(gid):
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_gen_docs", row)
         c.execute(f"UPDATE office_gen_docs SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [gid, oid])
+        if "title" in row:  # 2.351.0 A (#2823): its node in a folder takes the new title
+            oft_renamed(c, GD_KIND, gid, row["title"])
         bump(c)
         c.commit()
     return jsonify(dt_doc_public(c, oid, dt_doc(c, oid, gid)))

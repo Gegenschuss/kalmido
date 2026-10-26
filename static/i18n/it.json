@@ -14034,8 +14034,6 @@
   "{0} entry stays, one level up: {1}": ["{0} elemento resta, un livello più su: {1}", "{0} elementi restano, un livello più su: {1}"],
   "The share applies to this document.": "La condivisione vale per questo documento.",
   "Folders give access to documents, not to office actions (releasing and sending, payments, locking, export): those stay with the office groups.": "Le cartelle danno accesso ai documenti, non alle azioni dell’ufficio (approvare e inviare, pagamenti, blocco, esportazione): quelle restano ai gruppi dell’ufficio.",
-  "By client": "Per cliente",
-  "By year": "Per anno",
   "The folder holds documents you may not edit": "La cartella contiene documenti che non puoi modificare",
   "The folder holds documents you may not share with this role": "La cartella contiene documenti che non puoi condividere con questo permesso",
   "No rights to the document": "nessun permesso sul documento",
@@ -14316,5 +14314,8 @@
   "A shared address book works like sharing it in the address book: its contacts can be read or changed as the role says. Agents only see what is shared with exactly them.": "Una rubrica condivisa funziona come la condivisione nella rubrica: i suoi contatti si leggono o si modificano secondo il ruolo. Gli agenti vedono solo ciò che è condiviso esattamente con loro.",
   "Person or agent": "Persona o agente",
   "Open folder": "Apri cartella",
-  "No folder yet: create one in the files first": "Ancora nessuna cartella: creane prima una nei file"
+  "No folder yet: create one in the files first": "Ancora nessuna cartella: creane prima una nei file",
+  "More…": "Altro…",
+  "Documents stay in their own area": "I documenti restano nella loro area",
+  "Sent letter": "Lettera inviata"
 }
