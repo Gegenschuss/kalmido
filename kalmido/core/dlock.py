@@ -139,3 +139,33 @@ def dl_task_sql(c, uid, a=""):
 def dl_task_hidden(c, tid, uid):
     """THE task check: is task tid locked for account uid (by itself or a parent)?"""
     return bool(tid) and int(tid) in dl_task_ids(c, uid)
+
+
+def dl_tasks_locked(c, uid, tids):
+    """2.235.0 B2 (#2902): the set of the task ids among tids that agent uid's data lock covers (locked list or area, e-mail in
+    a private space, locked tag; by the task itself or a parent), whether or not the agent is in their lists: for the data a
+    person hands an agent (proposal job inputs). One query for all ids; empty for people."""
+    d = dl_of(c, uid)
+    ids = sorted({int(x) for x in tids or () if x})
+    if not d or not ids:
+        return set()
+    cond, args = [], []
+    if d["_lids"]:
+        cond.append(f"t.list_id IN ({','.join(str(x) for x in sorted(d['_lids']))})")
+    if d["_lareas"]:
+        cond.append(f"(COALESCE(l.life, '') IN ({','.join(repr(x) for x in d['_lareas'])}) AND l.org_id IS NULL)")
+    if d["_mail"]:
+        cond.append("(t.tt_id LIKE 'mail:%' AND l.org_id IS NULL)")
+    if d["_tags"]:
+        q = ",".join("?" * len(d["_tags"]))
+        cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")
+        cond.append(f"EXISTS (SELECT 1 FROM task_list_tags y JOIN list_tags z ON z.id=y.tag_id WHERE y.task_id=t.id AND lower(z.name) IN ({q}))")
+        args += list(d["_tags"]) * 2
+    if not cond:
+        return set()
+    rows = c.execute(f"""WITH RECURSIVE r(id, cur) AS (
+                           SELECT id, id FROM tasks WHERE id IN ({','.join('?' * len(ids))})
+                           UNION SELECT r.id, t.parent_id FROM r JOIN tasks t ON t.id=r.cur WHERE t.parent_id IS NOT NULL)
+                         SELECT DISTINCT r.id FROM r JOIN tasks t ON t.id=r.cur JOIN lists l ON l.id=t.list_id
+                         WHERE {' OR '.join(cond)}""", (*ids, *args)).fetchall()
+    return {r[0] for r in rows}

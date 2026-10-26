@@ -14,8 +14,10 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, inbox_default
 from ..core.access import list_role, vis_sql
-from ..core.dlock import DL_ALWAYS, DL_DEFAULT, DL_LISTS_MAX, DL_SWITCH, DL_TAG_LEN, DL_TAGS_MAX, dl_forget, dl_parse, dl_tag
-from ..core.errors import BadInput, UnknownFields
+from ..core.dlock import (
+    DL_ALWAYS, DL_DEFAULT, DL_LISTS_MAX, DL_SWITCH, DL_TAG_LEN, DL_TAGS_MAX, dl_forget, dl_list_hidden, dl_of, dl_parse, dl_tag, dl_tasks_locked,
+)
+from ..core.errors import BadInput, Denied, UnknownFields
 from ..accounts.session import me
 from ..agents.core import agent_emit, agent_row
 from ..agents.workstyle import ws_need_editor
@@ -104,6 +106,46 @@ def _dl_view(c, a):
                    always=list(DL_ALWAYS), defaults=DL_DEFAULT,
                    options={"lists": [{"id": k, "name": v} for k, v in names.items()],
                             "tags": sorted({t for t in tags if t}, key=str.lower)})
+
+
+def dl_job_input(c, aid, kind, inp, tid=None, lid=None, strict=True):
+    """2.235.0 B2 (#2902): a proposal job's input as agent aid may get it (job_request, GET /api/v1/agent/jobs/<id>): a person
+    hands over their own view (basket, day plan, a task's subtasks), the agent's data lock still leaves its tasks and lists
+    out. A locked task / list of the job itself -> 404. strict (a new request): nothing left -> BadInput like an empty input."""
+    if not dl_of(c, aid) or not isinstance(inp, dict):
+        return inp
+    if (tid and dl_tasks_locked(c, aid, [tid])) or (lid and _dl_lists_locked(c, aid, [lid])):
+        raise Denied(404)
+    if kind == "triage":
+        gone = dl_tasks_locked(c, aid, [x.get("task_id") for x in inp.get("items") or []])
+        inp["items"] = [x for x in inp.get("items") or [] if x.get("task_id") not in gone]
+        off = _dl_lists_locked(c, aid, [x.get("id") for x in inp.get("lists") or []])
+        inp["lists"] = [x for x in inp.get("lists") or [] if x.get("id") not in off]
+        if strict and not inp["items"]:
+            raise BadInput(tr("The basket is empty"))
+    elif kind == "dayplan":
+        gone = dl_tasks_locked(c, aid, [x.get("task_id") for k in ("tasks", "fixed") for x in inp.get(k) or []])
+        for k in ("tasks", "fixed"):
+            inp[k] = [x for x in inp.get(k) or [] if x.get("task_id") not in gone]
+        b = inp.get("builtin") or {}
+        if b:
+            b["plan"] = [x for x in b.get("plan") or [] if x.get("task_id") not in gone]
+            b["nofit"] = [x for x in b.get("nofit") or [] if x not in gone]
+        if strict and not inp["tasks"]:
+            raise BadInput(tr("There are no open tasks to plan"))
+    elif kind == "subtasks" and tid and isinstance(inp.get("task"), dict):
+        rows = c.execute("SELECT id, title FROM tasks WHERE parent_id=? AND deleted_at IS NULL ORDER BY sort, id", (tid,)).fetchall()
+        gone = dl_tasks_locked(c, aid, [r[0] for r in rows])
+        inp["task"]["subtasks"] = [r[1] for r in rows if r[0] not in gone][:100]
+    return inp
+
+
+def _dl_lists_locked(c, aid, lids):
+    ids = sorted({int(x) for x in lids if x})
+    if not ids:
+        return set()
+    return {r[0] for r in c.execute(f"SELECT id, life, org_id FROM lists WHERE id IN ({','.join('?' * len(ids))})", ids)
+            if dl_list_hidden(c, aid, r[0], r[1], r[2])}
 
 
 @app.get("/api/agents/<int:aid>/data-lock")

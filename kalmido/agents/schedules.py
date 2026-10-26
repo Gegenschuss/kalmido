@@ -275,6 +275,7 @@ def ast2_sched_triage(c, r, a, now, manual):
     import json
     from ..agents.core import JOB_TITLE_MAX, job_dict
     from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, prop_input
+    from ..agents.datalock import dl_job_input
     from ..agents.usage import usage_block
     from ..collab.liste2eguard import le2b_list_locked
     aid, uid = r["agent_id"], r["user_id"]
@@ -292,6 +293,7 @@ def ast2_sched_triage(c, r, a, now, manual):
     if not state:
         try:
             inp, title, tid, lid = prop_input(c, uid, "triage", {"agent_id": aid, "kind": "triage"})
+            inp = dl_job_input(c, aid, "triage", inp, tid, lid)  # 2.235.0 B2 (#2902): the agent's data lock narrows the basket
         except (BadInput, Denied):
             inp = lid = None
             state = "empty"  # nothing open in the basket: nothing to sort, no event
