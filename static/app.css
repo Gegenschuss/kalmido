@@ -8207,7 +8207,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root.rail-nolabel{--srW:3.25rem}
 :root.rail-nolabel .srb .srbn{display:none}
 :root.rail-nolabel .srb{padding:.5rem .125rem}
-:root.rail-nolabel #side .sbmr .srb{width:2.75rem}
+:root.rail-nolabel #side .sbmr{grid-template-columns:repeat(auto-fill,minmax(2.75rem,1fr))}  /* 2.353.0 B (#2776) */
 .srb svg.i{width:1.25rem;height:1.25rem}
 .srb:hover{background:var(--bg3);color:var(--text)}
 .srb.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600;--dot:currentColor}
@@ -8335,9 +8335,9 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
    fixed on top (.sbfix), the row scrolls sideways and never wraps; Settings + the account fixed at the bottom (.sbmdock) */
 #side .sbmtop{margin-top:.5rem}
 #side .sbmtop .scmd{margin-bottom:.25rem}
-#side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:.75rem;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
-#side .sbmr::-webkit-scrollbar{display:none}
-#side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
+/* 2.353.0 B (#2776): the area icons wrap into a grid of equal tiles (no sideways scrolling, nothing cut off) */
+#side .sbmr{display:grid;grid-template-columns:repeat(auto-fill,minmax(3.875rem,1fr));gap:.125rem;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
+#side .sbmr .srb{width:auto;min-width:0;min-height:2.75rem}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}
 /* 2.290.0 C (#3163): an unfolded Fold 8 landscape / small tablets (900-1199 px). With a task open the panel folds into the
    drawer (detail.js layNow). Where the panel shows, the names come before the symbols: the share symbols and the progress

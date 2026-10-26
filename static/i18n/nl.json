@@ -14299,5 +14299,9 @@
   "A number can hold four text building blocks at most (project, client, initials)": "Een nummer kan hooguit vier tekstblokken bevatten (project, klant, initialen)",
   "App bar": "App-balk",
   "Show labels in the app bar": "Labels in de app-balk tonen",
-  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Uit: alleen de pictogrammen, de balk wordt smaller. De naam verschijnt als je naar een pictogram wijst."
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Uit: alleen de pictogrammen, de balk wordt smaller. De naam verschijnt als je naar een pictogram wijst.",
+  "The program that uploads new scans from a folder of your Mac or Windows PC, its download and the scan inboxes are in Settings > Integrations.": "Het programma dat nieuwe scans uit een map op je Mac of Windows-pc uploadt, de download ervan en de scaninboxen vind je onder Instellingen > Integraties.",
+  "{0} scan inbox set up": ["{0} scaninbox ingesteld", "{0} scaninboxen ingesteld"],
+  "Open Integrations": "Integraties openen",
+  "Folder watcher program for Mac and Windows, scan inboxes": "Maphulpprogramma voor Mac en Windows, scaninboxen"
 }

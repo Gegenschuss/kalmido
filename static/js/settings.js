@@ -220,8 +220,10 @@ function integrCardsHtml() {
   const C = [['cal', N_('Calendar on your phone'), N_('Your tasks with a date in the phone’s calendar app'), S.caldav?.enabled && S.me ? '#s-dav-h' : '#s-ical-h'],
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
     ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
+    ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Scans from your computer'), N_('Folder watcher program for Mac and Windows, scan inboxes'), '#s-scan-h']] : []),  // 2.353.0 B (#2773)
     ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
-  return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>`;
+  // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
+  return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
 }
 function modulesHtml(hint) {
   const s = S.settings;
@@ -656,6 +658,7 @@ function settingsModal(focus) {
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
       ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
       ${caldavHtml(hint)}
+      ${feat('docs') && typeof dsc_integrHtml === 'function' ? dsc_integrHtml() : ''}${''/* 2.353.0 B (#2773): docscan.js, drawn by dsc_integrDraw */}
       ${feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : ''}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
@@ -718,7 +721,7 @@ function settingsModal(focus) {
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -747,6 +750,7 @@ function settingsModal(focus) {
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
+  if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
@@ -757,7 +761,7 @@ function settingsModal(focus) {
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
-    if (k === 'integr') { icalDraw(md); calsDraw(md); }
+    if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
     if (k === 'access') acz_draw(md);  // 2.166.0 (#2633)
     if (k === 'notify') wpDraw(md);
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }
@@ -885,7 +889,7 @@ function settingsModal(focus) {
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
-  if (cur === 'integr') { icalDraw(md); calsDraw(md); }
+  if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
   if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)

@@ -14299,5 +14299,9 @@
   "A number can hold four text building blocks at most (project, client, initials)": "Un numéro peut contenir au plus quatre blocs de texte (projet, client, initiales)",
   "App bar": "Barre des applications",
   "Show labels in the app bar": "Afficher les libellés dans la barre des applications",
-  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Désactivé : seulement les icônes, la barre devient plus étroite. Le nom s'affiche quand tu pointes une icône."
+  "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Désactivé : seulement les icônes, la barre devient plus étroite. Le nom s'affiche quand tu pointes une icône.",
+  "The program that uploads new scans from a folder of your Mac or Windows PC, its download and the scan inboxes are in Settings > Integrations.": "Le programme qui envoie les nouveaux scans d’un dossier de votre Mac ou PC Windows, son téléchargement et les boîtes de scan se trouvent dans Réglages > Intégrations.",
+  "{0} scan inbox set up": ["{0} boîte de scan configurée", "{0} boîtes de scan configurées"],
+  "Open Integrations": "Ouvrir Intégrations",
+  "Folder watcher program for Mac and Windows, scan inboxes": "Programme de surveillance de dossier pour Mac et Windows, boîtes de scan"
 }
