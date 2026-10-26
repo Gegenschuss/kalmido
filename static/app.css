@@ -2208,6 +2208,21 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
   /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
+/* 2.350.0 A (#2793): the desktop composer: tools, box, Stop and Send on one line with one height (2.75rem, the touch size) and one rounding;
+   Send is an icon button (its word only in a wide chat); "Ctrl+Enter sends" is the Send button's title, no own line. The
+   narrow chat panel / window (#achat, agentchat.css) puts the tools behind the plus like the phone (#2788) */
+.chcomp > .chkh{display:none}
+@media (min-width:900px){
+  .chcomp{gap:.375rem;padding:.5rem .75rem;align-items:flex-end}
+  .chcomp textarea{min-height:2.75rem;padding:.6875rem .75rem;border-radius:var(--radius)}
+  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chstop,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
+}
+/* 2.350.0 A (#2790): the team chat on the phone: one header (the app header steps aside while a conversation is open, like
+   the agent chat), a long name stays on one line */
+.tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
