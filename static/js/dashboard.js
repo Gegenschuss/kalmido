@@ -512,7 +512,7 @@ function mailHtml(j) {
     <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
     <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
     ${S.me?.is_admin ? `<div class="row"><label>${tr('Mailbox')}</label><button type="button" class="btn sm" data-mail="poll" id="s-mailpoll">${ic('sync', 's')} ${tr('Fetch mails now')}</button><span class="muted" id="s-mailpoll-r" role="status" aria-live="polite"></span></div>` : ''}`
-    : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. Ask your admin.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
+    : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. The operator of this server can set it up.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
   if (!j) return '';

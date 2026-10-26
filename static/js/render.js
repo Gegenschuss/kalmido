@@ -57,7 +57,7 @@ async function quotaDialog(j) {
   const html = `<p>${esc(tr('Your storage is full: {0} of {1}. New files cannot be uploaded until there is space again. Nothing has been deleted.', fmtSize(q.used || 0), fmtSize(q.limit || 0)))}</p>
     <p class="muted">${esc(tr('Delete files you no longer need (attachments in tasks, comments and projects) or ask for more space.'))}</p>`;
   const ok = await askDialog({title: tr('Storage full'), html, ok: tr('Contact support'), cancel: tr('Close')});
-  if (ok) { if (q.support) location.href = quotaMail(q); else toast(tr('No support address is set on this server: ask your admin.')); }
+  if (ok) { if (q.support) location.href = quotaMail(q); else toast(tr('No support address is set on this server.')); }
 }
 // 2.13.3: the + button follows rotations / folding too (not only a full render): hidden where the add bar or the header's
 // "New task" is there (tablets, an unfolded Fold in portrait)

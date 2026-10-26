@@ -28,7 +28,7 @@ from ..core.pg import write_lock  # 2.269.0 C (#3017)
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
-OFFICE_ADMIN_ONLY = N_("Only an admin of this organisation can do this")
+OFFICE_ADMIN_ONLY = N_("Only an admin of this workspace can do this")
 OFFICE_OFF = N_("Office & finance is turned off in your settings")
 UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649): percent = a rate on the external fees (KSK)
 TAXES = ("standard", "reduced", "exempt")

@@ -473,7 +473,7 @@ def ofx_unlock_post(did):
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if not ofr_admin_or(c, uid, oid, "offers", "edit", "release"):  # 2.187.0 B (#2476): office groups: level + special
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     if ofx_locked(r):
         why = bga_offer_block(c, oid, r)
         if why:

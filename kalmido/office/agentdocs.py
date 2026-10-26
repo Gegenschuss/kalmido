@@ -889,7 +889,7 @@ def ofa_agent_patch(aid):
     if not role:
         raise Denied(404)
     if not ofr_admin_or(c, uid, oid, "settings", "manage"):  # 2.187.0 B (#2476): office groups: manage the settings
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     b = body()
     v = b.get("office_drafts") if isinstance(b, dict) else None
     if not isinstance(v, bool):

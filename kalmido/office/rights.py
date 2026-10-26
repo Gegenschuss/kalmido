@@ -726,7 +726,7 @@ def ofr_person_put(pid):
     if len(refs) > 1 and f"tpl:{TPL_NONE}" in refs:
         refs = [r for r in refs if r != f"tpl:{TPL_NONE}"]
     if f"tpl:{TPL_LEGACY}" in refs and mg != "admin":  # 2.223.2 B (#2860): previous access carries the role's old specials (release, export)
-        raise Denied(403, tr(N_("Only an admin of this organisation can do this")))
+        raise Denied(403, tr(N_("Only an admin of this workspace can do this")))
     prole = org_role(c, pid, oid) or ""
     for ref in refs:
         d = _ref_def(c, oid, ref, prole)

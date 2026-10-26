@@ -1632,7 +1632,7 @@ def odoc_delete(did):
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
         paths = trial_drop_doc(c, oid, r)
         bump(c)
@@ -1641,7 +1641,7 @@ def odoc_delete(did):
         return jsonify(ok=True)
     if idt_applies(r):  # 2.162.0 A (#2603): test phase, a finalised / sent invoice with confirm_number (+ cash=0|1)
         if office_role(c, uid, oid) != "admin":  # 2.237.0 B (#2864): only the admin of the office area, not office groups with manage
-            raise Denied(403, tr("Only an admin of this organisation can do this"))
+            raise Denied(403, tr("Only an admin of this workspace can do this"))
         resp, paths = idt_delete(c, oid, uid, r)
         if resp[1] != 200:
             c.rollback()
@@ -1739,7 +1739,7 @@ def otrial_delete_all():
     without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
     c, uid, oid = _ctx()
     if not _ofr_may(c, uid, oid, "manage"):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()
     fs_ids, fs_paths = [], []

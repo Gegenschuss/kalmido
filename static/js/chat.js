@@ -260,7 +260,7 @@ async function dmWhy(kind, msg, name) {
   const off = kind === 'off' || !teamOn();
   const html = `<p>${off ? tr('Direct messages are part of the team chat. Switch on collaboration in Settings > Modules > Collaboration.')
       : kind === 'err' ? esc(tr('You cannot write to {0} yet.', name || tr('this person'))) + (msg ? ' <span class="muted">' + esc(msg) + '</span>' : '')
-      : tr('Nobody to write to yet.')}</p>${off ? '' : `<p class="muted">${tr('You can write to people you share a project with (or who are in your organisation). Share a project with someone, or ask an admin to set up their account.')}</p>`}`;
+      : tr('Nobody to write to yet.')}</p>${off ? '' : `<p class="muted">${tr('You can write to people you share a project with (or who are in your workspace). Share a project with someone first.')}</p>`}`;
   const ok = await askDialog({title: tr('Direct messages'), html, ok: off ? tr('Open Modules') : tr('OK'), cancel: tr('Close')});
   if (ok && off) settingsModal('collab');
 }
