@@ -272,7 +272,7 @@ def overview_build(c, lid, uid):
            "files_trash_days": max(1, ret_days("trash")),
            "files_trash": [{"id": r["id"], "name": r["name"], "size": r["size"], "deleted_at": r["deleted_at"]} for r in c.execute(
                "SELECT id, name, size, deleted_at FROM list_files WHERE list_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id",
-               (lid,))],
+               (lid,))] if role != "participant" else [],  # 2.352.0 G (#2752, review N14): like the project files
            "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}

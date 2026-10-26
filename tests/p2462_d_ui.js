@@ -3,6 +3,7 @@
 // - #1662 an empty section has no "Drop tasks here" field any more, its name takes the drop; "+ New section" stays
 // - #1663 encryption locked and no note of mine: the encrypted-note field is gone; with a note of mine: "Unlock"
 // - #1664 a subfolder on the upper half of a top folder becomes a top-level folder right before it; lower half = into it
+//   (2.352.0 #2748: through the sidebar tree, sbb_treeReg 'lf')
 // - #1647 the import action bar is a flex row over the full width (the spacer works)
 const {execFileSync} = require('child_process');
 const {webcrypto} = require('crypto');
@@ -51,13 +52,10 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
 
   // ================= #1664
   w.eval(`S.settings.folders = JSON.stringify(['Work', 'Work' + FSEP + 'Sub', 'Home'])`);
-  const fh = f => { const e = d.createElement('div'); e.className = 'fhead'; e.dataset.folder = f; w.__fh = w.__fh || {}; w.__fh[f] = e; return f; };  // real nodes, kept on the page for eval
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Home'))}], false)`) === 'uptop', '#1664: subfolder on the upper half of a top folder = top level before it');
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Home'))}], true)`) === 'into', '#1664: lower half = into it (as before)');
-  check(w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Work'))}], false)`) === 'uptop' && w.eval(`folderDropKind('Work' + FSEP + 'Sub', __fh[${JSON.stringify(fh('Work'))}], true)`) === null,
-    '#1664: onto its own parent: upper half takes it out, lower half nothing');
-  await w.eval(`sideDrop({folder: 'Work' + FSEP + 'Sub'}, __fh[${JSON.stringify(fh('Home'))}], false)`);
-  await sleep(400);
+  // 2.352.0 (#2748): a folder is dragged by the sidebar tree (areas.js sbb_tzone: upper edge = before, middle = into, lower
+  // edge = after); sorted before a top folder from inside another one = a top-level folder right before it (the tree's order)
+  await w.eval(`SBB_TREE.lf.order('Work' + FSEP + 'Sub', {before: 'Home', into: ''})`);
+  await until(async () => JSON.parse(((await call('GET', '/api/state')).settings || {}).folders || '[]').join() === 'Work,Sub,Home');
   const fl = JSON.parse(w.eval(`S.settings.folders`));
   check(JSON.stringify(fl) === JSON.stringify(['Work', 'Sub', 'Home']), '#1664: the folder is now top-level, right before Home ' + JSON.stringify(fl));
   const sv = JSON.parse(((await call('GET', '/api/state')).settings || {}).folders || '[]');

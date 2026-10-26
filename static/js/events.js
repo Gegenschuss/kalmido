@@ -301,7 +301,7 @@ document.addEventListener('click', async e => {
   if (fm) {
     e.preventDefault(); e.stopPropagation();
     const f = fm.dataset.folder, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f), j = i + +fm.dataset.fmove;
-    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(sib) : sib.flatMap(t => [t, ...folderSubs(t)])); }
+    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fOrderWith(fParent(f), sib)); }  // 2.352.0 E (#2748): any depth
     return;
   }
   // 2.25.0 (UX-02): the "…" of a list / folder in sort mode: up, down, folder
@@ -316,7 +316,7 @@ document.addEventListener('click', async e => {
   if (fs) {
     e.preventDefault(); e.stopPropagation();
     const f = fs.dataset.fsort, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f);
-    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(s2) : s2.flatMap(t => [t, ...folderSubs(t)])); };
+    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fOrderWith(fParent(f), s2)); };  // 2.352.0 E (#2748): any depth
     menu(fs, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: i <= 0, fn: mv(-1)}, {label: tr('Move down'), icon: 'chev', dis: i < 0 || i >= sib.length - 1, fn: mv(1)}]);
     return;
   }
@@ -506,7 +506,7 @@ document.addEventListener('click', async e => {
       if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq, .rxrow'); (q?.querySelector('.rxq') || q?.querySelector('.rx'))?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
-    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project with progress and status…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
+    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
     case 'status': statusModal(id); break;

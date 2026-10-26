@@ -177,6 +177,21 @@ _BASE_CSS = (":root{color-scheme:light}html{background:#fff;color:#1a1a1a}body{m
              "-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%}table{max-width:100%}pre{white-space:pre-wrap}")
 
 
+def _mt():
+    from ..integrations import mailtrim_html  # 2.352.0 D (#2754): the one place of the hub that takes the shortening
+    return mailtrim_html
+
+
+def mh_short(src):
+    """The HTML src shortened for the reading view (forwarding header folded, older quotes + signature out)."""
+    return _mt().md_trim_html(src[:MH_HTML_MAX])  # 2.352.0 G (#2754, review M3): only what mh_clean shows anyway
+
+
+def mh_short_text(text):
+    """The plain text shortened for the reading view."""
+    return _mt().md_trim_view(text)
+
+
 def mh_clean(src, cids=None, images=False):
     """(document, number of external pictures / CSS URLs) of the HTML src, cleaned (allow list)."""
     p = _Cleaner(cids or {}, images)
@@ -254,7 +269,10 @@ def mh_mail_html(mid):
     if not got:
         raise Denied(404)
     images = request.args.get("images") in ("1", "true")
-    doc, _n = mh_clean(got[0], got[1], images)
+    src = got[0]
+    if request.args.get("short") in ("1", "true"):  # 2.352.0 D (#2754): forwarding header folded, older quotes + signature left out
+        src = mh_short(src)
+    doc, _n = mh_clean(src, got[1], images)
     resp = make_response(doc)
     resp.headers["Content-Type"] = "text/html; charset=utf-8"
     resp.headers["Content-Security-Policy"] = mh_csp(images)
@@ -265,7 +283,7 @@ def mh_mail_html(mid):
     return resp
 
 
-_MH_INFO = {}  # 2.360.0 C (#2496): eml node id -> (html, external pictures); an .eml never changes, so no parse per detail call
+_MH_INFO = {}  # 2.360.0 C (#2496): eml node id -> (html, external pictures, shortened differs); an .eml never changes, so no parse per detail call
 _MH_INFO_MAX = 2000
 
 
@@ -273,15 +291,19 @@ def mh_info(c, m):
     """For the reading view (GET /api/hubmail/mails/<id>): {"html": bool, "html_ext": external pictures} + the links."""
     hit = _MH_INFO.get(m["eml_id"]) if m["eml_id"] else None
     if hit and not c.execute("SELECT 1 FROM fs_nodes WHERE id=? AND deleted_at IS NULL", (m["eml_id"],)).fetchone():
-        hit = (False, 0)  # the original went since (trash): the text view, as mh_of
+        hit = (False, 0, False)  # the original went since (trash): the text view, as mh_of
     if hit is None:
         got = mh_of(c, m)
-        hit = (bool(got), mh_clean(got[0], got[1], False)[1] if got else 0)
+        whole, ext = mh_clean(got[0], got[1], False) if got else ("", 0)
+        short = False
+        if got:  # 2.352.0 D (#2754): does the shortened HTML differ from the whole mail (else the switch is pointless)
+            short = mh_clean(mh_short(got[0]), got[1], False)[0] != whole  # 2.352.0 G (review M3): the whole page cleaned once
+        hit = (bool(got), ext, short)
         if m["eml_id"]:
             if len(_MH_INFO) >= _MH_INFO_MAX:
                 _MH_INFO.pop(next(iter(_MH_INFO)), None)
             _MH_INFO[m["eml_id"]] = hit
-    return {"html": hit[0], "html_ext": hit[1], "made": mh_made(c, m["id"])}
+    return {"html": hit[0], "html_ext": hit[1], "html_short": hit[2], "made": mh_made(c, m["id"])}
 
 
 # ---- mail -> task / event ---------------------------------------------------------------------------------------------

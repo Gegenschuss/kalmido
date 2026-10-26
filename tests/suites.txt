@@ -2207,6 +2207,13 @@ shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new sui
 fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO_TEST_DATA"
 # 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar": off = icons only, narrower bar, names as title / aria-label (computer + phone, account)
 fresh; run p2319_b_rail_labels_ui node p2319_b_rail_labels_ui.js "$KALMIDO_TEST_DATA"
+# 2.352.0 D (#2754): filed mails shortened in the reading view (forward header as one line, no older quotes / signature; text + HTML), large viewer, "Whole mail"
+fresh; run p2352_d_mailtrim "$PY" p2352_d_mailtrim_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2352_d_mailviewer_ui node p2352_d_mailviewer_ui.js "$KALMIDO_TEST_DATA"
+# 2.352.0 A (#2748): list folders in the file store, folder rights at runtime, the one-way migration
+fresh; run p2352_a_listfolders "$PY" p2352_a_listfolders_test.py "$KALMIDO_TEST_DATA"
+# 2.352.0 F (#2748): review fixes of the projects folders (who may share / rename / move, subfolder owner, depth, own shares stay)
+fresh; run p2352_f_review "$PY" p2352_f_review_test.py "$KALMIDO_TEST_DATA"
 # 2.235.0 D (#2899): phones close the keyboard after sending (settings chat_kbd_agent / chat_kbd_team); freelancer-matrix: agents
 fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"
 # 2.354.0 C (#3326 #3009 #3013): +1 day / -1 day instead of Tomorrow, Overdue buttons clear of the block "…", small UI texts

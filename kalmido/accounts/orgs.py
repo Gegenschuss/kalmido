@@ -473,9 +473,13 @@ def list_org_set(c, lid, v):
         return False
     from .orgout import org_out  # 2.148.1 B (#2483): out of an organisation only through its admin (logged, admins told)
     org_out(c, lr["org_id"], oid, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid, obj=lid)  # 2.361.2 (#2923): obj
-    for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
+    # 2.352.0 F (#2748, review N4): a row only through the old workspace's folders ends with the move (grp_sync below)
+    for (uid,) in c.execute("""SELECT user_id FROM list_members WHERE list_id=? AND NOT (frole IS NOT NULL AND own_role IS NULL
+                               AND grole IS NULL) ORDER BY user_id""", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    from ..lists.groups import grp_sync
+    grp_sync(c, [lid])  # 2.352.0 A (#2748): its node into the new workspace's projects tree, the old folders' roles end
     # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
     from ..team.clients import _org_boundary
     list_space_follow(c, lid, lr["org_id"], _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
@@ -1036,7 +1040,6 @@ def org_mine_dict(c, r, uid):
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
-            "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1084,7 +1087,7 @@ def org_mine_update(oid):
         if not isinstance(b["ext_links"], bool):
             return err(tr("Invalid value: {0}", "ext_links"))
         c.execute("UPDATE orgs SET ext_links=? WHERE id=?", (int(b["ext_links"]), oid))
-    for k in ("asst_comments", "chn_content", "member_agents"):  # 2.240.0 (#2884, #2867), 2.361.4 (#2928): switches of the organisation (admins only)
+    for k in ("asst_comments", "chn_content"):  # 2.240.0 (#2884, #2867): privacy switches of the organisation (admins only)
         if k in b:
             if not isinstance(b[k], bool):
                 return err(tr("Invalid value: {0}", k))
@@ -1228,7 +1231,7 @@ def org_leave(c, oid, uid, heir):
     of the organisation (members and the agents it owns there stay with the lists), their personal agents of that workspace
     become private. The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
-    n = 0
+    n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if heir and heir != uid:
             owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
@@ -1240,6 +1243,7 @@ def org_leave(c, oid, uid, heir):
             continue
         else:
             c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
+            priv.append(lr["id"])
             c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lr["id"],))  # 2.172.1 (#2689)
             from ..admin.orgcrypt_cli import oc_settle_kick
             oc_settle_kick([lr["id"]])  # 2.64.0 (#1864): its files get the owner's account key
@@ -1247,6 +1251,9 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
+        from ..lists.groups import grp_sync
+        grp_sync(c, priv)
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     from ..contacts.orgbooks import obk_leave

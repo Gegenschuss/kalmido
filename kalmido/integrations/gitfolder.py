@@ -21,7 +21,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.pg import st_ids
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, list_role, need_list
+from ..core.access import Denied, list_role, need_list, reading_sql
 from ..core.errors import BadInput
 from ..agents.core import is_agent
 
@@ -55,8 +55,15 @@ def gf_own_conns(c, lid):
     return c.execute("SELECT * FROM git_conns WHERE list_id=? AND id NOT IN (SELECT conn_id FROM git_folders) ORDER BY id", (lid,)).fetchall()
 
 
+def _skip_sql():
+    """2.352.0 G (#2752, review M4): a list that never uses a folder repository although it is in the folder -- a life area
+    (health, budget, travel, read later ...), a family list or an organisation's read-later project (before #2752: not kind project)."""
+    return f"(COALESCE(l.life, '')<>'' OR COALESCE(l.family, '')<>'' OR {reading_sql('l')})"
+
+
 def _owner_lists(c, owner, folder):
-    return [r for r in c.execute("SELECT id, name, folder, kind, archived, git_folder_off FROM lists WHERE owner_id=? AND is_inbox=0 AND deleted_at IS NULL ORDER BY sort, id",
+    return [r for r in c.execute(f"SELECT l.id, l.name, l.folder, l.kind, l.archived, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l "
+                                 "WHERE l.owner_id=? AND l.is_inbox=0 AND l.deleted_at IS NULL ORDER BY l.sort, l.id",
                                  (owner,)) if _under(r["folder"], folder)]
 
 
@@ -77,8 +84,9 @@ def _nearest(c, owner, path, rows=None):
 def gf_conns_for_list(c, lid, ignore_own=False, ignore_off=False):
     """The folder repositories list lid uses ([] = none): a project list of the folder's owner, not switched off, without a
     repository of its own (ignore_*: what it would use -- the list dialog shows them)."""
-    lst = c.execute("SELECT id, owner_id, folder, kind, git_folder_off FROM lists WHERE id=?", (lid,)).fetchone()
-    if not lst or lst["kind"] != "project" or not lst["folder"] or (lst["git_folder_off"] and not ignore_off):
+    lst = c.execute(f"SELECT l.id, l.owner_id, l.folder, l.is_inbox, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l WHERE l.id=?",
+                    (lid,)).fetchone()
+    if not lst or lst["is_inbox"] or lst["gf_skip"] or not lst["folder"] or (lst["git_folder_off"] and not ignore_off):
         return []
     if not ignore_own and gf_own_conns(c, lid):
         return []
@@ -98,9 +106,9 @@ def gf_conns_of_lists(c, ids):
     rest = [i for i in ids if i not in out]
     if rest and c.execute("SELECT 1 FROM git_folders LIMIT 1").fetchone():
         per_owner = {}  # owner -> their folder repositories (the query of _nearest, once per owner)
-        for lst in c.execute("SELECT id, owner_id, folder, kind, git_folder_off FROM lists WHERE id = ANY(CAST(? AS BIGINT[])) ORDER BY id",
-                             (st_ids(rest),)).fetchall():
-            if lst["kind"] != "project" or not lst["folder"] or lst["git_folder_off"]:
+        for lst in c.execute(f"SELECT l.id, l.owner_id, l.folder, l.is_inbox, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l "
+                             "WHERE l.id = ANY(CAST(? AS BIGINT[])) ORDER BY l.id", (st_ids(rest),)).fetchall():
+            if lst["is_inbox"] or lst["gf_skip"] or not lst["folder"] or lst["git_folder_off"]:
                 continue  # the rules of gf_conns_for_list (a list with own repositories is already in out)
             if lst["owner_id"] not in per_owner:
                 per_owner[lst["owner_id"]] = c.execute("""SELECT k.*, f.folder AS gf_folder FROM git_folders f JOIN git_conns k ON k.id=f.conn_id
@@ -121,14 +129,15 @@ def gf_lists_of_conn(c, cid):
 
 def gf_list_state(c, lid):
     """For the list dialog: {folder (the folder whose repositories it uses / would use, null = none), off, own, uses}."""
-    lst = c.execute("SELECT owner_id, folder, kind, git_folder_off FROM lists WHERE id=?", (lid,)).fetchone()
+    lst = c.execute(f"SELECT l.owner_id, l.folder, l.is_inbox, l.git_folder_off, {_skip_sql()} AS gf_skip FROM lists l WHERE l.id=?",
+                    (lid,)).fetchone()
     if not lst:
         return None
     f, rows = _nearest(c, lst["owner_id"], lst["folder"] or "")
     own = bool(gf_own_conns(c, lid))
     return {"folder": (f if lst["owner_id"] == _viewer() else "") if f else None, "inherited": bool(rows),
             "off": bool(lst["git_folder_off"]), "own": own,
-            "uses": bool(rows) and lst["kind"] == "project" and not own and not lst["git_folder_off"]}
+            "uses": bool(rows) and not lst["is_inbox"] and not lst["gf_skip"] and not own and not lst["git_folder_off"]}
 
 
 def gf_need_conn(c, r, manage):
@@ -161,7 +170,7 @@ def gf_rehome(c, cid, exclude=None):
     if ok and not lst["archived"]:
         return
     cand = [r for r in _owner_lists(c, f["owner_id"], f["folder"]) if r["id"] != exclude]
-    cand.sort(key=lambda r: (bool(r["archived"]), r["kind"] != "project", r["git_folder_off"]))
+    cand.sort(key=lambda r: (bool(r["archived"]), bool(r["gf_skip"]), r["git_folder_off"]))
     if ok and (not cand or cand[0]["archived"]):  # an archived carrier is fine while every list of the folder is archived
         return
     if cand:
@@ -212,7 +221,7 @@ def gf_info(c, uid, f):
     lists = []
     for r in _owner_lists(c, uid, f):
         uses = gf_conns_for_list(c, r["id"])
-        lists.append({"id": r["id"], "name": r["name"], "folder": r["folder"], "project": r["kind"] == "project",
+        lists.append({"id": r["id"], "name": r["name"], "folder": r["folder"], "project": not r["gf_skip"],
                       "off": bool(r["git_folder_off"]), "own": bool(gf_own_conns(c, r["id"])),
                       "uses": bool(uses), "via": gf_row(c, uses[0]["id"])["folder"] if uses else None})
     return {"folder": f, "repos": [git_public(c, r, True) for r in rows], "max": GIT_MAX_CONNS, "key": bool(SECRET_KEY),
@@ -257,7 +266,7 @@ def gf_add():
         return err(tr("At most {0} repositories per folder", GIT_MAX_CONNS), 409)
     if any((x["provider"], x["base_url"], x["owner"].lower(), x["repo"].lower()) == (provider, base, owner.lower(), name.lower()) for x in cur):
         return err(tr("This repository is already connected"), 409)
-    lists.sort(key=lambda r: (bool(r["archived"]), r["kind"] != "project", r["git_folder_off"]))
+    lists.sort(key=lambda r: (bool(r["archived"]), bool(r["gf_skip"]), r["git_folder_off"]))
     resp = git_connect(c, lists[0]["id"], provider, base, owner, name, token, folder=f)
     if isinstance(resp, tuple) and resp[1] == 201:
         print("folder", repr(f), "of", login_log_who(g.user), "repository", f"{owner}/{name}", flush=True)

@@ -746,7 +746,8 @@ def init_db(guard=True, load=None):
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
-        c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL")
+        # 2.352.0 A (#2748): not a row only a folder's share gives (frole)
+        c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL AND frole IS NULL")
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(TIME_TITLE_TRIGGER)
@@ -921,6 +922,14 @@ def init_db(guard=True, load=None):
             gset(c, "migr_order988", "1")
             if n:
                 print("shared lists arranged like their owners have them (#988):", n, flush=True)
+        # 2.352.0 A (#2748), once (one-way): the folders of the lists go into the file store's projects trees, folder shares
+        # become shares of those folders (rights at runtime, list_members.frole); folder_people stays readable
+        if gsetting(c, "migr_lf2352") != "1":
+            from ..lists.lffolder import lf_migrate
+            n = lf_migrate(c)
+            gset(c, "migr_lf2352", "1")
+            if any(n.values()):
+                print("list folders into the projects trees (#2748):", n, flush=True)
         # 2.33.0 (#927), once: lists / folders shared so far keep every notification ("all", written explicitly; new shares
         # start with "read"), their owners are asked once in the app
         if gsetting(c, "migr_notiftpl2330") != "1":
@@ -1047,6 +1056,11 @@ def init_db(guard=True, load=None):
             from ..admin.dataretention import drt_fk_once
             drt_fk_once(c)
             gset(c, "migr_drt2239", "1")
+        if gsetting(c, "migr_kind2352") != "1":  # 2.352.0 B (#2752): list = project, tracked = has a status; kind stays unused
+            n = c.execute("UPDATE lists SET status='on_track' WHERE kind='project' AND is_inbox=0 AND COALESCE(status,'')=''").rowcount
+            gset(c, "migr_kind2352", "1")  # once: a status cleared later (= not tracked) stays cleared
+            if n:
+                print("list types:", n, "projects without a status became 'on track'", flush=True)
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         from ..collab.msgsearch import msg_index_init

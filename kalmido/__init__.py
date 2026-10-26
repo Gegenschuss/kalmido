@@ -72,6 +72,7 @@ ORDER = (
     "lists.folders",
     "lists.lmove",  # 2.401.0 (#2924): the dry run of a project's workspace change, what goes along
     "lists.foldershare",  # 2.41.0 (#1420)
+    "lists.lffolder",  # 2.352.0 A (#2748): the folders of the lists in the file store
     "lists.listhead",  # 2.83.0 C (#1427)
     "lists.listtrash",  # 2.102.0 A (#1988)
     "tasks.validation",
@@ -199,6 +200,7 @@ ORDER = (
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
     "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "integrations.mailtrim",  # 2.49.0 (#971)
+    "integrations.mailtrim_html",  # 2.352.0 D (#2754)
     "collab.notelock",  # 2.48.0 (#1642): a task's note locked with one's own password (needs collab.e2e)
     "collab.liste2e",  # 2.64.1 (#1817): the lock per list (texts encrypted in the browser; needs collab.e2e)
     "collab.liste2eguard",  # 2.64.1 B (#1817): the lock per list on the other ways (API, agents, CalDAV, mail, push, copies)

@@ -35,7 +35,7 @@ function sb_notesView() {
   sb_noteExcerpts();
   const ids = new Set((S.notes || []).map(n => n.list_id)), ls = S.lists.filter(l => ids.has(l.id) || l.id === S.sbn.lid);
   const opt = l => `<option value="${l.id}" ${l.id === S.sbn.lid ? 'selected' : ''}>${esc(lname(l))}</option>`;
-  const prj = ls.filter(l => l.kind === 'project'), oth = ls.filter(l => l.kind !== 'project');
+  const prj = ls.filter(l => !l.is_inbox), oth = ls.filter(l => l.is_inbox);  // 2.352.0 B (#2752)
   const sel = ls.length > 1 || S.sbn.lid ? `<select id="sbn-l" class="sbnsel" aria-label="${esc(tr('Project'))}"><option value="0">${tr('All projects')}</option>${prj.length && oth.length ? `<optgroup label="${esc(tr('Projects'))}">${prj.map(opt).join('')}</optgroup><optgroup label="${esc(tr('Other projects'))}">${oth.map(opt).join('')}</optgroup>` : ls.map(opt).join('')}</select>` : '';
   return `<div class="ntwrap"><div class="ntview sbnall"><div class="ntlist">
     <div class="ntbar sbnbar"><div class="ssearch">${ic('search', 's')}<input id="sbn-q" type="search" value="${esc(S.sbn.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>${sel}

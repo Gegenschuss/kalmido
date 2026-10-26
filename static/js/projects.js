@@ -106,7 +106,7 @@ const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l
 const ovProblems = () => statusOn() ? riskLists().length : 0;
 function ovRows() {
   const open = openTasks(), t0 = today();
-  return S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project' && inWs(l)).map(l => {
+  return S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)).map(l => {  // 2.352.0 B (#2752): tracked projects; 2.380.2 (#3407): inWs
     const ts = open.filter(t => t.list_id === l.id);
     const overdue = ts.filter(t => t.due && t.due < t0).sort((a, b) => a.due.localeCompare(b.due));
     const blocked = depsOn() ? ts.filter(t => t.blocked) : [];
@@ -167,7 +167,7 @@ function viewOverview() {
 // Which lists show their overview is remembered per device (LS pov); the list's own view (List / Kanban / Timeline) stays.
 S.pov = new Set(LS.get('pov', []));
 S.povD = {};  // list id -> {j, v, busy, err}
-const povOn = l => !!l && l.kind === 'project' && !l.is_inbox && S.pov.has(l.id);
+const povOn = l => !!l && !l.is_inbox && S.pov.has(l.id);
 function isOverview() { return povOn(routeList()); }
 function povSet(l, on) {
   if (on) S.pov.add(l.id); else S.pov.delete(l.id);
@@ -181,7 +181,7 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   render();
 }
 // 2.13.0: in projects the overview comes first
-const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap'], ...(feat('cal') ? [['calendar', N_('Calendar'), 'cal']] : [])];  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
+const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [['overview', N_('Project page'), 'brief'], ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap'], ...(feat('cal') ? [['calendar', N_('Calendar'), 'cal']] : [])];  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
 const curView = l => povOn(l) ? 'overview' : listView(l);
 async function povLoad(lid, force) {
   const d = S.povD[lid] || (S.povD[lid] = {});

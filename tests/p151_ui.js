@@ -229,7 +229,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`go('l/${WORK}')`); await sleep(200);
   w.eval(`listModal(${WORK})`); await sleep(200);
   const md = () => d.querySelector('.modal.lmodal');
-  check(md() && !md().querySelector('[data-m="save"]') && !/Cancel/.test(md().querySelector('.foot').textContent), 'no Save / Cancel');
+  check(md() && !md().querySelector('[data-m="save"]') && !/Cancel/.test(md().querySelector('.foot')?.textContent || ''), 'no Save / Cancel');  // 2.352.0 C (#2751): an open project has no footer (actions moved into the "Actions" section)
   check(!!md().querySelector('.lhdr [data-m="close"]'), 'close button in the header');
   const col = [...md().querySelectorAll('#l-col button')].find(x => x.dataset.c && !x.classList.contains('on'));
   click(w, col);
@@ -391,8 +391,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await mk('Loose inbox thing', null);
   await w.eval('load()'); w.eval(`go('today')`); await sleep(300);
   const fh = () => d.querySelector('#side .fhead[data-folder="Jobs"]');
-  check(!!fh().querySelector('.fgo[data-go="folder/Jobs"]'), 'folder name links to the folder view');
-  click(w, fh().querySelector('.fgo')); await sleep(400);
+  check(!!fh().querySelector('.sbbtn[data-go="folder/Jobs"]'), 'folder name links to the folder view');  // 2.352.0 (#2748): the name is the tree's button (.sbbtn)
+  click(w, fh().querySelector('.sbbtn')); await sleep(400);
   check(w.eval('S.route.key') === 'folder:Jobs' && w.location.hash === '#folder/Jobs', 'opens the folder view (own hash)');
   check(fh().classList.contains('on'), 'folder row marked as the current view');
   const heads = [...d.querySelectorAll('#view .ghead')].map(x => x.textContent);

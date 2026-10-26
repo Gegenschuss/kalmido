@@ -629,6 +629,9 @@ def fs_folder(c, uid, org_id, names, agent_id=None):
     return parent
 
 
+fs_change_hooks = []  # 2.352.0 A (#2748): f(c, nid, action) after every change noted by fs_log_add (lists/lffolder.py)
+
+
 def fs_log_add(c, nid, action, detail=""):
     """Note an access of the signed-in account in the node's history. Agents: every access; people: only changes (reads of
     people are not logged -- the history answers "what did the agent do with my file")."""
@@ -638,6 +641,8 @@ def fs_log_add(c, nid, action, detail=""):
         return
     c.execute("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,?,?,?,?)",
               (int(nid), uid, 1 if agent else 0, str(action)[:40], str(detail or "")[:300], _now()))
+    for f in fs_change_hooks:  # 2.352.0 A (#2748): e.g. the lists below a shared / moved projects folder get their roles anew
+        f(c, nid, action)
 
 
 def fs_height(c, nid):

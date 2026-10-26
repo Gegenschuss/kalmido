@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..core.serializers import unlink_files
 from ..core.state import visible_lists
 from ..lists.ownership import owner_transfer
+from ..lists.groups import grp_sync  # 2.352.0 F (#2748, review N6)
 from ..tasks.validation import as_int
 from ..accounts.users import user_forget_conns
 from ..collab.comments import user_names
@@ -125,11 +126,15 @@ def make_agent(c, uid):
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants go
     from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in them
     ses_end(c, uid)
-    c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
+    # 2.352.0 F (#2748, review N6): only its own role; a group's / folder's admin row is computed anew (grp_sync below)
+    c.execute("UPDATE list_members SET own_role='edit' WHERE user_id=? AND own_role='admin'", (uid,))
+    c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin' AND own_role IS NULL "
+              "AND grole IS NULL AND frole IS NULL", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
     # 2.236.0 (#2909): a new agent disturbs only at its limits (agents/workstyle.py WS_NEW)
     c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,1,'idle',?,?) ON CONFLICT DO NOTHING",
               (uid, iso(now_utc()), json.dumps(WS_NEW)))
+    grp_sync(c, [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=?", (uid,))])  # 2.352.0 F (#2748, review N6)
     if ctl_new():
         c.execute("UPDATE agents SET control=? WHERE user_id=? AND control=''", (json.dumps(ctl_new()), uid))
 

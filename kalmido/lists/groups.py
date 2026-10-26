@@ -3,7 +3,7 @@ import re
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, st_ids
+from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -93,6 +93,13 @@ def grp_list_ids(c, gid=None, owner=None):
             for x in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND folder!='' AND is_inbox=0", (r["owner_id"],)):
                 if folder_under(x["folder"], r["folder"]):
                     ids.add(x["id"])
+    if gid is not None:  # 2.352.0 A (#2748): the lists below projects folders shared with the group
+        from .lffolder import lf_lists_below
+        with system_ctx(c):
+            for r in c.execute("SELECT node_id FROM fs_shares WHERE group_id=?", (gid,)).fetchall():
+                ids.update(lf_lists_below(c, r[0]))
+            ids.update(r[0] for r in c.execute("SELECT DISTINCT m.list_id FROM list_members m JOIN group_members gm ON gm.user_id=m.user_id "
+                                               "WHERE m.frole IS NOT NULL AND gm.group_id=?", (gid,)))
     if gid is not None or owner is not None:  # rows that came from groups before (a share was removed meanwhile)
         sql = ("SELECT DISTINCT m.list_id FROM list_members m JOIN group_members gm ON gm.user_id=m.user_id "
                "WHERE m.grole IS NOT NULL AND gm.group_id=?") if gid is not None else \
@@ -108,6 +115,8 @@ def grp_sync(c, lids, actor=None):
     from ..collab.news import news_add
     from ..integrations.webhooks import wh_note_list
     from ..agents.core import agent_ids
+    from ..agents.safety import bridge_blocks
+    from .lffolder import lf_place, lf_skips, lf_want  # 2.352.0 A (#2748): the roles through the list's folders (frole)
     actor = actor if actor is not None else (me() if has_request_context() and getattr(g, "user", None) else None)
     agents = agent_ids(c)
     kids = {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1")}
@@ -125,38 +134,58 @@ def grp_sync(c, lids, actor=None):
                     if role_max(want.get(uid), role) != want.get(uid):
                         want[uid], gname[uid] = role_max(want.get(uid), role), gid
         rows = {r["user_id"]: r for r in c.execute("SELECT * FROM list_members WHERE list_id=?", (lid,))}
+        if not lr["is_inbox"]:
+            lf_place(c, lid)
+        skips = lf_skips(c, lid)
+        fwant = {u: r for u, r in lf_want(c, lid).items() if u not in skips}
+        for uid in [u for u in fwant if u not in rows and u not in want]:
+            if bridge_blocks(c, lid, uid):  # 2.30.0 (#919) for a folder's share too
+                fwant.pop(uid, None)
         if want and not lr["is_inbox"]:  # 2.30.0 (#919): a group never adds a person who would connect lists with different
-            from ..agents.safety import bridge_blocks  # people through the list's agent (skipped like another workspace)
+            # people through the list's agent (skipped like another workspace)
             for uid in [u for u in want if u not in rows and bridge_blocks(c, lid, u)]:
                 want.pop(uid, None)
-        for uid in sorted(set(rows) | set(want)):
-            r, gr = rows.get(uid), want.get(uid)
+        for uid in sorted(set(rows) | set(want) | set(fwant)):
+            r, gr, fr = rows.get(uid), want.get(uid), fwant.get(uid)
             own = None
-            if r is not None:
-                own = r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None else None)
-            eff = role_max(own, gr)
+            if r is not None:  # 2.352.0 A (#2748): a row only through folders (frole) has no own role either
+                own = r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None and r["frole"] is None else None)
+            eff = role_max(own, gr, fr)
             if eff and uid in kids:  # 2.19.0 (#653)
-                eff, gr = "participant", ("participant" if gr else gr)
+                eff, gr, fr = "participant", ("participant" if gr else gr), ("participant" if fr else fr)
             if eff == "participant" and lr["e2e"]:  # 2.64.1 (#1817): a list with the lock has no participants (no access)
                 eff = None
                 if r is None:
                     continue
+            if r is None and fr and not gr:  # 2.352.0 A (#2748): a folder's share follows the rules of a list's share (lock)
+                from ..collab.liste2e import le2a_member_problem
+                if le2a_member_problem(c, lid, uid, eff):
+                    continue
             if r is None:
-                c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,sort,added_at) VALUES(?,?,?,?,?,?,?)",
-                          (lid, uid, eff, None, gr, my_max_sort(c, uid) + 1, iso(now_utc())))
+                if not c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,frole,sort,added_at) VALUES(?,?,?,?,?,?,?,?) "
+                                 "ON CONFLICT(list_id,user_id) DO NOTHING",  # 2.352.0 F (#2748, review N10): a second share at the same time
+                                 (lid, uid, eff, None, gr, fr, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
+                    continue
                 from ..lists.lists import member_folder_adopt  # 2.22.0 (#740)
                 member_folder_adopt(c, lid, uid)
                 news_add(c, uid, "share", list_id=lid, actor=actor,
                          data={"role": eff, "name": lr["name"], "group": grp_name(c, gname.get(uid))})
-                wh_note_list(lid, "list.shared", {"member_id": uid, "role": eff, "group_id": gname.get(uid)})
+                wh_note_list(lid, "list.shared", {"member_id": uid, "role": eff, "group_id": gname.get(uid),
+                                                  **({"via_folder": True} if fr and not gr else {})})  # 2.352.0 A (#2748)
+                if fr and not gr and uid in agents:
+                    from ..admin.hosting import agent_joined_notice
+                    agent_joined_notice(c, lid, uid, actor)  # 2.352.0 A (#2748): like _folder_member_add
             elif eff is None:
                 c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+                # 2.352.0 F (#2748, review N7): like removing a member by hand (lists.py member_remove)
+                c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+                c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
                 c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
                           (str(uid), lid))
                 news_add(c, uid, "unshare", list_id=lid, actor=actor, data={"name": lr["name"]})
-            elif (r["role"], r["own_role"], r["grole"]) != (eff, own, gr):
-                c.execute("UPDATE list_members SET role=?, own_role=?, grole=? WHERE list_id=? AND user_id=?", (eff, own, gr, lid, uid))
+            elif (r["role"], r["own_role"], r["grole"], r["frole"]) != (eff, own, gr, fr):
+                c.execute("UPDATE list_members SET role=?, own_role=?, grole=?, frole=? WHERE list_id=? AND user_id=?", (eff, own, gr, fr, lid, uid))
                 if r["role"] != eff:
                     news_add(c, uid, "role", list_id=lid, actor=actor, data={"role": eff, "old": r["role"], "name": lr["name"]})
         # a group assignment stays only while that group still has access to the list
@@ -167,9 +196,14 @@ def grp_sync(c, lids, actor=None):
 
 
 def grp_touch(c, owner):
-    """The lists of owner moved between folders / were created: re-sync them if one of their folders is shared."""
+    """The lists of owner moved between folders / were created: re-sync them if one of their folders is shared. 2.352.0 A
+    (#2748): their nodes follow their paths (lf_sync_owner); a list that got a new place gets its roles through the folders anew."""
+    from .lffolder import lf_sync_owner
+    moved = set(lf_sync_owner(c, owner))
     if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND list_id IS NULL", (owner,)).fetchone():
         grp_sync(c, grp_list_ids(c, owner=owner) | {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (owner,))})
+    elif moved:
+        grp_sync(c, moved)
 
 
 def grp_name(c, gid):

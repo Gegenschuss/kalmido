@@ -32,7 +32,7 @@ function rmSet(patch, how = 'view') {
 }
 const rmZoom = () => RM_Z[rmP().z] ? rmP().z : 'month';
 const rmDW = () => RM_Z[rmZoom()].px * uiZ() * (isMobile() ? 5 / 6 : 1);
-const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && l.kind === 'project' && inWs(l));  // 2.380.2 (#3407): only the shown workspace
+const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && inWs(l));  // 2.352.0 B (#2752): every list but the inbox; 2.380.2 (#3407): only the shown workspace
 const rmPO = () => rmP().po ?? rmProjects().length > 0;   // "Projects only": default on as soon as one project exists
 const rmHD = () => rmP().hd !== false;                     // "Hide done": default on
 const rmNdOn = () => rmP().nd !== false;                   // 2.0.6 (#189) "No date" rows in open lists: default on
@@ -50,7 +50,7 @@ const rmCrGeo = G => ({s0: G.start, dw: G.dw, days: G.days});  // 2.18.0 (#431):
 // rows: f = folder, g = list (header row with the summary bar), t = task (only in an expanded list)
 function rmModel() {
   const P = rmP(), po = rmPO(), hd = rmHD(), who = rmWho(), sel = (P.ls || []).length ? new Set(P.ls) : null;
-  let lists = [inbox(), ...sideOrder()].filter(l => l && !l.archived && inWs(l) && (!po || l.kind === 'project') && (!sel || sel.has(l.id)));  // 2.380.2 (#3407): inWs
+  let lists = [inbox(), ...sideOrder()].filter(l => l && !l.archived && inWs(l) && (!po || !l.is_inbox) && (!sel || sel.has(l.id)));  // 2.380.2 (#3407): inWs
   const per = new Map(lists.map(l => [l.id, {open: [], shown: [], undated: 0, und: []}]));
   for (const t of S.tasks.values()) {
     const g = per.get(t.list_id); if (!g || t.deleted_at) continue;
@@ -60,7 +60,7 @@ function rmModel() {
   }
   // projects always show up (a new one has no dates yet: plan it here), other lists only with dated tasks;
   // with an assignee filter only the lists with a matching task
-  lists = lists.filter(l => { const g = per.get(l.id); return who ? g.shown.length > 0 : g.open.length > 0 || g.shown.length > 0 || l.kind === 'project'; });
+  lists = lists.filter(l => { const g = per.get(l.id); return who ? g.shown.length > 0 : g.open.length > 0 || g.shown.length > 0 || isTracked(l); });  // 2.352.0 B (#2752): tracked ones
   const nGroups = lists.length, def = P.def === 'c' ? 0 : P.def === 'e' ? 1 : nGroups < 5 ? 1 : 0;
   const isOpen = k => { const v = (P.t || {})[k]; return v == null ? (k.startsWith('f:') ? 1 : def) : v; };
   const rows = [], taskRow = new Map(), listNode = new Map(), groupOf = new Map();
@@ -73,7 +73,7 @@ function rmModel() {
     const r = push({type: 'g', l, key: 'l' + l.id, open, span, n: g.open.length, undated: g.undated, ts});
     listNode.set(l.id, r);
     // 2.18.0 (#462): inside an open list its sections (header rows, foldable per device), "+ Add task" after them (#431)
-    if (open) for (const sg of tlSecs(l.id, ts, l.kind === 'project')) {
+    if (open) for (const sg of tlSecs(l.id, ts, !l.is_inbox)) {
       const shut = !!sg.key && S.collapsed.has(sg.key);
       if (sg.key) push({type: 's', l, sg, key: sg.key, open: !shut, n: sg.ts.length});
       if (!shut) for (const t of sg.ts) taskRow.set(t.id, push({type: 't', t, l, insec: !!sg.key}));
@@ -145,7 +145,7 @@ function rmSumHtml(G, r) {
 }
 // 2.7.2: the milestones of a project (2.7.1, #410) as markers in its summary row of the "All" timeline too
 function rmMsHtml(G, l, r) {
-  if (l.kind !== 'project') return '';
+  if (l.is_inbox) return '';
   const t0 = today();
   // 2.18.0: an open list shows its milestone tasks as diamonds in their rows: no second marker for them here
   return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end && !(r?.open && tlMsDrawn(m, r.ts))).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day) + (m.envs?.length ? ' · ' + m.envs.map(env_text).join(', ') : ''))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day) + (m.envs?.length ? ', ' + m.envs.map(env_text).join(', ') : ''))}"></i>${m.envs?.length ? `<span class="rm-env" style="left:${rmX(G, m.day) + G.dw / 2 + 10}px">${esc(env_text(m.envs[0]))}</span>` : ''}`).join('');  // 2.60.0 (#1514): where the milestone runs now
@@ -179,14 +179,12 @@ function rmRowHtml(G, M, r) {
 function rmChips(M) {
   const P = rmP(), n = (P.ls || []).length, who = rmWho();
   const whoLbl = !who ? tr('Everyone') : who === 'me' ? tr('Me') : who === 'none' ? tr('Unassigned|assignee') : (rmPeople().find(p => p.user_id === +who)?.name || '?');
-  const noProj = !rmProjects().length;
   return `<div class="rm-chips fchips" role="toolbar" aria-label="${esc(tr('Filters'))}">
-    <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" ${noProj && !M.po ? `title="${esc(tr('Switch on progress and status for a project to plan it here'))}"` : ''}>${tr('Projects only')}</button>
+    <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" >${tr('Projects only')}</button>
     <button class="${rmHD() ? 'on' : ''}" data-act="rm-hd" aria-pressed="${rmHD()}">${tr('Hide done')}</button>
     <button class="${rmNdOn() ? 'on' : ''}" data-act="rm-nd" aria-pressed="${rmNdOn()}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')}${tr('No date')}</button>
     ${collab() ? `<button class="${who ? 'on' : ''}" data-act="rm-who" aria-haspopup="menu">${ic('user', 's')}${esc(whoLbl)}</button>` : ''}
     <button class="${n ? 'on' : ''}" data-act="rm-lists" aria-haspopup="dialog">${ic('filter', 's')}${n ? esc(trn('{0} project', '{0} projects', n)) : tr('All projects')}</button>
-    ${noProj ? `<span class="rm-hint">${ic('help', 's')}${tr('Switch on progress and status for a project to plan it here')}</span>` : ''}
     <span class="rm-ce"><button class="iconbtn" data-act="rm-collapse" title="${tr('Collapse all')}" aria-label="${tr('Collapse all')}">${ic('collapse')}</button><button class="iconbtn" data-act="rm-expand" title="${tr('Expand all')}" aria-label="${tr('Expand all')}">${ic('expand')}</button></span></div>`;
 }
 function rmPeople() {
@@ -205,7 +203,7 @@ function viewRoadmap() {
     </div>`;
   const from = S.tlPick && S.tasks.get(S.tlPick.from);
   const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
-  if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${M.po && !rmProjects().length ? tr('Switch on progress and status for a project to plan it here') : tr('Nothing to show with these filters')}</div>`;
+  if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${tr('Nothing to show with these filters')}</div>`;
   const hint = isTouch() ? tr('Long-press a project bar to move the whole project. Tap a name to open or close it.') : tr('Drag a project bar to move all its open tasks with a date. Click a name to open or close it.');
   return `${bar}${rmChips(M)}${pick}
     <div class="tl rm z-${G.z}${S.tlPick ? ' picking' : ''}" style="--dw:${G.dw}px;--days:${G.days};--rh:${G.rh}px;--hh:${G.hh}px;--grid:${G.z === 'week' ? G.dw : 7 * G.dw}px;--rm-h:${H + 2}px">
@@ -391,7 +389,7 @@ function rmSumMenu(el) {
 }
 function rmListsPop(anchor) {
   const sel = new Set(rmP().ls || []), po = rmPO();
-  const ls = [inbox(), ...sideOrder()].filter(l => l && !l.archived && (!po || l.kind === 'project'));
+  const ls = [inbox(), ...sideOrder()].filter(l => l && !l.archived && (!po || !l.is_inbox));
   const row = l => `<label class="rm-lrow"><input type="checkbox" data-l="${l.id}" ${sel.has(l.id) ? 'checked' : ''}><span>${esc(lname(l))}</span></label>`;
   let h = ls.filter(l => l.is_inbox || !l.folder).map(row).join('');
   for (const f of folderNames()) {

@@ -332,7 +332,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); if (o.closest('#pop') && typeof closePop === 'function') closePop(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk);
 });
 window.hbm_clientHtml = c => { if (c) ld_later('hubmail'); return ''; };
-window.hbm_projHtml = l => { if (l?.kind === 'project' && !l.e2e) ld_later('hubmail'); return ''; };
+window.hbm_projHtml = l => { if (l && !l.is_inbox && !l.e2e && !l.life && !l.family) ld_later('hubmail'); return ''; };
 
 // ---- 2.154.0 C (#2192): data protection sheets of the client (office/privacy.py; office admins, else no section / filter):
 // the section with each sheet's status and the filter of the list; the dialogs and the menu live in office_doctpl.js
