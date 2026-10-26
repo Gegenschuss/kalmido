@@ -47,7 +47,9 @@ OFD_RECEIPT_KEPT = N_("Receipt within its retention period")
 
 def _row(c, did):
     with system_ctx(c):  # the folder side asks across offices (a share of a personal office's folder); nothing is handed out
-        return c.execute("SELECT id, org_id, kind, number, status, locked_at, trial FROM office_docs WHERE id=?", (int(did),)).fetchone()
+        # 2.351.0 C (#3246): list_id / ref_doc_ids for an agent's project restriction (ofa_doc_in_lists)
+        return c.execute("SELECT id, org_id, kind, number, status, locked_at, trial, list_id, ref_doc_ids FROM office_docs WHERE id=?",
+                         (int(did),)).fetchone()
 
 
 def ofd_space(c, did):
@@ -123,6 +125,14 @@ def _agent_reads(c, uid, oid):
         return bool(ofa_agent_ok(c, uid, oid, "offers", "view"))
 
 
+def _agent_in_lists(c, uid, r):
+    """2.351.0 C (#3246): document row r lies within agent uid's project restriction (agents.list_ids), like the office's
+    own agent routes (ofa_need_in_lists): a folder share does not open a document of another project."""
+    from .agentdocs import ofa_doc_in_lists
+    with system_ctx(c):  # the agent's restriction and a reminder's invoices (structure: list ids)
+        return ofa_doc_in_lists(c, uid, r)
+
+
 def ofd_gate(c, uid, did):
     """2.238.0 A (#2863): the office's locks on the file store's content routes (like _need and the office's agent routes):
     a token needs the scope office (agents only), an agent the office's agent switches, a kid's account nothing, the office
@@ -133,6 +143,8 @@ def ofd_gate(c, uid, did):
     if _agent(c, uid):
         if not _agent_reads(c, uid, r["org_id"]):
             raise Denied(403)
+        if not _agent_in_lists(c, uid, r):
+            raise Denied(404)  # 2.351.0 C (#3246)
         return
     if fs_ref_token_lacks(uid, "office"):
         raise Denied(403, tr("This token lacks the permission “{0}”", "office"))
@@ -145,7 +157,8 @@ def ofd_gate(c, uid, did):
 
 def ofd_hidden(c, uid):
     """2.238.0 A (#2863): what a folder never opens, like sheets' hidden: for a token without the scope office every filed
-    document (a person's token never has it), for an agent the documents of every office it may not read (_agent_reads)."""
+    document (a person's token never has it), for an agent the documents of every office it may not read (_agent_reads)
+    and -- 2.351.0 C (#3246) -- those outside its project restriction (_agent_in_lists)."""
     if fs_ref_token_lacks(uid, "office"):
         return fs_ref_all_sql(OFD_KIND)
     if not _agent(c, uid):
@@ -154,13 +167,16 @@ def ofd_hidden(c, uid):
     if has_request_context() and key in g.setdefault("ofd_cache", {}):
         return g.ofd_cache[key]
     with system_ctx(c):  # the offices of the filed documents (structure: ids only)
-        rows = c.execute("SELECT n.ref_id, d.org_id FROM fs_nodes n JOIN office_docs d ON d.id=n.ref_id "
-                         "WHERE n.kind='ref' AND n.ref_kind=?", (OFD_KIND,)).fetchall()
+        rows = c.execute("SELECT n.ref_id, d.org_id, d.kind, d.list_id, d.ref_doc_ids FROM fs_nodes n JOIN office_docs d "
+                         "ON d.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=?", (OFD_KIND,)).fetchall()
+        lim = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (int(uid),)).fetchone()
+    lim = bool(lim and str(lim[0] or "").strip())  # 2.351.0 C (#3246): a project restriction to check per document
     ok = {}
     for x in rows:
         if x[1] not in ok:
             ok[x[1]] = _agent_reads(c, uid, x[1])
-    bad = [int(x[0]) for x in rows if not ok[x[1]]]
+    bad = [int(x[0]) for x in rows
+           if not ok[x[1]] or lim and not _agent_in_lists(c, uid, {"org_id": x[1], "kind": x[2], "list_id": x[3], "ref_doc_ids": x[4]})]
     out = f"({','.join(str(i) for i in bad)})" if bad else ""
     if has_request_context():
         g.ofd_cache[key] = out
