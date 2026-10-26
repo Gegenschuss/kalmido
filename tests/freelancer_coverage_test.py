@@ -989,7 +989,9 @@ def main():
     # ---- 2. every area is known; a matrix area is really tested (marker in a suite that runs), an n/a area has a reason
     tests = {os.path.basename(p): open(p, encoding="utf-8").read() for p in glob.glob(os.path.join(N, "*.py"))
              if os.path.basename(p) != os.path.basename(__file__)}
-    run_all = open(os.path.join(N, "run_all.sh"), encoding="utf-8").read()
+    sys.path.insert(0, N)
+    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    run_all = " " + " ".join(f or "" for _, _, f in _suites.rows(N)) + " "
     # a marker line: "freelancer-matrix: area, area, ..." (a comment in the suite, next to the calls of these areas)
     marked = {}
     for name, t in tests.items():
@@ -1005,7 +1007,7 @@ def main():
             check(k in marked, f"area {k}: no suite carries the marker 'freelancer-matrix: {k}'")
             for name in sorted(marked.get(k, ())):
                 check(re.search(r"\s" + re.escape(name) + r"\b", run_all) is not None,
-                      f"area {k}: the suite {name} with its marker does not run in tests/run_all.sh")
+                      f"area {k}: the suite {name} with its marker does not run (tests/suites.txt / kalmido-suite marker)")
         check(k in ROUTES.values(), f"area {k}: no route uses it (stale)")
 
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")

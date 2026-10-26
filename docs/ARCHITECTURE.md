@@ -450,13 +450,31 @@ image) with three rules: `no-undef`, `no-unused-vars` (local variables only; top
 and the HTML use) and `eqeqeq` (`== null` stays allowed for "null or undefined"). The client's global names come from
 `tools/eslint_globals.json`, which `tools/eslint_globals.py` writes from the top-level declarations of `static/i18n.js` +
 `static/js/*.js`; the browser's own names stand in a fixed list in the config (a new browser API = one name there).
-`static/sw.js` has its own service-worker scope. CI runs, and locally the same in the repo root:
+`static/sw.js` has its own service-worker scope. Since 2.320 (#1368) the JSON is generated right before ESLint and not kept
+in git (it changed in nearly every package and conflicted in every second merge). CI runs, and locally the same in the repo root:
 
 ```bash
-python3 tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
+python3 tools/eslint_globals.py && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
 ```
 
-After adding or renaming a top-level function run `python3 tools/eslint_globals.py` and commit the JSON with it.
+The generator exits 1 when two scripts declare the same top-level name.
+
+### Merging without conflicts (2.320, #1368)
+
+Packages are built side by side on their own branches and land on `main` one by one. The files every package touched by
+hand used to conflict in almost every merge; they are handled now so two packages that add different things never meet:
+
+- `tests/suites.txt` + a `kalmido-suite:` marker in a new test file replace the hand-kept list in `tests/run_all.sh`
+  (`python3 tests/suites.py --help`); a new suite needs no list entry.
+- `static/i18n/<code>.json` are merged by key (`tools/i18n_merge.py`, git merge driver): keys both sides added or changed
+  differently are the only conflict left.
+- the precache lists of `static/sw.js` are merged entry by entry (`tools/sw_lists.py`; `python3 tools/sw_lists.py` rewrites
+  them from `index.html` + `lazyload.js`, `--check` compares).
+- `tests/skip.txt` and `tests/selfstart.txt` merge as line unions.
+- `tools/eslint_globals.json` is generated, not committed; `VERSION`, `CHANGELOG.md` and the `CACHE` line of `sw.js` are
+  written only by the release cut (packages describe their change in `changelog.d/<id>.md`).
+
+The merge drivers are registered once per clone with `tools/git_setup.sh` (`.gitattributes` names them; CI never merges).
 
 ### Dragging
 

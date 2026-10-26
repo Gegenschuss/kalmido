@@ -27,11 +27,11 @@ PY_TALK = re.compile(r"requests\.|urlopen|\bsess\(|\blogin\(|\.(?:get|post|put|p
 
 
 def suites():
-    with open(os.path.join(N, "run_all.sh"), encoding="utf-8") as f:
-        for line in f:
-            m = RUN.match(line)
-            if m:
-                yield m.group(1), m.group(2)
+    sys.path.insert(0, N)
+    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    for _, name, fname in _suites.rows(N):
+        if fname:
+            yield name, fname
 
 
 def code_lines(path):

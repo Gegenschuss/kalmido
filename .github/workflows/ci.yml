@@ -5,7 +5,9 @@ on:
     # 2.285.0 (#2830): + hotfix/** = the fast lane of the live train (a patch on the last live tag, beside main); the
     # concurrency group hangs on github.ref, so a hotfix push and a push on main never cancel each other; tests/stages.py
     # gives a hotfix branch the full stage, the suite times still come from main (--branch main below)
-    branches: [main, "hotfix/**"]
+    # 2.320 (#1368, Trunk + Schnitt): + job/** = a package branch before it lands on main (kalmido-livezug.py landen pushes it,
+    # waits for this run, merges fast-forward when green, removes the branch again); push stage against main
+    branches: [main, "hotfix/**", "job/**"]
   pull_request:
   # 2.180.0 A (#2695): the nightly full run (23:30 UTC = 01:30 / 00:30 in Berlin, the window of the night flakes) and runs by
   # hand (stage full by default); both in their own concurrency group: a push never cancels them, they never cancel a push
@@ -22,8 +24,10 @@ on:
 permissions:
   contents: read
 
+# 2.320 (#1368): the cut's commit ("X.Y.Z: ... [release]", VERSION changes = the full stage release.yml waits for) gets its own
+# group, so the next landing on main does not cancel the release run; landings on main still replace each other
 concurrency:
-  group: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('ci-{0}-{1}', github.event_name, github.run_id) || format('ci-{0}', github.ref) }}
+  group: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('ci-{0}-{1}', github.event_name, github.run_id) || (contains(github.event.head_commit.message, '[release]') && format('ci-release-{0}', github.sha)) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 # 2.179 (#2691): one wave. GitHub runs about 20 jobs of the account at once. "plan" cuts the shards from the suite times of the
@@ -57,7 +61,13 @@ jobs:
           CI_BEFORE: ${{ github.event.before }}
           CI_INPUT_STAGE: ${{ inputs.stage }}
           CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # 2.320 (#1368): a package branch (job/**) is tested against main: its changed files from the compare API
+          case "$GITHUB_REF" in refs/heads/job/*)
+            CI_CHANGED_FILES=$(gh api --paginate "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq '.files[].filename' 2>/dev/null || true)
+            export CI_CHANGED_FILES; echo "job branch: $(wc -l <<<"$CI_CHANGED_FILES") changed file(s) against main" ;;
+          esac
           out=$(python3 tests/stages.py --ci --groups-out /tmp/push-groups.txt) || out=$'stage=full\nreason=tests/stages.py failed - full run'
           stage=$(sed -n 's/^stage=//p' <<<"$out"); reason=$(sed -n 's/^reason=//p' <<<"$out")
           if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
@@ -171,10 +181,11 @@ jobs:
       # // @ts-check, every new client file must (tools/check_tscheck.py)
       - name: Type check of the client (files with // @ts-check)
         run: python tools/check_tscheck.py && npx --yes -p typescript@6.0.3 tsc -p jsconfig.json
-      # 2.126.0 (#1993): ESLint as a check only (pinned version, eslint.config.mjs; no-undef, no-unused-vars, eqeqeq); the list of
-      # the client's global names (tools/eslint_globals.json) must be current
+      # 2.126.0 (#1993): ESLint as a check only (pinned version, eslint.config.mjs; no-undef, no-unused-vars, eqeqeq). 2.320 (#1368):
+      # the list of the client's global names (tools/eslint_globals.json) is generated here, not kept in git (exit 1 = a name
+      # declared twice)
       - name: ESLint of the client
-        run: python tools/eslint_globals.py --check && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
+        run: python tools/eslint_globals.py && npx --yes eslint@10.13.0 static/i18n.js 'static/js/*.js' static/sw.js
       # 2.191.0 B (#1824): JS / CSS go out without comments (kalmido/core/strip.py); every client file stripped, node --check,
       # tokens before / after compared with the tokenizer of the pinned ESLint (only comments may differ)
       - name: Comment remover of the static files

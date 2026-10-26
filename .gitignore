@@ -16,3 +16,4 @@ tests/.demo/
 /demo/
 tests/.demo-quick/
 tests/.demo-office/
+tools/eslint_globals.json

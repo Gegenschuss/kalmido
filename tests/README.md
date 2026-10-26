@@ -136,6 +136,16 @@ two Mac runs) goes into `skip.txt` with a date at most 14 days ahead and the tas
 until that date (a run naming it with `ONLY=` still runs it), and the lint step `skip_test.py` turns red once the date has
 passed. Fix the suite, delete its line.
 
+The suite list (2.320, #1368): `suites.txt` holds the old `run` lines (`[now ...; ]fresh; run <name> <command>` = a group
+with a fresh container; an indented `run` line = same group). A **new suite needs no list entry**: a marker line in the
+first 15 lines of its file is enough, `python3 suites.py --check` validates it, `--list` shows every suite with its group:
+
+```python
+# kalmido-suite:                      # python: its own fresh container, data dir argument (the default)
+// kalmido-suite: after=api           # node: runs in the group of `api`, right after it (uses its ids.json)
+# kalmido-suite: now=wed10:00 nodata  # a fixed test time for the group; no data dir argument
+```
+
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
 
 ```sh

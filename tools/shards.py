@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Shard report from measured suite times (2.149.0 E, #2514).
 
-tests/run_all.sh is a list of groups (one `fresh` container and the suites after it; a group stays whole) split into shards by
-`shard N` lines. Every run writes tests/timings.csv (shard,group,suite,seconds,rc; suite "*" = the whole group with its
+The test run is a list of groups (one `fresh` container and the suites after it; a group stays whole) split into shards by
+`shard N` lines; 2.321 (#1368): the list comes from tests/suites.py (tests/suites.txt + the test files with a `kalmido-suite:`
+marker), tests/run_all.sh only runs it. Every run writes tests/timings.csv (shard,group,suite,seconds,rc; suite "*" = the whole group with its
 container start). This tool reads the groups from run_all.sh and one or more timings files (CI artifacts timings-shard-*),
 spreads the groups over the shards by measured time (LPT: longest group first onto the emptiest shard) and shows how far the
 hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from the times of its last finished run
@@ -29,11 +30,28 @@ RUN_RE = re.compile(r"^(now [^;]*; *)?(fresh;)?[ \t]*run ([A-Za-z0-9_]+) ")
 SHARD_RE = re.compile(r"^shard ([0-9]+)\b")
 
 
-def groups(path):
-    """[(first suite, [suites], marker shard)] in the order of run_all.sh (the same count as run_all.sh's mine())."""
-    out, cur, marker = [], 1, 0
+def list_lines(path):
+    """2.321 (#1368): the suite lines of tests/run_all.sh come from tests/suites.py (suites.txt + marker files); a file that
+    still holds `run` lines itself (an older tree) is read as before."""
     with open(path, encoding="utf-8") as f:
-        for no, line in enumerate(f, 1):
+        text = f.read()
+    if RUN_RE.search(text) is None or 'eval "$LIST"' in text:
+        tests_dir = os.path.dirname(os.path.abspath(path))
+        sys.path.insert(0, tests_dir)
+        try:
+            import suites as _suites
+        finally:
+            sys.path.remove(tests_dir)
+        return [s.bash() for s in _suites.all_suites(tests_dir)[0]], True
+    return text.splitlines(), False
+
+
+def groups(path):
+    """[(first suite, [suites], marker shard)] in the order of the suite list (the same count as run_all.sh's mine())."""
+    out, cur, marker = [], 1, 0
+    lines, generated = list_lines(path)
+    if True:
+        for no, line in enumerate(lines, 1):
             m = SHARD_RE.match(line)
             if m:
                 cur, marker = int(m.group(1)), no

@@ -47,7 +47,8 @@ run, a release (a change of `VERSION`), a change of the CI files and a commit me
 a test for what you change; security fixes need a regression test in `tests/security_test.py`.
 
 - **Only some suites:** `ONLY="api security" ./run_all.sh` runs just the named suites (the names after `run` in
-  `run_all.sh`; the test containers of their groups are still started). Run the suites you touched while you work and
+  `tests/suites.txt`, or the file name of a test with a `kalmido-suite:` marker without `_test`; the test containers of
+  their groups are still started). Run the suites you touched while you work and
   the full run once before the pull request.
 - **bandit locally**, as CI does: `pip install bandit && bandit -q --severity-level high -r app.py kalmido tools`.
 - **Push tests** (`webpush`, `webpush_ui`) decrypt the payloads with `http-ece` from `tests/requirements.txt`;

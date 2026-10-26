@@ -35,7 +35,9 @@ def problems(text, suites, today):
 
 
 def main():
-    suites = set(re.findall(r"(?m)^(?:now [^;]*; *)?(?:fresh;)?[ \t]*run (\w+) ", open(os.path.join(HERE, "run_all.sh")).read()))
+    sys.path.insert(0, HERE)
+    import suites as _suites  # 2.320 (#1368): the suite list (suites.txt + marker files)
+    suites = {n for _, n, _ in _suites.rows(HERE)}
     today = datetime.datetime.now(ZoneInfo("Europe/Berlin")).date()
     d = datetime.date(2026, 10, 25)
     t = "# c\napi 2026-11-01 #1 CI v1\nui 2026-10-24 #2 x\nnone 2026-10-26 #3 x\napi 2026-10-30 #4 x\nui 2026-12-01 #5 x\nui 2026-10-30\n"

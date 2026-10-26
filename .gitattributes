@@ -1,0 +1,5 @@
+# 2.320 (#1368): git merge drivers for the files every package touches (register once: tools/git_setup.sh)
+static/i18n/*.json merge=i18n
+static/sw.js merge=swlists
+tests/skip.txt merge=union
+tests/selfstart.txt merge=union

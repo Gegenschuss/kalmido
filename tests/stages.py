@@ -35,6 +35,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, HERE)
 from shards import FRESH_RE, RUN_RE  # noqa: E402  (the same group count as tools/shards.py and run_all.sh)
 
 FILE_RE = re.compile(r"\s([A-Za-z0-9_./-]+\.(?:py|js))\b")
@@ -42,7 +43,7 @@ FILE_RE = re.compile(r"\s([A-Za-z0-9_./-]+\.(?:py|js))\b")
 FULL_EXACT = {
     "VERSION", "Dockerfile", ".dockerignore", "app.py", ".github/workflows/ci.yml",
     "tests/run_all.sh", "tests/start.sh", "tests/requirements.txt", "tests/package.json", "tests/package-lock.json",
-    "tests/stages.py", "tools/shards.py",
+    "tests/stages.py", "tests/suites.py", "tools/shards.py",
     # test helpers (nearly) every suite uses
     "tests/boot.js", "tests/kt.py", "tests/ff.js", "tests/testclock.py", "tests/testclock.js", "tests/dbx.py",
     # server start, schema, request context
@@ -75,9 +76,14 @@ def read(path):
 
 
 def suites(run_all):
-    """[(group index, suite, test file or None)] in the order of run_all.sh."""
+    """[(group index, suite, test file or None)] in run order. 2.320 (#1368): from tests/suites.py (tests/suites.txt + the test
+    files with a `kalmido-suite:` marker); an older tree whose run_all.sh still holds the lines is read as before."""
+    text = read(run_all)
+    if RUN_RE.search(text) is None or 'eval "$LIST"' in text:
+        import suites as _suites  # tests/ is on sys.path (HERE)
+        return _suites.rows(os.path.dirname(os.path.abspath(run_all)))
     out, g = [], 0
-    for line in read(run_all).splitlines():
+    for line in text.splitlines():
         if FRESH_RE.match(line):
             g += 1
         m = RUN_RE.match(line)
@@ -218,9 +224,9 @@ def i18n_only_added(base, head, rel, root):
     return all(ln.strip().rstrip(",") in plus for ln in d[0])
 
 
-def run_all_added(base, head, root):
-    """The suites of the run lines a diff of run_all.sh only adds (new suites / groups), None for any other change."""
-    d = diff_lines(base, head, "tests/run_all.sh", root)
+def run_all_added(base, head, root, path="tests/suites.txt"):
+    """The suites of the run lines a diff of the suite list only adds (new suites / groups), None for any other change."""
+    d = diff_lines(base, head, path, root)
     if d is None or d[0]:
         return None
     new = []
@@ -240,11 +246,13 @@ def classify(repo, path, base=None, head=None):
     p = p[2:] if p.startswith("./") else p
     name = os.path.basename(p)
     stem = os.path.splitext(name)[0]
-    if p == "tests/run_all.sh":
-        new = run_all_added(base, head, repo.root)
+    if p == "tests/suites.txt":  # 2.320 (#1368): the old list; new suites come by marker (their test file maps below)
+        new = run_all_added(base, head, repo.root, p)
         if new is not None and all(n in repo.group_of for n in new):
-            return "suites", {n: "new in run_all.sh" for n in new}
-        return "full", "run_all.sh changed (not only suites added)"
+            return "suites", {n: "new in suites.txt" for n in new}
+        return "full", "suites.txt changed (not only suites added)"
+    if p == "tests/run_all.sh":
+        return "full", "run_all.sh changed"
     if p in FULL_EXACT or p.startswith(FULL_PREFIX):
         return "full", "core / CI basics"
     if p.startswith("static/i18n/") and p.endswith(".json"):
@@ -400,6 +408,12 @@ def ci_base():
         # 2.285.0 (#2830): a hotfix branch (the fast lane of the live train, a patch on the last live tag) goes live
         # without the train's release push: always every suite
         return "full", "hotfix branch (fast lane): full run", None
+    if ev == "push" and os.environ.get("GITHUB_REF", "").startswith("refs/heads/job/"):
+        # 2.320 (#1368): a package branch before it lands on main (kalmido-livezug.py landen): its files against main come from
+        # ci.yml (compare API, CI_CHANGED_FILES); without them the full run
+        if os.environ.get("CI_CHANGED_FILES", "").strip():
+            return None, "package branch (job/**) against main", "env"
+        return "full", "package branch (job/**) without a file list: full run", None
     if ev == "push":
         before = os.environ.get("CI_BEFORE", "")
         if not before or set(before) == {"0"}:
@@ -435,7 +449,10 @@ def main(argv=None):
     if a.ci:
         pre, reason, base = ci_base()
         files = []
-        if pre is None:
+        if pre is None and base == "env":  # 2.320 (#1368): the file list of a package branch (ci.yml, compare API)
+            files = [x.strip() for x in os.environ.get("CI_CHANGED_FILES", "").splitlines() if x.strip()]
+            base = head = None
+        elif pre is None:
             if git_ok("rev-parse", "--verify", "-q", base + "^{commit}") is None:
                 pre, reason = "full", f"{reason}: base {base} not available"
             else:
