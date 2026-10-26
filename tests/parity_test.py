@@ -540,6 +540,12 @@ APP_ONLY = [
     ("2.235.0 A (#2891 #2900 #2901): the owner / an instance admin sets an agent's control level and takes its decisions back in "
      "the app; the agent never changes its own control, it reads it in GET /agent (control, event control_changed)",
      ("* /api/agents/{}/control", "POST /api/agents/{}/control/history/{}/undo")),
+    ("2.235.0 B (#2902): the owner / an instance admin locks data for an agent in the app; the agent only reads what is locked "
+     "in GET /agent (data_lock, event data_lock_changed) and never changes it",
+     ("* /api/agents/{}/data-lock",)),
+    ("2.235.0 C (#2903): the owner / an instance admin rewords, pauses, deletes or adds an agent's standing rules in the app; "
+     "the agent has its own GET/POST /agent/rules",
+     ("* /api/agents/{}/rules",)),
     ("2.312.0 D (#3266): the choice who answers an agent's permission questions is a picker in the agent's settings in the app; "
      "the value itself is runtime.perm_user (PATCH /api/admin/agents/{id}, PATCH /api/my/agents/{id}), the agent never picks it",
      ("=GET /api/agents/{}/perm-users",)),
