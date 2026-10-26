@@ -18,6 +18,7 @@
  (f) a person without an organisation: her personal office's tree (private space), her folder, her quotation and
      document in it, her agent reads the document through its share
  (h) another organisation's admin: her own office's tree only, no folder in alpha's folders
+ (f2) the lists of Documents / Correspondence show what another office (a personal office's folder) shares with the person
  (g) folder rules (docs/store.py): a rule files only into a folder the uploading person may edit -- the accounting person's
      upload stays where it lands without the rule (rollback test: without the fix it went into the folder)
 usage: p2351_a_officetree_test.py <datadir>
@@ -251,6 +252,22 @@ check(requests.get(B + f"/api/v1/files/{fgn['id']}", headers=FH).status_code == 
 share(Fr, FGF, agent_id=FA, role="view")
 r = requests.get(B + f"/api/v1/files/{fgn['id']}/content", headers=FH)
 check(r.ok and r.content[:5] == b"%PDF-", f"(f) her agent reads the document through its share ({r.status_code} {r.text[:120] if not r.ok else ''})")
+
+# ---------------------------------------------------------------- (f2) the Documents list shows what another office shares through a folder
+A.patch(B + "/api/settings", json={"workspace": "private"})
+PCL = A.post(B + "/api/clients", json={"name": "Private Client", "email": "pc@example.com"}).json()["id"]
+r = A.post(B + O + "/gen-docs", json={"client_id": PCL, "title": "Alice private paper", "body": "Invented."})
+check(r.status_code == 201, "(f2) setup: a document of alice's personal office " + r.text[:160])
+PGD = r.json().get("id")
+PGF = A.post(B + "/api/files/folders", json={"name": "Private papers", "space": "private"}).json()["id"]
+st_, pgn = file_in(A, "office_gendoc", PGD, PGF)
+check(st_ == 200 and not any(x["id"] == PGD for x in tree(A, "gen-docs").get("shared") or []), "(f2) her own document is not 'shared' in her own list")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+check(not any(x["id"] == PGD for x in tree(Ca, "gen-docs").get("shared") or []), "(f2) not shared: nothing of it in carl's list")
+share(A, PGF, user_id=USERS["carl"], role="view")
+sh = tree(Ca, "gen-docs").get("shared") or []
+check(any(x["id"] == PGD and x["node"] == pgn["id"] for x in sh) and Ca.get(B + f"/api/files/nodes/{pgn['id']}/content").ok,
+      f"(f2) shared with carl: the Documents list of his office shows it (shared through a folder), he reads its PDF ({sh})")
 
 # ---------------------------------------------------------------- (g) folder rules only into folders the uploader edits
 D0 = upload(A, "setup-secret.pdf", f"org:{ORG}")

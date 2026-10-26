@@ -22,6 +22,7 @@ async function oft_load(area) {
   catch (e) { if (e.message === 'auth') { OFT.busy[area] = false; return; } OFT.d[area] = {key, v: S.v, at: Date.now(), folders: [], docs: [], err: e.message}; }
   OFT.busy[area] = false;
   if (typeof sbb_officeSync === 'function') sbb_officeSync();
+  if ((area === 'gendocs' || area === 'letters') && OFT.d[area]?.shared?.length && S.route.mod === 'office' && S.route.tab === area && !S.route.id && typeof ofcDraw === 'function') ofcDraw();
 }
 // the tree of an area: loaded once per person / workspace, again after a change (S.v) at most every few seconds
 function oft_get(area) {
@@ -56,6 +57,14 @@ function oft_rowHtml(i, on) {
       return [...oft_kids(area, null).map(fold), ...oft_docsIn(area, null).map(x => doc(x, 'a:' + area)),
         ...(d.more ? [{k: 'of:m:' + area, name: tr('More…'), icon: 'dots', go: i.go, battrs: `data-oftmore="${esc(area)}"`}] : [])]; }};
   return sbb_treeHtml([node], 0);
+}
+
+// ---- 2.351.0 A (#2823): the lists of Documents / Correspondence also show what another office shares through a folder (read:
+// the PDF through the file store; the tree's data, office/oftree.py oft_shared)
+function oft_sharedHtml(area) {
+  const xs = oft_get(area)?.shared || []; if (!xs.length) return '';
+  return `<h3 class="ofcgrp">${esc(tr('Shared through a folder'))}</h3><ul class="ofclist dtp-list" role="list" data-oftshared="${esc(area)}">${xs.map(x => `<li><a class="ofcrow" href="/api/files/nodes/${x.node}/content" target="_blank" rel="noopener">
+    <span class="ofcn"><b>${esc(x.title)}</b><small class="muted">${esc(tr('Read only'))}</small></span>${ic('pdf', 's')}</a></li>`).join('')}</ul>`;
 }
 
 // ---- changes

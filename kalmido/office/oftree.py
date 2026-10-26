@@ -32,9 +32,11 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields
 from ..accounts.orgroles import org_writes
+from ..files.fsref import fs_ref_role
 from ..files.fsroots import fs_area_folder_name, fs_area_root
 from ..files.store import _now, _place, fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
 from .model import office_ctx, pb_owner
+from .oftref import _gd, _lt
 from .rights import AREA_LEGACY
 
 OFT_NEWEST = 20
@@ -160,7 +162,21 @@ def oft_tree(c, uid, oid, area):
     loose = OFT_DOCS[area](c, uid, oid, filed, True, OFT_NEWEST + 1)
     docs += [{**d, "folder_id": None, "fnode": None, "fsort": None} for d in loose[:OFT_NEWEST]]
     return {"area": area, "kind": kind, "space": f"org:{int(org)}" if org else "private", "root": root,
-            "can_add": bool(org_writes(c, uid, org)), "folders": folders, "docs": docs, "more": len(loose) > OFT_NEWEST}
+            "can_add": bool(org_writes(c, uid, org)), "folders": folders, "docs": docs, "more": len(loose) > OFT_NEWEST,
+            "shared": oft_shared(c, uid, oid, area) if area in ("gendocs", "letters") else []}
+
+
+def oft_shared(c, uid, oid, area):
+    """2.351.0 A (#2823): the documents / letters of ANOTHER office uid reaches only through a folder shared with them (e.g. a
+    freelancer's folder): [{id, node, title}] -- the lists of the area show them (read: the PDF through the file store)."""
+    kind, row = OFT_AREAS[area][1], (_gd if area == "gendocs" else _lt)
+    out = []
+    for n in c.execute(f"SELECT id, ref_id, name FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND deleted_at IS NULL "
+                       f"AND id IN {fs_visible_sql(uid, c)} ORDER BY id DESC LIMIT 200", (kind,)).fetchall():
+        r = row(c, n["ref_id"])
+        if r and r["org_id"] != oid and fs_ref_role(c, uid, kind, n["ref_id"]):
+            out.append({"id": n["ref_id"], "node": n["id"], "title": n["name"]})
+    return out
 
 
 def _folder_new(c, uid, oid, area):

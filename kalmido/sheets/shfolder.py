@@ -23,7 +23,7 @@ write it through its space / project (shs_need_own, share=False never asks the f
 - A deleted table (in its trash) gives nothing through its node (space None); moving the table to another workspace or
   deleting it for good removes its node (shmove / trash purge).
 """
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
@@ -35,7 +35,7 @@ from ..accounts.orgs import user_orgs
 from ..accounts.session import me
 from ..files.fsref import fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register, fs_ref_token_lacks
 from ..files.fsroots import fs_area_folder_name, fs_area_root
-from ..files.store import _now, _place, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
+from ..files.store import _now, _place, fs_chain, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
 from .core import sh_is_agent, sh_may, sh_space, sh_touch
 from .shbook import shb_rights_row
 from .vars import _agent_cap
@@ -154,6 +154,17 @@ fs_ref_register(SHF_KIND, label=N_("Table"), open_url=lambda rid: f"sheets/{int(
                 protect=_protect, hidden=_hidden, on_trash=_on_trash, title=_title, content=_content, content_gate=_gate)
 
 
+def shf_pchain(c, pid):
+    """2.351.0 A (#2823): the chain of folder pid, read once per GET request (the tables' index asks it per table and per
+    folder: N+1 statements with many folders); a writing request reads it fresh (a move in between)."""
+    if not pid or not has_request_context() or request.method != "GET":
+        return fs_chain(c, pid) if pid else []
+    cache = g.setdefault("shf_chains", {})
+    if pid not in cache:
+        cache[pid] = fs_chain(c, pid)
+    return cache[pid]
+
+
 def shf_folder_may(c, uid, r, write=False):
     """sh_may's hook: does the folder of r's table give uid the right to read (write: change) it?"""
     rr = shb_rights_row(c, r)
@@ -162,7 +173,7 @@ def shf_folder_may(c, uid, r, write=False):
     n = fs_ref_node(c, SHF_KIND, rr["id"])
     if n is None or n["deleted_at"]:
         return False
-    role = fs_ref_node_role(c, uid, n)
+    role = fs_ref_node_role(c, uid, n, chain=[n] + shf_pchain(c, n["parent_id"]))
     return role == "edit" or (role == "view" and not write)
 
 
@@ -217,7 +228,7 @@ def shf_marks(c, uid, rows, out):
 
     def _sees(pid):
         if pid not in seen:
-            seen[pid] = bool(fs_role(c, pid, uid))
+            seen[pid] = bool(fs_role(c, pid, uid, chain=shf_pchain(c, pid) or None))
         return seen[pid]
     for r, d in zip(rows, out):
         n = nodes.get(r["id"])
@@ -226,7 +237,7 @@ def shf_marks(c, uid, rows, out):
         d["folder_id"] = n["parent_id"] if n is not None else None
         d["fnode"], d["fsort"] = (n["id"], n["sort_no"]) if n is not None else (None, None)  # its node (sorting by hand)
         if n is not None and not d.get("shared_in") and not sh_may(c, uid, r, fold=False):
-            role = fs_ref_node_role(c, uid, n)
+            role = fs_ref_node_role(c, uid, n, chain=[n] + shf_pchain(c, n["parent_id"]))
             if role:
                 d["shared_in"], d["share_role"], d["folder_in"] = True, "write" if role == "edit" else "read", True
     return out
