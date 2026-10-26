@@ -58,6 +58,11 @@ def ct(x, path):
     return (e.text or "").strip() if e is not None else None
 
 
+def vids(x, path):
+    """the VAT ids (schemeID VA) of a trade party (the tax number FC stands before them)"""
+    return [e.text for e in ET.fromstring(x).findall(path + "/ram:SpecifiedTaxRegistration/ram:ID", C) if e.get("schemeID") == "VA"]
+
+
 def ut(x, path):
     e = ET.fromstring(x).find(path, U)
     return (e.text or "").strip() if e is not None else None
@@ -76,13 +81,12 @@ TT = "rsm:SupplyChainTradeTransaction/"
 for fmt in ("zugferd", "xrechnung"):
     x = ein.ein_build(fixture("eu_goods", EU), fmt)
     tax = TT + "ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/"
-    check(ct(x, tax + "ram:CategoryCode") == "K" and ct(x, tax + "ram:ExemptionReasonCode") == "VATEX-EU-IC" and ct(x, tax + "ram:RateApplicablePercent") == "0.00"
+    check(ct(x, tax + "ram:CategoryCode") == "K" and ct(x, tax + "ram:ExemptionReasonCode") == "VATEX-EU-IC" and Decimal(ct(x, tax + "ram:RateApplicablePercent")) == 0
           and Decimal(ct(x, tax + "ram:CalculatedAmount")) == 0, f"CII {fmt}: category K, VATEX-EU-IC, 0 %")
     check(ct(x, TT + "ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:CountryID") == "AT",
           f"CII {fmt}: deliver-to country AT (BR-IC-12)")
     ag = TT + "ram:ApplicableHeaderTradeAgreement/"
-    check(ct(x, ag + "ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID") == "DE123456789"
-          and ct(x, ag + "ram:BuyerTradeParty/ram:SpecifiedTaxRegistration/ram:ID") == "ATU12345675", f"CII {fmt}: both VAT ids (BR-IC-02)")
+    check(vids(x, ag + "ram:SellerTradeParty") == ["DE123456789"] and vids(x, ag + "ram:BuyerTradeParty") == ["ATU12345675"], f"CII {fmt}: both VAT ids (BR-IC-02)")
     check(ct(x, TT + "ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString") == "20260928",
           f"CII {fmt}: the delivery date as the period (BR-IC-11)")
     check(ein.ein_check(x) == [], f"CII {fmt}: own check {ein.ein_check(x)}")
@@ -99,7 +103,7 @@ write("p2355c-k-ubl.xml", xu)
 x = ein.ein_build(fixture("export", US), "zugferd")
 tax = TT + "ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/"
 check(ct(x, tax + "ram:CategoryCode") == "G" and ct(x, tax + "ram:ExemptionReasonCode") == "VATEX-EU-G", "CII: export = G, VATEX-EU-G")
-check(ct(x, TT + "ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID") == "DE123456789", "CII: G keeps the seller's VAT id (BR-G-02)")
+check(vids(x, TT + "ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty") == ["DE123456789"], "CII: G keeps the seller's VAT id (BR-G-02)")
 check(ct(x, TT + "ram:ApplicableHeaderTradeDelivery/ram:ShipToTradeParty/ram:PostalTradeAddress/ram:CountryID") is None, "CII: no deliver-to party for G")
 write("p2355c-g-zugferd.xml", x)
 write("p2355c-g-ubl.xml", ein.ein_ubl_build(fixture("export", US), "en16931"))
