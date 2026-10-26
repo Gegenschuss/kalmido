@@ -5,6 +5,13 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.307.4] - 2026-10-26
+
+### Fixed
+- Phone: the subtask arrow in a task row now has a full 44 px touch target (was 31 px wide); it still grows only to the right, never over the circle.
+- Paperless-ngx import: pressing Stop right while the background worker picked up the queued import no longer lets the import start anyway; the worker only takes a run that is still queued and Stop changes the state in one step.
+- CI of 2.307.3: p260_ui found the 31 px subtask arrow only on weekdays when the task was on screen; p248_d_paperless_api hit the Stop race above; p253_d_ui checked the tooltip of a link that a late redraw had replaced under the open preview card and now hovers the new link first.
+
 ## [2.307.3] - 2026-10-26
 
 ### Fixed
@@ -8317,7 +8324,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.307.4...HEAD
+[2.307.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.4
 [2.307.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.3
 [2.307.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.2
 [2.307.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.307.1
