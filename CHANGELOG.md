@@ -5,6 +5,10 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.323.0] - 2026-10-26
+
+- Trunk workflow: CI on job branches, suite list by marker, merge drivers for i18n and sw.js lists, 2-hour cut for the live train.
+
 ## [2.322.0] - 2026-10-26
 
 - Workflow tooling: trunk-based flow and 2-hour release cadence
@@ -8722,7 +8726,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.322.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.323.0...HEAD
+[2.323.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.0
 [2.322.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.322.0
 [2.321.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.321.0
 [2.318.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.318.5
