@@ -45,6 +45,7 @@ from ..core.pg import insert_id, table_columns, write_lock
 from ..files.scan import sc_copy_mark
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from ..core.errors import BadInput
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .ledger import ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
@@ -55,7 +56,6 @@ OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
 OFM_ADMIN = ("travel", "templates", "meals")  # their routes are for the office's admins only (travel.py, doctpl.py, meals.py)
 OFM_MAX = 200  # objects named in one move (a client's drafts and contact persons come on top, SMV_MAX in all)
-OFM_ONLY = N_("Only who created it or an admin of the organisation can move it out of it")
 OFM_RO = N_("This is a read-only copy of an issued document")
 # rows that keep a document in its office (it is no longer only a draft there)
 OFM_DOC_HOLD = ("office_payments", "office_purchases", "office_signoffs", "office_pay_props")
@@ -257,13 +257,30 @@ def ofm_rights(c, uid, what, src, dst, rows):
     ofm_groups(c, uid, what, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
-    if pb_owner(c, src) is None and rs != "admin" and any(r["created_by"] != uid for r in rows):
-        raise Denied(403, tr(OFM_ONLY))
     if what == "travel":  # 2.148.0 A (#2471): a trip leaves / enters no locked month
         from .travel import _trip_need_open
         for r in rows:
             _trip_need_open(c, src, r)
             _trip_need_open(c, dst, r)
+
+
+def ofm_out_denied(c, uid, what, src, to, rows):
+    """2.361.2 B (#2923): the 403 (Denied) when rows may not leave the organisation office src for to (None = private), else
+    None: only an admin of the organisation takes them out, or their maker into the private space with a released request
+    for each of them (accounts/orgout.py OO_KINDS: clients, drafts). Before, the maker took them out without an admin."""
+    if pb_owner(c, src) is not None:
+        return None
+    bad = [r for r in rows if not org_out_ok(c, src, to, what, r["id"])]
+    if not bad:
+        return None
+    return oo_denied(c, src, to, what, next((r for r in bad if r["created_by"] != uid), bad[0])["id"])
+
+
+def ofm_out_name(what, rows):
+    """2.361.2 B (#2923): what the organisation's log names for a move out."""
+    col = {"clients": "name", "drafts": "project_title"}.get(what, "name")
+    names = [str(r[col] or "") for r in rows if col in r.keys()]
+    return ", ".join(n for n in names if n)[:200] or tr("Office") + ": " + trn("{0} item", "{0} items", len(rows))
 
 
 # ---------------------------------------------------------------- the plan (dry run and move share it)
@@ -534,6 +551,9 @@ def ofm_move_space():
     smv_same(frm_ws, to)
     dst = pb_personal(c, uid) if to is None else to
     ofm_rights(c, uid, what, src, dst, rows)
+    deny = ofm_out_denied(c, uid, what, src, to, rows)  # 2.361.2 B (#2923): out of an organisation only by its admin or released
+    if deny and not b.get("dry"):
+        raise deny
     copy = b.get("copy_issued") in (1, True, "1")
     plain = pb_owner(c, src) is None and office_role(c, uid, src) != "admin"  # a plain member out of an organisation
     p = ofm_plan(c, uid, what, src, rows, own=plain)
@@ -547,10 +567,14 @@ def ofm_move_space():
               "trips": len(p["trips"]), "templates": len(p["tpls"]), "meals": len(p["meals"]), "contacts": sum(len(x["contacts"]) for x in p["clients"]),
               "issued": sum(len(x["issued"]) + len(x["arch"]) for x in p["clients"]) + p["keep"].get("issued", 0),
               "stay": sum(p["keep"].values()), "contracts": len(p.get("ctr", ()))}
+    notes.append(oo_into_note(c, frm_ws, to))  # 2.361.2 B (#2923): the way back (empty unless a member moves it in)
     if b.get("dry"):
+        if deny:  # 2.361.2 B (#2923): the maker can ask an admin (out_request)
+            return jsonify(smv_answer(notes, deny.text(), count=counts, **(deny.data or {})))
         return jsonify(smv_answer(notes, block, count=counts))
     if block:
         raise Denied(409, block)
+    org_out(c, frm_ws, to, what, ofm_out_name(what, rows), obj=ids)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso(now_utc())
     org_name = ""
     if frm_ws:
@@ -645,6 +669,11 @@ def rmv_undo_run(c, uid, mid, files):
     ofm_groups(c, uid, what, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    # 2.361.2 B (#2923): taking back a move into an organisation takes it out again: the rule of a move out (admin or released)
+    out = [i for i in d.get("ids") or [] if isinstance(i, int)] if pb_owner(c, dst) is None else []
+    bad = next((i for i in out if not org_out_ok(c, dst, x["from_org"], what, i)), None)
+    if bad is not None:
+        raise oo_denied(c, dst, x["from_org"], what, bad)
     write_lock(c, f"office_move_{int(dst)}")
     ts = iso(now_utc())
     back, kept, gone = 0, 0, []
@@ -728,6 +757,10 @@ def rmv_undo_run(c, uid, mid, files):
                     cl_trash(c, m["id"])
         elif m["t"] in ("office_contracts", "office_contract_files", "office_texts"):
             kept += rmv_unmake(c, m, dst, gone)  # 2.119.1 C (#2298)
+    if out:  # 2.361.2 B (#2923): logged, admins told, release used
+        t = "clients" if what == "clients" else OFM_TABLE[what]
+        org_out(c, dst, x["from_org"], what, ofm_out_name(what, c.execute(f"SELECT * FROM {t} WHERE id IN ({','.join('?' * len(out))})", out).fetchall()),
+                obj=out)
     d["undone"] = ts
     c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, default=str), mid))
     nid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",

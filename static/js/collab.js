@@ -448,6 +448,8 @@ async function newsOpen(i, opts) {
   if (it.kind === 'orglist' && it.data?.action === 'outok' && it.data.obj) {  // 2.361.2 (#2923): to the thing, its menu moves it
     const k = it.data.kind, o = it.data.obj;
     if (k === 'list' && listById(o)) go('l/' + o); else if (k === 'sheet') go('sheets/' + o); else if (k === 'file') go('ablage/' + o);
+    else if (k === 'wiki') go('wiki/' + o); else if (k === 'clients') go('client/' + o); else if (k === 'drafts') go(`office/offers/${o}`);  // 2.361.2 B (#2923)
+    else if (k === 'video' && typeof vdr_open === 'function') vdr_open(o); else if (k === 'bookmark') go('bookmarks');
     return;
   }
   if (it.kind === 'connreq' || it.kind === 'connok') { dsc_open(); return; }  // 2.49.0 (#1106)

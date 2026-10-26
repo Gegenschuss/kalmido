@@ -25,6 +25,13 @@ OO_KINDS = {
     "list": ("lists", "name", ("owner_id",)),
     "sheet": ("sheets", "title", ("created_by",)),
     "file": ("fs_nodes", "name", ("created_by", "owner_id")),
+    # 2.361.2 B (#2923): the other areas (before, their maker took them out without an admin)
+    "wiki": ("wiki_pages", "path", ("created_by",)),
+    "clients": ("clients", "name", ("created_by",)),
+    "drafts": ("office_docs", "project_title", ("created_by",)),
+    "video": ("video_reviews", "title", ("created_by",)),
+    "poll": ("sched_polls", "title", ("user_id",)),
+    "bookmark": ("bookmarks", "title", ("user_id",)),
 }
 
 

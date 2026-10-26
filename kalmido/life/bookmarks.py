@@ -657,13 +657,26 @@ def bm_move(c, uid, b):
                                     (uid, to)).fetchall()}
     dup = [r for r in rows if r["url_key"] in have]
     go = [r for r in rows if r["url_key"] not in have]
+    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
+    # 2.361.2 B (#2923): out of an organisation only by its admin, or by who saved it into the private space once released
+    bad = [r for r in go if not org_out_ok(c, r["org_id"], to, "bookmark", r["id"])]
+    x = next((r for r in bad if r["user_id"] != uid), bad[0]) if bad else None
+    deny = oo_denied(c, x["org_id"], to, "bookmark", x["id"]) if x else None
     notes = [trn("{0} link is already saved there: it stays where it is", "{0} links are already saved there: they stay where they are",
                  len(dup)) if dup else "",
-             tr("Every member of the organisation can then see it") if to else ""]
+             tr("Every member of the organisation can then see it") if to else "",
+             oo_into_note(c, None, to) if go else ""]  # 2.361.2 B (#2923): the way back
     if b.get("dry"):
+        if deny:  # 2.361.2 B (#2923): the maker can ask an admin (out_request)
+            return smv_answer(notes, deny.text(), count=len(go), **(deny.data or {}))
         return smv_answer(notes, None if go else tr("Everything is already saved there"), count=len(go))
     if not go:
         raise Denied(409, tr("Everything is already saved there"))
+    if deny:
+        raise deny
+    for o in dict.fromkeys(r["org_id"] for r in go):  # 2.361.2 B (#2923): logged, admins told, release used (per organisation)
+        mine = [r for r in go if r["org_id"] == o]
+        org_out(c, o, to, "bookmark", ", ".join(r["title"] or r["url"] for r in mine)[:200], obj=[r["id"] for r in mine])
     ts = iso_ms(now_utc())
     old_files = []
     for r in go:

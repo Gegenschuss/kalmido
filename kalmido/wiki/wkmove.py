@@ -21,7 +21,7 @@ from ..core.i18n import N_, tr, trn
 from ..core.pg import IntegrityError
 from ..core.access import Denied
 from ..accounts.session import me
-from ..accounts.orgs import is_org_admin
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from ..core.errors import BadInput
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
@@ -80,6 +80,18 @@ def wkm_share_note(n):
     return trn("{0} share of these pages ends (a share stays in its workspace)", "{0} shares of these pages end (a share stays in its workspace)", n) if n else ""
 
 
+def wkm_out_denied(c, uid, src, to, rows):
+    """2.361.2 B (#2923): the 403 (Denied) when these pages may not leave organisation src for to, else None: only an admin
+    of src takes them out, or their maker into the private space with a released request for every page (org_out_ok). A
+    page the person did not make is named first (asking would not help)."""
+    if not src:
+        return None
+    bad = [r for r in rows if not org_out_ok(c, src, to, "wiki", r["id"])]
+    if not bad:
+        return None
+    return oo_denied(c, src, to, "wiki", next((r for r in bad if r["created_by"] != uid), bad[0])["id"])
+
+
 @app.post("/api/wiki/move-space")
 def wiki_move_space():
     smv_refuse_agent()
@@ -94,8 +106,9 @@ def wiki_move_space():
     if wke_mode(c, src, uid)[0] or wke_mode(c, to, uid)[0]:
         return wkr_move(c, uid, src, to, b, dry)  # 2.97.0 D (#2050): a space with the lock -- the browser re-encrypts
     rows = wkm_rows(c, uid, src, b, lock=not dry)  # 2.273.0 F1 (#3042): paths / names below from the locked rows
-    if src and not is_org_admin(c, uid, src) and any(r["created_by"] != uid for r, _ in rows):
-        raise Denied(403, tr("Only who created these pages or an admin of the organisation can move them out of it"))
+    deny = wkm_out_denied(c, uid, src, to, [r for r, _ in rows])  # 2.361.2 B (#2923): out only by an admin or released
+    if deny and not dry:
+        raise deny
     dest = b.get("dest") or ""
     dest = wiki_clean_path(dest) if dest else ""
     moves = [(r, wiki_clean_path(dest + "/" + rest if dest else rest)) for r, rest in rows]
@@ -133,11 +146,15 @@ def wiki_move_space():
                       [*sa, folder.lower(), wkm_like(folder)]).fetchone()[0] if folder else 0
     notes += [wkm_share_note(shares),  # 2.273.0 B (#3042): what ends / stays behind is named before
               trn("{0} page in the trash stays in the old workspace", "{0} pages in the trash stay in the old workspace", trash) if trash else ""]
+    notes.append(oo_into_note(c, src, to))  # 2.361.2 B (#2923): the way back (empty unless a member moves it in)
     block = tr("A page with this name already exists") + ": " + ", ".join(taken[:5]) if taken else None
     if dry:
+        if deny:  # 2.361.2 B (#2923): the maker can ask an admin (out_request)
+            return jsonify(smv_answer(notes, deny.text(), count=len(moves), taken=taken[:20], shares=shares, trash=trash, **(deny.data or {})))
         return jsonify(smv_answer(notes, block, count=len(moves), taken=taken[:20], shares=shares, trash=trash))
     if taken:
         return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
+    org_out(c, src, to, "wiki", ", ".join(r["path"] for r, _ in moves), obj=ids)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso_ms(now_utc())
     try:
         with c.savepoint():
@@ -257,8 +274,9 @@ def wkr_move(c, uid, src, to, b, dry):
     items = b.get("pages")
     ids = wkr_ids(items)
     rows = [r for r, _ in wkm_rows(c, uid, src, {"pages": ids})]
-    if src and not is_org_admin(c, uid, src) and any(r["created_by"] != uid for r in rows):
-        raise Denied(403, tr("Only who created these pages or an admin of the organisation can move them out of it"))
+    deny = wkm_out_denied(c, uid, src, to, rows)  # 2.361.2 B (#2923): out only by an admin or released
+    if deny and not dry:
+        raise deny
     sst, tst = wkr_state(c, src, uid, lock=not dry), wkr_state(c, to, uid, lock=not dry)
     block = wkr_block(c, uid, sst, tst)
     e2e = {"from": sst, "to": tst}
@@ -268,13 +286,18 @@ def wkr_move(c, uid, src, to, b, dry):
     q = ",".join("?" * len(ids))
     vers = c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({q})", ids).fetchone()[0] if tst["mode"] else 0
     notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a space with the lock keeps no history",
-                                          "{0} earlier versions are deleted: a space with the lock keeps no history", vers) if vers else ""]
+                                          "{0} earlier versions are deleted: a space with the lock keeps no history", vers) if vers else "",
+              oo_into_note(c, src, to)]  # 2.361.2 B (#2923)
+    if deny:  # 2.361.2 B (#2923): the dry run names it, the maker can ask an admin (out_request)
+        block, e2e_deny = deny.text(), deny.data or {}
+    else:
+        e2e_deny = {}
     from .wikiatt import wka_pages_have_files
     if not block and tst["mode"] and wka_pages_have_files(c, [r["id"] for r in rows]):  # 2.99.0 (#2182): no plain files
         block = tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first.")
     if dry:  # 2.273.0 B (#3042): + updated_at per page (the move sends it back as expect_updated_at)
         return jsonify(smv_answer(notes, block, count=len(rows), e2e=e2e, taken=[], shares=shares,
-                                  pages=[{"id": r["id"], "updated_at": r["updated_at"]} for r in rows]))
+                                  pages=[{"id": r["id"], "updated_at": r["updated_at"]} for r in rows], **e2e_deny))
     if block:
         raise Denied(409, block)
     gens = b.get("gens") if isinstance(b.get("gens"), dict) else {}
@@ -302,6 +325,8 @@ def wkr_move(c, uid, src, to, b, dry):
         if taken:
             c.rollback()
             return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
+    org_out(c, src, to, "wiki", ", ".join(r["path"] for r in rows if not sst["mode"]) or tr("Knowledge pages"),
+            obj=[r["id"] for r in rows])  # 2.361.2 B (#2923): logged, admins told, release used (no names of a locked space)
     ts = iso_ms(now_utc())
     try:
         with c.savepoint():
