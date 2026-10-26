@@ -887,6 +887,8 @@ def rmv_unmake(c, m, dst, gone):
         r = c.execute("SELECT file FROM office_contract_files WHERE id=? AND org_id=?", (rid, dst)).fetchone()
         if r:
             c.execute("DELETE FROM office_contract_files WHERE id=?", (rid,))
+            from .oftref import oft_dropped  # 2.351.0 F (#2749, review N2): its node in a folder goes too
+            oft_dropped(c, "contract_file", rid)
             gone.append(rmv_path(dst, r["file"]))
         return 0
     if not c.execute(f"SELECT 1 FROM {t} WHERE id=? AND org_id=?", (rid, dst)).fetchone():

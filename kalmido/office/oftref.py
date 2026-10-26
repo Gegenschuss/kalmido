@@ -26,8 +26,9 @@ from ..files.fsref import fs_ref_all_sql, fs_ref_drop, fs_ref_node, fs_ref_regis
 from ..files.store import fs_read, fs_role
 from ..accounts.orgroles import office_allowed
 from ..accounts.orgs import org_role
+from .ledger import ofx_log
 from .model import OFFICE_OFF, office_on, pb_owner, pb_personal
-from .rights import LV, _is_agent, office_can, ofr_rights
+from .rights import LV, _is_agent, office_can, ofr_admin_or, ofr_rights
 
 GD_KIND = "office_gendoc"
 LT_KIND = "office_letter"
@@ -40,18 +41,19 @@ OFT_KEPT = N_("Receipt within its retention period")
 # ---------------------------------------------------------------- the rows (as "system": the folder side asks across offices)
 def _gd(c, rid):
     with system_ctx(c):
-        return c.execute("SELECT id, org_id, title, status, node_id FROM office_gen_docs WHERE id=?", (int(rid),)).fetchone()
+        return c.execute("SELECT id, org_id, title, status, node_id, archived FROM office_gen_docs WHERE id=?", (int(rid),)).fetchone()
 
 
 def _lt(c, rid):
     with system_ctx(c):
-        return c.execute("SELECT id, org_id, status, letter_date, node_id FROM office_letters WHERE id=?", (int(rid),)).fetchone()
+        return c.execute("SELECT id, org_id, status, letter_date, node_id, archived FROM office_letters WHERE id=?", (int(rid),)).fetchone()
 
 
 def _rc(c, rid):
     with system_ctx(c):
         return c.execute("""SELECT r.node_id, r.org_id, r.ws, n.name, n.mime, n.owner_id, n.created_by FROM rc_receipts r
-                            JOIN fs_nodes n ON n.id=r.node_id WHERE r.node_id=? AND n.kind='file'""", (int(rid),)).fetchone()
+                            JOIN fs_nodes n ON n.id=r.node_id WHERE r.node_id=? AND n.kind='file'
+                            AND n.deleted_at IS NULL""", (int(rid),)).fetchone()  # 2.351.0 F (#2823, review M3): not from the trash
 
 
 def _ws_space(ws):
@@ -73,7 +75,7 @@ def _rc_oid(c, r):
 def _space(row):
     def space(c, rid):
         r = row(c, rid)
-        if not r:
+        if not r or r["archived"]:  # 2.351.0 F (#2823, review M3): a removed (archived) one opens through no folder
             return None
         owner = pb_owner(c, r["org_id"])
         return (None, owner) if owner is not None else (r["org_id"], None)
@@ -94,6 +96,9 @@ def oft_base(c, uid, oid, area):
     if pb_owner(c, oid) is None and org_role(c, uid, oid) is None and not _is_agent(c, uid):
         return None
     if not office_can(c, uid, oid, area, "view") or office_allowed(c, uid, oid, write=False):
+        return None
+    # 2.351.0 F (#2823, review M1): letters are not bookkeeping -- the same check as the letters list (letters.lt_org)
+    if area == "letters" and not _is_agent(c, uid) and not ofr_admin_or(c, uid, oid, "letters", "view"):
         return None
     if office_allowed(c, uid, oid, write=True) or not office_can(c, uid, oid, area, "edit"):
         return "view"
@@ -285,6 +290,8 @@ def gd_content(c, uid, rid):
         d = dict(oc_dec_fields(c, oid, "office_gen_docs", c.execute("SELECT * FROM office_gen_docs WHERE id=?", (int(rid),)).fetchone()))
         data = _stored(c, d["node_id"]) if d["status"] != "draft" else None
         data = data if data is not None else dt_pdf(c, oid, d)
+        ofx_log(c, oid, "open", target="gen_doc", detail={"gen_doc": int(rid)})  # 2.351.0 F (#2823, review N5): like ofd_content
+    c.commit()
     return data, _pdf_name(d["title"]), "application/pdf"
 
 
@@ -299,6 +306,8 @@ def lt_content(c, uid, rid):
         d = lt_row(c, oid, int(rid))
         data = _stored(c, d.get("node_id")) if d["status"] != "draft" else None
         data = data if data is not None else lt_pdf(c, oid, d)
+        ofx_log(c, oid, "open", target="letter", detail={"letter": int(rid)})  # 2.351.0 F (#2823, review N5): like ofd_content
+    c.commit()
     return data, _pdf_name(lt_title(c, rid)), "application/pdf"
 
 

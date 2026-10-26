@@ -35,6 +35,7 @@ from ..accounts.orgroles import org_writes
 from ..files.fsref import fs_ref_role
 from ..files.fsroots import fs_area_folder_name, fs_area_root
 from ..files.store import _now, _place, fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_sql, safe_fs_name
+from .letters import lt_org
 from .model import office_ctx, pb_owner
 from .oftref import _gd, _lt
 from .rights import AREA_LEGACY
@@ -150,7 +151,7 @@ def oft_tree(c, uid, oid, area):
             out_par[p] = None
             continue
         out_par[p] = {"id": p, "parent_id": None, "name": chain[0]["name"], "sort_no": None, "role": role, "shared": False, "outside": True,
-                      "path": " / ".join(x["name"] for x in reversed(chain))}
+                      "path": _path(c, uid, chain)}
     folders += [x for x in out_par.values() if x]
     shown = seen | {k for k, v in out_par.items() if v}
     filed = {n["ref_id"]: n for n in nodes if n["parent_id"] in shown}
@@ -164,6 +165,17 @@ def oft_tree(c, uid, oid, area):
     return {"area": area, "kind": kind, "space": f"org:{int(org)}" if org else "private", "root": root,
             "can_add": bool(org_writes(c, uid, org)), "folders": folders, "docs": docs, "more": len(loose) > OFT_NEWEST,
             "shared": oft_shared(c, uid, oid, area) if area in ("gendocs", "letters") else []}
+
+
+def _path(c, uid, chain):
+    """2.351.0 F (#2823, review M5): the folder's path from the top uid sees (like the file store's crumbs, files/web.py
+    _crumbs): cut at the first folder above it uid does not see."""
+    out = [chain[0]["name"]]
+    for i in range(1, len(chain)):
+        if not fs_role(c, chain[i]["id"], uid, chain=chain[i:]):
+            break
+        out.append(chain[i]["name"])
+    return " / ".join(reversed(out))
 
 
 def oft_shared(c, uid, oid, area):
@@ -208,7 +220,10 @@ def _folder_new(c, uid, oid, area):
 
 def _ctx(area):
     """The area's office context: gen-docs / letters / receipts are admin routes like the area's own (office_ctx_admin)."""
-    return office_ctx(AREA_LEGACY[area] == "admin")
+    c, uid, oid = office_ctx(AREA_LEGACY[area] == "admin")
+    if area == "letters":  # 2.351.0 F (#2823, review M1): the accounting role reads no letters (letters.lt_org)
+        lt_org(c, uid)
+    return c, uid, oid
 
 
 def _get(area):

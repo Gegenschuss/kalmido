@@ -31,7 +31,7 @@ from ..files.fsref import (fs_protect_hook, fs_ref_all_sql, fs_ref_drop, fs_ref_
                            fs_ref_token_lacks)
 from ..accounts.orgroles import office_allowed
 from ..accounts.orgs import org_role
-from .docs import doc_public, doc_row, odoc_items_put, odoc_update
+from .docs import OfdConflict, doc_public, doc_row, odoc_items_put, odoc_update
 from .ledger import ofx_locked, ofx_log
 from .model import OFFICE_OFF, office_on, pb_owner
 from .pdfweb import _render, epdf_name, epdf_stored, opdf_doc_pdf
@@ -338,7 +338,7 @@ def ofd_head_body(c, did, b):
     for k in OFD_LINKS:
         if k in b and not _same_id(b.get(k), cur[k] if cur else None):
             raise Denied(403, tr(OFD_NO_LINK))
-    out = {k: v for k, v in b.items() if k in OFD_HEAD}
+    out = {k: v for k, v in b.items() if k in OFD_HEAD or k == "expect_updated_at"}  # 2.351.0 F (#2823, review M4): + the version
     rt = out.get("rights")
     if isinstance(rt, dict):
         try:
@@ -375,6 +375,15 @@ def ofd_items_body(c, oid, did, b):
             it = {k: v for k, v in it.items() if k != "cost"}
         out.append(it)
     return {**b, "items": out} if isinstance(b, dict) else out
+
+
+def _ofd_save(b, c, uid, oid, fn, did):
+    """2.351.0 F (#2823, review M4): a save over the folder way with the version check of the office route (expect_updated_at,
+    #3012): a conflict answers 409 with the current document cut down like every answer of the folder way."""
+    try:
+        return _ofd_out(_with_body(b, _run, c, uid, oid, fn, did))
+    except OfdConflict as e:
+        return jsonify(error=tr("Changed in the meantime"), doc=ofd_view(e.doc)), 409
 
 
 def _with_body(b, fn, *a):
@@ -423,7 +432,7 @@ def ofd_patch(did):
     into the office's master data (ofd_head_body)."""
     c = db()
     uid, oid, _role = _need(c, did, True)
-    return _ofd_out(_with_body(ofd_head_body(c, did, body()), _run, c, uid, oid, odoc_update, did))
+    return _ofd_save(ofd_head_body(c, did, body()), c, uid, oid, odoc_update, did)
 
 
 @app.put("/api/fsref/office_doc/<int:did>/items")
@@ -432,5 +441,5 @@ def ofd_items(did):
     (no new catalogue service, ofd_items_body)."""
     c = db()
     uid, oid, _role = _need(c, did, True)
-    return _ofd_out(_with_body(ofd_items_body(c, oid, did, body()), _run, c, uid, oid, odoc_items_put, did))
+    return _ofd_save(ofd_items_body(c, oid, did, body()), c, uid, oid, odoc_items_put, did)
 

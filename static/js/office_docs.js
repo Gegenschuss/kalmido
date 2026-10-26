@@ -64,7 +64,7 @@ async function ofdLoadDoc(id, force) {
   catch (x) {  // 2.199.0 B (#2742): no office right for it, but a shared folder holds it -> read through the folder (its PDF too)
     OFD.doc = null; OFD.err = x.message || tr('unknown');
     // 2.351.0 A (#2823): a draft with edit through the folder is edited (saved over the folder way, ofd_viaUrl)
-    try { const j = await rawFetch('GET', `/api/fsref/office_doc/${id}`); OFD.doc = {...j, can_edit: j.folder_role === 'edit' && !j.locked && j.can_edit !== false, can_delete: false, can_unlock: false, via_folder: true}; OFD.viaFolder.add(id); OFD.err = ''; } catch { /* keep the office's answer */ }
+    try { const j = await rawFetch('GET', `/api/fsref/office_doc/${id}`); OFD.doc = ofd_viaDoc(j, j.folder_role); OFD.viaFolder.add(id); OFD.err = ''; } catch { /* keep the office's answer */ }
   }
   OFD.docLoading = false;
   ofdDraw();
@@ -166,15 +166,17 @@ function ofdEditorHtml() {
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
   const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && (c.org_id || null) === pb_clOrg()) || c.id === d.client_id).map(c => [c.id, cdn_label(c)]) : [];
   const lk = !!d.locked, inv = ofdIsInv(d), kind = d.kind, ro = !d.can_edit;
+  const vf = !!d.via_folder;  // 2.351.0 F (#2823, review M4): through a folder: no status, next steps, parts, links into the master data
   const numTxt = d.number || (d.number_at_finalize ? tr('Draft') : tr('(no number)'));
   const stOpts = kind === 'offer' ? OFD_STATUS : OFD_INV_STATUS[kind].map(v => [v, OFD_STATE[v]]);
   const stCan = v => (kind === 'offer' && (v !== 'draft' || d.status === 'draft')) || v === d.status || (lk && d.status !== 'cancelled' && (v === 'sent' || (v === 'paid' && kind === 'invoice' && adm)) && (d.status !== 'paid' || adm));  // 2.39.1 (#1210 N3): paid only by admins
-  const stSel = `<select id="ofd-status" data-f="status" aria-label="${esc(tr('Status'))}" class="ofdstat st-${d.state || d.status}" ${inv && !lk ? 'disabled' : ''}>${stOpts.map(([v, n]) => `<option value="${v}" ${d.status === v ? 'selected' : ''} ${stCan(v) ? '' : 'disabled'}>${tr(n)}${v === d.status && d.state && d.state !== d.status ? ` (${tr(OFD_STATE[d.state])})` : ''}</option>`).join('')}</select>`;
+  const stSel = vf ? '' : `<select id="ofd-status" data-f="status" aria-label="${esc(tr('Status'))}" class="ofdstat st-${d.state || d.status}" ${inv && !lk ? 'disabled' : ''}>${stOpts.map(([v, n]) => `<option value="${v}" ${d.status === v ? 'selected' : ''} ${stCan(v) ? '' : 'disabled'}>${tr(n)}${v === d.status && d.state && d.state !== d.status ? ` (${tr(OFD_STATE[d.state])})` : ''}</option>`).join('')}</select>`;
   const acts = [];
   if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; 2.144.7 (#2572): + "Create invoice"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
   if (kind === 'offer' || kind === 'invoice') acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
   if ((inv || kind === 'offer') && lk && !ofr_noSp('offers', 'release')) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.113.2 (#2253): a finalised quotation is mailed too
+  if (vf) acts.length = 0;
   const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${inv ? esc(absKindName(d) || ofdKindName(kind, true)) + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
     ${stSel}<span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>${acts.join('')}
@@ -202,8 +204,8 @@ function ofdEditorHtml() {
     ${ofdF('currency', tr('Currency'), ofdSel('currency', d.currency, ofdCurOpts(d)))}
     ${d.currency !== ofcHome() ? ofdF('fx_rate', tr('Exchange rate'), ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12}), ofdFxHint(d)) : ''}
     ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('vat_mode', tr('VAT'), ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]])) : ''}
-    ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('contract_id', tr('Framework contract'), ofdSel('contract_id', d.contract_id, contracts, tr('none|contract')), d.contract ? tr('presets raw data, rights and closing; special rates apply to new positions') : '') : ''}
-    ${clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, cdn_on() ? tr('No client') : tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
+    ${!vf && kind !== 'reminder' && kind !== 'delivery' ? ofdF('contract_id', tr('Framework contract'), ofdSel('contract_id', d.contract_id, contracts, tr('none|contract')), d.contract ? tr('presets raw data, rights and closing; special rates apply to new positions') : '') : ''}
+    ${vf ? '' : clients.length ? ofdF('client_id', tr('Client'), ofdSel('client_id', d.client_id, clients, cdn_on() ? tr('No client') : tr('free recipient'))) : typeof clientsOn === 'function' && clientsOn() ? `<div class="row fx8a_nocl"><label>${esc(tr('Client'))}</label><span class="muted">${esc(tr('No clients in this area yet'))}</span>${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div>` : ''}
     ${d.client_id && (d.client_contacts || []).length ? ofdF('contact_id', tr('Contact person'), ofdSel('contact_id', d.contact_id ?? d.client_contacts[0].id, [...d.client_contacts.map(k => [k.id, k.name + (k.role ? ` (${k.role})` : '') + (k.is_default ? ' · ' + tr('default') : '')]), [0, tr('no contact person')]]), tr('the attention line of the address follows the choice')) : ''}
     ${cdn_on() ? cdn_recHtml(d, ro) : `${ofdF('recipient_name', tr('Recipient'), ofdIn('recipient_name', d.recipient?.name, {ph: tr('Company or name')}))}
     ${ofdF('recipient_lines', tr('Address lines'), ofdTa('recipient_lines', (d.recipient?.lines || []).join('\n'), 3, {ph: tr('one line each: name, attention, street, place')}))}`}
@@ -237,7 +239,7 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Standard texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${ofd_cfBar(d) /* 2.269.0 A (#3012) */}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live>${typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
+  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${ofd_cfBar(d) /* 2.269.0 A (#3012) */}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live>${!vf && typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${!vf && typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : rightsSec}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -440,7 +442,11 @@ const ofdPdfUrl = (id, inline) => `${OFD.viaFolder.has(id) ? '/api/fsref/office_
 // 2.269.0 A (#3012): the saves run one after another (never two PUT at once); those of the document's head, positions and parts
 // carry the version they build on (expect_updated_at), a 409 shows the conflict bar instead of overwriting the other one's save.
 // src = the local positions sent: a line added by one save is sent with its new id by the next one (no double line)
-const ofd_verUrl = url => !!OFD.doc && new RegExp(`^/api/office/docs/${OFD.doc.id}(/items|/parts(/\\d+(/items)?)?)?$`).test(url);
+const ofd_verUrl = url => !!OFD.doc && new RegExp(`^/api/(office/docs/${OFD.doc.id}(/items|/parts(/\\d+(/items)?)?)?|fsref/office_doc/${OFD.doc.id}(/items)?)$`).test(url);  // 2.351.0 F (#2823, review M4): + the folder way
+// 2.351.0 F (#2823, review M4): a document reached through a folder keeps that mark after a save / a conflict (the answers
+// of the folder way carry no folder role): read-only office menu, no delete / unlock
+const ofd_viaDoc = (j, role) => ({...j, folder_role: role, can_edit: role === 'edit' && !j.locked && j.can_edit !== false, can_delete: false, can_unlock: false, via_folder: true});
+const ofd_keepVia = j => OFD.doc?.via_folder && j && j.id === OFD.doc.id ? ofd_viaDoc(j, OFD.doc.folder_role) : j;
 // 2.351.0 A (#2823): a draft reached only through a folder share with edit saves over the folder way (office/docref.py: the
 // document's own fields and positions; links into the master data are refused there)
 const ofd_viaUrl = url => { const m = String(url).match(/^\/api\/office\/docs\/(\d+)(\/items)?$/); return m && OFD.viaFolder.has(+m[1]) ? `/api/fsref/office_doc/${m[1]}${m[2] || ''}` : url; };
@@ -458,7 +464,7 @@ async function ofd_save1(method, url, body, src) {
   try {
     const j = await rawFetch(method, url, body);
     if (src && j) { const its = (j.part ? j.part.items : j.items) || []; src.forEach((x, i) => { if (!x.id && its[i]?.id) x.id = its[i].id; }); }
-    if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = j.items ? j : {...OFD.doc, ...j}; /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes};
+    if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = ofd_keepVia(j.items ? j : {...OFD.doc, ...j}); /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes};
     if (!ver && method !== 'GET' && OFD.doc && j && !j.updated_at && url.startsWith(`/api/office/docs/${OFD.doc.id}/`)) {  // a status / number / payment answer without the version: the current state
       try { const f = await rawFetch('GET', `/api/office/docs/${OFD.doc.id}`); if (OFD.doc && f && f.id === OFD.doc.id) OFD.doc = f; } catch { /* the next save reports it */ }
     }
@@ -474,7 +480,7 @@ async function ofd_save1(method, url, body, src) {
 const ofd_cfBar = d => OFD.conflict && OFD.conflict.id === d.id ? `<div class="ofdlnote ofdcf" role="alert">${ic('info', 's')}<span><b>${esc(tr('Changed in the meantime'))}</b><br>${esc(tr('Someone else saved this document in the meantime. Your last change was not saved; reload to see the current version.'))}</span><button type="button" class="btn sm" data-ofd="cf-reload">${esc(tr('Reload'))}</button></div>` : '';
 function ofd_cfReload() {
   const cf = OFD.conflict; OFD.conflict = null;
-  if (cf && OFD.doc && cf.id === OFD.doc.id) OFD.doc = cf.doc;
+  if (cf && OFD.doc && cf.id === OFD.doc.id) OFD.doc = ofd_keepVia(cf.doc);
   OFD.log = null; ofdDraw();
   if (OFD.doc) ofdLoadDoc(OFD.doc.id, true);  // and once more from the server (another save may have come since)
 }

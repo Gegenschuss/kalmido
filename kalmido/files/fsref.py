@@ -179,6 +179,8 @@ def fs_ref_role(c, uid, ref_kind, ref_id):
     reg = FSR.get(ref_kind or "")
     if reg is None or not uid:
         return None
+    if _hidden(c, uid, reg, ref_id):  # 2.351.0 F (#3246, review M2): what a folder never opens, the base role does not either
+        return None
     base = _role_of(reg["base_role"](c, uid, int(ref_id)))
     if base == "edit":
         return base
