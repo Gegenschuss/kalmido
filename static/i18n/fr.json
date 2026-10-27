@@ -14555,5 +14555,6 @@
   "The refund exceeds what is to be paid back": "Le remboursement dépasse le montant à rembourser",
   "Only money paid out can be a refund": "Seul un paiement sortant peut être un remboursement",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Un avoir conserve la devise, le taux de change, le client et la TVA de sa facture",
-  "Taken from the invoice": "Repris de la facture"
+  "Taken from the invoice": "Repris de la facture",
+  "No pages to list here.": "Aucune page à lister ici."
 }

@@ -14555,5 +14555,6 @@
   "The refund exceeds what is to be paid back": "De terugbetaling is hoger dan het terug te betalen bedrag",
   "Only money paid out can be a refund": "Alleen uitgaand geld kan een terugbetaling zijn",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Een creditnota behoudt valuta, wisselkoers, klant en btw van haar factuur",
-  "Taken from the invoice": "Overgenomen van de factuur"
+  "Taken from the invoice": "Overgenomen van de factuur",
+  "No pages to list here.": "Hier zijn geen pagina's om te tonen."
 }

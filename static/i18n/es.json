@@ -14555,5 +14555,6 @@
   "The refund exceeds what is to be paid back": "El reembolso supera el importe a devolver",
   "Only money paid out can be a refund": "Solo un pago saliente puede ser un reembolso",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Una factura rectificativa mantiene la moneda, el tipo de cambio, el cliente y el IVA de su factura",
-  "Taken from the invoice": "Tomado de la factura"
+  "Taken from the invoice": "Tomado de la factura",
+  "No pages to list here.": "Aquí no hay páginas que listar."
 }

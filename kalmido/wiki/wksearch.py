@@ -11,7 +11,12 @@ restored with the recovery key, a rotation, another server key), never at every 
 A page matches when every query word is in its name (part of a word, as before) or in its text (a whole word, or a word
 starting with it: like the documents' search, a word of 4+ characters is found by its longest stored prefix and checked
 against the opened text). Ranking: words in the name first, then words in the text, then the newest.
+2.376 (#3292): the hits of the page shown (offset / limit) carry a short plain text snippet around the first word found in
+the text (wks_snippets): opened in memory only, never stored, indexed or logged; spaces with the lock cut theirs in the
+browser (wkhist.js wks_snip, same rules).
 """
+import re
+
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..collab.liste2e import le2e_is_cipher
 from ..core.db import connect
@@ -20,6 +25,7 @@ from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before 
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
+WKS_SNIP = 180       # 2.376 (#3292): characters of a snippet (about two lines)
 
 
 def wks_ws(oid, owner):
@@ -186,3 +192,101 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
             "SELECT p.id, p.org_id, p.owner_id, p.path, p.attrs, p.created_by, p.updated_by, p.created_at, p.updated_at "
             f"FROM wiki_pages p WHERE p.id IN ({','.join('?' * len(part))})", part)})
     return [full[i] for i in ids if i in full], len(hits)
+
+
+# ---- 2.376 (#3292): the snippet of a hit
+_WKP = ((re.compile(r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", re.S), " "),          # the frontmatter
+        (re.compile(r"^[ \t]*(?:`{3,}|~{3,}).*$", re.M), " "),                                   # code fences (their text stays)
+        (re.compile(r"!\[([^\[\]]*)\]\([^()\s]*\)"), r"\1"),                                  # ![alt](picture) -> alt
+        (re.compile(r"\[\[([^\[\]|#\n]*)(?:#[^\[\]|\n]*)?\|([^\[\]\n]+)\]\]"), r"\2"),           # [[page|label]] -> label
+        (re.compile(r"\[\[([^\[\]|#\n]+)(?:#[^\[\]\n]*)?\]\]"), lambda m: m.group(1).split("/")[-1]),  # [[folder/page]] -> page
+        (re.compile(r"\[([^\[\]]+)\]\([^()\s]*\)"), r"\1"),                                    # [label](url) -> label
+        (re.compile(r"<[^<>\n]{1,200}>"), " "),                                                  # html tags
+        (re.compile(r"^[ \t]*(?:[-*_][ \t]*){3,}$", re.M), " "),                                 # rules
+        (re.compile(r"^[ \t]*(?:>[ \t]?)*(?:#{1,6}[ \t]+|[-*+][ \t]+(?:\[[ xX]\][ \t]+)?|\d{1,9}[.)][ \t]+)?", re.M), ""),  # quote, heading, list
+        (re.compile(r"[*~`]+|(?<!\w)_+|_+(?!\w)|\\(?=[!-/:-@\[-`{-~])"), ""),                     # emphasis marks, escapes
+        (re.compile(r"[ \t]*\|[ \t]*"), " "),                                                     # table cells
+        (re.compile(r"\s+"), " "))
+
+
+def wks_plain(text):
+    """The plain text of a page for a snippet: without frontmatter and Markdown marks, on one line."""
+    s = str(text or "")[:200_000]
+    for rx, to in _WKP:
+        s = rx.sub(to, s)
+    return s.strip()
+
+
+def _folded(text):
+    """(folded text, map folded position -> original position): the index's folding (docs/rules.py fold) per character."""
+    from ..docs.rules import fold
+    out, pos = [], []
+    for i, ch in enumerate(text):
+        f = ch.lower() if ch < "\x80" else (fold(ch) or ch.lower())  # ASCII: the quick way (same result)
+        out.append(f)
+        pos += [i] * len(f)
+    return "".join(out), pos
+
+
+def wks_snippet(text, words, size=WKS_SNIP):
+    """(snippet, [[start, end], ...] relative to it, in code points) around the first word of words (folded query words) in
+    the plain text of a page -- a word of 4+ characters also at the beginning of a longer word, a shorter one whole, like
+    the index; None when no word is in the text."""
+    t = wks_plain(text)
+    if not t or not words:
+        return None
+    ft, pos = _folded(t)
+    marks = []
+    for wd in words:
+        rx = re.compile(r"(?<!\w)" + re.escape(wd) + (r"(?!\w)" if len(wd) < 4 else ""))
+        for m in rx.finditer(ft):
+            marks.append([pos[m.start()], pos[m.end() - 1] + 1])
+            if len(marks) > 400:
+                break
+    if not marks:
+        return None
+    marks.sort()
+    merged = []
+    for a, b in marks:
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    first = merged[0][0]
+    start, end = 0, len(t)
+    if len(t) > size:
+        start = max(0, min(first - size // 3, len(t) - size))
+        start = 0 if start < 16 else start  # a few words before the hit: from the beginning
+        if start > 0:  # at a word boundary: from the next space on (never past the hit)
+            sp = t.find(" ", start - 1, first)
+            start = sp + 1 if sp >= 0 else start
+        end = min(len(t), start + size)
+        if end < len(t):
+            sp = t.rfind(" ", max(start + 1, merged[0][1]), end + 1)
+            end = sp if sp > 0 else end
+    pre, post = ("…" if start > 0 else ""), ("…" if end < len(t) else "")
+    sh = len(pre) - start
+    return pre + t[start:end] + post, [[a + sh, min(b, end) + sh] for a, b in merged if start <= a < end]
+
+
+def wks_snippets(c, rows, q):
+    """{page id: (snippet, marks)} for the hit rows of one result page (the ones shown, at most WKS_LIMIT_MAX): their texts
+    opened in memory only; a page that cannot be opened, of a space with the lock or without a word in its text has none.
+    Nothing is kept, indexed or logged."""
+    from ..docs.store import index_words
+    words = index_words(q)[:8]
+    ids = [r["id"] for r in rows if not str(r["path"]).startswith("e2e1:")]
+    if not words or not ids:
+        return {}
+    out = {}
+    for r in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id IN ({','.join('?' * len(ids))})", ids):
+        try:
+            text = wkh_body(c, r)
+        except WikiUnreadable:  # no snippet (and no log line: the search goes on as before)
+            continue
+        if not text or le2e_is_cipher(text):
+            continue
+        sn = wks_snippet(text, words)
+        if sn:
+            out[r["id"]] = sn
+    return out

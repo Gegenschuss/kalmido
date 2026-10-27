@@ -14555,5 +14555,6 @@
   "The refund exceeds what is to be paid back": "Die Erstattung übersteigt den zu erstattenden Betrag",
   "Only money paid out can be a refund": "Nur ausgehendes Geld kann eine Erstattung sein",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Eine Gutschrift behält Währung, Kurs, Kunde und Umsatzsteuer ihrer Rechnung",
-  "Taken from the invoice": "Aus der Rechnung übernommen"
+  "Taken from the invoice": "Aus der Rechnung übernommen",
+  "No pages to list here.": "Hier gibt es keine Seiten zum Auflisten."
 }
