@@ -3707,6 +3707,12 @@ MIGRATIONS = [
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
     ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    # 2.361.0 (#2922): who moved a project from their private space into its organisation (accounts/orgs.py list_org_set);
+    # it goes back to that person's private space when they leave (org_leave). Older versions ignore it (the way back)
+    ("lists", "brought_by", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    # 2.361.0 (#2920): the day the members of an organisation were told it is deleted (accounts/orgleave.py; the deletion
+    # waits until then). Older versions ignore it (they delete at once, as before)
+    ("orgs", "delete_notice", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS delete_notice TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
