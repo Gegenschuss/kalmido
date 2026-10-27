@@ -24,6 +24,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Office**: hand in receipts to the bookkeeping, GoBD export, take your part of an organisation's office into your personal one; refunds on credit notes, reverse charge hints, progress and final invoices.
 - **Projects**: show a task in several projects (field "Projects" in the task panel, Alt-drag onto a project).
 - **Knowledge**: live preview editor with "/" commands and tickable checkboxes; search hits show a text snippet.
+- **Agent chat**: a calm one-row header, everything else in the "…" menu.
 - **Offline**: typed text survives a closed tab, an expired session or a failed save; it is sent later, never twice.
 - **Security**: downloads of backups and exports, restores and public links ask for your password first.
 
