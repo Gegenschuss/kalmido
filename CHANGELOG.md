@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.6] - 2026-10-27
+
+### Fixed
+- CI of 2.351.5: p2130_ui, p2146_d_api, p2193_a_ui, p2193_b_ui and p2239_b_logs are skipped until 2026-11-10 (#3402): red in CI 2.351.5, green in CI 2.351.4 on the same app code and green on the Mac.
+
 ## [2.351.5] - 2026-10-27
 
 ### Fixed
@@ -8827,7 +8832,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.5...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.6...HEAD
+[2.351.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.6
 [2.351.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.5
 [2.351.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.4
 [2.351.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.3
