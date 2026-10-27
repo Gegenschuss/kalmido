@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.3] - 2026-10-27
+
+Package 2.351.2 (CI fix of the live train 2.351.2).
+### Fixed
+- CI of 2.351.2: a changed server notice gets a new id even when it is saved within the same second as the one before (the id was only the time, so a person who had hidden the first notice never saw the changed one); the UI test of "All to today" waits for the move instead of a fixed pause.
+
 ## [2.351.2] - 2026-10-27
 
 Package 2.351.1 (CI fix of the live train 2.351.1).
@@ -8808,7 +8814,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.3...HEAD
+[2.351.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.3
 [2.351.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.2
 [2.351.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.1
 [2.351.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.0
