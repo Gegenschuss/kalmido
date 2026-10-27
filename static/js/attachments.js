@@ -447,7 +447,8 @@ function savesStash(send) {
   if (send) { for (const e of out) if (!/\/-\d+$/.test(e.url)) keepSend(e.method, e.url, e.body, e.k); flushSaves(); }
   return out.length;
 }
-if (typeof fgWatch === 'function') fgWatch(() => Object.values(saveTimers).some(s => typeof le2eOn === 'function' && le2eOn(taskById(s.id)?.list_id)));
+// after every script ran: in the one-file demo bundle formguard.js comes later, and typeof on its not yet initialised const throws
+document.addEventListener('DOMContentLoaded', () => { if (typeof fgWatch === 'function') fgWatch(() => Object.values(saveTimers).some(s => typeof le2eOn === 'function' && le2eOn(taskById(s.id)?.list_id))); });
 // 2.359.0 A (#3024): a save that failed: the field says "Not saved", the text is sent again (5 s, 15 s); after the third failure
 // it waits in the conflicts dialog and the local copy goes back to what the server has (no "saved" look, no false conflict)
 const SAVE_RETRY_MS = [5000, 15000];

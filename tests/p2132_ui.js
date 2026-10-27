@@ -332,10 +332,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const sb = await rect('[data-act="chat-send"]'); await tap(sb.x, sb.y); await settle(ev, idle);
     // 2.358.0 C (#2782): until the sent state is there instead of 1.5 s
     const AF = `(() => ({focus: document.activeElement.id, val: document.querySelector('#chat-in').value, last: [...document.querySelectorAll('#chat-msgs .cmsg.me')].pop()?.textContent || ''}))()`;
-    // 2.358.0 (#2899, intended change of 2.235.0 D): on a phone the keyboard closes after sending (chat_kbd_agent, on by default)
-    let af = await until(async () => { const x = await ev(AF); return x.focus !== 'chat-in' && x.val === '' && /Hello/.test(x.last) && x; }) || await ev(AF);
-    check(af.focus !== 'chat-in' && af.val === '' && /Hello/.test(af.last), `${vw} #2899: Send sends and closes the keyboard (default) ` + JSON.stringify(af));
-    // ... and with the setting off Send keeps it (N9)
+    // Sammelzug 2.376: the switch is off for this test (2.351.1, PATCH chat_kbd_agent above), so Send keeps the keyboard; the
+    // default (on, the keyboard closes) needs a touch device - isTouch() is false in this browser
+    let af = await until(async () => { const x = await ev(AF); return x.focus === 'chat-in' && x.val === '' && /Hello/.test(x.last) && x; }) || await ev(AF);
+    check(af.focus === 'chat-in' && af.val === '' && /Hello/.test(af.last), `${vw} N9: Send sends and keeps the keyboard (switch off) ` + JSON.stringify(af));
+    // ... and again with the setting off in the page as well (N9)
     await ev(`(() => { S.settings.chat_kbd_agent = '0'; const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Hello again'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     const sb2 = await rect('[data-act="chat-send"]'); await tap(sb2.x, sb2.y); await settle(ev, idle);
     af = await until(async () => { const x = await ev(AF); return x.focus === 'chat-in' && x.val === '' && /Hello again/.test(x.last) && x; }) || await ev(AF);
