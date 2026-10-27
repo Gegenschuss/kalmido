@@ -22,7 +22,7 @@ const kp_mon = ym => { const [y, m] = ym.split('-').map(Number); return new Date
 
 function kp_html() {
   if (KPS.oid !== OFC.info?.org_id) Object.assign(KPS, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (KPS.err) return `<div class="empty">${esc(KPS.err)}</div>`;
   if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) { setTimeout(() => { if (!KPS.data || KPS.q !== (KPS.year ? `?year=${KPS.year}` : '')) kp_load(); }, 0); if (!KPS.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = KPS.data, r = d.revenue, y = d.year, thisY = +String(d.today).slice(0, 4);
@@ -35,7 +35,7 @@ function kp_html() {
   const tiles = `<div class="kptiles">
     ${tile(r.to_date ? tr('Revenue this month') : tr('Revenue in December'), ofcMoney(r.month), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.month_prev))} ${kp_delta(r.month, r.month_prev)}`)}
     ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
-    ${tile(tr('Open invoices'), ofcMoney(d.invoices.open.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.open.count)), 'open')}
+    ${tile(tr('Open items'), ofcMoney(d.invoices.open.amount), esc(`${trn('{0} invoice', '{0} invoices', d.invoices.open.count)} · ${tr('open and overdue')}`), 'open')}${/* 2.356.0 D (#3007): the accountant's word */ ''}
     ${tile(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.overdue.count)), 'overdue', +d.invoices.overdue.count ? 'warn' : '')}
     ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(`${tr('value × probability')} · ${tr('{0} open', ofcMoney(d.pipeline.open))}`), 'pipeline')}
     ${tile(tr('Cash flow, next 3 months'), ofcMoney(d.cashflow.reduce((a, x) => a + +x.balance, 0)), esc(tr('Balance incl. expected payments')), 'cashflow')}</div>`;
@@ -76,11 +76,17 @@ function kp_tile(card) {
   if (!d) return '';
   const row = (label, v, extra = '') => `<li><span class="muted">${esc(label)}</span><span class="spacer"></span><b class="rksum ${extra}">${v}</b></li>`;
   const on = n => lyo_get('home', 'kpi', n, true);  // 2.55.0 (#1065): which figures (the block's settings, lyopts.js)
-  return card(`<ul class="kptl" role="list">${on('rev') ? row(tr('Revenue this month'), ofcMoney(d.revenue.month)) : ''}${on('open') ? row(tr('Open invoices'), ofcMoney(d.invoices.open.amount)) : ''}
+  return card(`<ul class="kptl" role="list">${on('rev') ? row(tr('Revenue this month'), ofcMoney(d.revenue.month)) : ''}${on('open') ? row(tr('Open items'), ofcMoney(d.invoices.open.amount)) : ''}
     ${on('over') && +d.invoices.overdue.count ? row(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), 'neg') : ''}${on('pipe') ? row(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted)) : ''}</ul>
     <a class="linkbtn" href="#office/kpi">${tr('All figures')}</a>`);
 }
 
+// 2.356.0 D (#3007): the invoice list filtered to the open items (status open = open and overdue, office/docs.py) or the
+// overdue ones -- the figure "Open items" and the palette ("Open items", "OP")
+function kp_openItems(st = 'open') {
+  if (typeof OFD === 'object') { OFD.kind = 'invoice'; OFD.status = st; OFD.list = null; OFD.doc = null; OFD.docId = null; }
+  go('office/offers');
+}
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-kp]'); if (!b) return;
   const a = b.dataset.kp, cur = KPS.data ? +String(KPS.data.today).slice(0, 4) : new Date().getFullYear();
@@ -89,10 +95,8 @@ document.addEventListener('click', e => {
   else if (a === 'tip') toast(b.dataset.t);
   else if (a === 'go') {
     const g = b.dataset.go;
-    if (g === 'open' || g === 'overdue') {  // the invoice list, overdue ones filtered
-      if (typeof OFD === 'object') { OFD.kind = 'invoice'; OFD.status = g === 'overdue' ? 'overdue' : ''; OFD.list = null; OFD.doc = null; OFD.docId = null; }
-      go('office/offers');
-    } else go('office/' + g);
+    if (g === 'open' || g === 'overdue') kp_openItems(g);  // the invoice list, the open items / overdue ones filtered
+    else go('office/' + g);
   }
   else return;
   e.preventDefault();

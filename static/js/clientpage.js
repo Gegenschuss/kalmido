@@ -280,9 +280,9 @@ function ofm_officeFrom() {  // the workspace of the office shown (org id | null
   const w = typeof wsCur === 'function' ? wsCur() : 'private', ws = S.me?.workspaces || [];
   return w.startsWith('org:') ? +w.slice(4) : w === 'all' && ws.length === 1 ? ws[0].id : null;
 }
-async function ofm_move({what, ids, from, label, after}) {
+async function ofm_move({what, ids, from, label, after, only = null}) {  // 2.356.0 A (#2926): only = the possible targets
   const req = (to, extra) => rawFetch('POST', '/api/office/move-space', {what, ids, to: smv_ws(to), ...extra});
-  const r = await smv_open({what: label, from, option: what === 'clients' ? {label: tr('Take issued documents along as a read-only copy')} : null,
+  const r = await smv_open({what: label, from, only, option: ['clients', 'office'].includes(what) ? {label: tr('Take issued documents along as a read-only copy')} : null,
     check: (to, _pl, opt) => req(to, {dry: 1, copy_issued: opt ? 1 : 0}),
     run: async (to, _pl, opt) => { try { return {...await req(to, {copy_issued: opt ? 1 : 0}), to, opt}; } catch (e) { toast(e.message); throw e; } }});
   if (!r || !r.ok) return null;

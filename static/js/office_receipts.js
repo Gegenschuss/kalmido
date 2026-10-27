@@ -91,7 +91,7 @@ function rclRow(r) {
   const sub = [fmtDateLoc(r.date), r.supplier, r.number, r.category, r.project?.name, bkVatLabel(r.vat_pct)].filter(Boolean).join(' · ');
   const orig = r.orig_currency ? ` <small class="muted">(${esc(fmtNum(+r.orig_amount, 2))} ${esc(r.orig_currency)})</small>` : '';
   return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
-    <small class="muted">${esc(sub)}</small></span>${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}
+    <small class="muted">${esc(sub)}</small></span>${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}${r.submitted_by ? `<span class="rotag rcl-sub">${esc(tr('Handed in by {0}', r.submitted_by))}</span>` : ''}
     <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('chev', 's')}</button></li>`;
 }
 function rclListHtml() {
@@ -151,8 +151,75 @@ document.addEventListener('click', e => {
 // receipts above. The bookkeeping keeps its upload.
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['receipts', 'ticket', N_('Receipts'), 1, () => rcp_tabHtml(), 'money']));
 function rcp_tabHtml() {
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only the admins of the office see the bookkeeping.')}</div>`;
+  if (!ofcAdmin()) return OFC.info?.submit ? rsb_tabHtml() : ofcLockedHtml();  // 2.356.0 D (#3129, #3006): members hand in receipts
   const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
   const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
-  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rclHtml(true)}</div>`;
+  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in
 }
+
+// ---- 2.356.0 D (#3129): "Submit receipt" (#office/receipts, rcp_tabHtml) for the people who may hand in a receipt but do not see the
+// bookkeeping (GET /api/office/settings submit): a photo or a file to the bookkeeping, below only the person's own receipts
+// handed in with their status. The people with the bookkeeping see what waits on top of Office > Receipts (rsb_inHtml) and
+// work on it in the receipt sheet like on every receipt. Server: kalmido/office/rcsubmit.py.
+const RSB = {oid: null, rows: null, err: null, loading: false, busy: false, inOid: null, inRows: null, inLoading: false};
+const RSB_STATE = {submitted: N_('Handed in'), processed: N_('In progress|receipt'), paid: N_('Paid'), removed: N_('Removed')};  // 2.356.0 (#3129): also when the person took it back
+async function rsb_load() {
+  const oid = OFC.info?.org_id;
+  RSB.loading = true;
+  try { const j = await api('GET', '/api/office/receipts/mine'); if (oid === OFC.info?.org_id) Object.assign(RSB, {rows: j.rows || [], err: null}); }
+  catch (x) { if (oid === OFC.info?.org_id) Object.assign(RSB, {rows: [], err: x.message || tr('unknown')}); }
+  RSB.loading = false; ofcDraw();
+}
+function rsb_tabHtml() {
+  if (!OFC.info?.submit && !ofcAdmin('receipts')) return ofcLockedHtml();
+  if (RSB.oid !== OFC.info?.org_id) Object.assign(RSB, {oid: OFC.info?.org_id, rows: null, err: null});
+  if (RSB.rows === null && !RSB.loading) setTimeout(rsb_load, 0);
+  const st = r => `<span class="rotag rsb-st rsb-${esc(r.status)}">${esc(tr(RSB_STATE[r.status] || r.status))}</span>`;
+  const list = RSB.err ? `<div class="empty">${esc(RSB.err)}</div>` : RSB.rows === null ? `<p class="muted lempty">${tr('Loading…')}</p>`
+    : !RSB.rows.length ? `<p class="muted lempty rsb-empty">${tr('You have not handed in a receipt yet.')}</p>`
+    : `<ul class="ofclist rsb-list" role="list" aria-labelledby="rsb-mine">${RSB.rows.map(r => `<li class="ofcrow rsb-row"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b><small class="muted">${esc(fmtDateLoc(String(r.submitted_at || '').slice(0, 10)))}</small></span>${st(r)}</li>`).join('')}</ul>`;
+  return `<div class="rsb"><h3 class="ofcgrp">${tr('Submit receipt')}</h3>
+    <p class="muted rsb-hint">${tr('Photograph a receipt or upload the file: it goes to the bookkeeping. You only see your own receipts here.')}</p>
+    <div class="bk-photo rsb-up"><label class="btn pri">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="rsb-shot" accept="image/*,application/pdf" capture="environment" multiple hidden></label>
+    <label class="btn">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="rsb-files" accept="${typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'image/*,application/pdf'}" multiple hidden></label></div>
+    <h3 class="ofcgrp" id="rsb-mine">${tr('My receipts handed in')}</h3>${list}</div>`;
+}
+async function rsb_upload(files) {
+  files = files.filter(f => f && f.size);
+  if (!files.length || RSB.busy) return;
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
+  RSB.busy = true;
+  let j; try { j = await api('POST', '/api/office/receipts/submit', fd); } catch (x) { RSB.busy = false; toast(x.message || tr('unknown')); return; }
+  RSB.busy = false;
+  for (const e of j.errors || []) toast(e);
+  if ((j.dups || []).length && !(j.ids || []).length) toast(tr('This file already exists: {0}', j.dups[0].name));
+  if ((j.ids || []).length) toast(j.ids.length === 1 ? tr('Receipt handed in') : tr('{0} receipts handed in', j.ids.length));
+  RSB.rows = null; ofcDraw();
+}
+// the receipts handed in that wait for the bookkeeping (on top of Office > Receipts; a 403 = nothing shown)
+async function rsb_inLoad() {
+  const oid = OFC.info?.org_id;
+  RSB.inLoading = true;
+  try { const j = await api('GET', '/api/office/receipts/submitted'); if (oid === OFC.info?.org_id) RSB.inRows = j.rows || []; } catch { if (oid === OFC.info?.org_id) RSB.inRows = []; }
+  RSB.inLoading = false; ofcDraw();
+}
+function rsb_inHtml() {
+  if (OFC.info?.personal) return '';
+  if (RSB.inOid !== OFC.info?.org_id) Object.assign(RSB, {inOid: OFC.info?.org_id, inRows: null});
+  if (RSB.inRows === null) { if (!RSB.inLoading) setTimeout(rsb_inLoad, 0); return ''; }
+  if (!RSB.inRows.length) return '';
+  return `<section class="rsb-in"><h3 class="ofcgrp" id="rsb-in-h">${tr('Handed in by members')} <span class="rotag">${RSB.inRows.length}</span></h3>
+    <ul class="ofclist" role="list" aria-labelledby="rsb-in-h">${RSB.inRows.map(r => `<li><button type="button" class="ofcrow" data-rsb="open" data-id="${+r.node_id}"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b>
+    <small class="muted">${esc([tr('Handed in by {0}', r.by?.name || '?'), fmtDateLoc(String(r.submitted_at || '').slice(0, 10))].join(' · '))}</small></span>${ic('chev', 's')}</button></li>`).join('')}</ul></section>`;
+}
+document.addEventListener('change', e => {
+  const t = /** @type {any} */ (e.target);
+  if (t.id !== 'rsb-shot' && t.id !== 'rsb-files') return;
+  const fs = [...(t.files || [])]; t.value = '';
+  if (fs.length) rsb_upload(fs);
+});
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-rsb="open"]'); if (!b) return;
+  bkSheet(+b.dataset.id, false);  // (bkReload after saving reads the list again)
+});

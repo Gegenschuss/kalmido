@@ -454,6 +454,8 @@ def doc_public(c, oid, r, admin, items=True):
             d["parts_shoot"] = tp_shoot_ok(c, oid)
         from .contacts_cl import fk_contacts
         d["client_contacts"] = fk_contacts(c, r["client_id"], oid) if r["client_id"] else []  # 2.40.0 (#1380); 2.148.1 B (#2484): same area only
+        from .offerlink import oil_doc_extra
+        oil_doc_extra(c, oid, r, d)  # 2.356.0 C (#3003): source_offer / offer_invoices
         d["contract"] = _contract(c, oid, d.get("contract_id"))
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
@@ -1222,20 +1224,25 @@ def odoc_list():
         args += [like, like, like, like]
     # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
     # missing behind the 500 newest); payments only of the rows shown; the language once
-    derived = st in ("partial", "overdue")
+    derived = st in ("partial", "overdue", "open")  # 2.356.0 D (#3007): open = the open items (open + overdue, as kpi.py kpi_open)
     if derived:
         sql += " AND kind='invoice' AND status NOT IN ('draft', 'paid', 'cancelled')"
+        if st == "open":
+            sql += " AND locked_at IS NOT NULL" + ("" if request.args.get("trial") in ("0", "1") else " AND trial=0")
         if st == "overdue":
             sql += " AND COALESCE(due_date, '') <> '' AND due_date < ?"
             args.append(local_now().date().isoformat())
-        else:
+        elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
     raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
     if derived:
-        raw = [r for r in raw if inv_state(r, pm) == st][:500]
+        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)][:500]
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
+    if kind == "offer":
+        from .offerlink import oil_list_marks
+        oil_list_marks(c, oid, rows)  # 2.356.0 C (#3005)
     role = office_role(c, uid, oid)
     if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
         for b, r in zip(rows, raw):

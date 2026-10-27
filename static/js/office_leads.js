@@ -91,6 +91,7 @@ function leadImpModal(text, p) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-li]'); if (!b) return;
     if (b.dataset.li === 'close') { close(); return; }
+    if (!await importTargetConfirm({what: trn('{0} lead', '{0} leads', p.count), ws: ofcWs(), place: tr('Office')})) return;  // 2.356.0 B (#2934): the target in words (#1940)
     b.disabled = true;
     try {
       const j = await api('POST', '/api/office/leads/import', {text, commit: true});

@@ -47,8 +47,8 @@ async function oor_ask(req) {
     return true;
   } catch { return false; /* api() showed it */ }
 }
-function smv_open({what, from = null, places = null, check, run, option = null, total = 0}) {
-  const tos = wsOptions().filter(w => w !== 'all' && w !== smv_ws(from));
+function smv_open({what, from = null, places = null, check, run, option = null, total = 0, only = null}) {
+  const tos = wsOptions().filter(w => w !== 'all' && w !== smv_ws(from) && (!only || only.includes(w)));  // 2.356.0 A (#2926): only = allowed targets
   if (!tos.length) { toast(tr('There is no other workspace')); return Promise.resolve(null); }
   return new Promise(res => {
     let done = false, to = tos[0], place = '', seq = 0, blocked = true, opt = false;

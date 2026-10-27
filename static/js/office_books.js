@@ -51,12 +51,12 @@ async function bkLoadUstva() {
   catch (x) { toast(x.message || tr('unknown')); }
   ofcDraw();
 }
-const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list  // 2.114.1 B (#2018): receipts count in the cash flow
+const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
 
 function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -81,7 +81,8 @@ function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
   return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
-    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div></section>`;
+    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
+    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${tr('{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
 }
 
 function bkRcRow(r) {

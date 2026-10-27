@@ -315,7 +315,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
   area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,
   `list_office_documents`, `get_office_document`, `create_offer_draft` / `update_offer_draft` (your own drafts),
-  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`), `draft_reminder`, `suggest_payment` /
+  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`; 2.356.0: `409` `invoice_exists` = it has an invoice already, ask the person and send `force` only on their yes), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
   let you. Since 2.187.0 your office access comes from the office rights groups (Office > Settings > Rights): without a

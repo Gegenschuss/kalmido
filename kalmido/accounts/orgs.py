@@ -9,6 +9,7 @@ from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
+from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
@@ -127,7 +128,7 @@ def om_setup_org(c, uid, name):
         if c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
             return None
         oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (nm, "", iso(now_utc())))
-        org_member_add(c, oid, uid, "admin")
+        org_member_add(c, oid, uid, "admin", keep_office=False)
     return oid
 
 
@@ -151,10 +152,33 @@ def user_orgs(c, uid):
                                         "AND o.retired_at IS NULL ORDER BY m.org_id", (uid,))]
 
 
-def org_member_add(c, oid, uid, role="member"):
-    """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts."""
-    c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role))
+def org_member_add(c, oid, uid, role="member", keep_office=True):
+    """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts.
+    keep_office=False (2.356.0, review N3): the person creates the organisation herself -- she goes on in it."""
+    n = c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role)).rowcount
     acx_drop()
+    if n == 1 and keep_office:  # 2.356.0 B (#2932): a person with an own office keeps working in it (every way of joining comes here)
+        _office_keep_on_join(c, uid)
+
+
+def _office_keep_on_join(c, uid):
+    """2.356.0 B (#2932): uid just joined an organisation. While the setting "workspace" is still unset ("all") and uid
+    has a personal office (office/model.py pb_personal) with data (documents, master data, receipts, bank, cash book or
+    private clients), it becomes "private": the office stays the person's own instead of switching silently to the
+    organisation's (office_where: "all" + one organisation = its office, its numbers). Without such data nothing changes."""
+    with system_ctx(c):  # the person's own setting and area (also when an admin adds the person)
+        if (usettings(c, uid).get("workspace") or "all").strip() not in ("", "all"):
+            return False
+        pid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+        if not pid:
+            return False
+        used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM office_purchases WHERE org_id=? UNION ALL SELECT 1 FROM office_bank_tx WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM office_cash_entries WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM clients WHERE org_id IS NULL AND created_by=? LIMIT 1", (pid[0],) * 5 + (uid,)).fetchone()
+        if used:
+            uset(c, uid, "workspace", "private")
+    return bool(used)
 
 
 def org_names(c, uid):
@@ -758,7 +782,7 @@ def org_create():
         if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
             c.rollback()
             return err(tr("Invalid value: {0}", "admin_id"))
-        org_member_add(c, oid, adm, "admin")
+        org_member_add(c, oid, adm, "admin", keep_office=adm != me())
         bump(c)
         c.commit()
         print("organisation", oid, "created by", login_log_who(g.user), flush=True)

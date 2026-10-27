@@ -32,12 +32,13 @@ from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
-from ..api.common import v1_args, v1_json, v1_view
+from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
 from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .offerlink import OilExists, oil_agent_filter, oil_need_no_invoice  # 2.356.0 C (#3003)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_ITEM_KEYS += ("id",)  # 2.270.0 D (#3028): the stored position it changes (from GET): what the agent does not send stays
@@ -456,6 +457,7 @@ def _doc_v1(c, oid, r, items=True):
         d.pop(k, None)
     for it in d.get("items") or []:  # 2.144.5 C (#1523): the source list of a position is internal
         it.pop("list_id", None)
+    oil_agent_filter(d, lambda x: ofa_doc_in_lists(c, g.user["id"], x))  # 2.356.0 C (#3003): linked documents only inside the agent's projects
     d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotes & invoices"
     return d
 
@@ -706,7 +708,7 @@ def v1_office_invoice_post(did):
     project, rights ...; parts_mode for a quotation with parts). Never finalised or sent."""
     from .docs import doc_row, recalc
     from .invoices import inv_offer_invoice
-    b = _json(("parts_mode", "notify", "inv_type", "amount", "pct", "client_ref"))  # 2.120.0 A (#2087): progress / final invoice
+    b = _json(("parts_mode", "notify", "inv_type", "amount", "pct", "client_ref", "force"))  # 2.120.0 A (#2087): progress / final invoice; 2.356.0 C (#3003): + force
     c = db()
     notify = _flag_notify(b)
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="invoice")
@@ -721,6 +723,10 @@ def v1_office_invoice_post(did):
     pm = b.get("parts_mode")
     if pm not in (None, "", "full", "title", "summary"):
         raise BadInput(tr("Invalid value: {0}", "parts_mode"))
+    try:
+        oil_need_no_invoice(c, oid, r, b)  # 2.356.0 C (#3003): 409 invoice_exists unless force
+    except OilExists as e:
+        return v1_err(409, e.text(), name="invoice_exists", invoices=e.invoices)
     nid = inv_offer_invoice(c, oid, uid, r, b, pm or None, None)  # 2.149.0 A (#2521): the person's helper (+ the office log line)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (aid, r["list_id"], nid, oid))
     ofi_ref_keep(c, nid, ref)

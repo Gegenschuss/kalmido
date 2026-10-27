@@ -56,6 +56,7 @@ function dimp_dialog() {
     <div class="row"><label for="dimp-file">${tr('File')}</label><input type="file" id="dimp-file" accept=".csv,.txt,text/csv,text/plain"></div>
     <div id="dimp-pv" class="dimppv" aria-live="polite"></div>`, tr('Take over'), async () => {
     if (!DIMP.file) throw new Error(tr('Choose a file first'));
+    if (!await importTargetConfirm({what: tr('the data of the file'), ws: ofcWs(), place: tr('Office')})) return false;  // 2.356.0 B (#2934): the target in words (#1940)
     const fd = new FormData(); fd.append('file', DIMP.file);
     const j = await api('POST', '/api/office/datev/import', fd);
     DIMP.sup = null; DIMP.ob = {};

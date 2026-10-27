@@ -1,6 +1,8 @@
 /* Kalmido web client: the styles of the module "office" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
 .office .ofcorg{font-size:var(--fs-s)}
+.office .ofcws.wsbadge{margin-left:0;margin-right:.25rem}  /* 2.356.0 B (#2932): the area in the office header */
+.office span.ofcws{font-size:var(--fs-s);color:var(--muted)}
 .ofcbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
 .ofcgrp{display:flex;align-items:center;gap:.5rem;margin:1rem 0 .25rem;font-size:var(--fs-s);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .ofcgrp .c{font-weight:400;text-transform:none;letter-spacing:0}
@@ -109,6 +111,16 @@
 .ofdhead .ofdnum{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-l)}
 .ofdhead .ofdstat{min-height:var(--fld-h)}
 .ofdhead .ofdsave{font-size:var(--fs-s)}
+.ofdhead .oil_tail{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:nowrap}  /* 2.356.0 C (#3004): Preview, Download and "…" stay in one line */
+.oil_link{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin:0 0 .5rem;font-size:var(--fs-s)}  /* 2.356.0 C (#3003) */
+.oil_more{margin:.25rem 0 .5rem}  /* 2.356.0 C (#3005): language, currency, VAT, contract folded below the head */
+.oil_more>summary{display:flex;align-items:center;gap:.4rem;cursor:pointer;min-height:2.5rem;color:var(--muted);font-size:var(--fs-s);list-style:none}
+.oil_more>summary::-webkit-details-marker{display:none}
+.oil_more>summary .fcar{transform:rotate(-90deg)}
+.oil_more[open]>summary .fcar{transform:none}
+.oil_more>summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ofdgrid .row #ofd-contact_id{flex:1 1 100%}  /* 2.356.0 C (#3005): a long contact name wraps into its own line instead of being cut */
+.oil_rtadd{margin:.25rem 0 .75rem}
 .ofdeditor{display:flex;flex-direction:column;gap:.75rem}
 .ofdsecb{padding:.25rem 0 .5rem}
 .ofdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.25rem 1.5rem}
@@ -1026,3 +1038,16 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .oflgt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius)}
 .oflr.ofmmore{color:var(--muted)}
 .rcp-kinds{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+/* 2.356.0 D (#3006, #3129): the members' line (why Money is short, the way to hand in receipts), locked company fields,
+   "Submit receipt" with the person's own receipts and their status */
+.ofcmbr{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .625rem;margin:0 0 .75rem;font-size:var(--fs-s)}
+.ofcmbr>svg{flex:none}.ofcmbr>span{flex:1 1 16rem}
+.ofclocked .ofcmbr{justify-content:center;text-align:left;margin:0}
+.ofclockhint{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);margin:0 0 .75rem}
+.ostp[disabled] :is(input,textarea,select){background:var(--bg2);color:var(--muted);border-style:dashed;cursor:not-allowed}
+.ofcnamesug{margin:-.25rem 0 .75rem}
+.rsb-hint{margin:0 0 .5rem}
+.rsb-row{cursor:default}.rsb-row:hover{border-color:var(--line2)}
+.rsb-st{flex:none}.rsb-paid,.rsb-processed{color:var(--accent)}.rsb-removed{color:var(--muted)}
+.rsb-in{margin:0 0 1rem}
+.rcl-sub{color:var(--muted)}

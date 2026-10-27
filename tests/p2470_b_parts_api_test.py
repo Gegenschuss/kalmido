@@ -189,7 +189,7 @@ else:
 # ---------------------------------------------------------------- invoices from the quotation
 off = A.get(B + f"{D}/{DOC}").json()["totals"]
 for mode in ("full", "title", "summary"):
-    r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode})
+    r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode, "force": True})  # 2.356.0 (#3003): a further full invoice from the same quotation only with force (else 409 invoice_exists)
     check(r.status_code == 201, f"invoice {mode} " + r.text[:200])
     it = r.json()
     check(abs(float(it["totals"]["net"]) - off["net"]) < 0.005 and abs(float(it["totals"]["gross"]) - off["gross"]) < 0.005,
@@ -209,16 +209,16 @@ A.patch(B + f"{D}/{DOC}", json={"discount_pct": 10})
 A.patch(B + f"{D}/{DOC}/parts/{P1}", json={"settings": {"discount_pct": 5}})
 off2 = A.get(B + f"{D}/{DOC}").json()["totals"]
 for mode in ("full", "title", "summary"):
-    it = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode}).json()
+    it = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode, "force": True}).json()  # 2.356.0 (#3003): a further full invoice from the same quotation only with force (else 409 invoice_exists)
     check(abs(float(it["totals"]["net"]) - off2["net"]) < 0.005 and abs(float(it["totals"]["gross"]) - off2["gross"]) < 0.005,
           f"invoice {mode} with discounts: net / gross = the quotation's ({it['totals'].get('net')} / {it['totals'].get('gross')} vs {off2['net']} / {off2['gross']})")
 A.patch(B + f"{D}/{DOC}", json={"discount_pct": 0})
 A.patch(B + f"{D}/{DOC}/parts/{P1}", json={"settings": {"discount_pct": None}})
-r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "summary", "parts_title": "Production"})
+r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "summary", "parts_title": "Production", "force": True})  # 2.356.0 (#3003): a further full invoice from the same quotation only with force (else 409 invoice_exists)
 check(r.ok and {x["title"] for x in r.json()["items"]} == {"Production"}, "summary: own title")
-check(A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "bogus"}).status_code == 400, "bad mode -> 400")
+check(A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": "bogus", "force": True}).status_code == 400, "bad mode -> 400")
 A.put(B + "/api/office/settings", json={"parts_invoice_mode": "summary", "parts_summary_title_en": "Video production"})
-r = A.post(B + f"{D}/{DOC}/invoice", json={})
+r = A.post(B + f"{D}/{DOC}/invoice", json={"force": True})  # 2.356.0 (#3003): a further full invoice from the same quotation only with force (else 409 invoice_exists)
 check(r.ok and {x["title"] for x in r.json()["items"]} == {"Video production"}, "the organisation's default mode + title")
 r = A.post(B + f"{D}/{PLAIN['id']}/invoice", json={})
 check(r.ok and [x["title"] for x in r.json()["items"]][:2] == ["Concept", "Edit"], "a quotation without parts: invoice as before")

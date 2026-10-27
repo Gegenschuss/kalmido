@@ -31,7 +31,7 @@ const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
 function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
   const norc = typeof BNR === 'object' && bnr_route() && BNK.state === 'norc';  // 2.299.0 C (#3192): #office/bank/norc (the reminder task's link)
   if (!norc && (!BNK.data || BNK.q !== 'state=' + BNK.state)) { setTimeout(() => { if (BNK.q !== 'state=' + BNK.state || !BNK.data) bnkLoad(); }, 0); if (!BNK.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -198,7 +198,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const rowsView = () => {
     const p = st.p, many = (p.files || 1) > 1;
-    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.pending_count ? trn('{0} pending', '{0} pending', p.pending_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
+    card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc(tr('Import into: {0}', wsName(ofcWs())))/* 2.356.0 B (#2934) */} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.pending_count ? trn('{0} pending', '{0} pending', p.pending_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
       ${p.camt052 ? bnk052Html() : ''}${cfb_prevHtml(p.balances)}${filesInfo(p)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup || r.pending ? 'arch' : ''} ${r.pending ? 'pend' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.pending ? tr('pending – not imported') : r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
       ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
   };
@@ -223,6 +223,9 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     if (b.dataset.bi === 'pick') { const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = BNK_ACCEPT; i.className = 'bnk-file'; i.hidden = true; i.onchange = () => { take(i.files); i.remove(); }; md.append(i); i.click(); return; }
     if (b.dataset.bi === 'back') { await preview(null); return; }
     if (st.p?.columns) { st.mapping = mapOf(); b.disabled = true; await preview(st.mapping); return; }
+    // 2.356.0 B (#2934): the target before the start, in words: the office area of the account(s) + the account (#1940)
+    const accts = [...new Set((st.p?.balances || []).map(x => x.account).filter(Boolean))].map(cfb_acct);
+    if (!await importTargetConfirm({what: trn('{0} booking', '{0} bookings', st.p?.count || 0), ws: ofcWs(), place: st.account || accts.join(', ') || tr('Bank account')})) return;
     b.disabled = true;
     try {
       const j = await api('POST', '/api/office/bank/import', form(st.mapping)), iid = j.import.id;

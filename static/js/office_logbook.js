@@ -84,12 +84,13 @@ function lbVehModal(v) {
     ${ofcRowF('lgb-vkind', tr('Kind'), ofcSel('lgb-vkind', v?.kind || 'private', [['private', tr('Private car used for business (mileage allowance)')], ['company', tr('Company car (costs through receipts)')]]))}
     ${ofcRowF('lgb-vodo', tr('Odometer at the start'), ofcIn('lgb-vodo', v?.odo_start != null ? lbKm(v.odo_start) : '', {num: true, ph: tr('optional')}))}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${v ? `<button class="btn" data-m="arch">${v.archived ? tr('Restore') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${v ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${v ? `<button class="btn" data-m="arch">${v.archived ? tr('Restore') : tr('Archive')}</button>` : ''}${v && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${v ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'vehicles', ids: [v.id], from: ofm_officeFrom(), label: qn(v.name), after: async () => { LB.vid = null; lbReload(true); }}); return; }  // 2.356.0 A (#2926): with its logbook
     try {
       if (b.dataset.m === 'arch') {
         const on = v.archived ? 0 : 1;

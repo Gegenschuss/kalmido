@@ -25,7 +25,11 @@ Which office you work in follows the workspace switch at the top of the sidebar:
 shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
 mode `shared`) there is no switch: the office is simply your personal one. With the switch on "All workspaces", a person
 in exactly one organisation works in that organisation's office (as before 2.47.3); with several organisations the
-office asks to choose one.
+office asks to choose one. Since 2.356.0 a person who already has data in the personal office (documents, master data,
+receipts, bank, cash book or private clients) and joins an organisation while the switch is on "All workspaces" keeps
+working in the personal office (the switch is set to **Private**; the organisation is one switch away). The office header
+always names the workspace of the shown office and, with organisations, is the workspace switch itself; the first change
+of the office's workspace shows one short hint.
 
 ## Personal office
 
@@ -77,8 +81,23 @@ dialog names what moves and what stays before anything changes:
 Rights: the right to work in both offices (travel expenses, templates and framework contracts: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|office, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
+
+Further areas (2.356.0): fixed costs, vehicles (with their logbook: drives, change log and closed months - a month closed
+for every vehicle stays closed for the moved one; no move into or out of a locked month), text blocks, services and
+equipment move from their dialog (*Move to another workspace…*, the office admin of both sides). One that something in the
+old office still uses (an issued invoice's position, a set, a framework contract) stays there archived and is created anew
+in the target; a fixed cost or vehicle that is used there stays. Links into the old office end (a drive's client / trip,
+a device's receipt / contract, a service's role) and come back with the undo.
+
+**Your own part of an organisation's office into your personal office** (2.356.0, e.g. when you leave an office community):
+Settings of the organisation's office, *Transfer into your personal office…* (its admins only), the same dialog with preview
+and undo (`what: office`, `ids: [org id]`, `to: "private"`). Only what you created there moves: your clients (with your
+drafts; a client the organisation still uses stays there active and is created anew for you), your drafts, the framework
+contracts of the clients that move, your trips, entertainment receipts and templates. Issued documents stay (retention,
+read-only copies on request), drafts are numbered anew; the drafts of the others, the cash book, books, bank and the other
+master data stay in the organisation.
 
 **The whole personal office into an organisation** (2.139.1): Settings of the office, *Transfer into an organisation*, offered
 when you are an admin of at least one organisation. The preview names what goes along (documents, payments, clients with
@@ -87,7 +106,8 @@ company and bank data, your number counters, the start and real balances of the 
 and who sees it afterwards (every member of the organisation with access to the office). Every entry keeps its id;
 finalised invoices stay finalised with their numbers, closed cash book days stay closed; the protected fields and the
 stored files are sealed anew with the organisation's key. A number the organisation already uses refuses the transfer
-(the preview lists them; numbers are never rewritten). One way, no undo. Only the person in the app, never an agent or an
+(the preview lists them; numbers are never rewritten). The receipts the cash book and the equipment list point at (your
+own files in Documents) move into the organisation's documents, so its bookkeeping can open them (2.356.0). One way, no undo. Only the person in the app, never an agent or an
 access token. `GET /api/office/move/check?org=<id>` -> `{org, ok, moves, keeps, notes, conflicts, numbers, who}`;
 `POST /api/office/move/org` `{org, confirm: true}` -> `{ok, org_id, name, clients, files, rows}` (404 not a member, 403 not
 its admin, 409 conflicts / not a personal office / nothing to move).

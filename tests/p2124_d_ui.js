@@ -61,6 +61,8 @@ const CSV = `Buchungstag;Name;Verwendungszweck;Betrag;Saldo\n${DE};Laden Beispie
     check(await ev(`(document.querySelector('.modal .cfb-prev').textContent).includes(ofcMoney(1240))`), 'the balance of the last booking (newest first)');
     await shot('p2124-d-preview.png');
     await ev(`(() => { document.querySelector('.modal [data-bi="next"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal #bi-bal') && !document.querySelector('.modal .cfb-prev')`, 60), 'imported');
     const imp = await call(CF, 'GET', '/api/office/bank/imports');
     check((imp.items || []).length === 1, 'one import');

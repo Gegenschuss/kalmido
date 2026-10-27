@@ -1289,6 +1289,8 @@ def inv_from_offer_post(did):
     ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the invoice made the first time
     if hit:
         return _answer(c, oid, uid, hit)
+    from .offerlink import oil_need_no_invoice
+    oil_need_no_invoice(c, oid, r, b)  # 2.356.0 C (#3003): a second full invoice only with force
     nid = inv_offer_invoice(c, oid, uid, r, b, b.get("parts_mode") or None, b.get("parts_title") if isinstance(b.get("parts_title"), str) else None)
     ofi_ref_keep(c, nid, ref)
     bump(c)

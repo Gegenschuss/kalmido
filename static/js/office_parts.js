@@ -186,7 +186,8 @@ function tpInvoiceDialog(d) {
     ${ofdF('tp-sum-title', tr('Title of the position'), `<input id="ofd-tp-sum-title" maxlength="300" value="${esc(s['parts_summary_title_' + lg] || (lg === 'en' ? 'Film production' : 'Filmherstellung'))}">`)}`,
     tr('Create invoice'), async md => {
       const mode = $('input[name="tp-mode"]:checked', md)?.value || cur;
-      const j = await (typeof ofdRefCall === 'function' ? ofdRefCall : (k, f) => f())(`inv${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/invoice`, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : '', client_ref: ref}));  // 2.269.0 D (#3046)
+      const j = await oil_post(d, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : ''});  // 2.269.0 D (#3046); 2.356.0 C (#3003): asks before a second invoice
+      if (!j) return;
       OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; TP.open = null; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`);
     });
 }

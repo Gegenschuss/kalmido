@@ -21,6 +21,7 @@ from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, 
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
+from .rcsubmit import rsb_flag  # 2.356.0 D (#3129)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -50,6 +51,7 @@ def office_settings_get():
                    number_preview=onc_preview(c, oid, s, s["offer_scheme"]),  # 2.118.0 A (#2265): onc_preview
                    industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
                    used=of_used(c, oid),  # 2.276.0 A (#3039): what the office already holds (start page, folded group, menu points)
+                   submit=rsb_flag(c, uid, oid),  # 2.356.0 D (#3129): "Submit receipt" (may hand in, does not see the bookkeeping)
                    **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
 
 

@@ -112,12 +112,14 @@ def _uid_filter(uid):
 
 
 # ---------------------------------------------------------------- receipts (contract with part B)
-def bk_receipts(c, oid, frm, to, uid=None, by="paid"):
+def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     """The receipts of office area oid in [frm, to] (ISO days, both included) ->
     [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date}].
     A receipt = a document of the office's documents space with a row in rc_receipts and an amount, not in the trash.
     by="paid": the day = paid_at, else the document date (cash principle, the EUeR); by="doc": the document date, else
-    paid_at (input tax). uid: only documents this person sees (default: the signed-in person; 0 = all, for jobs)."""
+    paid_at (input tax). uid: only documents this person sees (default: the signed-in person; 0 = all, for jobs).
+    2.356.0 (#3097): gaps = a dict the exports fill with what they leave out: "no_amount" / "no_date" ([titles] of receipts
+    this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open)."""
     from ..docs.store import doc_open
     from ..files.store import fs_chain, fs_deleted, fs_role
     ws = bk_ws(c, oid)
@@ -131,14 +133,17 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid"):
     out = []
     for r in rows:
         raw = doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or ""
-        if not raw:
-            continue
-        a = dec(raw, "0")
-        if a == 0:
+        a = dec(raw, "0") if raw else dec(0)
+        if a == 0 and gaps is None:
             continue
         if fs_deleted(fs_chain(c, r["node_id"])):
             continue  # a folder above it is in the trash
         if uid and not fs_role(c, r["node_id"], uid):
+            if gaps is not None and a != 0:
+                gaps["hidden"] = gaps.get("hidden", 0) + 1
+            continue
+        if a == 0:
+            gaps.setdefault("no_amount", []).append(r["name"] or "")
             continue
         cur, rate = bk_home_rate(r["currency"], s)
         gross = money(a / rate if rate else a)
@@ -147,7 +152,35 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid"):
         out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
                     "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
                     "unrated": cur if rate is None else None})  # 2.189.0 B (#2475): a foreign receipt without office rate
+    if gaps is not None:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
+        for r in c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+                           "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "
+                           "ORDER BY r.node_id LIMIT 1000", (ws,)).fetchall():  # review N4: bounded (named, not all of them)
+            if fs_deleted(fs_chain(c, r["node_id"])):
+                continue
+            if uid and not fs_role(c, r["node_id"], uid):
+                gaps["hidden"] = gaps.get("hidden", 0) + 1
+                continue
+            gaps.setdefault("no_date", []).append(r["name"] or "")
     return out
+
+
+def bk_gaps_text(gaps, missing=()):
+    """2.356.0 (#3097): the text of missing.txt in an export ZIP -- the files that could not be read (missing: [(where, name)])
+    and the receipts left out (gaps of bk_receipts); "" when nothing is missing."""
+    out = []
+    if missing:
+        out.append(tr("Files that could not be read (damaged or missing) - the list names them, the ZIP does not hold them:"))
+        out += [f"- {w}: {n}" for w, n in missing]
+    if gaps.get("no_date"):
+        out.append(tr("Receipts without a date (not in the export, complete them under Office > Receipts):"))
+        out += [f"- {n}" for n in gaps["no_date"]]
+    if gaps.get("no_amount"):
+        out.append(tr("Receipts without an amount (not in the export, complete them under Office > Receipts):"))
+        out += [f"- {n}" for n in gaps["no_amount"]]
+    if gaps.get("hidden"):
+        out.append(tr("{0} receipts lie in folders you cannot open and are not in this export; the GoBD export holds them.", gaps["hidden"]))
+    return "\r\n".join(out) + ("\r\n" if out else "")
 
 
 BK_OFFER_MAX = 100  # 2.237.0 C (#2865): e-invoices waiting to be taken over as receipts, newest first
@@ -476,7 +509,8 @@ def bk_get():
     ws = bk_ws(c, oid)
     m_from, m_to = bk_period(int(mo[:4]), "m" + mo[5:])
     month = [_rc_public(x) for x in bk_receipts(c, oid, m_from, m_to)][-BK_LIST_MAX:]
-    missing = [_rc_public(x) for x in bk_receipts(c, oid, f"{year}-01-01", f"{year}-12-31") if x["vat_pct"] is None][:BK_LIST_MAX]
+    gaps = {}  # 2.356.0 (#3097): receipts of the year the exports leave out (no date / no amount)
+    missing = [_rc_public(x) for x in bk_receipts(c, oid, f"{year}-01-01", f"{year}-12-31", gaps=gaps) if x["vat_pct"] is None][:BK_LIST_MAX]
     from ..docs.dups import dup_seen
     dups = dup_seen(c, {x["node_id"] for x in month + missing}, uid)  # 2.185.0 A (#2583): marked in the list, still counted
     for x in month + missing:
@@ -488,7 +522,8 @@ def bk_get():
                    # 2.121.0 (#2093): SKR03 / SKR04 account per category (None: no DATEV input side; 2.147.0 (#2460): or DATEV off)
                    accounts=ca_accounts(c, oid, cats) if office_feature(c, oid, "books.datev", s) else None,
                    small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year, einvoices=einv,
-                   missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE))
+                   missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE),
+                   incomplete=len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ()))
 
 
 @app.get("/api/office/books/euer")

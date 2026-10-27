@@ -105,7 +105,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     await nav(B + '#office/offers');
     check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]') && typeof OFC === 'object' && !!OFC.info && OFC.info.role !== 'admin'`, 80), 'the office (member)');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
     check(await ev(`!document.querySelector('#side [data-ofm="pipeline"],#side [data-ofm="cashflow"],#side [data-ofm="kpi"],#side [data-ofm="travel"]')`), '#1917: a member sees no admin points');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
-    check(await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg).join() === 'sell,admin'`), '#1917: empty groups are hidden for a member');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
+    // 2.356.0 (#3129): a member hands in receipts: Money holds only "Submit receipt" (folded at first, #3039), the other empty groups stay hidden
+    check(await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg).join() === 'sell,money,admin' && ofm_items().filter(i => i.group === 'money').map(i => i.key + ':' + i.name).join() === 'receipts:Submit receipt'`), '#1917: empty groups are hidden for a member ' + await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join()`));  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p287b_c_ui: ${ok} ok, ${F.length} failed`);

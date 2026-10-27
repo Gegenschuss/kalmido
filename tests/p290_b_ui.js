@@ -80,6 +80,8 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await ev(`(() => { bnkImpModal(${JSON.stringify(camt)}, 'auszug.xml'); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.bnkdlg .bnkprev .ofcrow').length === 1 && !!document.querySelector('.bnkdlg [data-bi="next"]')`), 'CAMT: the preview without a column step');
     await ev(`(() => { document.querySelector('.bnkdlg [data-bi="next"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.bnkdlg') && [...document.querySelectorAll('.bnkrow')].some(e => /Druckerei/.test(e.textContent))`), 'CAMT: taken over, the booking is in the list');
     // a CSV first asks for the columns
     await ev(`(() => { bnkImpModal(${JSON.stringify('Buchungstag;Name;Verwendungszweck;Betrag\n' + de(day(5)) + ';Kino Beispiel;Miete;-300,00\n')}, 'zwei.csv'); return 1; })()`);
@@ -88,6 +90,8 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await ev(`(() => { document.querySelector('.bnkdlg [data-bi="next"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.bnkdlg .bnkprev .ofcrow').length === 1`), 'CSV: the preview');
     await ev(`(() => { document.querySelector('.bnkdlg [data-bi="next"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.bnkdlg') && [...document.querySelectorAll('.bnkrow')].some(e => /Kino/.test(e.textContent))`), 'CSV: taken over');
     // the import list with "Take back"
     await ev(`(() => { document.querySelector('[data-bnk="imps"]').click(); return 1; })()`);

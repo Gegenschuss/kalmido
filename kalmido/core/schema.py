@@ -3638,6 +3638,10 @@ MIGRATIONS = [
     # 2.357.0 C (#3158): a document from a template signed with the own signature picture of this person (office/doctpl.py; set
     # only by that person, NULL = without). Older versions ignore it
     ("office_gen_docs", "sign_uid", "ALTER TABLE office_gen_docs ADD COLUMN IF NOT EXISTS sign_uid BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+    # 2.356.0 D (#3129): a receipt a member handed in to the bookkeeping (office/rcsubmit.py): who and when (NULL = uploaded in
+    # the bookkeeping as before). Older versions ignore both
+    ("rc_receipts", "submitted_by", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS submitted_by BIGINT"),
+    ("rc_receipts", "submitted_at", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS submitted_at TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3930,6 +3934,7 @@ USER_DEFAULTS = {
     # json object. 1.8.1: the global switch show_completed is gone, a view without an entry shows its completed tasks
     "show_done_views": "{}",
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
+    "office_ws_hint": "0",      # 2.356.0 B (#2932): the office's "you are now working in the office of …" hint was shown
     "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)

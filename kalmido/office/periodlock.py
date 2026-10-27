@@ -18,7 +18,8 @@ from ..core.db import body, db, iso, local_now, now_utc
 from ..core.pg import write_lock
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .model import office_gate, office_org
+from .model import office_gate, office_org, office_role
+from .rights import ofr_rights
 
 PL_LOCKED = N_("{0} is locked (GoBD). Book corrections in an open month, e.g. as a credit note dated today.")
 PL_MAX_MONTHS = 600  # 50 years in one lock call at most
@@ -196,16 +197,40 @@ def pl_ws_office(c, ws):
     return r["id"] if r is not None else None
 
 
+def pl_sees_books(c, uid, oid):
+    """True when uid sees the bookkeeping of office area oid (Office > Receipts): an admin, accounting, the personal
+    office's owner or an office group with the bookkeeping (2.356.0 D, #3129: was rcsubmit.rsb_sees_books)."""
+    r = ofr_rights(c, uid, oid)
+    if r is None:
+        return office_role(c, uid, oid) in ("admin", "accounting")
+    return r["levels"].get("books", "none") != "none"
+
+
+PL_TAKEN = N_("The bookkeeping has taken over this receipt; only it can change or remove it")
+
+
+def _pl_taken(c, oid, r):
+    """2.356.0 (#3129, review M1): 409 when the signed-in person handed receipt row r in, the bookkeeping has taken it over
+    (changed it or noted the payment) and the person does not see the bookkeeping -- a booked receipt stays as booked."""
+    uid = g.user["id"] if getattr(g, "user", None) is not None else 0
+    if (uid and r["submitted_by"] == uid and (r["paid_at"] or (r["set_by"] and r["set_by"] != r["submitted_by"]))
+            and not pl_sees_books(c, uid, oid)):
+        raise Denied(409, tr(PL_TAKEN))
+
+
 def pl_receipt_need_open(c, nid, *new_days, becoming=False):
     """409 when document nid is a receipt (or becomes one: becoming=True) whose document date or payment day - or one of
-    new_days - lies in a locked month of its office area. Not a receipt / no office: nothing."""
-    r = c.execute("SELECT d.ws, d.doc_date, r.paid_at, r.node_id AS rc FROM doc_meta d LEFT JOIN rc_receipts r ON r.node_id=d.node_id "
-                  "WHERE d.node_id=?", (nid,)).fetchone()
+    new_days - lies in a locked month of its office area. Not a receipt / no office: nothing.
+    2.356.0 (#3129): also when its submitter would change a receipt the bookkeeping has taken over (_pl_taken)."""
+    r = c.execute("SELECT d.ws, d.doc_date, r.paid_at, r.node_id AS rc, r.submitted_by, r.set_by FROM doc_meta d "
+                  "LEFT JOIN rc_receipts r ON r.node_id=d.node_id WHERE d.node_id=?", (nid,)).fetchone()
     if r is None or (r["rc"] is None and not becoming):
         return
     oid = pl_ws_office(c, r["ws"])
     if oid:
         period_need_open(c, oid, r["doc_date"], r["paid_at"], *new_days)
+        if r["rc"] is not None:
+            _pl_taken(c, oid, r)
 
 
 def pl_tree_need_open(c, nid):
@@ -213,7 +238,7 @@ def pl_tree_need_open(c, nid):
     # 2.188.0 A (#2498): one query for the whole tree (document date, payment day and space of every receipt below), then
     # one check per office area -- the same as pl_receipt_need_open per receipt
     rows = c.execute("WITH RECURSIVE t(id) AS (SELECT ?::bigint UNION ALL SELECT n.id FROM fs_nodes n JOIN t ON n.parent_id=t.id) "
-                     "SELECT d.ws, d.doc_date, r.paid_at FROM rc_receipts r JOIN t ON t.id=r.node_id JOIN doc_meta d ON d.node_id=r.node_id "
+                     "SELECT d.ws, d.doc_date, r.paid_at, r.submitted_by, r.set_by FROM rc_receipts r JOIN t ON t.id=r.node_id JOIN doc_meta d ON d.node_id=r.node_id "
                      "ORDER BY r.node_id LIMIT 5000", (nid,)).fetchall()
     areas, days = {}, {}
     for r in rows:
@@ -222,5 +247,7 @@ def pl_tree_need_open(c, nid):
             areas[ws] = pl_ws_office(c, ws)
         if areas[ws]:
             days.setdefault(areas[ws], []).extend((r["doc_date"], r["paid_at"]))
+            if r["submitted_by"]:
+                _pl_taken(c, areas[ws], r)  # 2.356.0 (#3129)
     for oid, ds in days.items():
         period_need_open(c, oid, *sorted((d for d in ds if d not in (None, "")), key=str))

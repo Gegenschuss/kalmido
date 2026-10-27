@@ -280,7 +280,10 @@ def kva_invoice(S, who):
     check(r.status_code in (200, 201) and r.json().get("kind") == "invoice", f"{who}: #2235 invoice from a draft {r.status_code} {r.text[:200]}")
     r = S.post(B + f"{D}/{did}/status", json={"status": "sent"})
     check(r.ok and r.json().get("status") == "sent", f"{who}: mark as sent {r.text[:200]}")
+    # 2.356.0 (#3003): the quotation has an invoice (the draft one above) -> 409 invoice_exists first, never a status lock (#2235)
     r = S.post(B + f"{D}/{did}/invoice", json={})
+    check(r.status_code == 409 and r.json().get("code") == "invoice_exists", f"{who}: #3003 a second invoice asks first {r.status_code} {r.text[:200]}")
+    r = S.post(B + f"{D}/{did}/invoice", json={"force": True})
     check(r.status_code in (200, 201) and r.json().get("kind") == "invoice", f"{who}: #2235 invoice from a sent quotation {r.status_code}")
     for st in ("accepted", "declined"):
         r = S.post(B + f"{D}/{did}/status", json={"status": st})

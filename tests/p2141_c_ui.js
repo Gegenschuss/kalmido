@@ -53,6 +53,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(/Line 3/.test(d.querySelector('.nwl-md .nwl-imp-err')?.textContent || ''), 'the problem line is named with its line number');
   check((await call('GET', `/api/contacts/${c1.id}`)).newsletter.status !== 'yes', 'nothing stored before "Import"');
   d.querySelector('.nwl-md [data-nwl="imp-go"]').click();
+  (await until(() => d.querySelector('.itc-dlg [data-cd="yes"]')))?.click();  // 2.356.0 B (#2934): the import names its target first
   check(await until(async () => (await call('GET', `/api/contacts/${c1.id}`)).newsletter.status === 'yes'), 'Import stores the consent');
   check(await until(() => !d.querySelector('.nwl-md .nwl-imp-sum')), 'the preview is gone afterwards');
   w.close();

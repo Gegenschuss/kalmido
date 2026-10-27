@@ -64,6 +64,7 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 // text blocks are no menu points any more but the tab "Templates" under Settings (ofr_setTabsHtml), their routes stay
 const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')]];
 const ofm_ofc = () => officeOn();
+const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'offers', go: 'office/offers', icon: 'receipt', name: N_('Quotes & invoices'), group: 'sell', on: ofm_ofc},
@@ -84,7 +85,10 @@ const OFM_ITEMS = [
   {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'books', go: 'office/books', icon: 'book', name: N_('Bookkeeping'), group: 'money', on: ofm_ofc, adm: 1},
   // 2.276.0 A (#3039): the receipts (upload + list, office_receipts.js rcp_tabHtml) for everybody with the bookkeeping (lvk = its area)
-  {key: 'receipts', go: 'office/receipts', icon: 'ticket', name: N_('Receipts'), group: 'money', on: ofm_ofc, adm: 1, lvk: 'books'},
+  // 2.356.0 D (#3129): the same point is "Submit receipt" for the people who may hand in receipts but do not see the
+  // bookkeeping (GET /api/office/settings submit; office_receipts.js rsb_tabHtml): shown by their right in the area receipts
+  {key: 'receipts', go: 'office/receipts', icon: 'ticket', get name() { return ofm_sub() ? N_('Submit receipt') : N_('Receipts'); }, group: 'money', on: ofm_ofc,
+    get adm() { return ofm_sub() ? 0 : 1; }, get lvk() { return ofm_sub() ? 'receipts' : 'books'; }},
   {key: 'subs', go: 'office/subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'meals', go: 'office/meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
@@ -167,7 +171,7 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc) p = [tr('Quotes & invoices'), OFD.doc.number || tr('Draft')];
+  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr('Quotes & invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }

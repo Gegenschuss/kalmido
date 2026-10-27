@@ -49,6 +49,8 @@ from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from .ledger import ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
+from .periodlock import period_need_open
+from .travel import _trip_need_open
 from .rights import NO_RIGHT, office_can, ofr_rights
 from ..team.clients import cl_refs, cl_trash
 
@@ -69,6 +71,34 @@ OFM_TABLE["contracts"] = "office_contracts"
 OFM_ADMIN += ("contracts",)
 OFM_FK["office_contracts"] = {"client_id": "clients", "rights_time_id": "office_texts", "rights_territory_id": "office_texts",
                               "rights_media_id": "office_texts"}
+# 2.356.0 A (#2926): "office" = the own part of an organisation's office into the person's personal office (somebody leaves an
+# office community): what the person created there in ONE move with ONE undo (ids = [the organisation's id], to = private,
+# the admin of its office only). A client the organisation still uses is copied and stays active there; issued documents stay
+# (read-only copies on request), drafts are numbered anew; the drafts of the others, the cash book, books and bank stay.
+OFM_WHAT += ("office",)
+OFM_ADMIN += ("office",)
+OFM_OFFICE = (("clients", "clients"), ("drafts", "office_docs"), ("contracts", "office_contracts"), ("travel", "office_trips"),
+              ("meals", "office_meals"), ("templates", "office_doc_templates"))
+OFM_OFFICE_TO = N_("The own part of an office moves into your personal office only")
+# 2.356.0 A (#2926): further areas, one row = one object with its own rows (kids: (table, column, parent table)). A row that
+# something outside it still points at stays in the old office archived and is created anew in the target (tables with
+# "archived"), or stays there (the others: keep "used"); the columns in clear point into the old office and end (noted, the
+# undo puts them back). Everything for the office's admins only. A vehicle moves with its logbook: its drives, their change
+# log and its closed months (a month closed for every vehicle of the old office is closed for it in the target as well).
+OFM_SIMPLE = {
+    "fixed": ("office_fixed_costs", (("office_sub_reminders", "fixed_id", "office_fixed_costs"),), ("remind_user",)),
+    "vehicles": ("office_vehicles", (("office_drives", "vehicle_id", "office_vehicles"), ("office_drive_log", "drive_id", "office_drives"),
+                                     ("office_drive_closed", "vehicle_id", "office_vehicles")), ()),
+    "texts": ("office_texts", (), ()),
+    "services": ("office_services", (), ("role_id",)),
+    "equipment": ("office_equipment", (), ("receipt_node_id", "agreement_id")),
+}
+OFM_SIMPLE_CLEAR = {"office_drives": ("client_id", "trip_id")}  # a drive's links into the old office end (route, km and purpose stay)
+OFM_WHAT += tuple(OFM_SIMPLE)
+OFM_ADMIN += tuple(OFM_SIMPLE)
+OFM_TABLE.update({w: v[0] for w, v in OFM_SIMPLE.items()})
+OFM_FK.update({"office_equipment": {"agreement_id": "office_agreements", "receipt_node_id": "fs_nodes"}, "office_services": {"role_id": "office_roles"},
+               "office_drives": {"client_id": "clients", "trip_id": "office_trips"}})
 
 
 def ofm_fk_refs(c, table):
@@ -202,6 +232,13 @@ def ofm_meal_people(c, uid, r, src, dst):
 
 def ofm_need(c, uid, what, ids):
     """(source area, rows) of the objects to move: all visible to uid in ONE office (404 / 400)."""
+    if what == "office":  # 2.356.0 A (#2926): ids = [the organisation]; the rows are collected by ofm_plan_office
+        area = ids[0]
+        if len(ids) != 1 or not office_role(c, uid, area):
+            raise Denied(404)
+        if pb_owner(c, area) is not None:
+            raise Denied(409, tr("This is already in that workspace"))
+        return area, []
     if what == "clients":
         from ..team.clients import need_client
         rows = [need_client(c, i, uid) for i in ids]
@@ -236,7 +273,8 @@ def ofm_writer(c, uid, *areas):
 
 
 # 2.187.0 C (#2476): the office area (office/rights.py) of each kind of object that moves
-OFM_RIGHTS_AREA = {"clients": "offers", "drafts": "offers", "travel": "travel", "templates": "gendocs", "meals": "meals", "contracts": "contracts"}
+OFM_RIGHTS_AREA = {"clients": "offers", "drafts": "offers", "travel": "travel", "templates": "gendocs", "meals": "meals", "contracts": "contracts",
+                   "fixed": "cashflow", "vehicles": "logbook", "texts": "texts", "services": "services", "equipment": "equipment"}  # 2.356.0 A (#2926)
 
 
 def ofm_groups(c, uid, what, *areas):
@@ -257,6 +295,11 @@ def ofm_rights(c, uid, what, src, dst, rows):
     ofm_groups(c, uid, what, src, dst)
     if what in OFM_ADMIN and (rs != "admin" or rt != "admin"):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
+    if what == "vehicles":  # 2.356.0 A (#2926): a logbook leaves / enters no locked month
+        for r in rows:
+            days = [x[0] for x in c.execute("SELECT day FROM office_drives WHERE vehicle_id=? AND org_id=?", (r["id"], src))]
+            period_need_open(c, src, *days)
+            period_need_open(c, dst, *days)
     if what == "travel":  # 2.148.0 A (#2471): a trip leaves / enters no locked month
         from .travel import _trip_need_open
         for r in rows:
@@ -288,7 +331,7 @@ def ofm_plan(c, uid, what, src, rows, own=False):
     """{docs: [movable draft rows], keep: {why: n}, clients: [{row, mode: move | copy, refs, issued, contacts, docs}],
     trips, tpls} -- what would move and what stays. own: only uid's own drafts leave (a plain member out of an
     organisation: the drafts of the others stay with the client there)."""
-    p = {"docs": [], "keep": {}, "clients": [], "trips": [], "tpls": [], "meals": [], "detach": 0, "unclient": 0}
+    p = {"docs": [], "keep": {}, "clients": [], "trips": [], "tpls": [], "meals": [], "detach": 0, "unclient": 0, "simple": []}
     def keep(k, n=1):
         p["keep"][k] = p["keep"].get(k, 0) + n
     if what == "drafts":
@@ -314,6 +357,10 @@ def ofm_plan(c, uid, what, src, rows, own=False):
                 keep("meal")
             else:
                 p["meals"].append(r)
+    elif what == "office":
+        ofm_plan_office(c, uid, src, p)
+    elif what in OFM_SIMPLE:
+        ofm_plan_simple(c, what, src, rows, p)
     elif what == "templates":
         p["tpls"] = list(rows)
         q = ",".join("?" * len(rows))
@@ -341,15 +388,158 @@ def ofm_plan(c, uid, what, src, rows, own=False):
     return p
 
 
+def ofm_label(r):
+    """The name of a row of an OFM_SIMPLE table in the notes."""
+    k = r.keys()
+    return next((str(r[x]) for x in ("name", "label", "name_de", "key", "text_de") if x in k and r[x]), f"#{r['id']}")[:80]
+
+
+def ofm_kids(c, what, src, r):
+    """2.356.0 A (#2926): {table: [rows]} of the own rows of row r of what (OFM_SIMPLE kids, also their kids) in office src."""
+    out, ids = {}, {OFM_SIMPLE[what][0]: [r["id"]]}
+    for kt, col, parent in OFM_SIMPLE[what][1]:
+        pid = ids.get(parent) or []
+        rows = c.execute(f"SELECT * FROM {kt} WHERE org_id=? AND {col} IN ({','.join('?' * len(pid))}) ORDER BY id", (src, *pid)).fetchall() if pid else []
+        out[kt] = rows
+        ids[kt] = [x["id"] for x in rows]
+    return out
+
+
+def ofm_plan_simple(c, what, src, rows, p):
+    """2.356.0 A (#2926): p["simple"] = [{what, t, row, mode: move | copy, kids}] of the rows of an OFM_SIMPLE area; a row that
+    something outside it points at is copied (tables with "archived") or stays (keep "used"); one in the trash stays."""
+    t = OFM_SIMPLE[what][0]
+    kts = {k[0] for k in OFM_SIMPLE[what][1]}
+    in_sets = set()
+    if what == "equipment":  # the sets name their devices in a JSON list (no foreign key)
+        for x in c.execute("SELECT items FROM office_sets WHERE org_id=?", (src,)).fetchall():
+            try:
+                in_sets |= {int(i.get("equipment_id") or 0) for i in json.loads(x["items"] or "[]") if isinstance(i, dict)}
+            except (TypeError, ValueError):
+                pass
+    for r in rows:
+        if "deleted_at" in r.keys() and r["deleted_at"]:
+            p["keep"]["trash"] = p["keep"].get("trash", 0) + 1
+            continue
+        kids = ofm_kids(c, what, src, r)
+        used = bool(ofm_refs(c, t, r["id"], skip=kts)) or r["id"] in in_sets
+        for kt, krows in kids.items():  # the logbook: a drive that something outside the vehicle points at holds it
+            used = used or any(ofm_refs(c, kt, k["id"], skip=kts) for k in krows)
+        if used and (kids and any(kids.values()) or "archived" not in r.keys()):
+            p["keep"]["used"] = p["keep"].get("used", 0) + 1
+            continue
+        p["simple"].append({"what": what, "t": t, "row": r, "mode": "copy" if used else "move", "kids": kids})
+
+
+def ofm_move_simple(c, uid, p, src, dst, rec, made, ts):
+    """2.356.0 A (#2926): moves / copies p["simple"] (ofm_plan_simple) from office src to dst."""
+    for x in p["simple"]:
+        t, r, what = x["t"], x["row"], x["what"]
+        clear = {k: None for k in OFM_SIMPLE[what][2] if k in r.keys()}
+        upd = {"updated_at": ts} if "updated_at" in r.keys() else {}
+        if x["mode"] == "move":
+            ofm_move_row(c, rec, t, r, src, dst, dst, {**clear, **upd})
+            for kt, krows in x["kids"].items():
+                for k in krows:
+                    ofm_move_row(c, rec, kt, k, src, dst, dst, {col: None for col in OFM_SIMPLE_CLEAR.get(kt, ()) if col in k.keys()})
+            if what == "vehicles":  # the months closed for every vehicle of the old office stay closed for this one
+                for m in c.execute("SELECT month, closed_by, closed_at FROM office_drive_closed WHERE org_id=? AND vehicle_id IS NULL", (src,)).fetchall():
+                    if not c.execute("SELECT 1 FROM office_drive_closed WHERE org_id=? AND COALESCE(vehicle_id, ?)=? AND month=?",
+                                     (dst, r["id"], r["id"], m["month"])).fetchone():
+                        nid = insert_id(c, "INSERT INTO office_drive_closed(org_id, vehicle_id, month, closed_by, closed_at) VALUES(?,?,?,?,?)",
+                                        (dst, r["id"], m["month"], m["closed_by"], m["closed_at"]))
+                        made.append({"t": "office_drive_closed", "id": nid})
+            continue
+        row = {k: r[k] for k in sorted(table_columns(c, t) - {"id"})}
+        row.update(ofm_reseal(c, t, r, src, dst), org_id=dst, archived=0, **clear)
+        row.update({k: ts for k in ("created_at", "updated_at") if k in row})
+        if "import_run_id" in row:
+            row["import_run_id"] = None
+        nid = insert_id(c, f"INSERT INTO {t}({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+        made.append({"t": t, "id": nid})
+        if not r["archived"]:
+            rec.append({"t": t, "id": r["id"], "old": {"archived": 0}, "src": 1})
+            c.execute(f"UPDATE {t} SET archived=1 WHERE id=?", (r["id"],))
+
+
+def ofm_simple_notes(p):
+    """2.356.0 A (#2926): the notes of p["simple"]."""
+    xs = p.get("simple") or []
+    moved = [x for x in xs if x["mode"] == "move"]
+    notes = [trn("{0} entry moves", "{0} entries move", len(moved)) if moved else ""]
+    for x in [x for x in xs if x["mode"] == "copy"][:8]:
+        notes.append(tr("“{0}” is still used in the old workspace: it stays there archived and is created anew in the target", ofm_label(x["row"])))
+    drives = sum(len(x["kids"].get("office_drives") or ()) for x in moved)
+    if drives:
+        notes.append(trn("{0} logbook entry moves with its vehicle (closed months stay closed)",
+                         "{0} logbook entries move with their vehicle (closed months stay closed)", drives))
+    lost = sum(1 for x in moved for k in x["kids"].get("office_drives") or () if k["client_id"] or k["trip_id"])
+    lost += sum(1 for x in xs if any(x["row"][k] for k in OFM_SIMPLE[x["what"]][2] if k in x["row"].keys() and k != "remind_user"))
+    if lost:
+        notes.append(trn("{0} entry loses its link into the old workspace (client, trip, receipt, contract or role)",
+                         "{0} entries lose their link into the old workspace (client, trip, receipt, contract or role)", lost))
+    k = p["keep"]
+    if k.get("used"):
+        notes.append(trn("{0} entry stays: entries in the old workspace point at it", "{0} entries stay: entries in the old workspace point at them", k["used"]))
+    if k.get("trash"):
+        notes.append(trn("{0} entry in the trash stays", "{0} entries in the trash stay", k["trash"]))
+    return notes
+
+
+def ofm_plan_office(c, uid, src, p):
+    """2.356.0 A (#2926): the plan of what "office": every part of OFM_OFFICE uid created in organisation office src (the
+    clients' own drafts with them), merged into p; trips of a locked month stay (keep locked)."""
+    p["keep_src"] = 1
+    for w, t in OFM_OFFICE:
+        if w == "contracts":  # no creator of their own: the framework contracts of the clients that move as a whole
+            cids = [x["row"]["id"] for x in p["clients"] if x["mode"] == "move"] or [0]
+            rows = c.execute(f"SELECT * FROM office_contracts WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) ORDER BY id",
+                             (src, *cids)).fetchall()
+        else:
+            q = "SELECT * FROM clients WHERE org_id=? AND created_by=? AND archived=0 ORDER BY id" if w == "clients" else \
+                f"SELECT * FROM {t} WHERE org_id=? AND created_by=? ORDER BY id"
+            rows = c.execute(q, (src, uid)).fetchall()
+        if w == "drafts":  # the drafts of a moving client came with it, its issued documents are counted there
+            cids = {x["row"]["id"] for x in p["clients"]}
+            done = {d["id"] for d in p["docs"]}
+            rows = [r for r in rows if r["id"] not in done and not r["trial"] and r["client_id"] not in cids]
+        if w == "travel":
+            ok = []
+            for r in rows:
+                try:
+                    _trip_need_open(c, src, r)
+                    ok.append(r)
+                except Denied:
+                    p["keep"]["locked"] = p["keep"].get("locked", 0) + 1
+            rows = ok
+        if not rows:
+            continue
+        sub = ofm_plan(c, uid, w, src, rows, own=True)
+        for k in ("docs", "clients", "trips", "tpls", "meals"):
+            p[k] += sub[k]
+        if sub.get("ctr"):
+            p.setdefault("ctr", []).extend(sub["ctr"])
+        p["detach"] += sub["detach"]
+        if w in ("drafts", "travel"):  # the drafts / trips that lose a client of the organisation
+            p["unclient" if w == "drafts" else "unclient_trips"] = sub["unclient"]
+        for k, n in sub["keep"].items():
+            p["keep"][k] = p["keep"].get(k, 0) + n
+
+
 def ofm_notes(c, what, p, copy):
     notes, block = [], None
-    if what == "clients":
+    if what == "office":  # 2.356.0 A (#2926)
+        notes.append(tr("Only what you created in this office moves; the drafts of the others, the cash book, the books and the bank stay"))
+    if p["clients"]:
         cl = p["clients"]
         moved = sum(1 for x in cl if x["mode"] == "move")
         ks = sum(len(x["contacts"]) for x in cl)
         notes.append(trn("{0} client moves", "{0} clients move", moved) if moved else "")
         for x in [x for x in cl if x["mode"] == "copy"][:8]:
             n = len(x["issued"]) + len(x["arch"])
+            if p.get("keep_src"):  # 2.356.0 A (#2926): the organisation goes on using it
+                notes.append(tr("“{0}” is still used in the organisation: it stays there and is created anew in your personal office", x["row"]["name"]))
+                continue
             notes.append(trn("“{1}” stays archived in the old workspace for {0} issued document and is created anew in the target",
                              "“{1}” stays archived in the old workspace for {0} issued documents and is created anew in the target", n, x["row"]["name"])
                          if n else tr("“{0}” is still used in the old workspace (projects, trips or deals): it stays there archived and is created anew in the target",
@@ -367,12 +557,12 @@ def ofm_notes(c, what, p, copy):
         if refs:  # 2.273.0 B (#3051): what ofm_move_doc clears is named before
             notes.append(trn("{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)",
                              "{0} drafts lose their links in the old workspace (project, framework contract, earlier version or source document)", refs))
-    if what == "drafts" and p["unclient"]:
+    if what in ("drafts", "office") and p["unclient"]:
         notes.append(trn("{0} draft loses its client (the address stays in it)", "{0} drafts lose their client (the address stays in them)", p["unclient"]))
     if p["trips"]:
         notes.append(trn("{0} trip moves with its receipts", "{0} trips move with their receipts", len(p["trips"])))
-        if p["unclient"]:
-            notes.append(trn("{0} trip loses its client", "{0} trips lose their client", p["unclient"]))
+        if p.get("unclient_trips", p["unclient"]):
+            notes.append(trn("{0} trip loses its client", "{0} trips lose their client", p.get("unclient_trips", p["unclient"])))
     if p["meals"]:  # 2.119.0 A (#2288)
         notes.append(trn("{0} entertainment receipt moves with its bill", "{0} entertainment receipts move with their bills", len(p["meals"])))
     if p["tpls"]:
@@ -381,6 +571,8 @@ def ofm_notes(c, what, p, copy):
             notes.append(trn("{0} document made from it keeps its text and stays", "{0} documents made from them keep their text and stay", p["detach"]))
     if p.get("ctr"):
         notes.extend(rmv_notes(p))  # 2.119.1 C (#2298)
+    if what in OFM_SIMPLE:
+        notes.extend(ofm_simple_notes(p))  # 2.356.0 A (#2926)
     k = p["keep"]
     if k.get("issued"):
         notes.append(trn("{0} issued document stays in the old workspace (retention)", "{0} issued documents stay in the old workspace (retention)", k["issued"]))
@@ -390,9 +582,11 @@ def ofm_notes(c, what, p, copy):
         notes.append(trn("{0} draft stays: it has payments, a sign-off link or billed receipts there", "{0} drafts stay: they have payments, sign-off links or billed receipts there", k["linked"]))
     if k.get("trip"):
         notes.append(trn("{0} trip stays: receipts of it are in DATEV or billed", "{0} trips stay: receipts of them are in DATEV or billed", k["trip"]))
+    if k.get("locked"):  # 2.356.0 A (#2926)
+        notes.append(trn("{0} trip stays: it lies in a locked month", "{0} trips stay: they lie in a locked month", k["locked"]))
     if k.get("meal"):  # 2.119.0 A (#2288)
         notes.append(trn("{0} entertainment receipt stays: it is approved (retention)", "{0} entertainment receipts stay: they are approved (retention)", k["meal"]))
-    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"] or p["meals"] or p.get("ctr")):
+    if not (p["clients"] or p["docs"] or p["trips"] or p["tpls"] or p["meals"] or p.get("ctr") or p["simple"]):
         block = tr("Nothing here can move: issued documents and receipts stay where they were issued")
     return notes, block
 
@@ -514,7 +708,7 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
                 if "import_run_id" in kr:
                     kr["import_run_id"] = None
                 kmap[k["id"]] = insert_id(c, f"INSERT INTO office_client_contacts({','.join(kr)}) VALUES({','.join('?' * len(kr))})", list(kr.values()))
-            if not r["archived"]:
+            if not r["archived"] and not p.get("keep_src"):  # 2.356.0 A (#2926): the organisation's own copy stays active
                 rec.append({"t": "clients", "id": r["id"], "old": {"archived": 0}, "src": 1})
                 c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (ts, r["id"]))
             if copy:
@@ -549,6 +743,8 @@ def ofm_move_space():
     frm_ws = ofm_ws(c, src)
     to = smv_target(c, uid, b.get("to"))
     smv_same(frm_ws, to)
+    if what == "office" and to is not None:  # 2.356.0 A (#2926)
+        raise BadInput(tr(OFM_OFFICE_TO))
     dst = pb_personal(c, uid) if to is None else to
     ofm_rights(c, uid, what, src, dst, rows)
     deny = ofm_out_denied(c, uid, what, src, to, rows)  # 2.361.2 B (#2923): out of an organisation only by its admin or released
@@ -557,7 +753,8 @@ def ofm_move_space():
     copy = b.get("copy_issued") in (1, True, "1")
     plain = pb_owner(c, src) is None and office_role(c, uid, src) != "admin"  # a plain member out of an organisation
     p = ofm_plan(c, uid, what, src, rows, own=plain)
-    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) + len(p["meals"]) + len(p.get("ctr", ())) > SMV_MAX:
+    if sum(len(x["contacts"]) + 1 for x in p["clients"]) + len(p["docs"]) + len(p["trips"]) + len(p["tpls"]) + len(p["meals"]) + len(p.get("ctr", ())) \
+            + sum(1 + sum(len(v) for v in x["kids"].values()) for x in p["simple"]) > SMV_MAX:
         raise BadInput(tr("Too many at once"))
     notes, block = ofm_notes(c, what, p, copy and not plain)
     if copy and plain:  # copies of an organisation's issued documents: its office admin only
@@ -566,7 +763,7 @@ def ofm_move_space():
     counts = {"clients": len(p["clients"]), "copied": sum(1 for x in p["clients"] if x["mode"] == "copy"), "drafts": len(p["docs"]),
               "trips": len(p["trips"]), "templates": len(p["tpls"]), "meals": len(p["meals"]), "contacts": sum(len(x["contacts"]) for x in p["clients"]),
               "issued": sum(len(x["issued"]) + len(x["arch"]) for x in p["clients"]) + p["keep"].get("issued", 0),
-              "stay": sum(p["keep"].values()), "contracts": len(p.get("ctr", ()))}
+              "stay": sum(p["keep"].values()), "contracts": len(p.get("ctr", ())), "entries": len(p["simple"])}
     notes.append(oo_into_note(c, frm_ws, to))  # 2.361.2 B (#2923): the way back (empty unless a member moves it in)
     if b.get("dry"):
         if deny:  # 2.361.2 B (#2923): the maker can ask an admin (out_request)
@@ -584,8 +781,9 @@ def ofm_move_space():
     rec, made, files, old_files = [], [], [], []
     try:
         cmap, kmap = {}, {}
-        if what == "clients":
+        if p["clients"]:  # 2.356.0 A (#2926): also the clients of what "office"
             cmap, kmap = ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm)
+            p["cmap"] = cmap if what == "office" else {}
         for r in p["docs"]:
             ofm_move_doc(c, rec, r, src, dst, cmap, kmap, ts)
         for r in p["trips"]:
@@ -610,6 +808,8 @@ def ofm_move_space():
             ofm_detach(c, rec, "office_gen_docs", "template_id", r["id"], "office_doc_templates")
         if p.get("ctr"):  # 2.119.1 C (#2298)
             rmv_move(c, uid, p, src, dst, rec, made, files, ts)
+        if p["simple"]:  # 2.356.0 A (#2926)
+            ofm_move_simple(c, uid, p, src, dst, rec, made, ts)
         detail = {"src": src, "dst": dst, "what": what, "ids": ids, "copy": 1 if copy else 0, "rows": rec, "made": made, "at": ts}
         mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES(?,?,?,?,?,?,?)",
                         (f"office_{what}", ids[0], frm_ws, to, uid, ts, json.dumps(detail, default=str)))
@@ -686,6 +886,10 @@ def rmv_undo_run(c, uid, mid, files):
             hold = ofm_doc_hold if r["t"] == "office_docs" else ofm_trip_hold if r["t"] == "office_trips" else ofm_meal_hold  # 2.119.0 A (#2288)
             if cur and (cur["org_id"] or None) == (r.get("org") or None) and hold(c, cur):
                 raise Denied(409, tr("Cannot be undone: a document was issued in the target since"))
+        if r["t"] == "office_vehicles" and not r.get("detach") and not r.get("src"):  # 2.356.0 (#2926, review N1): as on the way there
+            days = [x[0] for x in c.execute("SELECT day FROM office_drives WHERE vehicle_id=? AND org_id=?", (r["id"], dst))]
+            period_need_open(c, dst, *days)
+            period_need_open(c, src, *days)
     for r in reversed(d.get("rows") or []):
         t, rid, old = r["t"], r["id"], dict(r.get("old") or {})  # the detail is the server's own record
         cur = c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone()
@@ -729,6 +933,13 @@ def rmv_undo_run(c, uid, mid, files):
                     if (kt, k["id"]) not in seen:  # 2.273.0 F1 (#3042): + the target's service / list end, as on the way there
                         clr = {"service_id": None, "list_id": None} if kt == "office_doc_items" else {}
                         ofm_set(c, kt, k["id"], {"org_id": src, **clr, **ofm_reseal(c, kt, k, dst, src)})
+        if t == "office_vehicles":  # 2.356.0 A (#2926): drives entered in the target since go back with the vehicle (+ their log)
+            seen = {(x["t"], x["id"]) for x in d.get("rows") or []}
+            for k in c.execute("SELECT * FROM office_drives WHERE vehicle_id=? AND org_id=? ORDER BY id", (rid, dst)).fetchall():
+                if ("office_drives", k["id"]) not in seen:
+                    ofm_set(c, "office_drives", k["id"], {"org_id": src, "client_id": None, "trip_id": None, **ofm_reseal(c, "office_drives", k, dst, src)})
+                    for lg in c.execute("SELECT * FROM office_drive_log WHERE drive_id=? AND org_id=? ORDER BY id", (k["id"], dst)).fetchall():
+                        ofm_set(c, "office_drive_log", lg["id"], {"org_id": src, **ofm_reseal(c, "office_drive_log", lg, dst, src)})
         if t == "office_contracts" and not r.get("src"):
             # 2.119.1 review F8 (#2298): PDFs added in the target since go back with the contract (copied into the source's
             # folder with its key); the deleted ones stay in the target's trash, where its purge removes them
@@ -757,6 +968,8 @@ def rmv_undo_run(c, uid, mid, files):
                     cl_trash(c, m["id"])
         elif m["t"] in ("office_contracts", "office_contract_files", "office_texts"):
             kept += rmv_unmake(c, m, dst, gone)  # 2.119.1 C (#2298)
+        elif m["t"] in {v[0] for v in OFM_SIMPLE.values()} | {"office_drive_closed"}:
+            rmv_unmake(c, m, dst, gone)  # 2.356.0 A (#2926): a copy the target uses since stays
     if out:  # 2.361.2 B (#2923): logged, admins told, release used
         t = "clients" if what == "clients" else OFM_TABLE[what]
         org_out(c, dst, x["from_org"], what, ofm_out_name(what, c.execute(f"SELECT * FROM {t} WHERE id IN ({','.join('?' * len(out))})", out).fetchall()),
@@ -819,7 +1032,7 @@ def rmv_notes(p):
                                             x["row"]["name"]))
     n = sum(x["drafts"] for x in cs)
     notes.append(trn("{0} draft loses its framework contract", "{0} drafts lose their framework contract", n) if n else "")
-    n = sum(1 for x in cs if x["row"]["client_id"])
+    n = 0 if p.get("keep_src") else sum(1 for x in cs if x["row"]["client_id"])  # 2.356.0 A (#2926): "office" takes the client along
     notes.append(trn("{0} framework contract loses its client (clients stay in their workspace)",
                      "{0} framework contracts lose their client (clients stay in their workspace)", n) if n else "")
     return notes
@@ -873,7 +1086,8 @@ def rmv_move(c, uid, p, src, dst, rec, made, files, ts):
     cols = sorted(table_columns(c, "office_contracts") - {"id"})
     for x in p["ctr"]:
         r = x["row"]
-        extra = {"client_id": None, "updated_at": ts, **rmv_texts(c, r, src, dst, tmap, made)}
+        # 2.356.0 A (#2926): with what "office" the contract keeps its client when that moves along (p["cmap"])
+        extra = {"client_id": p.get("cmap", {}).get(r["client_id"]), "updated_at": ts, **rmv_texts(c, r, src, dst, tmap, made)}
         if x["mode"] == "move":
             ofm_move_row(c, rec, "office_contracts", r, src, dst, dst, extra)
             ofm_detach(c, rec, "office_docs", "contract_id", r["id"], "office_contracts")

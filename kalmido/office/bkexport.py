@@ -22,6 +22,7 @@ from ..core.config import app
 from ..core.db import db, local_now
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput
+from .books import bk_gaps_text
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 
@@ -74,9 +75,9 @@ def _fx(r, home):
     return bk_fx(r, home)
 
 
-def bx_rows(c, oid, frm, to):
-    """-> (rows, docs, receipts): rows = dicts of BX_COLS (amounts as Decimal), docs = [(doc id, row)] of the issued
-    documents, receipts = [(node id, row)] of the receipt files."""
+def bx_rows(c, oid, frm, to, gaps=None):
+    """-> (rows, docs, receipts): rows = dicts of BX_COLS (amounts as Decimal), docs = [(doc id, row, [its list rows])] of the
+    issued documents, receipts = [(node id, row)] of the receipt files. gaps: see books.bk_receipts (2.356.0, #3097)."""
     from .books import _home, bk_payments, bk_receipts
     from .pdfweb import epdf_name
     from .travel import rk_cat_label, rk_trips
@@ -89,7 +90,7 @@ def bx_rows(c, oid, frm, to):
         t, fx, sign = _j(r["totals"]), _fx(r, home), (-1 if r["kind"] == "credit" else 1)
         who = (_j(r["recipient"]).get("name") or r["bx_client"] or "").strip()
         f = "documents/" + epdf_name(r) + ".pdf"
-        parts = []
+        parts, mine = [], []
         if (r["vat_mode"] or "vat") != "novat":
             for tl in t.get("tax_lines") or []:
                 parts.append((dec(tl.get("pct") or 0), dec(tl.get("base") or 0), dec(tl.get("amount") or 0)))
@@ -99,12 +100,13 @@ def bx_rows(c, oid, frm, to):
             net, tx = money(base / fx) * sign, money(tax / fx) * sign
             rows.append({"type": r["kind"], "date": r["date"], "number": r["number"], "counterparty": who, "text": r["project_title"] or "",
                          "category": "", "tax_pct": pct.normalize(), "net": net, "tax": tx, "gross": net + tx, "currency": home, "file": f})
-        docs.append((r["id"], r))
+            mine.append(rows[-1])
+        docs.append((r["id"], r, mine))
     for p, r in bk_payments(c, oid, frm, to, home):
         a = money(dec(p["amount"]) / _fx(r, home)) * (-1 if r["kind"] == "credit" else 1)
         rows.append({"type": "payment", "date": p["date"], "number": r["number"], "counterparty": (_j(r["recipient"]).get("name") or "").strip(),
                      "text": "", "category": "", "tax_pct": "", "net": "", "tax": "", "gross": a, "currency": home, "file": ""})
-    for rc in bk_receipts(c, oid, frm, to, by="doc"):
+    for rc in bk_receipts(c, oid, frm, to, by="doc", gaps=gaps):
         rows.append({"type": "receipt", "date": rc["date"], "number": "", "counterparty": "", "text": rc["title"], "category": rc["category"],
                      "tax_pct": dec(rc["vat_pct"]) if rc["vat_pct"] is not None else "", "net": -rc["net"], "tax": -rc["vat"],
                      "gross": -rc["amount"], "currency": home, "file": rc["title"] or ""})
@@ -155,9 +157,11 @@ def bx_export():
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     frm, to = _period()
-    rows, docs, recs = bx_rows(c, oid, frm, to)
-    if request.args.get("check"):
-        return jsonify(**{"from": frm, "to": to}, rows=len(rows), documents=len(docs), receipts=len(recs))
+    gaps = {}
+    rows, docs, recs = bx_rows(c, oid, frm, to, gaps)
+    if request.args.get("check"):  # 2.356.0 (#3097): + what the export leaves out
+        return jsonify(**{"from": frm, "to": to}, rows=len(rows), documents=len(docs), receipts=len(recs),
+                       no_date=len(gaps.get("no_date") or ()), no_amount=len(gaps.get("no_amount") or ()), hidden=gaps.get("hidden", 0))
     stem = f"{tr('bookings')}-{frm}-{to}"
     want_zip = request.args.get("zip") == "1"
     ofx_log(c, oid, "export", target="books", detail={"what": "export.zip" if want_zip else "export.csv", "from": frm, "to": to, "rows": len(rows)})
@@ -166,19 +170,21 @@ def bx_export():
         c.commit()
         return Response(data, mimetype="text/csv; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{stem}.csv"', "Cache-Control": "no-store"})
-    path = bx_zip(c, oid, rows, docs, recs, stem)
+    path = bx_zip(c, oid, rows, docs, recs, stem, gaps)
     c.commit()
     from ..files.bulk import abm_send_zip
     return abm_send_zip(path, stem + ".zip")
 
 
-def bx_zip(c, oid, rows, docs, recs, stem):
-    """The ZIP in a temporary file (the limits of the files ZIP; Denied(413) before anything is sent, no half ZIP)."""
+def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
+    """The ZIP in a temporary file (the limits of the files ZIP; Denied(413) before anything is sent, no half ZIP).
+    2.356.0 (#3097): the list's "file" column is the name inside the ZIP; files that cannot be read and receipts left out
+    (gaps) are named in missing.txt instead of being skipped silently."""
     from ..files.bulk import ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique
     from ..files.store import fs_read
     from .pdfweb import epdf_doc_files
-    if len(docs) * 2 + len(recs) + 1 > ABM_ZIP_MAX_FILES:
-        raise Denied(413, abm_too_big(len(docs) * 2 + len(recs) + 1, 0))
+    if len(docs) * 2 + len(recs) + 2 > ABM_ZIP_MAX_FILES:  # + the list and missing.txt
+        raise Denied(413, abm_too_big(len(docs) * 2 + len(recs) + 2, 0))
     fd, path = tempfile.mkstemp(prefix="kalmido-books-", suffix=".zip")
     if not ABM_BUSY.acquire(blocking=False):
         os.close(fd)
@@ -188,20 +194,29 @@ def bx_zip(c, oid, rows, docs, recs, stem):
     try:
         with os.fdopen(fd, "wb") as f, zipfile.ZipFile(f, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
             taken = {"documents": set(), "receipts": set()}
-            for did, r in docs:
+            missing = []
+            for did, r, mine in docs:
                 try:
                     files = epdf_doc_files(c, oid, did)
                 except (OSError, Denied, BadInput):
-                    continue  # a damaged stored file: the list names it, the rest still comes
+                    missing.append((tr("Invoice"), r["number"]))  # a damaged stored file: named in missing.txt, the rest still comes
+                    for row in mine:
+                        row["file"] = ""
+                    continue
                 for name, data, _mime in files:
                     size += len(data)
                     if size > cap:
                         raise Denied(413, abm_too_big(0, size))
-                    z.writestr("documents/" + abm_unique(_zip_part(name), taken["documents"]), data)
+                    zn = "documents/" + abm_unique(_zip_part(name), taken["documents"])
+                    z.writestr(zn, data)
+                    if name.endswith(".pdf"):
+                        for row in mine:
+                            row["file"] = zn
             for nid, row in recs:  # 2.306.0 D2 (#2875): recs = bk_receipts of the signed-in person (fs_role filtered there)
                 try:
                     data = fs_read(c, nid)  # sc_guard inside: a file found infected stays out, the list keeps the line
                 except (OSError, Denied):
+                    missing.append((tr("Receipt"), row["file"] or str(nid)))
                     row["file"] = ""
                     continue
                 n = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
@@ -212,6 +227,9 @@ def bx_zip(c, oid, rows, docs, recs, stem):
                     raise Denied(413, abm_too_big(0, size))
                 z.writestr(row["file"], data)
             z.writestr(stem + ".csv", bx_csv(c, oid, rows).encode("utf-8"))
+            note = bk_gaps_text(gaps or {}, missing)
+            if note:
+                z.writestr(tr("missing") + ".txt", note.encode("utf-8"))
     except BaseException:
         os.unlink(path)
         raise

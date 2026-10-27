@@ -24,6 +24,8 @@ function shxUiImport(space, lid) {
   inp.type = 'file'; inp.accept = '.csv,.tsv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   inp.onchange = async () => {
     const f = inp.files?.[0]; if (!f) return;
+    const l = lid && typeof listById === 'function' ? listById(lid) : null;  // 2.356.0 B (#2934): the target in words (#1940)
+    if (!await importTargetConfirm({what: tr('the data of the file'), ws: sp, place: l ? lname(l) : tr('Tables')})) return;
     const fd = new FormData(); fd.append('file', f); fd.append('space', sp); if (lid) fd.append('list_id', String(lid));
     let r; try { r = await rawFetch('POST', '/api/sheets/import', fd); } catch (e) { toast(e.message); return; }
     const id = r.sheet.id, title = r.sheet.title || '';

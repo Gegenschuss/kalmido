@@ -362,6 +362,8 @@ function pg_actions(add) {
   }, {sub: tr('Settings: {0}', tr('Agents'))});
   if (!S.me?.kid && clientsOn()) add('a:cl-new', 'action', tr('Add client'), 'brief', () => clientModal(null), {sub: tr('Clients')});
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
+    add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
+  if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_newDialog('invoice')), {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');

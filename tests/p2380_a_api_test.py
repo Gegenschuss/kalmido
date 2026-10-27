@@ -351,7 +351,10 @@ check(A.get(B + f"{D}/{OFF}").json()["can_delete"] is False and A.delete(B + f"{
       "sent quotation an invoice was made from: delete 409 (also in the 2.144.8 #2573 test phase)")
 r = A.post(B + f"{D}/{OFF}/duplicate")
 check(r.status_code == 201 and r.json()["can_edit"] is True and r.json()["status"] == "draft", "sent quotation: duplicate = a new editable draft")
-check(A.post(B + f"{D}/{OFF}/invoice").status_code == 201, "an invoice can still be made from the sent quotation")
+# 2.356.0 (#3003): the quotation has an invoice already -> 409 invoice_exists, a further one with force
+r = A.post(B + f"{D}/{OFF}/invoice")
+check(r.status_code == 409 and r.json().get("code") == "invoice_exists", "a second invoice from the sent quotation asks first " + r.text[:120])
+check(A.post(B + f"{D}/{OFF}/invoice", json={"force": True}).status_code == 201, "an invoice can still be made from the sent quotation")
 
 # ---------------------------------------------------------------- an invoice from time entries
 r = A.post(B + "/api/lists", json={"name": "Projekt Film"})

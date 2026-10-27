@@ -36,7 +36,10 @@ const TEST_IBAN = 'DE02120300000000202051';
   check(offer.http === 201 && offer.number, 'a quotation ' + offer.http);
   const inv = await call('POST', `/api/office/docs/${offer.id}/invoice`);
   check(inv.http === 201 && inv.kind === 'invoice' && inv.number === '' && inv.order_ref === 'PO-77', 'an invoice draft from the quotation ' + inv.http);
-  const inv2 = await call('POST', `/api/office/docs/${offer.id}/invoice`);
+  // 2.356.0 (#3003): a second full invoice from the same quotation asks first (409 invoice_exists), then force
+  const ask2 = await call('POST', `/api/office/docs/${offer.id}/invoice`);
+  check(ask2.http === 409 && ask2.code === 'invoice_exists', 'a second invoice from the quotation asks first ' + ask2.http);
+  const inv2 = await call('POST', `/api/office/docs/${offer.id}/invoice`, {force: true});
   const fin = await call('POST', `/api/office/docs/${inv2.id}/finalize`);
   check(fin.http === 200 && fin.number === 'RE-2026-001' && fin.status === 'issued', 'second invoice finalised ' + fin.http + ' ' + JSON.stringify(fin.error || fin.number));
   const pay = await call('POST', `/api/office/docs/${inv2.id}/payments`, {date: '2026-10-01', amount: 1000, method: 'transfer'});
