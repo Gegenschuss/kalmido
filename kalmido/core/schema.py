@@ -3669,6 +3669,7 @@ CREATE INDEX IF NOT EXISTS ix2281_office_equipment_agreement_id ON office_equipm
 CREATE INDEX IF NOT EXISTS ix2281_office_payments_reverses_id ON office_payments(reverses_id) WHERE reverses_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_office_signoffs_gen_doc_id ON office_signoffs(gen_doc_id) WHERE gen_doc_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_tchat_rooms_created_by ON tchat_rooms(created_by) WHERE created_by IS NOT NULL;
+CREATE INDEX IF NOT EXISTS office_gen_docs_sign_uid ON office_gen_docs(sign_uid) WHERE sign_uid IS NOT NULL;  -- CI of 2.361.2: the FK of 2.357.0 C (#3158)
 CREATE INDEX IF NOT EXISTS tasks_completed_by ON tasks(completed_by, completed_at) WHERE completed_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS templates_user ON templates(user_id);
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);

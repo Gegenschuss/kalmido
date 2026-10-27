@@ -3,7 +3,8 @@
 Invented names and amounts only.
  - the office setting accept_on is on by default; a new quotation follows it (accept_on null, accept_print 1) and its PDF
    carries the order confirmation; setting off = no block; per quotation 1 / 0 wins over the setting either way
- - the reference line to the rights appendix stands exactly once, with and without the block
+ - the reference line to the rights appendix stands exactly once, with and without the block, when the appendix has a page of
+   its own; 2.357.0 C (#3182): an appendix that fits on the last page stands there without the reference line
  - a finalised quotation keeps the value it was finalised with: changing the setting later changes its PDF not; a
    finalised quotation cannot be switched (409)
  - a member without office admin rights cannot change the setting (403, unchanged)
@@ -48,6 +49,17 @@ def pdf_text(S, did):
     if r.status_code != 200 or not r.content.startswith(b"%PDF"):
         return None
     return squash("\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(r.content)).pages))
+
+
+def see_ok(S, did):
+    """The reference line once when the rights appendix has a page of its own, none when it stands inline (2.357.0 C, #3182)."""
+    r = S.get(B + f"{D}/{did}/pdf")
+    if r.status_code != 200 or not r.content.startswith(b"%PDF"):
+        return False
+    pages = [squash(p.extract_text() or "") for p in PdfReader(io.BytesIO(r.content)).pages]
+    app = [t for t in pages if "inperpetuity" in t]  # the page with the appendix (its rights text)
+    own = len(app) == 1 and "Concept" not in app[0]  # not on the page with the positions
+    return len(app) == 1 and "".join(pages).count(SEE) == (1 if own else 0)
 
 
 def has_accept(S, did):
@@ -95,11 +107,11 @@ def scenario(S, who):
     check(d.get("accept_on") is None and d.get("accept_print") == 1, f"{who}: a new quotation follows the setting {d.get('accept_on')} {d.get('accept_print')}")
     t = pdf_text(S, q)
     check(t is not None and ACCEPT in t.upper(), f"{who}: setting on = order confirmation in the PDF")
-    check(t is not None and t.count(SEE) == 1, f"{who}: with the block the reference line stands once")
+    check(see_ok(S, q), f"{who}: with the block the reference line stands once (none with the appendix inline)")
     setting(S, 0)
     t = pdf_text(S, q)
     check(t is not None and ACCEPT not in t.upper(), f"{who}: setting off = no order confirmation")
-    check(t is not None and t.count(SEE) == 1, f"{who}: without the block the reference line still stands once")
+    check(see_ok(S, q), f"{who}: without the block the reference line still stands once (none with the appendix inline)")
     check(S.get(B + f"{D}/{q}").json().get("accept_print") == 0, f"{who}: accept_print follows the setting")
     r = S.patch(B + f"{D}/{q}", json={"accept_on": 1})
     check(r.ok and r.json().get("accept_on") == 1 and r.json().get("accept_print") == 1, f"{who}: quotation on {r.text[:200]}")
