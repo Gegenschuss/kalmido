@@ -164,7 +164,7 @@ def olv_notice(c, oid):
 
 @app.post("/api/admin/orgs/<int:oid>/delete-notice")
 def olv_delete_notice(oid):
-    """2.361.0 (#2920): the instance admin tells the members of organisation oid that it is deleted on a day ({days}: 1-90,
+    """2.361.0 (#2920): the instance admin tells the members of this organisation that it is deleted on a day ({days}: 1-90,
     default OLV_NOTICE_DAYS): each gets a News item with that day and what of theirs is in it; deleting waits until then
     (org_delete). DELETE takes the notice back (the members are told)."""
     _need_admin()
@@ -176,7 +176,7 @@ def olv_delete_notice(oid):
         days = 0
     if not 1 <= days <= 90:
         return err(tr("Invalid value: {0}", "days"))
-    with system_ctx(c):
+    with system_ctx(c):  # structure: the mode, the organisation row and its members (instance admin)
         if instance_mode(c) != "workspaces":
             _no_change()
         r = c.execute("SELECT name FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (oid,)).fetchone()

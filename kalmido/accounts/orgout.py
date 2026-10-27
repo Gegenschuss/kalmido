@@ -91,7 +91,14 @@ def org_out(c, oid, to_oid, kind, name, list_id=None, obj=None):
         n = c.execute(f"UPDATE org_out_requests SET state='used' WHERE state='approved' AND id IN ({','.join('?' * len(grants))})", grants).rowcount
         if n != len(set(grants)):  # review: a second move at the same time does not use the same release again
             raise oo_denied(c, oid, to_oid, kind, objs[0])
-    detail = {"kind": kind, "to": "org" if to_oid else "private", **({"released": True} if grants else {})}
+    oo_note(c, oid, real, kind, name, list_id, to="org" if to_oid else "private", released=bool(grants))
+
+
+def oo_note(c, oid, real, kind, name, list_id=None, to="private", back=False, released=False):
+    """The log row (action moveout) and the News to the other admins of a move out of organisation oid (named real).
+    2.361.0 (#2922): back = a list its owner had brought in went back to their private space (accounts/orgs.py org_leave).
+    2.361.2 (#2923): released = a member's released request let it go."""
+    detail = {"kind": kind, "to": to, **({"released": True} if released else {}), **({"back": True} if back else {})}
     c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) VALUES(?,?,?,?,?,?,?,?,?)",
               (oid, list_id, str(name or "")[:200], "moveout", me(), None, None, iso(now_utc()), json.dumps(detail)))
     with system_ctx(c):  # the organisation's other admins (structure)
