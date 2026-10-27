@@ -151,6 +151,7 @@ KINDS = {
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
                         "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
+    "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
@@ -558,6 +559,7 @@ ROUTES = {
     # ---- dav (8)
     "DAV /": "dav", "DAV /.well-known/caldav": "dav", "DAV /.well-known/caldav/": "dav", "DAV /.well-known/carddav": "dav",
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
+    "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
     "GET /api/v1/events/{}": "event", "PATCH /api/v1/events/{}": "event", "DELETE /api/v1/events/{}": "event",

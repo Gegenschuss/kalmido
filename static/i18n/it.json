@@ -14569,5 +14569,14 @@
   "Option: also show here": "Opzione: mostra anche qui",
   "Alt: also show here": "Alt: mostra anche qui",
   "{0} task also in {1}": ["{0} attività anche in {1}", "{0} attività anche in {1}"],
-  "Also show in {0}": "Mostra anche in {0}"
+  "Also show in {0}": "Mostra anche in {0}",
+  "Still syncing, try again in a moment": "Sincronizzazione in corso, riprova tra un momento",
+  "The new task could not be created, the change was not saved": "Non è stato possibile creare la nuova attività, la modifica non è salvata",
+  "The new task could not be created": "Non è stato possibile creare la nuova attività",
+  "{0} change of the previous account on this device is not synced yet": ["{0} modifica dell'account precedente su questo dispositivo non è ancora sincronizzata", "{0} modifiche dell'account precedente su questo dispositivo non sono ancora sincronizzate"],
+  "Signing in with another account deletes them. Cancel signs out again: the previous account can then sign in and send them.": "Accedere con un altro account le elimina. Annulla esce di nuovo: l'account precedente può allora accedere e inviarle.",
+  "Delete and continue": "Elimina e continua",
+  "Files not uploaded: {0}": "File non caricati: {0}",
+  "Offline: the files are uploaded once the task is synced": "Offline: i file vengono caricati appena l'attività è sincronizzata",
+  "Not saved yet, trying again": "Non ancora salvato, nuovo tentativo in arrivo"
 }

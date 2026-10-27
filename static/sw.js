@@ -399,10 +399,14 @@ async function swOutboxSend() {
           body.data = d;
         }
       }
+      // 2.359.0 A (#3023): a temporary id without its real one (its create failed or waits for the app): never sent as such
+      if (/\/-\d+(?=[/?]|$)/.test(url) || (body && [body.parent_id, body.task_id, ...(body.ids || []), ...(body.items || []).map(it => it && it.id)].some(v => typeof v === 'number' && v < 0))) break;
       const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
       if (e.k) opt.headers['Idempotency-Key'] = String(e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice
       if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
       const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
+      // 2.359.0 A (#3023): a server error / too many requests: the browser tries the sync again later (the entry stays first)
+      if (r.status >= 500 || r.status === 429 || r.status === 408) throw new Error('outbox: server error ' + r.status);
       if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) break;  // for the app (its own handling of errors)
       const j = await r.json().catch(() => ({}));
       if (j.conflicts && j.conflicts.length && url === '/api/tasks/batch' && body && body.action === 'complete') { j.conflicts = []; j.skipped = true; }  // 2.270.0 C (#3022): already ticked

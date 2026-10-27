@@ -73,6 +73,7 @@ KINDS = {
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, manifest, share target, QR code)"),
+    "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     # 2.102.0 (#1999)
     "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
                          "nobody into the one project list the server operator chose, nothing is read back or answered"),
@@ -602,6 +603,7 @@ ROUTES = {
     # ---- pim (88)
     "DAV /": "pim", "DAV /.well-known/caldav": "pim", "DAV /.well-known/caldav/": "pim", "DAV /.well-known/carddav": "pim",
     "DAV /.well-known/carddav/": "pim", "DAV /dav": "pim", "DAV /dav/": "pim", "DAV /dav/{}": "pim",
+    "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
     "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
     "DELETE /api/calendars/{}": "pim", "DELETE /api/calendars/{}/events": "pim", "DELETE /api/contacts/{}": "pim",

@@ -1307,6 +1307,9 @@ def bkr_after_restore(c, rows):
     return gone, off, recent
 
 
+_BK_RESEAL = {"bk_pass": "backup", "bko_sec": "backup-offsite"}  # 2.359.0 (#2894): kept settings sealed with auth_secret (offsite.BKO_SEAL)
+
+
 def bk_restore(path, pw, admin, via):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
     from .worker import WRK_REPLICAS, WRK_ROLE
@@ -1328,6 +1331,14 @@ def bk_restore(path, pw, admin, via):
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
+            # 2.359.0 (#2894): the passphrase and the off-site secrets are sealed with this instance's auth_secret, but the
+            # restore brings the auth_secret of the backup: open them now, seal them again with the restored one below
+            plain = {}
+            for k, purpose in _BK_RESEAL.items():
+                try:
+                    plain[k] = unseal(cur, purpose, keep.get(k) or "")
+                except (InvalidTag, ValueError):
+                    pass  # unreadable already: kept as it is (the settings page asks for it again)
             ver = int(gsetting(cur, "version") or 0)
             journal = bkr_read(cur)  # 2.152.0 B (#2172)
             # 2.273.0 A (#3051 p. 12): the queue is never in a backup (#2220): what waits now is gone after the restore
@@ -1363,7 +1374,7 @@ def bk_restore(path, pw, admin, via):
             try:
                 with _pg.system_ctx(c):  # every session of every organisation ends
                     for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
-                        gset(c, k, v)
+                        gset(c, k, seal(c, _BK_RESEAL[k], plain[k]) if plain.get(k) else v)  # 2.359.0 (#2894)
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now

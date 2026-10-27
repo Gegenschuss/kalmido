@@ -681,6 +681,22 @@ r = restore(name=enc["name"], passphrase="correct horse battery")
 A = sess("alice")
 check(r.ok and "after encrypted backup" not in titles(A), "restore of the encrypted backup with its passphrase")
 check(len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "encrypted round trip: both organisations' lists")
+# 2.359.0 (#2894): a backup with another server key (auth_secret, e.g. from the old server of a move): the passphrase and
+# the off-site secrets set here are sealed with this server's key and must stay readable after the restore
+check(state()["passphrase_set"], "#2894: passphrase readable before (this also loads the server's sign-in key into memory)")
+dbx("UPDATE settings SET value=? WHERE key='auth_secret'", (os.urandom(32).hex(),))  # only the dump gets it; the app keeps its key in memory
+had = {x["name"] for x in state()["items"]}
+j = backup_now()
+new = [x for x in j["items"] if x["name"] not in had]
+check(not j["last_error"] and j["passphrase_set"] and new and new[0]["encrypted"], f"#2894: encrypted backup carrying another server key: {j['last_error']}")
+r = restore(name=new[0]["name"]) if new else None
+A = sess("alice")
+j = state()
+check(r is not None and r.ok and j["passphrase_set"], f"#2894: after a restore with another server key the saved passphrase is still readable: {r.text[:160] if r is not None else ''}")
+had = {x["name"] for x in j["items"]}
+j = backup_now()
+check(not j["last_error"] and any(x["encrypted"] for x in j["items"] if x["name"] not in had),
+      f"#2894: an encrypted backup works right after that restore: {j['last_error']}")
 r = A.patch(B + "/api/admin/backups", json={"encrypt": False})
 check(r.ok and not r.json()["encrypt"], "encryption off again")
 

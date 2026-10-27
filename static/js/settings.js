@@ -844,7 +844,20 @@ function settingsModal(focus) {
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
-  onRemove(md, () => { if (!md._noflush) flush(); });
+  // 2.359.0 A (#3024): the page goes away within the 0.9 s of typing: the text fields waiting are sent with keepalive (core.js
+  // keepSend; settings have no queue: a later change elsewhere is not overwritten at the next start)
+  const leave = () => {
+    for (const id of [...pend.keys()]) {
+      clearTimeout(pend.get(id)); pend.delete(id);
+      const el = $('#' + id, md); if (!el) continue;
+      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) keepSend('PATCH', '/api/me', {display_name: v}); continue; }
+      const d = SETS[id], v = d && setVal(el, d[2]);
+      if (d && d[2] === 'time' && id === 's-allday' && !v) continue;  // 2.359.0 (review): the same guard as saveEl
+      if (v !== undefined && String(v) !== String(S.settings[d[0]] ?? '')) keepSend('PATCH', '/api/settings', {[d[0]]: v});
+    }
+  };
+  addEventListener('pagehide', leave);
+  onRemove(md, () => { removeEventListener('pagehide', leave); if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } } });
   md.addEventListener('click', e => { if (e.target.closest('[data-m="s-index"]')) { idx(true); $('.snav [data-sec]', md)?.focus(); } });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it

@@ -211,6 +211,7 @@ async function submitQuick(input, extra = {}) {
     const tt = t.title || '', tq = tr('“{0}”|quoted', toastClip(tt));  // 2.25.0 (UX-31): which task, where it went
     toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
+  if (d.files?.length && created?.id < 0 && await qfKeep(created.id, d.files)) { toast(tr('Offline: the files are uploaded once the task is synced')); return; }  // 2.359.0 A (#3023)
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
   const again = document.body.contains(input) ? input : $('#' + input.id); if (again) again.focus();
 }

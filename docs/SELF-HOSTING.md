@@ -512,6 +512,17 @@ docker compose up -d kalmido
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
 
+- **The server key is part of every backup (2.359.0).** A backup holds the data, never the server key
+  (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
+  copy of the key apart from the backups (a password manager). To restore on another server (a move, a new disk, a lost
+  server), put the old key in place **before the new server's first start**: in `.env` as `KALMIDO_SECRET_KEY=…`, or as the
+  file `secret/kalmido.key`. Then start it and restore the backup. Restored with a different key, the database comes back but
+  attachments, private files, organisation files, office documents and fields and the wiki history cannot be decrypted
+  (the app answers with the code `orgcrypt`); with the old key back in place they are readable again. Account keys have
+  no recovery key: without the old server key private files are lost for good. The backup passphrase and the off-site
+  access data set on the restoring server stay usable after the restore (2.359.0; before, encrypted backups failed until
+  the passphrase was entered again).
+
 - **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
   archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
   the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of every restore,
@@ -1707,9 +1718,13 @@ Notes:
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
 2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`):
-   without it, stored secrets (repository tokens, sign-on client secret) cannot be decrypted and must be
-   entered again.
+   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+   **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
+   with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
+   and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
+   have no recovery key, so private files cannot be brought back any other way, and the export of an office refuses
+   without the key. Put the key in place on the new server *before* its first start (see
+   [Backup and encryption](#backup-and-encryption)).
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,
    tasks; `GET /api/v1/admin/status` with an admin token) against the old server.
 4. **Switch DNS.** Old answers stay cached for a while: test the new server directly with

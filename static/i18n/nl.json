@@ -14569,5 +14569,14 @@
   "Option: also show here": "Option: ook hier tonen",
   "Alt: also show here": "Alt: ook hier tonen",
   "{0} task also in {1}": ["{0} taak ook in {1}", "{0} taken ook in {1}"],
-  "Also show in {0}": "Ook in {0} tonen"
+  "Also show in {0}": "Ook in {0} tonen",
+  "Still syncing, try again in a moment": "Wordt nog gesynchroniseerd, probeer het zo opnieuw",
+  "The new task could not be created, the change was not saved": "De nieuwe taak kon niet worden aangemaakt, de wijziging is niet opgeslagen",
+  "The new task could not be created": "De nieuwe taak kon niet worden aangemaakt",
+  "{0} change of the previous account on this device is not synced yet": ["{0} wijziging van het vorige account op dit apparaat is nog niet gesynchroniseerd", "{0} wijzigingen van het vorige account op dit apparaat zijn nog niet gesynchroniseerd"],
+  "Signing in with another account deletes them. Cancel signs out again: the previous account can then sign in and send them.": "Aanmelden met een ander account verwijdert ze. Annuleren meldt weer af: het vorige account kan zich dan aanmelden en ze versturen.",
+  "Delete and continue": "Verwijderen en doorgaan",
+  "Files not uploaded: {0}": "Niet geüploade bestanden: {0}",
+  "Offline: the files are uploaded once the task is synced": "Offline: de bestanden worden geüpload zodra de taak is gesynchroniseerd",
+  "Not saved yet, trying again": "Nog niet opgeslagen, wordt opnieuw geprobeerd"
 }

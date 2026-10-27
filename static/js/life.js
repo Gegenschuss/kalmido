@@ -546,6 +546,14 @@ document.addEventListener('input', e => {
   const el = e.target, s = $('.rvsaved'); if (s) s.textContent = '';
   clearTimeout(RV.t); RV.t = setTimeout(() => rvSave(el.dataset.day, {text: el.value}), 700);
 });
+// 2.359.0 A (#3024): the page goes away within the 0.7 s of typing: the entry goes into the queue and out with keepalive (core.js
+// outKeep, same key); a change elsewhere meanwhile = 409 when it is sent, the text then waits in the conflicts dialog
+window.addEventListener('pagehide', () => {
+  const el = $('#rv-text'), r = RV.data; if (!RV.t || !el || !r?.journal) return;
+  clearTimeout(RV.t); RV.t = null;
+  const day = el.dataset.day, cur = r.journal.find(x => x.day === day) || {mood: null, updated_at: ''};
+  outKeep('PUT', `/api/life/journal/${day}`, {text: el.value, mood: cur.mood ?? null, expect_updated_at: cur.updated_at || ''});
+});
 document.addEventListener('focusout', e => { if (e.target.id === 'rv-text' && RV.t) { clearTimeout(RV.t); RV.t = null; rvSave(e.target.dataset.day, {text: e.target.value}); } });
 
 // ---- clicks

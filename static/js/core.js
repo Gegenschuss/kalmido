@@ -411,8 +411,10 @@ function obxAdopt() {
   const old = LS.get('outbox', null);
   if (!Array.isArray(old) || !old.length) return;
   const have = new Set(OUT.q.map(x => x.k)), n0 = Math.min(obxSeq(), ...OUT.q.map(x => x.n));
-  const add = old.map((x, i) => ({...x, k: x.k || outKey(), n: n0 - old.length + i})).filter(x => !have.has(x.k));
-  OUT.q = [...add, ...OUT.q];
+  const add = old.map((x, i) => ({...x, k: x.k || outKey(), n: x.n ?? n0 - old.length + i})).filter(x => !have.has(x.k));
+  // 2.359.0 (#3024, review): what outStash put there carries its number (a newer change): after the queue, never before it
+  const late = add.filter(x => x.n > n0);
+  OUT.q = [...add.filter(x => !late.includes(x)), ...OUT.q, ...late.sort((a, b) => a.n - b.n)];
   obxWrite(add.map(obxRec), []).then(() => LS.del('outbox'), () => {});
 }
 function obxSave(fn) {
@@ -453,6 +455,7 @@ async function obxDrain() {
     OBX.st.setMeta('swres', undefined).catch(() => {});
     setTimeout(() => { for (const j of res) if (j.conflicts?.length) addConflicts(j.id, j.conflicts, j.title); if (res.some(j => j.skipped)) toast(tr('Recurring task was already checked off, not advanced twice')); }, 0);
   }
+  if (map && Object.keys(map).length && typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline
 }
 const obxMeta = (k, v) => { if (OBX.on) OBX.st.setMeta(k, v).catch(() => {}); };
 // logout / another user in this browser (clearLocal): the queue goes with the rest of the local data
@@ -520,18 +523,26 @@ async function rawFetch0(method, url, body, key) {
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
-  if ([502, 503, 504].includes(r.status) && !(r.headers.get('content-type') || '').includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  // 2.359.0 A (#3023): an HTML page with a server error (500, a database restart) the same way (the change waits, no reload)
+  const ctype = r.headers.get('content-type') || '';
+  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && !ctype.includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
-  if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
-    if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) await authGone();  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
+  // 2.359.0 A (#3023): an HTML 404 / 405 / 4xx (an address without a route, e.g. a temporary id; a proxy's page) is an error
+  // like any other, never "session expired": the reload came back to the same write and reloaded again and again
+  if (r.type !== 'opaqueredirect' && ctype.includes('text/html') && r.status >= 400 && r.status !== 401 && r.status !== 403) { const e = new Error(httpErrText(r.status)); e.status = r.status; e.data = {}; throw e; }
+  // 2.359.0 A (#3024): the session ended in the middle of a write: the write and typed text not saved yet go into the queue
+  // first (sent after the next sign-in of the same account; another account is asked first), then the page reloads
+  const keepW = () => { if (key === undefined && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) outStash([{method, url, body: outPrev(method, url, body), uid: S.me?.id, k: outKey()}]); if (typeof savesStash === 'function') savesStash(false); };
+  if (r.type === 'opaqueredirect' || ctype.includes('text/html')) {
+    if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { keepW(); await authGone(); }  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
     location.reload();  // login session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
   if (url === '/api/state' && (r.status === 401 || (r.status === 403 && j.auth))) await sessGone();  // 2.238.0 B (#2872)
-  if ((r.status === 401 || r.status === 403) && j.auth) { await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
-  if (r.status === 401) { await authGone(); location.reload(); throw new Error('auth'); }
+  if ((r.status === 401 || r.status === 403) && j.auth) { keepW(); await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
+  if (r.status === 401) { keepW(); await authGone(); location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.data = j;
     if ((method !== 'GET' || r.status >= 500) && typeof botStartle === 'function') botStartle();  // 2.165.0 (#2613): a refused write or a server error
     if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full
@@ -578,6 +589,16 @@ async function api(method, url, body) {
   if (lo instanceof Promise) { try { body = await lo; } catch (e) { if (e.message !== 'auth') toast(e.message); throw e; } } else body = lo;
   // 2.126.0 D (#1990): a new task carries its own id from the first try on: sent again (the answer got lost) = the same task
   if (method === 'POST' && url === '/api/tasks' && body && typeof body === 'object' && !(body instanceof FormData) && !body.client_ref) body = {...body, client_ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)};
+  // 2.359.0 A (#3023): a temporary id (created offline) never goes to the server as such: the real id once its create went out,
+  // behind the create while it still waits; a create that failed = the change waits in the conflicts dialog (its text kept)
+  const tu = tmpUrl(url);
+  if (tu === null && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
+  if (tu === null || tu === false) {
+    const e = new Error(tu === null ? tr('Still syncing, try again in a moment') : tr('The new task could not be created, the change was not saved')); e.status = 409; e.data = {code: 'tmp_id'};
+    if (method !== 'GET') { if (tu === false) { outReject({method, url, body}, e); renderTop(); } toast(e.message); }
+    e.shown = true; throw e;
+  }
+  url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
@@ -591,13 +612,47 @@ async function api(method, url, body) {
     throw e;
   }
 }
-function enqueue(method, url, body) {
-  // remember what this device saw before the edit, so the server can detect edits made elsewhere
+// 2.359.0 A (#3023): the address with a temporary id replaced: the real id once its create went out (this tab or another,
+// the service worker); null = its create still waits in the queue; false = no create waits for it (it failed)
+function tmpUrl(url) {
+  const m = url.match(/\/(-\d+)(?=[/?]|$)/); if (!m) return url;
+  const real = HIST.ids[m[1]] || LS.get('idmap', {})[m[1]];
+  if (real) return url.replace(m[0], '/' + real);
+  return outSync().some(x => x.tmp === +m[1] && !x.done) ? null : false;
+}
+// remember what this device saw before the edit, so the server can detect edits made elsewhere
+function outPrev(method, url, body) {
   const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);
-  if (pm && body && !body._prev && +pm[1] > 0) {
+  if (pm && body && typeof body === 'object' && !body._prev && +pm[1] > 0) {
     const t = S.tasks.get(+pm[1]);
     if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : t._enc && k in t._enc ? t._enc[k] : (t[k] ?? null)]))};  // 2.64.1 (#1817): a locked list's text = its cipher
   }
+  return body;
+}
+// 2.359.0 A (#3024): entries that must survive a page going away right now (pagehide, an ended session before the reload):
+// without IndexedDB straight into the queue (localStorage), with it into localStorage first, which the IndexedDB queue takes
+// over (obxAdopt: now, and at the next start should the page be gone before its write)
+function outStash(list) {
+  if (!list.length) return;
+  // 2.359.0 (review): numbered, so they go after what already waits (obxAdopt)
+  if (OBX.on) { LS.set('outbox', [...LS.get('outbox', []), ...list.map(x => ({...x, n: x.n ?? obxSeq()}))]); obxAdopt(); } else outSave(() => OUT.q.push(...list));
+}
+// a write that outlives the page: fetch with keepalive (sent after the tab closed; the browser allows about 64 KB per page),
+// the queue entry's key with it: the queued copy sent at the next start gets the server's first answer (never applied twice)
+function keepSend(method, url, body, key) {
+  const h = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}; if (key) h['Idempotency-Key'] = key;
+  try { fetch(url, {method, keepalive: true, credentials: 'same-origin', headers: h, body: JSON.stringify(body)}).catch(() => {}); return true; } catch { return false; }
+}
+// a write that waits for its debounce (notes, the diary): into the queue and out with keepalive (url without a temporary id)
+function outKeep(method, url, body) {
+  const e = {method, url, body, uid: S.me?.id, k: outKey()};
+  outStash([e]);
+  if (!/\/-\d+(?=[/?]|$)/.test(url)) keepSend(method, url, body, e.k);
+  return e;
+}
+function enqueue(method, url, body) {
+  body = outPrev(method, url, body);
+  const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);
   // 2.13.0 (#453): typed text waiting in the outbox is coalesced: a newer title / description of the same task replaces
   // the queued one (which keeps its _prev = the base the server last confirmed), so a replay sends only the latest text
   const tk = pm && body ? Object.keys(body).filter(k => !k.startsWith('_')) : [];
@@ -663,6 +718,7 @@ function applyLocal(e) {
 }
 async function flush() {
   if (OUT.flushing || !outSync().length) return;
+  if (OUT.retryAt && Date.now() < OUT.retryAt) return;  // 2.359.0 A (#3023): after a server error the next try waits (outRetry)
   // 2.126.0 D (#1992 O5): only once the server has said who is logged in on this page (load() comes back here)
   if (!S.me || OUT.me !== S.me.id) { if (!OUT.meCheck) { OUT.meCheck = true; load().catch(() => {}).finally(() => { OUT.meCheck = false; }); } return; }
   // 2.126.0 D (#1989): one tab of the browser replays the queue, the others see it shrink (without Web Locks: as before)
@@ -691,11 +747,15 @@ async function outFlush() {
         for (const k of ['items', 'expect', 'guard']) if (d[k] && !Array.isArray(d[k])) d[k] = Object.fromEntries(Object.entries(d[k]).map(([id, v]) => [fix(+id), v]));
         body = {...body, data: d};
       }
+      // 2.359.0 A (#3023): a temporary id still in the entry: its create failed (a create always waits ahead of its changes) ->
+      // not sent (no PATCH /api/tasks/-123), the change waits in the conflicts dialog
+      const tmpLeft = /\/-\d+(?=[/?]|$)/.test(url) || [body?.parent_id, body?.task_id, ...(body?.ids || []), ...(body?.items || []).map(it => it?.id)].some(v => typeof v === 'number' && v < 0);
+      if (tmpLeft) { console.warn('outbox: its new task was not created', e); dropped++; outReject(e, new Error(tr('The new task could not be created'))); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; continue; }
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
         const j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
-        sent++;
+        sent++; OUT.tries = 0; OUT.retryAt = 0;
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
         if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
@@ -711,6 +771,15 @@ async function outFlush() {
         e.res = j;
       } catch (err) {
         if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
+        // 2.359.0 A (#3023): a server error (5xx, the maintenance / restore 503, too many requests 429, a timeout 408) is no
+        // answer about the change: it stays first in the queue and goes again later (the idempotency key keeps a write the
+        // server did apply from being applied twice). Only an entry that failed with a 500 OUT_MAX_TRIES times in a row goes
+        // to the conflicts dialog (with its whole content), so it does not hold back everything behind it forever.
+        const st = err.status || 0;
+        if (st >= 500 || st === 429 || st === 408) {
+          const tries = (e.tries || 0) + 1;
+          if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; e.tries = tries; }); outRetry(); return; }
+        }
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
         if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
@@ -730,8 +799,17 @@ async function outFlush() {
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
   }
   await load(); render();
+  if (typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline (attachments.js)
 }
-window.addEventListener('online', () => flush());
+window.addEventListener('online', () => { OUT.retryAt = 0; flush(); });
+// 2.359.0 A (#3023): the next try after a server error: 2 s, 4 s, 8 s ... at most a minute (a success starts again at 2 s)
+const OUT_MAX_TRIES = 12;
+function outRetry() {
+  OUT.tries = (OUT.tries || 0) + 1;
+  const ms = Math.min(60000, 2000 * 2 ** (OUT.tries - 1));
+  OUT.retryAt = Date.now() + ms;
+  clearTimeout(outRetry.t); outRetry.t = setTimeout(() => { OUT.retryAt = 0; if (OUT.q.length) flush(); }, ms);
+}
 // 2.25.0 (UX-55): after waiting changes went out: "All saved ✓" for a moment where the "waiting" chip was (not as a toast,
 // which would push away an Undo that is still on screen)
 function savedChip() {
@@ -777,14 +855,19 @@ function addConflicts(tid, list, title) {
 }
 // 2.126.0 D (#1992 O8): an offline change the server refused (deleted, no right any more, invalid) is not lost silently:
 // its text waits in the conflicts dialog with the reason, to copy
+// 2.359.0 A (#3023): the whole change, also lists and objects (tags, fields, a batch, a new order, a completion), never only a
+// count; a new task's own title is its heading
 function outReject(e, err) {
   const b = e.body && typeof e.body === 'object' ? e.body : {};
-  const txt = Object.entries(b).filter(([k, v]) => !k.startsWith('_') && k !== 'client_ref' && k !== 'expect_updated_at' && v != null && v !== '' && typeof v !== 'object')
-    .map(([k, v]) => k === 'title' || k === 'content' || k === 'body' ? String(v) : `${k}: ${v}`).join('\n');  // 2.143.0 C (#2153): + a note's text
+  const val = v => typeof v === 'object' ? JSON.stringify(v) : String(v);
+  let txt = Object.entries(b).filter(([k, v]) => !k.startsWith('_') && k !== 'client_ref' && k !== 'expect_updated_at' && v != null && v !== '' && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => (k === 'title' || k === 'content' || k === 'body') && typeof v !== 'object' ? String(v) : `${k}: ${val(v)}`).join('\n');  // 2.143.0 C (#2153): + a note's text
+  const um = e.url.match(/^\/api\/tasks\/(-?\d+)(?:\/(\w+))?/) || [], raw = +um[1] || 0, act = um[2] || (e.url === '/api/tasks/batch' ? b.action : e.url === '/api/tasks/reorder' ? 'reorder' : '');
+  if (act) txt = [`${tr('Action')}: ${act}`, txt].filter(Boolean).join('\n');
   if (!txt) return;
-  const id = +((e.url.match(/^\/api\/tasks\/(\d+)/) || [])[1]) || 0;
+  const id = raw > 0 ? raw : 0;
   const nt = !id && (S.nt?.notes || S.notes || []).find(n => '/api/notes/' + n.id === e.url);  // 2.143.0 C (#2153)
-  S.conflicts.push({tid: id, title: b.title || S.tasks.get(id)?.title || nt?.title || '', field: 'rejected', server: err?.message || '', mine: txt, at: Date.now()});
+  S.conflicts.push({tid: id, title: b.title || S.tasks.get(raw)?.title || nt?.title || '', field: 'rejected', server: err?.message || '', mine: txt, at: Date.now()});
   LS.set('conflicts', S.conflicts);
 }
 // the calm bar under a field that was changed elsewhere while it was being edited (2.13.0)
@@ -849,16 +932,34 @@ function conflictModal() {
   });
 }
 
+// 2.359.0 A (#3023): another account signs in while changes of the previous one wait on this device: they go only after a
+// yes (only their number shows); "Cancel" signs out again, so the previous person can sign in and send them
+async function userSwitchAsk(id, n) {
+  if (typeof bootDone === 'function') bootDone();
+  try { await i18nLoad(uiLang()); } catch { /* English */ }
+  const ok = await askConfirm(trn('{0} change of the previous account on this device is not synced yet', '{0} changes of the previous account on this device are not synced yet', n),
+    tr('Signing in with another account deletes them. Cancel signs out again: the previous account can then sign in and send them.'), {ok: tr('Delete and continue'), danger: true});
+  if (ok) { userSwitch(id); return; }
+  try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
+  location.reload();
+}
+// another user than last time in this browser: drop everything local of the previous one, then the app loads again
+function userSwitch(id) {
+  clearLocal(); LS.set('uid', id);
+  // 2.126.0 C (#1991): the previous person's push subscription and remembered keys in this browser go too
+  const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget(),
+    // 2.190.0 A (#2496): and the Cache Storage like at the logout (shared files waiting, kept pages); the app loads again
+    (async () => { if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k); })()]);
+  Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
+}
 function applyState(j) {
-  if (j.me) {  // another user than last time in this browser: drop everything local of the previous one
+  if (j.me) {  // another user than last time in this browser: drop everything local of the previous one (userSwitch)
     const last = LS.get('uid', null);
     if (last !== null && last !== j.me.id) {
-      clearLocal(); LS.set('uid', j.me.id);
-      // 2.126.0 C (#1991): the previous person's push subscription and remembered keys in this browser go too
-      const gone = Promise.allSettled([typeof wpDisable === 'function' && wpDisable(), typeof e2eForget === 'function' && e2eForget(),
-        // 2.190.0 A (#2496): and the Cache Storage like at the logout (shared files waiting, kept pages); the app loads again
-        (async () => { if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k); })()]);
-      Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
+      // 2.359.0 A (#3023): changes of the previous account still wait on this device: asked first (only their number shows);
+      // "Cancel" signs out again, so the previous person can sign in and send them
+      const n = outSync().filter(x => x.uid !== j.me.id).length + (S.conflicts || []).length;  // 2.359.0 A (#3023)
+      if (!n) userSwitch(j.me.id); else if (!OUT.switchAsk) OUT.switchAsk = userSwitchAsk(j.me.id, n);  // 2.359.0 (review): one question, not one per poll
       throw new Error('auth');
     }
     if (last === null) LS.set('uid', j.me.id);
@@ -1080,7 +1181,9 @@ function verStale() { return !!(APP_VER && S.serverVer && APP_VER !== S.serverVe
 // 2.273.0 C (#3051): + every other text field / text area whose typed value differs from what it was drawn with (also one
 // out of view: a collapsed panel, a background tab of a dialog); search fields do not count
 const VER_DRAFT_SEL = 'textarea, input:not([type]), input[type="text"], input[type="url"], input[type="email"], input[type="tel"]';
+// 2.359.0 A (#3024): + a draft kept in memory only (S.drafts: a comment / chat message typed in a task or chat not shown now)
 const verDraft = () => ['#c-input', '#tc-in', '#chat-in', '#qinput', '#qsheet', '#d-sub'].some(s => ($(s)?.value || '').trim())
+  || Object.values(S.drafts || {}).some(v => typeof v === 'string' && v.trim() !== '')
   || [...document.querySelectorAll(VER_DRAFT_SEL)].some(e => !e.readOnly && !e.disabled && e.value !== e.defaultValue && e.value.trim() !== '');
 const verQuiet = () => !editing() && !editFocused() && !$('.modal') && !$('#pop:not(.hidden)') && !$('.qadd.sheet') && !OUT.q.length && !S.multiMode && !verDraft();
 let verBusy = false;

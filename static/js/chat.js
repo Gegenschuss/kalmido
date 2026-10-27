@@ -844,15 +844,28 @@ function noteEditHtml(n) {
 }
 const noteCur = () => S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);
 function noteQueue() { S.nt.dirty = true; clearTimeout(S.nt.saveT); S.nt.saveT = setTimeout(noteFlush, 1200); }
-async function noteFlush() {
-  clearTimeout(S.nt.saveT);
-  const n = noteCur(); if (!n || !S.nt.dirty) return;
-  S.nt.dirty = false;
+function notePatch(n) {
   const t = $('#nt-title'), b = $('#nt-body'), g = $('#nt-tags');
   const patch = {expect_updated_at: n.updated_at};
   if (t && t.value.trim() && t.value.trim() !== n.title) patch.title = t.value.trim();
   if (b && b.value !== n.body) patch.body = b.value;
   if (g) { const tg = g.value.split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean); if (tg.join() !== n.tags.join()) patch.tags = tg; }
+  return patch;
+}
+// 2.359.0 A (#3024): the page goes away within the 1.2 s of typing: the change goes into the queue and out with keepalive
+// (core.js outKeep; the queued copy has the same key). A locked list's note keeps the normal way (the queue holds no plain text).
+window.addEventListener('pagehide', () => {
+  const n = S.nt.dirty && noteCur(); if (!n || ntLocked(n.list_id)) return;
+  const patch = notePatch(n); if (Object.keys(patch).length === 1) return;
+  clearTimeout(S.nt.saveT); S.nt.dirty = false;
+  if (n.id < 0) delete patch.expect_updated_at;
+  outKeep('PATCH', `/api/notes/${n.id}`, patch);
+});
+async function noteFlush() {
+  clearTimeout(S.nt.saveT);
+  const n = noteCur(); if (!n || !S.nt.dirty) return;
+  S.nt.dirty = false;
+  const patch = notePatch(n);
   if (Object.keys(patch).length === 1) return;
   try {
     const r = await ntWrite(n, patch);  // 2.143.0 C (#2153): offline into the outbox
