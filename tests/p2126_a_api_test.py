@@ -105,10 +105,8 @@ def numbers_case(S, who, cl):
     r = S.post(B + f"{D}/{inv['id']}/number", json={})
     check(r.status_code == 409, f"{who}: the next number of an invoice draft comes at finalising (409) " + r.text[:120])
     check(S.get(B + f"{D}/{inv['id']}").json()["number"] == "", f"{who}: still no number")
-    cr = S.post(B + D, json={"kind": "credit"}).json()
-    check(S.post(B + f"{D}/{cr['id']}/number").status_code == 409, f"{who}: a credit note draft neither")
-    r = S.delete(B + f"{D}/{cr['id']}")
-    check(r.ok, f"{who}: an unnumbered credit note draft can be deleted " + r.text[:120])
+    # 2.354.0 (#2838): a credit note only from a finalised invoice (the numbers of its draft: below, after F5)
+    check(S.post(B + D, json={"kind": "credit"}).status_code == 409, f"{who}: no credit note without an invoice (409)")
     r = S.post(B + f"{D}/{inv['id']}/number", json={"number": f"RE-{time.localtime().tm_year}-001"})
     check(r.ok, f"{who}: a manual number is still possible " + r.text[:160])
     d = S.get(B + f"{D}/{inv['id']}").json()
@@ -165,6 +163,10 @@ check(Fr.post(B + D + "/from-time", json={"client_id": CL, "from": "2026-05-01",
 # ================================================================ #1979 F5-F7, L1, L4, L5, L7
 r = A.post(B + f"{D}/{INV1}/finalize")
 check(r.ok and r.json()["locked"], "F5: an invoice with a manual number is finalised " + r.text[:200])
+cr = A.post(B + f"{D}/{INV1}/credit").json()  # 2.354.0 (#2838): was a free credit note draft in numbers_case
+check(A.post(B + f"{D}/{cr['id']}/number").status_code == 409, "org: a credit note draft has no number before finalising either")
+r = A.delete(B + f"{D}/{cr['id']}")
+check(r.ok, "org: an unnumbered credit note draft can be deleted " + r.text[:120])
 # F6: a copy starts with a fresh reminder fee state and without the agent's marks
 sql("UPDATE office_docs SET reminder_fee_state='paid', agent_id=?, list_id=? WHERE id=?", (ALICE, LA, INV1), write=True)
 r = A.post(B + f"{D}/{INV1}/duplicate")

@@ -1130,7 +1130,10 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'tpl') { await autosave(); md.remove(); saveTemplate({list_id: id, ...((listById(id) || l).kind === 'project' ? {relative: true} : {})}, lname(l)); return; }  // 2.4.0 (#328): projects keep their dates relative to the project start
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
-      if (!nm) return $('#l-name', md).focus();
+      if (!nm) {  // 2.354.0 C (#3013): say why nothing happens, mark the field
+        const ni = $('#l-name', md); ni.setAttribute('aria-invalid', 'true'); ni.addEventListener('input', () => ni.removeAttribute('aria-invalid'), {once: true});
+        toast(tr('Name missing')); return ni.focus();
+      }
       const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)

@@ -23,7 +23,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
-from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
+from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
@@ -33,6 +33,7 @@ from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
 from .countries import fk_reverse_case  # 2.296.0 F (#3168)
 from .pdfweb import epdf_format  # 2.296.0 F (#3173)
+from . import abschlag as _abs  # 2.354.0 B (#2836): the module, abschlag imports invoices too (cycle)
 
 INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
@@ -221,10 +222,34 @@ def inv_refresh_paid(c, oid, did):
         if r["status"] != "paid":
             c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
             from ..integrations.webhooks import who_note
-            who_note("invoice.paid", "invoice", did)  # 2.115.0 A (#2061): the payments reached the total
+            if r["kind"] == "invoice":  # 2.354.0 D (#2837): a refunded credit note is no paid invoice
+                who_note("invoice.paid", "invoice", did)  # 2.115.0 A (#2061): the payments reached the total
     elif r["status"] == "paid":
         c.execute("UPDATE office_docs SET status=?, paid_at=NULL, updated_at=? WHERE id=? AND org_id=?",
                   ("sent" if r["sent_at"] else "issued", ts, did, oid))
+
+
+def inv_refund_open(c, oid, r):
+    """2.354.0 D (#2837): what can still be paid back to the customer (Decimal >= 0). Invoice r: what its payments and finalised
+    credit notes cover beyond its gross, less the refunds already booked on those credit notes. Credit note r: the same for its
+    invoice, at most its own gross less its refunds (a credit note without invoice: its gross less its refunds)."""
+    zero = {"paid": Decimal(0), "credits": Decimal(0)}
+    own = None
+    inv_ = r
+    if r["kind"] == "credit":
+        own = money(dec(_j(r["totals"], {}).get("gross") or 0)) - (inv_paid_map(c, oid, [r["id"]]).get(r["id"]) or zero)["paid"]
+        cid = _col(r, "cancels_id")
+        inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (cid, oid)).fetchone() if cid else None
+        if inv_ is None:
+            return money(max(own, Decimal(0)))
+    sibs = [x["id"] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL",
+                                       (oid, inv_["id"]))]
+    pm = inv_paid_map(c, oid, [inv_["id"]] + sibs)
+    p = pm.get(inv_["id"]) or zero
+    rest = p["paid"] + p["credits"] - money(dec(_j(inv_["totals"], {}).get("gross") or 0)) - sum(((pm.get(x) or zero)["paid"] for x in sibs), Decimal(0))
+    if own is not None:
+        rest = min(rest, own)
+    return money(max(rest, Decimal(0)))
 
 
 # ---------------------------------------------------------------- finalising (called by ledger.ofx_finalize)
@@ -295,6 +320,11 @@ def inv_missing(c, oid, r, s, pack, items):
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (
                 cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
             miss.append(tr("the client's VAT ID (reverse charge)"))
+    # 2.354.0 A (#2834): "abroad" without a register number is category G in the e-invoice, which needs the seller's VAT id (BR-G-02);
+    # 2.357.0 (#3218): with the tax number it is O (einvoice._doc_cat), which needs no VAT id
+    if r["vat_mode"] == "novat" and _col(r, "vat_note") == "abroad" and office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial") and not (
+            co.get("vat_id") or str(co.get("register_no") or "").strip() or str(co.get("tax_number") or "").strip()):
+        miss.append(tr("your VAT ID or register number (not taxable domestically)"))
     if r["vat_mode"] == "novat" and _col(r, "vat_note") in ("eu_goods", "export"):
         # 2.355.0 C (#2844): goods to a business in another EU state (section 6a UStG: both VAT ids, BR-IC-02) / to a third
         # country (section 6 UStG; BR-G-02 the seller's VAT id in the e-invoice); the delivery date = the period of service
@@ -323,7 +353,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     if r["kind"] in ("invoice", "credit"):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
-    abs_before_finalize(c, oid, r)  # 2.120.0 A (#2087): a final invoice deducts the current progress invoices
+    abs_before_finalize(c, oid, r, items)  # 2.120.0 A (#2087): a final invoice deducts the current progress invoices (2.354.0 B: + items)
     # 2.190.0 D (#2496): a negative total is booked as a credit note, never finalised. 2.190.0 R (#2496): except a final
     # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
     if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
@@ -373,6 +403,7 @@ def inv_after_finalize(c, oid, uid, r):
             credited = sum((money(dec(_j(x["totals"], {}).get("gross") or 0)) for x in c.execute(
                 "SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND id<>?",
                 (oid, inv_["id"], r["id"]))), Decimal(0))
+            inv_credit_check(c, oid, r, inv_)  # 2.354.0 D (#2838): its currency and rate, and per VAT rate
             if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
                 raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
             if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
@@ -438,9 +469,10 @@ def inv_items_from_offer(c, oid, r, parts_mode=None, parts_title=None):
         elif ln["kind"] == "raw" and not ln.get("optional") or ln["kind"] == "surcharge":  # 2.113.1 (#2252): + surcharge
             out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": "" if ln["kind"] == "surcharge" else ln.get("detail") or "", "qty": 1, "unit": "flat",
                         "rate": ln["total"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
-        elif ln["kind"] == "discount":
-            out.append({"kind": "discount", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
-                        "rate": abs(dec(ln["total"])), "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+        elif ln["kind"] == "discount":  # 2.354.0 A (#2835): one position per tax key, as the quotation computed it (was all at "standard")
+            for k, v in (ln.get("by_tax") or {"standard": abs(dec(ln["total"]))}).items():
+                out.append({"kind": "discount", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
+                            "rate": abs(dec(v)), "tax": k if k in TAX_KEYS else "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
     return out
 
 
@@ -558,6 +590,45 @@ def inv_from_offer(c, oid, uid, offer, parts_mode=None, parts_title=None):
     did = _insert_doc(c, oid, uid, row)
     _put_rows(c, oid, did, inv_items_from_offer(c, oid, offer, parts_mode, parts_title))
     return did
+
+
+def inv_credit_pack(c, oid, r, pack):
+    """2.354.0 D (#2838): pack for credit note r: with the tax rates frozen in its finalised invoice (tax_snapshot), so a
+    change of the country pack since then never makes the credit note differ from the invoice; else pack as it is."""
+    cid = _col(r, "cancels_id")
+    row = c.execute("SELECT tax_snapshot FROM office_docs WHERE id=? AND org_id=? AND kind='invoice' AND locked_at IS NOT NULL",
+                    (cid, oid)).fetchone() if cid else None
+    tax = _j(row["tax_snapshot"], {}).get("tax") if row is not None and row["tax_snapshot"] else None
+    return {**(pack or {}), "tax": tax} if isinstance(tax, dict) and tax else pack
+
+
+def inv_credit_rates(r):
+    """2.354.0 D (#2838): {VAT rate: gross} of the totals of document r (its currency); one key "" without tax lines."""
+    t = _j(r["totals"], {})
+    out = {}
+    for x in t.get("tax_lines") or []:
+        k = str(dec(x.get("pct") or 0).normalize())
+        out[k] = out.get(k, Decimal(0)) + dec(x.get("base") or 0) + dec(x.get("amount") or 0)
+    if not out:
+        out[""] = dec(t.get("gross") or 0)
+    return out
+
+
+def inv_credit_check(c, oid, r, inv_):
+    """2.354.0 D (#2838): finalising credit note r of invoice inv_: in the invoice's currency and rate (an older draft switched
+    to another one: 409), and the finalised credit notes never exceed the invoice per VAT rate (409; a rate the invoice
+    does not have is more)."""
+    if (r["currency"] or "EUR").upper() != (inv_["currency"] or "EUR").upper() or abs(float(r["fx_rate"] or 1) - float(inv_["fx_rate"] or 1)) > 1e-9:
+        raise Denied(409, tr("A credit note keeps the currency, exchange rate, client and VAT of its invoice"))
+    have, got = inv_credit_rates(inv_), {}
+    for x in list(c.execute("SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND id<>?",
+                            (oid, inv_["id"], r["id"]))) + [r]:
+        for k, v in inv_credit_rates(x).items():
+            got[k] = got.get(k, Decimal(0)) + v
+    if list(have) == [""]:  # an invoice without tax lines: the sum only
+        got = {"": sum(got.values(), Decimal(0))}
+    if any(money(v) > money(have.get(k, Decimal(0))) for k, v in got.items() if money(v) > 0):
+        raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
 
 
 def inv_credit_of(c, oid, uid, inv_):
@@ -1267,6 +1338,8 @@ def inv_offer_invoice(c, oid, uid, r, b, parts_mode=None, parts_title=None):
     elif typ:
         raise BadInput(tr("Invalid value: {0}", "inv_type"))
     else:
+        if _abs.abs_progress_of(c, oid, r["id"], locked_only=True):  # 2.354.0 B (#2836): a full invoice would bill the progress invoices twice
+            raise Denied(409, tr("The quotation has progress invoices; create the final invoice instead"))
         nid = inv_from_offer(c, oid, uid, r, parts_mode, parts_title)
     recalc(c, oid, nid)
     ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from_id": r["id"], "from_number": r["number"], **({"inv_type": typ} if typ else {})})
@@ -1308,6 +1381,7 @@ def inv_credit_post(did):
         raise Denied(409, tr("A credit note needs a finalised invoice"))
     if r["status"] == "cancelled":
         raise Denied(409, tr("This invoice is already cancelled"))
+    _abs.abs_credit_check(c, oid, r)  # 2.354.0 B (#2836): not on a progress invoice a finalised final invoice deducts
     ref, hit = ofi_ref_doc(c, oid, uid, body())  # 2.269.0 D (#3046): sent again = the credit note made the first time
     if hit:
         return _answer(c, oid, uid, hit)
@@ -1389,6 +1463,7 @@ def inv_payments_get(did):
 @app.post("/api/office/docs/<int:did>/payments")
 def inv_payment_post(did):
     """{date, amount, method?: transfer|cash|card|other, note?, client_ref?} on a finalised invoice; covers the gross -> paid.
+    2.354.0 D (#2837): on a finalised credit note = the refund paid back to the customer (at most inv_refund_open).
     201 the document. 2.269.0 D (#3046): sent again with the same client_ref = 200 the document, no second payment."""
     from .docs import doc_row
     c, uid, oid = _ctx()
@@ -1422,7 +1497,8 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
                 raise Denied(409, tr("Invalid value: {0}", "client_ref"))
             return None
     r = doc_row(c, oid, did)
-    if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
+    refund = r["kind"] == "credit" and ofx_locked(r) and r["status"] not in ("cancelled", "paid")  # 2.354.0 D (#2837): the refund
+    if not refund and (r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid")):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
@@ -1432,7 +1508,12 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
         raise BadInput(tr("The date must not lie in the future"))
     from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
-    if money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
+    if refund:
+        if r["cancels_id"]:  # 2.354.0 review (#2837): the cap is shared by all credit notes of the invoice
+            write_lock(c, f"office_credits_{int(r['cancels_id'])}")
+        if money(amt) > inv_refund_open(c, oid, r):  # 2.354.0 D (#2837): only what the customer paid beyond the invoice
+            raise Denied(409, tr("The refund exceeds what is to be paid back"))
+    elif money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
         raise Denied(409, tr("The payment exceeds the open amount"))
     method = b.get("method") or "transfer"
     if method not in PAY_METHODS:

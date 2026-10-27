@@ -10,7 +10,7 @@
 const timeOn = () => feat('time') && S.timeAll !== false;  // own switch + the admin's switch for the whole server
 const mtTime = lid => !!listById(lid)?.time_tracking;  // 2.41.0 (#1471): the list's own switch "Time tracking" (any type, default off)
 const hmm = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600)}:${pad(Math.floor(s % 3600 / 60))}`; };
-const fmtDur = s => fmtH(Math.floor(Math.max(0, s) / 60));
+const fmtDur = s => s > 0 && s < 60 ? tr('under 1 minute') : fmtH(Math.floor(Math.max(0, s) / 60));  // 2.354.0 C (#3013): not "0:00" for the first minute
 const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const hoursDec = s => (s / 3600).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const money = (v, cur) => v.toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (cur ? ' ' + cur : '');

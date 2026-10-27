@@ -458,7 +458,7 @@ function sbb_wsMenu(anchor) {
   const opts = [...all.filter(w => w.startsWith('org:')), ...all.filter(w => !w.startsWith('org:'))];  // the companies first (sketch)
   const set = cur.startsWith('org:') && typeof lmOrgPaneOn === 'function' && lmOrgPaneOn();
   const p = menu(anchor, [{head: tr('Switch to')}, ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, cls: 'kbwsi', title: wsName(ws), fn: () => { if (ws !== wsCur()) wsSet(ws); }})),
-    '-', {label: tr('Add a company'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
+    '-', {label: tr('Add an organisation'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
     ...(set ? [{label: tr('Company settings'), icon: 'building', cls: 'kbws-set', fn: () => settingsModal('org')}] : [])]);
   // each company's own sign in place of the icon: its picture or symbol, else its initial on a tile
   opts.forEach((ws, i) => {
@@ -471,7 +471,7 @@ function sbb_wsMenu(anchor) {
 async function sbb_orgAdd() {
   if (S.me?.is_admin && typeof orgModal !== 'function') await loadModule('settings').catch(() => {});  // 2.152.3: orgModal lives in the lazy settings module
   if (S.me?.is_admin && typeof orgModal === 'function') { orgModal(null, () => load().then(render).catch(() => {})); return; }
-  await askConfirm(tr('Add a company'), tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.'), {ok: tr('OK')});
+  await askConfirm(tr('Add an organisation'), tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.'), {ok: tr('OK')});
 }
 // the panel's head: the area's name, "Fold all" / "Unfold all" (only a panel with groups that fold: Tasks, or a panel whose
 // html has sbb_head groups or a tree marked data-sbbfold) and "Hide the panel". pan = the panel's html (not Tasks)

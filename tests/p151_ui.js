@@ -182,7 +182,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await call('PATCH', `/api/tasks/${a}`, {due: T1}); await w.eval('load()');  // 2.218.0 (#2799): due today shows no Today button, so start tomorrow
   w.eval(`openDetail(${a})`); await sleep(300);
   const dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
-  check(dq.length === 2 && /^Due: Today/.test(dq[0].title), 'detail panel: two buttons next to the date');
+  check(dq.length === 3 && /^Due: Today/.test(dq[0].title), 'detail panel: Today, Tomorrow and -1 day next to the date');  // 2.354.0 C (#3326): due tomorrow also shows "-1 day"
   click(w, dq[0]);
   check(await until(async () => (await task(a)).due === T0), 'detail: Today');
   check(await until(() => !d.querySelector('#detail [data-act="due-q"][data-d="0"]') && d.querySelector('#detail [data-act="due-q"][data-d="1"]')), 'detail: Today is the date, only Tomorrow left');  // 2.218.0 (#2799): was "Today marked"

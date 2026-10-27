@@ -324,6 +324,7 @@ document.addEventListener('click', async e => {
     // 2.26.x (#953): left from the open drawer: the entry remembers it, so Back to it shows the drawer open again (Android's
     // back preview already shows it; route() used to close it right away = a short flash)
     if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
+    S.viaDrawer = g.closest('#side') ? g.dataset.go : null;  // 2.354.0 C (#3013): an area opened from the drawer does not light up "More"
     go(g.dataset.go); return;
   }
   const qc = e.target.closest('.qchip:not([data-act])');  // 2.36.2 (#1138): a chip with its own action (the list of "Tasks of X") is no parser chip

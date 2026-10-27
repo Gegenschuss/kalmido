@@ -2,7 +2,8 @@
 
 office_calc(doc, items, pack) -> dict reproduces the rules of the spreadsheet template the module replaces:
  - a position is qty x rate; rates are kept in the organisation's currency (EUR) and converted into the document's
-   currency with doc["fx_rate"] when the document is in USD (converted rate rounded to 2 places first, like the template)
+   currency with doc["fx_rate"] when the document is in USD (2.354.0 A (#2831): the exact rate, the position is
+   money(qty x rate x fx); was the converted rate rounded to 2 places first, like the template)
    2.189.0 (#2475): "the organisation's currency" is doc["home"] (the office's home currency, missing = EUR); every other
    currency of homecur.HC_CODES is converted with its rate (units per one unit of the home currency)
  - "Producing": the sum of the quantities of the positions flagged producing, divided by doc["prod_quotient"], rounded to
@@ -204,12 +205,12 @@ def fmt_qty(d, lang="de"):
     return s if (lang or "de").lower().startswith("en") else s.replace(".", ",")
 
 
-def fmt_money(d, lang="de", currency="EUR"):
+def fmt_money(d, lang="de", currency="EUR", places=2):
     """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en) / USD "1.234,50 $" / "$1,234.50"; 2.296.0 B (#3175): by CALC_LOCALE
-    ("1 234,50 €" fr, "€ 1.234,50" nl)."""
-    d = money(dec(d))
+    ("1 234,50 €" fr, "€ 1.234,50" nl). 2.354.0 A (#2831): places 3 / 4 for a unit price (fmt_rate)."""
+    d = money(dec(d)) if places == 2 else dec(d).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
     neg = d < 0
-    whole, frac = f"{abs(d):.2f}".split(".")
+    whole, frac = f"{abs(d):.{places}f}".split(".")
     lg = str(lang or "de").lower()
     tho, dp, before = CALC_LOCALE.get("en" if lg.startswith("en") else lg.split("-")[0], CALC_LOCALE["de"])
     groups = []
@@ -222,6 +223,17 @@ def fmt_money(d, lang="de", currency="EUR"):
     if before:
         return ("-" if neg else "") + sym + ("" if len(sym) == 1 and dp == "." else " ") + s
     return ("-" if neg else "") + s + " " + sym
+
+
+def rate_places(d):
+    """2.354.0 A (#2831): the places a unit price is shown with: 2, or 3 / 4 when it has them (0.125 -> 3)."""
+    d = dec(d).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    return 2 if d == money(d) else max(2, min(4, -d.normalize().as_tuple().exponent))
+
+
+def fmt_rate(d, lang="de", currency="EUR"):
+    """2.354.0 A (#2831): a unit price as money text with up to 4 places ("0,125 €"); 2 places as fmt_money otherwise."""
+    return fmt_money(d, lang, currency, rate_places(d))
 
 
 def calc_cur(doc):
@@ -264,9 +276,9 @@ def office_calc(doc, items, pack=None):
     hu_pct, mk_pct = dec(doc.get("handling_pct"), "0"), dec(doc.get("markup_pct"), "0")  # 2.113.1 (#2252)
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
-    def conv(rate):  # the rate in the document's currency
+    def conv(rate):  # the rate in the document's currency; 2.354.0 A (#2831): unrounded (was money(): 1000 x 0.125 = 130)
         r = dec(rate)
-        return money(r * fx) if foreign else money(r)
+        return r * fx if foreign else r
 
     # 2.47.0 (#1649): a position of unit "percent" (e.g. the artists' social insurance) is its rate in percent of the
     # positions marked extern of the same sheet; its quantity does not count
@@ -329,7 +341,7 @@ def office_calc(doc, items, pack=None):
                       "intext": it.get("intext") or "intern", "discountable": 1 if _flag(it.get("discountable", 1)) else 0})
 
     # Producing
-    prod_rate_doc = conv(prod_rate)
+    prod_rate_doc = money(conv(prod_rate))  # 2.354.0 A (#2831): the day rate stays a money amount, as before
     if share:  # 2.113.1 (#2251): amount and rate both in the document's currency
         days = half_days(prod_amt / prod_rate_doc * quot) if prod_on and quot > 0 and prod_rate_doc > 0 and prod_amt > 0 else Decimal(0)
     else:
@@ -378,14 +390,17 @@ def office_calc(doc, items, pack=None):
 
     # discount
     discount = Decimal(0)
+    disc_by = {}  # 2.354.0 A (#2835): the discount per tax key (an invoice from the quotation takes one position per key)
     if disc_pct > 0:
         for k in TAX_KEYS:
             d = money(disc_base[k] * disc_pct / 100)
             base[k] -= d
             discount += d
+            if d:
+                disc_by[k] = _num(d)
         if discount > 0:
             lines.append({"kind": "discount", "title": label(pack, lang, "discount"), "pct": _num(disc_pct), "total": _num(-discount),
-                          "detail": label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang))})
+                          "detail": label(pack, lang, "discount_detail", pct=fmt_qty(disc_pct, lang)), "by_tax": disc_by})
 
     net = items_net + prod_total + hu_total + mk_total + (raw_amount if raw_mode == "included" else Decimal(0)) - discount
     tax_lines, tax_sum = [], Decimal(0)
@@ -498,9 +513,9 @@ def inv_calc(doc, items, pack=None):
     novat = str(doc.get("vat_mode") or "vat") == "novat"
     rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
 
-    def conv(rate):
+    def conv(rate):  # 2.354.0 A (#2831): unrounded, the position is money(qty x rate x fx) (was money(rate) first)
         r = dec(rate)
-        return money(r * fx) if foreign else money(r)
+        return r * fx if foreign else r
 
     lines, pos = [], 0
     net = Decimal(0)
@@ -536,7 +551,7 @@ def inv_calc(doc, items, pack=None):
                       "qty": _num(qty), "qty_text": fmt_qty(qty, lang) if pct is None else fmt_qty(pct, lang) + " %", "unit": unit,
                       "unit_text": unit_text(pack, lang, unit, qty) if pct is None else "",
                       **({"pct": _num(pct), "base": _num(ext_base)} if pct is not None else {}),
-                      "rate": _num(rate), "rate_text": fmt_money(rate, lang, currency), "tax": tax, "tax_pct": _num(rates[tax]),
+                      "rate": _num(rate), "rate_text": fmt_rate(rate, lang, currency) if pct is None else fmt_money(rate, lang, currency), "tax": tax, "tax_pct": _num(rates[tax]),
                       "total": _num(total), "total_text": fmt_money(total, lang, currency), "net": dstr(total), "intext": it.get("intext") or "intern"})
     tax_lines, tax_sum = [], Decimal(0)
     if not novat:

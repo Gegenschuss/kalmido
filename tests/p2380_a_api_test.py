@@ -158,7 +158,8 @@ A.delete(B + f"{D}/{ai['id']}")
 
 # ---------------------------------------------------------------- editing the draft, required fields, number rules
 r = A.patch(B + f"{D}/{IID}", json={"order_ref": "PO-2026-0001-A", "due_date": "2027-06-07", "vat_note": "reverse"})
-check(r.ok and r.json()["order_ref"] == "PO-2026-0001-A" and r.json()["due_date"] == "2027-06-07" and r.json()["vat_note"] == "reverse", "invoice head fields " + r.text[:120])
+check(r.ok and r.json()["order_ref"] == "PO-2026-0001-A" and r.json()["due_date"] == "2027-06-07" and r.json()["vat_note"] == "", "invoice head fields " + r.text[:120])
+# 2.354.0 A (#2833): ^ a taxed invoice keeps no VAT note (was stored: "reverse" next to VAT)
 check(A.patch(B + f"{D}/{IID}", json={"vat_note": "x"}).status_code == 400 and A.patch(B + f"{D}/{IID}", json={"payment_days": 999}).status_code == 400, "invoice fields validated")
 check(A.post(B + f"{D}/{IID}/status", json={"status": "issued"}).status_code == 409, "status issued only by finalising (409)")
 check(A.post(B + f"{D}/{IID}/status", json={"status": "sent"}).status_code == 409, "draft invoice cannot be sent by status (409)")
@@ -175,7 +176,8 @@ EMPTY = r.json()["id"]
 r = A.post(B + f"{D}/{EMPTY}/finalize")
 e = r.json().get("error", "")
 check(r.status_code == 400 and "recipient" in e and "period of service" in e and "position" in e, "required fields: 400 with the list " + e[:200])
-check(A.post(B + D, json={"kind": "credit"}).status_code == 201 and A.post(B + D, json={"kind": "reminder"}).status_code == 201, "empty credit note / reminder drafts")
+# 2.354.0 (#2838): an empty credit note draft is 409 now (a credit note only from a finalised invoice)
+check(A.post(B + D, json={"kind": "credit"}).status_code == 409 and A.post(B + D, json={"kind": "reminder"}).status_code == 201, "no empty credit note (409), empty reminder draft")
 check(A.post(B + D, json={"kind": "nope"}).status_code == 400, "unknown kind: 400")
 # the VAT note is required for novat invoices
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "vat_mode": "novat", "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 1, "rate": 100}]})
@@ -397,10 +399,9 @@ dbxm.overdue(DATA, [INVX])  # 2.355.0 D (#2846): reminders only for overdue invo
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID, INVX], "level": 1})
 check(r.status_code == 400 and "one client" in r.json().get("error", ""), "reminder over invoices of two clients: 400 " + r.text[:120])
 check(A.post(B + f"{D}/reminder", json={"doc_ids": [INVX], "level": 1}).status_code == 201, "reminder over one client's invoice: 201")
-# a duplicated credit note is a fresh one, bound to no invoice; credit notes never exceed the invoice
+# 2.354.0 (#2838): a credit note is not copied (it would be bound to no invoice): 409; credit notes never exceed the invoice
 r = A.post(B + f"{D}/{CR['id']}/duplicate")
-check(r.status_code == 201 and r.json()["kind"] == "credit" and r.json()["cancels_id"] is None and r.json()["status"] == "draft", "duplicated credit note: no cancels_id " + r.text[:120])
-A.delete(B + f"{D}/{r.json()['id']}")
+check(r.status_code == 409, "duplicated credit note: 409 (#2838) " + r.text[:120])
 r = A.post(B + f"{D}/{INVX}/credit")
 CRA = r.json()["id"]
 A.put(B + f"{D}/{CRA}/items", json={"items": [{"title": "Beratung", "qty": 1, "rate": 100}]})

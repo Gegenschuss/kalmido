@@ -47,8 +47,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   let w = await boot({user: 'alice', mobile: true, hash: 'l/' + L}), d = w.document;
   w.eval(`openDetail(${T})`); await sleep(400);
   let dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
-  check(dq.length === 2 && dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Today,Tomorrow', '#636: Today / Tomorrow in the header with their words ' + dq.map(b => b.textContent.trim()));
-  check(dq[1].getAttribute('aria-label') === 'Tomorrow, each further click +1 day'  /* 2.199.0 M (#2768): new tooltip */ && d.querySelector('#detail .dtop .dbr[aria-hidden="true"]'), '#636: aria-label kept, the row break is hidden from screen readers');
+  check(dq.length === 3 && dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Today,+1 day,-1 day' /* 2.354.0 C (#3326): the task is due later */, '#636: Today / Tomorrow in the header with their words ' + dq.map(b => b.textContent.trim()));
+  check(/^\+1 day: Set to /.test(dq[1].getAttribute('aria-label'))  /* 2.354.0 C (#3326): names the target day */ && d.querySelector('#detail .dtop .dbr[aria-hidden="true"]'), '#636: aria-label kept, the row break is hidden from screen readers');
   check(d.querySelector('#detail .dtop [data-act="pin"]') && d.querySelector('#detail .dtop .dchip .dct'), 'the header still has Pin (CSS decides) and the date');
   click(w, dq[1]);
   check(await until(async () => (await task(T)).due === day(10)), '#636: a tap on Tomorrow moves one more day');  // 2.199.0 M (#2768): was day(1)
@@ -117,7 +117,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   await w.eval('load().then(render)'); await sleep(300);
   w.eval(`openDetail(${DT})`); await sleep(400);
   dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
-  check(dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Heute,Morgen' && dq[0].getAttribute('aria-label') === 'Fällig: Heute', 'German: Heute / Morgen');
+  check(dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Heute,+1 Tag,-1 Tag' && dq[0].getAttribute('aria-label') === 'Fällig: Heute', 'German: Heute / Morgen');  // 2.354.0 C (#3326): due in 3 days: +1 Tag, -1 Tag
   w.eval('closeDetail()');
   w.eval(`tokModal(null, [])`); await sleep(300);
   check([...d.querySelectorAll('.modal')].pop().querySelector('.stfoot label[for="tk-exp"]')?.textContent === 'Läuft ab', 'German: Läuft ab in the footer');

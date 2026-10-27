@@ -2207,3 +2207,5 @@ fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO
 fresh; run p2319_b_rail_labels_ui node p2319_b_rail_labels_ui.js "$KALMIDO_TEST_DATA"
 # 2.235.0 D (#2899): phones close the keyboard after sending (settings chat_kbd_agent / chat_kbd_team); freelancer-matrix: agents
 fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"
+# 2.354.0 C (#3326 #3009 #3013): +1 day / -1 day instead of Tomorrow, Overdue buttons clear of the block "…", small UI texts
+fresh; run p2354_c_ui node p2354_c_ui.js "$KALMIDO_TEST_DATA"

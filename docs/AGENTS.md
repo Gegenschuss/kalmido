@@ -2063,7 +2063,9 @@ draft's `updated_at` you read: a person who saved in between answers `409` (`err
 current draft) - read it again and build on it, never resend the old list. Positions billed from receipts stay on the draft. A draft of an agent never gets a number; the document
 shows *Drafted by the agent ...*. 2.269.0: the three draft routes (quotation, invoice from a quotation, reminder) take an
 optional `client_ref` (your own id of the request, at most 64 characters): sent again with the same value (the answer got
-lost, a retry), Kalmido answers `200` with the draft made the first time instead of making a second one. `notify: true` posts a card in the person's chat with the sum and two link buttons,
+lost, a retry), Kalmido answers `200` with the draft made the first time instead of making a second one. 2.354.0: an invoice from a quotation that has finalised progress invoices
+(`inv_type: "progress"`) answers `409` without `inv_type` (it would bill them twice) - draft `inv_type: "final"`, which deducts
+each progress invoice less the credit notes on it. `notify: true` posts a card in the person's chat with the sum and two link buttons,
 *Open in the office* and *PDF preview* (link buttons are choices with `href`: only app targets `#...` and the PDF preview).
 
 Payments: Kalmido has no bank access. The agent reads an incoming payment from what a person gave it (e.g. a pasted bank

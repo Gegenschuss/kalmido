@@ -23,7 +23,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, inv_calc, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
-from .invoices import inv_paid_map  # 2.355.0 C (#2840)
+from . import invoices as _inv  # 2.355.0 C (#2840); 2.354.0 B (#2836): the module, invoices imports abschlag too (cycle)
 from .pdf import pdf_date  # 2.296.0 B (#3175)
 
 ABS_TYPES = ("", "progress", "final")
@@ -112,7 +112,7 @@ def abs_skonto_taken(c, oid, r):
     sk = abs_skonto_numbers(r, _j(r["totals"], {}).get("gross") or 0)
     if sk is None:
         return None
-    p = inv_paid_map(c, oid, [r["id"]]).get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
+    p = _inv.inv_paid_map(c, oid, [r["id"]]).get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
     rest = money(dec(_j(r["totals"], {}).get("gross") or 0)) - p["paid"] - p["credits"]
     if rest <= 0 or not abs_skonto_covered(c, oid, r, p["credits"]):
         return None
@@ -215,6 +215,23 @@ def _pack(c, oid):
     return s, office_pack_for(s)
 
 
+def _credited(c, oid, pid, pack, doc_items):
+    """2.354.0 B (#2836): ({tax key: net}, {tax key: net in EUR}, {tax key: tax}) of the finalised credit notes on progress
+    invoice pid (a partial credit lowers what the final invoice deducts)."""
+    nets, eur, tax = {}, {}, {}
+    for cr in c.execute("SELECT id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND locked_at<>''",
+                        (oid, pid)).fetchall():
+        t = _j(cr["totals"], {})
+        for k, v in _bases(t.get("lines")).items():
+            nets[k] = nets.get(k, Decimal(0)) + v
+        for k, v in _eur_bases(doc_items(c, cr["id"], oid), pack).items():
+            eur[k] = eur.get(k, Decimal(0)) + v
+        for tl in t.get("tax_lines") or []:
+            k = tl.get("rate_key")
+            tax[k] = tax.get(k, Decimal(0)) + dec(tl.get("amount") or 0)
+    return nets, eur, tax
+
+
 def abs_offer_info(c, oid, offer):
     """{net, progress: [...], billed, remaining} of a quotation (net in EUR, as the invoices' rates)."""
     from .docs import doc_items
@@ -226,6 +243,7 @@ def abs_offer_info(c, oid, offer):
     out, billed = [], Decimal(0)
     for x in rows:
         pn = sum(_eur_bases(doc_items(c, x["id"], oid), pack).values(), Decimal(0))
+        pn -= sum(_credited(c, oid, x["id"], pack, doc_items)[1].values(), Decimal(0))  # 2.354.0 B (#2836): less partial credit notes
         billed += pn
         t = _j(x["totals"], {})
         out.append({"id": x["id"], "number": x["number"], "date": x["date"], "status": x["status"], "locked": bool(x["locked_at"]),
@@ -315,6 +333,9 @@ def abs_deductions(c, oid, offer, lang, cur):
                 nets.setdefault(ln["tax"], Decimal(0))
                 nets[ln["tax"]] += dec(ln.get("net") or ln.get("total") or 0)
         eur = _eur_bases(doc_items(c, x["id"], oid), pack)
+        cn, ce, ct = _credited(c, oid, x["id"], pack, doc_items)  # 2.354.0 B (#2836): the deduction = net per rate less the credit notes on it
+        for k in ce:
+            eur[k] = eur.get(k, Decimal(0)) - ce[k]
         mf = inv_money_fields(x, pm)
         paid = _t("paid", lang) if dec(mf["open"]) <= 0 else _t("open", lang)
         dt = x["date"] or ""
@@ -322,10 +343,10 @@ def abs_deductions(c, oid, offer, lang, cur):
         if calc_lang(lang) != "de" and len(dt) == 10:  # 2.296.0 F (#3175): like the head and the skonto line (was ISO in English)
             dtext = pdf_date(dt, calc_lang(lang))
         for k in sorted(eur, key=lambda k: TAX_KEYS.index(k)):
-            if eur[k] == 0:
+            if eur[k] <= 0:  # 2.354.0 B (#2836): credited in full at this rate (was == 0; abs() made a credit above it a deduction)
                 continue
-            net = nets.get(k, eur[k])
-            tax = dec((taxes.get(k) or {}).get("amount") or 0)
+            net = nets.get(k, eur[k] + ce.get(k, 0)) - cn.get(k, Decimal(0))
+            tax = dec((taxes.get(k) or {}).get("amount") or 0) - ct.get(k, Decimal(0))
             pct = (taxes.get(k) or {}).get("pct") or (dstr(pack_rate(pack, k)) if x["vat_mode"] != "novat" else "0")
             out.append({"kind": "discount", "service_id": None, "title": _t("deduct", lang, num=x["number"], date=dtext),
                         "detail": _t("deduct_detail", lang, net=fmt_money(net, lang, cur), pct=_pct_text(pct, lang), tax=fmt_money(tax, lang, cur),
@@ -352,15 +373,39 @@ def abs_final(c, oid, uid, offer, parts_mode=None, parts_title=None):
     return did
 
 
-def abs_before_finalize(c, oid, r):
+def abs_credit_check(c, oid, inv_):
+    """2.354.0 B (#2836): 409 for a credit note on a progress invoice that a finalised, not cancelled final invoice
+    deducts (the final invoice would keep deducting the cancelled part, it is never billed)."""
+    if inv_ is None or inv_["kind"] != "invoice" or _col(inv_, "inv_type") != "progress" or not _col(inv_, "source_doc_id"):
+        return
+    for f in c.execute("SELECT abs_refs FROM office_docs WHERE org_id=? AND kind='invoice' AND inv_type='final' AND source_doc_id=? "
+                       "AND locked_at IS NOT NULL AND locked_at<>'' AND status NOT IN ('draft', 'cancelled')", (oid, inv_["source_doc_id"])).fetchall():
+        if inv_["id"] in [int(x) for x in _j(f["abs_refs"] or "[]", [])]:
+            raise Denied(409, tr("The final invoice already deducts this progress invoice; cancel the final invoice first"))
+
+
+def _stale_deductions(c, oid, r, items):
+    """2.354.0 B (#2836): True when a deduction line of final invoice draft r no longer matches its progress invoice
+    (a partial credit note finalised after the draft). Only the lines this module wrote (by their title) are compared."""
+    _ids, ded = abs_deductions(c, oid, {"id": r["source_doc_id"]}, r["lang"], r["currency"])
+    want = {(x["title"], x["tax"]): money(dec(x["rate"])) for x in ded}
+    titles = {x["title"] for x in ded}
+    have = {(x["title"], x["tax"]): money(dec(x["rate"])) for x in items if x.get("kind") == "discount" and x.get("title") in titles}
+    return any(k not in want or want[k] != v for k, v in have.items())
+
+
+def abs_before_finalize(c, oid, r, items=None):
     """A final invoice: the finalised, not cancelled progress invoices of its quotation are still those it deducts."""
+    if r["kind"] == "credit" and _col(r, "cancels_id"):  # 2.354.0 B (#2836): also a credit draft made before the final invoice
+        abs_credit_check(c, oid, c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone())
+        return
     if r["kind"] != "invoice" or _col(r, "inv_type") not in ("final", "progress") or not _col(r, "source_doc_id"):
         return
     abs_final_done(c, oid, r["source_doc_id"], but=r["id"])  # 2.120.0 (review M3): two drafts, a double click, an agent
     if _col(r, "inv_type") != "final":
         return
     now = sorted(x["id"] for x in abs_progress_of(c, oid, r["source_doc_id"], locked_only=True))
-    if now != sorted(int(x) for x in _j(_col(r, "abs_refs") or "[]", [])):
+    if now != sorted(int(x) for x in _j(_col(r, "abs_refs") or "[]", [])) or (items is not None and _stale_deductions(c, oid, r, items)):
         raise BadInput(tr("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
 
 

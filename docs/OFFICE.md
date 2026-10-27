@@ -1710,6 +1710,11 @@ lowers the invoice's open amount; over the full gross it sets the invoice to `ca
 number series and print "Credit note for invoice no. ...". Since 2.40.0 a credit note keeps the e-invoice format of its
 invoice (XRechnung for a client with a buyer reference), has its own closing (pack text `credit_closing`) and its XML
 carries no "payable on receipt" terms.
+2.354: a credit note always comes from its invoice: `POST /api/office/docs {kind: "credit"}` and copying a credit note
+answer 409 (credit notes made before stay readable). It keeps the invoice's currency, exchange rate, client, VAT mode and
+VAT note (a change in the draft: 409; the editor shows the fields locked) and the VAT rates frozen with the invoice
+(`tax_snapshot`), even after the country pack changed. Finalising checks the credit notes of an invoice per VAT rate:
+together never more than the invoice at that rate (409).
 
 **Changing the language of a draft** (2.40.0): `PATCH /api/office/docs/<id> {lang}` sets intro, closing (settings, pack or
 framework contract), the rights texts, the rights note and the titles of catalogue positions anew in the new language,
@@ -1732,6 +1737,12 @@ covers that day, on the day of the correction, the note names the payment's day;
 day either way), `reverses_id` = the payment; the list shows both
 (the payment marked `reversed`), the balance is right again, the books and the DATEV export see both lines. A reversal
 or a payment already reversed cannot be reversed (409).
+2.354: a **refund** is a payment on a finalised credit note (same routes, the bank reconciliation matches money paid out
+to it): at most `refund_open` of the credit note = what the customer paid beyond the invoice (payments plus credit notes
+over its gross, less the refunds booked), 409 above. Invoice and credit note answer `refund_open`; the invoice shows
+"Refund open" while money is still to be paid back. The books (VAT on payments received, income statement), the key
+figures, the cash flow and the DATEV export count a refund negative, so a paid invoice cancelled in full and refunded
+counts 0.
 
 ### Kept by law
 

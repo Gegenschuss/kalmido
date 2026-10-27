@@ -1827,6 +1827,7 @@ body.tdrag .sdrop{display:flex}
 .tpk .tpl{color:var(--muted);font-size:var(--fs-s)}
 .tpin{flex:1;font:var(--fs-l) var(--mono);font-variant-numeric:tabular-nums;padding:.375rem .5rem}
 .tpin.bad{border-color:var(--danger)}
+#l-name[aria-invalid="true"]{border-color:var(--danger)}  /* 2.354.0 C (#3013): New project without a name */
 .tpcols{display:grid;grid-template-columns:3fr 2fr;gap:.625rem}
 .tph,.tpm{display:grid;gap:2px;align-content:start}
 .tph{grid-template-columns:repeat(6,1fr)}
@@ -2650,6 +2651,8 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   @container dtop (min-width:23rem) and (max-width:27.99rem){
     .dtop .dq{padding:0 .625rem}
     .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+    .dtop .dq[data-d="-1"]{padding:0}  /* 2.354.0 C (#3326): "-1 day" stays a small arrow on a phone: the date keeps its room */
+    .dtop .dq[data-d="-1"] .dql{display:none}
   }
 }
 #detail{overflow-x:hidden}
@@ -3074,6 +3077,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 #top .cmdbar{height:2.25rem;border-radius:1.125rem;padding:0 .5rem 0 .75rem;background:var(--bg2);flex:1 1 15rem;max-width:23.75rem;min-width:9rem;width:auto}
 #top .cmdbar>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #top:is(.tl1,.tl2,.tl3,.tl4) .cmdbar{flex:none;min-width:0;padding:0 .625rem}
+@media not all and (hover:hover) and (pointer:fine){ #top .cmdbar .kbs{display:none} }  /* 2.354.0 C (#3013): no "Ctrl K" hint where there is no keyboard to press it on */
 #top .tnew{height:2rem;border-radius:var(--radius);padding:0 .75rem;font-weight:600;font-size:var(--fs-m);flex:none}
 #top:is(.tl1,.tl2,.tl3,.tl4) .tnew>span{display:none}
 #top:is(.tl1,.tl2,.tl3,.tl4) .tnew{padding:0;width:2rem}
@@ -4948,7 +4952,11 @@ button.lkchip:hover{border-color:var(--accent)}
   @container dtop (min-width:20rem) and (max-width:27.99rem){
     .dtop .dq{padding:0 .625rem}
     .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+    .dtop .dq[data-d="-1"]{padding:0}  /* 2.354.0 C (#3326): "-1 day" stays a small arrow on a phone: the date keeps its room */
+    .dtop .dq[data-d="-1"] .dql{display:none}
   }
+  /* 2.354.0 C (#3326): a 360 px phone with three quick buttons: only "Today" keeps its word, so the date stays whole */
+  @container dtop (max-width:21.99rem){ .dtop:has(.dq[data-d="-1"]) .dq:not([data-d="0"]){padding:0} .dtop:has(.dq[data-d="-1"]) .dq:not([data-d="0"]) .dql{display:none} }
 }
 /* UX-56: "Saved" in the task header for a moment after a change reached the server */
 .dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok-t);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
@@ -5970,6 +5978,10 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 [data-ly="today"] > .lyb > .lymore{background:none}
 [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:2.25rem}
 @media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] > .lymore{top:0} [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:3rem} }
+/* 2.354.0 C (#3009): the head of "Overdue" carries "All to today" / "Another day…": its right edge keeps clear of the block's "…"
+   (the button's width + its offset), so the two never overlap at any width */
+[data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:3.25rem}
+@media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:4rem} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
 /* 2.46.2 (#1452): the evening review card (only after the end of the working hours) keeps its "Hide for today" x clear of the … button */
@@ -8206,7 +8218,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #srail .srbs,#srail .srfoot{display:flex;flex-direction:column;gap:.125rem}
 #srail .srfoot{margin-top:auto;padding-top:.5rem;align-items:stretch}
 .srb{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1875rem;width:100%;padding:.4375rem .125rem .375rem;border-radius:var(--radius);color:var(--muted);font-size:.6875rem;line-height:1.15;text-align:center}
-.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;hyphens:auto;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names (Einstellungen, Gewohnheiten) wrap to a second line instead of being cut */
+.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:break-word;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names (Einstellungen, Gewohnheiten) wrap to a second line instead of being cut */  /* 2.354.0 C (#3013): no hyphenation (it cut words with a hyphen sign) */
 /* 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar" off: icons only, a narrower bar (detail.js srW), the name as title */
 :root.rail-nolabel{--srW:3.25rem}
 :root.rail-nolabel .srb .srbn{display:none}

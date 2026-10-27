@@ -80,7 +80,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // the setting: "Workspace colour", Private's default = purple
   w.eval(`settingsModal(lmOrgPaneOn() ? 'org' : 'account')`);
   const pane = await until(() => d.querySelector('.wsp-pane'));
-  check(pane && pane.querySelector('h5')?.textContent === 'Workspace colour' && /stripe on top of the sidebar/.test(pane.querySelector('.shint')?.textContent || ''), '#2389: the setting is called "Workspace colour", the hint names the stripe');
+  check(pane && pane.querySelector('h5')?.textContent === 'My colour' && /stripe on top of the sidebar/.test(pane.querySelector('.shint')?.textContent || ''), '#2389: the setting is called "My colour" (#3013), the hint names the stripe');
   const pdef = pane?.querySelector('.wsp-row[data-wsp="private"] [data-wspc=""]');
   check(pdef && /accent/.test(pdef.getAttribute('style')) && pdef.getAttribute('aria-label') === 'Default (Kalmido purple)', '#2389: Private\'s default swatch is the accent');
   d.querySelectorAll('.modal').forEach(x => x.remove());

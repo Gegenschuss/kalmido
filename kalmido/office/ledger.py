@@ -332,6 +332,9 @@ def ofx_finalize(c, oid, uid, did):
     pack = office_pack_for(s) or {}
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the required fields of an invoice (400 with the list), due date
         write_lock(c, f"office_num_{int(oid)}")  # 2.126.0 A (#1979 F5): the date check and the number in one go (docs._assign_number)
+        if r["kind"] == "credit":  # 2.354.0 review (#2838): the required-field check with the invoice's rates like the totals
+            from .invoices import inv_credit_pack
+            pack = inv_credit_pack(c, oid, r, pack)
         inv_before_finalize(c, oid, r, s, pack)
         r = doc_row(c, oid, did)
         from .periodlock import period_need_open
@@ -341,6 +344,9 @@ def ofx_finalize(c, oid, uid, did):
         r = doc_row(c, oid, did)
     lang = doc_lg(r["lang"])  # 2.185.0 C (#2520): every app language; the pack's words / texts in it (doclang.doc_pack)
     pack = doc_pack(pack, lang)
+    if r["kind"] == "credit":
+        from .invoices import inv_credit_pack
+        pack = inv_credit_pack(c, oid, r, pack)  # 2.354.0 D (#2838): its snapshot freezes the invoice's rates too
     t = doc_totals(c, oid, r)
     lines = {ln.get("id"): ln for ln in t["lines"] if ln.get("kind") in ("item", "discount")}
     for it in doc_items(c, did, oid):

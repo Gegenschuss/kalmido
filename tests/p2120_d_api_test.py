@@ -97,7 +97,14 @@ check(all(float(x["rate"]) == 0 for x in d["items"] if x["kind"] == "service") a
 check(d["client_id"] == CL and d["project_title"] == "Filmprojekt" and d["number"] == "" and d["number_at_finalize"], "client / project taken over, number at finalising")
 check(sql("SELECT source_doc_id FROM office_docs WHERE id=?", (LS,))[0][0] == OFF, "source noted")
 check(A.post(B + f"{D}/{LS}/delivery", json={}).status_code == 409, "no delivery note from a delivery note")
-cr = A.post(B + D, json={"kind": "credit"}).json()["id"]
+# 2.354.0 (#2838): no credit note without an invoice any more (409); the credit note of a finalised invoice
+check(A.post(B + D, json={"kind": "credit"}).status_code == 409, "#2838: no credit note without an invoice (409)")
+A.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Studio GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt",
+                                                    "country": "DE", "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}})
+IV = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "items": [item("Kamera", 1, 500)]}).json()["id"]
+r = A.post(B + f"{D}/{IV}/finalize")
+check(r.ok, "an invoice finalised for its credit note " + r.text[:200])
+cr = A.post(B + f"{D}/{IV}/credit").json()["id"]
 check(A.post(B + f"{D}/{cr}/delivery", json={}).status_code == 409, "no delivery note from a credit note")
 # lists
 check([x["id"] for x in A.get(B + D + "?kind=delivery").json()["docs"]] == [LS], "own list")

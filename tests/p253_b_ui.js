@@ -167,7 +167,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.close();
   w = await boot({user: 'bob'}); d = w.document;
   w.eval(`settingsModal(lmOrgPaneOn() ? 'org' : 'account')`); await until(() => d.querySelector('.wscpick'));
-  check(d.querySelector('.wscpick') && [...d.querySelectorAll('.wscpick [data-wscp]')].every(b => b.disabled), '#1474: a member sees the colour, cannot change it');
+  check(!d.querySelector('.wscpick'), '#1474 (#3013): a member has no organisation colour picker');  // 2.354.0 C (#3013): was a locked picker
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

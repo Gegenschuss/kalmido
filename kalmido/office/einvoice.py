@@ -96,7 +96,7 @@ def _doc_cat(m):
     subject to VAT") carries no VAT id of seller or buyer (BR-O-02), so the seller needs its register number (BT-30) for
     BR-CO-26; without one the document stays G as before (BR-G-02 wants the seller's VAT id, which it keeps). 2.357.0 (#3218):
     the seller's tax number as seller identifier (BT-29, see _seller_id) satisfies BR-CO-26 as well, so O without a register."""
-    novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
+    novat = m.get("vat_mode") == "novat"  # 2.354.0 A (#2833): from vat_mode alone (was "or vat_note_key": AE on a taxed invoice, BR-CO-15)
     if not novat:
         return False, "S", ""
     cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", ""))

@@ -119,7 +119,8 @@ check([str(half_days(x)) for x in ("4.6667", "4.75", "4.74", "0.2", "0.25", "0",
 q = office_calc({**DOC, "prod_quotient": "2,5"}, [it("A", "1,5", "1.234,56", prod=1)], PACK)
 check(q["lines"][0]["qty"] == 1.5 and q["lines"][0]["rate"] == 1234.56 and q["lines"][0]["total"] == 1851.84 and q["producing_days"] == 0.5, f"comma inputs: 1,5 x 1.234,56 = 1851.84 (1851.84), 1.5 / 2.5 = 0.6 -> 0.5 days, got {q['lines'][0]} {q['producing_days']}")
 h = office_calc(DOC, [it("A", 3, 33.333)], PACK)
-check(h["lines"][0]["total"] == 99.99 and h["lines"][0]["rate"] == 33.33, f"rates rounded to 2 places before multiplying (3 x 33.33 = 99.99, like the template): {h['lines'][0]}")
+# 2.354.0 A (#2831): the exact rate x qty, rounded once (was the rate rounded first: 3 x 33.33 = 99.99)
+check(h["lines"][0]["total"] == 100 and h["lines"][0]["rate"] == 33.333, f"exact rate before rounding (3 x 33.333 = 100.00): {h['lines'][0]}")
 check(office_calc(DOC, [it("A", 1, 10.005)], PACK)["net"] == 10.01, "half up, not banker's rounding")
 check(str(dec("1,234.56")) == "1234.56" and str(dec("1.234,56")) == "1234.56" and str(dec("4,5")) == "4.5" and str(dec("abc")) == "0" and str(dec(None)) == "0", "dec() reads both notations")
 check(fmt_money(1234.5, "de") == "1.234,50 €" and fmt_money(1234.5, "en") == "€1,234.50" and fmt_money(-23, "de", "USD") == "-23,00 $" and fmt_money(1234567.891, "en", "USD") == "$1,234,567.89", "money formats per language")
@@ -153,12 +154,14 @@ t = inv_calc({"lang": "de"}, [it("Webhosting (3 Monate)", 1, 105)])
 check(t["net"] == "105.00" and t["tax"] == "19.95" and t["gross"] == "124.95", f"credit note amounts: {t['net']} {t['tax']} {t['gross']}")
 # rounding at the 0.005 borders: half up per position and per tax rate
 t = inv_calc({"lang": "de"}, [it("a", 1, "0.005"), it("b", 3, "0.015")])
-check(t["lines"][0]["net"] == "0.01" and t["lines"][1]["net"] == "0.06" and t["net"] == "0.07" and t["tax"] == "0.01" and t["gross"] == "0.08",
-      f"half-up rounding (rate rounded to 2 places first, like the template: 0.015 -> 0.02): {[ln['net'] for ln in t['lines']]} {t['net']} {t['tax']} {t['gross']}")
+# 2.354.0 A (#2831): 3 x 0.015 = 0.045 -> 0.05 (was the rate rounded first: 3 x 0.02 = 0.06)
+check(t["lines"][0]["net"] == "0.01" and t["lines"][1]["net"] == "0.05" and t["net"] == "0.06" and t["tax"] == "0.01" and t["gross"] == "0.07",
+      f"half-up rounding of qty x exact rate: {[ln['net'] for ln in t['lines']]} {t['net']} {t['tax']} {t['gross']}")
 t = inv_calc({"lang": "de"}, [it("c", 1, "100.025")])
 check(t["lines"][0]["net"] == "100.03" and t["tax"] == "19.01", f"0.005 border on the rate: {t['lines'][0]['net']} tax {t['tax']}")
 t = inv_calc({"lang": "de"}, [it("d", 7, "14.285")])
-check(t["lines"][0]["net"] == "100.03" and t["tax"] == "19.01", f"rate 14.285 -> 14.29 before the product: {t['lines'][0]['net']}")
+# 2.354.0 A (#2831): 7 x 14.285 = 99.995 -> 100.00 (was 14.29 first: 100.03)
+check(t["lines"][0]["net"] == "100.00" and t["tax"] == "19.00" and t["lines"][0]["rate_text"] == "14,285 €", f"7 x 14.285 = 100.00: {t['lines'][0]['net']} {t['lines'][0]['rate_text']}")
 # a discount position: its amount is taken off (same tax class); no percent automation on invoices
 t = inv_calc({"lang": "de"}, RE663 + [{"kind": "discount", "title": "Nachlass", "qty": 1, "rate": 100, "tax": "standard"}])
 check(t["net"] == "34322.90" and t["tax"] == "6521.35" and t["gross"] == "40844.25" and t["lines"][-1]["kind"] == "discount" and t["lines"][-1]["total"] == -100 and t["lines"][-1]["net"] == "-100.00",

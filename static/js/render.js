@@ -145,7 +145,7 @@ function tabOverflow() {
 function renderTabs() {
   const {shown, more} = tabOverflow(), all = tabItems(), on = tabOn(all);
   // highlight "Mehr" when the current view is only reachable through it (overflow tab, unpinned module, search)
-  const moreOn = more.length > 0 && (on ? !shown.some(t => t.id === on) : (S.route.mod !== 'tasks' && S.route.mod !== 'news') || S.route.key === 'search');
+  const moreOn = more.length > 0 && !(S.viaDrawer && '#' + S.viaDrawer === location.hash) && (on ? !shown.some(t => t.id === on) : (S.route.mod !== 'tasks' && S.route.mod !== 'news') || S.route.key === 'search');
   // 2.31.0 (#1057): with "Search" in the tab bar the phone has ONE search: no magnifier in the header, no search field in the
   // drawer and no search button next to it (CSS body.tab-search); without the tab they stay, so search is always reachable
   document.body.classList.toggle('tab-search', shown.some(t => t.id === 'search'));
@@ -1134,7 +1134,7 @@ async function assignMenu(anchor, id) {
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
     ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
       ...ac_mi(p.user_id), on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),  // 2.47.1 (#1721): + the person's colour
-    ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])]);
+    ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])], null, null, tr('Assign'));  // 2.354.0 C (#3013): the sheet gets a heading
 }
 // ---- custom fields: display (chips on the rows, columns, detail panel)
 const numFmt = v => { const x = +v; return Number.isFinite(x) ? x.toLocaleString(LOCALE(), {maximumFractionDigits: 6}) : String(v); };

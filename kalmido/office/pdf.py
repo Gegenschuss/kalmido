@@ -714,13 +714,14 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
 
 
 # ---- number and date formats in the document language -------------------------------------------------------------
-def pdf_money(v, lang, currency, fmt=None):
+def pdf_money(v, lang, currency, fmt=None, places=2):
     """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en); fmt = the pack's formats (optional).
     2.185.0 C (#2520): without fmt nl / fr / es / it write the decimal comma like de. 2.296.0 B (#3175): the one format of
-    calc.fmt_money (language table, "$" like the model's texts); the pack's formats only for German documents."""
+    calc.fmt_money (language table, "$" like the model's texts); the pack's formats only for German documents.
+    2.354.0 A (#2831): places 3 / 4 for a unit price (pdf_rate_places)."""
     fmt = fmt or {}
     if str(lang or "de").split("-")[0] != "de" or not fmt:
-        return _pdf_fmt_money(v, lang, currency or "EUR")
+        return _pdf_fmt_money(v, lang, currency or "EUR", places)
     comma = str(lang or "").split("-")[0] in PDF_COMMA
     dec = fmt.get("decimal") or ("," if comma else ".")
     tho = fmt.get("thousands") or ("." if comma else ",")
@@ -729,13 +730,22 @@ def pdf_money(v, lang, currency, fmt=None):
     except (TypeError, ValueError):
         v = 0.0
     neg = v < 0
-    s = f"{abs(v):,.2f}".replace(",", "\x00").replace(".", dec).replace("\x00", tho)
+    s = f"{abs(v):,.{places}f}".replace(",", "\x00").replace(".", dec).replace("\x00", tho)
     sym = fmt.get("currency_symbol") or {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "")
     s = f"{sym} {s}" if (fmt.get("currency_pos") == "before") else f"{s} {sym}"
     return ("-" if neg else "") + s
 
 
-def _pdf_fmt_money(v, lang, currency):
+def pdf_rate_places(v):
+    """2.354.0 A (#2831): the places of a unit price on paper: 2, or 3 / 4 when it has them (0.125 -> 3)."""
+    try:
+        s = f"{float(v or 0):.4f}".rstrip("0")
+    except (TypeError, ValueError):
+        return 2
+    return max(2, min(4, len(s.split(".")[1]) if "." in s else 0))
+
+
+def _pdf_fmt_money(v, lang, currency, places=2):
     """2.296.0 B (#3175): calc.fmt_money (the package's, or calc.py next to this file when loaded on its own)."""
     global _PDF_CALC
     if _PDF_CALC is None:  # loaded on its own (tests): calc.py next to this file
@@ -745,7 +755,7 @@ def _pdf_fmt_money(v, lang, currency):
         sp.loader.exec_module(_c)
         _PDF_CALC = _c
     try:
-        return _PDF_CALC.fmt_money(v if v not in (None, "") else 0, lang, currency)
+        return _PDF_CALC.fmt_money(v if v not in (None, "") else 0, lang, currency, places)
     except (TypeError, ValueError, ArithmeticError):
         return _PDF_CALC.fmt_money(0, lang, currency)
 
@@ -1411,7 +1421,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 qty_s = " ".join(x for x in qty_two(ln) if x).strip()
                 # 2.296.0 E (#3170): too wide for the column: number and unit on two lines (each wrapped to the column)
                 q_lines = [qty_s] if pdf_text_width(qty_s, 8.8) <= c_qty - 6 else [w for x in qty_two(ln) if x for w in pdf_wrap(x, 8.8, c_qty - 6)]
-                rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
+                rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (pdf_money(ln["rate"], lang, cur, fmt, pdf_rate_places(ln["rate"])) if ln.get("rate") not in (None, "") else "")  # 2.354.0 A (#2831)
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") and c_vat else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
                 if np_:
