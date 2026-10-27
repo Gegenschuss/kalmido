@@ -5,6 +5,15 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.7] - 2026-10-27
+
+### Fixed
+- Calendar and timeline on a phone: a held event or bar no longer drops when a live update arrives during the hold; the view is redrawn after letting go (#3402).
+- Tests: p2130_ui, p2193_a_ui and p2193_b_ui run again (no longer skipped); p2130_ui waits for the bell after closing a task on a phone, p2193_a_ui / p2193_b_ui check that a redraw during a hold keeps the ghost (#3402).
+
+### Fixed
+- CI of 2.351.6: p289_b_ui waits for the grid to show the sorted order instead of reading it at once; a table load still running from the option saved before only marked a reload, so the sort returned before the grid was redrawn (#3402).
+
 ## [2.351.6] - 2026-10-27
 
 ### Fixed
@@ -8832,7 +8841,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.6...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.7...HEAD
+[2.351.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.7
 [2.351.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.6
 [2.351.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.5
 [2.351.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.4
