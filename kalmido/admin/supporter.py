@@ -8,7 +8,7 @@ key(s) below (no network): KSUP1.<base64url JSON>.<base64url signature>, JSON {"
 answer): clients get the kind, the date and the label only.
 Removing keeps the key one step back (sup_*_prev) so "Undo" can bring it back without the client ever holding the key:
 POST .../swap exchanges the current and the previous key (undo / redo of entering and removing alike).
-The quiet hint: at most once a year, admins only, not in the first 30 days of the instance, only while neither a server
+The quiet hint: at most once a year, admins only, not in the first year of the instance (2.320, #3291), only while neither a server
 licence nor an own licence exists, switchable off (user setting sup_nudge = 0; sup_nudge_at = the day it was shown)."""
 import base64
 import json
@@ -44,7 +44,7 @@ SUP_SHOP_LIVE = False
 SUP_PRICES = {"person": 25, "server": 100}
 SUP_CURRENCY = "EUR"
 SUP_NUDGE_DAYS = 365
-SUP_QUIET_DAYS = 30  # no hint in the first days after the instance was set up
+SUP_QUIET_DAYS = 365  # 2.320 (#3291): no hint in the first year after the instance was set up (was 30 days)
 
 
 def sup_url():

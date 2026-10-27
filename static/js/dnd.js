@@ -32,6 +32,7 @@ function markDrop(el, id, y) {
 }
 document.addEventListener('dragover', e => {
   if (!dragId) return;
+  if (ml_altOver(e, dragId)) { mdLast = null; dsEdge(e.clientY); return; }  // 2.320.0 (#3289): Alt onto a project in the sidebar = show also there
   if (dgOver(e, dragId)) { mdLast = null; e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
   if (markDrop(e.target, dragId, e.clientY)) e.preventDefault();
   dsEdge(e.clientY);
@@ -51,6 +52,7 @@ document.addEventListener('drop', async e => {
   if (!dragId) return;
   e.preventDefault();
   const id = dragId; dragId = null;
+  if (ml_altDrop(e, id)) return;  // 2.320.0 (#3289): multilist.js
   if (dgDrop(e, id)) return;  // 2.43.0 (#1330, #1003): dragmulti.js
   dropTask(id, e.target, e.clientY);
 });

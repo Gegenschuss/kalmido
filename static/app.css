@@ -7611,6 +7611,26 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .mlm svg.i{flex:0 0 auto;color:var(--accent)}
 @media (max-width:40rem){.meta .mlm{max-width:8rem}}
+/* 2.320.0 (#3289): the field Projects in the task panel; Alt onto a project in the sidebar (the hint while dragging) */
+#detail .dmlp{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.125rem 0 .5rem;font-size:var(--fs-s);color:var(--text2)}
+#detail .dmlpk{color:var(--muted);margin-right:.125rem}
+#detail .mlp{display:inline-flex;align-items:center;gap:.25rem;max-width:14rem;min-height:1.75rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:999rem;min-width:0}
+#detail .mlp.own{background:var(--bg3)}
+#detail .mlp>span,#detail .mlpn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#detail .mlp svg.i{flex:0 0 auto;color:var(--muted)}
+#detail .mlp:has(.mlpx){padding-right:0}
+#detail .mlpn{display:inline-flex;align-items:center;gap:.25rem;min-width:0;min-height:1.5rem;color:inherit}
+#detail .mlpn:hover{color:var(--text)}
+#detail .mlpx{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:1.5rem;min-height:1.5rem;border-radius:999rem;color:var(--muted)}
+#detail .mlpx:hover{background:var(--bg3);color:var(--text)}
+#detail .mlpadd{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem;min-width:1.75rem;justify-content:center;padding:0 .5rem;border:1px dashed var(--line2);border-radius:999rem;color:var(--accent)}
+#detail .mlpadd:hover{background:var(--accent-soft)}
+.srow.mlalt,.srow.mlno,.srow.mlhint{position:relative}
+.srow.mlalt{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.srow.mlno{box-shadow:inset 0 0 0 2px var(--line2)}
+.srow.mlalt::after,.srow.mlno::after,.srow.mlhint::after{content:attr(data-ml);position:absolute;right:.375rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
+  padding:.125rem .5rem;border-radius:999rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:600;white-space:nowrap;max-width:75%;overflow:hidden;text-overflow:ellipsis}
+.srow.mlno::after,.srow.mlhint::after{background:var(--bg4);color:var(--text2);font-weight:400}
 /* 2.71.0 A (#1457) rules of a list: rows in the list settings, the mark on rule comments, the proposal card */
 .rul-row{align-items:flex-start;gap:.5rem}
 .rul-row.off .rul-txt{opacity:.6}

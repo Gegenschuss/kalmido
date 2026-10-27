@@ -14556,5 +14556,18 @@
   "Only money paid out can be a refund": "Nur ausgehendes Geld kann eine Erstattung sein",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Eine Gutschrift behält Währung, Kurs, Kunde und Umsatzsteuer ihrer Rechnung",
   "Taken from the invoice": "Aus der Rechnung übernommen",
-  "No pages to list here.": "Hier gibt es keine Seiten zum Auflisten."
+  "No pages to list here.": "Hier gibt es keine Seiten zum Auflisten.",
+  "Only main tasks": "Nur Hauptaufgaben",
+  "Its own project": "Eigenes Projekt der Aufgabe",
+  "Already shown here": "Wird hier schon angezeigt",
+  "Not possible for this project": "In diesem Projekt nicht möglich",
+  "Already in {0} further projects": "Schon in {0} weiteren Projekten",
+  "Also in…": "Auch in …",
+  "{0} skipped (not possible there)": ["{0} übersprungen (dort nicht möglich)", "{0} übersprungen (dort nicht möglich)"],
+  "Not possible for the selected tasks": "Für die markierten Aufgaben nicht möglich",
+  "{0} task is now also in {1}": ["{0} Aufgabe ist jetzt auch in {1}", "{0} Aufgaben sind jetzt auch in {1}"],
+  "Option: also show here": "Option: auch hier anzeigen",
+  "Alt: also show here": "Alt: auch hier anzeigen",
+  "{0} task also in {1}": ["{0} Aufgabe auch in {1}", "{0} Aufgaben auch in {1}"],
+  "Also show in {0}": "Auch in {0} anzeigen"
 }

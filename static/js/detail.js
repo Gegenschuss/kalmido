@@ -603,6 +603,7 @@ function renderDetail0() {
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''}">
       ${crumbsHtml(t, l, parent)}
+      ${ml_detailHtml(t)}${''/* 2.320.0 (#3289): the field Projects (multilist.js) */}
       ${le2uLk ? le2u_detailHtml(t) : ''}<div class="dtitle" ${le2uLk ? 'hidden' : ''}><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${tlkR ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
       ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}

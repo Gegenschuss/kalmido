@@ -621,11 +621,16 @@ of the same organisation (or the same personal office) whose e-mail or e-mail fo
 - **Show also in project…** in a task's menu (and in the task panel's project path) puts the task into a further list of the same
   workspace without copying it: it is one task, every change shows everywhere. *Remove from <project>* takes it out of that
   project again; the task stays. Both are one undo step, and the task's history notes them.
+- *Since 2.320:* the task panel shows the field **Projects**: the task's own project (fixed) and every further one; **+** adds
+  one, **x** removes it (phone and computer alike). On a computer, hold **Alt** (Option on a Mac) while dropping a task onto a
+  project in the sidebar: it is then shown there too instead of moved (the project says so while you drag). For several
+  selected tasks, **Show also in project…** sits in the selection panel (on a phone under More); subtasks and tasks that
+  cannot go there are skipped and counted. At most 10 further projects per task, main tasks only.
 - In the further list the row says **From <its project>**, in its own project **Also in <project>**. The further project has its own
   place and column for it: dragging it there (also on the board) moves only that place, never the task into another project.
 - **Who sees it** is decided by the task's own project only. Someone who sees only the further project does not see the task
   there (nor in search, the calendar feed, a public link or an export). Projects of another organisation, private projects of
-  an organisation's task (and the other way round), health projects and locked projects cannot be used.
+  an organisation's task (and the other way round), health, budget and locked projects cannot be used.
 - It counts once: in statistics, Today, the calendar, search and exports. The sidebar counts it in each project it is in.
 
 <a id="rules-in-lists-2710"></a>

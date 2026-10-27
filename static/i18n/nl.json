@@ -14556,5 +14556,18 @@
   "Only money paid out can be a refund": "Alleen uitgaand geld kan een terugbetaling zijn",
   "A credit note keeps the currency, exchange rate, client and VAT of its invoice": "Een creditnota behoudt valuta, wisselkoers, klant en btw van haar factuur",
   "Taken from the invoice": "Overgenomen van de factuur",
-  "No pages to list here.": "Hier zijn geen pagina's om te tonen."
+  "No pages to list here.": "Hier zijn geen pagina's om te tonen.",
+  "Only main tasks": "Alleen hoofdtaken",
+  "Its own project": "Eigen project van de taak",
+  "Already shown here": "Wordt hier al getoond",
+  "Not possible for this project": "Niet mogelijk in dit project",
+  "Already in {0} further projects": "Al in {0} andere projecten",
+  "Also in…": "Ook in…",
+  "{0} skipped (not possible there)": ["{0} overgeslagen (daar niet mogelijk)", "{0} overgeslagen (daar niet mogelijk)"],
+  "Not possible for the selected tasks": "Niet mogelijk voor de geselecteerde taken",
+  "{0} task is now also in {1}": ["{0} taak staat nu ook in {1}", "{0} taken staan nu ook in {1}"],
+  "Option: also show here": "Option: ook hier tonen",
+  "Alt: also show here": "Alt: ook hier tonen",
+  "{0} task also in {1}": ["{0} taak ook in {1}", "{0} taken ook in {1}"],
+  "Also show in {0}": "Ook in {0} tonen"
 }
