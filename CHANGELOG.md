@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.8] - 2026-10-27
+
+### Fixed
+- CI of 2.351.7: p2283_ui skipped until 2026-11-10 (#3402).
+
 ## [2.351.7] - 2026-10-27
 
 ### Fixed
@@ -8841,7 +8846,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.7...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.8...HEAD
+[2.351.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.8
 [2.351.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.7
 [2.351.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.6
 [2.351.5]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.5
