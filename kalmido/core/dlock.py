@@ -114,7 +114,7 @@ def dl_task_ids(c, uid):
     # 2.235.0 B2 (#2902): one base query per kind (the mail part can use the partial index tasks_mail_list), scoped once
     base, args = [], [int(uid), int(uid)]
     if d["_mail"]:
-        base.append("SELECT t.id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.tt_id LIKE 'mail:%' AND l.org_id IS NULL"
+        base.append("SELECT t.id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.tt_id LIKE 'mail:%' AND l.org_id IS NULL"  # pg-ok: the prefix is always lower case; LIKE matches the partial index
                     " AND t.list_id IN (SELECT id FROM s)")
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
@@ -165,7 +165,7 @@ def dl_tasks_locked(c, uid, tids):
     if d["_lareas"]:
         cond.append(f"(COALESCE(l.life, '') IN ({','.join(repr(x) for x in d['_lareas'])}) AND l.org_id IS NULL)")
     if d["_mail"]:
-        cond.append("(t.tt_id LIKE 'mail:%' AND l.org_id IS NULL)")
+        cond.append("(t.tt_id LIKE 'mail:%' AND l.org_id IS NULL)")  # pg-ok: the prefix is always lower case (tasks_mail_list)
     if d["_tags"]:
         q = ",".join("?" * len(d["_tags"]))
         cond.append(f"EXISTS (SELECT 1 FROM task_tags x WHERE x.task_id=t.id AND lower(x.tag) IN ({q}))")

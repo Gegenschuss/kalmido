@@ -60,6 +60,8 @@ function lpLive(v, ch, n, inDelta) {
 }
 // what the sidebar and the rows show of the light areas (a change of it is drawn, nothing else)
 const lpSideSig = () => JSON.stringify([(S.agents || []).map(x => [x.id, x.chat_unread, x.approvals_open, x.waiting, x.status]), S.team, S.news?.unread, S.news?.unread_me]);
+// 2.351.1: the tasks as one order-free number (ids + change times): a whole-state follow-up redraws the view only when they moved
+const lpTaskSig = () => { let n = 0, h = 0; for (const t of S.tasks.values()) { n++; h = (h + t.id * 7919 + (Date.parse(t.updated_at) || 0) % 1e9) % 2147483647; } return n + ':' + h; };
 function lpRowSig() { const o = []; for (const t of S.tasks.values()) if (t.comment_count || t.unread || t.approvals_open) o.push(t.id, t.comment_count, t.unread, t.approvals_open || 0); return o.join(','); }
 async function lpFollow() {
   clearTimeout(lpT); lpT = 0;  // 2.351.0 D (#2785): called early (not by its timer): the timer must not run it a second time later
@@ -69,11 +71,13 @@ async function lpFollow() {
   try { ok = await lpDelta(S.v, ['tasks', ...areas], undefined, since); } catch { ok = false; }  // 2.280.0 A (#3109)
   if (!ok) {  // the server answered full: as before
     S.lpN.state++;
+    const ts = lpTaskSig();
     let r; try { r = await load(true); } catch { return; }
     if (r === 'brake') { for (const k of areas) lpAreas.add(k); if (!lpT) lpT = setTimeout(lpFollow, 4000); return; }  // 2.280.0 F (#3109): held back: again later
     // 2.351.0 D (#2785): the whole state may bring more than the light counters (a task deleted on another device meanwhile):
-    // it took S.v, so the poll sees nothing new any more -> drawn bundled like the poll's full way (lpDraw checks only counters)
-    td_renderSoon();
+    // it took S.v, so the poll sees nothing new any more -> drawn bundled like the poll's full way (lpDraw checks only counters);
+    // 2.351.1: only when the tasks moved - else a redraw dropped what the view held (the timeline's hold ghost, its scroll)
+    if (lpTaskSig() !== ts) td_renderSoon();
   }
   lpDraw(side, rows, areas);
 }

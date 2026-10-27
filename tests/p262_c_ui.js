@@ -48,7 +48,7 @@ const FEAT = 'cal,comments,collab,files,docs';
 
   // ================= #1485 the sticky head of the list settings and the folder settings
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
-  check(/\.lmodal \.card>\.lhdr,\.fsmodal \.card>\.lhdr\{[^}]*position:sticky;top:0/.test(css), '#1485: CSS: the settings head is sticky');
+  check(/\.lmodal \.card>\.lhdr,\.fsmodal \.card>\.lhdr\{[^}]*position:sticky;top:(0|-[\d.]+rem)/.test(css), '#1485: CSS: the settings head is sticky');  // 2.351.1: since #2745 it sits at the card edge (top: minus the padding)
   w.eval(`listModal(${L1})`); await sleep(500);
   const hd = d.querySelector('.lmodal .lhdr');
   check(hd && hd.parentElement.classList.contains('card') && hd.querySelector('.ssaved'), '#1485: the list settings head (Saved · Undo) is a direct child of the scrolling card');

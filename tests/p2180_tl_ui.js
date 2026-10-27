@@ -334,7 +334,10 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
     await ev(`(() => { const i = document.querySelector('#tl-new-in'); i?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); return 1; })()`); await sleep(300);
     // review R10: scrolled into the month, its name still shows at the left of the visible range (sticky)
     const mo = await ev(`(() => { const sc = document.querySelector('#tlscroll'), nr = document.querySelector('.tl-headrow .tl-name').getBoundingClientRect().right, dw = tlDW();
-      const ms = [...document.querySelectorAll('.tl-headrow .tl-m')], m = ms.find(x => { const r = x.getBoundingClientRect(); return r.left < nr + 1 && r.right > nr + 6 * dw; }); if (!m) return {none: true};
+      const ms = [...document.querySelectorAll('.tl-headrow .tl-m')], into = x => { const r = x.getBoundingClientRect(); return r.left < nr + 1 && r.right > nr + 6 * dw; };
+      // 2.351.1: near a month's end (e.g. on 27.10. at 390 px) no month reaches 6 days into view: start 2 days into a long month
+      if (!ms.some(into)) { const lg = ms.find(x => x.getBoundingClientRect().width > 12 * dw); if (lg) sc.scrollLeft += lg.getBoundingClientRect().left - nr + 2 * dw; }
+      const m = ms.find(into); if (!m) return {none: true};
       const r0 = m.getBoundingClientRect(); sc.scrollLeft += 3 * dw; const s = m.querySelector('span').getBoundingClientRect(), r1 = m.getBoundingClientRect();
       return {t: m.textContent, sl: s.left, nr, ml: r1.left, w: s.width}; })()`);
     check(!mo.none && (mo.sl >= mo.nr - 1 && mo.sl <= mo.nr + 12 && mo.ml < mo.nr - 10 && mo.w > 20), `${tag}: review R10: the month name sticks right of the names when scrolled into the month ` + JSON.stringify(mo));

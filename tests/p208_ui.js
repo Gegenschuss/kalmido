@@ -103,6 +103,7 @@ async function swTests() {
   await call('PATCH', '/api/settings', {lang: 'en'});
 
   // ================= #320 / 2.13.2 (#478 N9): sending keeps the keyboard on a phone too, the desktop keeps typing
+  await call('PATCH', '/api/settings', {chat_kbd_agent: false});  // 2.351.1: since 2.235.0 D (#2899) phones close the keyboard by default; this checks the switch off
   w = await boot({user: 'alice', mobile: true, hash: 'agents/' + AG}); d = w.document; await idle(w);
   let ci = d.querySelector('#chat-in');
   ci.focus(); ci.value = 'Hello from the phone'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));

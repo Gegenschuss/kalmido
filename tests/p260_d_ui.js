@@ -64,7 +64,7 @@ const FEAT = 'cal,comments,collab,clients,office';
   // sideways instead of wrapping (design variant A of #2180), the active tab in sight
   // 2.152.2 (#2617): a computer has no rail any more: its points sit in the panel #side (one per line), a phone keeps .ofpb
   const tabs = `(() => { const bar = document.querySelector('#view .ofpb') || document.querySelector('#side [data-ofm]')?.closest('#side'); if (!bar) return null; const b = bar.getBoundingClientRect(); const bs = [...bar.querySelectorAll('[data-ofm]')], ts = bs.map(x => x.getBoundingClientRect());
-    const row = bar.querySelector('.ofpts'), rb = row && row.getBoundingClientRect(), on = bar.querySelector('[data-ofm].on'), ob = on && on.getBoundingClientRect();
+    const row = bar.querySelector('.ofpts'), rb = row && row.getBoundingClientRect(), on = bar.querySelector('[data-ofm].on, [data-ofm][aria-current="page"]'), ob = on && on.getBoundingClientRect();
     const k = document.querySelector('.office .ofdkinds'); const kb = k && k.getBoundingClientRect();
     return JSON.stringify({rail: bar.id === 'side', n: ts.length, inside: ts.every(r => r.left >= b.left - 1 && r.right <= b.right + 1 && r.width > 0), wrap: row ? getComputedStyle(row).flexWrap : '', ox: row ? getComputedStyle(row).overflowX : '',
       rows: new Set(ts.map(r => Math.round(r.top))).size,  /* 2.152.2 (#2617): rail = the panel #side */ onSeen: !!ob && (!rb || ob.left >= rb.left - 1 && ob.right <= rb.right + 1), kinds: kb ? [...k.querySelectorAll('button')].every(x => { const r = x.getBoundingClientRect(); return r.right <= kb.right + 1 && r.width > 0; }) : true,

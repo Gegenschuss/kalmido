@@ -40,17 +40,17 @@ OFT_KEPT = N_("Receipt within its retention period")
 
 # ---------------------------------------------------------------- the rows (as "system": the folder side asks across offices)
 def _gd(c, rid):
-    with system_ctx(c):
+    with system_ctx(c):  # the folder side asks across offices (see the head of this block)
         return c.execute("SELECT id, org_id, title, status, node_id, archived FROM office_gen_docs WHERE id=?", (int(rid),)).fetchone()
 
 
 def _lt(c, rid):
-    with system_ctx(c):
+    with system_ctx(c):  # the folder side asks across offices (see the head of this block)
         return c.execute("SELECT id, org_id, status, letter_date, node_id, archived FROM office_letters WHERE id=?", (int(rid),)).fetchone()
 
 
 def _rc(c, rid):
-    with system_ctx(c):
+    with system_ctx(c):  # the folder side asks across offices (see the head of this block)
         return c.execute("""SELECT r.node_id, r.org_id, r.ws, n.name, n.mime, n.owner_id, n.created_by FROM rc_receipts r
                             JOIN fs_nodes n ON n.id=r.node_id WHERE r.node_id=? AND n.kind='file'
                             AND n.deleted_at IS NULL""", (int(rid),)).fetchone()  # 2.351.0 F (#2823, review M3): not from the trash
@@ -241,7 +241,7 @@ def rc_protect(c, rid):
     from ..receipts.suggest import olk_fs_locked
     if not _rc(c, rid):
         return None
-    with system_ctx(c):
+    with system_ctx(c):  # the retention lock is read across offices, like _rc
         kept = olk_fs_locked(c, int(rid))
     return tr(OFT_KEPT) if kept else None
 
@@ -315,7 +315,7 @@ def rc_content(c, uid, rid):
     r = _rc(c, rid)
     if not r:
         return None
-    with system_ctx(c):
+    with system_ctx(c):  # the receipt's file may lie in another office's space, like _rc
         data = fs_read(c, int(rid))
     return data, r["name"], r["mime"] or "application/octet-stream"
 

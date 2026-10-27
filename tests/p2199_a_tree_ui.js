@@ -85,7 +85,7 @@ function dnd(w, from, to, y) {  // a mouse drag of node from onto node to at hei
   check(!menuItems(d).length, 'automatic group: a right-click opens no menu');
   const old = w.eval(`sbb_treeHtml([{k: 't:o', name: 'Old', go: 'x', kids: false}])`);
   check(old === '<div class="fhead sbbt closed " style="--sbbl:0" ><span class="sbbtar" aria-hidden="true"></span><button type="button" class="sbbtn" data-go="x" >' + w.eval(`ic('folder', 's')`) + '<span class="n">Old</span></button></div>', 'a node without the new fields draws as before ' + old);
-  d.querySelector('#tauto').remove();
+  d.querySelector('#tauto')?.remove();  // 2.351.1: a redraw of the panel may have taken it already
   // the Share dialog
   w.eval(`ab_share(${id.Gamma})`);
   const md = await until(() => d.querySelector('.abshdlg'));

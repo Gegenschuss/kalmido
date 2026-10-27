@@ -1,3 +1,4 @@
+// kalmido-suite: fresh
 // 2.330 UI tests, part A (small fixes found while filling staging), own container (start.sh, mode workspaces), Firefox.
 // Invented companies, people and figures only. freelancer-matrix: office
 // - #3296: Office > Cash flow: the balance in a month card's head counts that month's corrections by hand (like the

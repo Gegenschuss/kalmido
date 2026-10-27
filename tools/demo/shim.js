@@ -1133,6 +1133,7 @@
       && (!g || (c.groups || []).includes(g)) && (!bk || c.book_id === bk)).sort((a, b) => ctFn(a).localeCompare(ctFn(b)));
     return {items: all.slice(off, off + lim).map(ctBrief), total: all.length, groups: [...new Set(liveCt().flatMap(c => c.groups || []))].sort()};
   });
+  on('GET', '/api/contacts/folders', () => ({spaces: [], folders: [], items: []}));  // 2.351.1: the folder tree of the address book needs the file store (server only)
   on('GET', '/api/contacts/groups', () => ({items: [...new Set(liveCt().flatMap(c => c.groups || []))].sort().map(name => ({name, count: liveCt().filter(c => (c.groups || []).includes(name)).length}))}));
   on('POST', '/api/contacts/groups', (q, b) => { let n = 0;
     for (const c of liveCt()) if ((c.groups || []).includes(b.name)) { c.groups = b.action === 'rename' ? [...new Set(c.groups.map(x => x === b.name ? b.to : x))] : c.groups.filter(x => x !== b.name); n++; }
