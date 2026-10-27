@@ -5,6 +5,56 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.361.2] - 2026-10-27
+
+Package 2.355 (Bündel Büro: Nummern, Bank, Skonto, USt-Auswertung, Mahnwesen (2.231 + 2.232)).
+### Added
+- Office: split one bank booking across several invoices in the bank matching ("Split across invoices…"), with a live rest; an overpaid rest stays visible on the booking (#2843).
+- Office: optional default interest (base rate + 5 / + 9 points) and the 40 EUR flat fee for businesses on reminders, off by default (Office settings > Reminders); the editor, the PDF and the GiroCode show the same total (#2846).
+- Office: new VAT notes "goods to an EU business" (e-invoice category K with deliver-to address, both VAT ids required, field 41) and "export of goods" (category G, field 43); the VAT figures add fields 48 and 60 (#2844, #2841).
+- Office: invoices paid above their total show the amount to pay back ("To refund") (#2847).
+### Changed
+- Office: a cash discount taken lowers the VAT base on accrual basis (per rate, in the month of payment) and is booked on the discount accounts in the DATEV export; a discount period longer than the payment terms stops finalising (#2840).
+- Office: DATEV books EU services on 8336 by default (adjustable); domestic reverse charge 8337, EU goods 8125, exports 8120 (#2844); the new default also applies when older documents are exported again.
+- Office: reminders only for invoices past their due date (not yet due ones are greyed out in the reminder dialog); an open reminder fee is cancelled together with its invoice (#2846).
+- Office: "paid" set by hand books a payment of the open rest (#2847); a copy of a final invoice is a plain invoice (#2839).
+- Office: locked months move along when a personal office moves into an organisation; the asset register counts for the legal retention; entertainment receipts are kept at least 8 years; open receipts and received e-invoices of an office cannot be deleted for good; the move preview names the open points of the months it locks (#2845).
+- Office: an invoice paid in cash in the cash book is now paid (a payment on the invoice; cancelling the entry takes it back) (#2843).
+### Fixed
+- Office: a hand-set number can no longer slip onto an invoice being finalised; a manual number must carry the invoice's year and a numbered draft keeps its date within that year (#2839).
+- Office: a reversed payment is dated on the payment's day, so VAT and key figures stay in the right period; when a DATEV export already covers that day, the reversal row is dated today so the next export carries it (#2841).
+- Office: foreign-currency invoices need an exchange rate before finalising (no silent rate 1) (#2844).
+- Bank import: thousand separators only in groups of three (else the row is flagged instead of "1.234" = 1.23), a minus in the credit column counts, British dates (DD/MM/YYYY); a fixed EndToEndId no longer swallows next month's payment; no doubles after moving a personal office into an organisation; a receipt match keeps its hand-set payment day and warns when amounts differ (#2843).
+- Office: closing balance of a one-day CSV sorted newest first, cash book log and GoBD export default year by local day, a match waits for an import being taken back, "1.234.567" is read as one million, files of an unfinished finalising are removed (#2847).
+
+Package 2.361.2 (Teil 2/5: Bündel Selbstständige: Org verlassen/löschen, eigener Agent, eigene Firma (2.260 + 2.262)).
+### Added
+- The way back out of an organisation for members (#2923): who brought something in or made it there and is no admin gets *Ask an admin* (move dialog and message) instead of a dead end. The admins get a News item and find the request at the top of *Settings > Workspaces > Projects of the organisation* with *Release* / *Decline*; after a release the member moves it into their private space with the usual dialog within 14 days. Projects, tables, files and folders, knowledge pages, office clients and drafts, video sign-offs, polls and bookmarks.
+- Moving a project, table, file, page, client or other item into an organisation tells a member up front: back only after an admin releases it (#2923).
+### Changed
+- Knowledge pages, office clients and drafts, video sign-offs, polls and bookmarks leave an organisation only through its admin or a released request, like projects, tables and files; before, their maker took them out silently (#2923).
+- Releases, declines and released moves are written to the organisation's project history and told to the admins (#2923).
+
+Package 2.357 (Bündel Büro-PDF Gestaltung, Papierformat, Unterschrift (2.297 + 2.295)).
+### Added
+- Office: paper size per company, A4 (DIN 5008) or US Letter, in the office settings (letterhead / layout); every office PDF follows it, finalised documents keep the size they were finalised with (#3156).
+- Own signature everywhere: "With my signature" is always offered in letters and template documents; without a picture it opens the setup (upload with the light background removed, or draw with finger / trackpad). Quotations and reminders can carry the signature of the person who finalised them (office setting "Signature under quotations and reminders", off by default). Drafts never show it, and never someone else's signature (#3158).
+- Finalised office documents from older versions that were never stored get their PDF / XML stored once with a SHA-256 checksum, so later print changes no longer alter them (GoBD; runs once in the background, `KALMIDO_OFFICE_STORE_FILL=off` skips it) (#3221).
+### Changed
+- Office PDFs: the logo box is 45 x 22 mm, small logos are never scaled beyond 200 dpi (upload hint below 300 px), colour profiles are converted to sRGB (#3179).
+- Footer labels follow one colon rule, tax number and VAT ID moved to the register column; spaced titles no longer leave single words alone, cut words get a hyphen, long key-data values go below their label; quotations ask for "Ihre Referenz" (#3180).
+- One VAT rate (also section 19 / reverse charge) prints no VAT column on any document; a reminder without a fee no longer repeats the amount as total; invoices name their subject once (#3181).
+- A short quotation keeps its rights appendix and order confirmation on the same page when they fit; a sentence above the signature lines says what signing means, with room for a hand signature. Template documents: own letterhead, wrapped titles, signature lines that stay with the closing and never land in the footer (#3182).
+- Wording: "Summe netto", "Gesamt brutto", "Einzelpreis"; English labels in sentence case with a "Description" column; "Leistungsdatum" for a single service day; Spanish dates "9 de octubre de 2026"; French and Spanish documents capitalise the sentence after the salutation; entertainment receipts carry the company logo; one-page letters no longer print "Page 1 of 1"; the online acceptance box follows the document's language (#3183).
+- Template samples for small businesses (section 19) take the total instead of "net plus VAT" (#3219).
+### Fixed
+- E-invoice: a 0 % standard / reduced rate (a true zero rate) is category Z without exemption reason instead of E, and needs no exemption reason before finalising; tax-exempt positions stay E (#3217).
+- E-invoice: "not taxable domestically" is category O also without a register number when the seller has a tax number (seller identifier BT-29), instead of G (#3218).
+- Document templates: an empty variable closes up only its own gap, punctuation elsewhere on the line stays (#3220).
+
+### Fixed
+- CI of pre-check (2.355 + 2.357 + 2.361.2): org_out_requests.obj_id carries its "no FK" note (#2923); the logo test expects the "prints small" hint of its 1 px logo (#3179); p2400_d_ui waits for the reminder list and the text block choices instead of reading them at once (they load after the page); p2290_api skipped until 2026-11-10 (#3421).
+
 ## [2.351.8] - 2026-10-27
 
 ### Fixed
@@ -8846,7 +8896,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.8...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.361.2...HEAD
+[2.361.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.2
 [2.351.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.8
 [2.351.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.7
 [2.351.6]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.6
