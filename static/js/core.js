@@ -946,16 +946,11 @@ function optSet(get, vals) {
 async function load(auto) {
   let j;
   try {
-    let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = S.wseq || 0;
       j = await api('GET', auto && !i ? '/api/state?auto=1' : '/api/state');  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
-      crossed = (S.wseq || 0) !== w0;
-      if (!crossed) break;
+      if ((S.wseq || 0) === w0) break;
     }
-    // 2.350.0 C (#2806): still crossed by a write after the third try: the own settings win over that answer (it may predate
-    // the save); the next load brings changes made elsewhere
-    if (crossed && j?.settings && S.settings && j.me?.id === S.me?.id) j.settings = {...j.settings, ...S.settings};
     if (j?.brake) return 'brake';  // 2.280.0 F (#3109): the caller keeps the change pending
     OUT.me = j?.me?.id;  // 2.126.0 D (#1992 O5)
     if (j?.me?.id === LS.get('uid', j?.me?.id)) sessGuard(j?.me);  // 2.238.0 B (#2872): before the outbox is sent (another account: applyState clears all)

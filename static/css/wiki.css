@@ -118,23 +118,3 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkmore{flex:none}
 .wkdlist .wkrow{border-bottom:1px solid var(--line)}
 .wkdlist .wkrow>.wkitem{border-bottom:0}
-/* 2.350.0 B (#3147): the live preview: drawn blocks, the open block is a growing field with its Markdown */
-.wklive{position:relative;min-height:12rem;padding:.25rem 0 2rem;cursor:text}
-.wklive .wklb{border-radius:var(--r-s);min-height:.25rem}
-.wklive .wklb>:first-child{margin-top:0}
-.wklive .wklb>:last-child{margin-bottom:0}
-.wklive .wklb+.wklb,.wklive .wklb+.wkblk,.wklive .wkblk+.wklb{margin-top:.25rem}
-.wklive .wkgap1{min-height:0;height:0}
-.wklive .wkgap2{height:1.5em}
-.wklive .wkgap3{height:3em}
-.wklive .wkgap4{height:4.5em}
-@media (hover:hover){.wklive .wklb:not(.wkgap1):hover{background:var(--bg2)}}
-.wklive .wklvfm{margin:0;color:var(--muted);font-size:var(--fs-s);white-space:pre-wrap}
-.wkblk{display:block;box-sizing:border-box;width:100%;min-height:1.75rem;margin:0;padding:.25rem .375rem;border:0;border-radius:var(--r-s);outline:1px solid var(--line2);background:var(--bg2);color:var(--text);font:inherit;line-height:1.5;resize:none;overflow:hidden}
-.wkblk:focus{outline:2px solid var(--accent)}
-.wkedwrap:has(#wk-live) .wkac{bottom:auto}
-/* 2.350.0 C (#2744): a running import - the note on top of the knowledge pages and at Knowledge in the bar (a click opens its window) */
-.wki-st{display:flex;align-items:center;gap:.5rem;width:100%;margin:0 0 .5rem;padding:.375rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--bg2);color:var(--text);font:inherit;font-size:.8125rem;text-align:left;cursor:pointer}
-.wki-st:hover{background:var(--bg3)}
-.wki-st .wki-stt{font-variant-numeric:tabular-nums}
-.srb .srbd.wki-dot{height:1rem;padding:0 .25rem;border-radius:.5rem;background:var(--accent);color:var(--on-accent,#fff);font:600 .5625rem/1rem var(--mono);white-space:nowrap;cursor:pointer}

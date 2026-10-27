@@ -84,12 +84,9 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     // ================= agent chat
     await nav(B + '#agents/' + CL); await ready(ev);
     await until(ev, `!!document.querySelector('#chat-msgs .cmsg')`);
-    // 2.350.0 (#3317): the search is an entry of the agent chat header's ⋯ menu ("Search in this chat")
-    await ev(`(() => { document.querySelector('.chath [data-act="chat-head-menu"]').click(); return 1; })()`);
-    const a0 = await until(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'Search in this chat')`);
-    check(a0, '#1080: "Search in this chat" in the agent chat header menu');
-    await ev(`(() => { [...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].find(x => x.textContent.trim() === 'Search in this chat')?.click(); return 1; })()`);
-    await until(ev, `!!document.querySelector('#ms-q')`);
+    const a0 = await ev(`(() => { const b = document.querySelector('.chath [data-act="ms-toggle"]'); return b ? {w: b.getBoundingClientRect().width, in: b.getBoundingClientRect().right <= innerWidth} : null; })()`);
+    check(a0 && a0.w >= 24 && a0.in, '#1080: a magnifier in the agent chat header ' + JSON.stringify(a0));
+    await ev(`(() => { document.querySelector('.chath [data-act="ms-toggle"]').click(); return 1; })()`); await sleep(200);
     await type(ev, '#ms-q', 'invoice');
     const ac = await until(ev, `document.querySelector('.mqbar .mscount')?.textContent === '1 of 2' && !!document.querySelector('#chat-msgs mark.mshl')`);
     check(ac && await ev(`document.querySelector('#chat-msgs mark.mshl').textContent === 'invoice'`), '#1080: search in the agent chat, the newest hit marked');

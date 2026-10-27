@@ -41,13 +41,13 @@ function browser() {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', lang: 'en', tour: 'done'});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
   await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   CK = await login('frida');
   const st0 = await call('GET', '/api/state');
   check(!(st0.me.workspaces || []).length, 'setup: frida has no organisation');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
   const P1 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Start', body: 'Alpha start text'})).id;
   const P2 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Other', body: 'Beta zebra text'})).id;
   check(P1 && P2, 'setup: two pages');

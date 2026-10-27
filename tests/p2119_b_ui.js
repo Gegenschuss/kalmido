@@ -73,8 +73,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
           const h = await ev(`(() => { const e = document.querySelector('.chcomp .chkh'), t = document.querySelector('.chcomp textarea');
             return {txt: e ? e.textContent.trim() : null, vis: !!(e && e.offsetWidth), below: !!(e && t && e.getBoundingClientRect().top >= t.getBoundingClientRect().bottom - 1)}; })()`);
           if (touch) check(!h.vis, `${vw}px ${theme}: no key hint on a touch device ${JSON.stringify(h)}`);
-          // 2.350.0 (#2793): no own line for the hint any more; it is the Send button's title (the element stays, hidden)
-          else check(/(Ctrl|Cmd)\+Enter sends/.test(h.txt || '') && !h.vis && /(Ctrl|Cmd)\+Enter sends/.test(await ev(`document.querySelector('.chcomp [data-act="chat-send"]')?.title || ''`)), `${vw}px ${theme}: the key hint is the Send button's title, no line under the field ${JSON.stringify(h)}`);
+          else check(/(Ctrl|Cmd)\+Enter sends/.test(h.txt || '') && h.vis && h.below, `${vw}px ${theme}: the key hint stands under the chat field ${JSON.stringify(h)}`);
           await shot(`p2119b-chat-${vw}-${theme}.png`);
         }
       }

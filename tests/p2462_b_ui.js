@@ -101,15 +101,12 @@ const shift = card => card.style.transform;
   // ================= #1719 desktop: the button and the middle click
   await w.eval(`(() => { window._wo = []; window.open = (u, n, f) => { window._wo.push([u, n, f]); return {focus() {}}; }; return 1; })()`);
   w.eval(`chatOpen(${AG})`);
-  // 2.350.0 (#3317): "Open in its own window" is an entry of the agent chat header's ⋯ menu
-  await until(() => d.querySelector('#achat [data-act="chat-head-menu"]'));
-  const owin = async () => { d.querySelector('#achat [data-act="chat-head-menu"]').click(); return until(() => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => x.textContent.trim() === 'Open in its own window')); };
-  let ab = await owin();
-  check(!!ab && !d.querySelector('#achat [data-dwchat]'), '#1719: the agent chat header menu has "Open in its own window"');
+  const ab = await until(() => d.querySelector(`#achat [data-dwchat="agents/${AG}"]`));
+  check(!!ab && ab.getAttribute('aria-label') === 'Open in its own window', '#1719: the agent chat header has "Open in its own window"');
   ab?.click();
   let wo = w.eval('window._wo');
   check(wo.length === 1 && wo[0][0] === `/?mini=1#agents/${AG}` && wo[0][1] === `kalmido-chat-a-${AG}` && /popup/.test(wo[0][2]), '#1719: the agent chat opens in its window ' + JSON.stringify(wo));
-  ab = await owin(); ab?.click();
+  ab?.click();
   wo = w.eval('window._wo');
   check(wo.length === 2 && wo[1][1] === wo[0][1], '#1719: the same chat comes back to the same window name');
   w.eval('chatClose()');

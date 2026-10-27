@@ -1317,7 +1317,7 @@ Where people see it (2.30.0, only where the agent really writes):
 
 - `working` **with** `task_id`: "Claude is working on it" (with the status text) in the comment area of exactly that task,
   and *working on #51* in the chat header -- not under the chat messages.
-- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working: text", 2.350.0 the one state line) and in the
+- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working · text") and in the
   header chip only (2.32.0: no longer repeated under the last chat message, there only the typing dots); never in a task
   and never in a project's agent band. The status text of such a
   status never appears where other people read along, but keep chat content out of it anyway.
@@ -1330,9 +1330,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
 `host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
-agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
-"Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
-"Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
+agent (`host` in the agent objects people get) and shows them in the chat header: the permission badge says
+"Host default (Auto)" instead of only "Host default", the model stands next to it, and a model set in the runtime settings
 that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"). Unknown fields stay as before.
 2.44.0 (#1517): `host` (max. 80 characters) names the computer; it is kept on the token the request came with, so
 *Set up on a computer* lists each computer by name (the reference launchers send it once at start, `KALMIDO_HOST` or the
@@ -3091,8 +3090,7 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
-yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 

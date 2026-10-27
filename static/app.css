@@ -2208,21 +2208,6 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
   /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
-/* 2.350.0 A (#2793): the desktop composer: tools, box, Stop and Send on one line with one height (2.75rem, the touch size) and one rounding;
-   Send is an icon button (its word only in a wide chat); "Ctrl+Enter sends" is the Send button's title, no own line. The
-   narrow chat panel / window (#achat, agentchat.css) puts the tools behind the plus like the phone (#2788) */
-.chcomp > .chkh{display:none}
-@media (min-width:900px){
-  .chcomp{gap:.375rem;padding:.5rem .75rem;align-items:flex-end}
-  .chcomp textarea{min-height:2.75rem;padding:.6875rem .75rem;border-radius:var(--radius)}
-  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chstop,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
-  .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
-  .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
-}
-/* 2.350.0 A (#2790): the team chat on the phone: one header (the app header steps aside while a conversation is open, like
-   the agent chat), a long name stays on one line */
-.tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
@@ -2241,7 +2226,7 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
 /* 2.13.0: the app resizes beside the panel. 2.13.2 (#478 N1): the whole app (sidebar | list | task), not only the list
    area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
-@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:var(--chatW,26rem)} #achat{width:var(--chatW,26rem)}}
+@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(var(--chatW,26rem),40vw)} #achat{width:min(var(--chatW,26rem),40vw)}}
 body.chat-yield #achat{display:none}
 /* 2.29.0 (#363): the chat as a pop-up window (desktop) and its round button bottom right; neither takes room from the page */
 #achat.float{top:auto;left:auto;right:1.25rem;bottom:1.25rem;width:min(24rem,calc(100vw - 2rem));height:min(36rem,calc(100vh - 2.5rem));border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;z-index:62}
@@ -7373,8 +7358,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 @media (pointer:coarse){.ftxtbar input{min-height:2.75rem}}
 
 /* 2.62.0 C (#1485): the head of the list and folder settings (name, "Saved · Undo", close) stays on top while the dialog scrolls */
-.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:-1.25rem;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
-/* 2.350.0 D (#2745): top:-1.25rem - the sticky edge lies inside the card's 1.25rem padding, top:0 pushed the head 20 px down over the first row */
+.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:0;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
 /* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
 .cmsg.csdpend .cbub{opacity:.6}
 .cmsg.csdpend .cmeta{opacity:.8}

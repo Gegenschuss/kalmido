@@ -14297,17 +14297,6 @@
   "App bar": "Barre des applications",
   "Show labels in the app bar": "Afficher les libellés dans la barre des applications",
   "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Désactivé : seulement les icônes, la barre devient plus étroite. Le nom s'affiche quand tu pointes une icône.",
-  "Write … ([[Page]], #123, / for commands)": "Écrire … ([[Page]], #123, / pour les commandes)",
-  "Live preview while writing": "Aperçu en direct pendant la saisie",
-  "Numbered list": "Liste numérotée",
-  "Picture or file": "Image ou fichier",
-  "Embed a table": "Intégrer un tableau",
-  "Link to a page": "Lien vers une page",
-  "Idea": "Idée",
-  "Import running · {0} %": "Import en cours · {0} %",
-  "The import goes on in the background.": "L’import continue en arrière-plan.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "L’avancement s’affiche à Savoir dans la barre et en haut des pages de savoir.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page coche aussi la tâche.",
   "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Pour l’argent hors de Kalmido en {0}. Compte dans le solde du mois et dans le solde du compte ; les entrées et sorties restent inchangées.",
   "Shared contacts": "Contacts partagés",
   "All contacts": "Tous les contacts",
@@ -14399,5 +14388,6 @@
   "Fields: {0}": "Champs : {0}",
   "Step: {0}": "Étape : {0}",
   "One-way step – cannot be undone": "Étape sans retour – impossible à annuler",
-  "The agent recommends: {0}": "L’agent recommande : {0}"
+  "The agent recommends: {0}": "L’agent recommande : {0}",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page ne modifie pas la tâche."
 }

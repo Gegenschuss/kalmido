@@ -798,8 +798,7 @@ Usage* then shows it, and the limits in the agent's dialog apply. Optional keys 
 sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
 
 **Plan usage ring (2.33.0, optional).** The chat header can show how much of the agent's plan is used (Claude's 5-hour and
-weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …* (2.350.0: below
-the warning level the ring and its numbers sit in the chat header's "…" menu as "Usage: …"). Claude Code
+weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …*. Claude Code
 hands these values (`rate_limits`) only to a *status line* command, so set one up for the agent's interactive sessions
 (`statusLine` in `~/agent/.claude/settings.json`, script `~/agent/bin/statusline.sh` from
 [docs/AGENTS.md, Plan usage](AGENTS.md#plan-usage-the-ring-in-the-chat-header)); it sends them with

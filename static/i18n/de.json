@@ -14297,17 +14297,6 @@
   "App bar": "App-Leiste",
   "Show labels in the app bar": "Beschriftung in der App-Leiste anzeigen",
   "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Aus: nur die Symbole, die Leiste wird schmaler. Der Name erscheint, wenn du auf ein Symbol zeigst.",
-  "Write … ([[Page]], #123, / for commands)": "Schreiben … ([[Seite]], #123, / für Befehle)",
-  "Live preview while writing": "Live-Vorschau beim Schreiben",
-  "Numbered list": "Nummerierte Liste",
-  "Picture or file": "Bild oder Datei",
-  "Embed a table": "Tabelle einbetten",
-  "Link to a page": "Verweis auf eine Seite",
-  "Idea": "Idee",
-  "Import running · {0} %": "Import läuft · {0} %",
-  "The import goes on in the background.": "Der Import läuft im Hintergrund weiter.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite hakt auch die Aufgabe ab.",
   "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Für Geld außerhalb von Kalmido im {0}. Zählt im Saldo des Monats und im Kontostand; Einnahmen und Ausgaben bleiben, wie sie sind.",
   "Shared contacts": "Geteilte Kontakte",
   "All contacts": "Alle Kontakte",
@@ -14399,5 +14388,6 @@
   "Fields: {0}": "Felder: {0}",
   "Step: {0}": "Schritt: {0}",
   "One-way step – cannot be undone": "Einbahn-Schritt – lässt sich nicht rückgängig machen",
-  "The agent recommends: {0}": "Empfehlung des Agenten: {0}"
+  "The agent recommends: {0}": "Empfehlung des Agenten: {0}",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite ändert die Aufgabe nicht."
 }

@@ -14297,17 +14297,6 @@
   "App bar": "Barra de apps",
   "Show labels in the app bar": "Mostrar etiquetas en la barra de apps",
   "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Desactivado: solo los iconos, la barra se estrecha. El nombre aparece al señalar un icono.",
-  "Write … ([[Page]], #123, / for commands)": "Escribir … ([[Página]], #123, / para comandos)",
-  "Live preview while writing": "Vista previa en vivo al escribir",
-  "Numbered list": "Lista numerada",
-  "Picture or file": "Imagen o archivo",
-  "Embed a table": "Insertar una tabla",
-  "Link to a page": "Enlace a una página",
-  "Idea": "Idea",
-  "Import running · {0} %": "Importación en curso · {0} %",
-  "The import goes on in the background.": "La importación continúa en segundo plano.",
-  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "El progreso aparece en Conocimiento en la barra y arriba en las páginas de conocimiento.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Fechas, #etiquetas y !prioridad como en la entrada rápida. Marcarla en la página también marca la tarea.",
   "For money outside Kalmido in {0}. Counts in the balance of the month and in the account balance; money in and out stay as they are.": "Para dinero fuera de Kalmido en {0}. Cuenta en el saldo del mes y en el saldo de la cuenta; los ingresos y gastos no cambian.",
   "Shared contacts": "Contactos compartidos",
   "All contacts": "Todos los contactos",
@@ -14399,5 +14388,6 @@
   "Fields: {0}": "Campos: {0}",
   "Step: {0}": "Paso: {0}",
   "One-way step – cannot be undone": "Paso sin retorno – no se puede deshacer",
-  "The agent recommends: {0}": "El agente recomienda: {0}"
+  "The agent recommends: {0}": "El agente recomienda: {0}",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Fechas, #etiquetas y !prioridad como en la entrada rápida. Marcarla en la página no cambia la tarea."
 }

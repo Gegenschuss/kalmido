@@ -562,7 +562,7 @@ function chatStHtml(a) {
     : tr('working on {0}', `<button class="linkbtn chtask" data-act="open-id" data-id="${a.status_task}" title="${esc(taskById(a.status_task)?.title || '')}">#${a.status_task}</button>`);
   const cls = !a.enabled ? 'paused' : off ? 'offline' : a.limit_reached ? 'limit' : esc(a.status || 'idle');
   // 2.13.0 (#453 P11): the typing dots only once, in the line under the messages (#chat-typing); the header keeps the state
-  return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx">${a.status === 'paused' && a.enabled ? esc(tr('does not answer right now: {0}', a.pause_reason || a.status_text || '')) : st + (a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? (a.status === 'working' ? ': ' : ' · ') + esc(a.status_text) : '')}</span></span>`;  // 2.26.0 (#949); 2.30.0 (#1039): a task's status text shows in that task
+  return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx">${a.status === 'paused' && a.enabled ? esc(tr('does not answer right now: {0}', a.pause_reason || a.status_text || '')) : st + (a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? ' · ' + esc(a.status_text) : '')}</span></span>`;  // 2.26.0 (#949); 2.30.0 (#1039): a task's status text shows in that task
 }
 // 2.29.0 (#1029): the permission mode badge (Auto / Ask) -- the owner (a team agent: an admin) switches it here; the agent's host
 // reads it before its next run (runtime.permission_mode). Nothing when it is the host's default and the viewer cannot change it.
@@ -624,7 +624,13 @@ function chatHeadSync(a) {
     if (f) $('.chring', nm)?.focus({preventScroll: true});
   }
   nm._rh = rh;
-  // 2.350.0 A (#3317): mode and model are no longer in the header; the ⋯ menu reads them when it opens (chatHeadInfo)
+  const h = chatModeHtml(a) + '|' + chatModelHtml(a);
+  if (nm._mh === undefined) { nm._mh = h; return; }  // drawn with the header just now
+  if (nm._mh === h) return;
+  nm._mh = h; const f = document.activeElement?.classList?.contains('chmode');
+  $$('.chmode', nm).forEach(x => x.remove()); nm.insertAdjacentHTML('beforeend', chatModeHtml(a));
+  $$('.chmodel', l2).forEach(x => x.remove()); l2.insertAdjacentHTML('beforeend', chatModelHtml(a));
+  if (f) $('.chmode', nm)?.focus({preventScroll: true});
 }
 function chatModeMenu(btn) {
   const a = agentById(S.chat.aid); if (!a) return;
@@ -680,36 +686,12 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   // 2.152.2 C (#2627): filter, long messages and steps live in this menu (the header shows only search + menu)
   const filt = !S.chat.job && S.jcd.n;
-  menu(b, [...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
+  menu(b, [...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
     {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
     {label: tr('Chat settings'), icon: 'cog', fn: () => acset_open()},  // 2.233.0 A (#2848)
     ...S.chat.job ? [] : ['-', {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]]);
 });
-// 2.350.0 A (#2790 #3317): what the header showed before, as menu entries with their current value: permissions (opens the
-// mode menu, chatModeMenu), model, workspace, usage (its windows one level down); then search, fold and own window
-function chatHeadInfo(b) {
-  const a = agentById(S.chat.aid); if (!a) return [];
-  const it = [], info = label => ({label, dis: true, cls: 'minfo'});
-  const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
-  if (m || a.may_set_mode || a.host?.host_permission_mode) {
-    const l = tr('Permissions: {0}', agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
-    it.push(a.may_set_mode ? {label: l, icon: 'lock', cls: 'chmi-mode', fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
-  }
-  const mr = a.host?.model || '', ms = a.runtime_model || '';
-  if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
-  if (typeof wsOn === 'function' && wsOn()) it.push({...info(tr('Workspace: {0}', wsName(a.org_id ? 'org:' + a.org_id : 'private'))), icon: 'folder'});
-  const q = a.quota;
-  if (q?.windows?.length) {
-    const lines = ($('#chat-ring')?.textContent || '').split('\n').slice(1).filter(Boolean);
-    const u = tr('Usage: {0}', quotaPct(q.percent));
-    it.push(lines.length ? {label: u, icon: 'chart', cls: 'chmi-use', more: lines.map(info)} : {...info(u), icon: 'chart'});
-  }
-  const fl = !S.chat.job && !chatFull() && !!$('#achat.float'), mn = fl && $('#achat')?.classList.contains('min');
-  return [...it, ...it.length ? ['-'] : [], {label: tr('Search in this chat'), icon: 'search', fn: () => msSearchToggle('a', a.id)},
-    ...fl ? [{label: mn ? tr('Unfold') : tr('Fold'), icon: 'chev', fn: () => chatFloatMin(!mn)}] : [],
-    ...!chatFull() && typeof dw_winBtn === 'function' && dw_winBtn('agents', a.id) ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => dw_chatOpen('agents', a.id)}] : [], '-'];
-}
 function stepsAlways() {
   const on = !stepsAlwaysOn(); stepsSet('agent_steps_always', on); S.jobOpen = {};
   toast(on ? tr('Steps are shown above every answer') : tr('Steps are shown only while the agent works'));
@@ -762,10 +744,11 @@ function stepsChanged() {
   else if (Object.keys(S.jobOpen).length || stepsAlwaysOn()) jobStepsRedraw();
 }
 // 2.29.0 (#363): window <-> side panel, fold (window only)
-// 2.350.0 A (#3317): "Open in its own window" and "Fold" are entries of the ⋯ menu (chatHeadInfo); the switch stays
 function chatWinBtns() {
   const fl = !!$('#achat.float');
-  return `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
+  return (typeof dw_winBtn === 'function' ? dw_winBtn('agents', S.chat.aid) : '')  // 2.46.2 (#1719)
+    + (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
+    + `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
 }
 // 2.174.0 A (#2681): the agent's workspace as a name with a colour dot in the header (replaces the colour bar on top)
 function chatWsHtml(a) {
@@ -780,11 +763,8 @@ function chatInner(aid) {
   const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const gc = ac_color(a.id), gcs = gc ? ` agcol" style="--agcol:${gc}` : '';  // 2.144.0 B (#2411): the agent's own colour on the header and the box
-  // 2.350.0 A (#2790 #3317): one header on the phone and the desktop: name + ONE state (the usage ring only near its limit);
-  // permissions, model, workspace, usage, search and the window actions sit in the ⋯ menu. Right at most the side panel
-  // switch, ⋯ and close as one group (the phone: only ⋯). The search button stays hidden as the anchor of the search bar.
-  return `<div class="chath chh2${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
-      <span class="chhb" role="group" aria-label="${esc(tr('Chat'))}">${back ? '' : chatWinBtns()}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</span></div>
+  return `<div class="chath${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatModeHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatModelHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${chatWsHtml(a)}
+      ${msgSearchBtn('a', a.id)}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : chatWinBtns()}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs"${gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
