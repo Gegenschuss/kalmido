@@ -5,6 +5,104 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.376.0] - 2026-10-28
+
+Package 2.356 (Bündel Büro-Wege, Belege einreichen, GoBD-Export, Büro der Selbstständigen (2.252 + 2.276.1 + 2.261)).
+### Added
+- Office: take your own part of an organisation's office back into your personal office (Office settings > Data > "Move into your personal office…": your clients, drafts, contracts, trips, templates; issued invoices stay, a read-only copy on request; one undo) (#2926).
+- Office: fixed costs, vehicles with their logbook, text blocks, services and equipment can move between workspaces ("Move to another workspace…" in their dialogs) (#2926).
+- Quotations and invoices are linked both ways ("Invoices for this quotation" / "From quotation …", tappable); a second invoice from the same quotation asks first (agents: 409 `invoice_exists`, `force`) (#3003).
+- New invoice > "From a quotation…" picks an open quotation (#3005).
+- Office: "Open items" - the figure on the office start, the status filter in the invoice list and a palette entry (#3007).
+- Office: members hand in receipts to the bookkeeping ("Hand in receipt": photo or file, own list with status; admins see them marked under Office > Receipts) (#3129).
+### Changed
+- Joining an organisation no longer switches a freelancer's office silently: with data in the personal office, Kalmido stays in "Private"; the office header always names its workspace and opens the switch, a one-time hint on the first change (#2932).
+- Bank statement, DATEV, leads, newsletter consent and table imports ask where the data goes before they start; a static check keeps every importer asking (#2934).
+- Moving the personal office into an organisation takes the cash book receipts into the organisation's documents (#2926).
+- Office path line always names the open document; the document kind tab is part of the address, Back returns to it; Preview / Download / More stay in one line (#3004).
+- New invoice / quotation: client first, language / currency / VAT / contract folded under "More details"; transfer of rights on an invoice only when it has rights; e-invoice format names translated; one Preview in the editor; list amounts say net / gross (#3003, #3005).
+- Office for members: a line explains why bookkeeping pages are missing and where receipts go, locked pages explain instead of a dead end, locked company fields look locked with a hint, the company name is suggested from the organisation (#3006).
+### Fixed
+- Bookkeeping and GoBD export: files that cannot be read and receipts without a date or an amount are named in missing.txt (and counted in the check and in index.xml) instead of being left out silently; the list's file column is the name inside the ZIP; the GoBD export holds no trial invoices; the books page names receipts the export leaves out (#3097).
+- Switching the document kind tab while a list was loading showed the old list under the new tab (#3004).
+
+Package 2.354 (Bündel Büro-Richtigkeit: Rundung, Reverse Charge, Rabatt, Abschlag, Gutschrift (2.229 + 2.230, vorher gegen 2.296 abgleichen)).
+### Added
+- Office: refunds are booked on the credit note (Office > invoice > credit note > "Book refund", or a money-out line in the bank reconciliation); a paid, cancelled invoice shows "Refund open" until the money is paid back. VAT on payments received and the income statement net out a paid, cancelled and refunded invoice (#2837)
+- Tasks: a task already due tomorrow or later shows "+1 day" instead of "Tomorrow" (the tooltip names the target day) and a "-1 day" button (never before today), in the task detail and in the due menu (#3326)
+- Office: reverse charge shows a hint in the editor when the client has no VAT ID yet (#2834)
+### Changed
+- Office: an invoice from a quotation with finalised progress invoices must be the final invoice - the dialog greys out "Full invoice" and preselects "Final invoice" (#2836)
+- Office: credit notes stay bound to their invoice - currency, rate, client and VAT are locked ("Taken from the invoice"), VAT rates come from the invoice, never more than the invoice per VAT rate; credit notes are made from an invoice only (no free or copied credit notes) (#2838)
+- Office: a VAT note (reverse charge / abroad / small business) is kept only without VAT; the e-invoice category follows the VAT mode alone (#2833)
+- Office: "not taxable domestically" without a register number needs the own VAT ID before finalising (BR-G-02) (#2834)
+- Small UI: the assign sheet has a heading, shorter team chat placeholder, members no longer see the locked organisation colour picker ("My colour" / "Colour of the organisation"), the workspace switch says "Add an organisation", no "Ctrl K" hint on touch, no hyphenation in the icon bar, the "More" tab is not lit for areas opened from the drawer, short time entries read "under 1 minute", a new project without a name says "Name missing" (#3013)
+### Fixed
+- Office: a position is quantity x exact unit price, rounded once (1000 x 0.125 = 125.00, was 130.00); unit prices show up to 4 places (#2831)
+- Office: an invoice from a quotation with several VAT rates takes the discount per rate (same VAT as the quotation) (#2835)
+- Office: a final invoice deducts each progress invoice less the credit notes on it, per VAT rate; no credit note on a progress invoice a finalised final invoice already deducts (#2836)
+- Office: key figures, revenue per client no longer subtracts the credit note of a cancelled invoice twice (#2842)
+- Today > Overdue: "All to today" / "Another day..." no longer sit under the block's "..." menu (#3009)
+
+Package 2.376 (Knowledge search: text snippets, panel ends a search, page list block).
+### Added
+- Knowledge search: each hit found in the text shows a short snippet (about two lines) around the first match below its name, the search words in bold. The server opens only the texts of the hits shown, in memory; nothing is stored or logged. In spaces with the lock the browser cuts the snippet from texts it already has (#3292).
+- Knowledge pages: a ```` ```seiten ```` block (English ```` ```pages ````) lists the pages of the space as a nested list of links, live from the index the browser already has (also in spaces with the lock); lines `ohne:` / `exclude:`, `ab:` / `from:` and `tiefe:` / `depth:` filter it (#3294).
+
+### Fixed
+- Knowledge pages: after a search, a step in the side panel (another space, folder or page) or opening a hit ends the search, so the folder shows again (#3293).
+
+Package 2.320 (Several projects easier to use).
+### Added
+- Task panel: the field "Projects" shows the task's own project (fixed) and every further project it is also shown in; + adds one through the project picker (same workspace, main tasks only, at most 10), x removes it. The same on a phone and a computer (#3289).
+- Dragging a task onto a project in the sidebar with Alt (Option on a Mac) held shows it also there instead of moving it; the project says so while dragging ("Also show in Marketing") (#3289).
+- Selection: "Show also in project…" in the selection panel and the phone's More menu; tasks that cannot go there (subtasks, another workspace, health, budget or locked projects, already 10 further ones) are skipped and counted (#3289).
+### Changed
+- The quiet supporter hint for admins no longer appears in the first year of an instance (was the first 30 days) (#3291).
+
+Package 2.359 (Teil 1/4: Bündel Datenverlust beim Tippen/Offline + Sicherung (2.271 + 2.223.4)).
+### Fixed
+- Offline changes are no longer dropped on server errors: 5xx, maintenance 503 and 429 retry with backoff, refused changes wait in the conflicts dialog with their full content, and /api errors answer with JSON instead of an HTML page that caused a reload loop (#3023)
+- Tasks created offline: follow-up changes never go to the temporary id, images pasted into the quick add are kept and uploaded after sync; signing in with another account asks (once) before waiting changes are discarded (#3023)
+- Typed text is no longer lost when the tab closes, the session expires mid-save or a save fails: it goes into the offline queue (plus keepalive) in the right order, failed saves show "Not saved yet" and are retried; notes, diary and settings are saved when the page goes away (#3024)
+- Backups: after restoring a backup from another server, encrypted backups keep working - the saved backup passphrase and the off-site access data stay readable (#2894)
+### Changed
+- Self-hosting docs: without the old server key (`KALMIDO_SECRET_KEY` / `secret/kalmido.key`) every encrypted file is lost for good; the key belongs to every backup and goes in place before restoring on a new server (#2890)
+
+Package 2.350.0 (Chat bundle: chat header on phone and desktop, chat width, knowledge editor).
+### Added
+- Knowledge pages: live preview while writing - the page stays drawn, only the block with the cursor shows its Markdown; the plain text field is back via the page's "…" menu (account setting) (#3147)
+- Knowledge editor: "/" at the start of a line opens commands (heading, lists, checkbox, table, code, mind map, picture or file, embedded table, page link, date, templates); Ctrl/Cmd+K inserts a link, Ctrl/Cmd+Shift+7 / 8 / 9 make a numbered list / list / checkbox (#3149)
+- Knowledge: checkboxes tick in read mode (saved like an edit: history, conflicts, offline, locked spaces); a line with #123 ticks its task too; right click / long press offers "Create as task" (#3148)
+- Knowledge import: "Import running · 34 %" on top of the knowledge pages and at Knowledge in the bar; a click reopens the progress window, a click next to it keeps the import in the background with a note (#2744)
+- Chat and left sidebar can be dragged as wide as you like; only the list keeps a minimum of 12 rem; double-click on the handle resets the width (#2750)
+### Changed
+- Agent chat header: one row on phones (max 56 px) and on the desktop with the name and a single state ("working: <job>" / "ready"); permissions, model, workspace, usage and search moved into the "…" menu; at most three icons on the right (sidebar, "…", close) (#2790, #3317)
+- The usage ring shows next to the agent's name only near its limit; its numbers are in the "…" menu (#3317)
+- Desktop chat composer: tools, box and Send on one line with one height; the key hint is Send's tooltip; the narrow chat panel puts the tools behind "+" (#2793)
+- Team chat on phones: the app header steps aside while a conversation is open; long names stay on one line (#2790)
+### Fixed
+- Project and folder settings: the fixed title no longer covers the first row (#2745)
+- The undo message closes on a page change also from the start page (empty address hash) (#3242)
+- Sidebar pins are saved as single entries, so a reload crossing the save no longer drops an earlier pin (#2806)
+
+Package 2.360 (Teil 1/6: Bündel Sicherheits- und Datenschutz-Reste, Abhängigkeiten (2.197 + 2.223.9 + 2.239.1 + 2.313)).
+### Changed
+- Downloading a backup or an account / organisation export, restoring a backup and switching on public links, open registration or auto-created sign-on accounts (or switching off the two-factor policy) now ask for your password; switching back does not (#2496).
+- A password reset (by link or by an admin) also revokes the person's own API tokens; agents keep theirs. A restore keeps API tokens and app passwords revoked that were revoked after the backup was written (#2496).
+- Agent setup on Mac / Linux and Windows passes the one-time code in the environment and refuses plain http:// addresses unless it is the computer itself or --allow-http; an approved agent request runs with the token that asked for it; read-only agent tokens can no longer open jobs for a person or waiting jobs (#2496).
+- Disposition: only the person who booked it or an admin changes, deletes or restores a booking. Open or rejected vacation requests keep their kind. Filed client e-mails are moved or deleted by their recipient, the client's creator or an organisation admin (#2496).
+- A public link of a knowledge page belongs to that page; moving pages into an organisation no longer takes their earlier versions along (the move dialog says how many stay behind) (#2496).
+- Withdrawing an approval, answering a customer on a video sign-off and changing someone's weekly hours need the matching right; kid stars count once per task and day (#2496).
+### Fixed
+- Documents found infected by the later virus scan no longer show their recognised text and drop out of the search; letterhead and terms uploads wait for the virus scanner (#2496).
+- Videos (MP4, MOV) lose their recorded location on upload, like photos (#2496).
+- Office agents in an office rights group need the Receipts area to suggest receipt details; other agents work as before (#2496).
+- Office: two progress invoices at once can no longer exceed the quotation, a double undo of an office move runs once, accepting a suggested document folder files it there, and an organisation contract's deadline task only goes to your own private list (#2496).
+- Portal: a report shows up under "All my reports" only after the link in the mail to its address was opened. Registrations without e-mail confirmation no longer join an organisation by their e-mail domain (#2496).
+- Forms: a customer matched only by the typed e-mail address is shown as "not confirmed". Invitations: the attached calendar file names only its recipient, a server-wide daily mail limit applies (KALMIDO_INVITE_MAIL_DAY, default 2000); the booking page counts only calendars you own or edit as busy (#2496).
+- Tokens of public links no longer appear in error logs; browser error reports open at most three new tickets per person and hour; the Docker image has a health check (#2496).
+
 ## [2.361.3] - 2026-10-27
 
 ### Fixed
@@ -8901,7 +8999,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.361.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.376.0...HEAD
+[2.376.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.0
 [2.361.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.3
 [2.361.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.2
 [2.351.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.8
