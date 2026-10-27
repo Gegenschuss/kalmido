@@ -640,8 +640,8 @@ function outStash(list) {
 // a write that outlives the page: fetch with keepalive (sent after the tab closed; the browser allows about 64 KB per page),
 // the queue entry's key with it: the queued copy sent at the next start gets the server's first answer (never applied twice)
 function keepSend(method, url, body, key) {
-  const h = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}; if (key) h['Idempotency-Key'] = key;
-  try { fetch(url, {method, keepalive: true, credentials: 'same-origin', headers: h, body: JSON.stringify(body)}).catch(() => {}); return true; } catch { return false; }
+  const h = key ? {'Idempotency-Key': key} : {};
+  try { fetch(url, {method, keepalive: true, credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido', ...h}, body: JSON.stringify(body)}).catch(() => {}); return true; } catch { return false; }
 }
 // a write that waits for its debounce (notes, the diary): into the queue and out with keepalive (url without a temporary id)
 function outKeep(method, url, body) {
