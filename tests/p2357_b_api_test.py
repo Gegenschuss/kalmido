@@ -19,6 +19,7 @@ import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
+import dbx as dbxm  # noqa: E402
 import pdfcheck  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import FAILS, OKS, check, done, sess, B, H, DATA  # noqa: E402,F401
@@ -85,7 +86,8 @@ for who, S in (("org admin", A), ("freelancer", F)):
     check(not pdfcheck.problems(r.content), f"{who}: invoice layout clean {pdfcheck.problems(r.content)[:3]}")
     feet = "\n".join(ln for fl in pdfcheck.footer_lines(r.content) for ln in fl)
     check("Steuernummer: 12/345/67890" in feet and "USt-IdNr. DE999999999" in feet, f"{who}: #3180 tax lines whole in the PDF footer")
-    # ---- #3181 reminders: the total only with a fee
+    # ---- #3181 reminders: the total only with a fee (2.355.0 D #2846: only an overdue invoice gets a reminder)
+    dbxm.q(DATA, "UPDATE office_docs SET due_date=? WHERE id=?", ("2026-01-15", IID))
     r = S.post(B + f"{D}/reminder", json={"doc_ids": [IID], "level": 1})
     check(r.status_code == 201 and r.json()["totals"]["fee"] in ("0.00", "0"), f"{who}: level 1 reminder without a fee " + r.text[:160])
     R1 = r.json()["id"]
