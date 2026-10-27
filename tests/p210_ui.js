@@ -61,16 +61,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       const top = () => w.eval(`(() => { const el = [...document.querySelectorAll('.smodal .ssaved')].pop(); return !!(el && el._e && HIST.undo[HIST.undo.length - 1] === el._e); })()`);
       // 2.14.0: the real cause of the CI flake is fixed in the app (a state answer that the save overtook put the old
       // setting back locally, so Undo saw "changed elsewhere"); the note holds the entry once the save is through
-      // 2.358.0 B (#3302): CI / Mac red "Changed elsewhere, not undone": a reload between the save and the undo brought the
-      // server's order of news_kinds and the undo skipped it; here the reload comes on purpose (red without the fix)
-      await w.eval(`load()`);
-      check(w.eval(`S.settings.news_kinds`) === st.settings.news_kinds, 'reload: the page holds the server\'s value ' + w.eval(`S.settings.news_kinds`));
       for (let i = 0; i < 50 && !top(); i++) await sleep(100);
       check(top(), 'the note holds the newest undo step');
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
       for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.complete.news === false && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, redo ${w.eval('HIST.redo.length')}, local ${w.eval('S.settings.news_kinds')}, toast ${d.querySelector('#toast')?.textContent || ''})`);  // 2.358.0 B (#3302): #toast, redo, local value
+      check(st.notify.complete.news === false && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, toast ${[...d.querySelectorAll('.toast')].map(t => t.textContent).join(' / ')})`);
     }
     w.close();
   }

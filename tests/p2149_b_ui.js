@@ -123,7 +123,7 @@ async function swCheck() {
   const T = (await call(CA, 'POST', '/api/tasks', {title: 'Cut the hedge', list_id: L})).id;
   check(L > 0 && T > 0, 'a list with a task');
   const man = await (await fetch(B + 'sw-manifest.json')).json();
-  const until = (ev, expr, n) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+  const until = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
 
   await firefox(async ({ev, nav, shot}) => {
     await nav(B + 'static/icon.svg');

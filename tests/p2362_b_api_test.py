@@ -24,8 +24,18 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SECRET = "Geheimprojekt Nordlicht 4711"  # a list name: must never show up in an alert
+
+
+def sess(user=None, pw="password123", ip=None):
+    s = requests.Session()
+    s.headers.update(H)
+    if user:
+        h = {"X-Forwarded-For": ip} if ip else {}
+        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw}, headers=h)
+        assert r.ok, (user, r.text)
+    return s
 
 
 def ntfy_log():

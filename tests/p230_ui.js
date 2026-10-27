@@ -24,7 +24,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el) => el && el.dispatchEvent(new w.Event('change', {bubbles: true}));
 const input = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
-const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };  // 2.206.0 B (#2513): fn may be async
 const menuTexts = d => [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
 const menuClick = (w, d, re) => click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => re.test(b.textContent)));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,agents';

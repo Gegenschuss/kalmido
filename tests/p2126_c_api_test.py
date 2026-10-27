@@ -35,8 +35,16 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 ROOT = os.path.join(N, "..")
+
+
+def sess(user, pw="password123", ip=None):
+    s = requests.Session()
+    s.headers.update(H)
+    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw}, headers={"X-Forwarded-For": ip} if ip else {})
+    assert r.ok, (user, r.text)
+    return s
 
 
 def login(user, pw, ip):

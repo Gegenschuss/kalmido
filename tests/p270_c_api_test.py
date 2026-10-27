@@ -26,8 +26,10 @@ import dbx as dbxm
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
+import functools
 import kt
 from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+until = functools.partial(kt.until, step=0.5)  # the old copy polled every 0.5 s; the agent events are rate-limited
 V = B + "/api/v1"
 
 
@@ -130,7 +132,7 @@ check(A.put(B + f"/api/lists/{HL}/members", json={"user_id": HEA, "role": "edit"
 dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)", (HL, HEA, "edit", "edit", 99, "2026-01-01T00:00:00Z"))
 
 # ---------------------------------------------------------------- the event contract_notice
-ev = kt.until(lambda: len(events(CLH)) >= 3 and events(CLH), step=0.5)  # the agent events are rate-limited: poll every 0.5 s
+ev = until(lambda: len(events(CLH)) >= 3 and events(CLH))
 ids = sorted(e["data"]["task_id"] for e in ev)
 check(ids == sorted([C_MOB["id"], C_L60["id"], C_L0["id"]]), f"contract_notice for the contracts in reach (own lead, else 30 days) {ids}")
 d = next((e["data"] for e in ev if e["data"]["task_id"] == C_MOB["id"]), {})
@@ -151,9 +153,9 @@ check(dbx("SELECT COUNT(*) FROM ctr_notices WHERE task_id=? AND due=? AND agent_
       "the sent marker (ctr_notices)")
 r = A.patch(B + f"/api/tasks/{C_EDGE['id']}", json={"due": D(5)})
 check(r.ok, "move the gym deadline into reach")
-check(kt.until(lambda: any(e["data"]["task_id"] == C_EDGE["id"] for e in events(CLH)), step=0.5), "a deadline that comes into reach: its event")
+check(until(lambda: any(e["data"]["task_id"] == C_EDGE["id"] for e in events(CLH))), "a deadline that comes into reach: its event")
 A.patch(B + f"/api/tasks/{C_MOB['id']}", json={"due": D(8)})
-check(kt.until(lambda: sum(e["data"]["task_id"] == C_MOB["id"] for e in events(CLH)) == 2, step=0.5), "a moved deadline = a new event")
+check(until(lambda: sum(e["data"]["task_id"] == C_MOB["id"] for e in events(CLH)) == 2), "a moved deadline = a new event")
 
 # ---------------------------------------------------------------- the agent proposes
 r = propose(CLH, C_MOB["id"])
@@ -207,7 +209,7 @@ rem1 = dbx("SELECT reminders FROM tasks WHERE id=?", (C_MOB["id"],))[0][0]
 check("4320" in rem1.split(",") and set(rem0.split(",")) < set(rem1.split(",")), f"a reminder 3 days before ({rem0} -> {rem1})")
 check(dbx("SELECT COUNT(*) FROM activity WHERE task_id=? AND kind='proposal'", (C_MOB["id"],))[0][0] >= 1, "the history line")
 check(A.post(B + f"/api/proposals/{J2}/apply", json={"select": ["0"]}).status_code == 409, "a second apply: 409")
-check(kt.until(lambda: any(e["data"].get("action") == "approve" and e["data"]["job"]["id"] == J2 for e in events(CLH, "job")), 10, step=0.5),
+check(until(lambda: any(e["data"].get("action") == "approve" and e["data"]["job"]["id"] == J2 for e in events(CLH, "job")), 10),
       "the agent hears approve")
 r = A.post(B + f"/api/proposals/{J2}/undo")
 check(r.ok and r.json().get("undone", 0) >= 1, "undo " + r.text[:200])
@@ -221,7 +223,7 @@ r = propose(CLH, C_L60["id"], text="Electricity: until the deadline you can swit
 J3 = r.json().get("id")
 check(r.status_code == 201 and A.post(B + f"/api/proposals/{J3}/discard").ok, "discard")
 check(A.post(B + f"/api/proposals/{J3}/apply", json={"select": ["0"]}).status_code == 409, "apply after discard: 409")
-check(kt.until(lambda: any(e["data"].get("action") == "reject" and e["data"]["job"]["id"] == J3 for e in events(CLH, "job")), 10, step=0.5),
+check(until(lambda: any(e["data"].get("action") == "reject" and e["data"]["job"]["id"] == J3 for e in events(CLH, "job")), 10),
       "the agent hears reject")
 check(not dbx("SELECT 1 FROM comments WHERE task_id=?", (C_L60["id"],)), "discard writes nothing")
 # a note without remind on a near deadline: no reminder button
@@ -239,7 +241,7 @@ check(r.status_code == 201, "the freelancer's own agent " + r.text[:200])
 BB, BBH = r.json()["id"], tokh(r.json()["token"])
 C_BOB = contract(Bo, "Handyvertrag", D(6), cost=12, per="month")
 share(Bo, C_BOB["list_id"], BB)
-ev = kt.until(lambda: events(BBH), step=0.5)
+ev = until(lambda: events(BBH))
 check(ev and ev[0]["data"]["task_id"] == C_BOB["id"] and ev[0]["data"]["lang"] == "de" and ev[0]["data"]["user"]["id"] == BOB,
       "freelancer: the event in the person's language")
 r = propose(BBH, C_BOB["id"], text="Dein Handyvertrag kostet 12 im Monat; kuendigen kannst du bis zur Frist.")

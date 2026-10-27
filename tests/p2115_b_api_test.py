@@ -38,10 +38,18 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
-from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 UA_FF = "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0"
 UA_IOS = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 "
           "Mobile/15E148 Safari/604.1")
+
+
+def sess(user, pw="password123", ua=UA_FF):
+    s = requests.Session()
+    s.headers.update({**H, "User-Agent": ua})
+    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
+    assert r.ok, (user, r.text)
+    return s
 
 
 def b64u(b):
@@ -77,7 +85,7 @@ DB = dbx.connect(DATA)
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice", ua=UA_FF)
+A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 uid = {}
@@ -92,7 +100,7 @@ ORG2 = r.json()["id"]
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok  # bob: admin of Alpha only
 
 # ================================================================ sessions: the list
-Bo1, Bo2 = sess("bob", ua=UA_FF), sess("bob", ua=UA_IOS)
+Bo1, Bo2 = sess("bob"), sess("bob", ua=UA_IOS)
 sub1, sub2 = subscribe(Bo1, 1), subscribe(Bo2, 2)
 r = Bo1.get(B + "/api/me/sessions")
 j = r.json() if r.ok else {}
@@ -118,7 +126,7 @@ subs = {x["id"]: x["session_hash"] for x in DB.execute("SELECT id, session_hash 
 check(subs.get(sub1) and subs.get(sub2) and subs[sub1] != subs[sub2] and set(subs.values()) <= set(hashes), "push subscriptions know their session")
 
 # ---- end one
-C = sess("carol", ua=UA_FF)
+C = sess("carol")
 csid = C.get(B + "/api/me/sessions").json()["sessions"][0]["sid"]
 check(Bo1.delete(B + f"/api/me/sessions/{csid}").status_code == 404 and C.get(B + "/api/state").ok, "someone else's session id: 404, it lives on")
 check(Bo1.delete(B + "/api/me/sessions/0123456789abcdef").status_code == 404, "an unknown id: 404")
@@ -130,7 +138,7 @@ left = [x["id"] for x in DB.execute("SELECT id FROM push_subs WHERE user_id=?", 
 check(sub2 not in left and sub1 in left, f"its push subscription went, the other stays: {left}")
 
 # ---- everywhere else
-Bo3, Bo4 = sess("bob", ua=UA_FF), sess("bob", ua=UA_FF)
+Bo3, Bo4 = sess("bob"), sess("bob")
 r = Bo1.post(B + "/api/me/sessions/others")
 check(r.ok and r.json().get("ended") == 2, "log out everywhere else: 2 ended " + r.text[:200])
 check(Bo3.get(B + "/api/state").status_code == 401 and Bo4.get(B + "/api/state").status_code == 401 and Bo1.get(B + "/api/state").ok,
@@ -140,14 +148,14 @@ check(C.get(B + "/api/state").ok, "other people's sessions are untouched")
 check(Bo1.post(B + "/api/me/sessions/others", headers={"X-Requested-With": ""}).status_code == 403, "CSRF header needed")
 
 # ---- the current one = log out
-Bo5 = sess("bob", ua=UA_FF)
+Bo5 = sess("bob")
 s5 = subscribe(Bo5, 5)
 me5 = next(s for s in Bo5.get(B + "/api/me/sessions").json()["sessions"] if s["current"])
 r = Bo5.delete(B + f"/api/me/sessions/{me5['sid']}")
 check(r.ok and r.json().get("current") is True and "kalmido_session=" in r.headers.get("Set-Cookie", ""), "ending the current session clears the cookie")
 check(Bo5.get(B + "/api/state").status_code == 401 and not DB.execute("SELECT 1 FROM push_subs WHERE id=?", (s5,)).fetchone(),
       "logged out, its push subscription gone")
-Bo6 = sess("bob", ua=UA_FF)
+Bo6 = sess("bob")
 s6 = subscribe(Bo6, 6)
 check(Bo6.post(B + "/api/auth/logout").ok and not DB.execute("SELECT 1 FROM push_subs WHERE id=?", (s6,)).fetchone()
       and DB.execute("SELECT 1 FROM push_subs WHERE id=?", (sub1,)).fetchone(), "the logout removes only its own session's subscription")
@@ -160,7 +168,7 @@ check(requests.get(B + "/api/v1/me", headers=AGH).ok, "the agent token still wor
 
 # ---- freelancer-matrix: own -- a person without an organisation: the same
 FID, Fr1 = freelancer(B, A)
-Fr2 = sess("frida", ua=UA_FF)
+Fr2 = sess("frida")
 r = Fr1.get(B + "/api/me/sessions")
 check(r.ok and len(r.json()["sessions"]) == 2, "freelancer: the own sessions " + r.text[:200])
 r = Fr1.post(B + "/api/me/sessions/others")
@@ -169,8 +177,8 @@ me_f = Fr1.get(B + "/api/me/sessions").json()["sessions"][0]
 check(Fr1.delete(B + f"/api/me/sessions/{me_f['sid']}").ok and Fr1.get(B + "/api/state").status_code == 401, "freelancer: log out this one")
 
 # ================================================================ organisation invitations (tenant-matrix: org)
-Bo = sess("bob", ua=UA_FF)
-Fk = sess("frank", ua=UA_FF)
+Bo = sess("bob")
+Fk = sess("frank")
 r = Bo.get(B + f"/api/orgs/{ORG}/invites")
 check(r.ok and r.json() == {"invites": [], "enabled": True}, "an organisation admin: no open invitations yet " + r.text[:200])
 check(C.get(B + f"/api/orgs/{ORG}/invites").status_code == 403, "a plain member: 403")

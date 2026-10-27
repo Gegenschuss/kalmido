@@ -18,7 +18,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2298A2_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const FEAT = 'cal,comments,collab,clients,office,forms';
 const call = async (method, url, body, ck) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = (fn, n) => require('./boot').until(async () => { try { return await fn(); } catch { return false; } }, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { let x = null; try { x = await fn(); } catch { /* not there yet */ } if (x) return x; await sleep(150); } try { return await fn(); } catch { return null; } };
 // a .shint behind (i): infoize marked it as the source of an (i) button
 const behindI = (d, el) => !!el && el.classList.contains('iisrc') && !!d.querySelector(`.ib[data-ii="${el.id}"]`);
 

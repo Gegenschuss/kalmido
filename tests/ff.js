@@ -1,7 +1,7 @@
 // ff.js -- Firefox headless driven over WebDriver BiDi, shared by the UI suites that check the real layout (2.7.2: one copy
 // instead of one per suite). Skipped (with a note) when there is no firefox on PATH.
 //   const firefox = require('./ff')({tag: 'p272', check, shots: 'P272_SHOTS'});
-//   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle}) => { ... }, touch);
+//   await firefox(async ({cmd, ev, nav, ctx, shot, drag}) => { ... }, touch);
 // touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
 // A Firefox that does not answer within 45 s (seen on CI runners) gets one more try on another port (2.7.1, first in p221).
 const {spawn, execFileSync} = require('child_process');
@@ -12,21 +12,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // on the same machine (parallel places / shards): the connection went to that one ("session.new: Maximum number of active sessions")
 const freePort = () => new Promise(res => { const s = net.createServer(); s.on('error', () => res(9300 + Math.floor(Math.random() * 600)));
   s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
-
-// 2.358.0 C (#2782): the request counter, run in the page (script.addPreloadScript) - keep it free of outer names
-const NET = () => {
-  if (window.__net) return;
-  const net = window.__net = {n: 0, at: performance.now(), open: new Map()}; let k = 0;
-  const begin = u => { const id = ++k; net.n++; net.at = performance.now(); net.open.set(id, String(u).slice(0, 120)); return id; };
-  const end = id => { if (!net.open.delete(id)) return; net.n--; net.at = performance.now(); };
-  const f0 = window.fetch;
-  if (f0) window.fetch = function (u, o) { const id = begin(u && u.url || u), p = f0.apply(this, arguments); p.then(() => end(id), () => end(id)); return p; };
-  const X = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
-  if (X) { const open = X.open, send = X.send;
-    X.open = function (m, u) { this.__u = u; return open.apply(this, arguments); };
-    X.send = function () { const id = begin(this.__u); this.addEventListener('loadend', () => end(id), {once: true});
-      try { return send.apply(this, arguments); } catch (e) { end(id); throw e; } }; }
-};
 
 // prefs: extra Firefox preferences for one suite (2.13.0)
 // 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
@@ -74,9 +59,6 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       await cmd('session.new', {capabilities: {}});
     });
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
-    // 2.358.0 C (#2782): count the page's open requests (fetch + XMLHttpRequest) as window.__net = {n, at, open} like boot.js does
-    // for jsdom - a preload script runs in every new document before the app's own scripts, so idle() works after each nav()
-    await cmd('script.addPreloadScript', {functionDeclaration: NET.toString()}).catch(e => console.log('ff: no preload script, idle() waits by time only:', e.message));
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
     // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows
     // it: p2100_ui, p21144_d_ui, p270_ui) - after 40 s the same navigate once more instead of 120 s and a failed suite
@@ -96,27 +78,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     const drag = (x0, y0, dx, dy, kind = 'mouse') => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},
       actions: [{type: 'pointerMove', x: Math.round(x0), y: Math.round(y0)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(x0 + dx / 2), y: Math.round(y0 + dy / 2), duration: 120},
         {type: 'pointerMove', x: Math.round(x0 + dx), y: Math.round(y0 + dy), duration: 120}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
-    // 2.358.0 C (#2782): wait for a state instead of a fixed sleep (like boot.js): until(expr | fn) polls a page expression (string,
-    // a throw counts as false) or a function until it is truthy (-> that value) or timeout ms are over (-> the last value)
-    const until = async (x, {timeout = 15000, step = 100} = {}) => {
-      const end = performance.now() + timeout;
-      for (;;) {
-        const v = await Promise.resolve().then(() => typeof x === 'string' ? ev(x) : x()).catch(() => false);  // a plain (sync) fn too
-        if (v || performance.now() >= end) return v;
-        await sleep(step);
-      }
-    };
-    // idle(): none of the page's requests in flight for `quiet` ms (at least `quiet` ms after the call, so a request the action
-    // starts from a short timer is still seen), at most timeout ms (then it goes on and says what is still open). For an action
-    // that loads; not for debounced saves or the app's own timers. Without the counter (no preload script) it waits `quiet` ms.
-    const idle = async ({quiet = 250, timeout = 15000} = {}) => {
-      const t0 = performance.now();
-      const st = `(() => { const n = window.__net; return !n ? -1 : n.n ? -2 : performance.now() - n.at; })()`;
-      const ok = await until(async () => { const q = await ev(st); return performance.now() - t0 >= quiet && (q === -1 || q >= quiet); }, {timeout, step: 50});
-      if (!ok) console.log(`ff idle: still loading after ${timeout} ms:`, await ev(`[...(window.__net?.open?.values() || [])].slice(0, 5).join(' ')`).catch(() => '?'));
-      return ok;
-    };
-    await fn({cmd, ev, nav, ctx, shot, drag, until, idle});
+    await fn({cmd, ev, nav, ctx, shot, drag});
   } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
     try { ws && ws.close(); } catch { /* gone */ }
     try { ff.kill(); } catch { /* gone */ }

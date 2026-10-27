@@ -30,7 +30,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 H = {"X-Requested-With": "kalmido"}
 ORIGIN, RP = "https://kalmido.example", "kalmido.example"  # PUBLIC_URL of the test container
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def b64u(b):
@@ -49,6 +49,15 @@ def dbx(sql, args=()):
         return r
     finally:
         c.close()
+
+
+def sess(user=None, pw="password123"):
+    s = requests.Session()
+    s.headers.update(H)
+    if user:
+        r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
+        assert r.ok and r.json().get("ok"), (user, r.text)
+    return s
 
 
 def totp(secret, step=None):
@@ -140,12 +149,12 @@ def enrol_totp(s, pw="password123"):
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice", json_ok=True)
+A = sess("alice")
 for u in ("bob", "dave", "erin", "fred", "gwen"):
     assert A.post(B + "/api/users", json={"username": u, "password": "password123"}).ok
 assert A.post(B + "/api/users", json={"username": "carol", "proxy_login": "carol-sso"}).ok
 IDS = {u["username"]: u["id"] for u in A.get(B + "/api/users").json()["users"]}
-Bo = sess("bob", json_ok=True)
+Bo = sess("bob")
 C = requests.Session()
 C.headers.update({**H, "Remote-User": "carol-sso"})
 
@@ -234,8 +243,8 @@ tok2 = r.cookies.get("kalmido_session")
 check(tok2 != tok1 and requests.get(B + "/api/me", cookies={"kalmido_session": tok1}).status_code == 401, "a new login ends the previous session of this browser")
 
 # ---- disable TOTP (dave: own user, so bob's lock does not interfere)
-D = sess("dave", json_ok=True)
-D2 = sess("dave", json_ok=True)  # another device of dave
+D = sess("dave")
+D2 = sess("dave")  # another device of dave
 dsec, dj = enrol_totp(D)
 check(D2.get(B + "/api/state").status_code == 401 and D.get(B + "/api/state").ok, "turning on the first factor ends the other sessions, keeps this one")
 dcodes = dj["recovery_codes"]
@@ -250,7 +259,7 @@ check(login("dave")[1].json().get("ok") is True, "login without a second step ag
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env=dict(os.environ, KEEP="1"))
 assert r.returncode == 0, r.stdout + r.stderr
 dbx("DELETE FROM rate_hits")  # 2.306.0 (#2875): the failure counters live in the database too now (a restart keeps them)
-E = sess("erin", json_ok=True)
+E = sess("erin")
 k = Authenticator()
 check(E.post(B + "/api/me/passkeys/options", json={"password": "bad-password"}).status_code == 403, "passkey options need the password")
 o = E.post(B + "/api/me/passkeys/options", json={"password": "password123"}).json()
@@ -292,7 +301,7 @@ s, _ = login("erin")
 o = s.post(B + "/api/auth/2fa/passkey/options").json()
 check(s.post(B + "/api/auth/2fa/passkey", json={"credential": k.assert_(o, count=k.count)}).status_code == 401, "same counter again (cloned authenticator) refused")
 # a passkey of another user cannot be the second factor of erin
-F = sess("fred", json_ok=True)
+F = sess("fred")
 kf = Authenticator()
 o = F.post(B + "/api/me/passkeys/options", json={"password": "password123"}).json()
 assert F.post(B + "/api/me/passkeys", json={"credential": kf.register(o)}).ok

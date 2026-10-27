@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -137,12 +137,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
-  // rsz after a viewport change: the app's resize handlers wait 150 ms, then two frames
-  const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
-  const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
-  const rsz = async ev => { await sleep(400); await frames(ev); };
-  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
+  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
   const tapper = ({cmd, ctx}) => async (x, y) => {
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]}]});
     await cmd('input.releaseActions', {context: ctx});
@@ -167,7 +162,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   };
   const openTask = async (o, id) => {
     const tap = tapper(o);
-    await o.nav(B + '#l/' + L); await ready(o.ev, o.idle);
+    await o.nav(B + '#l/' + L); await ready(o.ev);
     const p = await o.ev(center(`#view .trow[data-id="${id}"] .ttl`));
     if (p) await tap(p.x, p.y); else await o.ev(`(() => { openDetail(${id}); return 1; })()`);
     for (let i = 0; i < 20 && !(await o.ev(`!!document.querySelector('#detail .dtop')`)); i++) await sleep(200);
@@ -191,7 +186,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     check(await until(() => ev(`!!document.querySelector('#detail [data-act="due-q"][data-d="1"]') && !document.querySelector('#detail [data-act="due-q"][data-d="1"].on')`)), '390: Tomorrow not marked (date is later)');  // 2.199.0 M (#2768)
     await call('PATCH', `/api/tasks/${T}`, {due: day(9)});
     // the matrix: a tap folds a quadrant
-    await o.nav(B + '#matrix'); await ready(ev, o.idle);
+    await o.nav(B + '#matrix'); await ready(ev);
     // 2.24.0: centred first (the tab bar over the bottom edge holds Search now, a tap there would leave the matrix)
     await ev(`(() => { document.querySelector('.quad[data-quad="3"] .qfold').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);
     const qh = await ev(`(() => { const b = document.querySelector('.quad[data-quad="3"] .qfold').getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, h: b.height}; })()`);
@@ -206,13 +201,13 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await shot('p2151-390-matrix-folded.png');
     await ev(`(() => { localStorage.removeItem('tasks.mxFold'); return 1; })()`);
     // Search: opened, focused; the palette above the keyboard
-    await o.nav(B + '#today'); await ready(ev, o.idle);
-    await ev(`(() => { location.hash = 'search'; return 1; })()`); await settle(ev, o.idle);
+    await o.nav(B + '#today'); await ready(ev);
+    await ev(`(() => { location.hash = 'search'; return 1; })()`); await sleep(800);
     check(await ev(`document.activeElement?.id`) === 'searchq', '390: opening Search focuses the field');
-    await ev(`(() => { location.hash = 'today'; return 1; })()`); await settle(ev, o.idle);
+    await ev(`(() => { location.hash = 'today'; return 1; })()`); await sleep(800);
     await ev(VVSIM);
-    const sb = await ev(center('#top [data-act="side"]')); await tap(sb.x, sb.y); await settle(ev, o.idle);
-    const sc = await ev(center('#side .scmd')); await tap(sc.x, sc.y); await settle(ev, o.idle);
+    const sb = await ev(center('#top [data-act="side"]')); await tap(sb.x, sb.y); await sleep(600);
+    const sc = await ev(center('#side .scmd')); await tap(sc.x, sc.y); await sleep(700);
     const pa = await ev(`(() => { const c = document.querySelector('.palette .card').getBoundingClientRect(); return {act: document.activeElement?.className, top: Math.round(c.top), foot: getComputedStyle(document.querySelector('.palette .pfoot')).display, kbs: [...document.querySelectorAll('.palette .kbs')].filter(k => getComputedStyle(k).display !== 'none').length, minH: Math.round(Math.min(...[...document.querySelectorAll('.palette .pitem')].map(e => e.getBoundingClientRect().height)))}; })()`);
     check(/pqin/.test(pa.act) && pa.top <= 24 && pa.foot === 'none' && pa.kbs === 0, '390: the drawer search: focused, at the top, no keyboard hints ' + JSON.stringify(pa));
     check(pa.minH >= 44, '390: palette rows are 44 px touch targets ' + pa.minH);
@@ -222,7 +217,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await shot('p2151-390-palette-keyboard.png');
     await ev(`(() => { closePalette(); __setKb(null, 0); return 1; })()`); await sleep(300);
     // the week view
-    await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); location.hash = 'cal'; return 1; })()`); await settle(ev, o.idle);
+    await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); location.hash = 'cal'; return 1; })()`); await sleep(1200);
     const wk = await ev(`(() => { const lb = document.querySelector('.wlbl').getBoundingClientRect(), row = document.querySelector('.wallday').getBoundingClientRect(), wb = document.querySelector('#wbody').getBoundingClientRect();
       const t7 = [...document.querySelectorAll('.wtime')].find(e => e.textContent === '07:00').getBoundingClientRect();
       const ev = [...document.querySelectorAll('.wad .ev')].find(e => /plumber/.test(e.textContent)), lh = parseFloat(getComputedStyle(ev).lineHeight);
@@ -232,16 +227,16 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     check(wk.over <= 0 && wk.page <= 1, '390 week: no sideways scroll, only the grid scrolls');
     await shot('p2151-390-week.png');
     // a week without all-day tasks: the row keeps its minimum height with "all day" in two short lines
-    await ev(`(() => { document.querySelector('[data-act="cal-next"]').click(); return 1; })()`); await settle(ev, o.idle);
+    await ev(`(() => { document.querySelector('[data-act="cal-next"]').click(); return 1; })()`); await sleep(700);
     const wk2 = await ev(`(() => ({row: Math.round(document.querySelector('.wallday').getBoundingClientRect().height), n: document.querySelectorAll('.wad .ev').length}))()`);
     check(wk2.n === 0 && wk2.row <= 33, '390 week: "all day" does not make its row taller ' + JSON.stringify(wk2));
     // the new token dialog: Expires + Create without scrolling, at 390 x 844 and 360 x 640
     for (const [ww, hh] of [[390, 844], [360, 640]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: ww, height: hh}});
-      await o.nav(B + '#today'); await ready(ev, o.idle);
+      await o.nav(B + '#today'); await ready(ev);
       // CI of 2.167.1: the API tokens moved from Account > Advanced to Settings > Access in 2.166.0 (#2633)
-      await ev(`(() => { settingsModal('tokens'); return 1; })()`); await settle(ev, o.idle);
-      const nb = await ev(center('[data-tok="new"]')); await tap(nb.x, nb.y); await settle(ev, o.idle);
+      await ev(`(() => { settingsModal('tokens'); return 1; })()`); await sleep(700);
+      const nb = await ev(center('[data-tok="new"]')); await tap(nb.x, nb.y); await sleep(700);
       const tk = await ev(`(() => { const m = [...document.querySelectorAll('.modal')].pop(), c = m.querySelector('.card'), r = s => m.querySelector(s).getBoundingClientRect();
         return {ih: innerHeight, exp: Math.round(r('#tk-exp').bottom), ok: Math.round(r('[data-m="ok"]').bottom), okTop: Math.round(r('[data-m="ok"]').top), okH: Math.round(r('[data-m="ok"]').height), st: c.scrollTop, long: c.scrollHeight > c.clientHeight, over: document.documentElement.scrollWidth - innerWidth}; })()`);
       check(tk.st === 0 && tk.exp <= tk.ih && tk.ok <= tk.ih && tk.okTop >= 0 && tk.okH >= 40 && tk.over <= 0, `${ww}x${hh}: new token: Expires and Create visible without scrolling ` + JSON.stringify(tk));
@@ -261,8 +256,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     const {cmd, ev, ctx, shot} = o;
     check(await ffLogin(o, 'light', 'dora') === 200, 'de 390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await o.nav(B + '#today'); await ready(ev, o.idle);
-    await ev(`(() => { openDetail(${DT}); return 1; })()`); await settle(ev, o.idle);
+    await o.nav(B + '#today'); await ready(ev);
+    await ev(`(() => { openDetail(${DT}); return 1; })()`); await sleep(900);
     const x = await ev(HEAD);
     headChecks('de 390', x, {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
     await shot('p2151-de-390-header.png');
@@ -276,19 +271,19 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await openTask(o, T);
     headChecks('fold 904', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799): narrow side panel, Pin in "…"
     await shot('p2151-904-header.png');
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await rsz(ev);
-    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await sleep(900);
+    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
     headChecks('fold folded 412', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await rsz(ev);
-    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await sleep(900);
+    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
     headChecks('fold unfolded again', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await rsz(ev);
-    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await sleep(900);
+    if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
     headChecks('880 portrait', await ev(HEAD), {rows: 1, words: false, pin: true});
     await shot('p2151-880-header.png');
     // the matrix keeps two columns on the unfolded Fold: no fold buttons
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
-    await o.nav(B + '#matrix'); await ready(ev, o.idle);
+    await o.nav(B + '#matrix'); await ready(ev);
     check(await ev(`!document.querySelector('.quad .qfold')`), 'fold 904 matrix: two columns, no fold buttons');
   }, true);
 
@@ -297,8 +292,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     const {cmd, ev, ctx, shot} = o;
     check(await ffLogin(o, 'dark') === 200, '1440: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await o.nav(B + '#l/' + L); await ready(ev, o.idle);
-    await ev(`(() => { openDetail(${T}); return 1; })()`); await settle(ev, o.idle);
+    await o.nav(B + '#l/' + L); await ready(ev);
+    await ev(`(() => { openDetail(${T}); return 1; })()`); await sleep(800);
     const x = await ev(HEAD);
     check(x && x.over <= 0 && x.out === 0 && x.h < 60 && x.today && x.tom && !x.words && x.pin && Math.abs(x.chip.t - x.today.t) <= 3, '1440: one row, Today / Tomorrow as icons, Pin ' + JSON.stringify(x));
     check(!(await ev(`getComputedStyle(document.querySelector('#detail .dtop .dbr')).display !== 'none'`)), '1440: no row break');

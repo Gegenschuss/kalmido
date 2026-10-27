@@ -17,7 +17,7 @@ import dbx
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import testclock  # 2.206.0 A (#2512)
 from zoneinfo import ZoneInfo
 
@@ -51,10 +51,7 @@ def age(tid, minutes):
     """Pretend the last nag of task tid was `minutes` ago (keeps its due-date key)."""
     raw = db("SELECT nag_at FROM tasks WHERE id=?", (tid,))[0][0]
     key = raw.partition("|")[0]
-    # 2.358.0 C (#2784): `minutes` of real time (UTC): Berlin wall-clock arithmetic over the switch to winter time made
-    # "23 h ago" 24 real hours on 25.10.2026 and the daily nag came early
-    at = testclock.now().astimezone(timezone.utc) - timedelta(minutes=minutes)
-    db("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{at.isoformat()}", tid))
+    db("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{(testclock.now() - timedelta(minutes=minutes)).isoformat()}", tid))
 
 
 def nags(title):

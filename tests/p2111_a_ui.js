@@ -35,7 +35,7 @@ const FEAT = 'cal,comments,collab,office,clients,sheets';
   const docGet = async () => call(CA, 'GET', `/api/office/docs/${doc.id}`);
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
-  const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+  const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { if (await fn()) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const setField = (ev, id, v) => ev(`(() => { const i = document.getElementById('${id}'); i.focus(); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('change', {bubbles: true})); i.blur(); return 1; })()`);
   const toastOn = `(() => { const t = document.getElementById('toast'); return !!t && !t.classList.contains('hidden') && /saved/i.test(t.textContent) && !!t.querySelector('button:not(.tx)'); })()`;

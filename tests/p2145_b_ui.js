@@ -48,7 +48,7 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floo
   const st = await call(CA, 'GET', '/api/state');
   console.log(`p2145_b_ui: state with ${(st.tasks || []).length} tasks, ${(st.lists || []).length} lists, ${Math.round(JSON.stringify(st).length / 1024)} KB`);
 
-  const until = (ev, expr, n) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+  const until = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const VIEWS = [
     ['list', `l/${L}`, `!!document.querySelector('#view .trow[data-id="${T}"]')`],
     ['task', `t/${T}`, `(document.querySelector('#detail #d-title')?.value || '') === 'Buy paint'`],

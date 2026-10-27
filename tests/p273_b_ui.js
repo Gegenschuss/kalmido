@@ -17,7 +17,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 const KEY = require('crypto').randomBytes(32).toString('base64');  // the organisation export needs the server key
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: `${process.env.EXTRA || ''} -e KALMIDO_SECRET_KEY=${KEY}`}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
 // 2.360.0 (#2496): a download behind the step-up: POST with the password -> a one-time ticket, then GET with it
 const suFetch = async (path, ck) => {
   const r = await fetch(B + path, {method: 'POST', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json', Cookie: ck}, body: JSON.stringify({password: 'password123'})});

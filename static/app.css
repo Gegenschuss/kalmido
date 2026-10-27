@@ -7644,7 +7644,6 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 #detail .mlpx:hover{background:var(--bg3);color:var(--text)}
 #detail .mlpadd{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem;min-width:1.75rem;justify-content:center;padding:0 .5rem;border:1px dashed var(--line2);border-radius:999rem;color:var(--accent)}
 #detail .mlpadd:hover{background:var(--accent-soft)}
-@media (pointer:coarse){ #detail .mlpadd{min-height:2.75rem;min-width:2.75rem} }  /* Sammelzug 2.376 (p260): a full touch target */
 .srow.mlalt,.srow.mlno,.srow.mlhint{position:relative}
 .srow.mlalt{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .srow.mlno{box-shadow:inset 0 0 0 2px var(--line2)}

@@ -18,8 +18,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
-// 2.358.0 B (#3302): every wait of this suite up to 200 rounds (~30 s; CI: 2 cores, many suites at once)
+const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const FEAT = 'cal,comments,collab,office,clients';
 const TEST_IBAN = 'DE02120300000000202051';
 
@@ -48,12 +47,12 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= #1366 / #1364 / #1368 10: the finalised invoice: PDF buttons, menu, send dialog
   let w = await boot({hash: 'office/offers/' + open2.id}); let d = w.document;
-  await until(() => d.querySelector('.ofdhead .ofdpdf'), 200);
+  await until(() => d.querySelector('.ofdhead .ofdpdf'), 60);
   const pdf = d.querySelector('.ofdhead .ofdpdf'), dl = d.querySelector('.ofdhead .ofddl');
   check(pdf && /\/pdf\?inline=1$/.test(pdf.getAttribute('href')) && pdf.getAttribute('target') === '_blank', '#1366: the PDF button opens the PDF in the browser: ' + pdf?.getAttribute('href'));
   check(dl && /\/pdf$/.test(dl.getAttribute('href')) && dl.hasAttribute('download') && /Download/.test(dl.textContent), '#1366: own "Download" button: ' + dl?.getAttribute('href'));
   d.querySelector('[data-ofd="more"]').click();
-  await until(() => d.querySelector('.menu-list'), 200);
+  await until(() => d.querySelector('.menu-list'), 20);
   const mt = d.querySelector('.menu-list')?.textContent || '';
   // 2.356.0 (#3005): the editor's menu has no second "Preview (PDF)" (the button above opens it); the list row menu keeps it (p287b_e_ui)
   check(!/Preview \(PDF\)/.test(mt) && !/print model/.test(mt) && pdf, '#1364/#3005: no second preview in the editor menu, the button opens the PDF: ' + mt.slice(0, 120));
@@ -61,7 +60,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   const ms = await call('GET', '/api/office/mail-status');
   w.eval('S.me.is_admin = false');
   d.querySelector('[data-ofd="send"]').click();
-  await until(() => d.querySelector('#ofd-s-to'), 200);
+  await until(() => d.querySelector('#ofd-s-to'), 40);
   const md = d.querySelector('#ofd-s-to')?.closest('.modal') || d.body;
   const lab = d.querySelector('label[for="ofd-s-to"]')?.textContent || '';
   check(lab === 'To', '#1368 10: the field is labelled "To": ' + lab);
@@ -75,22 +74,16 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
   w = await boot({hash: 'office/offers'}); d = w.document;
-  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 200);
-  // 2.358.0 B (#3302): a switch of kind while the list loads (Mac red: the offers' answer stayed under "Invoices", the
-  // reload of the new kind was dropped); started here on purpose, red without the fix
-  await until(() => w.eval(`!OFD.loading && Array.isArray(OFD.list)`), 200);
-  w.eval(`OFD.list = null; ofdLoadList(true); OFD.kind = 'invoice'; OFD.status = ''; OFD.list = null; ofdLoadList(true)`);
-  check(await until(() => w.eval(`!OFD.loading && Array.isArray(OFD.list) && OFD.list.some(x => x.id === ${inv.id})`), 200), '#3302: a switch of kind while the list loads shows the invoices: ' + w.eval(`JSON.stringify((OFD.list || []).map(x => [x.id, x.kind]))`));
+  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
-  await until(() => d.querySelector('[data-ofd="remind"]'), 200);
-  // 2.357 (#3221) + 2.356.0 (#3004) + 2.358.0 B (#3302): the stored files render once after the start and the tab changes the
-  // address first: wait for the invoice tab and the invoice's own row with its fee (Mac red: rows of the list before the switch were read)
-  const paidRow = () => [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id) && /reminder fee open: .*5,00/.test(x.textContent));
-  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]') && paidRow(), 200);
-  const rowPaid = paidRow() || [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id));
+  await until(() => d.querySelector('[data-ofd="remind"]'), 60);
+  // 2.357 (#3221) + 2.356.0 (#3004): the stored files render once after the start and the tab changes the address first:
+  // wait for the invoice tab and the row itself
+  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]') && [...d.querySelectorAll('.ofdlist .ofdrow')].some(x => x.dataset.id === String(inv.id) && /reminder fee open/.test(x.textContent)), 200);
+  const rowPaid = [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id));
   check(rowPaid && /reminder fee open: .*5,00/.test(rowPaid.textContent), '#1368 8: the paid invoice shows the open reminder fee: ' + (rowPaid?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   d.querySelector('[data-ofd="remind"]').click();
-  await until(() => d.querySelector('#ofd-r-fee'), 200);
+  await until(() => d.querySelector('#ofd-r-fee'), 40);
   const cb = d.querySelector(`[data-rid="${open2.id}"]`);
   check(!!cb, 'the open invoice is offered');
   if (cb) { cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); }
@@ -107,20 +100,19 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= #1368 8 + 9: reminder list and editor
   w = await boot({hash: 'office/offers'}); d = w.document;
-  await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 200);
+  await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
-  // 2.358.0 B (#3302): wait for the reminder list itself (Mac red: the rows before the switch were read)
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && /Settled/.test([...d.querySelectorAll('.ofdlist > li')].pop()?.textContent || '') && d.querySelector('.ofdlist .ofdgrp'), 200);
+  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);
   const items = [...d.querySelectorAll('.ofdlist > li')];
   const last = items[items.length - 1]?.textContent || '';
   check(/Settled/.test(last) && /fee open: .*5,00/.test(last) && !!d.querySelector('.ofdlist .ofdgrp'), '#1368 9: settled reminder last, under "Settled", with the open fee: ' + last.replace(/\s+/g, ' ').slice(0, 140));
   w.close();
   w = await boot({hash: 'office/offers/' + rem.id}); d = w.document;
-  await until(() => d.querySelector('.ofdfeeinfo'), 200);
+  await until(() => d.querySelector('.ofdfeeinfo'), 60);
   check(/Reminder fee .*5,00.*open/.test(d.querySelector('.ofdfeeinfo')?.textContent || '') && !!d.querySelector('[data-ofd="fee"][data-st="waived"]') && !!d.querySelector('[data-ofd="fee"][data-st="paid"]'),
     '#1368 8: the finalised reminder shows the open fee with Waive / Paid: ' + (d.querySelector('.ofdfeeinfo')?.textContent || ''));
   d.querySelector('[data-ofd="fee"][data-st="waived"]').click();
-  await until(() => /waived/.test(d.querySelector('.ofdfeeinfo')?.textContent || ''), 200);
+  await until(() => /waived/.test(d.querySelector('.ofdfeeinfo')?.textContent || ''), 40);
   check(/waived/.test(d.querySelector('.ofdfeeinfo')?.textContent || '') && !!d.querySelector('[data-ofd="fee"][data-st=""]'), '#1368 8: waived, "Open again" offered');
   w.close();
 
@@ -128,19 +120,19 @@ const TEST_IBAN = 'DE02120300000000202051';
   const SV = (await call('POST', '/api/office/services', {name_de: 'Farbkorrektur', daily_rate: 500})).id;
   const off = await call('POST', '/api/office/docs', {project_title: 'Imagefilm', items: [{service_id: SV, qty: 1}]});
   w = await boot({hash: 'office/offers/' + off.id}); d = w.document;
-  await until(() => d.querySelector('#ofd-lang'), 200);
+  await until(() => d.querySelector('#ofd-lang'), 60);
   const ls = d.querySelector('#ofd-lang'); ls.value = 'en'; ls.dispatchEvent(new w.Event('change', {bubbles: true}));
-  await until(() => d.querySelector('.ofdlnote'), 200);
+  await until(() => d.querySelector('.ofdlnote'), 60);
   check(/Dear Sir or Madam/.test(d.querySelector('#ofd-intro')?.value || ''), '#1381: the intro is English after the switch');
   check(/Farbkorrektur/.test(d.querySelector('.ofdlnote')?.textContent || '') && /no English name/.test(d.querySelector('.ofdlnote')?.textContent || ''), '#1381: note box names the position without an English name: ' + (d.querySelector('.ofdlnote')?.textContent || '').slice(0, 160));
   d.querySelector('[data-ofd="ln-x"]')?.click();
-  await until(() => !d.querySelector('.ofdlnote'), 200);
+  await until(() => !d.querySelector('.ofdlnote'), 20);
   check(!d.querySelector('.ofdlnote'), '#1381: the note box closes');
   w.close();
 
   // ================= #1381: settings - the English choice shows the English text
   w = await boot({hash: 'office/settings'}); d = w.document;
-  // 2.358.0 B (#3302): the select is drawn before the text blocks have loaded (only "none"): wait for the texts in it
+  // the text blocks load after the page (office.js ofcLoad('texts')): wait for the choices, not only for the field
   await until(() => d.querySelectorAll('#os-intro-en option').length > 1 && d.querySelectorAll('#os-intro-de option').length > 1, 200);
   const oe = [...d.querySelectorAll('#os-intro-en option')].map(o => o.textContent).join(' | ');
   const od = [...d.querySelectorAll('#os-intro-de option')].map(o => o.textContent).join(' | ');

@@ -24,7 +24,7 @@ const call = async (method, url, body, ck = CK) => {
   if (!r.ok) console.log('  ', method, url, r.status, String(t).slice(0, 200));
   return j;
 };
-const until = (fn, n) => require('./boot').until(async () => { try { return await fn(); } catch { return false; } }, {timeout: n ? n * 100 : 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { let x; try { x = await fn(); } catch { x = false; } if (x) return x; await sleep(100); } try { return await fn(); } catch { return false; } };
 const get = async u => (await fetch(B + u)).text();
 // module -> its files (LD_MODS) that were start files before 2.149.0
 const MOVED = {life: ['budget'], settings: ['servers'], listprint: ['listprint'], evinvite: ['evinvite'], projtime: ['projtime'],

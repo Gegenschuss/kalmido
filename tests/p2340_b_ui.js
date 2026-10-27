@@ -51,7 +51,7 @@ const ago = d => new Date(Date.now() - d * 86400000).toISOString().slice(0, 19) 
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
-  const until = (ev, expr, n) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+  const until = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   await firefox(async o => {
     const {cmd, ev, ctx, shot, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

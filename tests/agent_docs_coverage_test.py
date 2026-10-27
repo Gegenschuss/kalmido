@@ -10,8 +10,16 @@ import re
 import sys
 
 R = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-import kt  # noqa: E402
-from kt import check  # noqa: E402  2.358.0 D (#2783): shared helpers (tests/kt.py)
+F, ok = [], 0
+
+
+def check(c, what):
+    global ok
+    if c:
+        ok += 1
+    else:
+        F.append(what)
+        print("FAIL:", what)
 
 
 def read(*p):
@@ -65,5 +73,5 @@ js = read("static", "js", "agentchat.js") if os.path.exists(os.path.join(R, "sta
 if js and mm:
     am = re.search(r"^const AG_RULES = (\".*\");$", js, re.M)
     check(am is not None and json.loads(am.group(1)) == mm.group(1), "AG_RULES in agentchat.js equals the template block")
-print(f"agent_docs_coverage: {kt.OKS[0]} ok, {len(kt.FAILS)} failed ({len(events)} events, {len(routes)} endpoints, {len(tools)} tools)")
-sys.exit(1 if kt.FAILS else 0)
+print(f"agent_docs_coverage: {ok} ok, {len(F)} failed ({len(events)} events, {len(routes)} endpoints, {len(tools)} tools)")
+sys.exit(1 if F else 0)
