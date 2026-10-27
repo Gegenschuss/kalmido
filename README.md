@@ -9,7 +9,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><a href="https://github.com/Gegenschuss/kalmido/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Gegenschuss/kalmido?label=version"></a> <a href="https://github.com/Gegenschuss/kalmido/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Gegenschuss/kalmido/actions/workflows/ci.yml/badge.svg"></a> <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a></p>
 
-<p align="center"><picture><source media="(prefers-color-scheme: light)" srcset="docs/today-light.png"><img src="docs/today.png" alt="Today view with an agent waiting for approval, overdue and today's tasks, subtasks, tags and the list sidebar"></picture></p>
+<p align="center"><img src="docs/today.png" alt="Today view with the morning briefing, today's event, overdue tasks with their assignees and the project sidebar"></p>
 
 <p align="center"><b><a href="https://kalmido.com/demo/">Try it in your browser</a></b>: no account, no server, your data stays in your browser.</p>
 
@@ -144,7 +144,7 @@ uses the modules that are on, stays private and quiet (no reminders, pushes, New
 digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
 if you edited them, tasks you added yourself stay, and so does their project.
 
-<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, then Start with: Empty, Sample project, Agency, Software and Personal"></p>
+<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: language, then what Kalmido is for (For me, Home, Family, Team, Software projects, Office &amp; finance) and a switch for all modules"></p>
 
 </details>
 
@@ -219,6 +219,18 @@ per area here; the details are under [Documentation](#documentation), every sing
 |---|---|---|
 | <img src="docs/calendar.png" alt="Month calendar"> | <img src="docs/matrix.png" alt="Eisenhower matrix"> | <img src="docs/habits.png" alt="Habits: the last seven days and streaks"> |
 | Calendar | Eisenhower matrix | Habits |
+
+### Dark mode
+
+Every view also comes in a dark design: *Settings > Appearance > Color scheme* (Automatic follows your system).
+The pictures on this page show the light design; here are a few views in dark.
+
+| | | |
+|---|---|---|
+| <img src="docs/dark-today.png" alt="Today in the dark design: briefing, today's event and overdue tasks"> | <img src="docs/dark-calendar.png" alt="Calendar week in the dark design with all-day tasks and appointments"> | <img src="docs/dark-roadmap.png" alt="Roadmap of all projects in the dark design with progress bars and milestones"> |
+| Today | Calendar | Roadmap |
+
+<p align="center"><img src="docs/dark-office.png" width="560" alt="Office pipeline in the dark design: open value, expected income per month and the deals by stage"> <img src="docs/dark-mobile.png" width="170" alt="Today on the phone in the dark design"></p>
 
 ## Updating
 
@@ -602,15 +614,12 @@ and dark and with every accent colour on every change. Details and known limits:
 
 | | |
 |---|---|
-| <img src="docs/palette.png" alt="Command palette with actions for the selected task"> | <img src="docs/celebration.png" alt="The heron swinging across the screen on a vine with checkmark confetti after Today was cleared"> |
+| <img src="docs/palette.png" alt="Command palette with actions for the selected task"> | <img src="docs/celebration.png" alt="The Kalmido figure with a checkmark and confetti after Today was cleared"> |
 | Command palette | The heron celebrates |
 
-| | |
-|---|---|
-| <img src="docs/appearance.png" alt="Settings, Appearance tab with a live preview, color scheme, density, font size, font and accent color"> | <img src="docs/appearance-light.png" alt="Today in the light theme with the violet accent, Atkinson Hyperlegible and the large font size"> |
-| Settings > Appearance | Light, violet, Atkinson Hyperlegible, 112 % |
+<p align="center"><img src="docs/appearance.png" width="760" alt="Settings, Appearance tab with a live preview, theme, color scheme, density and font size"></p>
 
-<p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar, dark"> <img src="docs/mobile-light.png" width="300" alt="Phone layout with tab bar, light"></p>
+<p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar"></p>
 
 </details>
 <details>
@@ -747,7 +756,7 @@ boolean `checklist` are still accepted as deprecated aliases.
 
 ### Comments and activity
 
-<p align="center"><img src="docs/comments.png" alt="Task panel with a website link, activity lines and comments with @mentions"></p>
+<p align="center"><img src="docs/comments.png" alt="Task panel with comments of the team, reactions and activity lines"></p>
 
 - **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *View only*
   members (they still cannot change the task). In private projects and without collaboration, comments are personal
@@ -861,7 +870,7 @@ their progress, pinned tasks, recent notes, the agents, a few numbers and a sear
 reorder, half or full width, optionally different on the phone; on the project page the owner sets the standard for
 everyone and each person may override it. The start page can also be a tab (Settings > Appearance > Tab bar).
 
-<p align="center"><img src="docs/project-page.png" width="760" alt="A project page built from blocks: description, status update, milestones, key links, members, project files with an image preview, empty blocks as single lines, Customize"></p>
+<p align="center"><img src="docs/project-page.png" width="760" alt="A project page built from blocks: status line, description, status updates, milestones, key links, members, notes and team chat"></p>
 
 </details>
 <details>
@@ -1451,7 +1460,7 @@ and the activity log; [docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md) adds the 
 Claude Code (own user, egress firewall, the token out of the model's reach) and the prompt-injection checklist we test
 with.
 
-![An agent in a task: mentioned, answers with a plan, approved with 👍; the chip in the top bar shows its jobs](docs/agents.png)
+![An agent in a task: mentioned in a comment, answers with a plan and asks for approval with Yes, go ahead or No](docs/agents.png)
 
 </details>
 <details>
@@ -1566,7 +1575,7 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
   | Ctrl+Shift+Z / Cmd+Shift+Z, Ctrl+Y | Redo |
   | Right-click or long-press on ← / → | The last ten steps, jump to one |
 
-<p align="center"><img src="docs/undo.png" alt="Top bar with the undo and redo arrows and the history menu: section added, task moved, priority changed, task completed"></p>
+<p align="center"><img src="docs/undo.png" alt="Top bar with the undo and redo arrows and the history menu: task moved, date changed"></p>
 
 - **Settings save themselves:** every switch, choice and field in *Settings* applies at once and shows *Saved · Undo*;
   each change is a step in the history above, so a wrong click is one *Undo* away. *Settings > Modules* lists every
@@ -1577,7 +1586,7 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 
 | Settings > Modules | Date picker |
 |---|---|
-| <img src="docs/settings-modules.png" alt="Settings, Modules tab: every module with a switch and one sentence, grouped into views, for you, projects and team; Saved and Undo in the header"> | <img src="docs/datepicker.png" alt="Task date dialog with the own month grid and a second picker for the start date"> |
+| <img src="docs/settings-modules.png" alt="Settings, Modules tab: what Kalmido is for, the switch for all modules, then the modules grouped into views, calendar and people, for you"> | <img src="docs/datepicker.png" alt="Task date dialog with the own month grid and a second picker for the start date"> |
 - **Statistics** (module, on by default; sidebar, command bar or a pinned tab) for the last 12 weeks: completed tasks per
   week or per day and per project, on-time rate (completed on or before the due day), the overdue trend (your open
   tasks past their due date at the end of each week), focus minutes per week and per project, habit rates and streaks.
@@ -1662,7 +1671,7 @@ without it the server refuses a timer or a new time entry, tracked time stays in
 minutes of tracked time got *Progress and status* on with the update; checklists stayed checklists. Each person can hide a project's progress bar with the
 small **×** next to it (*Show progress* in the project's … menu or the project dialog brings it back).
 
-![Gantt timeline of a website relaunch: bars from start to due, arrows from each task to the tasks waiting on it, a red arrow where a task starts before its blocker is due](docs/gantt.png)
+![Gantt timeline of a website relaunch: milestones, bars from start to due and arrows from each task to the tasks waiting on it](docs/gantt.png)
 
 - **Gantt timeline** (list view *Timeline*, or *Calendar > Timeline* for all projects): every open task with a date is a
   bar from its start to its due date, and each dependency is an arrow from the end of a task to the start of the
@@ -1688,7 +1697,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 
 ### Roadmap: all projects on one timeline
 
-![Roadmap of a small agency: six projects in two folders, each with a summary bar filled by its progress, the tasks of the expanded projects below, arrows between projects](docs/roadmap.png)
+![Roadmap of a small agency: the projects in two folders, each with a summary bar filled by its progress and its milestones](docs/roadmap.png)
 
 - **Where:** *All* > the *Timeline* button next to the title (needs the *Timeline* module; nothing else). Your choice,
   the zoom, the filters and which projects are collapsed are saved for you on the server.
@@ -1767,7 +1776,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 
 | | |
 |---|---|
-| <img src="docs/fields.png" alt="Work project with progress bar and At risk status, field chips and waiting tasks; task panel with custom fields and dependencies"> | <img src="docs/overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per project"> |
+| <img src="docs/fields.png" alt="Project timeline with blocked tasks; task panel with custom fields (phase, budget, effort, preview link) and tracked time"> | <img src="docs/overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per project"> |
 | Custom fields, dependencies, progress and status | *Where is it stuck?* |
 
 </details>
