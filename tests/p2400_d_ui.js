@@ -76,7 +76,9 @@ const TEST_IBAN = 'DE02120300000000202051';
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelector('[data-ofd="remind"]'), 60);
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length >= 2, 60);
+  // 2.357 (#3221): the server renders the stored files of finalised documents once after its start, the list can come late:
+  // wait for the row itself, not only for two rows
+  await until(() => [...d.querySelectorAll('.ofdlist .ofdrow')].some(x => x.dataset.id === String(inv.id) && /reminder fee open/.test(x.textContent)), 200);
   const rowPaid = [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id));
   check(rowPaid && /reminder fee open: .*5,00/.test(rowPaid.textContent), '#1368 8: the paid invoice shows the open reminder fee: ' + (rowPaid?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   d.querySelector('[data-ofd="remind"]').click();
@@ -99,7 +101,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
+  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);
   const items = [...d.querySelectorAll('.ofdlist > li')];
   const last = items[items.length - 1]?.textContent || '';
   check(/Settled/.test(last) && /fee open: .*5,00/.test(last) && !!d.querySelector('.ofdlist .ofdgrp'), '#1368 9: settled reminder last, under "Settled", with the open fee: ' + last.replace(/\s+/g, ' ').slice(0, 140));
@@ -129,7 +131,8 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= #1381: settings - the English choice shows the English text
   w = await boot({hash: 'office/settings'}); d = w.document;
-  await until(() => d.querySelector('#os-intro-en'), 60);
+  // the text blocks load after the page (office.js ofcLoad('texts')): wait for the choices, not only for the field
+  await until(() => d.querySelectorAll('#os-intro-en option').length > 1 && d.querySelectorAll('#os-intro-de option').length > 1, 200);
   const oe = [...d.querySelectorAll('#os-intro-en option')].map(o => o.textContent).join(' | ');
   const od = [...d.querySelectorAll('#os-intro-de option')].map(o => o.textContent).join(' | ');
   check(/thank you|enquiry/i.test(oe) && !/vielen Dank/.test(oe) && /vielen Dank/.test(od), '#1381: English choice in English, German in German: ' + oe.slice(0, 120));
