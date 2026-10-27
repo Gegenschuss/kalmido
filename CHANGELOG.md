@@ -5,6 +5,14 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.4] - 2026-10-27
+
+### Fixed
+- CI of 2.351.3: the UI tests of the office tree (phone drawer) and of time tracking (list hourly rate) wait for the page state instead of fixed pauses; both stay skipped until proven stable (#3398).
+
+### Removed
+- Package 2.350.0 (Release 2.350 Bündel Chat) taken out of the train again before going live (CI rot: p2130_ui (A5 Back returns to the bell)); it follows in a later version.
+
 ## [2.351.3] - 2026-10-27
 
 Package 2.351.2 (CI fix of the live train 2.351.2).
@@ -8814,7 +8822,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.4...HEAD
+[2.351.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.4
 [2.351.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.3
 [2.351.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.2
 [2.351.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.1
