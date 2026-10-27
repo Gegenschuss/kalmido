@@ -20,551 +20,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-- **2.318.3** (2026-10-26): a bundle of 2.210-2.319 - privacy and security hardening (IP addresses shortened in logs, step-up for off-site backup targets, folder references follow office rules, importer limits), incoming e-invoices wait for a person to take them over, Office PDFs never cut the footer, MT940 import and bank rules, find clients and invoices with search / Ctrl K, per-agent work style and chat settings, lean start state with live deltas, right click on folders, labels of the app bar can be turned off.
-- **2.304.0** (2026-10-25): **delete, trash and undo work the same everywhere** - deleting means trash first, then really gone after the trash period (switchable, counted while off) across tasks, projects, files, clients, contacts and notes; the **office** gets a point *Receipts* and a new office opens on Quotes & invoices with Money folded until first use; the **knowledge editor** has a formatting bar and the normal font.
-- **2.223.0** (2026-10-23): a big bundle of packages 2.164-2.223; phone fixes (client card, quotation editor, search hits), the agent chat with the module *Agents* off asks to turn it on, the starts *Team* / *Office & finance* switch *Agents* on, long recipient names wrap in PDFs, the agent button covers nothing, icons instead of emoji.
-- **2.168.3** (2026-10-23): CI fixes of 2.168.2; the **phone drawer works like sidebar B** (fixed search / Today / Inbox,
-  a sideways row of area icons, one panel, Settings and account at the bottom); JS and CSS are served without comments
-  and the language texts are split per area at runtime (no build step).
-- **2.168.2** (2026-10-23): CI fixes of 2.168.1; the office has an own **home currency** (base pack) and takes any foreign
-  currency with an exchange rate.
-- **2.168.1** (2026-10-23): **office access rights** - groups with a level per office area (no access / own entries only
-  / view / edit / manage) and special rights (finalise and send invoices, payments, period locks, exports), every change
-  logged; members keep their previous access until assigned. **Old Excel files (.xls)** are read by the legacy import
-  (new dependency xlrd, BSD), and office documents can be written in **Dutch, French, Spanish and Italian** too;
-  receipts show a **possible duplicate** mark; after a waived retention export, kept private
-  projects go to the deleting instance admin (download + early delete in the trash).
-- **2.184.0** (2026-10-23): **letters on your own letterhead**; the organisation export / import now includes letters and
-  document fields, sent letters are kept for 6 years in the retention export, document fields on moves only by admins. In Knowledge, "All workspaces" shows one panel entry per workspace instead of the space switch.
-- **2.179.0** (2026-10-22): **new area Reading** (Read later with its own view, Feeds, Bookmarks) per workspace; the edit
-  field of knowledge pages and notes fills the whole free height; knowledge ZIP import takes large archives (up to 4 GB)
-  with a progress bar; feeds name a site that refuses servers (403); the knowledge tree stays open on a phone; CI runs in one wave.
-- **2.165.9** (2026-10-22): **agent chat bubbles in the agent's colour** - its messages and its jobs' messages are tinted
-  in their colour, the colour bar on top is replaced by the workspace's name in the header (#2681).
-- **2.165.7** (2026-10-22): **module counts include the parts of the areas** - *Settings > Modules* says how many
-  single modules are on, *Switch on all modules* and the area switches show the real state (half = partly on).
-- **2.165.6** (2026-10-22): **one head bar over everything on a computer** - brand, workspace menu (Private and every
-  company with its sign, *Add a company*), search, bell and account on top; the panel head can **fold all** and **hide
-  the panel**; **tables, knowledge folders and file store folders sit in the panel** (no tree columns any more); the
-  **app icon** stays recognisable on the dark tile of macOS.
-- **2.165.2** (2026-10-22): **one word per thing** in the German interface (*Eingang*, *Arbeitsbereich*, *teilen* /
-  *Freigabe* / *Abnahme*, *Weiterleitungen*, *Sicherung*, office menu *Anfragen* / *Liquidität* / *Geräte*, quotations
-  printed as *Angebot*, the formal *Sie* towards customers); in the agent chat only a job's long messages fold.
-- **2.165.1** (2026-10-22): **sidebar B on a computer** - a bar with the areas and one panel per area that reopens the
-  page used last, the office without a second column, time / review / home / file store without tabs; **every list is a
-  project** now (the type became the switch *Progress and status*); the **chat header** shows only search and the menu.
-- **2.165.0** (2026-10-22): the **bot figure greets once on the very first start**, looks **startled for a moment on an
-  error or when the connection drops**, and **hops on pull to refresh** on phones; nothing moves with *reduce motion*.
-- **2.161.2** (2026-10-21): the **Kalmido brand is back on top of the sidebar** and is the workspace switch, the
-  **bot figure comes alive** (empty views, a nod for the last task ticked off, at work in the agent chat and beside long
-  imports and exports; still with *reduce motion*), the **News number is the bell's number everywhere**, the office opens
-  on the point used last.
-- **2.161.0** (2026-10-21): the **organisation's own picture** can also be uploaded and removed in the admin dialog
-  *Edit organisation*, not only in Settings > Workspaces.
-- **2.157.0** (2026-10-21): **agent setup with one command, tried on a real Mac**: setup over SSH works without a screen
-  login, a half-done setup leaves no autostart behind, a hard-killed launcher leaves no runner behind, and after
-  *Remove computer* the agent stops quietly. Details: [docs/AGENTS.md](docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
-- **2.156.0** (2026-10-21): tasks and the mind map go **five levels** deep; the mind map shows **task properties on
-  demand** and can ask a connected agent to **add ideas** you take over or drop; list fields get **multiple choice,
-  currency, rating and task links**, formulas get **IF, SUM, ROUND** and more; a **calendar view per list**, **My tasks as
-  a board**, folded sections on every device and **section templates**; **sidebar views** as tiles, the same on every device.
-- **2.154.0** (2026-10-21): **stack scans split into documents** by archive numbers or separator sheets (preview with cuts,
-  blank pages left out, undo), documents **linked with tasks**; **e-invoices over the Peppol network** through your own
-  access point provider account (UBL, Peppol ID, status); **data protection sheets** for clients (DPA, privacy
-  information, consent) with mail, signing link and status; agents' receipt suggestions in the office; an industry pack
-  per calculation part; a hint when duplicating an invoice made from times.
-- **2.153.0** (2026-10-21): **correspondence** in the office - letters after DIN 5008 with signature, sent by post or
-  e-mail with the answer linked automatically, text blocks, deadlines and follow-ups as tasks, answer drafts by agents;
-  **custom fields for documents** (also from Paperless); an **own chat per job**; **all receipts** with filters and an
-  export of the filtered receipts for the tax advisor; incoming e-invoices become receipts.
-- **2.152.0** (2026-10-21): **deletion rules and legal retention** - every trash has a period, deleted accounts and
-  organisations really go (files included), office records the law keeps stay locked (a personal office with such
-  records is retired, not deleted), and the logbook can be closed; deletion runs only count until the operator switches them on.
-- **2.151.0** (2026-10-21): **a task knows its build state** - in a list with a repository the task shows *In version
-  2.150.0*, *In main, not released yet* or *Built, not in main yet* with the branch, straight from the repository; a
-  **hint when a task is still open although its package / version is already released**, also in the task row; agents
-  read it as `build` and with the new MCP tool `list_build_status`, and software agents get the rule *the task list is
-  the truth for tickets and releases*.
-- **2.148.1** (2026-10-21): security release - joining an organisation needs your yes, organisation data leaves it only
-  through an admin, public links reset on owner change, complete encryption tooling and backups, resource limits,
-  agent approvals for public forms and address books.
-- **2.148.0** (2026-10-21): DATEV Unternehmen online replaced - lock periods (GoBD), receipt images with the DATEV batch, export for the tax auditor, procedure documentation, DATEV import of master data and opening balances
-- **2.147.2** (2026-10-21): fixes for the **read-only role** (the office opens straight away, no *Join* that brings
-  no writing, no + button in lists you may only read) and for **dialogs on phones** (role picker, role help, backup
-  fields above the keyboard, long names in the pages trash).
-- **2.144.6** (2026-10-21): office fixes - **tracked time to the invoice**: entries are billable or not, "invoice
-  from time" binds the open hours as billed so they never land on two invoices, a deleted draft or a cancelled invoice
-  frees them; the legacy import asks for a reason when raising the invoice counter and its undo restores the order of
-  the services; asking for an approval no longer fires "assigned" rules; one "transfer into an organisation" section.
-- **2.147.1** (2026-10-21): **drag tasks into the chats** (team chat, thread, agent chat) as references, several at once, with
-  *Insert reference* on phones; **overdue invoices suggest a payment reminder** as a draft (nothing is sent) and
-  invoices / reminders in EUR carry a **GiroCode** for banking apps; moving many documents to another workspace shows
-  **progress**; agents show their workspace as a stripe; the bell counts agent approvals and says "Gelesen".
-- **2.147.0** (2026-10-21): **country pack functions** - the country pack decides which office functions appear (DATEV,
-  e-invoices, VAT return figures, tax dates), single ones can be **switched off** without losing data, an
-  **international base pack** with own VAT rates and an **export for any tax advisor** (CSV + ZIP), and a new office
-  asks for its country. Details: [docs/OFFICE.md](docs/OFFICE.md#country-pack-functions-and-switches-2147).
-- **2.146.0** (2026-10-21): imports from everyday life - e-invoices (XRechnung, ZUGFeRD) are received and read from
-  their XML, duplicate receipts are found and kept out of DATEV, several files / ZIP / winmail.dat at once, iPhone HEIC
-  photos, household import with debit/credit column and undo, CAMT.052 pending entries handled, legacy import with
-  address columns and CSV, several vCards or a ZIP, and a retention export before deleting an account or organisation.
-- **2.145.0** (2026-10-21): **own windows open faster** (a list, task or chat window takes the open app's state and
-  catches up in the background), the **list CSV** gets start, deadline, duration, tracked time, created / completed by,
-  milestone, sprint and the checklist, the **printable project** starts with a project head (description, status,
-  time span, members, milestones), the **logo** keeps the lilac of the app icon, a small Kalmido mark sits at the
-  bottom of the sidebar (a tap opens Start), the workspace head lines up with the page title, and the news say when
-  unread items wait in another workspace.
-- **2.144.2** (2026-10-21): small fixes - subtasks appear at once while you type, touch targets of at least 44 px
-  in office and settings dialogs, the Android print view and office search focus, Undo on vacation decisions.
-- **2.144.1** (2026-10-21): office fixes - the bank import takes several statements or a ZIP at once and says which
-  file to export from online banking (CAMT.053 recommended), the cash flow opens it next to the bank balance; the office
-  side bar stays put on touch tablets.
-- **2.144.0** (2026-10-20): agent chat - a **stop button** (Esc, Ctrl+C without a selection) for a running answer,
-  **agent colours** in header and composer, fold long messages for all at once, the filter as an icon in the header
-  that really hides job results; the home block **Today** shows today's events and counts running jobs; **group a
-  list** by a custom field; an optional **operator interface** for hosters (numbers only, no content) and the
-  supporter licence prices.
-- **2.143.0** (2026-10-20): organisation roles read-only, guest and accounting; off-site backups to S3, WebDAV or SFTP
-  (encrypted only); outbox in IndexedDB with background sync, offline notes and time entries, an install hint; share
-  any file type to Kalmido; appearance follows your account; activity per organisation for admins; the pages trash
-  and old terms PDFs are emptied for good.
-- **2.141.0** (2026-10-20): the **e-mail filing as a small mail desk** - an own IMAP / SMTP mailbox per workspace,
-  reply and write from the filing (sent mails filed too), HTML mails shown safely, tasks and events from a mail; a CSV /
-  ICS export of the disposition and a consent import for newsletters.
-- **2.140.0** (2026-10-20): private space - shopping items with quantity and price and an offline shopping mode,
-  recipes onto the shopping list and the meal plan beyond one week, journal history with search, export and mood
-  statistics, budget month comparison and one bank statement reader with the office, several reminder times per habit,
-  devices linked with the office equipment, birthdays written back to the address book.
-- **2.139.1** (2026-10-20): a whole organisation moves between two Kalmido servers - the import of an organisation export
-  now takes over every area (office with finalised invoices and cash book, clients, file store, documents, knowledge
-  pages, tables, video sign-offs, team chat, absences, newsletter, forms, notes, time entries), with the references
-  between them; a freelancer exports their personal office and moves it into an organisation they administer.
-- **2.139.0** (2026-10-20): team chat threads, voice messages with their own player and "Read by" (can be switched
-  off); every task comment can become a task; unreadable pages back in the search once their key returns; proposal
-  cards with the app thumb and larger check boxes.
-- **2.138.4** (2026-10-20): phones - office fixed-cost import rows stay whole, table checkbox cells tick on a tap
-  with undo, sheet bar above the tab bar, Android print view, touch-sized controls in documents and bookmarks; the
-  agent chat keeps an open edit; error-report webhook token in a header, contact copies out of mirrored address books,
-  a notice when the portal sign-in budget is used up, `reindex-private` after a new server key.
-- **2.138.3** (2026-10-20): edit organisation - members as a searchable list with "Member" and "Admin" boxes; a decided
-  agent approval no longer stays unread in the notifications.
-- **2.138.2** (2026-10-20): the sidebar head shows your **workspace** on top (avatar at the bottom next to the search),
-  a **colour stripe** on top of the sidebar marks private / organisation; office PDFs of **drafts** ask to finalise first
-  or are marked DRAFT on every page, the number scheme knows **{isodate}**, calmer rights annex and a bold multi-line
-  company name in the footer; **News** in *For you / Also new / Read*; a larger **Mac dock icon**.
-- **2.138.1** (2026-10-20): six releases from 19.10. brought onto today's code - office undo, invitation mails
-  and calendar subscription links, quick add with @person and reminders at a time; file store ZIP, phone scan and
-  external links; office settings in areas, quotation parts in colour, terms as PDF; team chat files, channels and
-  groups; producing by amount, handling costs and markup; inbound and organisation webhooks, active sessions,
-  invitations by e-mail; trash period, list CSV / print, full-text search, repeats several times a day.
-- **2.138.0** (2026-10-20): office - start number per number range, the quotation bar shows the next step, quotation
-  fixes (units by quantity, renamed parts on the title page, wrapping PDF headings, closing kept together), import order
-  and undo; resizable dialogs; rule triggers / actions and Kanban swimlanes; sidebar search at the bottom; security fixes.
-- **2.126.2** (2026-10-20): pages on phones - suggestions stay above the keyboard, checkbox "+" without overlap; a
-  news entry when someone shares pages with you; "Mentioned in" on tables; ended links and unreadable sealed pages shown as such.
-- **2.126.1** (2026-10-20): agents draft for you - office texts and reminders, document summaries, the client report
-  from the status report, table rows as tasks, a planned morning sort of the basket; always as a card you decide on.
-- **2.126.0** (2026-10-20): security release - fixes from the internal audit for office, documents, agents, sync and
-  offline; private document data on the account key; ESLint in CI.
-- **2.125.0** (2026-10-20): vacation requests with approval and vacation accounts, working days and weekly hours per
-  person, close and approve monthly timesheets, time zone per person with entries split at midnight, timer shortcut,
-  Excel export of times and workload; the browser demo starts like a new account and shows every module.
-- **2.124.0** (2026-10-20): tables - SUMIF, COUNTIF, VLOOKUP / XLOOKUP, text and date functions, checkbox / person /
-  link / file columns, rows and columns kept in view, print, cell history, sharing single tables with people and agents,
-  charts, several sheets per table, tables in Mod+K; cash flow balance from the bank reconciliation.
-- **2.123.0** (2026-10-20): knowledge pages - history with restore, pictures and files from the file store, read-only
-  sharing with people or a public link, full-text search with a word index, `[[datei:…]]` / `[[tabelle:…]]` links, check
-  boxes become tasks, texts encrypted at rest (switched on by the admin); cash flow with opening balance, corrections by
-  hand and the real month-end balance.
-- **2.122.0** (2026-10-20): file request links for clients, tags in the file store, a much stronger document search
-  with bulk changes and ZIP, Shift-click ranges, documents via the API, CSV export, more OCR languages, swiping
-  through the news on phones and yearly VAT returns.
-- **2.121.0** (2026-10-20): receipts - the recognition reads supplier, VAT rate, net / gross and invoice number as a
-  suggestion, categories with their SKR03 / SKR04 account, receipts billed on to clients as outlays, a cash book (gapless
-  numbers, day closing, cancellation instead of delete, CSV / PDF), agents may suggest amount and VAT rate.
-- **2.120.0** (2026-10-19): progress and final invoices with cash discount, the client portal shows quotations, invoices
-  and their payment state, delivery notes and a timesheet attachment, DATEV with receipts and travel costs, an own letterhead PDF.
-- **2.119.2** (2026-10-19): contacts import and export CSV (Outlook, Google, Excel), load beyond 500, hint on duplicates,
-  manage groups, a contact history and "Create client" on the card, addresses as map links; framework contracts move
-  between private and organisation; undo of a list delete keeps the list active.
-- **2.119.0** (2026-10-19): entertainment receipts as an office module (form with pick lists, lock with logged unlock,
-  PDF receipt, 70/30 report with filters), filled icon buttons when switched on, pin agents in "All people …".
-- **2.118.0** (2026-10-19): quotation numbers per client or project (e.g. KV-ACME-2026-03) and a `{version}` block
-  for duplicates (KV-ACME-2026-03-V2); one switch for the progress line and rings in the sidebar.
-- **2.117.0** (2026-10-19): travel costs filtered by person and with own purposes, a row menu per trip, the "To"
-  calendar starts at the start date; seven document samples, PDFs attached to framework contracts, a compact chat filter on phones.
-- **2.99.0** (2026-10-19): files on knowledge pages (PDFs, pictures) and a ZIP import that keeps them, one "…" menu on
-  knowledge pages, the acceptance note on quotations accepted online, a short sidebar group Exchange (pinned people),
-  a name addition for clients and a company name on up to three lines, 44 px fields in the document editor, aligned chat icons.
-- **2.102.0** (2026-10-19): a trash for deleted lists (organisation lists in the organisation's trash, 30 days),
-  questionnaire links per client, calmer news counts, the send hint in chats, background work once per instance.
-- **2.114.5** (2026-10-19): office fixes 5 - page 1 of the quotation PDF tightened (order confirmation at the end with
-  a page line, no VAT column with one rate, the option as total rows, a three-line footer).
-- **2.114.4** (2026-10-19): office fixes 4 - a calmer quotation PDF (footer without breaks, page number only from
-  two pages, only the VAT rates that occur), the order confirmation optional, documents with PDF preview and the same
-  footer, travel costs with the per diem as the main amount.
-- **2.114.2** (2026-10-19): office fixes 2 - a finalised quotation that never left the house can be deleted or
-  taken back to a draft (same number), number scheme errors under the field with a reset button.
-- **2.114.1** (2026-10-19): office fixes - the transfer of rights as the last page of the quotation PDF, receipts in
-  the cash flow, books up to date right after a bank match, clearer bank buttons on phones.
-- **2.136.0** (2026-10-19): a new face - the Kalmido bot replaces the heron in the app icon, the empty views, the
-  celebration and the loading screen; on iPhone / iPad add the web app to the home screen again for the new icon.
-- **2.98.0** (2026-10-19): scheduling polls with a public vote link, questionnaires in forms (answers become a task at the
-  customer), the office menu as a rail on the left, resizable tables in their own window, documents guess amounts only
-  where they fit.
-- **2.101.0** (2026-10-19): *Show more* on a long description keeps the next tasks unfolded too until *Show less*
-  (per device); a trademark note in Settings > About.
-- **2.97.0** (2026-10-19): bookmarks with preview, tags and search (Karakeep fills the same store), a display name for
-  customers and the recipient always from the customer, office data and wiki spaces with a lock move between the private
-  space and an organisation.
-- **2.96.2** (2026-10-19): video sign-off at tasks, projects and clients - links from Vimeo, YouTube or a video file (no
-  hosting), comments at the time code with marks, versions, a customer link with Approve / Request changes, export for
-  the edit, agent access; how to contribute national e-invoice formats ([CONTRIBUTING.md](CONTRIBUTING.md)).
-- **2.96.0** (2026-10-18): files, folders, documents, wiki pages and tables move between your private space and an
-  organisation, both ways (sealed again, shares that do not hold end, one undo); an organisation export can go into the
-  private space; one card per background job in the agent chat with a filter.
-- **2.95.0** (2026-10-18): the per diem of business trips with the German flat rates per year (BMF 2025 / 2026; country,
-  city, times and meals per day; a year without rates shows a hint), its report per person as PDF / Excel / CSV, and the
-  import of a per diem spreadsheet with a preview.
-- **2.94.0** (2026-10-18): a public booking page for customers (free times from your calendar, mail confirmation,
-  event + contact + lead), leads before the sales pipeline (follow-up, convert to client, CSV import, agents), and Enter in
-  the chats makes a new line.
-- **2.93.0** (2026-10-18): documents from your own templates (contracts, order confirmations, NDAs) with variables
-  from client, project and quotation, as PDF in the client's folder and signed by the customer through a link; a
-  logbook in the travel expenses with change log, year report and the mileage allowance in the income/expense statement.
-- **2.92.3** (2026-10-18): fixes of 2.92.2 (equipment page while loading, inline title height).
-- **2.92.2** (2026-10-18): before every import Kalmido names the target and asks (*Rather to private*), Paperless-ngx in the
-  settings, an office menu in four groups, organisation pictures, smoother dragging everywhere, freelancer parity guard.
-- **2.92.0** (2026-10-18): contracts and insurance in the office (notice deadlines as tasks, contributions in the cash
-  flow), equipment value with depreciation and an insurance list, Word and Excel preview with *Summarize* by a connected
-  agent, and three phone fixes from the 2.88 device tests.
-- **2.91.0** (2026-10-18): recurring invoices (monthly, quarterly, yearly; drafts or sent automatically, in the cash
-  flow) and an office overview of subscriptions and tools with sums, notice periods, users, renewal reminders and a
-  *hardly used* mark.
-- **2.90.0** (2026-10-18): bookkeeping light in the office - income/expense statement with CSV / PDF, VAT return
-  figures, receipt photo, tax reserve in the cash flow, bank reconciliation (CSV / CAMT) and tax dates as recurring tasks;
-  also without an organisation.
-- **2.89.0** (2026-10-18): Tables - simple spreadsheets whose cells can hold live Kalmido values (project time,
-  open tasks, client rates), stored by id and computed with each viewer's rights; selection columns with colours,
-  import/export CSV and Excel, agents build whole sheets; rows to tasks, sheet to quotation, list as rows.
-- **2.88.0** (2026-10-18): sent quotations count in the cash flow plan as open quotations, one version per quotation
-  with a per-quotation switch; user administration with search, filters, pages and bulk actions, deleting an account
-  hands its lists to another person or deletes them along.
-- **2.87.0** (2026-10-18): hardening from the security audit, part 3 - people who leave an organisation drop out of its
-  appointments, lists are handed over only to visible people; the agent chat header without info button.
-- **2.86.0** (2026-10-17): hardening from the security audit - sign-in floods no longer lock owners out, child
-  accounts and instance admins kept to their organisation, stricter rights for approvals, list rules and office data,
-  upload limits, sandboxed PDFs, push and mail day limits, agents see only what is shared with them.
-- **2.85.0** (2026-10-17): Feeds - an RSS / Atom reader in *At home* (private, hourly, OPML, *Read later* as a
-  task); *Edit list* shows the lock state right after loading; tests use the Berlin day.
-- **2.84.0** (2026-10-17): e-mails filed at clients and projects - own addresses, matching by sender, search, original
-  mail and attachments in the file store.
-- **2.83.0** (2026-10-17): themes (Paper, Night, Contrast) and header strips for lists and folders, progress rings;
-  the organisation view hides the private areas; assigned tasks of organisation-wide lists without joining; agent colour
-  on the person card for organisation admins; team rooms open in a split window from their header.
-- **2.82.0** (2026-10-17): **security release** - tighter permission boundaries (folder defaults, birthday tasks, the
-  *My tasks* order, agents as list admins), locked lists open with texts that begin with `e2e1:`, *Accept* / *Decline* on
-  layout proposals, pinning leftovers, 44 px review buttons on the phone and the reviewer's name in the history.
-- **2.81.0** (2026-10-17): security fixes (customer portal sign-out, single-use form pages, rate limits, agent data -
-  **portal users sign in once again**); office archive entries can be corrected after the import (client, net amounts
-  per tax rate, paid, with history); DATEV keeps the customer number of locked invoices; the Paperless ZIP check runs in
-  the background.
-- **2.80.2** (2026-10-18): patch - agent replies count at the bell, previews for imported documents, switching the
-  workspace reloads documents.
-- **2.80.0** (2026-10-17): small fixes - import amounts with thousands separators, new clients at once in the import and
-  in quotations / invoices (with *Add client* when there is none), undo of a contact merge across workspaces, larger
-  Undo button and a wrapping selection bar on the phone, all quota windows named in the agent chat.
-- **2.79.0** (2026-10-17): **security release** (audit part 1): calendar imports invite only people you may see, tighter
-  token permissions (app passwords, admin routes, child accounts, health time entries), safer first OIDC login, uploads
-  held back until the virus scan, complete backups. **Check your proxy setting** if a reverse proxy on the host reaches a
-  published Docker port (see CHANGELOG).
-- **2.78.0** (2026-10-17): **Duplicate list** in the list menu and the list dialog: a copy with sections, tasks and their dates, notepads and the page arrangement (completed tasks optional; members and shares stay with the original).
-- **2.77.0** (2026-10-17): a **pack catalogue** in Office & finance: search, install, update and remove country and industry packs per office (verified / community, checked by SHA-256, data only).
-- **2.74.0** (2026-10-17): **several Kalmido servers in one app** (work + home side by side, with server badges) and **moving** between app.kalmido.com and your own server (export everything, import with people matched by e-mail).
-- **2.73.0** (2026-10-17): **household budget** at home (module *Budget*, off by default): income and expenses with
-  categories and a monthly limit, planned / spent per month, recurring entries (also taken over from your contracts), CSV
-  import of your bank's statement with column mapping and duplicate check, receipts on an entry; shared with your family
-  like any list, never visible to agents, amounts and texts stored encrypted.
-- **2.66.0** (2026-10-17): **merge duplicate contacts and clients** - pick the record that stays and the value per field,
-  everything linked moves along, undo for 30 days.
-- **2.65.0** (2026-10-17): **faster start** (compressed answers, areas load when first opened) and **smooth long lists**
-  (only the visible rows are drawn).
-- **2.64.3** (2026-10-17): **encrypted knowledge space**: a whole knowledge space (private or an organisation's) can be
-  encrypted in the browser; search, backlinks and export run in the browser, agents have no access.
-- **2.64.2** (2026-10-17): **lock per list, stage 2**: attachments and the team chat of a locked list are encrypted
-  too, and when a member leaves the key changes and older contents are encrypted again in the background.
-- **2.64.1** (2026-10-17): **lock per list**: a list's titles, descriptions, subtasks, comments, notes, section names,
-  text fields, links and snippets **encrypted in the browser** with a key per list for every member (waiting list, safety
-  numbers); agents, mail address, public link and templates stay out of such a list, search runs in the browser.
-- **2.64.0** (2026-10-17): **files in the private space are stored encrypted** on the server (a key per person, like the
-  organisations' files since 2.42; server-side, not end-to-end). Security fix (files at rest).
-- **2.63.0** (2026-10-17): **report forms** with a type, one file and a **status link** for the sender, the **customer
-  portal** (state, public answers, answering without an account; comments stay internal), a conversation on job cards,
-  project templates with notepads, and a security fix for project time entries.
-- **2.62.0** (2026-10-17): **pin chat messages**, agents' comments **only as replies to you** if you like, chat messages
-  sent exactly once, and *Change position...* in the list menu.
-- **2.61.0** (2026-10-17): **safe uploads** - every file is checked for malware (ClamAV), photos lose location and camera
-  data, and PDFs and pictures become **searchable by their text**.
-- **2.60.0** (2026-10-17): Software team - **sprints** with burndown and review, **WIP limits** per kanban column,
-  **story points** and velocity, a **review step** (done only after approval) and **environments** (Staging, Live:
-  where a milestone runs since when). All off until a list switches it on.
-- **2.59.0** (2026-10-17): **related tasks** and probable duplicates by meaning (optional local `kalmido-embed` service,
-  nothing leaves the server), client contacts linked to the address book, and job names with their own colour.
-- **2.58.0** (2026-10-17): a collection of **fixes** - Back on Android closes dialogs, invoices from quotations with parts
-  exact to the cent, share expiry on the chosen day, constant-time password reset, sealed list pictures in encrypted
-  organisations, **job names** for agents,
-  **fewer symbols** in task rows and the sidebar, and the archive import finds the **recipient's address** of old PDFs again.
-- **2.57.1** (2026-10-17): the drawer on phones no longer scrolls sideways.
-- **2.57.0** (2026-10-17): the sidebar's head (brand, workspace, search, favourites) **stays in place** while the rest
-  scrolls, **anything in the sidebar can be a favourite** - icon tiles in your own order on all devices -, and **your own
-  colour per workspace** tints the sidebar.
-- **2.56.4** (2026-10-17): connecting **Paperless-ngx 3.x** works again (API version negotiated, custom fields readable).
-- **2.56.3** (2026-10-16): the client field of a document in an organisation's office offers its clients again.
-- **2.56.1** (2026-10-16): CI fixes for 2.56.0 (both go live with this version).
-- **2.56.0** (2026-10-16): a **Message** button on job cards, a **chat history per job** (tap its name), running jobs in
-  the agent menu, **organisation admins rename and restyle** their organisation's lists (no access to contents) and
-  sidebar symbols in fixed columns.
-- **2.55.1** (2026-10-16): start page arrangements save with the office figures card (both go live with this version).
-- **2.55.0** (2026-10-16): **saved arrangements** per view switched in the header, **settings per block**, arrangements
-  **sent as templates**, **agents propose arrangements** (you accept), more views on the block builder and a **newsletter
-  connection** to listmonk (Kalmido sends nothing itself; only consented contacts, unsubscribes come back).
-- **2.53.1** (2026-10-16): CI fixes for 2.53.0, the browser demo loads the on-demand areas (both go live with this version).
-- **2.53.0** (2026-10-16): **the interface** - list colours as the accent with a fixed 12-tone palette and coloured task
-  edges, a colour per organisation (private stays neutral), a bell per task with *Urgent*, references by drag and drop with
-  cards and a hover preview, agents' comments in their own tone, a tags overview, and a faster start (rarely used areas load
-  on demand).
-- **2.52.1** (2026-10-16): CI fixes for 2.52.0, calendar styles in rem (both go live with this version).
-- **2.52.0** (2026-10-16): the calendar like a desktop app - **drag to create, move and resize** events, also by long
-  press on phones; **write into subscribed CalDAV calendars** (switch per subscription, off by default) and **address
-  books of an organisation** that stay when a person leaves.
-- **2.51.1** (2026-10-16): CI fixes for 2.51.0, own time picker in agent proposals (both go live with this version).
-- **2.51.0** (2026-10-16): **agents pitch in with business work** - quotation drafts in the office, invoice and reminder
-  drafts and payment suggestions, an inquiry becomes a project with one yes, a setup assistant, a weekly status on project
-  pages, a time tracking check and shoot planning. The agent proposes, a person confirms; all new rights are off by default.
-- **2.50.2** (2026-10-16): office amounts from 1,000 keep their value on save (live together with 2.50.0 and 2.50.1).
-- **2.50.1** (2026-10-16): CI fixes for 2.50.0 and hidden form rows on phones (both go live with this version).
-- **2.50.0** (2026-10-16): business hub part 2 - **absences** with public holidays, a **disposition** for crew and
-  equipment, a **sales pipeline** and **key figures** in the office, a **customer view** for public links and **customer
-  approvals** with a simple electronic signature.
-- **2.49.0** (2026-10-16): **Forgot your password?** on a calmer login page, **kid accounts** without errors, with their
-  own tour and a **parents' PIN**, **knowledge pages** per organisation and a **mind map** view of every list, **find
-  people by e-mail** (opt-in, with connection requests), a softer tick-off, an x on notices and new lists that hide
-  completed tasks.
-- **2.49.1** (2026-10-16): CI fixes for 2.49.0 (both go live with this version).
-- **2.48.1** (2026-10-16): CI fixes for 2.48.0 (both go live with this version).
-- **2.48.0** (2026-10-16): **Files** with folders, versions and shares to people, groups and agents (each agent sees
-  only what is shared with it and gets its own result folder); **Documents** that read scans locally, find date, due
-  date and amount, sort themselves in by rules or by learning from your corrections and are searchable in full text;
-  a **PDF preview** inside Kalmido; **lock a note** with your own password (end-to-end); for self-hosters an import
-  from **Paperless-ngx**.
-- **2.47.3** (2026-10-16): Office & finance **without an organisation** (a personal office for freelancers, section 19
-  small business rule), **travel expenses** with billing on, a **cash flow** overview, the **DATEV booking batch**
-  export, **several at once** for contacts, clients and sidebar lists, a clients page like the contacts, the uninstall
-  command for agent computers and job colours in the chat.
-- **2.47.2** (2026-10-15): CI fixes for 2.47.0 and 2.47.1 (both go live with this version).
-- **2.47.1** (2026-10-15): **several chats at once**: agent chats, team channels and direct messages open one above the
-  other in the chat panel (Ctrl/Cmd+click or *Open in split window*), each with its own draft and unread dot, a movable
-  divider and the open windows kept per device; phones switch between them in a row at the top. **Fixed colours**:
-  every agent and colleague has one colour everywhere (task rows, sidebar, chat), changeable in the profile and the agent
-  settings, people's colours can be switched off.
-- **2.47.0** (2026-10-15): Office & finance: **quotation parts** (sub pages with a title page, invoice from them in
-  three forms), a **shoot calculation** for film and video (industry pack), **crew and freelancer roles** with purchase
-  prices and the **surplus per position** for admins, producing and raw data **switched per quotation**, and the legacy
-  Excel import **fills empty fields** instead of skipping.
-- **2.46.7** (2026-10-15): fixes for 2.46.6: a long press on Android inserts "Yes, but: ..." once; larger touch targets in the agent view.
-- **2.46.6** (2026-10-15): **agent launcher and settings**: the reference launcher gives every run its **fixed
-  safety rules** itself, offers **exactly one suggestion** (cut at a word, 80 characters), learns the working routine in
-  `WORKFLOW-KALMIDO.md`, wakes the chat agent after a **job** and resumes a job once after a restart; the **agent view**
-  shows an agent's lists and who can use it, a new personal agent offers **Set up on a computer** right away, the setup
-  command speaks the account's language; **admin settings** gathered under *Administration* (German: *Admin*), and a
-  pen on **approval cards** writes "Yes, but: ..." into the message box.
-- **2.46.5** (2026-10-15): the undo message with the keyboard open sits above the field you type in.
-- **2.46.4** (2026-10-15): **contacts sync, share labels, shopping lists**: the **Mac Contacts app** can change and delete
-  contacts over CardDAV again (and contacts no longer all reload after an update), **Share dialogs** say whether an item
-  belongs to an organisation or is private, a **tap ticks off** in shopping lists (switch per list), and the undo
-  message fits small screens.
-- **2.46.3** (2026-10-15): fixes for 2.46.2 (table cells after editing, focus after dialogs, the new-message pills).
-- **2.46.2** (2026-10-15): **fixes and polish**: **no flicker** on live updates, renames and list settings **show at
-  once**, new chat messages and comments **fade in** (with "New message ↓"), **dialogs move** on the desktop, a chat in
-  **its own window**, copy comments, a dismissible layout note, and fixes for customers, the PDF import, empty sections,
-  encrypted notes and folders.
-- **2.46.1** (2026-10-15): **folder rows** like list rows, lists and sections **drag to the very end**, **several
-  contacts at once** (delete, move), the legacy import **per area**, a **list channel** for listening agents,
-  **favourites** for agents and Ctrl+K, a switch **all modules** and samples only on request, a simpler **family**
-  setup, and **soft animations** on the phone.
-- **2.46.0** (2026-10-15): **organisations and rights**: one kind of server - organisations plus a private space for
-  everybody, new accounts join no organisation by themselves, organisation admins remove members, the admin picks the
-  **organisation and role when adding a person**, organisation lists can be open to **everyone in the organisation**,
-  folder sharing **asks before it replaces roles** set per list, **group pictures**, a Back button between sharing and
-  settings, a tidier organisation page with the boundary check in detail.
-- **2.45.1** (2026-10-15): **vCard import** with ß and old vCard 2.1 files (quoted-printable) arrives complete and
-  readable; **devices** get an English name, and the legacy Excel import reads *Device DE* / *Device EN*.
-- **2.45.0** (2026-10-15): a **friendlier start page** (one sentence on the day, Today with a box to add, compact news,
-  active projects, slim empty cards); the **sidebar** puts the lists right below Plan, folds All / Completed / Trash /
-  Archived into *More*, reaches the **messenger** directly (Messages, last conversations, a bubble at every person) and
-  shows **all notes** in one place; **self-hosting** gets a one-time setup code, a server key file, backups on, proxy
-  examples, a health check and the installer in the repository; reloading after an update waits for the server.
-- **2.44.0** (2026-10-15): **agent starter**: set up a project agent on a **Mac, Windows or Linux computer with one
-  command** (one-time code, autostart, connected status), the starter runs on macOS without PowerShell and asks for
-  permissions in the chat, takes approvals decided in words, attaches files, runs long work as a job and keeps the
-  conversation; the sidebar gets four **areas** (Office, Time, Review, Home).
-- **2.43.0** (2026-10-15): **project pro**: lists with columns work like a **spreadsheet** (keyboard, paste ranges,
-  fill down), **formula fields**, a totals row and **key figures** on the project page, **dependencies and subtasks by
-  dragging** (several tasks at once), **blocks adjusted in place** with a **pinboard** project page (colours, notepads),
-  the tracked time of a project in one window and a task in its own window.
-- **2.42.0** (2026-10-14): **end-to-end encryption** in the browser for a private task note, files and direct messages
-  (passphrase + recovery code, safety numbers), **encryption at rest per organisation** for bank and tax data, purchase
-  and contract rates and stored files (recovery key, way back with `decrypt-all`), an encrypted **organisation export**,
-  *Save as task* under agent comments, and live updates that load only the changed tasks.
-- **2.41.2** (2026-10-14): **the interface answers at once**: list colours and names, folders, sections, list tags,
-  fields and settings show a change right away instead of waiting for the whole state to reload.
-- **2.41.0** (2026-10-14): **folders show and manage who they are shared with** (people, groups and several agents in one
-  Share dialog, folder settings that work like a list's), **My tasks** can leave lists out, **time tracking is a switch
-  per list**, recent *Waiting on* entries, chat messages **copy with formatting**, **approval cards in comments** and
-  notices in the agent chat, large **vCard imports** in the background, lighter live updates, a CLA for contributions.
-- **2.40.0** (2026-10-14): Office & finance for **everyday invoicing**: several contacts per client, a country picker,
-  document texts that follow the language, Producing as an option, explained settings and number schemes, unsaved input
-  is kept, invoice and reminder fixes; **favourite lists**, your **own order in My tasks**, Markdown in task titles,
-  priority as background, columns on tablets, *Load more* for jobs, completed, trash and news, list admins manage fields,
-  name and colour.
-- **2.39.1** (2026-10-12): **lists like a spreadsheet** (column lines, drag widths and column order, edit custom-field cells
-  in place, custom fields in plain lists), the inbox is now the **Basket** with a *Sort* mode and *My tasks* shows your own
-  unshared lists, group headings show where a group comes from, list admins may delete shared lists, *Settings >
-  Organisation*, *Hide completed* as a default, **legacy data import** for Office & finance (clients and services from
-  an .xlsx, old invoices and quotations as a read-only archive), invoice payments only by organisation admins, phone
-  sheets you can drag and swipe away, a loading screen, a bigger celebration and a list in its own window.
-- **2.39.0** (2026-10-12): a **Playbook** per list and folder (working rules for the list's agents, versions, agent
-  proposals, scheduled checks), **tidy up an existing list** by its tidy agent (proposal first, confirm, one-step undo) and
-  **edit your own messages** to an agent (see [docs/AGENTS.md](docs/AGENTS.md#playbook-2390)).
-- **2.38.0** (2026-10-12): **Invoices** in Office & finance: invoices, credit notes and payment reminders with a GoBD-style
-  number series, exact amounts, **ZUGFeRD / XRechnung e-invoices** in PDF/A-3, payments, sending by e-mail and a copy to the
-  DATEV inbox (see [docs/OFFICE.md](docs/OFFICE.md)). Phones: long press on a title always multi-selects, *Move to list* shows
-  folders like the sidebar, the installed app does not zoom by accident, the list colour tints the whole icon.
-- **2.37.0** (2026-10-11): **PostgreSQL 17 for every installation** (SQLite ends; self-hosters add the database
-  service, the data moves over by itself on the first start, see [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required)).
-  Row-level security per organisation in the database, backups with `pg_dump`, chat messages can be **saved as a
-  task** or **copied** whole, clearer folder settings, finished agent jobs leave *Open* without a reload.
-- **2.36.2** (2026-10-11): Organisations hardened. **Security fixes** (organisation boundary, office & finance) and
-  **admin alerts for intrusion signs**; lists show their **line icons everywhere**, the sidebar tells **people from
-  agents**, projects keep **completed tasks in their section**, quick add in *Tasks of <person>* assigns the task, a
-  new view **Assigned by me**, and office documents can be **finalised** with structured company and client data.
-- **2.36.1** (2026-10-10): Office & finance, stage 1. A new **Office & finance** module for organisations with
-  services and rates, equipment, text blocks, framework contracts and a German country pack, **quotations** with a
-  live calculator (producing days, raw data, discount, EUR/USD, transfer of rights) and a **PDF** on real A4 pages.
-  Calendars and tasks can be **switched on and off from the calendar view**, also per calendar for Today and for
-  planning the day, and the phone timeline keeps titles inside their bars. Details: [docs/OFFICE.md](docs/OFFICE.md).
-- **2.36.0** (2026-10-09): Sidebar, lock and comments. A calmer **sidebar** with grey **line icons** (emoji or dot
-  as a setting, progress bars can be switched off), **lock a task** against accidental edits (tasks created by agents
-  start locked), selecting text no longer opens the editor, code blocks in comments **wrap**, and an open task keeps
-  its **scroll position** when new comments arrive. The Paperless connection is removed.
-- **2.35.0** (2026-10-09): Agents, chat and polish. **Approval cards** in the agent chat, **code snippets** in
-  tasks, **#123 links** everywhere, **arrange blocks in the view**, organisation admins manage the **lists of their
-  organisation**, **links to files** on network drives, and the agent launcher's **event mode**.
-- **2.34.0** (2026-10-09): Agents in everyday work. A **morning briefing** at the top of Today, a **status report**
-  per project, a **Lying idle** view, **days without tracked time** and the **timesheet as text**, **planned agent
-  jobs**, and agents **read PDF attachments** as text.
-- **2.33.0** (2026-10-09): Agents and notifications. **Reply to one message** (swipe right on a phone), **search in
-  chats and comments**, owners choose **how much a shared list notifies** its people, a **plan usage ring** for agents,
-  a **repository on a folder**, *Your IP* under Administration > Server.
-- **2.32.0** (2026-10-09): Shorter ways. **Arrange your views** (Today, Time tracking, overviews, start page and the
-  **project page** as blocks), a **long press selects** tasks on a phone, **swipe through tasks** in the task panel, a
-  **folded share dialog**, **quick add chips**; agents show their **steps while they work** and the **model that really
-  runs**, approvals with 👍 / 👎.
-- **2.31.0** (2026-10-08): Phone everyday. **Task rows line up** on a phone, **Today is calmer** (the daily review
-  folds, overdue actions in the heading, the agent band only when needed), a **one-line list head**, the task panel
-  **without tabs** on a phone and with a **resizable comments area** on a desktop, **menus in groups**, the *Search* tab
-  opens the search, **sort by a column title**, a **connection dot** on your picture.
-- **2.30.0** (2026-10-08): Clear boundaries, calmer agents. **Calendars and address books belong to a workspace** like
-  lists, a **nightly boundary check**; agents never **bridge lists with different people** unasked, can be **limited to
-  chosen lists** and leave an **access log**; **Allow / Deny** buttons and answer buttons that expire; agents **listen in
-  by project type**; **.md, text and code files open in a viewer**; agents write text files; *Use agents safely*.
-- **2.29.0** (2026-10-08): Folders like lists, calm agents. **Folder settings** (workspace, agent, tidy-up) apply to every
-  list in a folder, a folder is **shared with roles** like a list, and a list someone adds to a shared folder is shared
-  at once; the agent **chat as a pop-up window** (button, key `A`); a visible **permission mode** per agent; agents get
-  **no backlog flood**; instances are **not indexed** by search engines.
-- **2.28.0** (2026-10-08): Work and private apart. Every list and agent belongs to a **workspace** (private or an
-  organisation) with a **switch in the sidebar**; a new server mode runs **several organisations on one server**, each
-  with its own admins. **Personal agents are invisible to admins**, agents get a **robot badge**, News split into **For
-  you** and **Activity**, agents ask with **answer buttons** in the chat.
-- **2.27.0** (2026-10-08): Bugs & polish. A window running **old code after an update** says so and reloads; **shared
-  folders look the same for everyone**; automatic **tidy-up waits until nobody types**; new **projects start without
-  sections** unless you ask; **comments at the bottom** of a task again; agents per folder in the settings; and 20
-  smaller fixes.
-- **2.26.0** (2026-10-06): Agents in a team. The list owner decides **who may address its agent**, agents do not
-  instruct each other, **one agent per list**, approvals **to integrate and to deploy** without a pull request; several
-  tasks **edited at once** in the task panel, a **resizable sidebar**.
-- **2.25.0** (2026-10-06): Usability, part 2. **One word per thing** in every language (*Plan*, *Focus timer*, *Start*,
-  *Project status*, *Project page*, *Waiting on someone* vs. *Blocked by*, *Shown fields*); **a sidebar you arrange**
-  (groups up / down, hide groups and entries); **settings that start with an overview** on phones, modules in folded
-  groups, Integrations in plain words and a clear *does this device ring?*; **menus that only offer what works** (a long
-  press opens the task's menu, the path of a task moves it, *Delete…* in every list menu); a **calm first start** for
-  people who are invited; and the app says when your changes are **saved**.
-- **2.24.0** (2026-10-06): Usability. A **direct message** one tap away (person card, *Tasks of …*, team chat); your
-  **own lists right below Inbox and Today**; **one task menu** in a fixed order; a calmer **Today**; the **assignee and
-  the comments at the top** of a task; a **settings search** that finds buttons and helper texts; **Administration in
-  sub-tabs**; a profile picture **cropped with a round mask**. The unfolded **Fold held sideways** gets the desktop
-  layout, **DeX** stops sliding when typing. For running Kalmido for others: **storage per person** with *Contact
-  support*, a **notice to everyone** before maintenance (also from scripts), **e-mail limits** per day and a **note to
-  everyone in a list when an agent joins** (and where it runs).
-- **2.23.0** (2026-10-05): Team, family, clients. **Clients** above your lists with hours, budget (hours or money),
-  estimate vs. actual and a **timesheet per client and month**; **workload** per person and week against their hours;
-  **approvals** as a step of a task (approve, ask for changes, reject); **forms** whose link creates a task (requests,
-  bug reports); **registration on the login page** (by e-mail domain, with an admin's approval or open); **sign-in links
-  with a QR code** for family members without e-mail; the kind of server (one organisation or a shared server) is set in
-  the configuration; agents hear about tasks that are added to their lists; a tidier sidebar.
-- **2.22.0** (2026-10-05): Home & life. Seven small modules, each off until you want it: **contracts** with the last day
-  to cancel and the cost per month, **devices** with their warranty and **upkeep** that comes back, **staying in touch**
-  with the people who matter, **health** (appointments, check-ups, medication) in a private list agents never see, the
-  **day and week in review** with a private **journal**, **trips** with bookings and packing lists, and **read later**
-  (also from Karakeep). Quick add knows `@` and pasted images, *Waiting on external* is one tap away, Today can show the
-  inbox, new lists get an emoji, the heron flies, and the sidebar folders read as a tree.
-- **2.21.0** (2026-10-05): Events & contacts. Kalmido keeps your **events** and **contacts** itself, next to the tasks,
-  and your phone's own **calendar and contacts apps sync directly** (CalDAV and CardDAV: iPhone, Android with DAVx⁵,
-  Thunderbird). Events with time zones, repeats (also *only this date*), reminders, **invitations** with answers and a
-  linked **preparation task**; several calendars, shared like lists; an **agenda**; drag over free time in the week to
-  create one; **ICS import** (e.g. a Google export). Contacts with search, groups, photos, birthdays as tasks, linked to
-  tasks (*waiting on*, *responsible*) and events; vCard import. API + MCP with the new permissions *calendar* and
-  *contacts*. The family events of 2.19 became real events. Starting while the server is down shows your tasks.
-- **2.19.0** (2026-10-04): Family. A module for households, off until you want it: **birthdays and anniversaries** with
-  the age, gift ideas and an import from your **contacts** (CardDAV); household chores that **take turns**; **child
-  accounts** with a simple view, stars and rewards; **who comes along**; **shopping lists** by shop area with a shopping
-  mode; a **meal plan** whose ingredients go to the shopping list in one tap; household **deadlines** (passport, car
-  inspection, insurance); **packing lists** from templates. The setup asks *What do you use Kalmido for?*. Profile
-  pictures are herons, the search button stays in reach with the phone sidebar open, "+" for more reactions in the chats.
-- **2.18.0** (2026-10-04): Software & Planning. **Milestones are tasks** (a diamond in the list, Kanban, calendar and
-  timeline) with their tasks, progress, a burndown and release notes; **create tasks right in the timeline** (drag a
-  range, double-click, "+") which now shows **sections**; **GitLab** and **Bitbucket Cloud** next to GitHub and Gitea /
-  Forgejo, a release tag reaches its milestone, **error reports** (Sentry or any JSON) become tickets; the **project type**
-  of a list can be changed; **code highlighting** and `file:line` links into the repository; reactions sit visibly at
-  every chat message; the search icon always stays in the phone header; a new app icon.
-- **2.17.0** (2026-10-04): Communication. A **team chat** (direct messages between people who work together and one
-  channel per shared list, agents included), **notes** per list or project (Markdown, `#123` links tasks, search),
-  **tasks by e-mail** (a secret address per person and list) and the daily summary by e-mail, **News bundled** per task
-  with "Needs you" first and *Summarize* by an agent, a **dashboard** behind the logo, and fast very long lists.
-- **2.16.0** (2026-10-04): Accessibility (WCAG 2.2 AA, see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)): the whole app
-  by keyboard with a visible focus, names and states for screen readers, messages read out, errors in words, priorities
-  and overdue dates not only in colour, moving tasks without dragging, high contrast and reduced motion. Also: drag the
-  task panel and the chat wider or narrower, column widths by dragging, your account at the top of the sidebar,
-  density for the sidebar too (and *Custom*), a reaction button on every chat message, the command field asks an
-  agent or creates a task, clearer Today / Tomorrow icons, a *Pinned* view across all lists.
-- **2.15.0** (2026-10-03): Permissions for API tokens and agents (read, tasks, comments, structure, delete, files, time,
-  export) with a server-wide limit and address restrictions; an agent's dangerous changes wait for a person's
-  approval; the API and the MCP server now cover everything the app does (sections, moving with position, batches,
-  dependencies, custom fields, templates, trash, file uploads, folders, sharing, filters, habits, timer); a new person's
-  inbox is named in their language.
-- **2.14.0** (2026-10-03): *Columns…* per list: pick and order the columns of the rows (task number, date, priority,
-  assignee, tags, time, subtasks, dependencies, created, custom fields), the same for everyone in the list; quick add
-  opens the new task's details or attaches files right away; a calm heron in empty lists, on Today and on the error pages.
-- **2.13.4** (2026-10-03): Phone round: touch drags scroll at the edges and move tasks to other lists, the section "+"
-  above the keyboard, the chat and comment box with the keyboard, Markdown lists keep counting.
-- **2.13** (2026-10-03): Images and files in the agent chat, Markdown in comments and chat, the task next to the
-  chat on desktops, many phone and Fold polish fixes.
-- **2.12.0** (2026-10-02): Try Kalmido in your browser without an account (the [demo](https://kalmido.com/demo/)); quick
-  add understands French, Spanish, Italian and Dutch words too.
-- **2.11.0** (2026-10-02): French, Spanish, Italian and Dutch (beta), a day plan that never moves due dates, violet as
-  the default accent, subagent usage in the Claude Code hook.
-- **2.10.0** (2026-10-02): Groups for sharing and "whoever has time" tasks, *Plan my day* between your appointments
-  (built in or by an agent), an evening review, real client addresses behind a proxy.
+**2.351** (2026-10-26, fixes up to 2.351.8 on 2026-10-27):
+- **Agents**: a control level per agent and project (approve everything, routine free, free run with a goal), approval cards for one-way steps on every level, "data the agent never sees" and standing rules.
+- **Office**: Quotes & invoices, Documents, Correspondence and Receipts open as trees in the sidebar; documents, letters, receipts, address books, contacts and contracts can be filed and shared in folders.
+- **Look**: petrol is the brand colour and the default accent; violet stays selectable.
+- **Phones**: the keyboard closes after sending a chat message, so the answer has the whole screen.
+
+Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Why Kalmido
 
@@ -574,7 +36,311 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Yours.** Runs on your own server, no vendor account, no telemetry (the update check asks GitHub for the latest version every 6 hours and can be switched off; everything else that leaves your server is listed in docs/SELF-HOSTING.md, Outgoing connections), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
 - **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and no support desk yet.
 
+## Try it without installing
+
+[kalmido.com/demo](https://kalmido.com/demo/) runs the real app in your browser with sample data in your language (a
+client website project with sections, tickets, milestones, time entries and dependencies, a personal project, and a
+simulated agent that waits for your approval). There is no server behind it: an in-browser stand-in for the API keeps
+everything in your browser's storage, the page's Content-Security-Policy forbids every network connection
+(`connect-src 'none'`), and there is no analytics. *Reset demo* brings the sample back. Features that need a server
+(push notifications, CalDAV, calendar subscriptions, real agents, Git, webhooks, OIDC, more users) show a
+short notice with the way to install.
+
+The demo is built from the current sources by `python3 tools/build_demo.py [out_dir]` (static files only; serve the
+folder with any web server, e.g. `python3 -m http.server` in it). CI builds it and opens it in jsdom
+(`tests/demo_test.js`) so it cannot drift from the app.
+
+## Quick start
+
+Requirements: Docker with Compose on a 64-bit system (linux/amd64 or linux/arm64, also macOS and Windows with Docker
+Desktop). Without the virus scanner **1 GB RAM** (about 250 MB idle); with it (the default of the installer and of
+`.env.example`, `COMPOSE_PROFILES=localdb,clamav`) about **2.5 GB**, and the first start can take up to 5 minutes. On a
+small server remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty. Details and disk, CPU and Raspberry
+Pi advice: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
+
+**Installer** (macOS, Linux; Windows: `irm https://kalmido.com/install.ps1 | iex`): downloads the latest release,
+uses the prebuilt image (or builds it locally if that is not possible) and starts it on `http://localhost:3040`.
+kalmido.com/install.sh (and `.ps1`) forwards to the installer of the latest GitHub release; it checks the download
+against the release's `SHA256SUMS` and uses the image digest of the release.
+It never uses sudo, writes an `update.sh` into the install folder (`~/kalmido`) and shows the one-time **setup
+code** for the first account at the end. The scripts are in this repository: [install.sh](install.sh),
+[install.ps1](install.ps1).
+
+```sh
+curl -fsSL https://kalmido.com/install.sh | sh
+```
+
+The same without the website:
+
+```sh
+curl -fsSL https://github.com/Gegenschuss/kalmido/releases/latest/download/install.sh | sh
+```
+
+<details>
+<summary><b>Install by hand (git clone, or the prebuilt image)</b></summary>
+
+**By hand:**
+
+```sh
+git clone https://github.com/Gegenschuss/kalmido.git
+cd kalmido
+git checkout "$(git tag --sort=-v:refname | head -n 1)"   # the latest release
+cp .env.example .env        # set TZ, PUBLIC_URL and POSTGRES_PASSWORD at least
+mkdir -p data secret        # create them yourself, so the container (user 1000) may write them
+docker compose up -d --build
+docker compose logs kalmido | grep "Setup code"
+```
+
+Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64): put
+`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z` into `.env` (X.Y.Z = the release you checked out, `git describe
+--tags` without the `v`), then `docker compose pull && docker compose up -d`. On Linux with a user other than 1000,
+give the folders to the container's user (`sudo chown 1000:1000 data secret`). The image runs as uid 1000 and read-only:
+[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) *User and read-only image*.
+
+</details>
+
+Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
+`./pgdata`), attachments and backups live in `./data`, the server key in `./secret` (see below).
+`docker compose ps` shows the service as *healthy* once it answers (`/api/health`).
+
+<details>
+<summary><b>First start: setup code, presets, sample project</b></summary>
+
+Open it: the first start shows a **setup page** that creates the first account (the admin). It asks for the
+**one-time setup code** that only the server's log shows (`docker compose logs kalmido`, a framed block *Kalmido first
+setup*), so nobody else who reaches a fresh server first can make themselves its admin. The code works once; a
+restart prints a new one; wrong codes are rate limited like logins. For tests and automation only:
+`KALMIDO_SETUP_CODE=<fixed code>` or `KALMIDO_SETUP_CODE=off` in `.env`. A second step asks **what you want to use**, with three
+starting points:
+
+| Preset | For | On |
+|---|---|---|
+| **Simple list** (preselected) | a plain to-do list, a household | projects, subtasks, reminders, the calendar |
+| **Just me** | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress, comments |
+| **Projects & team** | small teams up to about ten people, e.g. an agency | everything: sharing, assigning, comments, time tracking, the Gantt timeline with dependencies, custom fields |
+
+Under *Customize…* below the cards you can switch single modules on or off (the matching card stays highlighted),
+and pick the language; *Start* stays in view. The modules become the default for new users; collaboration and time tracking are switches for the whole
+server. The welcome tour and the *Getting started* project only mention modules that are on. All of it can be changed
+later in *Settings*.
+
+Below that, one question: **Start with**: *Empty*, the *Sample project*, or a project of the type *Agency*,
+*Software / AI dev* or *Personal* (sections, fields and settings for that kind of work; picking one switches the
+modules it needs on). More projects any time: *Projects > + > New project*.
+
+**Sample project.** *Sample project* under *Start with* and on the first card of every new account's welcome tour
+(ticked when the project modules are on) adds a realistic example in the user's
+language: *Example: Image film for client Muster* with the phases Concept, Pre-production, Shoot, Edit and Approval,
+about fifteen tasks around today (overdue, today, next week, undated) with start dates for the timeline, dependencies
+for *Flow* and *Now doable*, all four matrix quadrants, subtasks, a Markdown checklist, tags, a weekly status call, a
+comment, custom fields, a time entry and a project status, plus the project *Example: Shoot day packing list* (completed
+items at the bottom). It only
+uses the modules that are on, stays private and quiet (no reminders, pushes, News or webhooks, not in the daily
+digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
+if you edited them, tasks you added yourself stay, and so does their project.
+
+<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, then Start with: Empty, Sample project, Agency, Software and Personal"></p>
+
+</details>
+
+> [!IMPORTANT]
+> Use HTTPS (a reverse proxy) for anything beyond your own machine: the login sends your password and
+> the session cookie is only marked `Secure` behind HTTPS.
+
+**Server key and backups (2.45.0).** Without `KALMIDO_SECRET_KEY` in `.env` the server creates its key on the first
+start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` always wins. It encrypts stored tokens
+and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
+data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Administration >
+Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
+`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too. The backup page warns when the
+disk has room for fewer than three more archives; set a passphrase (see `docs/SELF-HOSTING.md`, "Disk space and passphrase").
+
+The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
+
 ## Features
+
+Kalmido is built from modules: switch on what you need under *Settings > Modules*, the rest stays out of sight. One line
+per area here; the details are under [Documentation](#documentation), every single feature in the
+[full feature list](#full-feature-list).
+
+**Your own work**
+- **Tasks and projects**: projects with folders, sections and Kanban columns, subtasks up to five levels, priorities, tags, pinned tasks, Markdown notes, attachments, drag and drop everywhere (also on touch)
+- **Quick add** in plain language (`Dentist tomorrow 3pm !high #private ~Work`) and quick capture from anywhere (`q`, a bookmarklet, [sharing from your phone](#share-from-your-phone))
+- **Dates and reminders**: recurring tasks (also any RRULE), reminders up to a year ahead, deadlines with a countdown, reminders that repeat until done
+- **Today and planning**: smart lists (basket, today, next 7 days, *Now doable*), *Plan my day* between your appointments, a daily review, all overdue tasks moved in one click
+- **Views**: calendar and timeline, a Gantt timeline with dependencies, a roadmap of all projects, the Eisenhower matrix, Kanban with WIP limits, sprints and burndown
+- **Habits, focus and time**: habits with streaks, a Pomodoro timer and stopwatch, [time tracking](#time-tracking) with rates, rounding, CSV export and a printable timesheet
+- **Templates, undo, statistics**: templates for tasks and projects, undo and redo of your last 30 changes, a trash with restore ([details](#templates-undo-statistics)); [notes](#notes) per project
+
+**Together**
+- **Sharing**: projects and folders shared with people or groups as admin, member, participant or viewer, tasks assigned (also to a group, "whoever has time"), public links ([Users and sharing](#users-and-sharing))
+- **Comments and News**: comments with @mentions and files, reactions, an activity history, a News inbox and bundled push notifications
+- **Project tools**: project types, dependencies, project status and progress, a project page, custom fields with formulas ([details](#projects-dependencies-status-custom-fields))
+- **Workspaces and organisations**: a private space for everybody plus organisations with invitations, apart or together in one view ([Workspaces](#workspaces-work-and-private-apart), [Organisations](#organisations-and-invitations))
+- **Clients, workload, approvals, forms** for small teams ([details](#clients-workload-approvals-forms), [docs/TEAM.md](docs/TEAM.md))
+- **Team chat**: direct messages and a channel per shared project, agents included ([Team chat](#team-chat))
+- **Start page**: what waits for you, today's tasks, News, the team chat and your projects on one page ([Start page](#start-page))
+
+**Home and family**
+- **Family**: birthdays, chores that take turns, children, shopping lists, a meal plan, household deadlines and packing lists ([Family](#family))
+- **Home & life**: contracts & subscriptions, home & devices, staying in touch, health, review & journal, travel and budget ([Home & life](#home--life))
+- **Reading**: read later, feeds and bookmarks per workspace ([Reading](#reading))
+
+**Office, files and knowledge**
+- **Office & finance**: quotes and invoices with PDFs, e-invoices, receipts, letters on your own letterhead, bank import and DATEV export ([docs/OFFICE.md](docs/OFFICE.md))
+- **Files and documents**: folders and files for you and each organisation, with versions, a trash and sharing ([Files and documents](#files-and-documents))
+- **Knowledge pages and tables**: knowledge spaces with a mind map, also offline, and tables ([docs/WIKI.md](docs/WIKI.md), [docs/SHEETS.md](docs/SHEETS.md))
+- **Events and contacts**: your own calendars and address books in Kalmido, synced with the phone's apps ([Events](#events), [Contacts](#contacts))
+
+**AI agents**
+- **Agents as team members**: Claude Code, Codex, n8n, a local model or your own script as a user of type *Agent*: sees only the projects shared with it, has its own token and an on/off switch
+- **You stay in control**: control levels, approval cards for one-way steps, permissions per agent and token, data the agent never sees, usage limits and an activity log ([AI agents](#ai-agents), [docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md))
+- **Events, chat and MCP**: signed webhooks or long-polling, a chat panel per agent, an MCP server and a setup guide ([docs/AGENTS.md](docs/AGENTS.md), [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md))
+- **Built-in assistant**: one language model of the operator's choice for small everyday helps ([docs/ASSISTANT.md](docs/ASSISTANT.md))
+- **Git integration**: GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud at the tasks; hand a ticket to a coding agent ([Git integration](#git-integration))
+
+**Connect and run**
+- **Everywhere**: an installable web app (PWA) for phone and desktop that works offline and syncs later
+- **Notifications**: Web Push or ntfy, plus Slack, Matrix, Telegram or Signal ([Notifications](#notifications))
+- **Calendars**: [other calendars in Kalmido](#calendar-subscriptions-other-calendars-in-kalmido), [your tasks as a feed](#calendar-subscription-your-tasks-in-other-calendars) and [CalDAV both ways](#calendar-apps-caldav)
+- **Tasks by e-mail**: a secret address for new tasks ([Tasks by e-mail](#tasks-by-e-mail))
+- **Import and export**: Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, CSV, Markdown and ICS, with a preview and undo; out again as Todoist CSV or Markdown ([Moving from other apps](#moving-from-other-apps))
+- **REST API and webhooks** (OpenAPI 3.1) for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
+- **Login and security**: built-in login with two-factor and passkeys, single sign-on through your proxy or OpenID Connect, end-to-end encrypted notes and a lock per project, encryption at rest ([Login](#login))
+- **Backups**: automatic daily backups, optionally encrypted, an off-site target, restore in the app ([Backups and restore](#backups-and-restore))
+- **Languages, look and accessibility**: English and German, French, Spanish, Italian and Dutch in beta; dark or light, font size from 75 to 150 %; aims at WCAG 2.2 AA ([Language](#language), [Accessibility](#accessibility))
+
+| | | |
+|---|---|---|
+| <img src="docs/calendar.png" alt="Month calendar"> | <img src="docs/matrix.png" alt="Eisenhower matrix"> | <img src="docs/habits.png" alt="Habits: the last seven days and streaks"> |
+| Calendar | Eisenhower matrix | Habits |
+
+## Updating
+
+Kalmido follows [semantic versioning](https://semver.org/); every release is listed in [CHANGELOG.md](CHANGELOG.md)
+and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Settings > Help* shows the running version
+and, since 2.27.0, the version of the app in that window. A window that was open across an update shows *New version
+available – Reload* and reloads by itself once nothing is being typed.
+
+How to update depends on how you installed:
+
+| Installed with | Update |
+|---|---|
+| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
+| prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
+| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
+
+Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; migrations only add, so the data of
+an older version stays readable.
+
+**Installing a specific version** (vX.Y.Z = a tag from the releases page): with the installer
+`curl -fsSL https://kalmido.com/install.sh | KALMIDO_VERSION=vX.Y.Z sh` (the same variable pins updates:
+`KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh`); by hand `git checkout vX.Y.Z` or
+`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`.
+
+<details>
+<summary><b>Updating from a version before 2.45, and the update check</b></summary>
+
+**Updating to 2.45 or later from an older version:** the new `docker-compose.yml` keeps the server key in its own folder
+`./secret` next to `./data`. Create it before the first start so the container (user 1000) can write the key file:
+`mkdir secret && sudo chown 1000 secret`. If `KALMIDO_SECRET_KEY` is already set in `.env`, it stays in charge and the folder
+stays empty. Otherwise the server creates a key once and from then on encrypts organisation data with it: keep a copy of
+`secret/kalmido.key` apart from the backups of `./data` - a backup without its key cannot be read
+(*Administration > Whole server* reminds you).
+
+**Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
+version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
+available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
+no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
+
+</details>
+
+## Backups and restore
+
+*Settings > Administration > Whole server > Backups* (admins):
+
+- **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
+  (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
+  keeps running), `attachments/` (2.46.0: with the profile pictures, project icons and group pictures) and `manifest.json` (app and schema version, counts,
+  size + SHA-256 of every file). 2.45.0: on by default for a new server (the first automatic one the day after the
+setup); an existing server keeps its setting. *Back up now* makes one at any time.
+- **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
+  and the newest of each of the last 8 weeks (both adjustable); the last 3 safety backups. Other files in the folder
+  (e.g. the database copies of the installer's `update.sh`) are never touched.
+- **Encryption (optional, off by default):** AES-256-GCM with a key derived from a passphrase (scrypt), in 1 MiB
+  chunks whose order and end are authenticated (`.zip.enc`). The passphrase is set in the app (stored encrypted on
+  the server, never shown again) or with `KALMIDO_BACKUP_PASSPHRASE`. **Without the passphrase an encrypted backup
+  cannot be restored, by anyone.** Keep it in your password manager. Only the date, versions and counts are readable
+  without it. Useful when the backups are copied to a place you trust less than the server.
+- **Download** (admins only, streamed) and **Check** (decrypts, verifies every checksum and the database integrity
+  without changing anything). Copy the folder somewhere else too: a backup on the same disk does not survive the disk.
+- **Admin alerts** (*Storage and health*): a failed backup, no successful backup for 2 days, low disk space.
+
+<details>
+<summary><b>Restore: what Kalmido checks and does</b></summary>
+
+**Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
+project). You type `RESTORE` to confirm. Kalmido then:
+
+1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
+   no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
+   bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
+   data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
+   rebuilt by Kalmido), a schema version this Kalmido can migrate (a backup from a newer version is refused);
+2. switches to maintenance (other requests get "please try again in a minute", background jobs pause) and waits
+   until nothing else runs;
+3. makes a **safety backup** of the current state (listed as "before a restore");
+4. swaps the attachments folder and replaces the database with `pg_restore` (one transaction), runs the migrations;
+   if anything fails, the previous database and attachments are put back. Backups from before 2.37 (`tasks.db`) are
+   moved over into PostgreSQL the same way as on the first start of 2.37;
+5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
+   themselves stay as they are.
+
+Restoring the safety backup undoes a restore. Without the app: see *Backup* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
+(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`).
+
+</details>
+
+*Settings > Data > Export* gives every user a JSON dump of their own data.
+
+## Documentation
+
+Everything in detail, folded: click a title to open it. More in [docs/](docs/): [self-hosting](docs/SELF-HOSTING.md), [all settings](docs/ENV.md), [API](docs/API.md), [agents](docs/AGENTS.md), [office](docs/OFFICE.md), [architecture](docs/ARCHITECTURE.md).
+
+[Try it locally](#try-it-locally) · [Accessibility](#accessibility) · [Full feature list](#full-feature-list) · [Moving from other apps](#moving-from-other-apps) · [Users and sharing](#users-and-sharing) · [Start page](#start-page) · [Family](#family) · [Workspaces: work and private apart](#workspaces-work-and-private-apart) · [Organisations and invitations](#organisations-and-invitations) · [Clients, workload, approvals, forms](#clients-workload-approvals-forms) · [Home & life](#home--life) · [Reading](#reading) · [Events](#events) · [Contacts](#contacts) · [Team chat](#team-chat) · [Files and documents](#files-and-documents) · [Offline knowledge, office projects, pictures](#offline-knowledge-office-projects-pictures) · [Notes](#notes) · [Tasks by e-mail](#tasks-by-e-mail) · [Calendar subscriptions (other calendars in Kalmido)](#calendar-subscriptions-other-calendars-in-kalmido) · [Calendar subscription (your tasks in other calendars)](#calendar-subscription-your-tasks-in-other-calendars) · [Calendar apps (CalDAV)](#calendar-apps-caldav) · [REST API and webhooks](#rest-api-and-webhooks) · [AI agents](#ai-agents) · [Git integration](#git-integration) · [Templates, undo, statistics](#templates-undo-statistics) · [Time tracking](#time-tracking) · [Projects: dependencies, status, custom fields](#projects-dependencies-status-custom-fields) · [Login](#login) · [Reverse proxy](#reverse-proxy) · [Configuration](#configuration) · [Language](#language) · [Notifications](#notifications) · [Share from your phone](#share-from-your-phone) · [Tech](#tech) · [Limits](#limits) · [How this was built](#how-this-was-built) · [Contributing and contact](#contributing-and-contact) · [Supporter licence](#supporter-licence)
+
+<details>
+<summary><a id="try-it-locally"></a><b>Try it locally</b></summary>
+
+No proxy needed for a quick look. After the quick start above, open **http://localhost:3040** on the same machine.
+Everything works there, including installing it as an app and offline mode (browsers treat `localhost` as secure).
+Push notifications and `/drop` stay off until you configure them.
+
+To try it from your phone or another device on your network, change the port line in `docker-compose.yml` to
+`"3040:3040"`, run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
+app works, but it cannot be installed and has no offline mode.
+
+> [!WARNING]
+> Over plain HTTP your password travels unencrypted through your network. Fine for a test at home; for daily
+> use put it behind a reverse proxy with HTTPS (next section) and switch the port back.
+
+To remove the test again: `docker compose down` and delete the folder (your test data is in `./data`).
+
+</details>
+<details>
+<summary><a id="accessibility"></a><b>Accessibility</b></summary>
+
+Kalmido aims at **WCAG 2.2 level AA**: everything works with the keyboard (one Tab stop per project, ↑ ↓ to move, Enter to
+open, Esc to go back, `?` for all keys), the focus is always visible and never hidden, screen readers get names, roles,
+states and announcements, errors are said in words, colour is never the only signal, every drag has another way
+(menu items, Alt+↑ / Alt+↓, keys on the grips), touch targets are 44 px, *reduce motion* and Windows high contrast are
+respected, and the app reflows at 320 px and 200 % zoom. An automated test with axe-core checks the main views in light
+and dark and with every accent colour on every change. Details and known limits: [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
+
+</details>
+<details>
+<summary><a id="full-feature-list"></a><b>Full feature list</b></summary>
 
 **Projects**
 - Projects with emoji, own picture or colour, project folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
@@ -841,142 +607,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar, dark"> <img src="docs/mobile-light.png" width="300" alt="Phone layout with tab bar, light"></p>
 
-## Accessibility
-
-Kalmido aims at **WCAG 2.2 level AA**: everything works with the keyboard (one Tab stop per project, ↑ ↓ to move, Enter to
-open, Esc to go back, `?` for all keys), the focus is always visible and never hidden, screen readers get names, roles,
-states and announcements, errors are said in words, colour is never the only signal, every drag has another way
-(menu items, Alt+↑ / Alt+↓, keys on the grips), touch targets are 44 px, *reduce motion* and Windows high contrast are
-respected, and the app reflows at 320 px and 200 % zoom. An automated test with axe-core checks the main views in light
-and dark and with every accent colour on every change. Details and known limits: [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
-
-## Try it without installing
-
-[kalmido.com/demo](https://kalmido.com/demo/) runs the real app in your browser with sample data in your language (a
-client website project with sections, tickets, milestones, time entries and dependencies, a personal project, and a
-simulated agent that waits for your approval). There is no server behind it: an in-browser stand-in for the API keeps
-everything in your browser's storage, the page's Content-Security-Policy forbids every network connection
-(`connect-src 'none'`), and there is no analytics. *Reset demo* brings the sample back. Features that need a server
-(push notifications, CalDAV, calendar subscriptions, real agents, Git, webhooks, OIDC, more users) show a
-short notice with the way to install.
-
-The demo is built from the current sources by `python3 tools/build_demo.py [out_dir]` (static files only; serve the
-folder with any web server, e.g. `python3 -m http.server` in it). CI builds it and opens it in jsdom
-(`tests/demo_test.js`) so it cannot drift from the app.
-
-## Quick start
-
-Requirements: Docker with Compose on a 64-bit system (linux/amd64 or linux/arm64, also macOS and Windows with Docker
-Desktop). Without the virus scanner **1 GB RAM** (about 250 MB idle); with it (the default of the installer and of
-`.env.example`, `COMPOSE_PROFILES=localdb,clamav`) about **2.5 GB**, and the first start can take up to 5 minutes. On a
-small server remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty. Details and disk, CPU and Raspberry
-Pi advice: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
-
-**Installer** (macOS, Linux; Windows: `irm https://kalmido.com/install.ps1 | iex`): downloads the latest release,
-uses the prebuilt image (or builds it locally if that is not possible) and starts it on `http://localhost:3040`.
-kalmido.com/install.sh (and `.ps1`) forwards to the installer of the latest GitHub release; it checks the download
-against the release's `SHA256SUMS` and uses the image digest of the release.
-It never uses sudo, writes an `update.sh` into the install folder (`~/kalmido`) and shows the one-time **setup
-code** for the first account at the end. The scripts are in this repository: [install.sh](install.sh),
-[install.ps1](install.ps1).
-
-```sh
-curl -fsSL https://kalmido.com/install.sh | sh
-```
-
-The same without the website:
-
-```sh
-curl -fsSL https://github.com/Gegenschuss/kalmido/releases/latest/download/install.sh | sh
-```
-
-**By hand:**
-
-```sh
-git clone https://github.com/Gegenschuss/kalmido.git
-cd kalmido
-git checkout "$(git tag --sort=-v:refname | head -n 1)"   # the latest release
-cp .env.example .env        # set TZ, PUBLIC_URL and POSTGRES_PASSWORD at least
-mkdir -p data secret        # create them yourself, so the container (user 1000) may write them
-docker compose up -d --build
-docker compose logs kalmido | grep "Setup code"
-```
-
-Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64): put
-`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z` into `.env` (X.Y.Z = the release you checked out, `git describe
---tags` without the `v`), then `docker compose pull && docker compose up -d`. On Linux with a user other than 1000,
-give the folders to the container's user (`sudo chown 1000:1000 data secret`). The image runs as uid 1000 and read-only:
-[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) *User and read-only image*.
-
-Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
-`./pgdata`), attachments and backups live in `./data`, the server key in `./secret` (see below).
-`docker compose ps` shows the service as *healthy* once it answers (`/api/health`).
-Open it: the first start shows a **setup page** that creates the first account (the admin). It asks for the
-**one-time setup code** that only the server's log shows (`docker compose logs kalmido`, a framed block *Kalmido first
-setup*), so nobody else who reaches a fresh server first can make themselves its admin. The code works once; a
-restart prints a new one; wrong codes are rate limited like logins. For tests and automation only:
-`KALMIDO_SETUP_CODE=<fixed code>` or `KALMIDO_SETUP_CODE=off` in `.env`. A second step asks **what you want to use**, with three
-starting points:
-
-| Preset | For | On |
-|---|---|---|
-| **Simple list** (preselected) | a plain to-do list, a household | projects, subtasks, reminders, the calendar |
-| **Just me** | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress, comments |
-| **Projects & team** | small teams up to about ten people, e.g. an agency | everything: sharing, assigning, comments, time tracking, the Gantt timeline with dependencies, custom fields |
-
-Under *Customize…* below the cards you can switch single modules on or off (the matching card stays highlighted),
-and pick the language; *Start* stays in view. The modules become the default for new users; collaboration and time tracking are switches for the whole
-server. The welcome tour and the *Getting started* project only mention modules that are on. All of it can be changed
-later in *Settings*.
-
-Below that, one question: **Start with**: *Empty*, the *Sample project*, or a project of the type *Agency*,
-*Software / AI dev* or *Personal* (sections, fields and settings for that kind of work; picking one switches the
-modules it needs on). More projects any time: *Projects > + > New project*.
-
-**Sample project.** *Sample project* under *Start with* and on the first card of every new account's welcome tour
-(ticked when the project modules are on) adds a realistic example in the user's
-language: *Example: Image film for client Muster* with the phases Concept, Pre-production, Shoot, Edit and Approval,
-about fifteen tasks around today (overdue, today, next week, undated) with start dates for the timeline, dependencies
-for *Flow* and *Now doable*, all four matrix quadrants, subtasks, a Markdown checklist, tags, a weekly status call, a
-comment, custom fields, a time entry and a project status, plus the project *Example: Shoot day packing list* (completed
-items at the bottom). It only
-uses the modules that are on, stays private and quiet (no reminders, pushes, News or webhooks, not in the daily
-digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
-if you edited them, tasks you added yourself stay, and so does their project.
-
-<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, then Start with: Empty, Sample project, Agency, Software and Personal"></p>
-
-> [!IMPORTANT]
-> Use HTTPS (a reverse proxy) for anything beyond your own machine: the login sends your password and
-> the session cookie is only marked `Secure` behind HTTPS.
-
-**Server key and backups (2.45.0).** Without `KALMIDO_SECRET_KEY` in `.env` the server creates its key on the first
-start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` always wins. It encrypts stored tokens
-and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
-data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Administration >
-Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
-`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too. The backup page warns when the
-disk has room for fewer than three more archives; set a passphrase (see `docs/SELF-HOSTING.md`, "Disk space and passphrase").
-
-The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
-
-## Try it locally
-
-No proxy needed for a quick look. After the quick start above, open **http://localhost:3040** on the same machine.
-Everything works there, including installing it as an app and offline mode (browsers treat `localhost` as secure).
-Push notifications and `/drop` stay off until you configure them.
-
-To try it from your phone or another device on your network, change the port line in `docker-compose.yml` to
-`"3040:3040"`, run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
-app works, but it cannot be installed and has no offline mode.
-
-> [!WARNING]
-> Over plain HTTP your password travels unencrypted through your network. Fine for a test at home; for daily
-> use put it behind a reverse proxy with HTTPS (next section) and switch the port back.
-
-To remove the test again: `docker compose down` and delete the folder (your test data is in `./data`).
-
-## Moving from other apps
+</details>
+<details>
+<summary><a id="moving-from-other-apps"></a><b>Moving from other apps</b></summary>
 
 *Settings > Data > Import*: pick the app, choose its export file, and Kalmido shows a **preview** first: how many
 tasks go into which project, a few sample rows and everything that cannot be mapped exactly (a date text it did not
@@ -1011,7 +644,9 @@ own project with the same name is reused) or one existing project you can edit. 
 | **Any CSV** (2.142.0) | Any spreadsheet saved as CSV | Columns are matched by their English or German header (title, due, notes, project (or list), priority, tags, done ...); the preview shows which column went where, unknown columns go into the notes. |
 | **Markdown** (2.142.0) | A `.md` file (Obsidian, Logseq, a README) | Top headings become projects, deeper ones sections; `- [ ]` / `- [x]` tasks, indentation = subtask, text below a task = its note; unambiguous dates (`2025-01-15`, `15.01.2025`, `due:`), `#tags`. |
 
-## Users and sharing
+</details>
+<details>
+<summary><a id="users-and-sharing"></a><b>Users and sharing</b></summary>
 
 <p align="center"><img src="docs/share.png" width="760" alt="The Share dialog of a project: people with their roles open, groups, agents, the public link and the owner folded with their state"></p>
 
@@ -1209,7 +844,9 @@ which answers with a short summary.
   they only change what you see, per device.
 - Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
 
-## Start page
+</details>
+<details>
+<summary><a id="start-page"></a><b>Start page</b></summary>
 
 A tap on the logo (*Kalmido* at the top of the sidebar) opens the **start page** (the dashboard): what waits for you (approvals,
 mentions, assignments), today's tasks (complete them right there), News bundled, the team chat, your projects with
@@ -1221,7 +858,9 @@ everyone and each person may override it. The start page can also be a tab (Sett
 
 <p align="center"><img src="docs/project-page.png" width="760" alt="A project page built from blocks: description, status update, milestones, key links, members, project files with an image preview, empty blocks as single lines, Customize"></p>
 
-## Family
+</details>
+<details>
+<summary><a id="family"></a><b>Family</b></summary>
 
 *Settings > Modules > At home > Family* (or *What do you use Kalmido for? > Family* in the setup, the welcome tour or
 *Settings > Modules*) switches on everything for a household; while it is off, none of it shows. The **Family** view
@@ -1258,7 +897,9 @@ everyone and each person may override it. The start page can also be a tab (Sett
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
 
-## Workspaces: work and private apart
+</details>
+<details>
+<summary><a id="workspaces-work-and-private-apart"></a><b>Workspaces: work and private apart</b></summary>
 
 Since 2.28.0.
 
@@ -1300,7 +941,9 @@ private; nobody loses access). A **nightly boundary check** counts every members
 (projects, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
 *Administration > Organisations*.
 
-## Organisations and invitations
+</details>
+<details>
+<summary><a id="organisations-and-invitations"></a><b>Organisations and invitations</b></summary>
 
 2.46.0: **one kind of server** - organisations plus a private space for everybody. People see the members of their
 organisations and the people they are connected with (a project or group in common, their kids, their agents); on a server
@@ -1340,7 +983,9 @@ e-mail address. Opened on their device it signs them in there, once, within 7 da
 your account*: they choose their own password and are signed in. *Send the invitation again* / *Send a link to set a
 new password* in the user dialog; without SMTP you copy the link.
 
-## Clients, workload, approvals, forms
+</details>
+<details>
+<summary><a id="clients-workload-approvals-forms"></a><b>Clients, workload, approvals, forms</b></summary>
 
 Three modules under *Settings > Modules > Projects and team*, each off until you switch it on, all within your
 organisation:
@@ -1360,7 +1005,9 @@ organisation:
 **approve** it (done), **ask for changes** (back to you, with a note) or **reject** it (won't do). Agents can ask, never
 decide.
 
-## Home & life
+</details>
+<details>
+<summary><a id="home--life"></a><b>Home & life</b></summary>
 
 Six modules under *Settings > Modules > At home*, each off until you switch it on; the view **Home & life** shows a
 card per module (sidebar, command field). They are made of ordinary tasks, projects and contacts, so reminders, the
@@ -1394,7 +1041,9 @@ calendar, CalDAV, sharing and the API work as everywhere.
   any project (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are
   encrypted at rest with the key of the project's space (needs `KALMIDO_SECRET_KEY`).
 
-## Reading
+</details>
+<details>
+<summary><a id="reading"></a><b>Reading</b></summary>
 
 *Reading* is an area of its own (sidebar, tab bar, *Settings > Modules*), in Private and in every organisation apart; each
 view shows only the entries of the workspace you are in. Without an organisation everything works privately.
@@ -1410,7 +1059,9 @@ view shows only the entries of the workspace you are in. Without an organisation
   browser button ([docs/BOOKMARKS.md](docs/BOOKMARKS.md)); *Connect Karakeep…* with your own address and API key (stored
   encrypted) brings Karakeep's links in as bookmarks (notes stay tasks) and archives the archived ones in Karakeep.
 
-## Events
+</details>
+<details>
+<summary><a id="events"></a><b>Events</b></summary>
 
 Kalmido keeps your appointments itself (module *Events*, on by default; *Settings > Modules*). They show next to your
 tasks in the **year**, month, week and day view, in the **agenda** (the coming two weeks, events and tasks by day) and in *Events
@@ -1440,7 +1091,9 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
 - The family events of 2.19 (tasks with people who come along) became events once, with those people invited; the
   task stays, marked done and linked to its event.
 
-## Contacts
+</details>
+<details>
+<summary><a id="contacts"></a><b>Contacts</b></summary>
 
 Your address books live in Kalmido too (module *Contacts*, on by default): **Contacts** in the sidebar lists them with
 a search (name, company, e-mail, phone, address, group), a group filter and a card per person (phones and e-mails as
@@ -1455,7 +1108,9 @@ e-mails, addresses, web links, birthday and anniversary (also without the year),
 - **Import / export**: vCard files (3.0 and 4.0); **on the phone** each address book is an address book in the phone's
   contacts app (CardDAV), both ways.
 
-## Team chat
+</details>
+<details>
+<summary><a id="team-chat"></a><b>Team chat</b></summary>
 
 People talk to each other in Kalmido: **direct messages** between two people who work together (they share a project or a
 group) and **one channel per shared project** for everyone who sees the whole project. Agents shared with the project are in its
@@ -1479,7 +1134,9 @@ heights). On phones a row of the open chats at the top switches between them. Ev
 colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
 people's colours off under *Settings > Appearance*.
 
-## Files and documents
+</details>
+<details>
+<summary><a id="files-and-documents"></a><b>Files and documents</b></summary>
 
 Since 2.48.0.
 
@@ -1509,7 +1166,9 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 
 **Knowledge folders** (2.200.0, #2747): knowledge pages live in the same folder tree as the file store (empty folders, drag to move or sort, a "…" menu). Share a folder or a page with people, groups or agents (read / edit, inherited). Agents reach pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_create`, scopes `wiki:read` / `wiki:write`), only those shared with them.
 
-## Offline knowledge, office projects, pictures
+</details>
+<details>
+<summary><a id="offline-knowledge-office-projects-pictures"></a><b>Offline knowledge, office projects, pictures</b></summary>
 
 - **Knowledge pages offline**: every space you can read is kept on the device, opens and can be searched without a
   connection; pages edited offline are sent once you are online again (a change made elsewhere meanwhile waits at the
@@ -1523,7 +1182,9 @@ answers with the summary. Kalmido calls no language model itself; undo removes t
 - **Pictures**: the bot figure's antenna sways gently at rest; profile pictures come as ten people for users and ten bots
   for agents (#2673 #2674 #2675).
 
-## Notes
+</details>
+<details>
+<summary><a id="notes"></a><b>Notes</b></summary>
 
 Every project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
 (project menu > *Notes*, the project page). Title, tags, pinned notes first, a search field; typing saves by itself,
@@ -1532,7 +1193,9 @@ moves to another project, and is found by the command field. Everyone who sees t
 do not), owner, project admins and members write them; when someone else changed a note while you were typing, Kalmido shows
 both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search_notes`, `create_note` ….
 
-## Tasks by e-mail
+</details>
+<details>
+<summary><a id="tasks-by-e-mail"></a><b>Tasks by e-mail</b></summary>
 
 With one mailbox set up (`KALMIDO_MAIL_ADDRESS` + `KALMIDO_IMAP_*`, see *Configuration*), everyone gets a **secret
 address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your basket,
@@ -1551,7 +1214,9 @@ only with a valid certificate, and hosts in the local network only when listed u
 (`KALMIDO_CALENDAR_ALLOW_HOSTS`). With SMTP set up, *Reply* and *New e-mail* send plain-text mails that are filed as
 *Sent*. HTML mails are shown cleaned in a sandboxed frame; external images load only on request.
 
-## Calendar subscriptions (other calendars in Kalmido)
+</details>
+<details>
+<summary><a id="calendar-subscriptions-other-calendars-in-kalmido"></a><b>Calendar subscriptions (other calendars in Kalmido)</b></summary>
 
 ![Calendar week with tasks and calendar events](docs/calendar-events.png)
 
@@ -1598,7 +1263,9 @@ internal hosts* (`host` or `host:port`, comma-separated), or `KALMIDO_CALENDAR_A
 list servers you trust: every user can then subscribe to calendars on them. `KALMIDO_CALENDARS=0` turns the whole
 feature off.
 
-## Calendar subscription (your tasks in other calendars)
+</details>
+<details>
+<summary><a id="calendar-subscription-your-tasks-in-other-calendars"></a><b>Calendar subscription (your tasks in other calendars)</b></summary>
 
 *Settings > Integrations > Calendar subscription > Create subscription link* gives you a private URL
 (`https://tasks.example.com/ical/<id>.<secret>.ics`) that any calendar app can subscribe to (read-only):
@@ -1624,7 +1291,9 @@ The secret in the URL is the only credential: anyone with the link can read thes
 (the old URL stops working at once), *Turn off* removes it. Wrong tokens answer 404 and are rate-limited per
 address. With a login proxy, let `/ical/*` bypass it (see *Reverse proxy*); Kalmido never reads the proxy header there.
 
-## Calendar apps (CalDAV)
+</details>
+<details>
+<summary><a id="calendar-apps-caldav"></a><b>Calendar apps (CalDAV)</b></summary>
 
 Kalmido is a CalDAV server for tasks: every project you see (not archived) shows up as a task list in Reminders on iPhone,
 iPad and Mac, Thunderbird, Evolution, Tasks.org or DAVx⁵ (with Tasks.org, jtx Board or OpenTasks) on Android, and changes
@@ -1640,7 +1309,9 @@ unchanged. Viewers get read-only projects, participants only their tasks; deleti
 CalDAV" in the history. Behind a login proxy, `/dav` and `/.well-known/caldav` must bypass the login (see *Reverse
 proxy*). Details, the mapping table and proxy examples (Caddy, Authelia, nginx, Traefik): [docs/CALDAV.md](docs/CALDAV.md).
 
-## REST API and webhooks
+</details>
+<details>
+<summary><a id="rest-api-and-webhooks"></a><b>REST API and webhooks</b></summary>
 
 Kalmido has a small REST API (`/api/v1`) for scripts and integrations, and outgoing webhooks. Full reference with
 examples for curl, Home Assistant, n8n and a shell script: **[docs/API.md](docs/API.md)**; the OpenAPI 3.1 description
@@ -1668,7 +1339,9 @@ is served at `/api/v1/openapi.json`.
   "fields": [...]}}`, so a misspelt field never gets lost silently (`content` is accepted as an alias of `notes`).
 - `KALMIDO_API=0` / `KALMIDO_WEBHOOKS=0` turn them off.
 
-## AI agents
+</details>
+<details>
+<summary><a id="ai-agents"></a><b>AI agents</b></summary>
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
 member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares projects
@@ -1775,7 +1448,9 @@ with.
 
 ![An agent in a task: mentioned, answers with a plan, approved with 👍; the chip in the top bar shows its jobs](docs/agents.png)
 
-## Git integration
+</details>
+<details>
+<summary><a id="git-integration"></a><b>Git integration</b></summary>
 
 A **project** can be connected to one or more repositories (*Edit project > Repository*, up to five; the area shows
 for projects of the type *Software / AI dev* and for projects that already have a repository): **GitHub** (github.com or a
@@ -1846,7 +1521,9 @@ the pull request, its CI and *Approve* / *Reject* for the project owner, project
 the agent a `reaction` event with `approval` and `merge_request`; only then does it merge. A sample `CLAUDE.md` for such
 a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 
-## Templates, undo, statistics
+</details>
+<details>
+<summary><a id="templates-undo-statistics"></a><b>Templates, undo, statistics</b></summary>
 
 - **Templates:** *Save as template* in a task's menu (the task with its subtasks, priority, tags, notes, repeat and
   dates as "days after use") or in the project dialog (sections and open tasks). The template button in the add bar
@@ -1903,7 +1580,9 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 
 <p align="center"><img src="docs/stats.png" alt="Statistics view with completed tasks per week, by project, overdue trend, focus time, tracked time and habits"></p>
 
-## Time tracking
+</details>
+<details>
+<summary><a id="time-tracking"></a><b>Time tracking</b></summary>
 
 A module (on by default, *Settings > Modules*) for tracking the time you spend on tasks, for yourself or to bill a client.
 Since 2.41.0 each project switches it on in its settings (*Track time in this project*, off by default, any project type).
@@ -1941,7 +1620,9 @@ entries are there again.
 
 <p align="center"><img src="docs/time.png" alt="Time tracking report with hours per day and per project and task"></p>
 
-## Projects: dependencies, status, custom fields
+</details>
+<details>
+<summary><a id="projects-dependencies-status-custom-fields"></a><b>Projects: dependencies, status, custom fields</b></summary>
 
 **Project types.** *Projects > + > New project…* (also from the command palette, the setup and the first welcome card)
 can start from a type:
@@ -2084,7 +1765,9 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 | <img src="docs/fields.png" alt="Work project with progress bar and At risk status, field chips and waiting tasks; task panel with custom fields and dependencies"> | <img src="docs/overview.png" alt="Where is it stuck overview: overdue by assignee, waiting and unassigned tasks per project"> |
 | Custom fields, dependencies, progress and status | *Where is it stuck?* |
 
-## Login
+</details>
+<details>
+<summary><a id="login"></a><b>Login</b></summary>
 
 **Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
 ("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20, which slows sign-ins down instead of refusing them; names known at that address for 30 days are not slowed down) and per user
@@ -2213,7 +1896,9 @@ calendar subscriptions: public addresses and https only, unless the host is allo
 internal hosts list under *Settings > Administration > Advanced*), which you need for a provider in your own network. The
 client secret, codes and tokens are never logged or shown. Two-factor for OIDC logins is the provider's job.
 
-## Reverse proxy
+</details>
+<details>
+<summary><a id="reverse-proxy"></a><b>Reverse proxy</b></summary>
 
 More from running Kalmido (proxy pitfalls, VPN-only setups, PWA and push, backups and encryption at rest, server
 hardening, mail, moving to a new server, production updates): [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
@@ -2264,7 +1949,9 @@ With `AUTH_PROXY_PORT` (see *Login*) the last line points at the proxy port inst
 published it), while the API line keeps using the app port. With the built-in login a plain
 `reverse_proxy 127.0.0.1:3040` is enough.
 
-## Configuration
+</details>
+<details>
+<summary><a id="configuration"></a><b>Configuration</b></summary>
 
 All settings are environment variables in `.env` (see [.env.example](.env.example)); [docs/ENV.md](docs/ENV.md) lists every variable the server reads with its default (2.149, generated from the code). Switches accept `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`.
 
@@ -2364,7 +2051,9 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 
 Everything else (language, reminder defaults, digest time, pomodoro lengths, which modules are shown) is set per user in the app under *Settings*; the switches for the whole server (collaboration, time tracking, public links, update check, sign-in policy, OIDC, backups, admin alerts, allowed internal hosts) are under *Settings > Administration > Whole server*.
 
-## Language
+</details>
+<details>
+<summary><a id="language"></a><b>Language</b></summary>
 
 Kalmido starts in **English**. Open *Settings > General > Language* (in German: *Einstellungen > Allgemein > Sprache*) to switch; **Deutsch**
 is included. The choice is stored per user on the server, so it applies to all your devices and also to your push
@@ -2395,7 +2084,9 @@ Dates with a slash (`3/10`, `3/10/27`) are day / month in every language, like t
 
 Task titles, project names, tags and notes are never translated.
 
-## Notifications
+</details>
+<details>
+<summary><a id="notifications"></a><b>Notifications</b></summary>
 
 Kalmido has two ways to reach you. Pick one per account under *Settings > Notifications > Channel*:
 
@@ -2482,7 +2173,9 @@ summary* at a time you choose. All limits and thresholds are under *Limits and t
 listed below the settings with their state (delivered, not delivered, waiting for the summary, hourly limit
 reached) and can be cleared. The background job (watchdog) sends them, so they need `TASKS_WATCHDOG` on (default).
 
-## Share from your phone
+</details>
+<details>
+<summary><a id="share-from-your-phone"></a><b>Share from your phone</b></summary>
 
 *Settings > Integrations > Share from your phone*. Every share becomes a task in *your* inbox, files attached; it goes
 to `POST /drop` with your personal upload token (with a login proxy, let `/drop` pass, see above). Chrome passes no
@@ -2512,86 +2205,9 @@ address (without `/drop`, it adds that itself) and the token on import.
 > or the default topic name (`inbox`). Attachments are only downloaded when their URL points to your ntfy server
 > (`NTFY_INBOX_URL` or `NTFY_INBOX_PUBLIC`); the inbox token is never sent anywhere else.
 
-## Backups and restore
-
-*Settings > Administration > Whole server > Backups* (admins):
-
-- **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
-  (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
-  keeps running), `attachments/` (2.46.0: with the profile pictures, project icons and group pictures) and `manifest.json` (app and schema version, counts,
-  size + SHA-256 of every file). 2.45.0: on by default for a new server (the first automatic one the day after the
-setup); an existing server keeps its setting. *Back up now* makes one at any time.
-- **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
-  and the newest of each of the last 8 weeks (both adjustable); the last 3 safety backups. Other files in the folder
-  (e.g. the database copies of the installer's `update.sh`) are never touched.
-- **Encryption (optional, off by default):** AES-256-GCM with a key derived from a passphrase (scrypt), in 1 MiB
-  chunks whose order and end are authenticated (`.zip.enc`). The passphrase is set in the app (stored encrypted on
-  the server, never shown again) or with `KALMIDO_BACKUP_PASSPHRASE`. **Without the passphrase an encrypted backup
-  cannot be restored, by anyone.** Keep it in your password manager. Only the date, versions and counts are readable
-  without it. Useful when the backups are copied to a place you trust less than the server.
-- **Download** (admins only, streamed) and **Check** (decrypts, verifies every checksum and the database integrity
-  without changing anything). Copy the folder somewhere else too: a backup on the same disk does not survive the disk.
-- **Admin alerts** (*Storage and health*): a failed backup, no successful backup for 2 days, low disk space.
-
-**Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
-project). You type `RESTORE` to confirm. Kalmido then:
-
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
-   no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
-   bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
-   data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
-   rebuilt by Kalmido), a schema version this Kalmido can migrate (a backup from a newer version is refused);
-2. switches to maintenance (other requests get "please try again in a minute", background jobs pause) and waits
-   until nothing else runs;
-3. makes a **safety backup** of the current state (listed as "before a restore");
-4. swaps the attachments folder and replaces the database with `pg_restore` (one transaction), runs the migrations;
-   if anything fails, the previous database and attachments are put back. Backups from before 2.37 (`tasks.db`) are
-   moved over into PostgreSQL the same way as on the first start of 2.37;
-5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
-   themselves stay as they are.
-
-Restoring the safety backup undoes a restore. Without the app: see *Backup* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
-(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`).
-
-*Settings > Data > Export* gives every user a JSON dump of their own data.
-
-## Updating
-
-Kalmido follows [semantic versioning](https://semver.org/); every release is listed in [CHANGELOG.md](CHANGELOG.md)
-and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Settings > Help* shows the running version
-and, since 2.27.0, the version of the app in that window. A window that was open across an update shows *New version
-available – Reload* and reloads by itself once nothing is being typed.
-
-**Updating to 2.45 or later from an older version:** the new `docker-compose.yml` keeps the server key in its own folder
-`./secret` next to `./data`. Create it before the first start so the container (user 1000) can write the key file:
-`mkdir secret && sudo chown 1000 secret`. If `KALMIDO_SECRET_KEY` is already set in `.env`, it stays in charge and the folder
-stays empty. Otherwise the server creates a key once and from then on encrypts organisation data with it: keep a copy of
-`secret/kalmido.key` apart from the backups of `./data` - a backup without its key cannot be read
-(*Administration > Whole server* reminds you).
-
-**Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
-version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
-available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
-no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
-
-How to update depends on how you installed:
-
-| Installed with | Update |
-|---|---|
-| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
-| prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
-| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
-
-Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; migrations only add, so the data of
-an older version stays readable.
-
-**Installing a specific version** (vX.Y.Z = a tag from the releases page): with the installer
-`curl -fsSL https://kalmido.com/install.sh | KALMIDO_VERSION=vX.Y.Z sh` (the same variable pins updates:
-`KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh`); by hand `git checkout vX.Y.Z` or
-`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`.
-
-## Tech
+</details>
+<details>
+<summary><a id="tech"></a><b>Tech</b></summary>
 
 Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored secrets, backup encryption and the OIDC token checks, icalendar and recurring-ical-events for calendar subscriptions, py_webauthn for passkeys, segno for the QR code of the authenticator app, Pillow for profile photos) and PostgreSQL 17 (psycopg) on the server, plain JavaScript in the browser (`static/js/`, translation helpers in `i18n.js`, translations in `static/i18n/*.json`): no build step, no framework. How the code is organised: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The browser makes no external requests (website links are never fetched, no favicons, no CDN); the server only contacts services you configure, plus the optional update check against GitHub. Icons from [Lucide](https://lucide.dev).
 
@@ -2604,7 +2220,9 @@ Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored 
 | `static/icon-light.svg` | White tile, dark bot |
 | `static/favicon.svg` | Favicon without a tile: the bot is dark in a light browser and white in a dark one |
 
-## Limits
+</details>
+<details>
+<summary><a id="limits"></a><b>Limits</b></summary>
 
 One Kalmido instance is built for one person, a household or a small team. Many separate groups run best as one instance each, not as thousands of accounts on a single instance.
 
@@ -2621,7 +2239,9 @@ One Kalmido instance is built for one person, a household or a small team. Many 
 If you run into these limits, the next steps would be per-user change tracking, sending only changes
 instead of the full state, and rendering long lists incrementally. Issues and pull requests are welcome.
 
-## How this was built
+</details>
+<details>
+<summary><a id="how-this-was-built"></a><b>How this was built</b></summary>
 
 Kalmido is built with AI assistance (Claude Code). The owner decides what it does, uses it every day, and every
 change runs the automated test suite (API, UI, security regression tests) in CI. Before 1.0.0 an independent AI
@@ -2629,20 +2249,26 @@ security review (separate agent, black-box + code review) was run and all findin
 automated scanners (bandit, pip-audit, semgrep, OWASP ZAP baseline) run too. There has been no independent human
 security audit yet — reviews and reports are welcome ([SECURITY.md](SECURITY.md)).
 
-## Contributing and contact
+</details>
+<details>
+<summary><a id="contributing-and-contact"></a><b>Contributing and contact</b></summary>
 
 Issues, translations and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md) and
 [tests/README.md](tests/README.md). Pull requests need a one-time agreement to the [CLA](CLA.md) (you keep your copyright; the
 project stays AGPL-3.0). A red test suite stops a release; a suite proven flaky is skipped for at most 14 days while its fix is open (`tests/skip.txt`). Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 Contact: hello@kalmido.com.
 
-## Supporter licence
+</details>
+<details>
+<summary><a id="supporter-licence"></a><b>Supporter licence</b></summary>
 
 Kalmido is free and stays free. If you want to support it, there is a voluntary one-time supporter licence: 25 EUR per
 person or 100 EUR per server, VAT included, no subscription. It unlocks nothing - every feature is in the free app - and
 shows a small badge under *Settings > Help > About*, where you also enter the key. The key is checked offline on your
 server. Purchases will run through a merchant of record with its buyer terms (refund within 14 days); until the shop is
 open the dialog shows only the prices. Hosted servers do not show the licence at all.
+
+</details>
 
 ## License
 
