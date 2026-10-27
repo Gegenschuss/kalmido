@@ -165,10 +165,13 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   md.remove();
   st = await call('GET', '/api/state');
   check(st.settings.time_rounding === '15' && st.settings.time_target === '6', 'settings saved');
-  w.eval(`listModal(${WORK})`); await sleep(200);
+  await until(() => w.eval(`listById(${WORK})?.rate`) === 60, 8000);  // CI of 2.351.3: the rate set over the API reaches the page late on a busy runner
+  w.eval(`listModal(${WORK})`);
+  await until(() => [...d.querySelectorAll('.modal')].pop()?.querySelector('#l-rate')?.value === '60', 4000);
   md = [...d.querySelectorAll('.modal')].pop();
-  check(md.querySelector('#l-rate').value === '60', 'list dialog: hourly rate');
-  md.querySelector('#l-rate').value = '72.5'; md.querySelector('[data-m="close"]').click(); await sleep(700);  // 1.5.1: saves itself (on close too)
+  check(md.querySelector('#l-rate')?.value === '60', 'list dialog: hourly rate');
+  md.querySelector('#l-rate').value = '72.5'; md.querySelector('[data-m="close"]').click();  // 1.5.1: saves itself (on close too)
+  await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === WORK).rate === 72.5, 8000);  // CI of 2.351.3: instead of a fixed 700 ms
   st = await call('GET', '/api/state');
   check(st.lists.find(l => l.id === WORK).rate === 72.5, 'rate saved from the dialog');
   w.location.hash = 'time'; await sleep(1200);
