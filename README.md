@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+**Next release**:
+- **Office**: split bank bookings across invoices; optional default interest and 40 EUR flat fee on reminders; cash discount in accrual VAT and DATEV; e-invoice category K for EU goods.
+- **Office PDFs**: paper size A4 or US Letter per company; your own signature (upload or draw) in letters, templates and optionally quotations / reminders.
+- **Organisations**: members ask an admin to give back what they brought in; one click releases it.
+
 **2.351** (2026-10-26, fixes up to 2.351.8 on 2026-10-27):
 - **Agents**: a control level per agent and project (approve everything, routine free, free run with a goal), approval cards for one-way steps on every level, "data the agent never sees" and standing rules.
 - **Office**: Quotes & invoices, Documents, Correspondence and Receipts open as trees in the sidebar; documents, letters, receipts, address books, contacts and contracts can be filed and shared in folders.
