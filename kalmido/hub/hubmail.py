@@ -20,7 +20,8 @@ index key per workspace, docs/store.py), never a plain index.
 
 Visibility (strict): a project's mail = whoever sees the list, a client's mail = whoever sees the client, a mail that is
 not assigned = its recipient; always inside the mail's workspace (client / list of another organisation = nobody).
-Writing (assign, delete, restore) = the write right on the list / seeing the client / the recipient. Agents and kid
+Writing (assign, delete, restore) = the write right on the list / for a client its mail's recipient, who created the
+client or an organisation admin (2.360.0) / the recipient. Agents and kid
 accounts get nothing (no v1 route, no MCP tool in 2.84.0). Deleting sets deleted_at (Undo restores)."""
 import email.utils
 import hashlib
@@ -38,6 +39,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
+from ..accounts.orgs import is_org_admin
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
 HBM_FILES = 20          # attachments of one mail at most
@@ -96,7 +98,10 @@ def hbm_can(c, uid, m, write=False):
         return role in WRITE_ROLES if write else bool(role)
     if m["client_id"]:
         cl = _visible_client(c, uid, m["client_id"])
-        return bool(cl) and (cl["org_id"] or None) == (m["org_id"] or None)
+        if not cl or (cl["org_id"] or None) != (m["org_id"] or None):
+            return False
+        # 2.360.0 C (#2496): moving / deleting a client's mail: its recipient, who created the client or an organisation admin
+        return not write or uid in (m["owner_id"], cl["created_by"]) or bool(m["org_id"] and is_org_admin(c, uid, m["org_id"]))
     if m["owner_id"] != uid:
         return False
     return not m["org_id"] or int(m["org_id"]) in acx_of(c, uid).org_ids

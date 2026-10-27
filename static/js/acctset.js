@@ -570,7 +570,7 @@ function bkRestore(md, src) {
       e.preventDefault();
       const go = $('#bkr-go', m); go.disabled = true; go.textContent = tr('Restoring…');
       try {
-        const r = await rawFetch('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || ''});
+        const r = await suApi('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || ''}, tr('Restore'));  // 2.360.0 A (#2496): with the step-up
         m.remove(); md.remove();
         clearLocal();
         if (r.notes?.length) await askConfirm(tr('Backup restored. Safety backup: {0}', r.safety), r.notes.join('\n\n'), {ok: tr('Reload')});  // 2.273.0 A (#3051)

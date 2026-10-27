@@ -30,7 +30,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # noqa: E402 -- shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # noqa: E402 -- shared helpers (tests/kt.py)
 
 
 def EH(email):
@@ -160,7 +160,7 @@ check(r.status_code == 403 and "Alice Start" in r.text and not r.content.startsw
 check(Bo.delete(B + P).status_code == 403, "bob: delete 403")
 r = Bo.post(B + P)
 check(r.status_code == 403 and "Alice Start" in r.text, f"bob: no replacing while alice holds the organisation {r.status_code} {r.text[:160]}")
-OX = A.get(B + P + "/file")
+OX = su_get(A, B + P + "/file")  # 2.360.0 (#2496): the step-up for an organisation's archive too
 check(OX.status_code == 200 and OX.content[:13] == b"KALMIDO-ORGX\n", "alice: download 200")
 OX = OX.content
 check(A.get(B + P).json().get("file") == ja.get("file"), "alice's archive is still there")
@@ -210,7 +210,7 @@ r = Bo.post(B + P)
 check(r.status_code == 202, f"bob starts a new export {r.status_code} {r.text[:160]}")
 jb = wait_export(Bo, ORG)
 check(jb.get("state") == "done" and not jb.get("foreign") and jb.get("file"), f"bob: his own archive {jb}")
-r = Bo.get(B + P + "/file")
+r = su_get(Bo, B + P + "/file")  # 2.360.0 (#2496): the step-up
 check(r.status_code == 200 and r.content[:13] == b"KALMIDO-ORGX\n", "bob: download of his own archive 200")
 check(Bo.delete(B + P).ok and Bo.get(B + P).json().get("state") == "none", "bob deletes his archive")
 

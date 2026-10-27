@@ -266,11 +266,21 @@ lst = js(Ca.get(B + f"/api/hubmail/mails?client_id={ACME}"))
 srow = [m for m in lst.get("mails", []) if m["id"] == (rs or {}).get("id")]
 check(srow and srow[0]["dir"] == "out" and "acme@example.com" in srow[0].get("to_list", "") and lst.get("can_send") is True,
       f"carol sees the sent mail in Acme's list, can write too ({srow})")
-# an answer to the sent mail from a new address joins Acme (In-Reply-To)
+# 2.360.0 (#2496): an answer to the sent mail joins Acme (In-Reply-To) only from someone who took part in it; a new
+# address with the known Message-ID waits in Not assigned
 M9 = mail("mail", "office@example.test", "newperson@example.org", "Re: Re: Offer spring", "Agreed.", reply_to_mid=SENT_MID)
 Bo.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"})
 r9 = until(lambda: row(M9), 40)
-check(r9 and r9["client_id"] == ACME and r9["org_id"] == ORG, f"an answer to the sent mail is filed with Acme ({r9})")
+check(r9 and r9["client_id"] is None and r9["list_id"] is None and r9["org_id"] == ORG, f"an answer from a new address: Not assigned ({r9})")
+M9b = mail("mail", "office@example.test", "Acme <acme@example.com>", "Re: Re: Offer spring", "Agreed too.", reply_to_mid=SENT_MID)
+Bo.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"})
+r9b = until(lambda: row(M9b), 40)
+check(r9b and r9b["client_id"] == ACME and r9b["org_id"] == ORG, f"an answer of a recipient is filed with Acme ({r9b})")
+# 2.360.0 R (#2496, review): a known address of the client (the contact person, not a recipient of the sent mail) counts too
+M9c = mail("mail", "office@example.test", "Lisa <lisa@example.com>", "Re: Re: Offer spring", "Lisa agrees.", reply_to_mid=SENT_MID)
+Bo.post(B + "/api/hubmail/mailbox/poll", json={"ws": f"org:{ORG}"})
+r9c = until(lambda: row(M9c), 40)
+check(r9c and r9c["client_id"] == ACME and r9c["org_id"] == ORG, f"an answer of Acme's contact person is filed with Acme ({r9c})")
 
 # ---- a new mail from a client, by carol (a member uses the workspace's SMTP)
 j = js(Ca.get(B + f"/api/hubmail/compose?client_id={ACME}"))

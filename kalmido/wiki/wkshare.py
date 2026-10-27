@@ -41,7 +41,9 @@ WSH_MAX = 300  # live shares per space
 WSH_PAGES = 2000  # pages listed for one share
 WSH_SEAL = "wikishare:"
 # the page(s) a share covers: same space, the path itself or (a folder) below it -- s = wiki_shares, p = wiki_pages
-WSH_COVER = ("COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND (lower(p.path)=lower(s.path) "
+# 2.360.0 D (#2496): a page share covers only the page it was made for (page_id; NULL = a row of an older version, by name)
+WSH_COVER = ("COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND ((lower(p.path)=lower(s.path) "
+             "AND (s.is_folder=1 OR s.page_id IS NULL OR s.page_id=p.id)) "
              "OR (s.is_folder=1 AND left(lower(p.path), length(lower(s.path))+1)=lower(s.path)||'/'))")
 
 
@@ -120,8 +122,10 @@ def wsh_rows(c, oid, owner, live=True):
     return c.execute(f"SELECT * FROM wiki_shares WHERE {w} ORDER BY id LIMIT {WSH_MAX * 2}", a).fetchall()
 
 
-def wsh_covers(r, path):
+def wsh_covers(r, path, pid=None):
     p, s = path.lower(), r["path"].lower()
+    if p == s and not r["is_folder"] and pid is not None and r["page_id"] is not None:  # 2.360.0 D (#2496): WSH_COVER
+        return r["page_id"] == pid
     return p == s or (bool(r["is_folder"]) and p.startswith(s + "/"))
 
 
@@ -133,7 +137,7 @@ def wsh_mark(c, oid, uid, pages):
     if not rows:
         return
     for d in pages:
-        if any(wsh_covers(r, d["path"]) for r in rows):
+        if any(wsh_covers(r, d["path"], d.get("id")) for r in rows):
             d["shared"] = 1
 
 
@@ -141,7 +145,7 @@ def wsh_count(c, r):
     """GET /api/wiki/pages/<id>: the number of live shares that cover the page (its mark)."""
     if r["path"].startswith("e2e1:"):
         return 0
-    return sum(1 for s in wsh_rows(c, r["org_id"], r["owner_id"]) if wsh_covers(s, r["path"]))
+    return sum(1 for s in wsh_rows(c, r["org_id"], r["owner_id"]) if wsh_covers(s, r["path"], r["id"]))
 
 
 def wsh_repath(c, oid, owner, old, new, folder):
@@ -240,7 +244,8 @@ def wsh_list():
     oid, owner, path, folder = wsh_target(c, uid, q, False)
     rows = wsh_rows(c, oid, owner, live=False)
     if path is not None:
-        rows = [r for r in rows if wsh_covers(r, path) or (folder and r["path"].lower().startswith(path.lower() + "/"))]
+        pid = None if folder else int(q["page_id"])
+        rows = [r for r in rows if wsh_covers(r, path, pid) or (folder and r["path"].lower().startswith(path.lower() + "/"))]
     names = user_names(c, ({r["created_by"] for r in rows} | {r["user_id"] for r in rows}) - {None})
     locked = wsh_locked(c, oid, owner)
     gone = wsh_gone(c, rows)
@@ -269,13 +274,14 @@ def wsh_create():
     if len(wsh_rows(c, oid, owner)) >= WSH_MAX:
         raise BadInput(tr("Too many shares in this space (at most {0})", WSH_MAX))
     ts = iso(now_utc())
+    page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
     if kind == "link":
         if not public_links_on(c):
             return jsonify(error=tr("Public links are turned off on this server")), 409
         tok = secrets.token_urlsafe(24)  # 192 bits, the shape of the list links (lists/public.py PUB_TOKEN_RE)
         h = _token_hash(tok)
-        sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,token_hash,token,expires_at,created_by,created_at) "
-                           "VALUES(?,?,?,?,'link',?,?,?,?,?)", (oid, owner, path, 1 if folder else 0, h, seal(c, WSH_SEAL + h, tok), exp, uid, ts))
+        sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,token_hash,token,expires_at,created_by,created_at,page_id) "
+                           "VALUES(?,?,?,?,'link',?,?,?,?,?,?)", (oid, owner, path, 1 if folder else 0, h, seal(c, WSH_SEAL + h, tok), exp, uid, ts, page))
         print("wiki public link created", sid, flush=True)
     else:
         if oid is not None:
@@ -286,15 +292,16 @@ def wsh_create():
         if who is None:  # by e-mail address: nothing happens, nothing is revealed
             return jsonify(ok=True, by_email=True)
         old = c.execute("SELECT id FROM wiki_shares WHERE kind='person' AND org_id IS NULL AND owner_id=? AND user_id=? AND lower(path)=lower(?) "
-                        f"AND is_folder=? AND {wsh_live('wiki_shares')}", (owner, who, path, 1 if folder else 0, ts)).fetchone()
+                        f"AND is_folder=? AND (page_id IS NULL OR page_id IS NOT DISTINCT FROM ?) AND {wsh_live('wiki_shares')}",
+                        (owner, who, path, 1 if folder else 0, page, ts)).fetchone()
         if old:  # 2.126.2 B (#2355): the same live share again: no second News item
             c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (exp, old["id"]))
             sid = old["id"]
         else:
             # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
-            sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at) "
-                               "VALUES(NULL,?,?,?,'person',?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
-                                                                       seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts))
+            sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at,page_id) "
+                               "VALUES(NULL,?,?,?,'person',?,?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
+                                                                         seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts, page))
             # 2.126.2 B (#2355): a News item for exactly that person (the sharing row of their settings; no push); only the
             # path they may read now
             from ..collab.news import news_add
@@ -516,9 +523,10 @@ def wsh_find(c, token):
 def wsh_pub_pages(c, s):
     """The pages of a link share (open, not in the trash), by name."""
     return c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.deleted_at IS NULL AND COALESCE(p.org_id,0)=? AND COALESCE(p.owner_id,0)=? "
-                     f"AND (lower(p.path)=lower(?) OR (? AND left(lower(p.path), length(lower(?))+1)=lower(?)||'/')) AND {wsh_open_sql()} "
-                     f"ORDER BY lower(p.path) LIMIT {WSH_PAGES}", (s["org_id"] or 0, s["owner_id"] or 0, s["path"], bool(s["is_folder"]),
-                                                                   s["path"], s["path"])).fetchall()
+                     f"AND ((lower(p.path)=lower(?) AND (? OR ?::bigint IS NULL OR p.id=?)) OR (? AND left(lower(p.path), length(lower(?))+1)=lower(?)||'/')) "
+                     f"AND {wsh_open_sql()} ORDER BY lower(p.path) LIMIT {WSH_PAGES}",  # 2.360.0 D (#2496): a page share: its page (WSH_COVER)
+                     (s["org_id"] or 0, s["owner_id"] or 0, s["path"], bool(s["is_folder"]), s["page_id"], s["page_id"], bool(s["is_folder"]),
+                      s["path"], s["path"])).fetchall()
 
 
 def wsh_lang(c, s):

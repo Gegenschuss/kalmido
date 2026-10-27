@@ -232,6 +232,12 @@ dbx("UPDATE agents SET list_ids='' WHERE user_id=?", (OAG,), write=True)
 r = OAGS.post(V + f"/documents/{OD}/receipt-suggestion", json={"project_id": OP, "category": "Marketing"})
 check(r.status_code == 201, f"the org agent suggests the org project ({r.status_code} {r.text[:200]})")
 OS = r.json().get("id")
+# 2.360.0 (#2496): an agent with a row in the office groups needs the receipts area ("staff": only its own receipts);
+# without a row (above) it suggests as before
+dbx("INSERT INTO office_rgroup_members(org_id,user_id,tpl,created_at) VALUES(?,?,?,?)", (ORG, OAG, "staff", "2026-10-25T10:00:00Z"), write=True)
+r = OAGS.post(V + f"/documents/{OD}/receipt-suggestion", json={"project_id": OP, "category": "Marketing"})
+check(r.status_code == 403, f"#2496: the org agent in a group without the receipts area: refused ({r.status_code} {r.text[:160]})")
+dbx("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id=?", (ORG, OAG), write=True)
 # tenant-matrix: receipt
 check(Ca.get(B + f"/api/docs/{OD}/receipt").status_code == 404, "carol (document not shared with her) does not see it")
 check(A.post(B + f"/api/receipt-suggestions/{OS}/accept", json={}).status_code == 404, "alice (outside the organisation): 404")

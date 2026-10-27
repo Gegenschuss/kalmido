@@ -172,7 +172,11 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   check(/Organisation/.test(d.querySelector('.smodal #a-orgs-h')?.textContent || '') && !d.querySelector('.smodal #a-vis') && d.querySelector('.smodal [data-acc="org-new"]'), '#799 / #1592: organisations shown, no visibility switch, "New organisation"');
   const ss = d.querySelector('.smodal #s-signup');
   check(ss && ss.value === 'off' && ss.querySelector('option[value="open"]').disabled, '#711: registration off; "open" not offered for an organisation');
-  change(w, ss, 'approval'); await sleep(500);
+  change(w, ss, 'approval');
+  const spp = await until(() => d.querySelector('.pwprompt #pp-pw'));  // 2.360.0 (#2496): opening the registration asks for the password
+  check(!!spp, '#711: registration mode asks for the password');
+  if (spp) { spp.value = 'password123'; spp.closest('form').dispatchEvent(new w.Event('submit', {cancelable: true})); }
+  await sleep(500);
   check((await call('GET', '/api/state')).about.signup_mode === 'approval', '#711: saved');
   w.close();
   // the login page: Create account

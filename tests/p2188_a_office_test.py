@@ -41,7 +41,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,time,docs,files,travel"
 O = "/api/office"
 D = O + "/docs"
@@ -200,7 +200,7 @@ def org_export(s, oid):
         if s.get(B + f"/api/orgs/{oid}/export").json().get("state") != "running":
             break
         time.sleep(0.25)
-    data = s.get(B + f"/api/orgs/{oid}/export/file").content
+    data = su_get(s, B + f"/api/orgs/{oid}/export/file").content  # 2.360.0 (#2496): the step-up
     rk = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     check(data[:13] == b"KALMIDO-ORGX\n" and rk, f"organisation export + recovery key of {oid}")
     return data, rk

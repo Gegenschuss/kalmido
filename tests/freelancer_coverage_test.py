@@ -99,7 +99,7 @@ ROUTES = {
     "DELETE /api/admin/groups/{}/avatar": "admin", "GET /api/admin/agent-policy": "admin", "GET /api/admin/agents": "admin",
     "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
-    "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
+    "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
     "GET /api/admin/retention": "admin",  # 2.152.0 (#2165): the retention runs in numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
@@ -527,7 +527,7 @@ ROUTES = {
     "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
     "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
     "DELETE /api/me/wait-suggestions": "own", "DELETE /api/me/webhooks/{}": "own", "DELETE /api/push/subs/{}": "own",
-    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own",
+    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own", "POST /api/account/export/file": "own",
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
     "GET /api/me/app-passwords": "own", "GET /api/me/mail": "own", "GET /api/me/share/httpshortcuts.zip": "own",
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",

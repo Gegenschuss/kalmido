@@ -271,7 +271,7 @@ A.patch(B + f"/api/orgs/{ORG}", json={"ext_links": True})
 check(pub(FP).status_code == 200, "organisation switch on again: works")
 A.patch(B + "/api/admin/settings", json={"public_links": False})
 check(pub(FP).status_code == 404 and mk(A, F).status_code == 409, "server switch off: dead, no new link")
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 check(pub(FP).status_code == 200, "server switch on again: works")
 
 # ---- an agent's folder, a link node

@@ -1254,6 +1254,31 @@ def bkr_read(c):
         return []
 
 
+# ---- 2.360.0 A (#2496): API tokens (agents' too) and app passwords revoked after the backup was written stay revoked.
+# 2.360.0 R (#2496, review): by the list of what was revoked (revoked_creds, filled by a database trigger on every delete,
+# core/schema.py REVOKED_TRIGGER), not by what is valid now: a restore onto a fresh server or of the safety backup keeps
+# every token the backup holds. The list is read before and written back after (union with the backup's own list).
+def bkr_creds_read(c):
+    """The revoked token / app password hashes now [(hash, at)]; caller is in system_ctx."""
+    try:
+        with c.savepoint():
+            return [tuple(r) for r in c.execute("SELECT hash, at FROM revoked_creds")]
+    except _pg.Error:  # a database from before 2.360 (no table yet): nothing to keep revoked
+        return []
+
+
+def bkr_creds_after(c, creds):
+    """After pg_restore and init_db (system_ctx, caller commits): the list back, then the restored tokens / app
+    passwords it names go again."""
+    for h, at in creds:
+        c.execute("INSERT INTO revoked_creds(hash, at) VALUES(?,?) ON CONFLICT (hash) DO NOTHING", (h, at))
+    for t, q in (("api_tokens", "DELETE FROM api_tokens WHERE token_hash IN (SELECT hash FROM revoked_creds)"),
+                 ("app_passwords", "DELETE FROM app_passwords WHERE pw_hash IN (SELECT hash FROM revoked_creds)")):
+        n = c.execute(q).rowcount  # plain statements: pg_prepare checks them
+        if n:
+            print(f"restore: {n} {t} revoked after the backup stay revoked", flush=True)
+
+
 BKR_RECENT_DAYS = 7
 
 
@@ -1344,6 +1369,7 @@ def bk_restore(path, pw, admin, via):
             # 2.273.0 A (#3051 p. 12): the queue is never in a backup (#2220): what waits now is gone after the restore
             with _pg.system_ctx(cur):
                 jobs = cur.execute("SELECT count(*) FROM bg_jobs WHERE state IN ('wait','run')").fetchone()[0]
+                creds = bkr_creds_read(cur)  # 2.360.0 A (#2496)
         finally:
             cur.close()
         if not GATE.begin(own=1, timeout=60):
@@ -1378,6 +1404,7 @@ def bk_restore(path, pw, admin, via):
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
+                    bkr_creds_after(c, creds)  # 2.360.0 A (#2496): what was revoked since the backup stays revoked
                     tok = None
                     u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
                     if u and via == "session":
@@ -1583,9 +1610,14 @@ def backups_now():
 
 
 @app.get("/api/admin/backups/<name>/download")
+@app.post("/api/admin/backups/<name>/download")  # 2.360.0 A (#2496): POST = the step-up -> a ticket for the GET
 def backups_download(name):
+    from .offsite import stepup_download
     need_backups()
     p = bk_path(name)
+    e = stepup_download(db(), proxy_ok=True)
+    if e is not None:
+        return e
     return send_file(p, as_attachment=True, download_name=name, mimetype="application/octet-stream",
                      conditional=False, max_age=0)
 
@@ -1676,6 +1708,10 @@ def backups_restore():
     c, b = db(), body()
     if b.get("confirm") != BK_CONFIRM:
         return err(BK_ERR_TEXT("confirm", BK_CONFIRM))
+    from .offsite import stepup_need
+    e = stepup_need(c, b, proxy_ok=True)  # 2.360.0 A (#2496): a stolen admin session alone restores nothing
+    if e is not None:
+        return e
     keys = _rate_keys(g.user["username"])
     e = login_wait(keys, g.user["username"])  # 2.282.0 (#3111)
     if e:

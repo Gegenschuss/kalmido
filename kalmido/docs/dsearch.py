@@ -231,7 +231,7 @@ def dsr_text(c, by_ws, hit, text):
         for i in sorted(hit)[:DSR_TEXT_MAX]:
             m = S.meta_row(c, i)
             name = c.execute("SELECT name FROM fs_nodes WHERE id=?", (i,)).fetchone()
-            t = " ".join(RU.fold(f"{name[0] if name else ''}\n{S.meta_text(c, m) if m else ''}").split())
+            t = " ".join(RU.fold(f"{name[0] if name else ''}\n{S.meta_text_shown(c, m) if m else ''}").split())
             if all(x in t for x in need) and not any(x in t for x in avoid if x):
                 ok.add(i)
         hit = ok

@@ -406,6 +406,8 @@ project files, chat, documents, mail and sharing into Kalmido); profile pictures
   only the metadata blocks are cut out (JPEG keeps its colour profile; HEIC keeps its structure, its metadata blocks are
   emptied). A photo stored turned (the camera's orientation mark) is turned upright first and saved again, so it shows the
   right way round without the mark. Anything Kalmido cannot read is stored unchanged; the upload never fails because of it.
+- Videos (MP4, MOV, also from phones, 2.360.0): the recorded place is overwritten with zeros in the file itself; the video,
+  its size and everything else stay as they were.
 - The switch *Remove location data from photos* (on by default) also removes camera details and capture time. For your
   private files it sits in *Settings > Data > Photos*; files of an organisation follow the organisation's switch in
   *Settings > Workspaces*, which only its admins change. Off: photos are stored exactly as uploaded.
@@ -580,7 +582,9 @@ A form with **status link** turns every report sent without an account into a cu
 its status page (on the thank-you page and by mail). There they see the title, the state (received, in progress, done), the
 text they sent, the team's public answers and their own comments, and they can answer. **All my reports** sends a sign-in
 link (valid 30 minutes, once) to their address; it opens a page with all their reports in the same organisation (or the same
-private project owner) - never reports of another organisation, even with the same address. Nobody needs an account.
+private project owner) - never reports of another organisation, even with the same address. A report counts there once
+its address is confirmed: the link in a mail to that address was opened (someone typing another person's address into the
+form does not put reports into that person's list; 2.360). Nobody needs an account.
 
 - **Internal stays internal.** In the task panel, a customer report shows the box *Customer report* (who sent it; the
   address, *Copy the status link* and *Mails to the customer* only for people who may change the task). The comment box

@@ -333,8 +333,10 @@ def user_update(uid):
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw) if pw else None, uid))
         ses_end(c, uid)  # 2.190.0 A (#1991)
-        # 2.190.0 A (#2496): the app passwords (CalDAV/CardDAV) go too; API tokens stay (agents keep working)
+        # 2.190.0 A (#2496): the app passwords (CalDAV/CardDAV) go too. 2.360.0 A (#2496): and a person's own API tokens
+        # (an agent's tokens belong to the agent's account: they stay)
         c.execute("DELETE FROM app_passwords WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM api_tokens WHERE user_id IN (SELECT id FROM users WHERE id=? AND COALESCE(kind, 'user')<>'agent')", (uid,))
         from ..docs.scankeys import sk_revoke_all  # 2.237.0 C (#2865): and the scan inbox keys
         sk_revoke_all(c, uid)
     if "ntfy_topic" in b:

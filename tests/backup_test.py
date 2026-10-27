@@ -40,7 +40,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 MAGIC = b"KALMIDO-BACKUP-ENC\x00"
 
 
@@ -128,7 +128,7 @@ def upload(data, s=None):
 
 
 def restore(s=None, base=None, **b):
-    return (s or A).post((base or B) + "/api/admin/backups/restore", json={"confirm": "RESTORE", **b})
+    return (s or A).post((base or B) + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", **b})
 
 
 def decrypt(path, pw):
@@ -242,7 +242,7 @@ r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json()["ok"] and r.json()["counts"]["tasks"] == 2 and r.json()["legacy"] is False, f"verify: {r.text[:200]}")
 
 # ---- download: admins only, the exact bytes
-r = A.get(B + f"/api/admin/backups/{name}/download")
+r = su_get(A, B + f"/api/admin/backups/{name}/download")  # 2.360.0 (#2496): the step-up
 check(r.ok and r.content == open(p, "rb").read() and "attachment" in r.headers.get("Content-Disposition", "")
       and r.headers.get("Cache-Control") == "no-store", "download: exact bytes, attachment, no-store")
 check(Bo.get(B + f"/api/admin/backups/{name}/download").status_code == 403, "download as user -> 403")
@@ -351,7 +351,7 @@ A.patch(B + "/api/admin/backups", json={"keep_daily": 9})  # a backup setting ch
 before = titles(A)
 check("created after backup" in before and "deleted after backup" not in before, "changed state before the restore")
 check(restore(name=good, confirm="restore").status_code == 400, "wrong confirmation word -> 400")
-r = A.post(B + "/api/admin/backups/restore", json={"name": good})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": good})
 check(r.status_code == 400, "no confirmation word -> 400")
 check(restore(name="../tasks.db").status_code == 404, "restore of a path -> 404")
 PX.get(BP + "/api/me")
@@ -431,7 +431,7 @@ check(PX.get(BP + "/api/me").ok, "proxy admin still logged in")
 A = sess("alice")
 
 # ---- upload + restore an uploaded archive
-r = A.get(B + f"/api/admin/backups/{good}/download")
+r = su_get(A, B + f"/api/admin/backups/{good}/download")  # 2.360.0 (#2496): the step-up
 up = upload(r.content)
 check(up.ok and up.json()["upload"].startswith("upload-") and up.json()["counts"]["tasks"] == 2 and not up.json()["encrypted"],
       f"upload accepted with a summary: {up.text[:200]}")
@@ -638,7 +638,7 @@ check(r.status_code == 400 and r.json().get("code") == "legacy" and "2.36" in r.
       f"old archive: restore refused with its own code: {r.text[:240]}")
 check(titles(A) == ref and not any(n.startswith(("attachments.", ".restore")) for n in os.listdir(DATA) + os.listdir(BK)),
       "old archive: nothing changed")
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "upload": up.json()["upload"]},
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "upload": up.json()["upload"]},
            headers={"Accept-Language": "de"}) if up.ok else up
 check(r.status_code == 400 and "SQLite" in r.json().get("error", ""), f"old archive: the text names the cause: {r.text[:200]}")
 old_name = "kalmido-backup-20200101-030000-manual.zip"

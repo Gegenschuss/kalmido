@@ -50,7 +50,8 @@ const until = async (fn, n = 400) => { for (let i = 0; i < n; i++) { const v = a
     // the move: alice's account export into bob (the API, like the settings page)
     check((await call('POST', '/api/account/export', null, CA)).status === 202, 'export started');
     check(await until(async () => (await call('GET', '/api/account/export', null, CA)).j.state === 'done'), 'export done');
-    const zip = Buffer.from(await (await fetch(B + 'api/account/export/file', {headers: {...H, Cookie: CA}})).arrayBuffer());
+    const t = (await (await fetch(B + 'api/account/export/file', {method: 'POST', headers: {...H, Cookie: CA}, body: JSON.stringify({password: 'password123'})})).json()).ticket;  // 2.360.0 (#2496): the step-up
+    const zip = Buffer.from(await (await fetch(B + 'api/account/export/file?t=' + encodeURIComponent(t || ''), {headers: {...H, Cookie: CA}})).arrayBuffer());
     const iid = (await call('POST', '/api/account/import', {size: zip.length, name: 'alice.zip'}, CB)).j.id;
     const up = await fetch(B + `api/account/import/${iid}?offset=0`, {method: 'PUT', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/octet-stream', Cookie: CB}, body: zip});
     check(up.ok, 'upload into bob');

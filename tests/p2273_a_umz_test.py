@@ -78,7 +78,7 @@ def export_of(s):
     assert r.status_code == 202, r.text
     j = until(lambda: (lambda x: x if x.get("state") != "running" else None)(s.get(B + "/api/account/export").json()), 120)
     assert j and j.get("state") == "done", j
-    r = s.get(B + "/api/account/export/file")
+    r = kt.su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     return r.content
 

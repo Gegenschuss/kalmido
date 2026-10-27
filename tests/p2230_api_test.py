@@ -330,7 +330,7 @@ check(429 in codes, "sending is rate limited per address " + str(codes))
 A.patch(B + "/api/admin/settings", json={"public_links": False})
 check(anon.get(B + "/f/" + tok2).status_code == 404 and not A.get(B + f"/api/lists/{FL}/forms").json()["forms"][1]["live"], "public links off: the public form is gone")
 check(A.post(B + f"/api/lists/{FL}/forms", json={"title": "x", "access": "public"}).status_code == 409, "… and none can be created")
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 r = A.patch(B + f"/api/forms/{F2['id']}", json={"regenerate": True})
 check(r.ok and r.json()["url"] != F2["url"] and anon.get(B + "/f/" + tok2).status_code == 404, "regenerate: the old link stops")
 check(A.patch(B + f"/api/forms/{F2['id']}", json={"enabled": False}).ok and anon.get(B + r.json()["url"].split("kalmido.example")[1]).status_code == 404, "disabled: gone")
@@ -372,7 +372,7 @@ check(requests.post(B + "/api/auth/signup", headers=H, json={"name": "X", "email
 check(A.patch(B + "/api/admin/settings", json={"signup_mode": "nope"}).status_code == 400, "a bad mode: 400")
 check(A.patch(B + f"/api/admin/orgs/{ORG2}", json={"domains": "agency.example, @Agency.example"}).json()["domains"] == "agency.example",
       "an organisation's e-mail domains (cleaned)")
-A.patch(B + "/api/admin/settings", json={"signup_mode": "domain", "signup_domains": "@acme.example, foo"})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "domain", "signup_domains": "@acme.example, foo"})
 ab = A.get(B + "/api/state").json()["about"]
 check(ab["signup_mode"] == "domain" and ab["signup_domains"] == "acme.example" and ab["signup_effective"] == "domain", "domain mode + the cleaned domains " + str(ab.get("signup_domains")))
 info = requests.get(B + "/api/auth/info").json()
@@ -403,7 +403,7 @@ check([l for l in st["lists"] if not l["is_inbox"]] == [] and not st["me"]["is_a
 dom = dbx("SELECT org_id FROM org_members WHERE user_id=?", (u[0][0],))
 check(dom == [], "#1562: no organisation without a domain match " + str(dom))  # 2.46.0 (#1562): before: the instance's first one
 # approval mode (with mail): confirm -> waits; the admin approves
-A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "approval"})
 m1 = len(mails())
 r = R.post(B + "/api/auth/signup", json={"name": "Nina", "email": "nina@agency.example"})
 check(r.json() == {"ok": True, "mail": True, "pending": True}, "approval mode: pending")
@@ -425,7 +425,7 @@ check(A.post(B + f"/api/users/{nid}/approve").status_code in (404, 409), "approv
 check(not any(it["kind"] == "signup" for it in A.get(B + "/api/news").json()["items"]), "the News item disappears once decided")
 # open mode, the rate limit, expired registrations are removed
 # 2.46.0 (#1592): a server with organisations refuses open registration; the rest runs in the approval mode
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).status_code == 409, "#1592: no open registration with organisations")
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "open"}).status_code == 409, "#1592: no open registration with organisations")
 r = R.post(B + "/api/auth/signup", json={"name": "Otto", "email": "otto@anywhere.example"})
 check(r.json() == {"ok": True, "mail": True, "pending": True} and dbx("SELECT signup FROM users WHERE username='otto'") == [("confirm",)], "approval mode")
 check(R.post(B + "/api/auth/signup", json={"name": "", "email": "y@anywhere.example"}).status_code == 400
@@ -466,7 +466,7 @@ check(oj["mode"] == "workspaces" and sorted(o["name"] for o in oj["orgs"]) == ["
       "#1592: the mode organisation is ignored: no renaming, nobody moved " + json.dumps(oj)[:200])
 check(requests.get(B + "/api/auth/info").json()["org"] == "", "#1592: the login page names no organisation")
 check({p["id"] for p in A.get(B + "/api/workload").json()["people"]} >= {1, BOB}, "#799: workload: the whole organisation")
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).status_code == 409 and A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"}).ok,
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "open"}).status_code == 409 and A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "approval"}).ok,
       "#799 / #1592: a server with organisations registers only by domain or with approval")
 restart("-e KALMIDO_INSTANCE_MODE=shared")
 A = sess("alice")
@@ -475,7 +475,7 @@ st = Bo.get(B + "/api/state").json()
 check(st["instance_mode"] == "shared" and st["people_visibility"] == "contacts" and st["me"]["orgs"] == [], "#799: shared: no organisations, own contacts")
 check(A.get(B + "/api/admin/orgs").json()["orgs"] == [] and requests.get(B + "/api/auth/info").json()["org"] == "", "#799: shared: nothing to show")
 check(CAROL not in {u["id"] for u in Bo.get(B + "/api/users").json()["users"]}, "#799: Bob does not see Carol (no list in common)")
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).ok, "#799: shared: open registration possible")
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "open"}).ok, "#799: shared: open registration possible")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

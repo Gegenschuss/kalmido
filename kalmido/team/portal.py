@@ -52,6 +52,11 @@ def pt_status_url(token):
     return f"{PUBLIC_URL}/p/{token}"
 
 
+def pt_mail_url(c, p, token):
+    """2.360.0 A (#2496): the status link in a mail to the ticket's address: opening it confirms the address (claimed)."""
+    return pt_status_url(token) + "?m=" + pt_key(c, p, "m")[:32]
+
+
 def pt_create(c, task_id, list_row, form_id=None, name="", email="", client_id=None):
     """A reported task becomes a ticket: one portal_tickets row in the list's space. list_row needs id, org_id, owner_id.
     Returns (ticket id, token); the token is only in the status link. The caller commits."""
@@ -61,7 +66,7 @@ def pt_create(c, task_id, list_row, form_id=None, name="", email="", client_id=N
         client_id = pt_client_for(c, list_row, e)
     ts = iso(now_utc())
     tid = insert_id(c, """INSERT INTO portal_tickets(task_id,list_id,org_id,owner_id,form_id,client_id,name,email,email_hash,token,token_hash,
-                          notify,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                          notify,created_at,claimed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)""",
                     (task_id, list_row["id"], list_row["org_id"], None if list_row["org_id"] else list_row["owner_id"], form_id, client_id,
                      (name or "")[:120], seal(c, "portal-email", e) if e else "", pt_email_hash(c, e) if e else "",
                      seal(c, "portal-token", tok), _token_hash(tok), 1 if e else 0, ts))
@@ -262,6 +267,7 @@ def pt_render(c, p, token, lg, note=""):
 
 @app.get("/p/<token>")
 def pt_page(token):
+    from flask import request
     from ..accounts.session import _accept_lang, rate_ip
     c = db()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -273,6 +279,8 @@ def pt_page(token):
     # 2.81.0 (#1866): a page view writes only when the last one is older than 5 minutes (or the language changed)
     c.execute("UPDATE portal_tickets SET last_seen_at=?, lang=? WHERE id=? AND (last_seen_at IS NULL OR last_seen_at<? OR lang<>?)",
               (iso(now_utc()), lg, p["id"], iso(now_utc() - timedelta(minutes=5)), lg))
+    if not p["claimed"] and hmac.compare_digest(str(request.args.get("m") or ""), pt_key(c, p, "m")[:32]):  # 2.360.0 A (#2496)
+        c.execute("UPDATE portal_tickets SET claimed=1 WHERE id=?", (p["id"],))
     if p["client_id"] is None:
         cl = pt_client_for(c, {"id": p["list_id"], "org_id": p["org_id"]}, pt_email(c, p))
         if cl:
@@ -582,7 +590,7 @@ def pt_my_tickets(c, eh, org_id, owner_id):
     """The tickets of one address in one space (newest first), live ones only."""
     return c.execute(f"""SELECT p.*, t.title, t.status, t.ttype, t.assignee_id, t.assignee_group_id FROM portal_tickets p
                          JOIN tasks t ON t.id=p.task_id JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
-                         WHERE p.email_hash=? AND p.org_id IS NOT DISTINCT FROM ? AND p.owner_id IS NOT DISTINCT FROM ?
+                         WHERE p.email_hash=? AND p.org_id IS NOT DISTINCT FROM ? AND p.owner_id IS NOT DISTINCT FROM ? AND p.claimed=1
                          AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()} ORDER BY p.id DESC LIMIT 200""",
                      (eh, org_id, owner_id)).fetchall()
 
@@ -770,7 +778,7 @@ def pt_mail_tick(c):
                 continue
             lg = p["lang"] or lang(c, p["l_owner"])
             tok = pt_token(c, p)
-            url, stop = pt_status_url(tok), pt_status_url(tok) + "/stop"
+            url, stop = pt_mail_url(c, p, tok), pt_status_url(tok) + "/stop"  # 2.360.0 A (#2496): the mail's link confirms
             head = tr("Your report “{0}” is done.", p["title"], lg=lg) if done else \
                 tr("There is a new answer to your report “{0}”.", p["title"], lg=lg)
             body_ = [(a["who"] or tr("Team", lg=lg)) + ":\n" + a["body"][:2000] for a in new[-3:]]

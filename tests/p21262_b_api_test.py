@@ -203,12 +203,13 @@ r = share(A, space="private", folder="Customer", kind="person", email="carol@exa
 it = news(Ca)
 check(r.ok and len(it) == 1 and it[0]["data"].get("folder") is True and it[0]["data"].get("path") == "Customer", "#2355: a folder share " + str(it)[:300])
 assert A.delete(B + f"/api/wiki/shares/{sid}").ok
-check(len(news(Bo)) == 1, "#2355: the item stays after a revoke")
+# 2.360.0 (#2496): the item ends with its share (it named a path the person may no longer read)
+check(len(news(Bo)) == 0, "#2496: the item is gone after a revoke")
 # the sharing row of the notification settings turns it off
 r = Bo.patch(B + "/api/settings", json={"notify": {"share": {"news": 0}}})
 check(r.ok, "#2355: the sharing row can be switched off " + r.text[:200])
 mp2 = page(A, "private", "Other/Page", "x")
-check(share(A, page_id=mp2, kind="person", user_id=BOB).status_code == 201 and len(news(Bo)) == 1, "#2355: with the sharing row off no item")
+check(share(A, page_id=mp2, kind="person", user_id=BOB).status_code == 201 and len(news(Bo)) == 0, "#2355: with the sharing row off no item")  # 2.360.0 (#2496): 0, the revoked one is gone
 # a person without an organisation (freelancer-matrix: wiki)
 FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
 fp = page(Fr, "private", "Offer", "the offer")

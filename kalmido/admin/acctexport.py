@@ -47,6 +47,7 @@ from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
+from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
@@ -691,12 +692,16 @@ def umz_start():
 
 
 @app.get("/api/account/export/file")
+@app.post("/api/account/export/file")  # 2.360.0 A (#2496): POST = the step-up -> a ticket for the GET
 def umz_download():
     umz_person()
     uid = me()
     st = umz_status(uid)
     if st.get("state") != "done":
         raise Denied(404)
+    e = stepup_download(db(), proxy_ok=True)
+    if e is not None:
+        return e
     raw = _state(uid) or {}
     path = os.path.join(_udir(uid), st["file"])
     key = umz_key(uid, "export") if raw.get("sealed") else None

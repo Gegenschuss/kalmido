@@ -2,25 +2,28 @@
 agent-setup.ps1 -- set up a Kalmido project agent on Windows with one command (2.44.0, #1517).
 
 Kalmido shows the command in Settings > Agents > (agent) > "Set up on a computer", e.g. (PowerShell):
-  & ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Code ks_... -Dir "$HOME\projects\site"
+  $env:KALMIDO_SETUP_CODE='ks_...'; & ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Dir "$HOME\projects\site"
 It trades the one-time setup code for the agent's token (stored in a file only your Windows account can read, never
 printed), fetches the starter files (mcp/starter_files.txt) and starts the agent in event mode at every login, hidden, with
 the Task Scheduler (no admin rights; when the Task Scheduler refuses, a hidden entry in your Startup folder). One instance
 per project folder. Needs: Windows PowerShell 5.1 or PowerShell 7, Python 3.9+, the agent command (default: claude).
 
   -Url          your Kalmido address
-  -Code         the one-time setup code (15 minutes, works once; make a new one in Kalmido when it expired)
+  -Code         the one-time setup code (15 minutes, works once; make a new one in Kalmido when it expired); better in the
+                environment as KALMIDO_SETUP_CODE (not in the process list of the computer; removed from it once read)
   -Dir          the project folder the agent works in (created when missing)
   -Cmd          the agent command (default claude); it gets --mcp-config with the Kalmido MCP server
   -From DIR     take the starter files from a local copy of mcp\ instead of downloading them
   -NoAutostart  install everything but the autostart
   -Lang         language of the messages: de or en (Kalmido adds the language of your account; anything else = en)
   -DryRun       only show what would happen: no code is redeemed, nothing is written, no task is registered
+  -AllowHttp    2.360.0: an http:// address that is not this computer (localhost) -- only for a Kalmido without https
+  (2.360.0: without -Code the code comes from the environment variable KALMIDO_SETUP_CODE)
   -Uninstall    stop and remove the autostart, revoke this computer's token in Kalmido, delete the instance folder
 Files: %LOCALAPPDATA%\Kalmido\agents\<folder name>-<hash>\ (starter files, kalmido-agent.env, mcp.json, agent.log).
 #>
 param([string]$Url = '', [string]$Code = '', [string]$Dir = '', [string]$Cmd = 'claude', [string]$From = '',
-      [switch]$NoAutostart, [switch]$DryRun, [switch]$Uninstall, [string]$Lang = 'en')
+      [switch]$NoAutostart, [switch]$DryRun, [switch]$Uninstall, [string]$Lang = 'en', [switch]$AllowHttp)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # Invoke-WebRequest is slow with the progress bar in 5.1
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -63,6 +66,8 @@ $MsgEn = @{
   s_starter = 'Fetching the starter files'
   dry_files = '  (dry run) the files of {0}/starter_files.txt into {1}'
   nobase = 'Kalmido sent no address for the starter files; use -From DIR'
+  nohttp = '{0} is an http:// address: the code and the token would cross the network unencrypted. Use the https:// address (or -AllowHttp when your Kalmido has no https)'
+  basehttp = 'Kalmido sent an address without https:// for the starter files ({0}); use -From DIR'
   nolist = 'no starter_files.txt in {0}'
   nolistfetch = 'cannot fetch the starter file list ({0}starter_files.txt); this version may not be published yet - try again later or use -From DIR'
   skippath = '  skipped {0} (no paths allowed)'
@@ -115,6 +120,8 @@ $MsgDe = @{
   s_starter = 'Lade die Starter-Dateien'
   dry_files = '  (Probelauf) die Dateien aus {0}/starter_files.txt nach {1}'
   nobase = 'Kalmido hat keine Adresse für die Starter-Dateien geschickt; nimm -From ORDNER'
+  nohttp = '{0} ist eine http://-Adresse: der Code und das Token gingen unverschlüsselt durchs Netz. Nimm die https://-Adresse (oder -AllowHttp, wenn dein Kalmido kein https hat)'
+  basehttp = 'Kalmido hat für die Starter-Dateien eine Adresse ohne https:// geschickt ({0}); nimm -From ORDNER'
   nolist = 'keine starter_files.txt in {0}'
   nolistfetch = 'die Liste der Starter-Dateien ({0}starter_files.txt) kann nicht geladen werden; diese Version ist vielleicht noch nicht veröffentlicht – versuche es später noch einmal oder nimm -From ORDNER'
   skippath = '  {0} übersprungen (keine Pfade erlaubt)'
@@ -228,8 +235,12 @@ if ($Uninstall) {
 }
 
 if (-not $Url) { Die (M 'nourl') }
+if (-not $Code) { $Code = [string]$env:KALMIDO_SETUP_CODE }  # 2.360.0 C (#2496)
+Remove-Item Env:KALMIDO_SETUP_CODE -ErrorAction SilentlyContinue  # 2.360.0 R (#2496): not left in the PowerShell session
 if (-not $Code -and -not $DryRun) { Die (M 'nocode') }
 $Url = $Url.TrimEnd('/')
+# 2.360.0 C (#2496): https only, except this computer (localhost) or -AllowHttp for a Kalmido without https
+if (-not $AllowHttp -and $Url -notmatch '^https://' -and $Url -notmatch '^http://(localhost|127\.0\.0\.1|\[::1\])([:/]|$)') { Die (M 'nohttp' @($Url)) }
 
 # kalmido-setup-step: redeem
 Step (M 's_connect')
@@ -291,6 +302,8 @@ function Fetch([string]$name, [string]$dest) {
 if ($DryRun) { Say (M 'dry_files' @($(if ($From) { $From } else { 'starter' }), $Inst)) }
 else {
   if (-not $From -and -not $StarterBase) { Die (M 'nobase') }
+  # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
+  if (-not $From -and $StarterBase -notmatch '^https://' -and -not $StarterBase.StartsWith($Url + '/')) { Die (M 'basehttp' @($StarterBase)) }
   $list = Join-Path $Inst 'starter_files.txt'
   if (-not (Fetch 'starter_files.txt' $list)) {
     if ($From) { Die (M 'nolist' @($From)) }

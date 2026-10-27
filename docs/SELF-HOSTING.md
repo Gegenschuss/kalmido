@@ -138,7 +138,8 @@ before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
 and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
-by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains, and an
+by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
+with a confirmed address: without e-mail sending an admin adds the person after the approval), and an
 organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
 once there is one, people see the members of their organisations and the people they share something with; private projects
 reach anybody else by e-mail address.
@@ -511,6 +512,12 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.360: downloading a backup, a restore, downloading an account or organisation export and switching on what opens the
+  server (public links, a registration mode, accounts on the first single sign-on) or off the two-factor policy ask for
+  the account password (a download: `POST` with `{"password"}` gives a one-time ticket, `GET ?t=<ticket>` the file; signed
+  in through the login proxy without a password: the session is enough). A restore also keeps every API token and app
+  password revoked after the backup was written revoked (the server notes what was revoked; a restore onto a fresh server
+  or of the safety backup keeps every token the backup holds); the sessions end as before.
 
 - **The server key is part of every backup (2.359.0).** A backup holds the data, never the server key
   (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
@@ -727,7 +734,10 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   organisation's key is renewed. After a `rewrap` with the earlier format the app can no longer show the current
   recovery key (its stored copy belonged to the old master key): the one you keep stays valid, *New recovery key*
   replaces it. Kalmido never replaces a recovery key on its own.
-- **Renewing an organisation's key** (2.138), e.g. after a recovery key got into the wrong hands:
+- **Renewing an organisation's key** (2.138), e.g. after a recovery key got into the wrong hands. Each value and file is
+  encrypted with a random 96-bit nonce (AES-256-GCM): renew the key long before about 2^32 (four billion) encryptions with
+  one key - far more than an organisation writes in normal use, but the reason to renew a key that has been in use for
+  many years on a very busy server (2.360):
 
   ```
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
@@ -1207,8 +1217,9 @@ the browsers then send nothing.
   (never from the request's host). The page answers the same whether the account exists or not, at most one link per
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
   without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
-  required: after the new password the second step follows, and all other sessions of the account end. App passwords
-  (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
+  required: after the new password the second step follows, and all other sessions of the account end. The account's
+  app passwords (CalDAV) and its own API tokens are revoked as well (2.190, 2.360; an admin setting a new password does
+  the same); the tokens of agents stay. The page for the new password says so.
 
 ## The error-report webhook token
 
@@ -1240,6 +1251,9 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
   Once the scanner answers again, the server checks these files in the background
   (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
   preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the project.
+  2.360.0: a locked document also shows no recognised text and leaves the search. The office's letterhead and terms go
+  out with every document and have no later scan of their own: while the scanner cannot check them their upload is
+  refused (503, "try again in a few minutes").
   *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
 - Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
 - Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a

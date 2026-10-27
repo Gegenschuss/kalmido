@@ -7,6 +7,7 @@ from ..core.db import body, bump, db, err, local_now, usettings, uset
 from ..core.config import app
 from ..core.i18n import tr
 from ..accounts.session import me, user_public
+from ..accounts.orgs import is_org_admin, user_orgs
 from ..core.access import Denied, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
 
@@ -145,9 +146,10 @@ def workload_get():
 
 @app.put("/api/workload/capacity/<int:uid>")
 def workload_capacity(uid):
-    """{hours: number | null}: hours per week of a person (oneself, or an admin for anyone; null = the default)."""
+    """{hours: number | null}: hours per week of a person (oneself, or an admin of an organisation the person is in; null =
+    the default). 2.360.0 D (#2496): the instance admin no longer for anyone (only as such an organisation admin)."""
     c = db()
-    if uid != me() and not g.user["is_admin"]:
+    if uid != me() and not any(is_org_admin(c, me(), o) for o in set(user_orgs(c, uid))):
         raise Denied(403, tr("Only admins can change the capacity of other people"))
     if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
         raise Denied(404)

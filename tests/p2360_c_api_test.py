@@ -23,7 +23,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PL_ENV = ["-e PAPERLESS_TOKEN=pl-old-env-token", "-e PAPERLESS_API=http://127.0.0.1:8082",
           "-e PAPERLESS_PUBLIC_URL=https://paperless.example.test", "-e KALMIDO_SECRET_KEY=" + "B" * 43 + "="]
 PL_TABLES = ("paperless_links", "pl_conns", "pl_conn_users", "pl_tokens", "list_paperless")
@@ -163,7 +163,7 @@ while time.time() - t0 < 40:
     time.sleep(0.4)
 check(len(j.get("items", [])) > n0 and not j.get("last_error"), f"backup done: {j.get('last_error')}")
 name = j["items"][0]["name"]
-z = A.get(B + f"/api/admin/backups/{name}/download")
+z = su_get(A, B + f"/api/admin/backups/{name}/download")  # 2.360.0 (#2496): the step-up
 try:  # 2.37.0: the rows inside the archive's kalmido.dump (pg_restore of the app image, to text: COPY blocks)
     dump = zipfile.ZipFile(io.BytesIO(z.content)).read("kalmido.dump")
     txt = subprocess.run(["docker", "exec", "-i", CT, "pg_restore", "-f", "-", "--data-only"], input=dump,
@@ -184,7 +184,7 @@ except (zipfile.BadZipFile, KeyError, subprocess.SubprocessError) as e:
 check(inside == mid, f"the backup holds the old tables with their rows: {inside}")
 dbx("DELETE FROM list_paperless")
 A.post(B + "/api/tasks", json={"title": "after the backup", "list_id": P})
-r = A.post(B + "/api/admin/backups/restore", json={"name": name, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": name, "confirm": "RESTORE"})
 check(r.ok and r.json().get("ok"), f"restored: {r.text[:200]}")
 time.sleep(1.0)
 check(counts() == mid, f"after the restore the old rows are back: {counts()}")

@@ -337,7 +337,7 @@ sql("UPDATE deleted_accounts SET at=? WHERE user_id=?", ((testclock.now().astime
 jr = sql("SELECT user_id, email_hash, username_hash FROM deleted_accounts WHERE user_id IN (?, ?) ORDER BY id", (GINA, HUGO))
 check([x[0] for x in jr] == [GINA, HUGO] and all(len(x[1]) == 64 and len(x[2]) == 64 for x in jr), f"journal: two rows of hashes {jr}")
 check(not sql("SELECT 1 FROM deleted_accounts WHERE email_hash LIKE '%example%' OR username_hash IN ('gina', 'hugo')"), "journal: no plain text")
-r = A.post(B + "/api/admin/backups/restore", json={"name": WITH, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": WITH, "confirm": "RESTORE"})
 if not r.ok:
     app_log()
 j = r.json() if r.ok else {}

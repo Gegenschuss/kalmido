@@ -241,7 +241,7 @@ check(PX.get(B + f"/portal/docs/{INV1}/pdf").status_code == 404, "#2088: off = t
 check(A.put(B + O + "/settings", json={"portal_docs": 1}).ok, "on again")
 A.patch(B + "/api/admin/settings", json={"public_links": False})
 off = PX.get(B + f"/portal/docs/{INV1}/pdf").status_code
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 check(off == 404, f"#2088: public links off = no documents ({off})")
 
 # ---------------------------------------------------------------- a person without organisation (personal office)

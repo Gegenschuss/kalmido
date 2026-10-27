@@ -874,7 +874,17 @@ def rmv_undo_run(c, uid, mid, files):
     bad = next((i for i in out if not org_out_ok(c, dst, x["from_org"], what, i)), None)
     if bad is not None:
         raise oo_denied(c, dst, x["from_org"], what, bad)
-    write_lock(c, f"office_move_{int(dst)}")
+    # 2.360.0 B (#2496): the move's key (its source) and the target's, in one order; read again under them, so two undos
+    # at once never both run (one undo row)
+    for k in sorted({src, dst}):
+        write_lock(c, f"office_move_{int(k)}")
+    r = c.execute("SELECT detail FROM space_moves WHERE id=?", (mid,)).fetchone()
+    try:
+        now_d = json.loads(r[0] or "{}") if r else {"undone": True}
+    except ValueError:
+        now_d = {}
+    if now_d.get("undone"):
+        raise Denied(409, tr("This was undone already"))
     ts = iso(now_utc())
     back, kept, gone = 0, 0, []
     from .legacyimport import fi_number_taken

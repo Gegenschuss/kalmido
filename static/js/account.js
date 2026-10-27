@@ -509,7 +509,7 @@ async function inviteScreen(tok) {
         <label class="chkl"><input type="checkbox" id="inv-2fa"> ${tr('Set up two-factor sign-in right after (recommended)')}</label>
         <div class="aerr" role="alert" id="inv-err"></div>
         <button class="btn pri" type="submit">${info.kind === 'reset' ? tr('Save and log in') : tr('Set up my account')}</button>
-        ${info.kind === 'reset' ? `<p class="muted">${esc(tr('App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).'))}</p>` : ''}${''/* 2.58.0 (#1792): L3, a hint only -- nothing is revoked */}
+        ${info.kind === 'reset' ? `<p class="muted">${esc(tr('The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.'))}</p>` : ''}${''/* 2.58.0 (#1792): L3; 2.360.0 (#2496): the reset revokes them */}
       </form></div>`;
     el.querySelector('#inv-form').addEventListener('submit', async e => {
       e.preventDefault();
@@ -776,7 +776,12 @@ function signupAdminHtml(a) {
 document.addEventListener('change', async e => {
   const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv') return;
   try {
-    const j = await api('PATCH', '/api/admin/settings', id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : {signup_domains: e.target.value});  // 2.115.0 B (#2062): + s-oinv
+    const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv
+    let j; try { j = await (id === 's-signup' ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
+      if (!x.data?.password_needed) { if (id === 's-signup') toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+      const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
+      j = await api('PATCH', '/api/admin/settings', {...b, password: p.password});
+    }
     if (j && j.version) S.about = j;
     const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
     if (id === 's-sdom') e.target.value = S.about?.signup_domains || '';
@@ -999,7 +1004,7 @@ async function bkDraw(md, j) {
   if (j.last_error) h += `<div class="shint cnote">${tr('The last backup failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
   h += j.items.length ? `<div class="members bklist">${j.items.map(x => `<div class="mrow bkrow" data-bkn="${esc(x.name)}"><span class="n"><b>${esc(aaWhen(x.created_at))}</b> · ${tr(BK_KIND[x.kind] || x.kind)} · ${fmtBytes(x.size)}${x.encrypted ? ` · ${ic('lock', 's')} ${tr('encrypted')}` : ''}${x.legacy ? ` · ${tr('old (SQLite), moved over when restored')}` : ''}
       <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
-      <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" title="${tr('Download')}">${ic('download', 's')}</a>
+      <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" data-sudl title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
   h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings dialog only */}</div>
     ${hint(tr('Larger files: copy them into the backup folder on the server instead, they then show up in the list.'))}`;

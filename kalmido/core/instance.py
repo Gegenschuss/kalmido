@@ -16,7 +16,7 @@ from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE, me
-from ..accounts.oidc import oidc_admin_rule, oidc_public, oidc_reauth
+from ..accounts.oidc import oidc_public, oidc_reauth
 from ..core.access import _COLLAB_ALL, _TIME_ALL, collab_all, time_all
 
 # 2.306.0 B (#2887): privacy statement / imprint of the operator (env or Administration > Server)
@@ -172,8 +172,15 @@ def admin_settings():
     need_admin()
     b, c = body(), db()
     old = {k: gsetting(c, k) not in ("0", "") for k in ("collab_all", "time_all", "update_check") + AUTH_SWITCHES}
-    if b.get("oidc_autocreate") is True and not old["oidc_autocreate"]:  # 2.306.0 Fix-1 (#2875 review): new accounts by the admin rule
-        e = oidc_admin_rule(c) and oidc_reauth(c, b)
+    # 2.306.0 Fix-1 (#2875 review): auto-created accounts by the admin rule ask for the account password. 2.360.0 A (#2496):
+    # every switch that opens the server (from its value in effect), so a stolen admin session alone cannot (an account
+    # without a password: its session)
+    eff = {"twofa_required": gsetting(c, "twofa_required") == "1", "oidc_autocreate": gsetting(c, "oidc_autocreate") == "1",
+           "public_links": gsetting(c, "public_links") != "0"}
+    if ((b.get("twofa_required") is False and eff["twofa_required"]) or (b.get("oidc_autocreate") is True and not eff["oidc_autocreate"])
+            or (b.get("public_links") is True and not eff["public_links"])
+            or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))):
+        e = oidc_reauth(c, b)
         if e:
             return e
     hosts = None

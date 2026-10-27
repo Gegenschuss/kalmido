@@ -4,7 +4,7 @@ addresses @example.com.
  - #1991: every way a session ends takes the push subscriptions made in it along: the own password change from session Y
    (the subscription of session X goes, the one of Y stays), the admin disables the account, the admin sets a password,
    a reset link; the daily clean-up removes subscriptions of sessions that are gone ('' = unknown session stays)
- - #2496: a reset link and the admin setting a password revoke the app passwords; API tokens stay
+ - #2496: a reset link and the admin setting a password revoke the app passwords (2.360.0: and the own API tokens, p2360_a)
  - #2496: in-memory sign-in tickets: one address keeps at most PEND_PER_IP, its own oldest give way, others stay
  - #2496: WebAuthn takes a localhost page origin only when PUBLIC_URL itself is localhost (here: kalmido.example)
  - #2496: a sign-in link for another account while someone is signed in asks first (the link stays unused), then signs in

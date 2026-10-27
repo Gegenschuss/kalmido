@@ -107,7 +107,7 @@ for _ in range(480):
     if Do.get(B + f"/api/orgs/{DEL}/export").json().get("state") != "running":
         break
     time.sleep(0.25)
-r = Do.get(B + f"/api/orgs/{DEL}/export/file")
+r = su_get(Do, B + f"/api/orgs/{DEL}/export/file")  # 2.360.0 (#2496): the step-up
 check(r.ok and r.content[:8] == b"KALMIDO-", f"dora: downloads the archive {r.status_code} {r.content[:60]}")
 r = Do.get(B + f"/api/retention/org/{DEL}")
 check(r.ok and r.json().get("can_export") is True and r.json().get("counts", {}).get("documents") == 1, "dora: the retention info " + r.text[:300])

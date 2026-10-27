@@ -39,7 +39,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 MAILENV = " ".join(["-e KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e KALMIDO_IMAP_HOST=127.0.0.1", "-e KALMIDO_IMAP_PORT=1143",
                     "-e KALMIDO_IMAP_SSL=0", "-e KALMIDO_IMAP_USER=kalmido", "-e KALMIDO_IMAP_PASSWORD=secret", "-e KALMIDO_IMAP_INTERVAL=600"])
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def sql(q, args=(), write=False):
@@ -119,7 +119,7 @@ def export_of(s, secs=120):
             break
         time.sleep(0.25)
     assert j.get("state") == "done", j
-    r = s.get(B + "/api/account/export/file")
+    r = su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     return r.content
 

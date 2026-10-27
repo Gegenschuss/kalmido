@@ -9981,7 +9981,6 @@
   "Task counts in the sidebar": "Contatori delle attività nella barra laterale",
   "Share marks (person / robot)": "Segni di condivisione (persona / robot)",
   "Without counts, Today keeps its red number while something is overdue.": "Senza contatori, Oggi mantiene il suo numero rosso finché qualcosa è scaduto.",
-  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "Le password per app (CalDAV) e i token API restano validi. Se qualcun altro potrebbe aver avuto accesso, controllali in Impostazioni > Account (token API: Avanzate · per sviluppatori).",
   "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. Undo possible.": "Applicando si creano il progetto, le sue attività e i giorni di ripresa come bozze di eventi nel tuo calendario, a tuo nome. Non viene inviato nulla. Annullabile.",
   "Linked": "Collegato",
   "Linked to a contact of the address book": "Collegato a un contatto della rubrica",
@@ -14588,5 +14587,15 @@
   "Import running · {0} %": "Importazione in corso · {0} %",
   "The import goes on in the background.": "L’importazione continua in background.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "L’avanzamento appare su Conoscenza nella barra e in cima alle pagine della conoscenza.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Date, #tag e !priorità come nell'inserimento rapido. Spuntarla nella pagina spunta anche l'attività."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Date, #tag e !priorità come nell'inserimento rapido. Spuntarla nella pagina spunta anche l'attività.",
+  "The virus scanner cannot check the file right now. Please try again in a few minutes.": "L’antivirus non può controllare il file in questo momento. Riprova tra qualche minuto.",
+  "{0} earlier version is deleted: the people of the organisation do not see older states": ["{0} versione precedente viene eliminata: i membri dell'organizzazione non vedono gli stati precedenti", "{0} versioni precedenti vengono eliminate: i membri dell'organizzazione non vedono gli stati precedenti"],
+  "not confirmed": "non confermato",
+  "(by the typed e-mail address, not confirmed)": "(dall'indirizzo e-mail digitato, non confermato)",
+  "The server sends no more invitation e-mails today. Try again tomorrow.": "Oggi il server non invia più e-mail di invito. Riprova domani.",
+  "Only people who may change the review answer the customer": "Solo chi può modificare la revisione risponde al cliente",
+  "A vacation request keeps its kind. Delete it and enter the absence anew.": "Una richiesta di ferie mantiene il suo tipo. Eliminala e inserisci di nuovo l’assenza.",
+  "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nuova password revoca le tue password per app (CalDAV) e i tuoi token API; se servono, creane di nuovi in Impostazioni > Account (token API: Avanzate · per sviluppatori). Gli agenti mantengono i loro token.",
+  "Please type your name without a link or web address.": "Inserisca il suo nome senza link né indirizzi web.",
+  "Saved. {0} booking of someone else stays as it was": ["Salvato. {0} prenotazione di un'altra persona resta com'era", "Salvato. {0} prenotazioni di altre persone restano com'erano"]
 }

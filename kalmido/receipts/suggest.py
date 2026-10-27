@@ -36,7 +36,7 @@ _KEEP = object()
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
-from ..office.rights import NO_RIGHT, ofr_allows, ofr_rights  # 2.237.0
+from ..office.rights import NO_RIGHT, ofr_allows, ofr_groups_of, ofr_rights  # 2.237.0
 
 
 def _is_agent():
@@ -400,6 +400,10 @@ def v1_rc_suggest(nid):
     c = db()
     aid = me()
     n, m = rc_doc(c, nid)
+    ws = m["ws"] or ""  # 2.360.0 C (#2496): an agent in the office groups needs the receipts area, like people; one without a
+    # group row as before (ofr_rights rules every agent, so without a row it would have no area at all)
+    if ws.startswith("o") and ws[1:].isdigit() and ofr_groups_of(c, int(ws[1:]), aid):
+        rc_office_need(c, m, aid, "view")
     lid, cat = rc_clean(b)
     amt = rc_amount_clean(b.get("amount"))  # 2.121.0 C (#2096): amount, currency and VAT rate may be suggested as well
     ccy = rc_currency_clean(b.get("currency"))

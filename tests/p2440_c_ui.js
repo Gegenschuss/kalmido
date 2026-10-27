@@ -47,8 +47,9 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-m="ains-make"]'));
   await until(() => !md.querySelector('#ains-out').hidden);
   const cmd = md.querySelector('#ains-cmd').value;
-  const code = (cmd.match(/--code (ks_[\w-]+)/) || [])[1];
-  check(code && cmd.startsWith("curl -fsSL '") && cmd.includes("/agent-setup.sh' | bash -s -- --url '") && cmd.includes(`--dir '~/projects/bob'\\''s site'`), 'one command with the code (shell quoting) ' + cmd);
+  // 2.360.0 (#2496): the code goes in the environment (not in the process list), no --allow-http on localhost
+  const code = (cmd.match(/\| KALMIDO_SETUP_CODE=(ks_[\w-]+) bash -s -- /) || [])[1];
+  check(code && cmd.startsWith("curl -fsSL '") && cmd.includes(" bash -s -- --url '") && !cmd.includes('--code') && !cmd.includes('--allow-http') && cmd.includes(`--dir '~/projects/bob'\\''s site'`), 'one command with the code (shell quoting) ' + cmd);
   check(/Valid for 15 more minutes, works once/.test(md.querySelector('#ains-exp').textContent), 'how long the code is valid: ' + md.querySelector('#ains-exp').textContent);
   check(md.querySelector('[data-m="ains-copy"]') && /Terminal/.test(md.querySelector('#ains-how').textContent), 'copy button + where to paste it');
   // Windows: the PowerShell form
@@ -59,9 +60,11 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   await until(() => !md.querySelector('#ains-out').hidden);
   const wcmd = md.querySelector('#ains-cmd').value;
   // 2.46.6 (#1713): the command ends with the account language (-Lang de|en)
-  check(wcmd.startsWith('& ([scriptblock]::Create((irm ') && wcmd.includes("/agent-setup.ps1'))) -Url '") && /-Code ks_[\w-]+ -Dir 'C:\\work\\site' -Lang (de|en)$/.test(wcmd), 'Windows: the PowerShell command ' + wcmd);
+  // 2.360.0 (#2496): the code in the environment ($env:KALMIDO_SETUP_CODE), not as -Code on the command line (process list)
+  check(/^\$env:KALMIDO_SETUP_CODE='ks_[\w-]+'; & \(\[scriptblock\]::Create\(\(irm /.test(wcmd) && wcmd.includes("/agent-setup.ps1'))) -Url '")
+        && !/-Code/.test(wcmd) && / -Dir 'C:\\work\\site' -Lang (de|en)$/.test(wcmd), 'Windows: the PowerShell command ' + wcmd);
   check(/PowerShell/.test(md.querySelector('#ains-how').textContent), 'Windows: paste into PowerShell');
-  const wcode = wcmd.match(/-Code (ks_[\w-]+)/)[1];
+  const wcode = (wcmd.match(/KALMIDO_SETUP_CODE='(ks_[\w-]+)'/) || [])[1];
   check(wcode !== code, 'every press makes a new code');
   // the computer shows up
   const red = await call('POST', '/api/agent-setup/redeem', {code, host: 'studio-laptop'}, null);
@@ -97,7 +100,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   md.querySelector('#ains-dir').value = '~/x';
   click(w, md.querySelector('[data-m="ains-make"]'));
   await until(() => !md.querySelector('#ains-out').hidden);
-  check(/--code ks_/.test(md.querySelector('#ains-cmd').value) || /-Code ks_/.test(md.querySelector('#ains-cmd').value), 'the admin route makes a code too');
+  check(/KALMIDO_SETUP_CODE=ks_/.test(md.querySelector('#ains-cmd').value) || /-Code ks_/.test(md.querySelector('#ains-cmd').value), 'the admin route makes a code too');
   const src = await (await fetch(B + 'static/js/agentchat.js')).text();
   check(src.includes('data-m="ains-setup"'), "the admin's agent dialog has the button");
   w.close();

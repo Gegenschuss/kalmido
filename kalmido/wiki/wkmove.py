@@ -92,6 +92,20 @@ def wkm_out_denied(c, uid, src, to, rows):
     return oo_denied(c, src, to, "wiki", next((r for r in bad if r["created_by"] != uid), bad[0])["id"])
 
 
+def wkm_vers_dropped(c, ids, to):
+    """2.360.0 D (#2496): how many earlier versions of pages ids a move to space to deletes. Into an organisation the history
+    does not go along: its members would read the old states (a private text before it was cleaned up, or the other
+    organisation's edits); into the private space it goes along (the mover read it already)."""
+    if to is None or not ids:
+        return 0
+    return c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
+
+
+def wkm_vers_note(n):
+    return trn("{0} earlier version is deleted: the people of the organisation do not see older states",
+               "{0} earlier versions are deleted: the people of the organisation do not see older states", n) if n else ""
+
+
 @app.post("/api/wiki/move-space")
 def wiki_move_space():
     smv_refuse_agent()
@@ -144,14 +158,16 @@ def wiki_move_space():
     shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], folder, dry=True)
     trash = c.execute(f"SELECT COUNT(*) FROM wiki_pages WHERE deleted_at IS NOT NULL AND {sw} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')",
                       [*sa, folder.lower(), wkm_like(folder)]).fetchone()[0] if folder else 0
+    vers = wkm_vers_dropped(c, ids, to)
     notes += [wkm_share_note(shares),  # 2.273.0 B (#3042): what ends / stays behind is named before
-              trn("{0} page in the trash stays in the old workspace", "{0} pages in the trash stay in the old workspace", trash) if trash else ""]
+              trn("{0} page in the trash stays in the old workspace", "{0} pages in the trash stay in the old workspace", trash) if trash else "",
+              wkm_vers_note(vers)]
     notes.append(oo_into_note(c, src, to))  # 2.361.2 B (#2923): the way back (empty unless a member moves it in)
     block = tr("A page with this name already exists") + ": " + ", ".join(taken[:5]) if taken else None
     if dry:
         if deny:  # 2.361.2 B (#2923): the maker can ask an admin (out_request)
-            return jsonify(smv_answer(notes, deny.text(), count=len(moves), taken=taken[:20], shares=shares, trash=trash, **(deny.data or {})))
-        return jsonify(smv_answer(notes, block, count=len(moves), taken=taken[:20], shares=shares, trash=trash))
+            return jsonify(smv_answer(notes, deny.text(), count=len(moves), taken=taken[:20], shares=shares, trash=trash, versions=vers, **(deny.data or {})))
+        return jsonify(smv_answer(notes, block, count=len(moves), taken=taken[:20], shares=shares, trash=trash, versions=vers))
     if taken:
         return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
     org_out(c, src, to, "wiki", ", ".join(r["path"] for r, _ in moves), obj=ids)  # 2.361.2 B (#2923): logged, admins told, release used
@@ -169,7 +185,8 @@ def wiki_move_space():
     # 2.123.0 B (#2104): their shares end (a share never changes its space)
     wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], folder)
     relinked = 0
-    wkh_move(c, [r for r, _ in moves], to, uid)  # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew
+    # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew; 2.360.0 D (#2496): not into an organisation
+    wkh_move(c, [r for r, _ in moves], to, uid, keep=to is None)
     for r, n in moves:
         nb = wkm_relink(plain[r["id"]], {k: v for k, v in ren.items() if k != v})
         if nb != plain[r["id"]]:
@@ -289,6 +306,9 @@ def wkr_move(c, uid, src, to, b, dry):
     notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a space with the lock keeps no history",
                                           "{0} earlier versions are deleted: a space with the lock keeps no history", vers) if vers else "",
               oo_into_note(c, src, to)]  # 2.361.2 B (#2923)
+    if not tst["mode"]:  # 2.360.0 D (#2496): an open organisation as the target keeps no history either (wkm_vers_note)
+        vers = wkm_vers_dropped(c, ids, to)
+        notes.append(wkm_vers_note(vers))
     if deny:  # 2.361.2 B (#2923): the dry run names it, the maker can ask an admin (out_request)
         block, e2e_deny = deny.text(), deny.data or {}
     else:
@@ -341,8 +361,9 @@ def wkr_move(c, uid, src, to, b, dry):
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
     # 2.123.0 B (#2104): their shares end (a locked source has none)
     wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows])
-    # 2.123.0 A (#2102): no history across a lock; 2.273.0 B (#3042): into an open space the history goes along
-    wkh_move(c, rows, to, uid, keep=not tst["mode"])
+    # 2.123.0 A (#2102): no history across a lock; 2.273.0 B (#3042): into an open space the history goes along -- 2.360.0 D
+    # (#2496): into the private space only (wkm_vers_note)
+    wkh_move(c, rows, to, uid, keep=not tst["mode"] and to is None)
     for r in rows:
         p, t = got[r["id"]]
         if tst["mode"]:

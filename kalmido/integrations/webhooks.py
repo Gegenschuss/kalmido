@@ -118,7 +118,18 @@ def wh_err_text(code, status=None):
 
 
 def wh_send(url, secret, event, delivery, attempt, body_bytes, allow):
-    """One POST (no database access): (ok, HTTP status or None, milliseconds, error code or '')."""
+    """One POST (no database access): (ok, HTTP status or None, milliseconds, error code or ''). 2.360.0 C (#2496): a host
+    of the admin allow-list (may be internal) answers one error for timeout / TLS / network, no port-scan hints."""
+    res = _wh_post(url, secret, event, delivery, attempt, body_bytes, allow)
+    if res[3] in ("timeout", "tls", "network"):
+        p = urllib.parse.urlsplit(url)
+        with contextlib.suppress(ValueError):
+            if cal_host_allowed(allow, p.hostname, p.port or {"http": 80, "https": 443}.get(p.scheme)):
+                return res[0], res[1], res[2], "network"
+    return res
+
+
+def _wh_post(url, secret, event, delivery, attempt, body_bytes, allow):
     t = str(int(time.time()))
     sig = hmac.new(secret.encode(), t.encode() + b"." + body_bytes, hashlib.sha256).hexdigest()
     hd = {"Content-Type": "application/json", "User-Agent": f"{APP_NAME}/{APP_VERSION} (webhook)", "X-Kalmido-Event": event,

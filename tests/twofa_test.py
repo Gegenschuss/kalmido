@@ -376,7 +376,7 @@ r = A.patch(B + f"/api/users/{IDS['gwen']}", json={"reset_2fa": True})
 check(r.ok and r.json()["twofa"] == [], "admin reset clears TOTP, passkeys, recovery codes")
 check(sess_g.get(B + "/api/state").status_code == 401, "admin reset ends the user's sessions")
 check(login("gwen")[1].json().get("enrol"), "after the reset (policy on): enrol again")
-assert A.patch(B + "/api/admin/settings", json={"twofa_required": False}).ok
+assert A.patch(B + "/api/admin/settings", json={"password": "password123", "twofa_required": False}).ok
 check(login("gwen")[1].json().get("ok") is True, "policy off: password alone again")
 
 # ---- secrets never logged

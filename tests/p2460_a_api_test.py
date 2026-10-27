@@ -122,7 +122,7 @@ r1 = A.put(B + f"/api/lists/{PL}/members", json={"email": "gina@example.com", "r
 r2 = A.put(B + f"/api/lists/{PL}/members", json={"email": "nobody@example.com", "role": "edit"})
 check(r1.json() == r2.json() == {"ok": True, "by_email": True} and PL in {l["id"] for l in Gi.get(B + "/api/state").json()["lists"]},
       "#1592: a private list reaches a person outside by e-mail address (same answer for an unknown address)")
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "open"}).status_code == 409, "#1592: no open registration with an organisation")
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "open"}).status_code == 409, "#1592: no open registration with an organisation")
 
 # ================================================================== a team agent works in its organisation
 r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name": "Team bot"})
@@ -162,7 +162,7 @@ check(requests.get(B + "/api/auth/info").json().get("org") == "", "#1592/#1552: 
 
 # ================================================================== #1562: registration (approval, no mail needed)
 dbx.connect(DATA).execute("UPDATE orgs SET domains='northwind.example' WHERE id=?", (ORG,))
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"}).ok, "approval mode")
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "approval"}).ok, "approval mode")
 R = requests.Session()
 R.headers.update(H)
 R.post(B + "/api/auth/signup", json={"name": "Ines", "email": "ines@elsewhere.example", "password": "ines-secret-1"})
@@ -170,7 +170,8 @@ R.post(B + "/api/auth/signup", json={"name": "Jan", "email": "jan@northwind.exam
 ines = db("SELECT id FROM users WHERE email='ines@elsewhere.example'")
 jan = db("SELECT id FROM users WHERE email='jan@northwind.example'")
 check(ines and not db("SELECT 1 FROM org_members WHERE user_id=?", (ines[0][0],)), "#1562: a registration without a matching domain joins no organisation")
-check(jan and db("SELECT org_id FROM org_members WHERE user_id=?", (jan[0][0],)) == [(ORG,)], "#1562: a registration with the organisation's domain joins it")
+# 2.360.0 (#2496): without e-mail the address is never confirmed: the domain alone puts nobody into the organisation
+check(jan and not db("SELECT 1 FROM org_members WHERE user_id=?", (jan[0][0],)), "#2496: a registration with the organisation's domain but no mail joins no organisation")
 check(ines and A.post(B + f"/api/users/{ines[0][0]}/approve").ok, "#1592: the instance admin approves a registration outside the organisation")
 
 # ================================================================== review: clients

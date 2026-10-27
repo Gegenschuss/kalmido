@@ -29,7 +29,7 @@ RUN_STALE = 30       # min after which a run that was cut off (restart) is taken
 TRIES = 3            # runs of one document at most
 MAIL_FILES = 20      # attachments of one mail at most
 MAIL_UNPACKED = 50   # 2.146.0 B (#2453): files out of one ZIP / winmail.dat of a mail at most
-_Q = {"thread": None, "scan": 0.0}
+_Q = {"thread": None, "scan": 0.0, "recent": []}  # 2.360.0 B (#2496): recent = workspaces served, longest ago first
 doc_on_done = []     # 2.48.0 (#1356): hooks f(c, nid, first) after a recognition run (receipts: the event document_added)
 _WAKE = threading.Event()
 _LOCK = threading.Lock()
@@ -147,6 +147,12 @@ def _loop():
             _WAKE.clear()
 
 
+# 2.360.0 B (#2496): the next waiting document, one workspace after the other (one not served lately first, then the one
+# served longest ago; ? = the workspaces served, longest ago first), so a pile of scans of one never holds up the others
+DOCS_NEXT = """SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.state='wait' AND n.deleted_at IS NULL
+               ORDER BY array_position(CAST(? AS TEXT[]), d.ws) NULLS FIRST, d.created_at, d.node_id LIMIT 1"""
+
+
 def docs_run_once():
     """One step of the queue: the inbox folders (every SCAN_EVERY s), then one waiting document. Returns 1 when a
     document was handled."""
@@ -164,10 +170,10 @@ def docs_run_once():
             if c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
                 c.execute("UPDATE doc_meta SET state='wait' WHERE state='run' AND updated_at < ?", (stale,))
                 c.execute("UPDATE doc_meta SET state='failed', error='failed' WHERE state='wait' AND tries >= ?", (TRIES,))
-                r = c.execute("""UPDATE doc_meta SET state='run', tries=tries+1, updated_at=? WHERE node_id=(
-                                   SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                                   WHERE d.state='wait' AND n.deleted_at IS NULL ORDER BY d.created_at, d.node_id LIMIT 1
-                                   FOR UPDATE OF d SKIP LOCKED) RETURNING node_id""", (_now(),)).fetchone()
+                r = c.execute(f"UPDATE doc_meta SET state='run', tries=tries+1, updated_at=? WHERE node_id=({DOCS_NEXT} FOR UPDATE OF d SKIP LOCKED) "
+                              "RETURNING node_id, ws", (_now(), "{" + ",".join(_Q["recent"]) + "}")).fetchone()
+                if r:
+                    _Q["recent"] = [w for w in _Q["recent"] if w != r[1]][-63:] + [r[1]]
         c.commit()
         if not r:
             from .split import sp_scan_queued  # 2.209.0 C (#2589): the page scan a split preview asked for, out of the request

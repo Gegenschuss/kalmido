@@ -18,7 +18,10 @@ stored; the picture itself stays as it is wherever possible:
         are TIFF inside (DNG, CR2, NEF, ARW) take this path but keep their EXIF directory (needed to develop them); other
         RAW formats stay as they came.
   GIF   2.209.0 D (#1856): comment blocks and application blocks other than the loop setting (NETSCAPE2.0 / ANIMEXTS1.0, e.g.
-        XMP) go; the image blocks are copied unchanged. Videos (MOV / MP4) stay as they are.
+        XMP) go; the image blocks are copied unchanged.
+  MP4   2.360.0 B (#2496): also MOV / M4V / 3GP. The place is overwritten in place (sizes and offsets stay): the boxes \xa9xyz
+        and loci (in udta) become "free" boxes with zeros, the values of the Apple keys com.apple.quicktime.location.* (meta
+        keys + ilst) and of an ilst \xa9xyz item are zeroed. Everything else of a video stays byte for byte.
 
 The capture date (EXIF DateTimeOriginal, else DateTime) is read before -- also when the setting keeps the metadata -- and
 handed on as meta["taken_at"] (documents keep it, files/store.py fs_put up=...). GPS is never stored anywhere.
@@ -76,6 +79,9 @@ def pm_kind(data):
         brands = {data[8:12]} | {data[i:i + 4] for i in range(16, min(n, 64, len(data)) - 3, 4)}
         if brands & _HEIF_BRANDS:
             return "heif"
+        return "mp4"  # 2.360.0 B (#2496): any other ISO base media file (MP4, MOV, M4V, 3GP)
+    if data[4:8] in (b"moov", b"wide", b"mdat") and len(data) >= 16:  # an older QuickTime movie without ftyp
+        return "mp4"
     return ""
 
 
@@ -86,7 +92,8 @@ def pm_strip(c, data, mime, uid=None, org_id=None):
         kind = pm_kind(data or b"")
         if not kind:
             return data, {}
-        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif, "tiff": _pm_tiff, "gif": _pm_gif}[kind]
+        fn = {"jpeg": _pm_jpeg, "png": _pm_png, "webp": _pm_webp, "heif": _pm_heif, "tiff": _pm_tiff, "gif": _pm_gif,
+              "mp4": _pm_mp4}[kind]
         out, taken = fn(data, pm_on(c, uid, org_id))
         meta = {"taken_at": taken} if taken else {}
         if out is None or not out:
@@ -680,3 +687,52 @@ def _pm_gif(data, on):
         return (bytes(out) + data[p:] if hit else None), ""
     except IndexError:
         return None, ""
+
+
+# ---- MP4 / MOV (2.360.0 B, #2496) -------------------------------------------------------------------------------------------
+_PM_MP4_INTO = {b"moov", b"trak", b"udta", b"meta"}
+_PM_MP4_PLACE = {b"\xa9xyz", b"loci"}
+
+
+def _pm_mp4(data, on):
+    """A video without its place (in place, see the module text); (None, "") when there is none."""
+    if not on:
+        return None, ""
+    put = []  # (offset, bytes): the file is copied only when there is a place to overwrite
+
+    def zero_values(p, end):  # the value bytes of the data boxes of one ilst item (their headers stay)
+        for typ, q, e in _pm_boxes(data, p, end):
+            if typ == b"data" and q + 8 <= e:
+                put.append((q + 8, b"\x00" * (e - q - 8)))
+
+    def walk(p, end, depth):
+        kids = _pm_boxes(data, p, end)
+        loc = set()
+        for typ, q, e in kids:
+            if typ == b"keys" and q + 8 <= e:  # version / flags, count, then [size, namespace, name]
+                k, i = q + 8, 1
+                while k + 8 <= e and i <= 4096:
+                    ln = struct.unpack(">I", data[k:k + 4])[0]
+                    if ln < 8 or k + ln > e:
+                        break
+                    if data[k + 8:k + ln].startswith(b"com.apple.quicktime.location."):
+                        loc.add(i)
+                    k, i = k + ln, i + 1
+        for typ, q, e in kids:
+            if typ in _PM_MP4_PLACE and depth:
+                put.append((q - 4, b"free" + b"\x00" * (e - q)))
+            elif typ == b"ilst":
+                for it, iq, ie in _pm_boxes(data, q, e):
+                    if it == b"\xa9xyz" or int.from_bytes(it, "big") in loc:
+                        zero_values(iq, ie)
+            elif typ in _PM_MP4_INTO and depth < 6:
+                # the meta box of MP4 is a full box (4 bytes version / flags before its boxes), QuickTime's is not
+                walk(q + 4 if typ == b"meta" and data[q + 4:q + 8] not in (b"hdlr", b"keys", b"ilst") else q, e, depth + 1)
+
+    walk(0, len(data), 0)
+    if not put:
+        return None, ""
+    buf = bytearray(data)
+    for o, b in put:
+        buf[o:o + len(b)] = b
+    return bytes(buf), ""

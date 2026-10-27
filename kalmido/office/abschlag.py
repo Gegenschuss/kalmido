@@ -20,6 +20,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.access import Denied
+from ..core.pg import write_lock  # 2.360.0 B (#2496)
 from ..core.errors import BadInput
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, inv_calc, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
@@ -269,6 +270,7 @@ def abs_progress(c, oid, uid, offer, amount=None, pct=None):
     """A progress invoice draft from quotation offer: amount (net, in the document's currency) or pct of the quotation's
     net, split onto its tax rates in proportion. -> new id."""
     from .invoices import _insert_doc, _put_rows, inv_items_from_offer, inv_new_row
+    write_lock(c, f"office_abschlag_{int(oid)}_{int(offer['id'])}")  # 2.360.0 B (#2496): two at once never pass the cap together
     abs_final_done(c, oid, offer["id"])
     s, pack = _pack(c, oid)
     bases = {k: v for k, v in _eur_bases(inv_items_from_offer(c, oid, offer), pack).items() if v != 0}

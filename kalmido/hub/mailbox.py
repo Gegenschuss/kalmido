@@ -537,6 +537,19 @@ def _refs(msg):
     return ids[-30:]
 
 
+def _parts(d):
+    """The addresses of an opened hub mail (its sender and recipients), lower case."""
+    return {a.strip().lower() for _n, a in email.utils.getaddresses([d.get("from_addr") or "", d.get("to_addrs") or ""]) if a.strip()}
+
+
+def _took_part(c, m, frm):
+    """2.360.0 C (#2496): the sender of an answer took part in the filed mail m (its sender or a recipient, Cc included).
+    2.360.0 R (#2496, review): or is a known address of m's client (its own, a contact person's, a linked contact's)."""
+    if frm in _parts(H._open(c, m)):
+        return True
+    return bool(m["client_id"]) and frm in {a["address"].lower() for a in _client_addrs(c, m["client_id"])}
+
+
 def mbx_import(c, box, raw):
     """One mail of workspace mailbox box -> the e-mail filing of box's workspace (never another one). Returns the mail id,
     0 when it was not filed (a double, nobody to receive)."""
@@ -561,8 +574,12 @@ def mbx_import(c, box, raw):
         refs = _refs(msg) if r is None else []
         if refs:  # an answer to a filed mail of this workspace: its client / project
             q = ",".join("?" * len(refs))
-            p = c.execute(f"SELECT * FROM hub_mails WHERE ws=? AND message_id IN ({q}) AND deleted_at IS NULL AND "
-                          "(client_id IS NOT NULL OR list_id IS NOT NULL) ORDER BY id DESC LIMIT 1", (ws, *refs)).fetchone()
+            # 2.360.0 C (#2496): only when the sender took part in that mail (its sender or a recipient): a known Message-ID
+            # alone does not file foreign content with the client / project
+            frm = email.utils.parseaddr(str(msg.get("From") or ""))[1].strip().lower()
+            p = next((x for x in c.execute(f"SELECT * FROM hub_mails WHERE ws=? AND message_id IN ({q}) AND deleted_at IS NULL AND "
+                                           "(client_id IS NOT NULL OR list_id IS NOT NULL) ORDER BY id DESC LIMIT 30", (ws, *refs)).fetchall()
+                      if frm and _took_part(c, x, frm)), None)
             if p:
                 kind = "list" if p["list_id"] else "client"
                 for uid in [x for x in (p["owner_id"], holder) if x]:

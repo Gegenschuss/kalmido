@@ -154,13 +154,15 @@ save(Bo, MV, "Text der umziehenden Seite mit Quitte, zweite Fassung")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": "private", "to": SP, "dest": ""})
 check(r.ok and A.get(B + f"/api/wiki/pages/{MV}").json().get("body") == "Text der umziehenden Seite mit Quitte, zweite Fassung"
       and raw(MV).startswith("kenc1:"), "#2105: private -> organisation: sealed for the organisation, a member reads it " + r.text[:200])
-vv = vers(A, MV) or []
-check(vv and A.get(B + f"/api/wiki/pages/{MV}/versions/{vv[-1]['id']}").ok, "#2102: the versions moved along (readable in the organisation) " + str(vv)[:200])
+vv = vers(A, MV)
+# 2.360.0 (#2496): into an organisation the earlier (private) versions do not go along -- its members would read them
+check(vv == [] and not sql("SELECT 1 FROM wiki_versions WHERE page_id=?", (MV,)), "#2496: no private versions in the organisation " + str(vv)[:200])
+save(A, MV, "Text der umziehenden Seite mit Quitte, dritte Fassung")  # a version made in the organisation
 # 2.361.2 (#2923): a member takes a page out of the organisation only after an admin released the request
 rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": MV}).json().get("id")
 check(A.post(B + f"/api/orgs/{ORG}/out-requests/{rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's request")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": SP, "to": "private", "dest": ""})
-check(r.ok and Bo.get(B + f"/api/wiki/pages/{MV}").json().get("body", "").endswith("zweite Fassung")
+check(r.ok and Bo.get(B + f"/api/wiki/pages/{MV}").json().get("body", "").endswith("dritte Fassung")
       and A.get(B + f"/api/wiki/pages/{MV}").status_code == 404, "#2105: and back into the private space " + r.text[:200])
 vv = vers(Bo, MV) or []
 check(len(vv) >= 1 and all(Bo.get(B + f"/api/wiki/pages/{MV}/versions/{v['id']}").ok for v in vv), "#2102: versions readable after the way back")

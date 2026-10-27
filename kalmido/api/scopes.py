@@ -270,8 +270,15 @@ SCOPE_RULES = (
 # post into it: chat messages, reactions, pins and proposals that reach people. Status, typing, progress, usage, its own jobs
 # and quota stay open (they only describe the agent).
 SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:read", "wiki:read"))  # 2.200.0 C (#1781): + wiki:read
-AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin)$", r"^/agent/proposals(/[a-z-]+)?$",
-                    r"^/agent/jobs/\{\}/proposal$")
+AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin|withdraw)$", r"^/agent/proposals(/[a-z-]+)?$",
+                    r"^/agent/jobs/\{\}/proposal$")  # 2.360.0 C (#2496): + withdraw
+# 2.360.0 C (#2496): its own jobs stay open (status / log), but not the parts that reach a person: a job for a person
+# (start line in their chat) or one that waits for them (News + push)
+AGENT_RO_JOBS = r"^/agent/jobs(/\{\})?$"
+
+
+def agent_ro_job_body(b):
+    return isinstance(b, dict) and (b.get("user_id") not in (None, "") or b.get("state") == "waiting")
 
 
 def agent_ro_refused(method, rule, scopes):
@@ -279,6 +286,8 @@ def agent_ro_refused(method, rule, scopes):
     if method in ("GET", "HEAD", "OPTIONS") or rule is None or set(scopes or ()) - SCOPES_READ_ONLY:
         return False
     path = re.sub(r"<[^>]+>", "{}", rule.rule[len(API_PREFIX) - 1:])
+    if re.match(AGENT_RO_JOBS, path):
+        return agent_ro_job_body(request.get_json(silent=True))
     return any(re.match(x, path) for x in AGENT_RO_REFUSED)
 
 
@@ -378,7 +387,7 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
         ttl = f"{ttl} · {d}" if d else ttl
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,approval,list_id)
                        VALUES(?,?,?,?,'waiting','',?,?,?,?)""",
-                    (aid, task_id, approver, ttl[:300], ts, ts, json.dumps({**spec, "key": key}), list_id))
+                    (aid, task_id, approver, ttl[:300], ts, ts, json.dumps({**spec, "key": key, "tok": (g.get("token") or {"id": None})["id"]}), list_id))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     job_notify(c, j, None)
     if approver and not task_id:  # job_notify only adds News for task jobs: the approver hears of it anyway
@@ -392,7 +401,7 @@ def need_approval(c, title, args=(), list_id=None, task_id=None, detail=None):
 
 
 def approval_replay_token(c, header):
-    """The X-Kalmido-Replay header of approval_run -> the agent's newest token row (once per approved job)."""
+    """The X-Kalmido-Replay header of approval_run -> the token row that asked (once per approved job)."""
     jid, _, sig = str(header).partition(":")
     if not re.fullmatch(r"[0-9]{1,18}", jid) or not re.fullmatch(r"[0-9a-f]{64}", sig):  # 2.126.0 B (#1979 G3): shape first
         return None
@@ -408,6 +417,8 @@ def approval_replay_token(c, header):
     c.execute("UPDATE agent_jobs SET approval=? WHERE id=?", (json.dumps({**ap, "ran": 1}), j["id"]))
     c.commit()
     g.approved_job = j["id"]
+    if ap.get("tok"):  # 2.360.0 C (#2496): the token that asked (its lists / scopes), gone = no replay; older jobs: the newest
+        return c.execute("SELECT * FROM api_tokens WHERE id=? AND user_id=?", (ap["tok"], j["agent_id"])).fetchone()
     return c.execute("SELECT * FROM api_tokens WHERE user_id=? ORDER BY id DESC LIMIT 1", (j["agent_id"],)).fetchone()
 
 

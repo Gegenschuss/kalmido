@@ -23,7 +23,7 @@ import requests
 
 import dbx as dbxm
 from freelancer_fixture import FEATURES, freelancer
-from kt import FAILS, OKS, check, sess
+from kt import FAILS, OKS, check, sess, su_get
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -172,7 +172,7 @@ for _ in range(960):  # until it is done (not only "not running": under load the
         break
     time.sleep(0.25)
 check(xs == "done", f"organisation export done {xs}")
-OX = A.get(B + f"/api/orgs/{ORG}/export/file").content
+OX = su_get(A, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): the step-up
 RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
 check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
 iid = upload(A, OX)
@@ -244,7 +244,7 @@ for _ in range(480):
     if Fr.get(B + "/api/account/export").json().get("state") != "running":
         break
     time.sleep(0.25)
-AX = Fr.get(B + "/api/account/export/file").content
+AX = su_get(Fr, B + "/api/account/export/file").content  # 2.360.0 (#2496): the step-up
 GID, Gr = freelancer(B, A, name="greta", features=FEATURES)
 iid = upload(Gr, AX, "frida.zip")
 j = wait(Gr, iid)

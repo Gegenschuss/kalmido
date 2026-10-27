@@ -18,6 +18,12 @@ const KEY = require('crypto').randomBytes(32).toString('base64');  // the organi
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: `${process.env.EXTRA || ''} -e KALMIDO_SECRET_KEY=${KEY}`}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+// 2.360.0 (#2496): a download behind the step-up: POST with the password -> a one-time ticket, then GET with it
+const suFetch = async (path, ck) => {
+  const r = await fetch(B + path, {method: 'POST', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json', Cookie: ck}, body: JSON.stringify({password: 'password123'})});
+  const t = r.ok ? (await r.json()).ticket : '';
+  return fetch(B + path + '?t=' + encodeURIComponent(t || ''), {headers: {Cookie: ck}});
+};
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const FEAT = 'cal,comments,collab';
 async function dataPane(w) {
@@ -53,12 +59,12 @@ async function dataPane(w) {
   check(eb && /Export everything/.test(eb.textContent), '"Export everything"');
   click(w, eb);
   const dl = await until(() => md.querySelector('#s-umz-exp a[href="/api/account/export/file"]'), 100);
-  check(dl && /kalmido-account-/.test(md.querySelector('#s-umz-exp').textContent), 'the export is ready: download link');
+  check(dl && dl.hasAttribute('data-sudl') && /kalmido-account-/.test(md.querySelector('#s-umz-exp').textContent), 'the export is ready: download link (behind the step-up, 2.360.0)');
   check(md.querySelector('#s-umz-exp [data-umz="exp-del"]'), '"Delete now"');
   w.close();
 
   // the file, uploaded by bob in pieces (the API; the app sends the same requests)
-  const zr = await fetch(B + 'api/account/export/file', {headers: {Cookie: CA}});
+  const zr = await suFetch('api/account/export/file', CA);
   const zip = Buffer.from(await zr.arrayBuffer());
   check(zr.ok && zip.length > 100, 'download');
   const up = await call(CB, 'POST', '/api/account/import', {size: zip.length, name: 'alice.zip'});
@@ -110,7 +116,7 @@ async function dataPane(w) {
   await call(CA, 'POST', '/api/lists', {name: 'Org UI Liste', org_id: 1});
   await call(CA, 'POST', '/api/orgs/1/export');
   await until(async () => (await call(CA, 'GET', '/api/orgs/1/export')).state !== 'running', 100);
-  const ox = Buffer.from(await (await fetch(B + 'api/orgs/1/export/file', {headers: {Cookie: CA}})).arrayBuffer());
+  const ox = Buffer.from(await (await suFetch('api/orgs/1/export/file', CA)).arrayBuffer());
   const rk = (await call(CA, 'POST', '/api/orgs/1/encryption/recovery', {password: 'password123'})).recovery_key;
   check(ox.length > 100 && rk, 'organisation export + recovery key');
   const oid = await up2(CA, ox);

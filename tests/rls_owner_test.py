@@ -153,7 +153,7 @@ try:
     check(not j.get("last_error") and len(j.get("items", [])) > n, f"backup as the owner: written ({j.get('last_error')})")
     name = [x["name"] for x in j.get("items", []) if x["kind"] == "manual"][:1]
     Bo.post(B + "/api/tasks", json={"title": "after the backup", "list_id": LA})
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name[0] if name else "x"})
+    r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name[0] if name else "x"})
     check(r.ok, f"restore as the owner: ok ({r.status_code} {r.text[:200]})")
     Bo = sess("bob")
     check("after the backup" not in titles(Bo) and f"{MARK} task" in titles(Bo), "restore: the state of the backup")

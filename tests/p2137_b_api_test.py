@@ -35,7 +35,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = FEATURES + ",sheets,videos"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
@@ -181,7 +181,7 @@ for _ in range(480):
     if A.get(B + f"/api/orgs/{ORG}/export").json().get("state") != "running":
         break
     time.sleep(0.25)
-OX = A.get(B + f"/api/orgs/{ORG}/export/file").content
+OX = su_get(A, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): the step-up
 RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
 check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
 

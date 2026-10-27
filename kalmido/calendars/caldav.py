@@ -503,7 +503,8 @@ def dav_vtodo(t, ctx):
         have, depth = {_prop_name(x) for x in L}, 0
         # 2.126.0 C (#1979 I3): the alarms and attachments a person's app kept go back to that person only
         by = meta["extra_by"] if "extra_by" in meta.keys() else None
-        own, skip = by is None or by == ctx.get("viewer"), 0
+        # 2.360.0 D (#2496): a row from before 2.126.0 (no extra_by) counts as someone else's (alarms / attachments stay out)
+        own, skip = by is not None and by == ctx.get("viewer"), 0
         for x in meta["extra"].split("\n"):
             if not x:
                 continue

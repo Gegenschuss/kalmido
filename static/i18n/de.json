@@ -9959,7 +9959,6 @@
   "Task counts in the sidebar": "Aufgaben-Zähler in der Seitenleiste",
   "Share marks (person / robot)": "Teilen-Markierung (Person / Roboter)",
   "Without counts, Today keeps its red number while something is overdue.": "Ohne Zähler behält Heute seine rote Zahl, solange etwas überfällig ist.",
-  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "App-Passwörter (CalDAV) und API-Tokens bleiben gültig. Falls jemand anderes Zugriff hatte, prüfe sie unter Einstellungen > Konto (API-Tokens: Erweitert · für Entwickler).",
   "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. Undo possible.": "Übernehmen legt das Projekt, seine Aufgaben und die Drehtage als Termin-Entwürfe in deinem Kalender an, als du. Nichts wird versendet. Rückgängig möglich.",
   "Linked": "Verknüpft",
   "Linked to a contact of the address book": "Mit einem Kontakt aus dem Adressbuch verknüpft",
@@ -14588,5 +14587,15 @@
   "Import running · {0} %": "Import läuft · {0} %",
   "The import goes on in the background.": "Der Import läuft im Hintergrund weiter.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite hakt auch die Aufgabe ab."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite hakt auch die Aufgabe ab.",
+  "The virus scanner cannot check the file right now. Please try again in a few minutes.": "Der Virenscanner kann die Datei gerade nicht prüfen. Bitte in ein paar Minuten noch einmal versuchen.",
+  "{0} earlier version is deleted: the people of the organisation do not see older states": ["{0} frühere Fassung wird gelöscht: die Mitglieder der Organisation sehen keine älteren Stände", "{0} frühere Fassungen werden gelöscht: die Mitglieder der Organisation sehen keine älteren Stände"],
+  "not confirmed": "nicht bestätigt",
+  "(by the typed e-mail address, not confirmed)": "(über die eingetippte E-Mail-Adresse, nicht bestätigt)",
+  "The server sends no more invitation e-mails today. Try again tomorrow.": "Der Server verschickt heute keine Einladungs-E-Mails mehr. Bitte morgen erneut versuchen.",
+  "Only people who may change the review answer the customer": "Nur wer die Abnahme ändern darf, antwortet dem Kunden",
+  "A vacation request keeps its kind. Delete it and enter the absence anew.": "Eine Urlaubsanfrage behält ihre Art. Lösche sie und trage die Abwesenheit neu ein.",
+  "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Das neue Passwort widerruft deine App-Passwörter (CalDAV) und deine eigenen API-Tokens; lege danach bei Bedarf neue unter Einstellungen > Konto an (API-Tokens: Erweitert · für Entwickler). Agenten behalten ihre Tokens.",
+  "Please type your name without a link or web address.": "Bitte geben Sie Ihren Namen ohne Link oder Web-Adresse ein.",
+  "Saved. {0} booking of someone else stays as it was": ["Gespeichert. {0} Buchung einer anderen Person bleibt, wie sie war", "Gespeichert. {0} Buchungen anderer bleiben, wie sie waren"]
 }

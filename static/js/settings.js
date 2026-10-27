@@ -1327,8 +1327,9 @@ async function adminSwitch(md, el, fromHist) {
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   try {
-    // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password
-    const pw = key === 'oidc_autocreate' && on;
+    // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
+    // 2.360.0 A (#2496): every security switch (core/instance.py AUTH_SWITCHES) asks for it when it changes
+    const pw = ['twofa_required', 'passkey_login', 'oidc_autocreate', 'public_links'].includes(key);
     let j; try { j = await (pw ? rawFetch : api)('PATCH', '/api/admin/settings', {[key]: on}); } catch (x) {
       if (!pw || !x.data?.password_needed) { if (pw) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;

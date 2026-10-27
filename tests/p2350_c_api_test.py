@@ -227,7 +227,7 @@ r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json().get("ok"), "backup: a backup with org_list_log verifies " + r.text[:200])
 n0 = dbx("SELECT COUNT(*) FROM org_list_log")[0][0]
 dbx("DELETE FROM org_list_log", write=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 check(wait_for(lambda: dbx("SELECT COUNT(*) FROM org_list_log")[0][0] == n0, 10), "backup: the history is back after the restore")
 

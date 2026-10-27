@@ -96,7 +96,7 @@ admin (the agent's dialog), personal agents from their owner (the lock button in
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
 needs no permission; 2.190.0: a token that may only read (no permission beyond *Read*, *Read files*, *Read the file store*,
-*Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
+*Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open; 2.360.0: a job for a person (`user_id`) or one that waits (`state: waiting`) and withdrawing answer buttons are refused too). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it. A few checks depend on the request body (a batch that also deletes, `export_data`, `time/from-events`, preparing a task for an event, linking a contact, the proposals `time`, `shoot`, `layout`, `import` and `structure` replace): they answer a plain `403` (“This token lacks the permission …”) without `required_scope`; read the message, it names the permission.
@@ -176,15 +176,18 @@ Set up on a computer* (the download button in the agent's row; admins: in the ag
 and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token:
 
 ```sh
-curl -fsSL https://tasks.example.com/agent-setup.sh | bash -s -- --url https://tasks.example.com --code ks_... --dir ~/projects/site
+curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... bash -s -- --url https://tasks.example.com --dir ~/projects/site
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Code ks_... -Dir "$HOME\projects\site"
+$env:KALMIDO_SETUP_CODE='ks_...'; & ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Dir "$HOME\projects\site"
 ```
 
-The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). The script, served by your
-own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
+The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). 2.360.0: the code goes in the
+environment (`KALMIDO_SETUP_CODE`, on Windows too), so it is not in the computer's process list (`--code` / `-Code` still
+work). The scripts take an `http://` address only for this computer (`localhost`, `127.0.0.1`, `[::1]`) or with
+`--allow-http` / `-AllowHttp` (Kalmido adds it to the command when it runs without https), and fetch the starter files
+only over `https://` or from the Kalmido itself. The script, served by your own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
 
 1. checks what is needed (Python 3.9+, curl, the agent command, default `claude`) and names what is missing,
 2. trades the code for the agent's token (`POST /api/agent-setup/redeem`, no login, rate limited like logins) and keeps
@@ -3048,6 +3051,8 @@ panel shows *Agent usage* on tasks with reports (only to people who see the task
   and `Retry-After` (seconds until the period ends), except `POST` / `GET /agent/usage`, `PUT /agent/status`,
   `/agent/quota` (2.33.0) and `GET /agent`. People see the agent as *limit reached*. It ends when the period rolls over or an admin raises the limit.
   `GET /agent` has `usage_limit` (the same object as `limit` above) so the agent can check where it stands.
+- 2.360.0: the limits count what the agent reports, so they are a cost brake for agents that behave, not a security
+  boundary: an agent that stops reporting is not stopped by them. To stop an agent, pause it or revoke its token.
 
 ### Claude Code: report usage automatically
 

@@ -257,7 +257,7 @@ check(f"office/{ORG2}/logo.png" not in names, "the removed logo of the second or
 check(A.delete(B + "/api/office/logo").ok and not os.path.exists(LOGO) and A.get(B + "/api/office/logo").status_code == 404, "the admin removes the logo: file gone, 404")
 r = A.get(B + f"{D}/{DOC}/pdf")
 check(r.ok and not has_image(pdf_texts(r.content)[0].pages[0]), "without the logo the PDF shows the company name again")
-r = A.post(B + "/api/admin/backups/restore", json={"name": NAME, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": NAME, "confirm": "RESTORE"})
 check(r.ok, f"restore: {r.status_code} {r.text[:160]}")
 A = sess("alice")
 check(os.path.isfile(LOGO) and A.get(B + "/api/office/logo").status_code == 200 and A.get(B + "/api/office/settings").json()["settings"]["logo"] == "logo.png",

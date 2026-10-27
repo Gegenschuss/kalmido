@@ -8,9 +8,12 @@ const ains_q = s => `'${String(s).replace(/'/g, "'\\''")}'`;   // POSIX shell si
 const ains_pq = s => `'${String(s).replace(/'/g, "''")}'`;     // PowerShell single quotes
 // 2.46.6 (#1713): the language of the account goes along (--lang / -Lang): the script speaks German or English, anything else = English
 const ains_lang = () => (LS.get('lang') || S.settings?.lang || 'en').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en';
+// 2.360.0 C (#2496): the scripts take http:// only for localhost or with --allow-http (a Kalmido without https); on Mac /
+// Linux the code goes in the environment, not on the command line (process list); 2.360.0 R (#2496, review): on Windows too
+const ains_http = url => /^http:\/\/(?!(localhost|127\.0\.0\.1|\[::1\])(:|\/|$))/i.test(url);
 function ains_command(os, url, code, folder) {
-  if (os === 'windows') return `& ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Url ${ains_pq(url)} -Code ${code} -Dir ${ains_pq(folder)} -Lang ${ains_lang()}`;
-  return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | bash -s -- --url ${ains_q(url)} --code ${code} --dir ${ains_q(folder)} --lang ${ains_lang()}`;
+  if (os === 'windows') return `$env:KALMIDO_SETUP_CODE=${ains_pq(code)}; & ([scriptblock]::Create((irm ${ains_pq(url + '/agent-setup.ps1')}))) -Url ${ains_pq(url)} -Dir ${ains_pq(folder)} -Lang ${ains_lang()}${ains_http(url) ? ' -AllowHttp' : ''}`;
+  return `curl -fsSL ${ains_q(url + '/agent-setup.sh')} | KALMIDO_SETUP_CODE=${code} bash -s -- --url ${ains_q(url)} --dir ${ains_q(folder)} --lang ${ains_lang()}${ains_http(url) ? ' --allow-http' : ''}`;
 }
 const ains_folderHint = os => os === 'windows' ? '~\\projects\\website' : '~/projects/website';
 const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) || '';

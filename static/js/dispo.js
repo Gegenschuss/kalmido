@@ -172,10 +172,11 @@ function dp_editSheet(b) {
     const before = {title: b.title, start: b.start, end: b.end, status: b.status, note: b.note || '', all: true};
     k.disabled = true;
     try {
-      await api('PATCH', `/api/team/dispo/bookings/${b.id}`, v);
+      const r = await api('PATCH', `/api/team/dispo/bookings/${b.id}`, v);
       const put = x => async () => { await api('PATCH', `/api/team/dispo/bookings/${b.id}`, x); dp_reload(); };
       histAdd({label: tr('Booking changed'), undo: put(before), redo: put(v)});
-      md.remove(); dp_reload(); toast(tr('Saved'));
+      // 2.360.0 R (#2496): bookings of colleagues in the job stay as they were (only their author or an admin changes them)
+      md.remove(); dp_reload(); toast(r?.skipped ? trn('Saved. {0} booking of someone else stays as it was', 'Saved. {0} bookings of others stay as they were', r.skipped) : tr('Saved'));
     } catch { k.disabled = false; /* api() said it */ }
   });
 }

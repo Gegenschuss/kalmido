@@ -192,7 +192,7 @@ GFS = r.json()["id"]
 r = A.post(B + f"/api/orgs/{ORG}/export")
 check(r.status_code == 202, "organisation export started " + r.text[:120])
 until(lambda: A.get(B + f"/api/orgs/{ORG}/export").json().get("state") != "running", 120)
-OX = A.get(B + f"/api/orgs/{ORG}/export/file").content
+OX = su_get(A, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): the step-up
 RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
 check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
 iid, pv = opened(A, OX, RK)

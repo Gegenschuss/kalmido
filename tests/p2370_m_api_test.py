@@ -267,7 +267,7 @@ A = sess()
 up = A.post(B + "/api/admin/backups/upload", data=buf.getvalue(), headers={"Content-Type": "application/octet-stream"}) if A else None
 check(up is not None and up.ok and up.json().get("legacy") is True, "(f) old archive uploaded, marked legacy " + (up.text[:200] if up is not None else ""))
 if up is not None and up.ok:
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "upload": up.json()["upload"]})
+    r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "upload": up.json()["upload"]})
     check(r.ok and r.json().get("ok"), "(f) the restore of the old archive runs the move " + r.text[:300])
     A2 = sess()
     st = A2.get(B + "/api/state").json() if A2 else {}

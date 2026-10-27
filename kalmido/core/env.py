@@ -146,6 +146,7 @@ VARS = (
     _v("KALMIDO_OFFICE_MAILS_DAY_ORG", "300", "Office documents sent by mail per organisation and day.", "mail"),
     _v("KALMIDO_OFFICE_MAILS_DAY_PERSON", "150", "Office documents sent by mail per person and day.", "mail"),
     _v("KALMIDO_OFFICE_MAILS_DAY_ADDRESS", "20", "Office documents sent by mail per organisation, receiving address and day.", "mail"),
+    _v("KALMIDO_INVITE_MAIL_DAY", "2000", "Calendar invitation mails of the whole server per day (each person: 200).", "mail"),
 
     # ---- files, scanning and text recognition
     _v("KALMIDO_CLAMD", "", "Virus scanner (clamd) as host:port; empty = no scan (Docker Compose sets clamav:3310).", "files"),

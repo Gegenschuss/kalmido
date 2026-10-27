@@ -145,7 +145,7 @@ bk = until(lambda: [x["name"] for x in A.get(B + "/api/admin/backups").json()["i
            and [x["name"] for x in A.get(B + "/api/admin/backups").json()["items"] if x["name"] not in before], 60)
 check(bool(bk), "setup: a backup with the WebDAV target in it")
 check(A.patch(OFF, json={"remove": True}).ok, "the target is removed after the backup")
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": bk[0] if bk else ""})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": bk[0] if bk else ""})
 check(r.ok, f"restore {r.status_code} {r.text[:200]}")
 A = sess("alice")
 j = A.get(OFF).json()

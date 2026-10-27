@@ -487,7 +487,13 @@ def vdr_comment_new(vid):
     c, uid = db(), me()
     r = vdr_need(c, vid)
     b = body()
-    cid = vdr_comment_add(c, r, uid, b if isinstance(b, dict) else {})
+    b = b if isinstance(b, dict) else {}
+    par = b.get("parent_id")
+    if isinstance(par, int) and not isinstance(par, bool):  # 2.360.0 D (#2496): as in v1 -- the customer page shows this answer
+        p = c.execute("SELECT ext_name FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()
+        if p and p["ext_name"] and not vdr_may(c, uid, r, write=True):
+            raise Denied(403, tr("Only people who may change the review answer the customer"))
+    cid = vdr_comment_add(c, r, uid, b)
     c.commit()
     return jsonify(dict(vdr_dict(c, vdr_reload(c, vid), uid, full=True), comment_id=cid))
 

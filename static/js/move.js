@@ -17,7 +17,7 @@ function umzExpHtml(j) {
   const start = lbl => `<button type="button" class="btn sm" data-umz="exp">${ic('download', 's')} ${lbl}</button>`;
   if (j.state === 'running') return `<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>`;
   if (j.state === 'done') return `<div class="row umzdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
-    <div class="row"><a class="btn sm pri" href="/api/account/export/file" download>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
+    <div class="row"><a class="btn sm pri" href="/api/account/export/file" download data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
   return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Export everything'))}</div>`;
 }
 async function umzExpLoad(md) {

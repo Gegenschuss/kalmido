@@ -77,7 +77,7 @@ for b in BASHES:
 
 # ---- a stub Kalmido
 TOKEN = "abk_stub_secret_token_4711"
-ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200,  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
+ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200, "base": None,  # 2.360.0: base = another starter address  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
       "revoked": False,  # 2.157.0 (#1517): GET /api/v1/agent answers 401 (computer removed in Kalmido)
       "polls": 0}  # 2.206.0 B (#2513): GET /api/v1/agent count: "nothing happens for N polls" instead of a fixed sleep
 
@@ -127,7 +127,7 @@ class Stub(BaseHTTPRequestHandler):
             if b.get("code") != "ks_good_code":
                 return self._json(400, {"error": "This setup code is invalid, used or expired. Create a new one in Kalmido."})
             return self._json(200, {"token": TOKEN, "url": "https://ignored.example", "version": "2.44.0",
-                                    "agent": {"id": 9, "name": "Helper", "username": "helper"}, "starter_base": f"{URL}/mcp/"})
+                                    "agent": {"id": 9, "name": "Helper", "username": "helper"}, "starter_base": ST["base"] or f"{URL}/mcp/"})
         if self.path == "/api/agent-setup/remove":
             ST["remove"].append(self.headers.get("Authorization"))
             if ST["remove_code"] != 200:
@@ -312,6 +312,25 @@ for b in BASHES:
     # missing prerequisites are named
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "x", "--dir", "/tmp/x", "--cmd", "claude-not-here"], env=env, capture_output=True, text=True, timeout=60)
     check(r.returncode == 1 and "missing on this computer" in r.stderr and "claude-not-here" in r.stderr, f"{b}: a missing agent command is named: {r.stderr[-300:]}")
+    # 2.360.0 C (#2496): the code from the environment (not on the command line); http:// only for localhost or --allow-http;
+    # starter files only over https or from the Kalmido itself
+    n = len(ST["redeem"])
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--dir", "~/envcode", "--cmd", "fakeagent", "--no-autostart"],
+                       env={**env, "KALMIDO_SETUP_CODE": "ks_good_code"}, capture_output=True, text=True, timeout=120)
+    check(r.returncode == 0 and len(ST["redeem"]) == n + 1 and ST["redeem"][-1][1].get("code") == "ks_good_code" and "ks_good_code" not in r.stdout + r.stderr,
+          f"{b}: the code from KALMIDO_SETUP_CODE: {r.returncode} {r.stderr[-300:]}")
+    n = len(ST["redeem"])
+    r = subprocess.run([b, SETUP_SH, "--url", "http://kalmido.example.invalid", "--code", "ks_good_code", "--dir", "~/http", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=60)
+    check(r.returncode != 0 and "is an http:// address" in r.stderr and len(ST["redeem"]) == n, f"{b}: http:// to another computer is refused before the code goes out: {r.stderr[-300:]}")
+    r = subprocess.run([b, SETUP_SH, "--allow-http", "--url", "http://kalmido.example.invalid", "--code", "ks_good_code", "--dir", "~/http", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=90)
+    check(r.returncode != 0 and "is an http:// address" not in r.stderr, f"{b}: --allow-http takes it (then the address is not reachable): {r.stderr[-300:]}")
+    ST["base"] = "http://starter.example.invalid/mcp/"
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/plainbase", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=120)
+    ST["base"] = None
+    check(r.returncode != 0 and "without https://" in r.stderr, f"{b}: starter files from a plain http address are refused: {r.stderr[-300:]}")
     shutil.rmtree(home, ignore_errors=True)
 
 # ---- setup.ps1 (dry run with pwsh when there is one)

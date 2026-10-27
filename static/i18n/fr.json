@@ -9981,7 +9981,6 @@
   "Task counts in the sidebar": "Compteurs de tâches dans la barre latérale",
   "Share marks (person / robot)": "Marques de partage (personne / robot)",
   "Without counts, Today keeps its red number while something is overdue.": "Sans compteurs, Aujourd'hui garde son nombre rouge tant que quelque chose est en retard.",
-  "App passwords (CalDAV) and API tokens stay valid. If someone else may have had access, check them under Settings > Account (API tokens: Advanced · for developers).": "Les mots de passe d'application (CalDAV) et les tokens API restent valides. Si quelqu’un d’autre a pu y accéder, vérifie-les sous Paramètres > Compte (tokens API : Avancé · pour les développeurs).",
   "Applying creates the project, its tasks and the shoot days as event drafts in your calendar, as you. Nothing is sent. Undo possible.": "Appliquer crée le projet, ses tâches et les jours de tournage comme brouillons d’événements dans ton calendrier, en ton nom. Rien n’est envoyé. Annulation possible.",
   "Linked": "Lié",
   "Linked to a contact of the address book": "Lié à un contact du carnet d'adresses",
@@ -14588,5 +14587,15 @@
   "Import running · {0} %": "Import en cours · {0} %",
   "The import goes on in the background.": "L’import continue en arrière-plan.",
   "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "L’avancement s’affiche à Savoir dans la barre et en haut des pages de savoir.",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page coche aussi la tâche."
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Dates, #tags et !priorité comme dans l'ajout rapide. La cocher dans la page coche aussi la tâche.",
+  "The virus scanner cannot check the file right now. Please try again in a few minutes.": "L’antivirus ne peut pas vérifier le fichier pour le moment. Réessaie dans quelques minutes.",
+  "{0} earlier version is deleted: the people of the organisation do not see older states": ["{0} version antérieure est supprimée : les membres de l'organisation ne voient pas les anciens états", "{0} versions antérieures sont supprimées : les membres de l'organisation ne voient pas les anciens états"],
+  "not confirmed": "non confirmé",
+  "(by the typed e-mail address, not confirmed)": "(par l'adresse e-mail saisie, non confirmé)",
+  "The server sends no more invitation e-mails today. Try again tomorrow.": "Le serveur n'envoie plus d'e-mails d'invitation aujourd'hui. Réessayez demain.",
+  "Only people who may change the review answer the customer": "Seules les personnes pouvant modifier la revue répondent au client",
+  "A vacation request keeps its kind. Delete it and enter the absence anew.": "Une demande de congés garde son type. Supprime-la et saisis l’absence à nouveau.",
+  "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Le nouveau mot de passe révoque tes mots de passe d'application (CalDAV) et tes propres tokens API ; crée-en de nouveaux ensuite si besoin sous Paramètres > Compte (tokens API : Avancé · pour les développeurs). Les agents gardent leurs tokens.",
+  "Please type your name without a link or web address.": "Veuillez saisir votre nom sans lien ni adresse web.",
+  "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"]
 }

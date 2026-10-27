@@ -195,7 +195,7 @@ ROUTES = {
     "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "GET /api/admin/storage-check": "admin",
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
-    "GET /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
+    "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
     "POST /api/admin/backups/restore": "admin",
     # 2.143.0 B (#2152): the off-site target of the backups (instance admins, p2143_b_api_test.py)
@@ -752,7 +752,7 @@ ROUTES = {
     # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
     # the import's target organisation needs its admin (p273_b_api_test.py)
     "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
-    "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
+    "GET /api/account/export/file": "own", "POST /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
     # 2.96.0 D (#1941 / #1918): an organisation export into the private space (p296_d_api_test.py)

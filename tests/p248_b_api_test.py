@@ -26,7 +26,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
            "-e", "KALMIDO_IMAP_SSL=0", "-e", "KALMIDO_IMAP_USER=kalmido", "-e", "KALMIDO_IMAP_PASSWORD=secret", "-e", "KALMIDO_IMAP_INTERVAL=600",
@@ -344,7 +344,7 @@ check(dbx("SELECT org_id FROM fs_nodes WHERE id=?", (DA,))[0][0] == ORG and dbx(
 r = Bo.post(B + f"/api/orgs/{ORG}/export")
 if r.status_code == 202:
     j = until(lambda: (lambda x: x if x.get("state") != "running" else None)(Bo.get(B + f"/api/orgs/{ORG}/export").json()), 120)
-    arc = Bo.get(B + f"/api/orgs/{ORG}/export/file").content
+    arc = su_get(Bo, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): the step-up
     rk = Bo.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     import tempfile
     import zipfile

@@ -275,7 +275,7 @@ name = items[0]["name"] if items else ""
 r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json().get("ok"), "backup: a backup with agent_schedules verifies " + r.text[:200])
 dbx("DELETE FROM agent_schedules", write=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 Bo = sess("bob")
 check(any(p["id"] == p1["id"] for p in plans(Bo).json().get("data", [])), "backup: the plans are back after the restore")

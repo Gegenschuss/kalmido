@@ -282,7 +282,7 @@ nt2 = A.post(B + f"/api/templates/{tt['id']}/apply", json={"list_id": L2}).json(
 check(nt2.get("ms") == 1, "a task template of a milestone makes a milestone")
 
 # ================================================================== restore an old backup: migrated again
-r = A.post(B + "/api/admin/backups/restore", json={"name": OLD_BK, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": OLD_BK, "confirm": "RESTORE"})
 check(r.ok, f"restore of the backup from before the migration {r.text[:200]}")
 check(dbx("SELECT COUNT(*) FROM list_milestones")[0][0] == 0, "after the restore: the old rows are migrated again")
 rt = sorted(x[0] for x in dbx("SELECT title FROM tasks WHERE ms=1 AND list_id=?", (L,)))

@@ -18,7 +18,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, REVOKED_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
 from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -143,17 +143,28 @@ def db_log_err(e):
 
 
 _FLASK_LOG_EXC = app.log_exception
+# 2.360.0 A (#2496): the secret part of a path in the log: hook tokens (2.126.0 B #1979 I8, 2.138.4 #2381, 2.148.1 E) and the
+# tokens of the public pages (shared lists / folders / quotations / videos / wiki, forms, action links, status pages,
+# calendar feeds, portal sign-in links, document ZIPs)
+_LOG_PATH_RE = re.compile(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/|/s/[bfqvw]/|/s/|/f/|/u/|/p/|/ical/(?:abs/|ev/)?"
+                          r"|/portal/login/|/api/docs/zip/)[^/]+")
+
+
+def log_path(path):
+    return _LOG_PATH_RE.sub(r"\1***", path or "")
 
 
 def _db_log_exception(exc_info):
     """2.239.0 B (#2888): a database error nobody caught (500) is logged as Flask does (same logger, same first line), but
     with its frames and db_log_err instead of the message with its values."""
     e = exc_info[1] if exc_info else None
-    if not isinstance(e, DbError) or not has_request_context():
+    if not has_request_context():
         return _FLASK_LOG_EXC(exc_info)
     import logging
+    if not isinstance(e, DbError):  # 2.360.0 A (#2496): as Flask logs it, without a token of the path
+        return logging.getLogger(app.name).error(f"Exception on {log_path(request.path)} [{request.method}]", exc_info=exc_info)
     import traceback
-    logging.getLogger(app.name).error(f"Exception on {request.path} [{request.method}]\nTraceback (most recent call last):\n"
+    logging.getLogger(app.name).error(f"Exception on {log_path(request.path)} [{request.method}]\nTraceback (most recent call last):\n"
                                       + "".join(traceback.format_tb(e.__traceback__)) + db_log_err(e))
 
 
@@ -177,7 +188,7 @@ def db_error(e):
         raise e
     import traceback
     code = 403 if denied else 400
-    path = re.sub(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/)[^/]+", r"\1***", request.path)  # 2.148.1 E (#2496): + inbound hooks;  # 2.126.0 B (#1979 I8): no hook token in the log; 2.138.4 (#2381): the deploy hook too
+    path = log_path(request.path)  # 2.360.0 A (#2496): no token in the log (log_path)
     print(f"database error ({code}) {request.method} {path}:\nTraceback (most recent call last):\n"  # 2.239.0 B (#2888): frames, no values
           + "".join(traceback.format_tb(e.__traceback__)) + db_log_err(e), flush=True)
     if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
@@ -186,7 +197,7 @@ def db_error(e):
             who = g.user["username"]
         except Exception:  # noqa: BLE001  (no user, or a public actor without a name)
             who = "?"
-        aa_count("security", "rls", f"{request.method} {request.url_rule.rule if request.url_rule else request.path}"[:120],
+        aa_count("security", "rls", f"{request.method} {request.url_rule.rule if request.url_rule else path}"[:120],
                  user=who)
     msg = tr("no permission") if denied else tr("Invalid data")
     if request.path.startswith("/api/v1/"):
@@ -741,6 +752,7 @@ def init_db(guard=True, load=None):
         c.executescript(TIME_TITLE_TRIGGER)
         c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
+        c.executescript(REVOKED_TRIGGER)  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
         from ..core.access import acx_gen_setup

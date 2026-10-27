@@ -37,7 +37,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 TOOL = os.path.join(N, "..", "tools", "kalmido_export_decrypt.py")
 TEST_IBAN = "DE89370400440532013000"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 TMP = os.path.join(os.path.dirname(os.path.abspath(DATA)), f"p2420c-{os.getpid()}")
 
 
@@ -171,7 +171,7 @@ j = wait_done(A, ORG)
 check(j.get("state") == "done" and j.get("file", "").endswith(".kalmido-export") and j.get("bytes", 0) > 1800000, f"export done: {j}")
 check(j.get("file", "").startswith("alpha-studio-") and KEY not in j.get("file", ""), "file name: organisation + date, no secret")
 check(Bo.get(B + P + "/file").status_code == 403 and Ca.get(B + P + "/file").status_code == 404, "download: member 403, other organisation 404")
-r = A.get(B + P + "/file")
+r = su_get(A, B + P + "/file")  # 2.360.0 (#2496): the step-up for an organisation's archive too
 check(r.ok and r.content[:13] == b"KALMIDO-ORGX\n" and "attachment" in r.headers.get("Content-Disposition", ""), "download of the archive")
 ARC = os.path.join(TMP, "org.kalmido-export")
 with open(ARC, "wb") as f:

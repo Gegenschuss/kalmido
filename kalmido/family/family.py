@@ -455,6 +455,10 @@ def stars_add(c, kid, t, at):
     if not kid or not is_kid(c, kid):
         return
     n = t["stars"] if t["stars"] is not None else 1
+    # 2.360.0 D (#2496): once per task and day -- ticking a repeating task's next dates ahead in a row earns nothing more
+    if n > 0 and c.execute("SELECT 1 FROM kid_stars WHERE kid_id=? AND task_id=? AND kind='task' AND left(at, 10)=left(?, 10) LIMIT 1",
+                           (kid, t["id"], at)).fetchone():
+        return
     if n > 0:
         c.execute("INSERT INTO kid_stars(kid_id,delta,kind,task_id,title,by_id,at,created_at) VALUES(?,?,?,?,?,?,?,?)",
                   (kid, n, "task", t["id"], (t["title"] or "")[:200], kid, at, iso(now_utc())))
@@ -470,6 +474,13 @@ def stars_revoke(c, tid, at=None, kid=None):
         q += " AND kid_id=?"
         a.append(kid)
     r = c.execute(q + " ORDER BY id DESC LIMIT 1", a).fetchone()
+    if not r and at and kid:  # 2.360.0 D (#2496): the done copy of a repeating task -- its stars hang on the original task
+        # 2.360.0 R (#2496, review): only the original's (the copy keeps its list, created_at and title, the ledger row the
+        # title of then), never another task's stars of the same moment (several tasks done in the same second)
+        r = c.execute("SELECT s.id FROM kid_stars s JOIN tasks o ON o.id=s.task_id JOIN tasks cp ON cp.id=? "
+                      "WHERE s.kind='task' AND s.at=? AND s.kid_id=? AND o.id<>cp.id AND o.list_id=cp.list_id "
+                      "AND o.created_at=cp.created_at AND s.title=left(cp.title, 200) ORDER BY s.id DESC LIMIT 1",
+                      (tid, at, kid)).fetchone()
     if r:
         c.execute("DELETE FROM kid_stars WHERE id=?", (r[0],))
 

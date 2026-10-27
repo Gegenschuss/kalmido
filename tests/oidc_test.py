@@ -224,7 +224,7 @@ s, r = oidc_login({"sub": "sub-frank", "preferred_username": "frank"}, kid="k2")
 check(err_of(r) == "ok" and len([x for x in oidc_log() if x["path"] == "/jwks"]) == 2, "new key id (ES256): JWKS fetched again, login ok")
 
 # ---- userinfo: extra claims (same sub only)
-A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "oidc_autocreate": True})
 s, r = oidc_login({"sub": "sub-jo", "preferred_username": "jo"}, userinfo={"sub": "sub-jo", "name": "Jo From Userinfo"})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["display_name"] == "Jo From Userinfo", "auto-create: display name from userinfo")
 check(dbx("SELECT is_admin, password_hash FROM users WHERE username='jo'")[0] == (0, None), "created without admin rights and without a password")

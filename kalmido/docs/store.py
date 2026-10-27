@@ -28,7 +28,9 @@ from . import rules as RU
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
+from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
@@ -215,6 +217,8 @@ def query_hashes(c, ws, word):
 
 def doc_index(c, nid, ws, text):
     c.execute("DELETE FROM doc_words WHERE node_id=?", (nid,))
+    if _sc_locked(c, "fs", nid):  # 2.360.0 B (#2496): a locked file stays out of the search
+        return
     hs = sorted(word_hashes(c, ws, index_words(text)))
     for i in range(0, len(hs), 500):
         part = hs[i:i + 500]
@@ -430,6 +434,12 @@ def meta_row(c, nid):
 
 def meta_text(c, m):
     return doc_open(c, m["ws"], "doc_meta.text", m["text"]) or ""
+
+
+def meta_text_shown(c, m):
+    """2.360.0 B (#2496): the recognised text for people / agents / the search: none while the file is locked (malware
+    found later). meta_text stays the stored value (re-sealing, the models)."""
+    return "" if _sc_locked(c, "fs", m["node_id"]) else meta_text(c, m)
 
 
 def meta_json(c, m, col, default):
@@ -732,6 +742,21 @@ def untrain(c, nid):
         model_put(c, m["ws"], f, model)
 
 
+def _learn_seen(c, m, uid, f, lid):
+    """2.360.0 B (#2496): the models of an organisation's documents folder learn from every member's documents; for a
+    member who does not manage it a learned sender / type / tag counts only when it is on another document they see."""
+    oid = ws_org(m["ws"])
+    if not oid or not uid:
+        return True
+    with system_ctx(c):
+        r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+    if r and r[0] == "admin":
+        return True
+    q = ("SELECT 1 FROM doc_node_tags WHERE tag_id=? AND node_id<>?" if f == "tag" else
+         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>?")
+    return bool(c.execute(f"{q} AND node_id IN {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
+
+
 def classify(c, m, node, text, given=None):
     """(set, suggest, auto): what the levels of the workspace decide for one document.
     set = {feature: value} applied now, suggest = {feature: {value, conf, by}} offered for review, auto = {feature: how}.
@@ -766,7 +791,14 @@ def classify(c, m, node, text, given=None):
         if f == "folder":
             if not folder_ok(c, node, label):
                 continue
-        elif not label_ok(c, ws, f, label):
+            # 2.360.0 B (#2496): a learned folder only one the uploading person sees; files into it on its own only where
+            # they may edit (like a rule), else a suggestion
+            fr = _fs_role(c, int(label), uid)
+            if not fr:
+                continue
+            if fr not in ("owner", "edit"):
+                conf = min(conf, CL.MAYBE)
+        elif not label_ok(c, ws, f, label) or not _learn_seen(c, m, uid, f, label):
             continue
         val = label if f == "folder" else int(label)
         if conf >= CL.SURE:
@@ -783,7 +815,7 @@ def classify(c, m, node, text, given=None):
         if lv["tags"] == "learn":
             maybe = []
             for tid, conf in CL.predict_tags(model_get(c, ws, "tags"), toks):
-                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags:
+                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags or not _learn_seen(c, m, uid, "tag", tid):
                     continue
                 if conf >= CL.SURE:
                     tags.append(int(tid))

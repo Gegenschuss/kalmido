@@ -244,6 +244,9 @@ check("### Company name\n=SUM(A1)" in content and "### What do you need?\nA new 
       and "Sent with the form “Questionnaire” by Eve <buyer@example.com>" in content,
       "the answers as Markdown: a heading per question, choices as a list, the number normalised, the files named " + content[:900])
 check("Client: Acme Example" in content and en and en[0][1] == ACME, "the client of the list's organisation (never the other organisation's with the same address)")
+# 2.360.0 (#2496): matched only by the typed address (anyone can type it): a suggestion, marked unconfirmed
+check("(by the typed e-mail address, not confirmed)" in content and dbx("SELECT client_typed FROM form_entries WHERE task_id=?", (en[0][0],))[0][0] == 1,
+      "#2496: the client by the typed address is marked unconfirmed")
 ans = json.loads(en[0][4]) if en else {}
 check(ans.get(QID["Services"]) == ["Design", "Hosting"] and ans.get(QID["Newsletter?"]) == "yes" and QID["What do you need?"] in ans
       and en[0][2] == "Eve" and en[0][3] == "buyer@example.com", "the entry: answers by question id, the sender " + str(en[:1])[:300])
@@ -304,6 +307,7 @@ es = j.get("entries") or []
 check(r.ok and len(es) == 4 and [x["id"] for x in j["questions"]] == [x["id"] for x in q] and es[-1]["task_id"] == T
       and es[-1]["client"] == {"id": ACME, "name": "Acme Example"} and es[-1]["answers"][QID["Budget"]] == "Medium",
       "the entries: newest first, the answers, the client " + r.text[:400])
+check(es and es[-1].get("client_typed") is True, "#2496: the evaluation marks the typed match " + str(es[-1:])[:200])
 r = A.get(B + f"/api/forms/{FQ['id']}/entries.csv")
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")))) if r.ok else []
 hdr = rows[0] if rows else []

@@ -43,7 +43,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import g, jsonify, request, send_file
+from flask import g, jsonify, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
@@ -939,12 +939,11 @@ def ox_download(oid):
     fx = ox_foreign(c, oid, own, {**(_state(oid) or {}), "state": "done"})
     if fx:  # 2.278.0 A (#3093): only the starter (the archive is filtered by their rights)
         raise Denied(403, _ox_foreign_msg(st, fx[0]))
-    if own:  # 2.223.2 C (#2871): the own office (0): POST with the step-up -> a ticket, GET with it -> the archive
-        e = stepup_download(c)
-        if e is not None:
-            return e
-    elif request.method == "POST":
-        raise Denied(404)
+    # 2.223.2 C (#2871): the own office (0): POST with the step-up -> a ticket, GET with it -> the archive. 2.360.0 A (#2496):
+    # an organisation's archive too (a login-proxy admin relies on the session there)
+    e = stepup_download(c, proxy_ok=not own)
+    if e is not None:
+        return e
     from ..office.ledger import ofx_log
     with system_ctx(c):  # 2.152.0 (#2167, review A4): an instance admin of a retired organisation is no member of it
         ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)

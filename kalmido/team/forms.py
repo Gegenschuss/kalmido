@@ -7,6 +7,7 @@ import re
 import secrets
 import threading
 import time
+import urllib.parse
 
 from flask import g, jsonify, request
 
@@ -17,7 +18,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
-from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_list
+from ..core.access import acx_anon_bind, Denied, list_role, MANAGE_ROLES, need_feat, need_list
 from ..tasks.validation import log_act
 from ..core.errors import BadInput
 from ..api.common import hit_budget, hit_limit
@@ -251,6 +252,11 @@ def _find(c, token):
             # 2.37.0 (review K2-2): a signed-in person of another organisation uses a public form like a visitor (the
             # context hook prefers g.user, whose organisations do not include the list's)
             g.user = None
+    # 2.360.0 D (#2496): a public form of a private list: a signed-in person who is neither its owner nor in the list sends
+    # like a visitor too (not as an author with their own account, files on their own quota)
+    if r is not None and g.user and r["access"] == "public" and not r["l_org"] and g.user["id"] != r["l_owner"] \
+            and not list_role(c, r["list_id"], g.user["id"]):
+        g.user = None
     if r is not None and not g.user:
         acx_anon_bind(c, r["l_org"])  # ... a visitor without an account works inside exactly the list's organisation
     return r
@@ -301,11 +307,33 @@ def _may_use(c, f):
     if f["l_org"]:
         owner_orgs = {f["l_org"]}
     if not owner_orgs:  # 2.148.1 D (#2495): an internal form of someone without an organisation is private: who sees the list
-        from ..core.access import list_role
         return None if g.user["id"] == f["l_owner"] or list_role(c, f["list_id"], g.user["id"]) else _gone(lg)
     if owner_orgs and not owner_orgs & mine and not (g.user["is_admin"] and instance_mode(c) != "workspaces"):
         return _gone(lg)
     return None
+
+
+def frm_origin_ok():
+    """2.360.0 D (#2496): a signed-in sender has no stamp (the visitor's check): a browser without Sec-Fetch-Site must not
+    send a foreign Origin or, without one, a foreign Referer (compared with this request's host and PUBLIC_URL)."""
+    if request.headers.get("Sec-Fetch-Site", ""):
+        return True  # cross-site was refused before; same-site / same-origin / none are this server's pages or the person
+    for h in ("Origin", "Referer"):
+        v = (request.headers.get(h) or "").strip()
+        if v and v != "null":
+            host = (urllib.parse.urlsplit(v).netloc or "").lower()
+            return bool(host) and host in frm_own_hosts()
+    return True
+
+
+def frm_own_hosts():
+    """2.360.0 R (#2496, review): the hosts this server is reached under: the request's (a trusted proxy's X-Forwarded-Host is
+    in it already), PUBLIC_URL's when set, and X-Forwarded-Host also from a proxy not named as trusted (one that rewrites
+    Host): a foreign page cannot make the person's browser send that header, so it proves no origin but costs nothing."""
+    out = {request.host.lower(), (urllib.parse.urlsplit(PUBLIC_URL).netloc or "").lower()}
+    out.update(h.strip().lower() for h in (request.headers.get("X-Forwarded-Host") or "").split(","))
+    out.discard("")
+    return out
 
 
 def frm_stamp(c, fid, t=None, n=None):
@@ -401,7 +429,7 @@ def form_send(token):
     if not f:
         return _gone()
     lg = _lang(c, f)
-    if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
+    if request.headers.get("Sec-Fetch-Site", "") == "cross-site" or (g.user and not frm_origin_ok()):
         return _msg(tr("Not allowed", lg=lg), tr("Please send the form from its own page.", lg=lg), lg, 403)
     bad = _may_use(c, f)
     if bad:
@@ -479,8 +507,9 @@ def form_send(token):
         return again(tr(LE2B_OFF_MSG, lg=lg))
     # 2.102.0 C (#2201): a valid client link first (also without the e-mail matching), else as before
     cid, cnote = fq_ck_client(c, f, fq_ck_in())
+    typed = False  # 2.360.0 D (#2496): the client only by the typed address (fq_client)
     if not cid:
-        cid, cnote = fq_client(c, f, email, name, olg) if f["client_match"] else (None, "")  # 2.98.0 B (#1954): only the list's space
+        cid, cnote, typed = fq_client(c, f, email, name, olg) if f["client_match"] else (None, "", False)  # 2.98.0 B (#1954): only the list's space
     if cnote:
         content += "\n\n" + cnote
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
@@ -495,13 +524,15 @@ def form_send(token):
         save_attachment_bytes(c, tid, *upload, owner=None if uid else f["l_owner"])
     if qs:  # 2.98.0 B (#1954): the answers for the evaluation, the files as attachments (sealed, scanned, counted)
         from ..core.pages import save_attachment_bytes
-        fq_entry_save(c, tid, f, cid, sender if g.user or name else "", email if not g.user else "", answers)
+        fq_entry_save(c, tid, f, cid, sender if g.user or name else "", email if not g.user else "", answers, typed)
         for up in q_ups:
             save_attachment_bytes(c, tid, *up, owner=None if uid else f["l_owner"])
     status_url = ""
     if portal:  # 2.63.0 (#1513): the report becomes a ticket with a status link (team/portal.py)
-        from .portal import pt_create, pt_status_url
-        status_url = pt_status_url(pt_create(c, tid, {"id": lid, "org_id": f["l_org"], "owner_id": f["l_owner"]}, f["id"], name, email, client_id=cid)[1])
+        from .portal import pt_create, pt_mail_url, pt_status_url
+        ptid, ptok = pt_create(c, tid, {"id": lid, "org_id": f["l_org"], "owner_id": f["l_owner"]}, f["id"], name, email, client_id=cid)
+        status_url = pt_status_url(ptok)
+        mail_url = pt_mail_url(c, {"id": ptid, "token_hash": _token_hash(ptok)}, ptok)  # 2.360.0 A (#2496): confirms the address
     if not g.user:
         from ..lists.public import PUB_ACTOR
         g.user, g.auth_via = PUB_ACTOR, "public"  # "someone via the form" in the history, News and pushes
@@ -517,7 +548,7 @@ def form_send(token):
     bump(c)
     c.commit()
     if mailed:
-        bgj_add("mail:forms", email, *frm_mail_text(f["title"], subject, status_url, lg))  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
+        bgj_add("mail:forms", email, *frm_mail_text(f["title"], subject, mail_url, lg))  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     if status_url:
         return frm_thanks(token, status_url, email if mailed else "", lg)
     ck = fq_ck_in()  # 2.102.0 C (#2201): "Send another one" keeps the client link

@@ -12,7 +12,7 @@ from ..core import orgcrypt as oc  # 2.306.0 A (#2885)
 from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import lang, N_, tr
 from ..core.db import iso, iso_ms, local_now, now_utc, usettings
-from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, vis_sql, wr_sql, FEAT_OFF
+from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF
 from ..core.serializers import load_tasks, csv_cell
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
@@ -852,6 +852,7 @@ def review(c, uid, period, day, journal=True):
     """{period, from, to, done, open, moved, next, journal}: what uid completed in the day / week (Monday to Sunday) of
     `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days."""
     from ..tasks.dayplan import dayplan_mine_sql
+    tv, tvt = tvis(c, uid), tvis(c, uid, "t.")  # 2.360.0 D (#2496): a participant's hidden tasks stay out (as in every view)
     lo_d = day - timedelta(days=day.weekday()) if period == "week" else day
     hi_d = lo_d + timedelta(days=6 if period == "week" else 0)
     a = datetime(lo_d.year, lo_d.month, lo_d.day, tzinfo=TZ).astimezone(timezone.utc)
@@ -860,22 +861,22 @@ def review(c, uid, period, day, journal=True):
     lo, hi, lo_s, hi_s = iso(a), iso(b), lo_d.isoformat(), hi_d.isoformat()
     done = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "at": r["completed_at"]} for r in c.execute(
         f"""SELECT id, title, list_id, completed_at FROM tasks WHERE completed_by=? AND status=2 AND deleted_at IS NULL
-            AND completed_at>=? AND completed_at<? AND list_id IN {vis_sql()} ORDER BY completed_at LIMIT 200""", (uid, lo, hi, uid, uid))]
+            AND completed_at>=? AND completed_at<? AND list_id IN {vis_sql()} AND {tv} ORDER BY completed_at LIMIT 200""", (uid, lo, hi, uid, uid))]
     mine = dayplan_mine_sql(uid)
     still = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"], "overdue": r["due"] < lo_s}
              for r in c.execute(f"""SELECT t.id, t.title, t.list_id, t.due FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.status=0
                                     AND t.deleted_at IS NULL AND t.parent_id IS NULL AND l.archived=0 AND t.due IS NOT NULL AND t.due<=?
-                                    AND t.list_id IN {vis_sql()} AND {mine} ORDER BY t.due, t.id LIMIT 200""",
+                                    AND t.list_id IN {vis_sql()} AND {tvt} AND {mine} ORDER BY t.due, t.id LIMIT 200""",
                                  (hi_s, uid, uid))]
     moved = [{"task_id": r["task_id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"]} for r in c.execute(
         f"""SELECT DISTINCT a.task_id, t.title, t.list_id, t.due FROM activity a JOIN tasks t ON t.id=a.task_id
             WHERE a.user_id=? AND a.kind IN ('due', 'snooze') AND a.created_at>=? AND a.created_at<?
-              AND t.status=0 AND t.deleted_at IS NULL AND t.due>? AND t.list_id IN {vis_sql()} LIMIT 100""", (uid, lo, hi, hi_s, uid, uid))]
+              AND t.status=0 AND t.deleted_at IS NULL AND t.due>? AND t.list_id IN {vis_sql()} AND {tvt} LIMIT 100""", (uid, lo, hi, hi_s, uid, uid))]
     n0, n1 = (hi_d + timedelta(days=1)).isoformat(), (hi_d + timedelta(days=7)).isoformat()
     nxt = [{"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "due": r["due"], "time": r["due_time"]}
            for r in c.execute(f"""SELECT t.id, t.title, t.list_id, t.due, t.due_time FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.status=0
                                   AND t.deleted_at IS NULL AND t.parent_id IS NULL AND l.archived=0 AND t.due>=? AND t.due<=?
-                                  AND t.list_id IN {vis_sql()} AND {mine} ORDER BY t.due, t.due_time IS NULL, t.due_time, t.id LIMIT 100""",
+                                  AND t.list_id IN {vis_sql()} AND {tvt} AND {mine} ORDER BY t.due, t.due_time IS NULL, t.due_time, t.id LIMIT 100""",
                                 (n0, n1, uid, uid))]
     out = {"period": period, "from": lo_s, "to": hi_s, "done": done, "open": still, "moved": moved, "next": nxt}
     if journal:

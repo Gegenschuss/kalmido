@@ -41,7 +41,7 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 KEY = base64.b64encode(os.urandom(32)).decode()
 O = "/api/office"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 NOSTART = os.environ.get("P21481C_NOSTART") == "1"
 
 
@@ -96,7 +96,7 @@ def export_of(s, secs=120):
             break
         time.sleep(0.25)
     assert j.get("state") == "done", j
-    r = s.get(B + "/api/account/export/file")
+    r = su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     return r.content
 
@@ -248,7 +248,7 @@ check(all("attachments/" + k in zj.get("names", []) for k in FILES) and zj.get("
 code = "import os, sys, json, shutil\nATT = sys.argv[1]\nfor rel in json.loads(sys.argv[2]): os.remove(os.path.join(ATT, rel))\n" \
        "p = os.path.join(ATT, sys.argv[3]); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w').write('keep me')\n"
 subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, json.dumps(list(FILES)), UNKNOWN], capture_output=True, text=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), f"#2482: restore {r.status_code} {r.text[:300]}")
 A = sess("alice")
 code = "import os, sys, json\nATT = sys.argv[1]\nprint(json.dumps({rel: open(os.path.join(ATT, rel), 'rb').read().hex() if os.path.exists(os.path.join(ATT, rel)) else None " \
@@ -267,7 +267,7 @@ subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT], capture_output
 NEWER = "tchat/7/after-backup.txt"
 code = "import os, sys\np = os.path.join(sys.argv[1], sys.argv[2]); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w').write('newer')\n"
 subprocess.run(["docker", "exec", CT, "python", "-c", code, ATT, NEWER], capture_output=True, text=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), f"#2482: second restore {r.status_code} {r.text[:300]}")
 A = sess("alice")
 code = "import os, sys\nbase = os.path.dirname(sys.argv[1].rstrip('/')); pre = os.path.basename(sys.argv[1].rstrip('/')) + '.pre-restore-'\n" \
