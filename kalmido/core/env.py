@@ -175,6 +175,7 @@ VARS = (
     _v("KALMIDO_DOCS_SCAN_S", "60", "Seconds between two looks into the document inbox folders.", "files"),
     _v("KALMIDO_DOCS_THUMB_FILL", "on", "Switch: create missing document previews in the background.", "files"),
     _v("KALMIDO_DOCS_THUMB_FILL_S", "15", "Seconds between two portions of previews.", "files"),
+    _v("KALMIDO_OFFICE_STORE_FILL", "on", "Switch: store the files of old finalised office documents once (GoBD).", "files"),  # 2.357.0 (#3221)
     _v("KALMIDO_DOCS_ZIP_MAX_FILES", "2000", "Files per document ZIP download at most.", "files"),
     _v("KALMIDO_DOCS_ZIP_MAX_MB", "1024", "Size in MB of a document ZIP download at most.", "files"),
     _v("KALMIDO_FILES_ZIP_MAX_FILES", "5000", "Files per ZIP download of attachments at most.", "files"),

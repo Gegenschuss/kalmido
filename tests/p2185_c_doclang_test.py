@@ -62,10 +62,12 @@ OLD_PDF = {  # office/pdf.py PDF_LABELS up to 2.167
     "producing": ("Producing", "Producing")}
 for k, (de, en) in OLD_PDF.items():
     check(pdf.tr(pdf.PDF_LABELS[k], lg="de") == de and pdf.tr(pdf.PDF_LABELS[k], lg="en") == en, f"pdf label {k}: de / en as before")
-check(len(pdf.PDF_LABELS) == len(OLD_PDF), "pdf: no label lost")
+# 2.357.0 C (#3182): + accept_text (the order sentence above the signature lines of a quotation)
+NEW_PDF = {"accept_text"}
+check(set(pdf.PDF_LABELS) == set(OLD_PDF) | NEW_PDF, "pdf: no label lost")
 check(pdf.tr(pdf.PDF_LABELS["title"], lg="fr") == "Devis" and pdf.tr(pdf.PDF_LABELS["vat"], lg="nl") == "Btw", "pdf: fr / nl words")
 
-OLD_CALC = {  # office/calc.py LABELS up to 2.167
+OLD_CALC = {  # office/calc.py LABELS up to 2.167 (2.357.0 (#3183): German "Summe netto" / "Gesamt brutto")
     "producing_detail": ("{days} {day_word} = {qty} {prod_word} / {quot}, auf halbe Tage gerundet", "{days} {day_word} = {qty} {prod_word} / {quot}, rounded to half days"),
     "raw_optional": ("Optional: Bereitstellung der Rohdaten", "Optional: Delivery of raw data"), "raw_included": ("Bereitstellung der Rohdaten", "Delivery of raw data"),
     "share_detail": ("{amount} / {rate} x {factor} = {days} Tage, auf halbe Tage gerundet", "{amount} / {rate} x {factor} = {days} days, rounded to half days"),
@@ -73,9 +75,9 @@ OLD_CALC = {  # office/calc.py LABELS up to 2.167
     "surcharge_detail": ("{pct} % auf die markierten Positionen", "{pct} % on the marked positions"),
     "surcharge_detail_stacked": ("{pct} % auf die markierten Positionen und die Handlungskosten", "{pct} % on the marked positions and the handling costs"),
     "raw_detail": ("{pct} % der Positionen mit Rohdaten", "{pct} % of the positions with raw data"), "discount": ("Rabatt", "Discount"),
-    "discount_detail": ("{pct} % auf die markierten Positionen", "{pct} % on the marked positions"), "net": ("Summe Netto", "Net Total"),
+    "discount_detail": ("{pct} % auf die markierten Positionen", "{pct} % on the marked positions"), "net": ("Summe netto", "Net Total"),
     "net_incl_raw": ("Summe netto mit Option Rohdaten", "Net total with option raw data"), "net_excl_raw": ("ohne Rohdaten", "excluding raw data"),
-    "gross": ("Gesamt Brutto", "Gross Total"), "tax_standard": ("MwSt. {pct} %", "VAT {pct} %"), "tax_reduced": ("MwSt. {pct} %", "VAT {pct} %"),
+    "gross": ("Gesamt brutto", "Gross Total"), "tax_standard": ("MwSt. {pct} %", "VAT {pct} %"), "tax_reduced": ("MwSt. {pct} %", "VAT {pct} %"),
     "tax_exempt": ("steuerfrei", "tax exempt"), "vat_note": ("Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "All prices plus 7 % or 19 % VAT."),
     "novat_note": ("Nicht im Inland steuerbar / Reverse-Charge-Verfahren.", "Not taxable domestically / reverse charge."),
     "fx_note": ("Wechselkurs 1 €: {rate} $", "Exchange rate €1: ${rate}"), "unit_day": ("Tage", "days"), "unit_hour": ("Std.", "h"),

@@ -192,7 +192,8 @@ r = A.post(B + LT, json={"client_id": CL, "subject": "Mit Unterschrift", "body":
 L3 = r.json()
 check(L3["greeting"] == "Beste Grüße" and L3["sign_name"] == "Alice Admin, Geschäftsführerin" and L3["sign_image"] == 1, "a new letter takes the profile")
 p = A.get(B + f"{LT}/{L3['id']}/pdf").content
-check(b"/Sig" in p and in_pdf(p, "Beste Grüße"), "PDF: the signature picture is in")
+# 2.357.0 (#3158): a draft carries no signature picture any more (its room stays free); the sent letter has it (p2357_c_signature_test)
+check(b"/Sig Do" not in p and in_pdf(p, "Beste Grüße"), "PDF: the draft keeps the room of the signature picture free")
 check(b"/Sig" not in A.get(B + f"{LT}/{L1['id']}/pdf").content, "PDF: not in a letter without sign_image")
 check(A.delete(B + LT + "/profile/image").json()["has_image"] is False and b"/Sig" not in A.get(B + f"{LT}/{L3['id']}/pdf").content, "picture removed")
 

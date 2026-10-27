@@ -183,6 +183,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_OCR_PAGES` | `30` | Pages recognised per document at most. |
 | `KALMIDO_OCR_PAGE_S` | `60` | Seconds per page at most. |
 | `KALMIDO_OCR_PARALLEL` | `1` | Documents recognised at the same time. |
+| `KALMIDO_OFFICE_STORE_FILL` | `on` | Switch: store the files of old finalised office documents once (GoBD). |
 | `KALMIDO_PAPERLESS_ZIP_CHUNK_KB` | `8192` | Size in KB of one upload part of a Paperless export. |
 | `KALMIDO_PAPERLESS_ZIP_DIR` | `<data dir>/paperless-zip` | Folder of the Paperless export uploads while they are imported. |
 | `KALMIDO_PAPERLESS_ZIP_MAX_MB` | `4096` | Size in MB of one uploaded Paperless export. |

@@ -27,7 +27,7 @@ from ..core.db import body, bump, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
-from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, pb_cl_sql, pb_owner
+from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, office_settings, pb_cl_sql, pb_owner
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .rights import ofr_admin_or, ofr_allows, ofr_need_area
 from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
@@ -394,7 +394,13 @@ def lt_sig_image(c, oid, d):
     owner = d.get("created_by") or me
     if not owner or (me is not None and me != owner):
         return None
-    p = lt_profile(c, oid, owner)
+    return lt_sig_pic(c, oid, owner)
+
+
+def lt_sig_pic(c, oid, uid):
+    """2.357.0 C (#3158): the signature picture of person uid's profile in area oid as a PDF image object, or None. The caller
+    makes sure uid is the person who signs (letters, documents from templates, quotations: never someone else's picture)."""
+    p = lt_profile(c, oid, uid) if uid else None
     if not p or not p.get("image"):
         return None
     from .pdf import pdf_image_object
@@ -402,6 +408,31 @@ def lt_sig_image(c, oid, d):
         return pdf_image_object(base64.b64decode(p["image"]))
     except (binascii.Error, ValueError):
         return None
+
+
+def lt_doc_sig(c, oid, r, model):
+    """2.357.0 C (#3158): office setting "sign_offers" (default off): quotations / cost estimates and payment reminders carry
+    the signature picture of the person who finalised them (office_docs.locked_by) -- never a draft / trial document (one
+    with a mark), never another person's picture. Puts it into print model as signature_image (base64). Returns model.
+    Review M1: the picture is the one frozen in the sender snapshot at finalising (ledger.ofx_finalize, sender.sign_image),
+    so a later setting or a new profile picture never changes a finalised document."""
+    if model.get("kind") not in ("offer", "reminder") or model.get("draft_mark") or not model.get("signature"):
+        return model
+    if not r["locked_at"] or not r["locked_by"]:
+        return model
+    try:
+        snd = json.loads(r["sender"] or "{}")
+    except ValueError:
+        snd = {}
+    img = snd.get("sign_image") if isinstance(snd, dict) else ""
+    if img and isinstance(img, str):
+        model["signature_image"] = img
+    return model
+
+
+def lt_sig_name(c, oid, uid):
+    """2.357.0 C (#3158): the name under the signature of person uid (the profile's name, else the account's name)."""
+    return ((lt_profile(c, oid, uid) or {}).get("name") or lt_user_name(c, uid)) if uid else ""
 
 
 LT_ADDR_LINES = 9  # 2.296.0 E (#3170): address lines the window holds (10 pt, below the sender line, above the text)
@@ -430,6 +461,7 @@ def lt_pdf(c, oid, d):
     from .docs import _fmt_date
     from .doctpl import _pack, dt_blocks, dt_company
     from .ledger import ofx_sender_line
+    P = P.pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156): the office's paper size
     lang = lt_lang(c, oid, d.get("lang"))
     co = dt_company(c, oid, lang)
     accent = co.get("color") or "#2f5d8a"
@@ -444,11 +476,11 @@ def lt_pdf(c, oid, d):
         if logo:
             images["Logo"] = logo
     sig = lt_sig_image(c, oid, d)
-    if sig:
-        images["Sig"] = sig
     subject = d.get("subject") or ""
     title = subject or tr("Letter", lg=lang)
     draft = tr("Draft", lg=lang).upper() if d.get("status") == "draft" else ""
+    if sig and not draft:  # 2.357.0 C (#3158): the picture only in the finished letter; the draft keeps its room free
+        images["Sig"] = sig
     body_sz, lh = 10, 10 * 1.42
     pages = []
     # 2.184.0 C (#2581): an own letterhead (office.letterhead) lies under the letter as under the other office PDFs
@@ -472,8 +504,8 @@ def lt_pdf(c, oid, d):
             if hide_head:  # the letterhead brings logo, name and fold marks
                 pass
             elif logo:
-                sc = min(P.PDF_LOGO_MAX_W / logo[0], P.PDF_LOGO_MAX_H / logo[1])
-                p.image("Logo", PL + PCW - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
+                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 # bundle 2.305 (#3170): the name lines one under the other, as the templates and the other office PDFs print
                 # them (2.99.0 D #2188; the joined name of several lines ran out of the page on the left)
@@ -481,7 +513,7 @@ def lt_pdf(c, oid, d):
                 for i, ln in enumerate(hl):
                     p.text(PL + PCW, P.PDF_TOP + 4 * P.MM + i * 18, ln, 15, True, P.C_INK, align="r", spacing=1.2)
                 p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(hl) - 1) * 18, 12 * P.MM, 2.2, accent)
-            for y in (() if hide_head else (105 * P.MM, 148.5 * P.MM, 210 * P.MM)):  # fold marks + punch mark
+            for y in (() if hide_head else P.PDF_MARKS):  # fold marks + punch mark (2.357.0 A (#3156): of the paper size)
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
         else:
             hy = PNT - 18 * P.MM if BPD else 12 * P.MM
@@ -563,7 +595,8 @@ def lt_pdf(c, oid, d):
             page.text(PL, y, s, body_sz)
             y += lh
     if sig:
-        page.image("Sig", PL, y + 2, sig_w, sig_h)
+        if not draft:
+            page.image("Sig", PL, y + 2, sig_w, sig_h)
         y += sig_h + 6
     else:
         y += lh * 2
@@ -575,16 +608,18 @@ def lt_pdf(c, oid, d):
         page.text(PL, y, sname, body_sz)
     total = len(pages)
     for n, p in enumerate(pages, 1):
+        pg = tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else ""  # 2.357.0 D (#3183): from two pages on, as the other PDFs
         if BPD and BPD["hide_footer"]:  # the letterhead has its own footer: only the page count under the body
-            p.text(PL + PCW, BPD["bottom"][n > 1] + 3 * P.MM, tr("Page {0} of {1}", n, total, lg=lang), 6.8, False, P.C_INK2, align="r")
+            if pg:
+                p.text(PL + PCW, BPD["bottom"][n > 1] + 3 * P.MM, pg, 6.8, False, P.C_INK2, align="r")
             continue
-        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang), foot_fit, foot_h, PL, PCW)
+        P.pdf_draw_footer(p, foot, pg, foot_fit, foot_h, PL, PCW)
     if draft:  # 2.294.0 (#3155): DRAFT as the diagonal watermark on every page (was a head line)
         for p in pages:
             p.mark(draft)
     if BPD:
         P.bp_finish(pages, BPD)
-    meta = {"when": now_utc(), "producer": f"Kalmido {APP_VERSION}"}
+    meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}  # 2.357.0 D (#3183): "v" as the other office PDFs
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
 

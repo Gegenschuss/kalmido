@@ -6,7 +6,7 @@
  - no "Dieses Angebot ist gültig bis" sentence below the table (the head has "Gültig bis"), no "Kunde" row, no page
    count next to the title
  - one VAT rate -> no VAT column, the note names that rate; mixed rates -> the column stays, both rates named
- - the option as three rows of the totals: "Summe Netto", "+ Optional: …", "Summe netto mit Option Rohdaten"; no
+ - the option as three rows of the totals: "Summe netto", "+ Optional: …", "Summe netto mit Option Rohdaten"; no
    "inklusive Rohdaten", no "… € netto" box
  - footer: "E-Mail: x" with a colon
  - 3 and 8 positions with and without option; 8 positions with the appendix: the totals stay on page 1
@@ -142,15 +142,15 @@ def scenario(S, who):
     allt, first = "\n".join(pg), squash(pg[0])
     check(len(pg) == 2, f"{who} 3: main page + appendix ({len(pg)})")
     moved(pg, who, "3 positions")
-    check(squash("POS.LEISTUNGMENGEPREISGESAMT") in first and "PREISMWST." not in first,
+    check(squash("POS.LEISTUNGMENGEEINZELPREISGESAMT") in first and "PREISMWST." not in first,  # 2.357.0 (#3183): Einzelpreis
           f"{who} 3: one rate -> no VAT column")
     check("Alle Preise zuzüglich 19 % MwSt." in allt and "7 %" not in allt, f"{who} 3: the note names 19 % only")
     check("gültig bis" not in allt and "Gültig bis" in pg[0], f"{who} 3: no 'gültig bis' sentence, the head has the date")
     check(not re.search(r"Kunde\s*Muster Agentur", allt), f"{who} 3: no 'Kunde' row")
     check(squash("Seite 1 von 2") in first and first.count(squash("Seite 1 von 2")) == 1, f"{who} 3: the page count once, in the footer")
-    check(squash(OPT_ROW) in first and squash(INC_ROW) in first and "Summe Netto" in pg[0], f"{who} 3: net, + option, net with option")
+    check(squash(OPT_ROW) in first and squash(INC_ROW) in first and "Summe netto" in pg[0], f"{who} 3: net, + option, net with option")  # 2.357.0 (#3183): Summe netto
     check("inklusive Rohdaten" not in allt and not re.search(r"€\s*netto", allt), f"{who} 3: no 'inklusive Rohdaten', no '… € netto' box")
-    i_net, i_opt, i_inc = first.find("SummeNetto"), first.find(squash(OPT_ROW)), first.find(squash(INC_ROW))
+    i_net, i_opt, i_inc = first.find("Summenetto"), first.find(squash(OPT_ROW)), first.find(squash(INC_ROW))  # 2.357.0 (#3183): Summe netto (the first match is the net row, the one with option follows)
     check(0 <= i_net < i_opt < i_inc, f"{who} 3: the three rows in order ({i_net} {i_opt} {i_inc})")
     check(any("E-Mail: post@musterfilm.example" in ln for t in pg for ln in t.splitlines()), f"{who}: 'E-Mail:' with a colon in the footer")
     check(any("+49 30 123456789" in ln for ln in pg[0].splitlines()), f"{who}: the phone stays grouped")
@@ -158,9 +158,9 @@ def scenario(S, who):
     q8 = quotation(S, who, cl, items(8, mixed=True))
     pg8 = pdf(S, q8, f"{who}-8pos-mixed" if who == "org" else "")
     f8 = squash(pg8[0])
-    check(squash("POS.LEISTUNGMENGEPREISMWST.GESAMT") in f8, f"{who} 8: mixed rates -> the VAT column stays")
+    check(squash("POS.LEISTUNGMENGEEINZELPREISMWST.GESAMT") in f8, f"{who} 8: mixed rates -> the VAT column stays")  # 2.357.0 (#3183): Einzelpreis
     check("Alle Preise zuzüglich 7 % bzw. 19 % MwSt." in "\n".join(pg8), f"{who} 8: both rates named")
-    check("Leistung Nr. 8" in pg8[0] and "Summe Netto" in pg8[0] and squash(INC_ROW) in f8, f"{who} 8: 8 positions and the totals on page 1")
+    check("Leistung Nr. 8" in pg8[0] and "Summe netto" in pg8[0] and squash(INC_ROW) in f8, f"{who} 8: 8 positions and the totals on page 1")  # 2.357.0 (#3183): Summe netto
     moved(pg8, who, "8 positions")
     # ------------------------------------------------ 8 positions without option: no option rows
     q8n = quotation(S, who, cl, items(8, option=False), title="Ohne Option")

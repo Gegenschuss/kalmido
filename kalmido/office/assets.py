@@ -25,6 +25,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_rows, office_settings, pb_owner
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 
 AST_GWG = Decimal("800")  # low-value assets: written off at once up to this net price (DE, 2026; without guarantee)
 # useful life in months by keyword of category / name (German AfA table, without guarantee; the admin may change it per
@@ -366,6 +367,8 @@ def ast_value_pdf():
     lg = "de" if lang(c, uid) == "de" else "en"
     cur = d["currency"]
     co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
+    ppr = pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)
+    A4_H, PDF_CW, PDF_L, _Page = ppr.A4_H, ppr.PDF_CW, ppr.PDF_L, ppr._Page
     pol = next((p["name"] for p in d["policies"] if p["id"] == _aid_arg()), "") if _aid_arg() else ""
     cols = [(tr("Device"), 0.25, "l"), (tr("Serial number"), 0.15, "l"), (tr("Purchase date"), 0.12, "l"), (tr("New value"), 0.14, "r"),
             (tr("Current value"), 0.14, "r"), (tr("Insured by"), 0.20, "l")]

@@ -29,6 +29,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role, office_settings, ofx_name1, pb_owner
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 
 PD_TEXT_MAX = 20000  # characters of one own text
 PD_VERSIONS_MAX = 500
@@ -431,8 +432,10 @@ def pd_markdown(d):
     return "\n".join(out).rstrip() + "\n"
 
 
-def pd_pdf(d):
+def pd_pdf(d, paper=None):
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_wrap, pdf_write
+    ppr = pdf_paper_ns(paper)  # 2.357.0 A (#3156): the office's paper size (None = A4)
+    A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     title, head = _head(d)
     x0, x1 = 56, A4_W - 56
     w = x1 - x0
@@ -499,7 +502,7 @@ def pd_pdf_get():
     from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     d = pd_state(c, uid, oid, _version_arg(), request.args.get("lang"))
-    data = pd_pdf(d)
+    data = pd_pdf(d, office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)
     ofx_log(c, oid, "export", target="procdoc", detail={"what": "pdf", "version": d["viewing"] or d["version"]}, dedupe_min=5)
     c.commit()
     return Response(data, mimetype="application/pdf",

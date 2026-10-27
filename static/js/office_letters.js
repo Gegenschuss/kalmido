@@ -93,7 +93,7 @@ function ltHead(d) {
     <div class="dtp-head"><h3>${esc(d.subject || tr('New letter'))} ${ltStTag(d)}</h3><p class="dtp-meta">${[d.client_id && d.client_name ? `${ic('brief', 's')} <a href="#client/${d.client_id}">${esc(d.client_name)}</a>` : '', d.contact_id ? `${ic('user', 's')} <a href="#contacts/${d.contact_id}">${esc(tr('Contact'))}</a>` : '', d.agent_id ? `${ic('bot', 's')} ${esc(tr('Drafted by an agent'))}` : ''].filter(Boolean).join('<span class="muted"> · </span>')}</p></div>`;
 }
 function ltEditHtml(d) {
-  const P = LT.data?.profile || {}, mine = d.created_by === LT.data?.me;
+  const mine = d.created_by === LT.data?.me || !d.created_by;  // 2.357.0 C (#3158): an agent's draft is signed by the person handling it
   const chOpts = Object.entries(LT_CH).map(([k, n]) => [k, tr(n)]);
   return ltHead(d) + `<div class="dtp-form lt-form">
     <section class="lt-rc" aria-label="${esc(tr('Recipient'))}">
@@ -112,7 +112,7 @@ function ltEditHtml(d) {
     <label for="lt-body" class="dtp-lab">${tr('Text')}</label>${ltHooks('tools', d)}<textarea id="lt-body" name="body" class="dtp-ta" rows="14" maxlength="60000" spellcheck="true">${esc(d.body || '')}</textarea>
     <p class="muted ofchint">${esc(tr('Paragraphs are separated by an empty line, list items start with -.'))}</p>
     <div class="lt-two">${ltRow('greeting', tr('Greeting'), ltIn('greeting', d.greeting, {max: 120}))}${ltRow('sign_name', tr('Name under the letter'), ltIn('sign_name', d.sign_name, {max: 120}))}</div>
-    ${mine && P.has_image ? ofcChk('lt-sign_image', tr('Use the signature picture'), d.sign_image) : ''}
+    ${mine ? ofcChk('lt-sign_image', tr('With my signature'), d.sign_image && LT.data?.profile?.has_image) : ''}
     <div class="lt-two">${ltRow('channel', tr('Sent by'), ofcSel('lt-channel', d.channel || 'post', chOpts).replace('<select ', '<select name="channel" '))}
       <div class="row lt-trk" ${d.channel === 'registered' ? '' : 'hidden'}><label for="lt-tracking_no">${esc(tr('Tracking number'))}</label>${ltIn('tracking_no', d.tracking_no, {max: 120})}</div></div>
     ${ltRow('followup_days', tr('Follow-up after days'), ltIn('followup_days', d.followup_days || '', {max: 3, num: 1, ph: '14'}), tr('0 or empty = no follow-up'))}
@@ -289,18 +289,52 @@ async function ltSentModal(d) {
     } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }
-function ltProfileModal() {
-  const P = LT.data?.profile || {};
-  let img = P.image || '';
+// 2.357.0 C (#3158): the own signature: a picture (its light background made transparent) or drawn with finger / trackpad
+const LT_PAD_W = 600, LT_PAD_H = 200;
+/** a picture (data URL) -> PNG data URL with near-white pixels transparent, at most 1200 px wide */
+function ltSigClear(url) {
+  return new Promise((ok, no) => {
+    const im = new Image();
+    im.onload = () => {
+      const sc = Math.min(1, 1200 / im.width), cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(im.width * sc)); cv.height = Math.max(1, Math.round(im.height * sc));
+      const cx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d')); cx.drawImage(im, 0, 0, cv.width, cv.height);
+      const px = cx.getImageData(0, 0, cv.width, cv.height), a = px.data;
+      for (let i = 0; i < a.length; i += 4) { const l = (a[i] + a[i + 1] + a[i + 2]) / 3; if (l > 200) a[i + 3] = l > 235 ? 0 : Math.round(a[i + 3] * (235 - l) / 35); }
+      cx.putImageData(px, 0, 0); ok(cv.toDataURL('image/png'));
+    };
+    im.onerror = () => no(new Error(tr('Please choose a PNG or JPEG picture')));
+    im.src = url;
+  });
+}
+/** the drawing field in el: pointer strokes in ink colour; -> {url(): PNG data URL or '' when empty, clear()} */
+function ltSigPad(el) {
+  el.innerHTML = `<canvas class="lt-pad" width="${LT_PAD_W}" height="${LT_PAD_H}" aria-label="${esc(tr('Draw your signature here'))}" style="width:100%;max-width:${LT_PAD_W}px;aspect-ratio:3/1;touch-action:none;background:#fff;border:1px solid var(--line, #ccd);border-radius:8px;cursor:crosshair"></canvas>`;
+  const cv = /** @type {HTMLCanvasElement} */ ($('canvas', el)), cx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+  let drawn = false, last = null;
+  cx.lineWidth = 3; cx.lineCap = 'round'; cx.lineJoin = 'round'; cx.strokeStyle = '#1a2340';
+  const at = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * LT_PAD_W / r.width, (e.clientY - r.top) * LT_PAD_H / r.height]; };
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); try { cv.setPointerCapture?.(e.pointerId); } catch { /* not a live pointer */ } last = at(e); cx.beginPath(); cx.arc(last[0], last[1], 1.4, 0, 7); cx.fillStyle = cx.strokeStyle; cx.fill(); drawn = true; });
+  cv.addEventListener('pointermove', e => { if (!last) return; const p = at(e); cx.beginPath(); cx.moveTo(last[0], last[1]); cx.lineTo(p[0], p[1]); cx.stroke(); last = p; });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) cv.addEventListener(t, () => { last = null; });
+  return {url: () => drawn ? cv.toDataURL('image/png') : '', clear: () => { cx.clearRect(0, 0, LT_PAD_W, LT_PAD_H); drawn = false; }};
+}
+/** opts.draw: open with the drawing field; done(profile) after saving */
+function ltProfileModal(opts = {}) {
+  const P = opts.profile || LT.data?.profile || {};
+  let img = P.image || '', pad = null;
   const pic = () => img ? `<img src="${esc(img)}" alt="${esc(tr('Signature picture'))}" class="lt-sigimg">` : `<p class="muted">${tr('No signature picture yet.')}</p>`;
   /** @type {any} */
   const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('The picture is only printed in your own letters.'))}</p>
     ${ofcRowF('lt-pgreet', tr('Greeting'), ofcIn('lt-pgreet', P.greeting, {max: 120, ph: P.default_greeting}))}
     ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}
     <div class="row"><label>${tr('Signature picture')}</label><div class="lt-sigbox">${pic()}</div></div>
+    <div class="lt-padbox" hidden></div>
     <div class="row lt-sigbtns"><label class="btn sm">${ic('upload', 's')} ${tr('Choose picture')}<input type="file" id="lt-pfile" accept="image/png,image/jpeg" hidden></label>
+      <button type="button" class="btn sm" data-m="draw">${ic('edit', 's')} ${tr('Draw')}</button>
+      <button type="button" class="btn sm ghost" data-m="padclr" hidden>${tr('Clear')}</button>
       <button type="button" class="btn sm ghost danger" data-m="rm" ${img ? '' : 'hidden'}>${tr('Remove')}</button></div>
-    <p class="muted ofchint">${esc(tr('PNG or JPEG, at most 300 KB; a scan of your signature on a white background.'))}</p>
+    <p class="muted ofchint">${esc(tr('PNG or JPEG, at most 300 KB; a scan of your signature on a white background.'))} ${esc(tr('A light background is made transparent. Or draw it with your finger or trackpad.'))}</p>
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ofcdlg');
@@ -310,22 +344,33 @@ function ltProfileModal() {
     if (/** @type {any} */ (e.target).id !== 'lt-pfile') return;
     const f = /** @type {any} */ (e.target).files?.[0]; if (!f) return;
     if (!/^image\/(png|jpeg)$/.test(f.type)) { err(tr('Please choose a PNG or JPEG picture')); return; }
-    if (f.size > 300 * 1024) { err(tr('The picture is too large (at most {0} KB)', 300)); return; }
+    if (f.size > 12 * 1024 * 1024) { err(tr('The picture is too large (at most {0} KB)', 300)); return; }  // 2.357.0 C (#3158): made smaller here
     const r = new FileReader();
-    r.onload = () => { img = String(r.result || ''); changed = true; $('.lt-sigbox', md).innerHTML = pic(); $('[data-m="rm"]', md).hidden = false; err(''); };
+    r.onload = async () => {
+      try { img = await ltSigClear(String(r.result || '')); } catch (x) { err(x.message || ''); return; }
+      if (img.length * 3 / 4 > 300 * 1024) { img = P.image || ''; err(tr('The picture is too large (at most {0} KB)', 300)); return; }
+      changed = true; padOff(); $('.lt-sigbox', md).innerHTML = pic(); $('[data-m="rm"]', md).hidden = false; err('');
+    };
     r.readAsDataURL(f);
   });
+  const padOff = () => { pad = null; const pb = $('.lt-padbox', md); pb.hidden = true; pb.innerHTML = ''; $('[data-m="padclr"]', md).hidden = true; $('.lt-sigbox', md).hidden = false; };
+  const padOn = () => { const pb = $('.lt-padbox', md); pb.hidden = false; pad = ltSigPad(pb); $('[data-m="padclr"]', md).hidden = false; $('.lt-sigbox', md).hidden = true; };
+  if (opts.draw && !img) padOn();
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
-    if (b.dataset.m === 'rm') { img = ''; changed = true; $('.lt-sigbox', md).innerHTML = pic(); b.hidden = true; return; }
+    if (b.dataset.m === 'draw') { padOn(); return; }
+    if (b.dataset.m === 'padclr') { pad?.clear(); return; }
+    if (b.dataset.m === 'rm') { img = ''; changed = true; padOff(); $('.lt-sigbox', md).innerHTML = pic(); b.hidden = true; return; }
     const old = {greeting: P.greeting || '', name: P.name || '', image: P.image || ''};
+    if (pad?.url()) { img = pad.url(); changed = true; }
     try {
       const body = {greeting: $('#lt-pgreet', md).value, name: $('#lt-pname', md).value};
       if (changed && img) body.image = img;
       let j = await api('PUT', '/api/office/letters/profile', body);
       if (changed && !img && old.image) j = await api('DELETE', '/api/office/letters/profile/image');
-      md.remove(); if (LT.data) LT.data.profile = j; ofcDraw();
+      md.remove(); if (LT.data) LT.data.profile = j;
+      if (opts.done) opts.done(j); else ofcDraw();
       toast(tr('Saved'), async () => {
         const o = await api('PUT', '/api/office/letters/profile', {greeting: old.greeting, name: old.name, ...(old.image ? {image: old.image} : {})});
         if (LT.data) LT.data.profile = old.image ? o : await api('DELETE', '/api/office/letters/profile/image');
@@ -403,6 +448,11 @@ document.addEventListener('change', e => {
   else if (id === 'lt-fc') { LT.fClient = x.value; ofcDraw(); }
   else if (S.route.mod === 'office' && S.route.tab === 'letters' && S.route.id && id.startsWith('lt-') && !x.closest('.modal')) {
     if (id === 'lt-channel') { const t = $('.lt-trk'); if (t) t.hidden = x.value !== 'registered'; }
+    if (id === 'lt-sign_image' && x.checked && !LT.data?.profile?.has_image) {  // 2.357.0 C (#3158): no picture yet -> set it up first
+      x.checked = false;
+      ltProfileModal({draw: true, done: j => { if (LT.data) LT.data.profile = j; const el = $('#lt-sign_image'); if (j.has_image && el) { el.checked = true; ltSaveSoon(); } }});
+      return;
+    }
     if (id !== 'lt-rsearch') ltSaveSoon();
   }
 });

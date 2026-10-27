@@ -23,7 +23,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
-from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
+from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
@@ -308,7 +308,7 @@ def inv_missing(c, oid, r, s, pack, items):
             miss.append(tr("the client's VAT ID"))
     # 2.296.0 B (#3169): a 0 % position of a taxed invoice needs the reason of its exemption (section 14 (4) no. 8 UStG, BT-120)
     if r["vat_mode"] != "novat" and not str(s.get("exempt_reason") or "").strip() and any(
-            it.get("kind") in ("service", "discount") and pack_tax(pack, it.get("tax") if it.get("tax") in TAX_KEYS else "standard") == 0 for it in items):
+            it.get("kind") in ("service", "discount") and it.get("tax") == "exempt" and pack_tax(pack, "exempt") == 0 for it in items):  # 2.357.0 (#3217): a 0 % standard / reduced rate is zero rated (Z), no reason
         miss.append(tr("reason for the tax exemption of the 0 % positions (office settings, invoices)"))
     return miss
 
@@ -896,8 +896,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
                          so["number"] + (f" ({m['source_offer']['date_text']})" if m["source_offer"]["date_text"] else "")])
     if m["order_ref"]:
         meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
-    if r["project_title"]:
-        meta.append([L.get("project", tr("Project title|document", lg=lang)), r["project_title"]])
+    # 2.357.0 B (#3181): no "Betreff" row in the head -- the project title is printed in bold below the title (was twice)
     if m["recipient"].get("customer_no"):
         meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), m["recipient"]["customer_no"]])
     if kind in ("invoice", "credit") and m["recipient"].get("vat_id"):  # 2.296.0 B (#3168): section 14a (1) UStG
@@ -908,7 +907,9 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
                      m["recipient"]["buyer_reference"]])
     meta.append([L.get("date", tr("Date|document", lg=lang)), m["date_text"]])
     if m["service_period_text"]:
-        meta.append([L.get("service_period", tr("Service period|document", lg=lang)), m["service_period_text"]])
+        one = m.get("service_from") in (None, "", m.get("service_to")) or not m.get("service_to")  # 2.357.0 D (#3183): one day = service date
+        meta.append([L.get("service_date", tr("Service date|document", lg=lang)) if one else L.get("service_period", tr("Service period|document", lg=lang)),
+                     m["service_period_text"]])
     if kind == "invoice" and m["due_date"]:
         meta.append([L.get("due", tr("Due on|document", lg=lang)), m["due_date_text"]])
     home = t.get("home") or "EUR"  # 2.189.0 (#2475): documents of before were computed in EUR
@@ -933,7 +934,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
     # 2.296.0 B (#3169): tax-exempt positions of a taxed invoice name their reason (PDF note beside the sums, e-invoice BT-120)
     if kind in ("invoice", "credit") and r["vat_mode"] != "novat" and any(  # 2.296.0 F (#3169): from the lines, a 0 EUR one has no tax line
-            ln.get("kind") in ("item", "discount") and dec(ln.get("tax_pct") or 0) == 0 for ln in t.get("lines") or []):
+            ln.get("kind") in ("item", "discount") and ln.get("tax") in ("exempt", None) and dec(ln.get("tax_pct") or 0) == 0 for ln in t.get("lines") or []):  # 2.357.0 (#3217)
         m["exempt_reason"] = str((snd.get("exempt_reason") if ofx_locked(r) else office_settings(c, oid).get("exempt_reason")) or "").strip()
         tot["exempt_note"] = m["exempt_reason"]
     tot["fx_line"] = ""
@@ -948,10 +949,13 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             "{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang != "en" else "."))
     if kind == "reminder":
         rows = [[L.get("open_total", tr("Amount outstanding|document", lg=lang)), tot["net_text"]]]
-        rows += inv_reminder_extra_rows(t, lang, cur)  # 2.355.0 D (#2846): default interest + flat fee (empty when off)
+        extra = inv_reminder_extra_rows(t, lang, cur)  # 2.355.0 D (#2846): default interest + flat fee (empty when off)
+        rows += extra
         if dec(t.get("fee") or 0) > 0:
             rows.append([L.get("reminder_fee", tr("Reminder fee|document", lg=lang)), t.get("fee_text") or ""])
-        rows.append([L.get("reminder_total", tr("Total amount due|document", lg=lang)), tot["gross_text"]])  # 2.40.0 (#1368)
+        if extra or dec(t.get("fee") or 0) > 0:
+            # 2.357.0 B (#3181): the total only with a fee / interest (without one it repeated the outstanding amount)
+            rows.append([L.get("reminder_total", tr("Total amount due|document", lg=lang)), tot["gross_text"]])  # 2.40.0 (#1368)
         deadline = ""
         if r["date"] and _col(r, "reminder_deadline_days"):
             deadline = fmt_date((date.fromisoformat(r["date"]) + timedelta(days=int(r["reminder_deadline_days"]))).isoformat(), pack)

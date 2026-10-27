@@ -31,6 +31,7 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
 
 CB_DIRS = ("in", "out")
@@ -816,6 +817,8 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
+    ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
+    A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
     lg = "de" if lg == "de" else "en"
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency

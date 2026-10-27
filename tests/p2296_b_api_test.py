@@ -211,5 +211,20 @@ check(r.status_code == 201, "final invoice " + r.text[:160])
 ded = [ln.get("title") or "" for ln in render(r.json()["id"]).get("lines") or [] if (ln.get("title") or "").startswith("Less progress invoice no.")]
 check(ded and re.search(r" of \d{1,2} [A-Z][a-z]+ \d{4}$", ded[0]) is not None, f"F #3175: deduction dated in English: {ded}")
 
+# 2.357.0 (#3217): an office with a true zero rate (standard 0 %, e.g. UK) finalises without an exemption reason, the XML says Z
+r = Fr.put(B + O + "/settings", json={"pack": "XX", "exempt_reason": "", "tax_rates": {"standard": 0, "reduced": 0}})  # own rates: the base pack only
+check(r.ok and r.json()["settings"]["pack"] == "XX", "#3217: base pack with a zero standard rate " + r.text[:160])
+ZR = invoice(CDE, [{"title": "Regie", "qty": 1, "rate": 1000}])
+check(render(ZR)["totals"].get("exempt_note") in (None, ""), f"#3217: no exemption note for a zero rated invoice: {render(ZR)['totals'].get('exempt_note')!r}")
+r = Fr.post(B + f"{D}/{ZR}/finalize")
+check(r.ok and r.json().get("locked"), "#3217: zero rated invoice finalised without an exemption reason " + r.text[:200])
+x = Fr.get(B + f"{D}/{ZR}/xml")
+check(x.ok and b"<ram:CategoryCode>Z</ram:CategoryCode>" in x.content and b"<ram:ExemptionReason>" not in x.content,
+      "#3217: the XML: category Z, no reason " + re.sub(rb"\s+", b" ", x.content[x.content.find(b"<ram:ApplicableTradeTax>"):][:300]).decode(errors="replace"))
+EZ = invoice(CDE, [{"title": "Kurs", "qty": 1, "rate": 300, "tax": "exempt"}])
+r = Fr.post(B + f"{D}/{EZ}/finalize")
+check(r.status_code == 400 and "tax exemption" in r.json().get("error", ""), "#3217: an exempt position still needs the reason " + r.text[:200])
+Fr.put(B + O + "/settings", json={"pack": "DE", "tax_rates": {}})
+
 print(f"p2296_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

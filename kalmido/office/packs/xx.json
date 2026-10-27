@@ -58,17 +58,18 @@
       "invoice_no": "Rechnung Nr.",
       "project": "Betreff",
       "ref": "Ref./PO-Nr.",
+      "offer_ref": "Ihre Referenz",
       "client": "Kunde",
       "date": "Datum",
       "valid_until": "Gültig bis",
       "pos": "Pos.",
       "title": "Leistung",
       "qty": "Menge",
-      "unit_price": "Preis",
+      "unit_price": "Einzelpreis",
       "vat": "USt.",
       "total": "Gesamt",
-      "net_total": "Summe Netto",
-      "gross_total": "Summe Brutto",
+      "net_total": "Summe netto",
+      "gross_total": "Gesamt brutto",
       "incl_raw": "Summe netto mit Option Rohdaten",
       "excl_raw": "ohne Rohdaten",
       "raw_optional": "Optional: Bereitstellung der Rohdaten",
@@ -116,6 +117,7 @@
       "to_offer": "zu Angebot Nr.",
       "customer_no": "Kunden-Nr.",
       "service_period": "Leistungszeitraum",
+      "service_date": "Leistungsdatum",
       "due": "Fällig am",
       "fx": "Wechselkurs 1 €",
       "subtotal": "Zwischensumme",
@@ -138,17 +140,18 @@
       "invoice_no": "Invoice No.",
       "project": "Project",
       "ref": "Ref./PO No.",
+      "offer_ref": "Your reference",
       "client": "Client",
       "date": "Date",
       "valid_until": "Valid until",
       "pos": "No.",
-      "title": "Title",
+      "title": "Description",
       "qty": "Qty",
-      "unit_price": "Unit Price",
+      "unit_price": "Unit price",
       "vat": "VAT",
       "total": "Total",
-      "net_total": "Net Total",
-      "gross_total": "Gross Total",
+      "net_total": "Net total",
+      "gross_total": "Gross total",
       "incl_raw": "Net total with option raw data",
       "excl_raw": "excluding raw data",
       "raw_optional": "Optional: delivery of raw data",
@@ -156,9 +159,9 @@
       "producing": "Producing",
       "discount": "Discount",
       "rights": "Transfer of rights",
-      "rights_time": "Duration of License",
-      "rights_territory": "Territorial Rights",
-      "rights_media": "Rights by Medium",
+      "rights_time": "Duration of licence",
+      "rights_territory": "Territorial rights",
+      "rights_media": "Rights by medium",
       "rights_exceptions": "Exceptions",
       "rights_exclusive": "Exclusive",
       "page_of": "Page {x} of {y}",
@@ -196,6 +199,7 @@
       "to_offer": "Re quotation No.",
       "customer_no": "Customer No.",
       "service_period": "Service period",
+      "service_date": "Service date",
       "due": "Due on",
       "fx": "Exchange rate €1",
       "subtotal": "Subtotal",
@@ -283,7 +287,7 @@
       },
       {
         "key": "internal_web_unpaid",
-        "de": "intern, web, unpaid media",
+        "de": "intern, Web, unbezahlte Medien",
         "en": "internal use, web, unpaid media"
       },
       {
@@ -293,7 +297,7 @@
       },
       {
         "key": "web_social_paid",
-        "de": "web, social media, paid media",
+        "de": "Web, Social Media, bezahlte Medien",
         "en": "web, social media, paid media"
       }
     ],
@@ -302,7 +306,7 @@
       "en": "regarding the project referenced above, we are pleased to submit the following charges for our services:"
     },
     "invoice_closing": {
-      "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere allgemeinen Geschäftsbedingungen.",
+      "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere Allgemeinen Geschäftsbedingungen.",
       "en": "Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply."
     },
     "delivery_intro": {
@@ -314,8 +318,8 @@
       "en": "Goods or services received in full and in good condition."
     },
     "credit_intro": {
-      "de": "zu der unten genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
-      "en": "regarding the invoice referenced below we issue the following credit note:"
+      "de": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
+      "en": "regarding the invoice referenced above we issue the following credit note:"
     },
     "credit_closing": {
       "de": "Den Gutschriftsbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",

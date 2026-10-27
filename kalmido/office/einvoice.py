@@ -94,20 +94,34 @@ def _exempt(m, lang):
 def _doc_cat(m):
     """(novat, category, VATEX code) of the document by its vat_note; S for taxed documents. 2.296.0 B (#3173): O ("not
     subject to VAT") carries no VAT id of seller or buyer (BR-O-02), so the seller needs its register number (BT-30) for
-    BR-CO-26; without one the document stays G as before (BR-G-02 wants the seller's VAT id, which it keeps)."""
+    BR-CO-26; without one the document stays G as before (BR-G-02 wants the seller's VAT id, which it keeps). 2.357.0 (#3218):
+    the seller's tax number as seller identifier (BT-29, see _seller_id) satisfies BR-CO-26 as well, so O without a register."""
     novat = (m.get("vat_mode") == "novat") or bool(m.get("vat_note_key"))
     if not novat:
         return False, "S", ""
     cat, excode = VAT_CATEGORY.get(m.get("vat_note_key") or "", ("E", ""))
-    if cat == "O" and not str((m.get("sender_fields") or {}).get("register_no") or "").strip():
+    sf = m.get("sender_fields") or {}
+    if cat == "O" and not str(sf.get("register_no") or "").strip() and not str(sf.get("tax_number") or "").strip():
         cat, excode = "G", "VATEX-EU-G"
     return True, cat, excode
 
 
-def _line_cat(cat, pct):
+def _seller_id(m, cat):
+    """2.357.0 (#3218): the seller identifier (BT-29) of a document not subject to VAT (O) without a register number: the
+    seller's tax number (BR-CO-26 without a VAT id, BR-O-02); empty otherwise (the output stays as before)."""
+    sf = m.get("sender_fields") or {}
+    if cat != "O" or str(sf.get("register_no") or "").strip():
+        return ""
+    return str(sf.get("tax_number") or "").strip()
+
+
+def _line_cat(cat, pct, key=""):
     """2.296.0 B (#3169): the category of one line: a taxed document's line at 0 % is exempt (E; BR-S-05: S needs a rate
-    above zero), any other line keeps the document's category."""
-    return "E" if cat == "S" and pct == 0 else cat
+    above zero), any other line keeps the document's category. 2.357.0 (#3217): a line of the standard / reduced rate set
+    to 0 % by the office (a true zero rate, e.g. UK) is Z (zero rated, no exemption reason); the key exempt stays E."""
+    if cat == "S" and pct == 0:
+        return "Z" if key in ("standard", "reduced") else "E"
+    return cat
 
 
 def _reason(m, lang, cat, lcat):
@@ -208,10 +222,13 @@ def fd_split_address(lines):
     return out
 
 
-def _party(parent, tag, name, fields, lang, home, contact=False, email=None, legal_id=None, person=None):
-    """A trade party (seller / buyer) in the schema order: Name, legal organisation, contact, address, URI, tax ids."""
+def _party(parent, tag, name, fields, lang, home, contact=False, email=None, legal_id=None, person=None, party_id=""):
+    """A trade party (seller / buyer) in the schema order: ID (BT-29, 2.357.0 #3218), Name, legal organisation, contact,
+    address, URI, tax ids."""
     f = fields or {}
     p = _e(parent, tag)
+    if party_id:
+        _e(p, "ram:ID", party_id)
     _e(p, "ram:Name", name or "")
     if legal_id:
         _e(_e(p, "ram:SpecifiedLegalOrganization"), "ram:ID", legal_id)
@@ -315,7 +332,7 @@ def ein_build(model, fmt="zugferd"):
         st = _e(li, "ram:SpecifiedLineTradeSettlement")
         t = _e(st, "ram:ApplicableTradeTax")
         _e(t, "ram:TypeCode", "VAT")
-        lcat = _line_cat(cat, pct)  # 2.296.0 B (#3169): the category per line
+        lcat = _line_cat(cat, pct, ln.get("tax"))  # 2.296.0 B (#3169): the category per line (2.357.0 #3217: Z by the tax key)
         _e(t, "ram:CategoryCode", lcat)
         if lcat != "O":  # BR-O-05: no rate for "not subject to VAT"
             _e(t, "ram:RateApplicablePercent", _pct(pct))
@@ -328,7 +345,7 @@ def ein_build(model, fmt="zugferd"):
         _e(ag, "ram:BuyerReference", buyer_ref)
     novid = {"vat_id": ""} if cat == "O" else {}  # 2.296.0 B (#3173): BR-O-02 no VAT ids
     _party(ag, "ram:SellerTradeParty", " ".join(str(sf.get("name") or (m.get("company") or {}).get("name") or "").split()), {**sf, "line2": sf.get("address_extra") or "", **novid}, lang, home, contact=True,  # 2.99.0 D (#2188): BT-27 on one line, BT-36
-           email=sf.get("email"), legal_id=sf.get("register_no"))
+           email=sf.get("email"), legal_id=sf.get("register_no"), party_id=_seller_id(m, cat))  # 2.357.0 (#3218): BT-29
     rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id"), **novid}
     if rc.get("extra"):  # 2.97.0 B (#1951): the client's extra address line (BT-51)
         rfields["line2"] = rc["extra"]
@@ -378,7 +395,7 @@ def ein_build(model, fmt="zugferd"):
         t = _e(se, "ram:ApplicableTradeTax")
         _e(t, "ram:CalculatedAmount", _m(amount))
         _e(t, "ram:TypeCode", "VAT")
-        if lcat != "S":
+        if lcat not in ("S", "Z"):  # 2.357.0 (#3217): BR-Z-10 no exemption reason for zero rated
             _e(t, "ram:ExemptionReason", _reason(m, lang, cat, lcat))
         _e(t, "ram:BasisAmount", _m(base))
         _e(t, "ram:CategoryCode", lcat)
@@ -478,7 +495,8 @@ def ein_check(xml_bytes):
             out.append(f"date not YYYYMMDD / format 102: {d.text}")
     profile = _text(root, "rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID")
     seller = _find(tx, "ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty")
-    if seller is not None and not seller.findall("ram:SpecifiedTaxRegistration/ram:ID", NS) and not _text(seller, "ram:SpecifiedLegalOrganization/ram:ID"):
+    if seller is not None and not seller.findall("ram:SpecifiedTaxRegistration/ram:ID", NS) and not _text(seller, "ram:SpecifiedLegalOrganization/ram:ID") \
+            and not _text(seller, "ram:ID"):  # 2.357.0 (#3218): + the seller identifier BT-29
         out.append("BT-31/BT-32/BT-30 seller tax or registration id missing")
     if "xrechnung" in profile:
         if not _text(tx, "ram:ApplicableHeaderTradeAgreement/ram:BuyerReference"):
@@ -547,8 +565,10 @@ def ein_check(xml_bytes):
             out.append(f"BR-CO-17: tax {amount} for {cat} {pct} % != {want}")
         if by_cat.get((cat, pct), Decimal("0")) != base:
             out.append(f"BR-S-08: basis {base} for {cat} {pct} % != sum of its lines {by_cat.get((cat, pct), Decimal('0'))}")
-        if cat != "S" and not (_text(t, "ram:ExemptionReason") or _text(t, "ram:ExemptionReasonCode")):
+        if cat not in ("S", "Z") and not (_text(t, "ram:ExemptionReason") or _text(t, "ram:ExemptionReasonCode")):
             out.append(f"BR-{cat}-10: exemption reason missing")
+        if cat == "Z" and (_text(t, "ram:ExemptionReason") or _text(t, "ram:ExemptionReasonCode")):  # 2.357.0 (#3217)
+            out.append("BR-Z-10: zero rated carries no exemption reason")
         tax_sum += amount
     if set(by_cat) - seen:
         out.append(f"tax breakdown lacks {sorted(set(by_cat) - seen)}")
@@ -650,15 +670,17 @@ def _ubl_lines(m, cat):
     return out
 
 
-def _ubl_party(parent, tag, name, f, home, endpoint=None, email=None, contact=None, legal_id=None, seller=False):
-    """AccountingSupplierParty / AccountingCustomerParty in the UBL order: EndpointID, PostalAddress, PartyTaxScheme,
-    PartyLegalEntity, Contact."""
+def _ubl_party(parent, tag, name, f, home, endpoint=None, email=None, contact=None, legal_id=None, seller=False, party_id=""):
+    """AccountingSupplierParty / AccountingCustomerParty in the UBL order: EndpointID, PartyIdentification (BT-29, 2.357.0
+    #3218), PostalAddress, PartyTaxScheme, PartyLegalEntity, Contact."""
     p = _u(_u(parent, tag), "cac:Party")
     ep = ein_ubl_endpoint(endpoint)
     if ep:
         _u(p, "cbc:EndpointID", ep[1], schemeID=ep[0])
     elif email:
         _u(p, "cbc:EndpointID", email, schemeID="EM")
+    if party_id:
+        _u(_u(p, "cac:PartyIdentification"), "cbc:ID", party_id)
     a = _u(p, "cac:PostalAddress")
     _ut(a, "cbc:StreetName", f.get("street"))
     _ut(a, "cbc:AdditionalStreetName", f.get("line2"))
@@ -747,7 +769,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     sname = " ".join(str(sf.get("name") or (m.get("company") or {}).get("name") or "").split())
     novid = {"vat_id": ""} if cat == "O" else {}  # 2.296.0 B (#3173): BR-O-02 no VAT ids
     _ubl_party(root, "cac:AccountingSupplierParty", sname, {**sf, "line2": sf.get("address_extra") or "", **novid}, home, endpoint=sender_id,
-               email=sf.get("email"), legal_id=sf.get("register_no"), seller=True,
+               email=sf.get("email"), legal_id=sf.get("register_no"), seller=True, party_id=_seller_id(m, cat),  # 2.357.0 (#3218): BT-29
                contact={"name": sf.get("managing_directors") or sname, "phone": sf.get("phone"), "email": sf.get("email")}
                if (sf.get("phone") or sf.get("email")) else None)
     rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id"), **novid}
@@ -799,7 +821,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     line_sum = sum((x[2] for x in lines), Decimal("0"))
     by_rate = {}
     for x in lines:  # 2.296.0 B (#3169): per category and rate
-        k = (_line_cat(cat, x[3]), x[3])
+        k = (_line_cat(cat, x[3], x[0].get("tax")), x[3])  # 2.357.0 (#3217)
         by_rate[k] = by_rate.get(k, Decimal("0")) + x[2]
     tax_lines = [tl for tl in (tot.get("tax_lines") or []) if isinstance(tl, dict)]
     tt = _u(root, "cac:TaxTotal")
@@ -817,7 +839,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         tc = _u(st, "cac:TaxCategory")
         _u(tc, "cbc:ID", lcat)
         _u(tc, "cbc:Percent", _pct(pct))  # BT-119 0 for O as well (XRechnung BR-DE-14 wants it; only the line rate BT-152 goes, BR-O-05)
-        if lcat != "S":
+        if lcat not in ("S", "Z"):  # 2.357.0 (#3217): BR-Z-10
             _ut(tc, "cbc:TaxExemptionReasonCode", excode if lcat == cat else "")
             _u(tc, "cbc:TaxExemptionReason", extext if lcat == cat else _reason(m, lang, cat, lcat))
         _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
@@ -845,7 +867,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _ut(it, "cbc:Description", str(ln.get("detail") or "")[:1000])
         _u(it, "cbc:Name", str(ln.get("title") or "")[:200] or ("Position " + str(n)))
         tc = _u(it, "cac:ClassifiedTaxCategory")
-        _u(tc, "cbc:ID", _line_cat(cat, pct))  # 2.296.0 B (#3169)
+        _u(tc, "cbc:ID", _line_cat(cat, pct, ln.get("tax")))  # 2.296.0 B (#3169), 2.357.0 (#3217)
         if _line_cat(cat, pct) != "O":
             _u(tc, "cbc:Percent", _pct(pct))
         _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
@@ -882,6 +904,12 @@ def ein_ubl_check(xml_bytes):
         out.append("more than one note (PEPPOL-EN16931-R002)")
     if len([t for t in root.findall("cac:TaxTotal", q) if t.find("cac:TaxSubtotal", q) is not None]) != 1:
         out.append("exactly one tax total with subtotals (PEPPOL-EN16931-R053)")
+    for tc in root.findall("cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory", q):  # 2.357.0 (#3217, review N3): BR-Z-10 / BR-E-10
+        cat, why = tc.findtext("cbc:ID", "", q), tc.findtext("cbc:TaxExemptionReason", "", q) or tc.findtext("cbc:TaxExemptionReasonCode", "", q)
+        if cat == "Z" and why:
+            out.append("BR-Z-10: zero rated carries no exemption reason")
+        if cat == "E" and not why:
+            out.append("BR-E-10: exemption reason missing")
     for el in root.iter():
         if len(el) == 0 and not (el.text or "").strip():
             out.append(f"empty element {el.tag.split('}')[-1]} (PEPPOL-EN16931-R008)")

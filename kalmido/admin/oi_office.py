@@ -482,7 +482,7 @@ SPECS = [
     OiT("office/pay-props.json", "office_pay_props", refs={"doc_id": "office_docs", "payment_id": "office_payments"}, need=("doc_id",),
         people={"agent_id": "null", "requested_by": "null", "decided_by": "null"}, private="office"),
     OiT("office/gen_docs.json", "office_gen_docs", refs={"template_id": "office_doc_templates", "client_id": "clients", "list_id": "lists",
-        "doc_id": "office_docs"}, late={"node_id": "fs_nodes", "signed_node_id": "fs_nodes"}, people=_P, private="office"),
+        "doc_id": "office_docs"}, late={"node_id": "fs_nodes", "signed_node_id": "fs_nodes"}, people={**_P, "sign_uid": "null"}, private="office"),  # 2.357.0 C (#3158)
     OiT("office/signoffs.json", "office_signoffs", refs={"doc_id": "office_docs", "list_id": "lists", "section_id": "sections", "task_id": "tasks",
         "gen_doc_id": "office_gen_docs"}, late={"video_id": "video_reviews"}, people=_P, private="office", prep=_p_signoff, after=_a_signoff),
     OiT("office/privacy_sheets.json", "office_privacy_sheets", refs={"client_id": "clients", "gen_doc_id": "office_gen_docs"},

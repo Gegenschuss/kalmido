@@ -3635,6 +3635,9 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.357.0 C (#3158): a document from a template signed with the own signature picture of this person (office/doctpl.py; set
+    # only by that person, NULL = without). Older versions ignore it
+    ("office_gen_docs", "sign_uid", "ALTER TABLE office_gen_docs ADD COLUMN IF NOT EXISTS sign_uid BIGINT REFERENCES users(id) ON DELETE SET NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -6,8 +6,10 @@ from datetime import date, timezone
 from ..core.config import TZ
 from ..core.db import local_now, parse_iso
 from ..core.i18n import lang, tr, trn
-from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, PDF_CW, PDF_L, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom, pdf_date, pdf_draw_footer,
-                  pdf_footer_cols, pdf_money, pdf_wrap, pdf_write)
+from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MAX_W, PDF_TOP, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom,
+                  pdf_date, pdf_draw_footer, pdf_footer_cols, pdf_image_object, pdf_money, pdf_wrap, pdf_write)
+from .model import office_settings  # 2.357.0 A (#3156)
+from .pdf import PAPER, pdf_paper, pdf_paper_bind
 
 BW_KIND = {"food": "Food", "drinks": "Drinks"}
 
@@ -38,25 +40,40 @@ def bw_kind_line(ln):
 
 def bw_footer(c, oid, lg):
     """2.296.0 A (#3176): the footer of the receipts (the office PDFs' columns: company, address, contact, register, bank)
-    -> (cols, fit, height, body bottom)."""
+    -> (cols, fit, height, body bottom, logo). 2.357.0 D (#3183): logo = the company's logo as an image object (or None)."""
     from .doctpl import dt_company
-    cols = pdf_footer_cols(dt_company(c, oid, lg))
+    co = dt_company(c, oid, lg)
+    cols = pdf_footer_cols(co)
     fit = p3f_fit(cols)
     h = p3f_foot_h(fit)
-    return cols, fit, h, pdf_body_bottom(h)
+    logo = None
+    if co.get("logo_path"):
+        try:
+            with open(co["logo_path"], "rb") as fh:
+                logo = pdf_image_object(fh.read(16 * 1024 * 1024))
+        except OSError:
+            logo = None
+    return cols, fit, h, pdf_body_bottom(h), logo
 
 
 def bw_draw_footers(pages, foot, lg):
     """2.296.0 A (#3176): the footer on every page; bottom right "Created with Kalmido on ..." (was a line in the body that
     the approval log could cover) and the page count from two pages on."""
-    cols, fit, h, _bottom = foot
+    cols, fit, h, _bottom = foot[:4]
     made = tr("Created with Kalmido on {0}", pdf_date(local_now().date().isoformat(), lg))
     for n, p in enumerate(pages, 1):
         pdf_draw_footer(p, cols, " · ".join([made] + ([tr("Page {0} of {1}", n, len(pages))] if len(pages) >= 2 else [])), fit, h)
 
 
+def bw_paper(c, oid):
+    """2.357.0 A (#3156): the office's paper size (a4 / letter)."""
+    return pdf_paper(office_settings(c, oid).get("paper"))
+
+
 def bw_meal_pdf_data(c, oid, m):
     """The Eigenbeleg of meal m (the public dict of meals.bw_public)."""
+    if bw_paper(c, oid) != PAPER:  # 2.357.0 A (#3156): the same code with the sizes of the paper
+        return pdf_paper_bind(bw_meal_pdf_data, bw_paper(c, oid))(c, oid, m)
     from .meals import BW_BILL_HINT, bw_company
     from .calc import dec
     lg, cur = bw_lg(), m["currency"] or "EUR"
@@ -67,6 +84,12 @@ def bw_meal_pdf_data(c, oid, m):
     p = _Page()
     pages = [p]
     y = 56.0
+    logo, images = foot[4], {}
+    if logo:  # 2.357.0 D (#3183): the logo top right as on the other office PDFs, the receipt begins below it
+        sc = min(PDF_LOGO_MAX_W / logo[0], 12 * MM / logo[1])
+        images["Logo"] = logo
+        p.image("Logo", PDF_L + PDF_CW - logo[0] * sc, PDF_TOP, logo[0] * sc, logo[1] * sc)
+        y = max(y, PDF_TOP + logo[1] * sc + 16)
 
     def need(h):  # 2.296.0 A (#3176): a new page when h does not fit above the footer
         nonlocal p, y
@@ -194,11 +217,14 @@ def bw_meal_pdf_data(c, oid, m):
             need(len(pdf_wrap(t, 8.2, PDF_CW)) * 8.2 * 1.42)
             y += p.para(PDF_L, y, t, 8.2, PDF_CW, color=C_INK2)
     bw_draw_footers(pages, foot, lg)
-    return pdf_write(pages, {}, title=f"{title} {m['date']}", author=co)
+    # 2.357.0 D (#3183): the date in the title as printed (was ISO)
+    return pdf_write(pages, images, title=f"{title} {pdf_date(m['date'], lg)}", author=co)
 
 
 def bw_report_pdf(c, oid, rep, df, dt, person, occ, cur):
     """The evaluation: head (company, period, filter), one row per approved meal, the totals, input VAT per rate."""
+    if bw_paper(c, oid) != PAPER:  # 2.357.0 A (#3156)
+        return pdf_paper_bind(bw_report_pdf, bw_paper(c, oid))(c, oid, rep, df, dt, person, occ, cur)
     from .meals import bw_company, bw_pname
     lg = bw_lg()
     co = bw_company(c, oid)

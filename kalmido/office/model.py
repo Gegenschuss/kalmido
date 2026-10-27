@@ -81,6 +81,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "producing_on": 0, "raw_on": 0,
                      "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
+                     "sign_offers": 0,  # 2.357.0 C (#3158): quotations / reminders with the signature picture of who finalised them
                      # 2.113.1 (#2251): day rate and factor of "share by amount" (an industry pack's option); None = the
                      # pack's values. prod_quotient / producing_rate above keep their old meaning for older documents
                      "share_rate": None, "share_factor": None,
@@ -117,6 +118,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "exempt_reason": "",
                      # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
                      "letterhead": {},
+                     # 2.357.0 A (#3156): the paper size of the office PDFs: "a4" (DIN 5008) or "letter" (US-Letter 8.5 x 11 in)
+                     "paper": "a4",
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
                      "terms": {},
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
@@ -434,6 +437,10 @@ def office_settings_clean(c, oid, b, cur):
         elif k in ("skonto_pct", "skonto_days"):  # 2.120.0 A (#2087)
             from .abschlag import abs_settings_clean
             abs_settings_clean(k, v, out)
+        elif k == "paper":  # 2.357.0 A (#3156)
+            if v not in ("a4", "letter"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "exempt_reason":  # 2.296.0 B (#3169): one line of text
             out[k] = " ".join(v.split())[:300] if isinstance(v, str) else ""
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
@@ -464,7 +471,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""

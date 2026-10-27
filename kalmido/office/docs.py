@@ -27,6 +27,7 @@ from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
+from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .invdelete import idt_applies, idt_delete, idt_info, idt_plan, odoc_unlink_refs  # 2.162.0 A (#2603)
@@ -1104,13 +1105,15 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     if cno:
         meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), cno])
     if r["project_ref"]:
-        meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), r["project_ref"]])
+        # 2.357.0 B (#3180): a quotation asks for the client's reference ("Ihre Referenz"); the invoice keeps "Bestellnr. / Referenz"
+        meta.append([L.get("offer_ref") or tr("Your reference|pdf", lg=lang), r["project_ref"]])
     if r["valid_until"]:
         meta.append([L.get("valid_until", tr("Valid until|document", lg=lang)), valid_text])
     sf, st = (r["service_from"] or "", r["service_to"] or "") if "service_from" in r.keys() else ("", "")
     if sf or st:  # 2.36.2: period of service
         per = _fd(sf) if sf == st or not st else (_fd(st) if not sf else f"{_fd(sf)} – {_fd(st)}")
-        meta.append([L.get("service_period", tr("Period of service|document", lg=lang)), per])
+        one = sf == st or not sf or not st  # 2.357.0 D (#3183): one day = service date
+        meta.append([L.get("service_date", tr("Service date|document", lg=lang)) if one else L.get("service_period", tr("Period of service|document", lg=lang)), per])
     rows = [[L.get("net_total", t["labels"]["net"]), fmt_money(t["net"], lang, cur)]]
     if t.get("net_incl_raw") is not None:
         rows.append([L.get("incl_raw", t["labels"]["net_incl_raw"]), fmt_money(t["net_incl_raw"], lang, cur)])
@@ -1155,6 +1158,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
     m["accept_on"] = bwb_accept_on(r, s, snd if locked else None)  # 2.114.4 B (#2270)
+    m["paper"] = pdf_paper((snd if locked else s).get("paper"))  # 2.357.0 A (#3156): a finalised document keeps its size (before: A4)
     if r["kind"] == "offer":  # 2.47.0 (#1215): the printed parts as own pages
         from .parts import tp_render
         tp_render(c, oid, r, m, pack, lang, locked)

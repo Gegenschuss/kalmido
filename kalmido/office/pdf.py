@@ -71,9 +71,12 @@ PDF_MARK_GREY = "0.85 0.86 0.88"  # 2.294.0 (#3155): the draft watermark (was 0.
 PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
 P3Q_MAX = 34 * MM        # 2.296.0 E (#3170): the widest quantity column (wider quantities: the unit on a second line)
 PDF_LOGO_MAX_W = 45 * MM  # 2.114.5 (#2300): smaller logo (was 60 x 22 mm)
-PDF_LOGO_MAX_H = 16 * MM
+PDF_LOGO_MAX_H = 22 * MM  # 2.357.0 B (#3179): a tall logo gets up to 22 mm (was 16: an upright logo printed 5 mm narrow)
+PDF_LOGO_DPI = 200       # 2.357.0 B (#3179): a small logo is never scaled up beyond this (drawn at its own size, not blurred)
 PDF_LOGO_MAX_PX = 1600   # the upload route scales to this width; the writer accepts anything Pillow reads
 BP = None                # 2.120.0 E (#2091): the own letterhead in effect -- set only in the run of bp_layout
+PDF_MARKS = (105 * MM, 148.5 * MM, 210 * MM)  # 2.357.0 A (#3156): fold and punch marks of the paper size (DIN 5008 form B)
+PAPER = "a4"             # 2.357.0 A (#3156): the paper size of this run -- "letter" only in a copy of pdf_paper_ns
 
 # ---- colours ("#rrggbb"); the accent comes from the company settings ----------------------------------------------
 C_INK, C_INK2, C_RULE, C_RULE2, C_WHITE = "#16191f", "#4b515c", "#c9ced6", "#e7e9ee", "#ffffff"
@@ -90,6 +93,7 @@ PDF_LABELS = {"title": N_("Quotation|pdf"), "number": N_("Quotation No.|pdf"), "
               "rights_see": N_("Transfer of rights see appendix|pdf"),  # 2.114.1 C (#2258)
               "accept_see": N_("Order confirmation by signature on page {0}|pdf"),  # 2.114.5 (#2300)
               "accept": N_("Order confirmation|pdf"), "place_date": N_("Place, date|pdf"), "sign": N_("Signature, stamp of the client|pdf"),
+              "accept_text": N_("We hereby place the order on the terms of this quotation.|pdf"),  # 2.357.0 C (#3182)
               "page": N_("Page {0} of {1}|pdf"), "contact": N_("Contact|pdf"), "register": N_("Registration|pdf"), "bank": N_("Bank|pdf"),
               "discount": N_("Discount|pdf"), "producing": N_("Producing|pdf")}
 PDF_COMMA = ("de", "fr", "es", "it", "nl")  # 2.185.0 C (#2520): decimal comma (English: the point)
@@ -281,27 +285,40 @@ def pdf_text_width(s, size, bold=False, spacing=0.0):
     return w * size / 1000.0 + spacing * len(b)
 
 
-def pdf_wrap(text, size, width, bold=False):
-    """Breaks text into lines that fit width (explicit line breaks kept, long words cut by characters)."""
+def pdf_wrap(text, size, width, bold=False, spacing=0.0):
+    """Breaks text into lines that fit width (explicit line breaks kept, long words cut by characters).
+    2.357.0 B (#3180): spacing = the character spacing of a spaced line (counts into every width, one pass: was a second
+    pass in pb_wrap that left single words alone); a word cut between two letters gets a hyphen."""
+    def tw(s_):
+        return pdf_text_width(s_, size, bold, spacing)
+    hw = tw("-")
     out = []
     for para in str(text or "").replace("\r", "").split("\n"):
         words = para.split(" ")
         line = ""
         for w in words:
             cand = (line + " " + w) if line else w
-            if pdf_text_width(cand, size, bold) <= width or not line and not w:
+            if tw(cand) <= width or not line and not w:
                 line = cand
                 continue
             if line:
                 out.append(line)
                 line = ""
-            if pdf_text_width(w, size, bold) > width and len(w) > 1:  # a word longer than the line: cut by summed widths, one pass
+            if tw(w) > width and len(w) > 1:  # a word longer than the line: cut by summed widths, one pass
                 part, pw = "", 0.0
                 for ch in w:
-                    cw = pdf_text_width(ch, size, bold)
+                    cw = tw(ch)
                     if part and pw + cw > width:
+                        carry = ""
+                        if part[-1].isalpha() and ch.isalpha():  # 2.357.0 B (#3180): room for the hyphen
+                            while len(part) > 2 and pw + hw > width:
+                                carry = part[-1] + carry
+                                pw -= tw(part[-1])
+                                part = part[:-1]
+                            if pw + hw <= width and part[-1].isalpha() and (carry or ch)[0].isalpha():
+                                part += "-"
                         out.append(part)
-                        part, pw = "", 0.0
+                        part, pw = carry, tw(carry) if carry else 0.0
                     part += ch
                     pw += cw
                 w = part
@@ -311,30 +328,9 @@ def pdf_wrap(text, size, width, bold=False):
 
 
 def pb_wrap(text, size, width, bold=False, spacing=0.0):
-    """2.138.0 A (#2240): pdf_wrap for a spaced heading line (the character spacing counts into the width)."""
-    if not spacing:
-        return pdf_wrap(text, size, width, bold)
-    out = []
-
-    def emit(line):
-        while len(line) > 1 and pdf_text_width(line, size, bold, spacing) > width:  # one long word: cut by characters
-            k = len(line) - 1
-            while k > 1 and pdf_text_width(line[:k], size, bold, spacing) > width:
-                k -= 1
-            out.append(line[:k])
-            line = line[k:]
-        out.append(line)
-    for ln in pdf_wrap(text, size, width, bold):
-        line = ""
-        for w in ln.split(" "):
-            cand = (line + " " + w) if line else w
-            if not line or pdf_text_width(cand, size, bold, spacing) <= width:
-                line = cand
-                continue
-            emit(line)
-            line = w
-        emit(line)
-    return out
+    """2.138.0 A (#2240): pdf_wrap for a spaced heading line (the character spacing counts into the width).
+    2.357.0 B (#3180): one pass in pdf_wrap (kept as a name for the callers)."""
+    return pdf_wrap(text, size, width, bold, spacing)
 
 
 def _rgb(hexcol):
@@ -385,6 +381,7 @@ def _f(x):
 
 class _Page:
     """Collects the content stream of one page (coordinates: x from the left, y from the TOP, in points)."""
+    W, H = A4_W, A4_H  # 2.357.0 A (#3156): the page size (pdf_paper_ns: a US-Letter subclass); pdf_write takes the MediaBox from it
 
     def __init__(self):
         self.ops = []
@@ -402,7 +399,7 @@ class _Page:
             x = x + ((width or 0) - w) / 2
         r, g, b = _rgb(color)
         self.ops.append(f"BT {r:.3f} {g:.3f} {b:.3f} rg /{'F2' if bold else 'F1'} {size:.2f} Tf {spacing:.2f} Tc "
-                        f"{x:.2f} {A4_H - y - size * 0.78:.2f} Td <{pdf_encode(s).hex()}> Tj ET")
+                        f"{x:.2f} {self.H - y - size * 0.78:.2f} Td <{pdf_encode(s).hex()}> Tj ET")
 
     def para(self, x, y, text, size, width, bold=False, color=C_INK, lh=None, align="l"):
         """A wrapped paragraph; returns the height used."""
@@ -415,15 +412,15 @@ class _Page:
     def line(self, x1, y1, x2, y2, w=0.5, color=C_RULE, dash=None):
         r, g, b = _rgb(color)
         d = f"[{dash[0]} {dash[1]}] 0 d " if dash else "[] 0 d "
-        self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} RG {w:.2f} w {d}{x1:.2f} {A4_H - y1:.2f} m {x2:.2f} {A4_H - y2:.2f} l S")
+        self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} RG {w:.2f} w {d}{x1:.2f} {self.H - y1:.2f} m {x2:.2f} {self.H - y2:.2f} l S")
 
     def rect(self, x, y, w, h, color, stroke=False, lw=0.5, dash=None):
         r, g, b = _rgb(color)
         if stroke:
             d = f"[{dash[0]} {dash[1]}] 0 d " if dash else "[] 0 d "
-            self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} RG {lw:.2f} w {d}{x:.2f} {A4_H - y - h:.2f} {w:.2f} {h:.2f} re S")
+            self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} RG {lw:.2f} w {d}{x:.2f} {self.H - y - h:.2f} {w:.2f} {h:.2f} re S")
         else:
-            self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {A4_H - y - h:.2f} {w:.2f} {h:.2f} re f")
+            self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {self.H - y - h:.2f} {w:.2f} {h:.2f} re f")
 
     def mark(self, word):
         """A diagonal word across the page (drafts), drawn first so the content stays on top. 2.294.0 (#3155): bolder (outlined
@@ -431,11 +428,11 @@ class _Page:
         size = 120
         w = pdf_text_width(word, size, True)
         self.ops.insert(0, f"q {PDF_MARK_GREY} rg {PDF_MARK_GREY} RG 2 w BT /F2 {size} Tf 2 Tr 0.7071 0.7071 -0.7071 0.7071 "
-                           f"{(A4_W - w * 0.7071) / 2 + 40:.2f} {(A4_H - w * 0.7071) / 2 - 60:.2f} Tm <{pdf_encode(word).hex()}> Tj ET Q")
+                           f"{(self.W - w * 0.7071) / 2 + 40:.2f} {(self.H - w * 0.7071) / 2 - 60:.2f} Tm <{pdf_encode(word).hex()}> Tj ET Q")
 
     def image(self, name, x, y, w, h):
         self.images.add(name)
-        self.ops.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {A4_H - y - h:.2f} cm /{name} Do Q")
+        self.ops.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {self.H - y - h:.2f} cm /{name} Do Q")
 
 
 def qac_sig_block_h(rows):
@@ -456,6 +453,28 @@ def qac_sig_block(p, y, rows, head, foot, accent):
     p.text(PDF_L + 10, yy + 2, foot, 7.6, False, C_INK2)
 
 
+def pdf_logo_fit(logo, max_w, max_h):
+    """2.357.0 B (#3179): the printed size (pt) of a logo (pdf_image_object) in a box of max_w x max_h: fitted, but never
+    larger than PDF_LOGO_DPI (a 100 px logo stays small and sharp instead of blown up to the box)."""
+    w, h = logo[0], logo[1]
+    sc = min(max_w / w, max_h / h, 72.0 / PDF_LOGO_DPI)
+    return w * sc, h * sc
+
+
+def pdf_to_srgb(im):
+    """2.357.0 B (#3179): a picture with an embedded colour profile (Adobe RGB, a CMYK JPEG) converted to sRGB (the
+    OutputIntent of the PDF); without ImageCms or on any error the picture comes back as it was."""
+    icc = im.info.get("icc_profile")
+    if not icc or im.mode not in ("RGB", "RGBA", "CMYK"):
+        return im
+    try:
+        from PIL import ImageCms
+        src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+        return ImageCms.profileToProfile(im, src, ImageCms.createProfile("sRGB"), outputMode="RGBA" if im.mode == "RGBA" else "RGB")
+    except Exception:  # noqa: BLE001  (no ImageCms / littlecms, a broken profile)
+        return im
+
+
 def pdf_image_object(raw):
     """Logo bytes (PNG / JPEG / WebP / GIF / BMP) -> (width px, height px, stream dict entries, stream data) for an
     image XObject: RGB 8 bit, transparency composed on white, FlateDecode. None when Pillow cannot read it."""
@@ -469,6 +488,7 @@ def pdf_image_object(raw):
             return None
         im.load()
         im = pdf_to_8bit(im)  # 2.296.0 D (#3172): 16 bit grey scaled, not clipped to white
+        im = pdf_to_srgb(im)  # 2.357.0 B (#3179): Adobe RGB / CMYK with a profile -> sRGB
         if im.mode in ("RGBA", "LA", "P", "PA"):
             im = im.convert("RGBA")
             bg = Image.new("RGB", im.size, (255, 255, 255))
@@ -633,7 +653,7 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
         content = zlib.compress("\n".join(p.ops).encode("latin-1"), 6)
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
         xo = " ".join([f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids] + [f"/{n} {form_ids[n]} 0 R" for n in sorted(getattr(p, "forms", None) or {})])
-        pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {A4_W:.2f} {A4_H:.2f}] "
+        pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {p.W:.2f} {p.H:.2f}] "
                   f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "
                   f"/ProcSet [/PDF /Text /ImageC] >> /Contents {cid} 0 R >>".encode())
         page_ids.append(pid)
@@ -759,6 +779,8 @@ def pdf_date(s, lang, fmt=None):
         return f"{d}.{mo}.{y}"
     mons = LANGS.get(str(lang or ""), {}).get("_months") if lang != "en" else None
     if isinstance(mons, list) and len(mons) == 12:
+        if lang == "es":  # 2.357.0 D (#3183): "9 de octubre de 2026"
+            return f"{int(d)} de {mons[int(mo) - 1]} de {y}"
         return f"{int(d)} {mons[int(mo) - 1]} {y}"
     months = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
     return f"{int(d)} {months[int(mo) - 1]} {y}"
@@ -1101,6 +1123,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     logo_bytes: the logo file (else company.logo_path is read). xml / meta (2.38.0): the e-invoice XML to embed and the
     writer's metadata, see pdf_write. model["draft_mark"]: a word printed as a light diagonal mark on every page (drafts)."""
     m = model or {}
+    if pdf_paper(m.get("paper")) != PAPER:  # 2.357.0 A (#3156): US-Letter: the same layout with the sizes of the paper
+        return pdf_paper_ns(m.get("paper")).office_pdf(model, logo_bytes, xml, meta)
     if BP is None and isinstance(m.get("letterhead"), dict):  # 2.120.0 E (#2091): own letterhead: the same layout with its margins
         return bp_layout(m["letterhead"], model, logo_bytes, xml, meta)
     lang = pdf_lang(m.get("lang"))  # 2.185.0 C (#2520): every app language
@@ -1135,9 +1159,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             images["Logo"] = logo
 
     def logo_box(max_w, max_h):
-        w, h = logo[0], logo[1]
-        sc = min(max_w / w, max_h / h)
-        return w * sc, h * sc
+        return pdf_logo_fit(logo, max_w, max_h)  # 2.357.0 B (#3179): at most PDF_LOGO_DPI
 
     # -- letterhead (page 1) and the small head (following pages)
     def draw_letterhead(p):
@@ -1151,7 +1173,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             for i, ln in enumerate(nl):
                 p.text(PDF_L + PDF_CW, PDF_TOP + 4 * MM + i * 18, ln, 15, True, C_INK, align="r", spacing=1.2)
             p.rect(A4_W - PDF_R - 12 * MM, PDF_TOP + 4 * MM + 24 + (len(nl) - 1) * 18, 12 * MM, 2.2, accent)
-        for y in (105 * MM, 148.5 * MM, 210 * MM):  # fold and punch marks (DIN 5008 form B)
+        for y in PDF_MARKS:  # fold and punch marks (DIN 5008 form B; 2.357.0 A (#3156): of the paper size)
             p.line(5 * MM, y, 9 * MM, y, 0.4, C_RULE)
 
     def draw_small_head(p):
@@ -1278,8 +1300,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     for k, v in info:
         kl = pdf_wrap(k, 8.6, info_w * 0.55) if pdf_text_width(k, 8.6) > info_w * 0.55 else [k]
         vw = info_w - max(pdf_text_width(x, 8.6) for x in kl) - 10
-        below = vw < 60 and pdf_text_width(v, 8.6, True) > vw
-        info_rows.append((kl, pdf_wrap(v, 8.6, info_w if below else max(vw, 40)), below))
+        # 2.357.0 B (#3180): also a value that would need more than two lines beside its label goes below it (a long order
+        # reference was four right-aligned lines); wrapped bold as it is drawn (was measured regular)
+        below = (vw < 60 or len(pdf_wrap(v, 8.6, max(vw, 40), True)) > 2) and pdf_text_width(v, 8.6, True) > vw
+        info_rows.append((kl, pdf_wrap(v, 8.6, info_w if below else max(vw, 40), True), below))
     head_h = max(PDF_ADDR_H, 16 + len(addr_lines) * lh + 4,
                  2 + sum(len(kl) + len(vl) if below else max(1, len(kl), len(vl)) for kl, vl, below in info_rows) * info_lh + 4)
     block(head_h, draw_head)
@@ -1329,9 +1353,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     c_qty = max(c_qty, min(P3Q_MAX, max(p3q_w or [0]) + 6))
     c_pos = max(c_pos, max([pdf_text_width(str(x.get("pos") or ""), 8) + 6 for x in p3q_rows] or [0]))
     # 2.114.5 (#2300): a quotation whose positions (parts too) all carry the same rate prints no VAT column
-    p3v = {str(x.get("tax_pct")) for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
+    p3v = {pdf_num(x.get("tax_pct"), "en") for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
            if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "raw", "discount") and x.get("tax_pct") not in (None, "")}
-    if (m.get("kind") or "offer") == "offer" and len(p3v) <= 1:
+    # 2.357.0 B (#3181): every document (was quotations only): one rate, also 0 % of section 19 / reverse charge, sits in the totals
+    # (review N4: the rates compared as numbers, so "19" and "19.0" are one)
+    if len(p3v) <= 1:
         c_vat = 0
     c_title = PDF_CW - c_pos - c_qty - c_rate - c_vat - c_tot
     x_pos = PDF_L
@@ -1604,6 +1630,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     p3a_on = (m.get("kind") or "offer") == "offer" and not acc and bool(m.get("accept_on", 1))
     p3a_end = p3a_on and bool(bfc_rights or any(isinstance(x, dict) for x in (m.get("parts") or [])))
     p3a_ref, p3a_at = [], []
+    rh_ref, rh_acc = [], []  # 2.357.0 C (#3182): the blocks of the reference lines / the order confirmation behind the appendix
 
     def bfc_see_ref():  # 2.114.1 C (#2258): one short line above the signature pointing to the rights appendix
         if bfc_seen:
@@ -1619,6 +1646,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                         p3a_ref.append((p, len(p.ops), y + 8 + q * 8.6 * 1.45, t))  # filled in at this place of the stream
                     else:
                         p.text(PDF_L, y + 8 + q * 8.6 * 1.45, t, 8.6, False, C_INK2)
+            rh_ref.append(len(blocks))  # 2.357.0 C (#3182): left out when the appendix stays on the page
             block(len(ref) * 8.6 * 1.45 + 8, draw_ref, keep_next=True, tail=True)
 
     # -- closing text, signature, order confirmation; 2.114.5 (#2300): the greeting set closer
@@ -1633,8 +1661,32 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         sg = str(m["signature"])
         # 2.296.0 E (#3170): every line of a company name of several lines one under the other (was printed as one line)
         sl = [sg] + [str(x) for x in [m.get("signature_name")] + (co_lines if len(co_lines) > 1 else [co.get("name")]) if x]
-        block((len(sl) - 1) * lh + 0.6 * lh + lh + 10, lambda p, y, sl=sl: [p.text(PDF_L, y + 8 + i * lh + (0.6 * lh if i else 0), s, body, bold=(i == 1))
-                                                                             for i, s in enumerate(sl)], tail=True, sq=4)
+        # 2.357.0 C (#3158): the own signature picture (model["signature_image"], base64; set by office.letters lt_doc_sig only for
+        # the person who finalised the document) between the greeting and the name; 2.357.0 C (#3182): a quotation without one
+        # keeps 2.5 lines of air for a signature by hand (was 0.6)
+        sig = None
+        if m.get("signature_image"):
+            import base64
+            try:
+                sig = pdf_image_object(base64.b64decode(str(m["signature_image"])))
+            except ValueError:
+                sig = None
+        sg_w = sg_h = 0.0
+        if sig:
+            images["Sig"] = sig
+            sg_h = 16 * MM
+            sg_w = min(60 * MM, sig[0] * sg_h / sig[1])
+            sg_h = sg_w * sig[1] / sig[0]
+            sg_gap = sg_h + 8
+        else:
+            sg_gap = 2.5 * lh if (m.get("kind") or "offer") == "offer" else 0.6 * lh
+
+        def draw_sig(p, y, sl=sl, sg_gap=sg_gap, sig=sig, sg_w=sg_w, sg_h=sg_h):
+            for i, s in enumerate(sl):
+                p.text(PDF_L, y + 8 + i * lh + (sg_gap if i else 0), s, body, bold=(i == 1))
+            if sig:
+                p.image("Sig", PDF_L, y + 8 + lh + 2, sg_w, sg_h)
+        block((len(sl) - 1) * lh + sg_gap + lh + 10, draw_sig, tail=True, sq=4)
     if m.get("terms_line"):  # 2.113.2 (#2253): "our terms apply (as of ...), see attachment"
         tl = str(m["terms_line"])
         block(len(pdf_wrap(tl, body, PDF_CW)) * lh + 10, lambda p, y, t=tl: p.para(PDF_L, y + 10, t, body, PDF_CW))
@@ -1642,18 +1694,22 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         acc_rows = [(str(x[0]), str(x[1])) for x in acc.get("rows") or [] if isinstance(x, (list, tuple)) and len(x) >= 2]
         block(8 + qac_sig_block_h(acc_rows), lambda p, y: qac_sig_block(p, y + 8, acc_rows, str(acc.get("head") or ""), str(acc.get("foot") or ""), accent), tail=True, sq=4)
     half = (PDF_CW - 28) / 2
+    acc_txt = str(L.get("accept_text") or "") if (m.get("kind") or "offer") == "offer" else ""  # 2.357.0 C (#3182): not on a delivery note
+    acc_dy = 14 if acc_txt else 0
 
     def draw_accept(p, y, gap=0):
         # 2.138.2 B (#2388): after the rights appendix (gap > 0) a section of its own: air above, heading and captions one step larger
         p3a_at.append(p)
         p.text(PDF_L, y + gap + 16, str(m.get("receipt_label") or L["accept"]).upper(), 10 if gap else 7.4, True, C_INK if gap else C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
-        yl = y + gap + 16 + 40 + (6 if gap else 0)
+        if acc_txt:  # 2.357.0 C (#3182): what the signature means, above the lines of a quotation
+            p.text(PDF_L, y + gap + 16 + (16 if gap else 12), acc_txt, 8.6, False, C_INK)
+        yl = y + gap + 16 + 40 + acc_dy + (6 if gap else 0)
         p.line(PDF_L, yl, PDF_L + half, yl, 0.6, C_INK)
         p.text(PDF_L, yl + 3, L["place_date"], 8.6 if gap else 7.6, False, C_INK2)
         p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
         p.text(PDF_L + half + 28, yl + 3, L["sign"], 8.6 if gap else 7.6, False, C_INK2)
     if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
-        block(16 + 40 + 16, draw_accept, tail=True, sq=8)
+        block(16 + 40 + acc_dy + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
 
     # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
@@ -1702,7 +1758,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     yy += (10.4 if j == 0 else 9) * 1.5
             block(14 + sum((10.4 if j == 0 else 9) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
 
-    # -- 2.114.1 C (#2258): the rights block as an appendix on its own last page, after the parts
+    # -- 2.114.1 C (#2258): the rights block as an appendix on its own last page, after the parts; 2.357.0 C (#3182): on the
+    # last page itself when it fits there completely (with the order confirmation behind it), see rh_at below
+    rh_at = []
     if bfc_rights:
         rtitle = str(rights.get("title") or L["rights"])
         rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
@@ -1717,11 +1775,13 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
             for j, s_ in enumerate(rs_lines):  # 2.138.2 B (#2388): not larger than the body text
                 p.text(PDF_L + PDF_CW, y + (34 if rs_low else 8) + j * 10, s_, 8, False, C_INK2, align="r")
+        rh_at.append(len(blocks))
         block(34 + 12 + max(0, len(rs_lines) * 10 + 6 if rs_low else (len(rs_lines) - 2) * 10), bfc_draw_rights_head, keep_next=True, brk=True)
         bfc_rights[0]()
     if p3a_end:  # 2.114.5 (#2300): the order confirmation behind the rights appendix (or the last part)
         agap = 32 if bfc_rights else 0  # 2.138.2 B (#2388)
-        block(agap + 16 + 40 + 16 + (6 + 6 if agap else 0), lambda p, y, g=agap: draw_accept(p, y, g))
+        rh_acc.append(len(blocks))
+        block(agap + 16 + 40 + acc_dy + 16 + (6 + 6 if agap else 0), lambda p, y, g=agap: draw_accept(p, y, g))
 
     # -- lay the blocks out on pages
     n_blocks = len(blocks)
@@ -1836,6 +1896,24 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     pages = []
     page = None
+    if rh_at:  # 2.357.0 C (#3182): the appendix without its page break when that saves a page and it stays whole on one page;
+        # then without the reference lines ("see appendix", "order confirmation on page n") and with the compact order confirmation
+        keep = [(i, dict(blocks[i])) for i in rh_ref + rh_acc]
+        for i in rh_ref:
+            blocks[i].update(h=0.0, draw=lambda p, y: None)
+        for i in rh_acc:
+            blocks[i].update(h=16 + 40 + acc_dy + 16, draw=lambda p, y: draw_accept(p, y))
+        blocks[rh_at[0]]["brk"] = False
+        app_hs = [b["h"] for b in blocks[rh_at[0]:]]
+        for b in blocks[rh_at[0]:]:
+            b["h"] = 0.0
+        n_main = lay(True, {})[0]  # the pages without the appendix
+        for b, h in zip(blocks[rh_at[0]:], app_hs):
+            b["h"] = h
+        if lay(True, {})[0] > n_main:  # it does not fit completely on the last page: as before on a page of its own
+            blocks[rh_at[0]]["brk"] = True
+            for i, b in keep:
+                blocks[i].update(b)
     # 2.294.0 (#3154): the full air unless that costs a page or presses the totals below their minimum gap; then less intro air
     # step by step, the totals' air last (it already shrinks on its own page before a break) -- never more pages than without air
     tries = [{"intro": 1.0, "sum": 1.0}, {"intro": 2 / 3, "sum": 1.0}, {"intro": 1 / 3, "sum": 1.0}, {"sum": 1.0}, {}]
@@ -1907,3 +1985,58 @@ def bp_finish(pages, bp):
             name = f"BP{i + 1}"
             p.ops.insert(0, f"q /{name} Do Q")
             p.forms = {name: (lambda objs, i=i: bp["emit"](objs, i))}
+
+
+# ---- 2.357.0 A (#3156): the paper size per company (office settings "paper": "a4" | "letter") ------------------------
+IN = 72.0
+PAPER_SIZES = {"a4": (A4_W, A4_H), "letter": (8.5 * IN, 11 * IN)}
+
+
+def pdf_paper(v):
+    """2.357.0 A (#3156): the paper size of a setting / print model: "letter" (US-Letter 8.5 x 11 in), anything else A4."""
+    return "letter" if str(v or "").strip().lower().replace("-", "_") in ("letter", "us_letter", "usletter") else "a4"
+
+
+def pdf_paper_ns(paper):
+    """2.357.0 A (#3156): this module for paper size `paper`: A4 = the module itself; US-Letter = a copy of its globals with
+    the page size, margins (1 in left / right), the address field for a #10 window envelope (recipient from about 2.1 in) and
+    fold marks on the thirds (no punch mark), every function bound to that copy -- the same pattern as bp_layout (which runs
+    inside it for a letterhead), so the layout code stays as it is and parallel requests never see each other's sizes.
+    Callers use it like the module: P = pdf_paper_ns(s.get("paper")); P._Page(), P.A4_W, P.pdf_write(...)."""
+    import sys
+    import types
+    if pdf_paper(paper) == PAPER:
+        mod = sys.modules.get(__name__)  # (a file loaded on its own by a test may not be in sys.modules)
+        return mod if mod is not None and globals() is vars(mod) else types.SimpleNamespace(**globals())
+    w, h = PAPER_SIZES[pdf_paper(paper)]
+    g = dict(globals())
+    if pdf_paper(paper) == "letter":
+        g.update(A4_W=w, A4_H=h, PDF_L=1 * IN, PDF_R=1 * IN, PDF_CW=w - 2 * IN, PDF_ADDR_TOP=2 * IN,
+                 PDF_BODY_BOTTOM=h - 12 * MM - PDF_FOOT_H, PDF_MARKS=(h / 3, 2 * h / 3), PAPER="letter")
+    else:  # back to A4 from a letter copy
+        g.update(A4_W=w, A4_H=h, PDF_L=25 * MM, PDF_R=20 * MM, PDF_CW=w - 45 * MM, PDF_ADDR_TOP=45 * MM,
+                 PDF_BODY_BOTTOM=h - 12 * MM - PDF_FOOT_H, PDF_MARKS=(105 * MM, 148.5 * MM, 210 * MM), PAPER="a4")
+    g["_Page"] = type("_Page", (_Page,), {"W": w, "H": h, "__module__": __name__})
+    for k, v in list(g.items()):
+        if isinstance(v, types.FunctionType) and v.__module__ == __name__:
+            g[k] = types.FunctionType(v.__code__, g, v.__name__, v.__defaults__, v.__closure__)
+    return types.SimpleNamespace(**g)
+
+
+def pdf_paper_bind(fn, paper):
+    """2.357.0 A (#3156): fn, a function of a module that imported names from this one at its top (mealpdf), bound to a copy
+    of that module's globals in which those names come from pdf_paper_ns(paper) (its other functions bound to the copy
+    too); A4: fn itself. The caller checks the imported PAPER first: `if paper != PAPER: return pdf_paper_bind(f, paper)(...)`."""
+    import types
+    if pdf_paper(paper) == PAPER:
+        return fn
+    ns = pdf_paper_ns(paper)
+    src, mine = fn.__globals__, globals()
+    g = dict(src)
+    for k, v in src.items():
+        if k in mine and mine[k] is v and hasattr(ns, k):
+            g[k] = getattr(ns, k)
+    for k, v in list(g.items()):
+        if isinstance(v, types.FunctionType) and v.__module__ == fn.__module__:
+            g[k] = types.FunctionType(v.__code__, g, v.__name__, v.__defaults__, v.__closure__)
+    return g[fn.__name__]

@@ -31,7 +31,7 @@ from ..core.db import connect, db, err
 from ..core.access import Denied
 from .model import office_feature, office_gate, office_logo_set, office_need_feature, office_org, office_settings
 from ..core.orgcrypt import oc_read_file, oc_write_file
-from .pdf import office_pdf, pdf_to_8bit  # 2.296.0 D (#3172): + pdf_to_8bit
+from .pdf import office_pdf, pdf_lang, pdf_to_8bit  # 2.296.0 D (#3172): + pdf_to_8bit, 2.357.0 D (#3183): + pdf_lang
 from .einvoice import ein_build
 
 LOGO_MAX_MB = 4
@@ -157,7 +157,10 @@ def _model(c, oid, did):
         co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
     from .docs import doc_row
     # 2.138.2 A (#2393): every kind that is not finalised (2.38.0: the invoice kinds only); 2.144.10 A (#2576): a trial one always
-    epdf_mark(doc_row(c, oid, did), model)
+    r = doc_row(c, oid, did)
+    epdf_mark(r, model)
+    from .letters import lt_doc_sig
+    lt_doc_sig(c, oid, r, model)  # 2.357.0 C (#3158): the own signature under quotations / reminders (office setting)
     model.pop("internal", None)  # never printed
     from .letterhead import bp_model
     return bp_model(c, oid, did, model)  # 2.120.0 E (#2091): the own letterhead (a finalised document: the one frozen with it)
@@ -224,10 +227,11 @@ def _render(c, oid, r, model=None):
     return pdf, xml, fmt
 
 
-def epdf_store(c, oid, did):
+def epdf_store(c, oid, did, log_extra=None):
     """Called at the end of ofx_finalize (office.ledger): writes the PDF/A-3 (+ XML for invoice / credit) of the now
     frozen document below the organisation's office folder, notes pdf_sha256 / xml_sha256 in office_docs and logs
-    "store". XRechnung without the client's buyer reference raises BadInput (400) -> the finalising is rolled back."""
+    "store". XRechnung without the client's buyer reference raises BadInput (400) -> the finalising is rolled back.
+    log_extra: more keys for the log entry (2.357.0 #3221: catch_up of the one-time catch-up)."""
     from .docs import doc_row
     from .ledger import ofx_log
     r = doc_row(c, oid, did)
@@ -244,7 +248,7 @@ def epdf_store(c, oid, did):
         shas[ext] = hashlib.sha256(data).hexdigest()
     c.execute("UPDATE office_docs SET pdf_sha256=?, xml_sha256=? WHERE id=? AND org_id=?", (shas.get("pdf", ""), shas.get("xml", ""), did, oid))
     ofx_log(c, oid, "store", doc_id=did, detail={"pdf_sha256": shas.get("pdf", ""), "xml_sha256": shas.get("xml", ""), "format": fmt,
-                                                 "pdf_bytes": len(pdf), "xml_bytes": len(xml or b"")})
+                                                 "pdf_bytes": len(pdf), "xml_bytes": len(xml or b""), **(log_extra or {})})
     return shas
 
 
@@ -324,7 +328,7 @@ def qac_pdf(c, oid, r, s):
     if os.path.isfile(p):
         return oc_read_file(c, p)
     model = _model(c, oid, r["id"])
-    lang = "en" if model.get("lang") == "en" else "de"
+    lang = pdf_lang(model.get("lang"))  # 2.357.0 D (#3183): the document's language (was de / en only)
     model["accepted"] = {"head": tr("Simple electronic signature", lg=lang),
                          "rows": [[tr("Accepted online by", lg=lang), s["signer_name"] or ""],
                                   [tr("Time (UTC)", lg=lang), (s["signed_at"] or "")[:19].replace("T", " ")],

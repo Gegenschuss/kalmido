@@ -683,6 +683,8 @@ def _watchdog_tick(c):
     _wd_section(c, "subscription reminders", abo_tick, now)  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     from ..office.banknorc import bnr_tick
     _wd_section(c, "bank bookings without a receipt", bnr_tick, now)  # 2.299.0 C (#3192): one reminder task while the list is not empty
+    from ..office.storefill import osf_tick
+    _wd_section(c, "office store catch-up", osf_tick)  # 2.357.0 (#3221): once, finalised documents from before they were stored
     from ..office.dunning import dun_tick
     _wd_section(c, "payment reminder suggestions", dun_tick, now)  # 2.147.1 B (#2054): reminder drafts for overdue invoices
     from ..office.letterlinks import ltl_followup_tick

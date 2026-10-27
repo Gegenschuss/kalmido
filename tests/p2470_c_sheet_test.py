@@ -247,7 +247,7 @@ eq(pr["head"][0], ["Drehtage", "1"], "print head")
 dump = json.dumps(pr)
 check("extern" not in dump and "intern" not in dump and "1400" not in dump, "print: no intern / extern, no purchase")
 eq(pr["rows"][0]["kind"], "group", "crew group heading")
-eq(pr["totals"][-1], ["Summe Netto", "8.033,00 €"], "print net: 8456 - 423")
+eq(pr["totals"][-1], ["Summe netto", "8.033,00 €"], "print net: 8456 - 423")  # 2.357.0 (#3183): Summe netto
 check(any(t[0].startswith("Rabatt 5") for t in pr["totals"]), "print discount")
 
 print(f"p2470_c_sheet: {OKS[0]} ok, {len(FAILS)} failed")

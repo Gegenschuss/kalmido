@@ -35,6 +35,7 @@ from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
 from .ledger import ofx_company  # 2.355.0 C (#2844)
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
@@ -542,6 +543,8 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
     from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
+    ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
+    A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     cur = d["currency"]
     lg = "de" if lang == "de" else "en"

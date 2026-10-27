@@ -256,13 +256,17 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     if f.get("country") and f["country"] != home and addr:
         addr.append(fk_country_label(f["country"], home) or f["country"])  # 2.296.0 B (#3168): the name in capitals, in the sender's language
     from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
-    contact = [x for x in (f"{W['phone']} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{W['email']}: {f['email']}" if f.get("email") else "") if x]  # 2.114.5 (#2300): "E-Mail:"
+    # 2.357.0 B (#3180): one rule for every label: a colon after a word ("E-Mail:", "Steuernummer:"), none after an
+    # abbreviation with its dot ("Tel.", "USt-IdNr.") and none after IBAN / BIC (was a colon only after the e-mail)
+    def cl(w):
+        return w if w.endswith((".", ":")) or w in ("IBAN", "BIC") else w + ":"
+    contact = [x for x in (f"{cl(W['phone'])} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{cl(W['email'])} {f['email']}" if f.get("email") else "") if x]  # 2.114.5 (#2300): "E-Mail:"
     reg = []
     if f.get("register_court") or f.get("register_no"):
-        reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
+        reg.append(" ".join(x for x in (cl(W["register"]) if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
     if f.get("managing_directors"):
         md = tr(FE_MD_LABELS[f.get("md_label")], lg=lg) if f.get("md_label") in FE_MD_LABELS and f.get("md_label") else W["managing_directors"]  # 2.40.0 (#1377)
-        reg.append(f"{md}: {f['managing_directors']}")
+        reg.append(f"{cl(md)} {f['managing_directors']}")
     bank = []
     if f.get("bank_name"):
         bank.append(f["bank_name"])
@@ -270,14 +274,13 @@ def ofx_company_print(fields, free, lang="de", pack=None):
         bank.append(f"{W['iban']} {' '.join(f['iban'][i:i + 4] for i in range(0, len(f['iban']), 4))}")
     if f.get("bic"):
         bank.append(f"{W['bic']} {f['bic']}")
-    if f.get("tax_number"):
-        bank.append(f"{W['tax_number']} {f['tax_number']}")
-    if f.get("vat_id"):
-        bank.append(f"{W['vat_id']} {f['vat_id']}")
+    # 2.357.0 B (#3180): tax number / VAT ID in the register column (was the bank column); the free lines of a column stay
+    # the fallback exactly as before (a tax line alone kept the free bank lines out and the free register lines in)
+    tax = [f"{cl(W[k])} {f[k]}" for k in ("tax_number", "vat_id") if f.get(k)]
     nm = f.get("name") or free.get("name") or ""  # 2.99.0 D (#2188): name = one line, name_lines = the up to three lines
     return {"name": ofx_name1(nm), "name_lines": ofx_name_lines(nm), "lines": addr or list(free.get("lines") or []),
             "contact_lines": contact or list(free.get("contact_lines") or []),
-            "register_lines": reg or list(free.get("register_lines") or []), "bank_lines": bank or list(free.get("bank_lines") or [])}
+            "register_lines": (reg or list(free.get("register_lines") or [])) + tax, "bank_lines": bank or ([] if tax else list(free.get("bank_lines") or []))}
 
 
 def ofx_sender_line(co):
@@ -357,6 +360,13 @@ def ofx_finalize(c, oid, uid, did):
     sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
     if s.get("exempt_reason"):
         sender["exempt_reason"] = s["exempt_reason"]  # 2.296.0 B (#3169): the exemption reason, frozen (invoices.inv_render)
+    if s.get("paper") == "letter":
+        sender["paper"] = "letter"  # 2.357.0 A (#3156): the paper size, frozen (docs.odoc_render; none = A4)
+    if r["kind"] in ("offer", "reminder") and s.get("sign_offers"):  # 2.357.0 (#3158, review M1): the finaliser's signature, frozen
+        pr = c.execute("SELECT * FROM office_letter_profiles WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+        img = (oc_dec_fields(c, oid, "office_letter_profiles", pr)["image"] if pr else "") or ""
+        if img:  # a quotation is rendered from its snapshot at every call: a later setting / picture never changes it
+            sender["sign_image"] = img
     from .letterhead import bp_snapshot
     lhs = bp_snapshot(c, oid, s)  # 2.120.0 E (#2091): the own letterhead frozen with the rest (only when there is one)
     if lhs:
