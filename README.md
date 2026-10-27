@@ -20,7 +20,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-**2.376** (2026-10-27, eight packages in one train):
+**2.376** (2026-10-27, seven packages in one train):
 - **Office**: hand in receipts to the bookkeeping, GoBD export, take your part of an organisation's office into your personal one; refunds on credit notes, reverse charge hints, progress and final invoices.
 - **Projects**: show a task in several projects (field "Projects" in the task panel, Alt-drag onto a project).
 - **Knowledge**: live preview editor with "/" commands and tickable checkboxes; search hits show a text snippet.
