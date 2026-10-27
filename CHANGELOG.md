@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.361.3] - 2026-10-27
+
+### Fixed
+- CI of 2.361.2: office_gen_docs(sign_uid) gets its foreign key index (#3158); p21144_b_api, p2470_b_parts_api and p293_a_api follow the 2.357 PDF rules (a rights appendix that fits on the last page stands there without the reference line, #3182; an emptied [ ] around an unknown variable goes too, #3220).
+
 ## [2.361.2] - 2026-10-27
 
 Package 2.355 (Bündel Büro: Nummern, Bank, Skonto, USt-Auswertung, Mahnwesen (2.231 + 2.232)).
@@ -8896,7 +8901,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.361.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.361.3...HEAD
+[2.361.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.3
 [2.361.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.2
 [2.351.8]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.8
 [2.351.7]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.7
