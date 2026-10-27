@@ -123,7 +123,10 @@ async function setStep(to, from, label, wire) {  // one way of a settings step; 
   const body = {}, skip = [];
   // 2.290.0 (#3197): a step sent as single entries (set_delta) needs no whole-value check: the server keeps its own order and
   // entries this client does not know, so the whole value never matches; the delta itself leaves other changes alone
-  for (const k in to) { if (!wire?.set_delta?.[k] && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
+  // 2.358.0 B (#3302): the same for a partial matrix (notify {event: {news|push}}: only this switch, it writes notify +
+  // news_kinds); a reload between save and undo brought the server's order of news_kinds, so the step was skipped
+  const part = k => wire?.set_delta?.[k] || (wire?.notify && typeof wire.notify === 'object' && (k === 'notify' || k === 'news_kinds'));
+  for (const k in to) { if (!part(k) && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
   if (!Object.keys(body).length) return {skipped: skip, none: true};
   await api('PATCH', '/api/settings', wire && !skip.length ? wire : body);  // 2.269.0 B (#3014)
   Object.assign(S.settings, body);

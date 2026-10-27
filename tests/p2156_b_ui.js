@@ -45,7 +45,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const mid = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({block: 'center'}); const b = e.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2, top = document.elementFromPoint(x, y);
       return {x, y, over: top && !e.contains(top) ? (top.className?.baseVal ?? top.className) + ' ' + top.tagName : ''}; })()`);
     const click = async sel => { const p = await mid(sel); if (!p) return false; if (p.over) console.log('note: on top of', sel, '->', p.over); await clickAt(p.x, p.y); return true; };
-    const until = async (fn, n = 20) => { for (let i = 0; i < n; i++) { if (await fn()) return true; await sleep(250); } return false; };
+    const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
     const cell = fid => `#tc-${T1} .lc[data-k="f:${fid}"]`;
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);

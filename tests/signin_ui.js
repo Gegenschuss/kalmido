@@ -9,7 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const {execFileSync} = require('child_process');
 const {JSDOM, VirtualConsole} = require('jsdom');
-const {B, login, sleep} = require('./boot');
+const {B, login, sleep, idle} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const F = []; let ok = 0; const errs = [];
@@ -73,14 +73,19 @@ async function page({cookie = '', hash = '', lang = null, wait = 2000, passkeys 
   const dom = await JSDOM.fromURL(B + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new (require('./boot').PooledLoader)(),  /* 2.20.0: browser-like connections (boot.js) */ pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = () => ({matches: false, addEventListener() {}, addListener() {}});
+      // 2.358.0 C (#2782): no background module loading (lazyload.js ld_idle, 5 s after the start): with waits on the state instead of
+      // fixed sleeps a window can close in the middle of it ("Could not load script timeline.js"); what the suite opens loads on demand
+      w.requestIdleCallback = () => 0;
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
-      w.fetch = async (u, o = {}) => {
+      w.__net = {n: 0, at: performance.now(), open: new Map()};  // 2.358.0 C (#2782): open requests for boot.idle(w), like boot()'s fetch
+      const f1 = async (u, o = {}) => {
         const hd = {...(o.headers || {}), Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; ')};
         const body = o.body && o.body.constructor && o.body.constructor.name === 'File' ? Buffer.from(await o.body.arrayBuffer()) : o.body;
         const r = await fetch(new URL(String(u), B), {...o, body, headers: hd, redirect: o.redirect === 'manual' ? 'manual' : 'follow'});
         for (const sc of r.headers.getSetCookie()) { const [kv, ...attrs] = sc.split(';'); const [k, v] = kv.split('='); if (/max-age=0|expires=thu, 01 jan 1970/i.test(attrs.join(';')) || v === '') jar.delete(k.trim()); else jar.set(k.trim(), v); }
         return r;
       };
+      w.fetch = (u, o) => { const n = w.__net, done = () => { n.n--; n.at = performance.now(); }; n.n++; n.at = performance.now(); const q = f1(u, o); q.then(done, done); return q; };
       w.Request = Request; w.Response = Response; w.Headers = Headers; w.FormData = FormData; w.File = File; w.Blob = Blob;
       Object.defineProperty(w.navigator, 'serviceWorker', {configurable: true, value: {register: () => Promise.resolve(), addEventListener() {}, controller: null}});
       Object.defineProperty(w, 'isSecureContext', {configurable: true, value: true});
@@ -97,7 +102,7 @@ async function page({cookie = '', hash = '', lang = null, wait = 2000, passkeys 
   return dom.window;
 }
 const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: H, body: b ? JSON.stringify(b) : undefined})).json();
-const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < t) { const x = fn(); if (x) return x; await sleep(100); } return fn(); };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env,
@@ -110,31 +115,31 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
 
   // ---- Settings > Account > Two-factor: TOTP
   let w = await page({cookie: await login('bob')}), d = w.document;
-  await w.eval(`settingsModal('account')`); await sleep(700);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+  await w.eval(`settingsModal('account')`); await until(() => d.querySelector('.smodal'), 15000); await idle(w);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   let md = d.querySelector('.smodal');
   check(md.querySelector('#s-2fa-h')?.textContent === 'Two-factor authentication' && /Authenticator app\s*Off/.test(md.querySelector('#s-2fa').textContent), 'account: 2FA section, app off');
   check(!!md.querySelector('[data-tfa="pk-add"]') && !md.querySelector('[data-tfa="pk-add"]').disabled, 'passkey button enabled on localhost with WebAuthn');
   click(w, md.querySelector('[data-tfa="totp-on"]')); await sleep(200);
   let pp = d.querySelector('.pwprompt');
   check(!!pp, 'asks for the password first');
-  pp.querySelector('#pp-pw').value = 'password123'; submit(w, pp.querySelector('form')); await sleep(600);
+  pp.querySelector('#pp-pw').value = 'password123'; submit(w, pp.querySelector('form')); await idle(w);
   let tm = d.querySelector('.totpmodal');
   const qr = tm?.querySelector('.totpqr img')?.getAttribute('src') || '';
   const secret = tm?.querySelector('#totp-secret')?.textContent || '';
   check(qr.startsWith('data:image/svg+xml') && /^[A-Z2-7 ]{35,}$/.test(secret), 'setup dialog: QR code (SVG data URI) + key in groups');
-  tm.querySelector('#totp-code').value = '000000'; submit(w, tm.querySelector('form')); await sleep(500);
+  tm.querySelector('#totp-code').value = '000000'; submit(w, tm.querySelector('form')); await idle(w);
   check(/Wrong code/.test(tm.querySelector('#totp-err').textContent), 'wrong code shown in the dialog');
-  tm.querySelector('#totp-code').value = totp(secret); submit(w, tm.querySelector('form')); await sleep(700);
+  tm.querySelector('#totp-code').value = totp(secret); submit(w, tm.querySelector('form')); await idle(w);
   const rc = d.querySelector('.rcmodal');
   const codes = [...(rc?.querySelectorAll('.rcodes code') || [])].map(x => x.textContent);
   check(codes.length === 10 && codes.every(c => /^[a-z2-9]{5}-[a-z2-9]{5}$/.test(c)), 'recovery codes dialog with 10 codes');
   click(w, rc.querySelector('[data-rc="copy"]')); await sleep(100);
   check((w.__clip || '').includes(codes[0]) && (w.__clip || '').includes(codes[9]), 'copy puts every code on the clipboard');
-  click(w, rc.querySelector('[data-m="ok"]')); await sleep(500);
+  click(w, rc.querySelector('[data-m="ok"]')); await idle(w);
   check(/Authenticator app\s*On/.test(md.querySelector('#s-2fa').textContent) && /10 left/.test(md.querySelector('#s-2fa').textContent), 'section: app on, 10 codes left');
   // passkey via the fake authenticator
   click(w, md.querySelector('[data-tfa="pk-add"]')); await sleep(200);
-  pp = d.querySelector('.pwprompt'); pp.querySelector('#pp-pw').value = 'password123'; submit(w, pp.querySelector('form')); await sleep(1000);
+  pp = d.querySelector('.pwprompt'); pp.querySelector('#pp-pw').value = 'password123'; submit(w, pp.querySelector('form')); await idle(w);
   check(md.querySelectorAll('.pklist [data-pk]').length === 1 && /Laptop/.test(md.querySelector('.pklist').textContent), 'passkey added and listed');
   w.close();
 
@@ -145,25 +150,25 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   check(!!scr.querySelector('[data-au="passkey"]'), 'login screen: "Log in with a passkey"');
   check(/no account for this login/.test(scr.querySelector('#au-err').textContent) && !/login-error/.test(w.location.hash), 'OIDC error shown, hash removed');
   scr.querySelector('#au-user').value = 'bob'; scr.querySelector('#au-pw').value = 'password123';
-  submit(w, scr.querySelector('#auth-form')); await sleep(700);
+  submit(w, scr.querySelector('#auth-form')); await idle(w);
   check(!!scr.querySelector('#tfa-form') && /authenticator app/.test(scr.textContent) && !w.__jar.has('kalmido_session') && w.__jar.has('kalmido_2fa'), 'second step shown, no session yet');
   check(!!scr.querySelector('[data-tfa="pk"]') && !!scr.querySelector('[data-tfa="rc"]'), 'offers the passkey and a recovery code');
-  scr.querySelector('#tfa-code').value = '000000'; submit(w, scr.querySelector('#tfa-form')); await sleep(500);
+  scr.querySelector('#tfa-code').value = '000000'; submit(w, scr.querySelector('#tfa-form')); await idle(w);
   check(/Wrong code/.test(scr.querySelector('#tfa-err').textContent), 'wrong code shown');
   click(w, scr.querySelector('[data-tfa="rc"]')); await sleep(100);
-  scr.querySelector('#tfa-code').value = codes[0]; submit(w, scr.querySelector('#tfa-form')); await sleep(700);
+  scr.querySelector('#tfa-code').value = codes[0]; submit(w, scr.querySelector('#tfa-form')); await idle(w);
   check(w.__jar.has('kalmido_session') && (await api(w, 'GET', '/api/me')).username === 'bob', 'logged in with a recovery code');
   w.close();
   // second step with the passkey
   w = await page(); d = w.document;
   d.querySelector('#au-user').value = 'bob'; d.querySelector('#au-pw').value = 'password123';
-  submit(w, d.querySelector('#auth-form')); await sleep(700);
-  click(w, d.querySelector('[data-tfa="pk"]')); await sleep(900);
+  submit(w, d.querySelector('#auth-form')); await idle(w);
+  click(w, d.querySelector('[data-tfa="pk"]')); await idle(w);
   check(w.__jar.has('kalmido_session') && (await api(w, 'GET', '/api/me')).via === '2fa', 'second step with the passkey');
   w.close();
   // passwordless
   w = await page(); d = w.document;
-  click(w, d.querySelector('[data-au="passkey"]')); await sleep(900);
+  click(w, d.querySelector('[data-au="passkey"]')); await idle(w);
   const me = await api(w, 'GET', '/api/me');
   check(w.__jar.has('kalmido_session') && me.username === 'bob' && me.via === 'passkey', 'passwordless login with the passkey: ' + JSON.stringify(me).slice(0, 80));
   w.close();
@@ -176,22 +181,22 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   await fetch(B + 'api/admin/settings', {method: 'PATCH', headers: {...H, Cookie: ac}, body: JSON.stringify({twofa_required: true})});
   w = await page(); d = w.document;
   d.querySelector('#au-user').value = 'gwen'; d.querySelector('#au-pw').value = 'password123';
-  submit(w, d.querySelector('#auth-form')); await sleep(700);
+  submit(w, d.querySelector('#auth-form')); await idle(w);
   check(/required on this server/.test(d.querySelector('.authscreen').textContent) && !!d.querySelector('[data-en="totp"]') && !!d.querySelector('[data-en="pk"]'), 'enrolment screen');
-  click(w, d.querySelector('[data-en="totp"]')); await sleep(600);
+  click(w, d.querySelector('[data-en="totp"]')); await idle(w);
   const gsec = d.querySelector('#totp-secret').textContent;
-  d.querySelector('#totp-code').value = totp(gsec); submit(w, d.querySelector('#en-totp')); await sleep(700);
+  d.querySelector('#totp-code').value = totp(gsec); submit(w, d.querySelector('#en-totp')); await idle(w);
   check(d.querySelectorAll('.authscreen .rcodes code').length === 10 && w.__jar.has('kalmido_session'), 'enrolled: recovery codes + session');
   w.close();
   await fetch(B + 'api/admin/settings', {method: 'PATCH', headers: {...H, Cookie: ac}, body: JSON.stringify({twofa_required: false, password: 'password123'})});  // 2.360.0 (#2496): off asks for the password
 
   // ---- Settings > Users > Whole server: sign-in + backups
   w = await page({cookie: ac}); d = w.document;
-  await w.eval(`settingsModal('users')`); await sleep(900);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+  await w.eval(`settingsModal('users')`); await until(() => d.querySelector('.smodal'), 15000); await idle(w);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   md = d.querySelector('.smodal');
   check(!!md.querySelector('#s-2fareq') && !md.querySelector('#s-2fareq').checked && md.querySelector('#s-pklogin').checked, 'sign-in switches (2FA off, passkey login on)');
   check(md.querySelector('#s-oidcredir')?.textContent === 'https://kalmido.example/api/auth/oidc/callback' && /id\.example/.test(md.querySelector('#sp-users').textContent), 'OIDC block: provider + redirect URI');
-  const cb = md.querySelector('#s-2fareq'); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  const cb = md.querySelector('#s-2fareq'); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   check((await api(w, 'GET', '/api/about')).twofa_required === true, 'switch applied at once');
   cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
   // 2.360.0 (#2496): turning the policy off asks for the password
@@ -201,8 +206,8 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   for (let i = 0; i < 50 && (await api(w, 'GET', '/api/about')).twofa_required !== false; i++) await sleep(100);
   check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && md.querySelector('#bk-on').checked && md.querySelector('#bk-time').value === '03:30', 'backups section: on, 03:30');  // 2.45.0 (#1515): backups on for a new server
   check(/No backups yet/.test(md.querySelector('#s-bk').textContent), 'no backups yet');
-  const bon = md.querySelector('#bk-on'); bon.checked = true; bon.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
-  const bd = md.querySelector('#bk-daily'); bd.value = '7'; bd.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  const bon = md.querySelector('#bk-on'); bon.checked = true; bon.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
+  const bd = md.querySelector('#bk-daily'); bd.value = '7'; bd.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   let bj = await api(w, 'GET', '/api/admin/backups');
   check(bj.on && bj.keep_daily === 7, 'backup settings saved at once (1.5)');
   check(!md.querySelector('[data-bk="save"]') && /Backups/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'no Save button; history step');
@@ -236,12 +241,12 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   const cc = await login('alice');
   await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: cc}, body: JSON.stringify({lang: 'de'})});
   w = await page({cookie: cc, lang: 'de'}); d = w.document;
-  await w.eval(`settingsModal('users')`); await sleep(900);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+  await w.eval(`settingsModal('users')`); await until(() => d.querySelector('.smodal'), 15000); await idle(w);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-bk-h')?.textContent === 'Sicherungen' && /Automatische Sicherungen/.test(md.querySelector('#s-bk').textContent)
     && /Zwei-Faktor-Anmeldung für die eingebaute Anmeldung vorschreiben/.test(md.textContent), 'German labels (users pane)');
   md.remove();
-  await w.eval(`settingsModal('account')`); await sleep(700);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+  await w.eval(`settingsModal('account')`); await until(() => d.querySelector('.smodal'), 15000); await idle(w);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   check(/Zwei-Faktor-Anmeldung/.test(d.querySelector('.smodal #s-2fa-h').textContent), 'German labels (account)');
   w.close();
 

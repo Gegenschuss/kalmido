@@ -23,7 +23,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
@@ -251,7 +251,12 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
+  // rsz after a viewport change: the app's resize handlers wait 150 ms, then two frames
+  const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
+  const rsz = async ev => { await sleep(400); await frames(ev); };
+  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const OVER = `(() => document.documentElement.scrollWidth - innerWidth)()`;
   const center = (ev, sel) => ev(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return {x: Math.round(r.left + Math.min(40, r.width / 2)), y: Math.round(r.top + r.height / 2)}; })()`);
   const keyClick = async ({cmd, ctx}, x, y, k) => cmd('input.performActions', {context: ctx, actions: [
@@ -261,20 +266,20 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   const LAYOUT = `(() => { const s = document.querySelector('#side').getBoundingClientRect(), m = document.querySelector('#main').getBoundingClientRect(), p = document.querySelector('#detail').getBoundingClientRect();
     return {s: Math.round(s.right), ml: Math.round(m.left), mr: Math.round(m.right), mw: Math.round(m.width), pl: Math.round(p.left), rail: document.querySelector('#app').classList.contains('side-rail'), o: document.documentElement.scrollWidth - innerWidth}; })()`;
   for (const th of ['light', 'dark']) await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = '1440 ' + th;
+    const {cmd, ev, idle, ctx, shot} = o, tag = '1440 ' + th;
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, idle);
     // a real Shift-click range from the open task
     const FO = await ev(`[...document.querySelectorAll('#view .trow')].map(x => +x.dataset.id)`);
-    await ev(`(() => { document.querySelector('#view .trow[data-id="${FO[0]}"] .ttl').click(); return 1; })()`); await sleep(500);
+    await ev(`(() => { document.querySelector('#view .trow[data-id="${FO[0]}"] .ttl').click(); return 1; })()`); await settle(ev, idle);
     const p = await center(ev, `#view .trow[data-id="${FO[3]}"] .ttl`);
-    await keyClick(o, p.x, p.y, ''); await sleep(600);
+    await keyClick(o, p.x, p.y, ''); await settle(ev, idle);
     const sel = await ev(`[...S.multi].length`);
     check(sel === 4, `${tag}: a real Shift-click selects the range (4) ` + sel);
     check(await ev(`!!document.querySelector('#detail.multi') && (window.getSelection() + '').trim() === ''`), `${tag}: the multi panel, no text selected by the Shift-click`);
     const q = await center(ev, `#view .trow[data-id="${FO[1]}"] .ttl`);
-    await keyClick(o, q.x, q.y, ''); await sleep(500);
+    await keyClick(o, q.x, q.y, ''); await settle(ev, idle);
     check(await ev(`[...S.multi].length`) === 3, `${tag}: a real Ctrl-click takes one out`);
     check((await ev(OVER)) <= 0, `${tag}: nothing sideways`);
     const lay = await ev(LAYOUT);
@@ -282,24 +287,24 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     const mb = await ev(`(() => { const b = document.querySelector('#mbar').getBoundingClientRect(), p = document.querySelector('#detail').getBoundingClientRect(); return {b: Math.round(b.right), p: Math.round(p.left), n: document.querySelectorAll('#mbar > *').length}; })()`);
     check(mb.b <= mb.p && mb.n === 4, `${tag}: the bar (4 elements) beside the panel ` + JSON.stringify(mb));
     // one changed field for the screenshot
-    await ev(`(() => { document.querySelector('#detail [data-act="me-shift"][data-n="7"]').click(); return 1; })()`); await sleep(1200);
+    await ev(`(() => { document.querySelector('#detail [data-act="me-shift"][data-n="7"]').click(); return 1; })()`); await settle(ev, idle);
     check(await ev(`!!document.querySelector('#detail .mef.chg[data-k="date"]')`), `${tag}: the shifted date is marked`);
     const small = await ev(`(() => [...document.querySelectorAll('#detail .mev, #detail .metag')].filter(e => e.getBoundingClientRect().height < 31).length)()`);
     check(small === 0, `${tag}: the panel's controls are big enough to hit ` + small);
     await shot(`p2260-${th}-1440-multi.png`);
     if (th === 'light') {
       // #932: drag the sidebar wider (the list keeps its room, the grip stays on the edge)
-      await ev(`(() => { S.multi.clear(); render(); return 1; })()`); await sleep(400);
-      await ev(`(() => { document.querySelector('#view .trow[data-id="${T[0]}"] .ttl').click(); return 1; })()`); await sleep(600);
+      await ev(`(() => { S.multi.clear(); render(); return 1; })()`); await settle(ev, idle);
+      await ev(`(() => { document.querySelector('#view .trow[data-id="${T[0]}"] .ttl').click(); return 1; })()`); await settle(ev, idle);
       const g = await ev(`(() => { placeGrips(); const g = document.querySelector('#pgrip-side'), r = g.getBoundingClientRect(), s = document.querySelector('#side').getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 200), s: Math.round(s.width), h: g.hidden}; })()`);
       check(!g.h && g.s === 240, `${tag}: the sidebar grip, 240 px standard ` + JSON.stringify(g));
-      await o.drag(g.x, g.y, 96, 0); await sleep(500);
+      await o.drag(g.x, g.y, 96, 0); await settle(ev, idle);
       const a = await ev(`(() => ({s: Math.round(document.querySelector('#side').getBoundingClientRect().width), st: localStorage.getItem('tasks.pw.side'), g: Math.round(document.querySelector('#pgrip-side').getBoundingClientRect().left + 5 - document.querySelector('#side').getBoundingClientRect().right)}))()`);
       check(Math.abs(a.s - 336) <= 8 && Math.abs(+a.st - 21) <= 0.5 && Math.abs(a.g) <= 1, `${tag}: dragged 96 px wider, stored, the grip follows ` + JSON.stringify(a));
       const lay2 = await ev(LAYOUT);
       check(!lay2.rail && lay2.s <= lay2.ml && lay2.pl >= lay2.mr - 1 && lay2.mw >= 420 && lay2.o <= 0, `${tag}: wider sidebar, list and panel beside it ` + JSON.stringify(lay2));
       await shot('p2260-light-1440-sidebar.png');
-      await o.drag(a.s + 0, g.y, 900, 0); await sleep(500);
+      await o.drag(a.s + 0, g.y, 900, 0); await settle(ev, idle);
       const lay3 = await ev(LAYOUT);
       check(!lay3.rail && lay3.mw >= 418, `${tag}: dragged far: the list still keeps 420 px ` + JSON.stringify(lay3));
       await ev(`(() => { document.querySelector('#pgrip-side').dispatchEvent(new MouseEvent('dblclick', {bubbles: true})); return 1; })()`); await sleep(300);
@@ -307,7 +312,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
       check(db[0] === 240 && db[1] == null, `${tag}: double-click = the standard width ` + JSON.stringify(db));
       for (const [vw, vh] of [[1280, 800], [1920, 1080]]) {
         await ev(`(() => { localStorage.setItem('tasks.pw.side', '19'); panelVars(); fitLayout(); return 1; })()`);
-        await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await sleep(700);
+        await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await rsz(ev);
         const ly = await ev(LAYOUT);
         check(!ly.rail && ly.s <= ly.ml && ly.pl >= ly.mr - 1 && ly.mw >= 420 && ly.o <= 0, `${vw}: a wider sidebar (19 rem) + the task panel: nothing overlaps, the list keeps its room ` + JSON.stringify(ly));
       }
@@ -326,20 +331,20 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   const KBOFF = `(async () => { document.activeElement?.blur?.(); ${FAKEVV(0, 0)} vvSync(); await new Promise(r => setTimeout(r, 450)); return 1; })()`;
   const inside = k => k && k.top >= k.vt - 1 && k.bottom <= k.vb + 1;
   await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = '390';
+    const {cmd, ev, idle, ctx, shot} = o, tag = '390';
     check(await ffLogin(o, 'light') === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, idle);
     await ev(`(() => { S.multiMode = true; S.multi = new Set([${T[0]}, ${T[2]}, ${T[4]}]); render(); return 1; })()`); await sleep(300);
-    await ev(`(() => { document.querySelector('#mbar [data-act="mb-menu"]').click(); [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent === 'Edit').click(); return 1; })()`); await sleep(700);  // 2.32.0 (#1055): Edit is under More
+    await ev(`(() => { document.querySelector('#mbar [data-act="mb-menu"]').click(); [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent === 'Edit').click(); return 1; })()`); await settle(ev, idle);  // 2.32.0 (#1055): Edit is under More
     const sh = await ev(`(() => { const r = document.querySelector('#detail').getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), w: Math.round(r.width), o: document.documentElement.scrollWidth - innerWidth}; })()`);
     check(sh.t > 100 && sh.b <= 845 && sh.w === 390 && sh.o <= 0, `${tag}: the multi panel is a bottom sheet (the list stays visible above) ` + JSON.stringify(sh));
     const small = await ev(`(() => [...document.querySelectorAll('#detail .mev, #detail .metag, #detail .metl, #mbar button')].filter(e => { const r = e.getBoundingClientRect(); return r.height && r.height < 43.5; }).map(e => e.className).slice(0, 5))()`);
     check(!small.length, `${tag}: 44 px targets in the sheet ` + small.join('|'));
     await shot('p2260-light-390-sheet.png');
-    await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`); await sleep(400);
+    await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`); await settle(ev, idle);
     // the quick sheet above the keyboard (also when iOS scrolled the visual viewport)
-    await ev(`(() => { openQuickSheet(''); return 1; })()`); await sleep(500);
+    await ev(`(() => { openQuickSheet(''); return 1; })()`); await settle(ev, idle);
     let k = await ev(KB('#qsheet', 330));
     check(inside(k), `${tag}: the quick add stays above the keyboard ` + JSON.stringify(k));
     k = await ev(KB('#qsheet', 330, 120));
@@ -355,7 +360,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     check(await ev(`['qsheet', 'qinput'].every(id => !document.getElementById(id) || document.getElementById(id).getAttribute('autocomplete') === 'off')`), `${tag}: #952 no autofill offer on the quick add`);
     await ev(KBOFF); await ev('closePop(); 1'); await sleep(300);
     // the comment box of the task panel
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(900);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     k = await ev(KB('#c-input', 330));
     check(inside(k), `${tag}: the comment box stays above the keyboard ` + JSON.stringify(k));
     k = await ev(KB('#c-input', 330, 140));
@@ -372,17 +377,17 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     await ev(KBOFF); await sleep(400);
     check(!(await ev(`!!document.querySelector('.vvpin, .vvph')`)), `${tag}: nothing stays pinned once the keyboard is gone`);
     // the search field
-    await o.nav(B + '#search'); await ready(ev);
+    await o.nav(B + '#search'); await ready(ev, idle);
     k = await ev(KB('#searchq', 330));
     check(inside(k), `${tag}: the search field stays visible ` + JSON.stringify(k));
     await ev(KBOFF);
   }, true);
   // a tablet (docked quick add at the bottom of the list): pinned above the keyboard, then let go
   await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = '820 tablet';
+    const {cmd, ev, idle, ctx, shot} = o, tag = '820 tablet';
     check(await ffLogin(o, 'light') === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 820, height: 1180}});
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, idle);
     check(await ev(`!!document.querySelector('#view .qdock #qinput') && !!document.querySelector('#view .qdock').offsetParent`), `${tag}: the docked quick add`);
     let k = await ev(KB('#view .qdock #qinput', 420));
     check(inside(k) && k.pin && k.act, `${tag}: the docked quick add is pinned above the keyboard ` + JSON.stringify(k));
@@ -396,17 +401,17 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   // #953: tablet widths with touch: a task opened (the sidebar folds into the drawer), closed again (the panel's back /
   // close button and the Android back) = exactly the layout before: sidebar back next to the list, full width, no gap
   for (const [vw, vh] of [[904, 1000], [1180, 820]]) await firefox(async o => {
-    const {cmd, ev, ctx} = o, tag = `#953 ${vw} touch`;
+    const {cmd, ev, idle, ctx} = o, tag = `#953 ${vw} touch`;
     check(await ffLogin(o, 'light') === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, idle);
     const LAY = `(() => { const app = document.querySelector('#app'); if (!app) return {noapp: true, hash: location.hash}; const side = document.querySelector('#side'), v = document.querySelector('#main') || document.querySelector('#view'), det = document.querySelector('#detail');
       const r = e => e ? e.getBoundingClientRect() : null, sr = r(side), vr = r(v), dr = r(det);
       return {rail: app.classList.contains('side-rail'), det: app.classList.contains('detail-open'), sideW: Math.round(sr && getComputedStyle(side).display !== 'none' && sr.right > 0 ? sr.width : 0),
         vL: Math.round(vr.left), vR: Math.round(vr.right), detVis: !!(dr && dr.width && det.offsetParent && !det.classList.contains('hidden') && dr.left < innerWidth), hash: location.hash, hst: !!history.state?.detail, iw: innerWidth}; })()`;
     const before = await ev(LAY);
     for (const how of ['button', 'back']) {
-      await ev(`(() => { document.querySelector('#view .trow[data-id="${T[1]}"] .ttl')?.click() || openDetail(${T[1]}); return 1; })()`); await sleep(900);
+      await ev(`(() => { document.querySelector('#view .trow[data-id="${T[1]}"] .ttl')?.click() || openDetail(${T[1]}); return 1; })()`); await settle(ev, idle);
       const open = await ev(LAY);
       check(open.det, `${tag}: the task panel opens ` + JSON.stringify(open));
       if (how === 'button') await ev(`(() => { const b = document.querySelector('#detail [data-act="close-detail"], #detail [data-act="detail-close"], #detail .dclose'); if (b) b.click(); else closeDetail(); return 1; })()`);
@@ -415,7 +420,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
       const after = await ev(LAY);
       check(!after.noapp && after.hash === before.hash && !after.hst && !after.det && !after.detVis && after.rail === before.rail && Math.abs(after.sideW - before.sideW) <= 2 && Math.abs(after.vL - before.vL) <= 2 && Math.abs(after.vR - before.vR) <= 2,
         `${tag}: ${how}: the layout of before (sidebar, full width, no gap) ` + JSON.stringify({before, open, after}));
-      if (after.hash !== before.hash) { await o.nav(B + '#l/' + L); await ready(ev); }
+      if (after.hash !== before.hash) { await o.nav(B + '#l/' + L); await ready(ev, idle); }
     }
   }, true);
 
@@ -423,19 +428,19 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   // from the open drawer -> task -> Back closes the task -> Back = the list before with the drawer OPEN and it stays -> Back
   // goes on as before (drawer closed)
   for (const [vw, vh] of [[690, 900], [904, 1100]]) await firefox(async o => {
-    const {cmd, ev, ctx} = o, tag = `#953 ${vw}x${vh} touch upright`;
+    const {cmd, ev, idle, ctx} = o, tag = `#953 ${vw}x${vh} touch upright`;
     check(await ffLogin(o, 'light', {'tasks.sideFold': 'true'}) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-    await o.nav(B + '#l/' + QP); await ready(ev);
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + QP); await ready(ev, idle);
+    await o.nav(B + '#l/' + L); await ready(ev, idle);
     const ST = `(() => ({hash: location.hash, side: !!document.querySelector('#side.open'), det: !!S.sel, rail: document.querySelector('#app').classList.contains('side-rail') || isMobile()}))()`;
     check((await ev(ST)).rail, tag + ': the sidebar is a drawer here');
-    await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(500);
+    await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await settle(ev, idle);
     check((await ev(ST)).side, tag + ': the drawer opens');
-    await ev(`(() => { document.querySelector('#side [data-go="l/${QP}"]').click(); return 1; })()`); await sleep(900);
+    await ev(`(() => { document.querySelector('#side [data-go="l/${QP}"]').click(); return 1; })()`); await settle(ev, idle);
     let st = await ev(ST);
     check(st.hash === '#l/' + QP && !st.side, tag + ': a list from the drawer, the drawer closes ' + JSON.stringify(st));
-    await ev(`(() => { openDetail(${P1}); return 1; })()`); await sleep(900);
+    await ev(`(() => { openDetail(${P1}); return 1; })()`); await settle(ev, idle);
     await ev(`(() => { history.back(); return 1; })()`); await sleep(900);
     st = await ev(ST);
     check(st.hash === '#l/' + QP && !st.det && !st.side, tag + ': Back closes only the task ' + JSON.stringify(st));

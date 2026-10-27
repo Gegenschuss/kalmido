@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # kalmido-suite: nodata
 """2.321 B (#1368): the git merge drivers of the files every package touched - static/i18n/<code>.json by key
-(tools/i18n_merge.py), the precache lists of static/sw.js entry by entry (tools/sw_lists.py), tests/skip.txt as a line union
-(.gitattributes). Throwaway git repos, no server, no network.
+(tools/i18n_merge.py), the precache lists of static/sw.js entry by entry (tools/sw_lists.py), tests/skip.txt as a line set
+(tools/lines_merge.py, 2.358.0 #3394: a line deleted on one side stays deleted). Throwaway git repos, no server, no network.
 
 - two packages that add different translation keys / modules / skip lines merge and rebase without a conflict
 - the same key changed differently on both sides stays a conflict; code outside the sw.js lists stays a conflict
@@ -44,10 +44,10 @@ def rd(repo, rel):
 def fresh_repo():
     r = tempfile.mkdtemp(prefix="merge-")
     git(r, "init", "-q", "-b", "main")
-    for t in ("i18n_merge.py", "sw_lists.py", "git_setup.sh"):
+    for t in ("i18n_merge.py", "sw_lists.py", "lines_merge.py", "git_setup.sh"):
         shutil.copy(os.path.join(ROOT, "tools", t), os.path.join(r, "tools", t)) if os.path.isdir(os.path.join(r, "tools")) else (
             os.makedirs(os.path.join(r, "tools")), shutil.copy(os.path.join(ROOT, "tools", t), os.path.join(r, "tools", t)))
-    put(r, ".gitattributes", "static/i18n/*.json merge=i18n\nstatic/sw.js merge=swlists\ntests/skip.txt merge=union\n")
+    put(r, ".gitattributes", "static/i18n/*.json merge=i18n\nstatic/sw.js merge=swlists\ntests/skip.txt merge=lines\n")  # 2.358.0 (#3394): was merge=union
     subprocess.run(["bash", os.path.join(r, "tools", "git_setup.sh")], capture_output=True, check=True)
     put(r, "static/sw.js", SW); put(r, "static/i18n/de.json", I18N); put(r, "tests/skip.txt", "x 2026-11-01 #1 ev\n")
     put(r, "static/index.html", '<script src="/static/js/a.js"></script>\n')
@@ -77,7 +77,7 @@ check('"P1": "p1",\n  "P2": "p2"' in rd(r, "static/i18n/de.json"), "translations
 check("const LAZY = ['/static/js/l1.js', '/static/js/p1.js', '/static/js/p2.js'];" in rd(r, "static/sw.js") and
       "const LAZY_CSS = ['/static/css/l1.css', '/static/css/p2.css'];" in rd(r, "static/sw.js") and
       "const SHELL = ['/', '/static/app.css', '/static/js/a.js', '/static/js/p1.js'];" in rd(r, "static/sw.js"), f"sw.js lists: entry union\n{rd(r, 'static/sw.js')}")
-check(rd(r, "tests/skip.txt") == "x 2026-11-01 #1 ev\np1_ui 2026-11-01 #2 ev\np2_ui 2026-11-01 #3 ev\n", "skip.txt: line union")
+check(rd(r, "tests/skip.txt") == "x 2026-11-01 #1 ev\np1_ui 2026-11-01 #2 ev\np2_ui 2026-11-01 #3 ev\n", "skip.txt: the lines of both")
 # rebase (what kalmido-livezug.py landen does): a third package built on the old base
 base2 = git(r, "rev-parse", "main~2").stdout.strip()
 git(r, "checkout", "-q", "-b", "p3", base2)
@@ -89,6 +89,16 @@ check(p.returncode == 0, f"rebase of a third package onto main: clean: {p.stderr
 t = rd(r, "static/i18n/de.json")
 check('"A": "a-new"' in t and '"P1"' in t and '"P2"' in t and t.rstrip().endswith('"P3": "p3"\n}'), f"rebased translations: change kept, all keys\n{t}")
 check("const LAZY_CSS = ['/static/css/l1.css', '/static/css/p2.css', '/static/css/p3.css'];" in rd(r, "static/sw.js"), "rebased sw.js list")
+# 2.358.0 (#3394): two packages each take their fixed suites off skip.txt (neighbouring lines): all stay off - union brought them back
+skip = "".join(f"s{i} 2026-11-01 #{i} ev\n" for i in range(1, 7))
+git(r, "checkout", "-q", "-b", "s0", base2); put(r, "tests/skip.txt", skip); git(r, "commit", "-qam", "s0")
+git(r, "checkout", "-q", "-b", "s1"); put(r, "tests/skip.txt", skip.replace("s2 2026-11-01 #2 ev\n", "").replace("s3 2026-11-01 #3 ev\n", "")); git(r, "commit", "-qam", "s1")
+git(r, "checkout", "-q", "s0"); git(r, "checkout", "-q", "-b", "s2"); put(r, "tests/skip.txt", skip.replace("s4 2026-11-01 #4 ev\n", "") + "s7 2026-11-01 #7 ev\n"); git(r, "commit", "-qam", "s2")
+git(r, "checkout", "-q", "s1")
+p = git(r, "merge", "s2", ok=False)
+check(p.returncode == 0 and rd(r, "tests/skip.txt") == "s1 2026-11-01 #1 ev\ns5 2026-11-01 #5 ev\ns6 2026-11-01 #6 ev\ns7 2026-11-01 #7 ev\n",
+      f"skip.txt: deleted lines of both sides stay deleted, the new one is kept\n{rd(r, 'tests/skip.txt')}")
+git(r, "checkout", "-q", "main")
 # real conflicts stay conflicts
 git(r, "checkout", "-q", "-b", "p4", base2)
 put(r, "static/i18n/de.json", I18N.replace('"A": "a"', '"A": "a-other"')); git(r, "commit", "-qam", "p4")
@@ -118,8 +128,10 @@ check(subprocess.run([sys.executable, os.path.join(ROOT, "tools", "sw_lists.py")
       "the repo's sw.js lists match index.html + lazyload.js")
 check(subprocess.run([sys.executable, os.path.join(ROOT, "tools", "i18n_merge.py"), "--selftest"], capture_output=True).returncode == 0,
       "i18n_merge.py --selftest")
+check(subprocess.run([sys.executable, os.path.join(ROOT, "tools", "lines_merge.py"), "--selftest"], capture_output=True).returncode == 0,
+      "lines_merge.py --selftest")
 ga = open(os.path.join(ROOT, ".gitattributes"), encoding="utf-8").read()
-check("static/i18n/*.json merge=i18n" in ga and "static/sw.js merge=swlists" in ga and "tests/skip.txt merge=union" in ga, ".gitattributes names the drivers")
+check("static/i18n/*.json merge=i18n" in ga and "static/sw.js merge=swlists" in ga and "tests/skip.txt merge=lines" in ga, ".gitattributes names the drivers")  # 2.358.0 (#3394): lines, not union
 
 print(f"p2321_b_merge: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

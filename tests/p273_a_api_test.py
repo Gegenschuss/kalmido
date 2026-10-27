@@ -37,7 +37,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 SELF = "http://127.0.0.1:3040"   # the app as seen from inside its container
 STUB = "http://127.0.0.1:8099"
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 SEEN500 = [0]
@@ -50,15 +50,6 @@ def on500(r, *a, **k):
         print("FAIL: 500 on", r.request.method, r.request.url, flush=True)
         log = subprocess.run(["docker", "logs", "--tail", "40", CT], capture_output=True, text=True)
         print((log.stdout + log.stderr)[-3000:], flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    s.hooks["response"].append(on500)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):
@@ -91,7 +82,7 @@ subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_msv.py"])
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice")
+A = sess("alice", hooks=[on500])
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "events"]})
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
@@ -102,7 +93,7 @@ for u in ("bob", "carol"):
     assert r.ok, r.text
     uid[u] = r.json()["id"]
 BOB, CAROL = uid["bob"], uid["carol"]
-Bo, Ca = sess("bob"), sess("carol")
+Bo, Ca = sess("bob", hooks=[on500]), sess("carol", hooks=[on500])
 for s_ in (Bo, Ca):
     s_.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 
@@ -430,7 +421,7 @@ check(r.status_code == 409, f"at most 10 accounts per person ({r.status_code})")
 # ================================================================== a hosted server: https only, no internal hosts
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
                env={**env, "KEEP": "1", "EXTRA": BASE_EXTRA + " -e KALMIDO_HOSTED=1"})
-A = sess("alice")
+A = sess("alice", hooks=[on500])
 dbx("DELETE FROM msv_links WHERE base_url LIKE ?", (f"{STUB}/evil/n%",))
 r = A.post(B + "/api/servers", json={"base_url": SELF, "token": CTOK})
 check(r.status_code == 400 and "https" in r.json()["error"], f"hosted: http refused ({r.status_code} {r.text[:150]})")

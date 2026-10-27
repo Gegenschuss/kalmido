@@ -16,7 +16,7 @@ if (!process.env.P299E_NOSTART) execFileSync('bash', [path.join(__dirname, 'star
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return Array.isArray(j) ? j : {...j, status: r.status}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 200) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };  // 2.206.0 B (#2513): 30 s (CI load)
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 30000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,comments';
 
@@ -95,7 +95,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   for (const i of [3, 4, 5]) {
     click(w, pinBtn(P[i])); pinned.push(P[i]);
     await until(() => pinBtn(P[i])?.getAttribute('aria-pressed') === 'true');
-    await pinsAre(pinned.join(','));
+    // 2.358.0 B (#3302): CI of 2.318.4 lost the 5th pin on the way (page 4,2,5,6; a state reload crossing the save put
+    // the older list back, fixed in the app by #2806 2.350.0 C): checked per pin, so a loss is named where it happens
+    check(await pinsAre(pinned.join(',')), `pin ${pinned.length} kept: ` + w.eval(`sbp_ids('side_people').join(',')`));
   }
   await until(() => pinBtn(P[0])?.getAttribute('aria-pressed') === 'true');
   check(await pinsAre(pinned.join(',')), '5 people pinned ' + w.eval(`sbp_ids('side_people').join(',')`));

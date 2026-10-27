@@ -31,6 +31,22 @@ PASSWORD = "password123"
 FAILS, OKS = [], [0]
 
 
+FIRST_FAIL = []
+
+
+def on_first_fail(fn):
+    """2.358.0 D (#2783): call fn() once, right after the first failed check (e.g. print the container's log)."""
+    FIRST_FAIL.append(fn)
+
+
+def docker_logs_on_first_fail(tail=60, chars=6000):
+    """2.358.0 D (#2783): the server's side of the first failure (a traceback of a background thread) into the output."""
+    def show():
+        r = subprocess.run(["docker", "logs", "--tail", str(tail), CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        print(r.stdout[-chars:], flush=True)
+    on_first_fail(show)
+
+
 def check(cond, what):
     """Count a passed check or print and remember a failed one (the suite ends with sys.exit(done(name)))."""
     if cond:
@@ -38,6 +54,9 @@ def check(cond, what):
     else:
         FAILS.append(what)
         print("FAIL:", what, flush=True)
+        if len(FAILS) == 1:
+            for fn in FIRST_FAIL:
+                fn()
     return bool(cond)
 
 
@@ -47,15 +66,27 @@ def done(name):
     return 1 if FAILS else 0
 
 
-def sess(user=None, pw=PASSWORD):
-    """A logged-in session with the X-Requested-With header (user None: a session that is not logged in, 2.206.0 #2762)."""
+def sess(user=None, pw=PASSWORD, ip=None, ua=None, headers=None, session_cls=None, hooks=(), soft=False, json_ok=False):
+    """A logged-in session with the X-Requested-With header (user None: a session that is not logged in, 2.206.0 #2762).
+    2.358.0 D (#2783), all optional: ip = X-Forwarded-For on the login request only; headers = extra headers of the whole
+    session (ua = its User-Agent); session_cls = a requests.Session subclass; hooks = response hooks; json_ok = the login
+    answer must carry ok=true too; soft = -> None instead of an assert error when the login fails."""
     import requests  # here, not at the top: the lint job runs i18n/mcp suites without requests installed (CI of 2.168.4)
-    s = requests.Session()
+    s = (session_cls or requests.Session)()
     s.headers.update(H)
+    if ua:
+        s.headers["User-Agent"] = ua
+    if headers:
+        s.headers.update(headers)
+    for h in hooks:
+        s.hooks["response"].append(h)
     if user is None:
         return s
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
+    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw}, headers={"X-Forwarded-For": ip} if ip else {})
+    good = r.ok and (not json_ok or r.json().get("ok"))
+    if soft:
+        return s if good else None
+    assert good, (user, r.text)
     return s
 
 

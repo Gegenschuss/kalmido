@@ -21,7 +21,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK, hd = {}) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...hd, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };  // local date (the container runs in Europe/Berlin)
@@ -126,7 +126,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   click(w, d.querySelector('#pop [data-bp="readall"]')); await until(() => /marked as read/.test(d.querySelector('#toast')?.textContent || ''));
   check(/marked as read/.test(d.querySelector('#toast').textContent) && /Undo/.test(d.querySelector('#toast button')?.textContent || ''), 'A5: "Mark all as read" has an Undo');
   check((await call('GET', '/api/news')).unread === 0, 'A5: all read');
-  d.querySelector('#toast button').click(); await sleep(800);
+  d.querySelector('#toast button').click(); await idle(w);  // 2.358.0 C (#2782)
   check((await call('GET', '/api/news')).unread === u0 && u0 > 0, `A5: Undo makes them unread again (${u0})`);
   closeAll(w); w.close();
   // P9: the News view has one filter row
@@ -302,22 +302,22 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const ta = () => d.querySelector('#d-content');
     const typeIt = v => { const t = ta(); t.focus(); t.value = v; t.dispatchEvent(new w.Event('input', {bubbles: true})); };
     const srv = async () => (await call('GET', '/api/state')).tasks.find(t => t.id === TT).content || '';
-    typeIt('Hello'); await sleep(1200);
+    typeIt('Hello'); await sleep(1200);  // on purpose: a window in which NO save may happen
     check(await srv() === '', 'notes: no save every keystroke pause (the 600 ms autosave is gone)');
     w.__offline = true; await w.eval('flushSaves()');
     typeIt('Hello world'); await w.eval('flushSaves()'); typeIt('Hello world, offline'); await w.eval('flushSaves()');
     const q = w.eval(`OUT.q.filter(e => e.url === '/api/tasks/${TT}').length`);
     check(q === 1 && d.activeElement === ta() && ta().value === 'Hello world, offline', `offline: the queued text is coalesced into one entry (${q}), focus + text kept`);
-    w.__offline = false; await w.eval('flush()'); await sleep(400);
+    w.__offline = false; await w.eval('flush()'); await idle(w);
     check(await srv() === 'Hello world, offline' && !w.eval('S.conflicts.length') && d.activeElement === ta(), 'back online: the latest text arrives, no conflict, the field keeps the focus');
     // a save whose answer got lost: the server has it, the device still builds on the older text
     await call('PATCH', `/api/tasks/${TT}`, {content: 'Lost answer', _prev: {content: 'Hello world, offline'}});
     w.eval(`S.sentVals['${TT}:content'].push('Lost answer')`);
-    typeIt('Lost answer and more'); await w.eval('flushSaves()'); await sleep(300);
+    typeIt('Lost answer and more'); await w.eval('flushSaves()'); await idle(w);
     check(await srv() === 'Lost answer and more' && !w.eval('S.conflicts.length') && !d.querySelector('.cfbar'), 'a "conflict" with our own earlier save is none: the newest text goes on top');
     // a real conflict: Anna changed the notes meanwhile
     await call('PATCH', `/api/tasks/${TT}`, {content: 'Anna wrote this'}, CKA);
-    typeIt('Lost answer and more, my draft'); await w.eval('flushSaves()'); await sleep(300);
+    typeIt('Lost answer and more, my draft'); await w.eval('flushSaves()'); await idle(w);
     check(d.querySelector('#detail .cfbar') && d.activeElement === ta() && ta().value === 'Lost answer and more, my draft' && await srv() === 'Anna wrote this', 'a real conflict: the draft and the focus stay, a calm bar under the field');
     click(w, d.querySelector('#detail .cfbar [data-cfi="mine"]')); await idle(w);
     check(await srv() === 'Lost answer and more, my draft' && !d.querySelector('.cfbar') && !w.eval(`S.conflicts.some(c => c.tid === ${TT})`), '"Keep mine" saves the draft on top of the other version');
@@ -331,18 +331,20 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
+  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0); };
+  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const CTR = `(fg, bg) => { const p = s => s.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => /^color\\(/.test(s) ? v * 255 : v).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); const L = c => { const [r, g, b] = p(c); return .2126 * r + .7152 * g + .0722 * b; }; const a = L(fg), b = L(bg); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); }`;
   const bgOf = `el => { for (let n = el; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c)) return c; } return 'rgb(255,255,255)'; }`;
 
   // ---- phone 390 x 844, touch, light, German
   await call('PATCH', '/api/settings', {lang: 'de'});
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'light') === 200, '390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     const tap = (x, y, hold = 60) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: hold}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
     // P11: the chat: its header replaces the page header, back on the left; A2: the hidden bar opens with a long press
-    await nav(B + '?p=1#agents/' + AG); await sleep(2200);
+    await nav(B + '?p=1#agents/' + AG); await settle(ev, idle);
     const ch = await ev(`(() => { const h = document.querySelector('.chview .chath'); const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); const q = m && m.querySelector('.rxrow .rx.add'); return {inChat: document.body.classList.contains('in-chat'), top: getComputedStyle(document.querySelector('#top')).display, first: h && h.firstElementChild.classList.contains('chback'), shown: q ? +getComputedStyle(q).opacity : null, mh: m ? Math.round(m.getBoundingClientRect().height) : 0, note: !!document.querySelector('.chnote')}; })()`);
     check(ch.inChat && ch.top === 'none' && ch.first && ch.shown >= .6 && !ch.note, '390 P11 / #651: chat header replaces the page header, back on the left, quick reactions visible (2.18.0), no note under the input ' + JSON.stringify(ch));
     await shot('p2130-chat-390.png');
@@ -350,8 +352,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     check(op.w >= 43.5 && op.h >= 43.5, '390 #651: the visible reactions are 44 px targets ' + JSON.stringify(op));
     // 2.87.0 (#1982): the (i) next to the agent's name is gone (it covered the usage ring)
     // an image attachment whose file is gone: a tile that says so instead of a broken image
-    await nav(B + '?att=1#l/' + P); await ready(ev);
-    await ev(`(() => { openDetail(${T[3]}); return 1; })()`); await sleep(1500);
+    await nav(B + '?att=1#l/' + P); await ready(ev, idle);
+    await ev(`(() => { openDetail(${T[3]}); return 1; })()`); await settle(ev, idle);
     const at = await ev(`(() => { const b = document.querySelector('#detail .att.broken'); return {broken: !!b, txt: b ? b.textContent : '', img: document.querySelectorAll('#detail .att.img img').length}; })()`);
     check(at.broken && /fehlt|missing/i.test(at.txt) && !at.img, '390: an attachment whose file is gone shows "missing", not a broken image ' + JSON.stringify(at));
     // 2.13.2: on a phone closeDetail() goes history.back() (the task's history entry); that navigation lands after the next
@@ -360,24 +362,24 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     for (let i = 0; i < 30 && await ev(`!!(history.state && history.state.detail)`).catch(() => true); i++) await sleep(100);
     await sleep(300);
     // A7: the view switch; A11 habits; P13 contrast
-    await nav(B + '?p=2#l/' + P); await ready(ev);
+    await nav(B + '?p=2#l/' + P); await ready(ev, idle);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);
     check(vs && vs.n === 6 /* 2.49.0 (#1201): + Mind map; 2.156.0 (#2071): + Calendar */ && vs.h >= 35.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 36 px (2.31.0 #1053, was 44), inside the screen ' + JSON.stringify(vs));
     const ctr = await ev(`(() => { const C = ${CTR}, bg = ${bgOf}; const sp = [...document.querySelectorAll('#tabs button:not(.on) > span')].filter(s => s.offsetWidth)[0]; return sp ? C(getComputedStyle(sp).color, bg(sp)) : 0; })()`);
     check(ctr >= 4.5, '390 P13: inactive tab label contrast ' + ctr.toFixed(2));
     await shot('p2130-list-390.png');
     // the list dialog with its (i)
-    await ev(`(() => { listModal(${P}); return 1; })()`); await sleep(700);
+    await ev(`(() => { listModal(${P}); return 1; })()`); await settle(ev, idle);
     const ld = await ev(`(() => ({ib: document.querySelectorAll('.lmodal .ib[data-ii]').length, inl: [...document.querySelectorAll('.lmodal .shint')].filter(h => h.offsetHeight).length}))()`);
     check(ld.ib >= 3, '390 helper texts: list dialog ' + JSON.stringify(ld));
     await shot('p2130-listdialog-390.png');
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);
-    await nav(B + '?p=3#habits'); await ready(ev);
-    await ev(`fetch('/api/habits', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({name: 'Walk'})}).then(() => load()).then(() => { render(); return 1; })`); await sleep(600);
+    await nav(B + '?p=3#habits'); await ready(ev, idle);
+    await ev(`fetch('/api/habits', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({name: 'Walk'})}).then(() => load()).then(() => { render(); return 1; })`); await settle(ev, idle);
     const hc = await ev(`(() => { const c = [...document.querySelectorAll('.hweek:not(.head) .hc')]; const r = c.map(x => x.getBoundingClientRect()); return {n: c.length, w: Math.min(...r.map(x => x.width)), h: Math.min(...r.map(x => x.height)), over: document.documentElement.scrollWidth > innerWidth}; })()`);
     check(hc.n >= 7 && hc.w >= 43.5 && hc.h >= 43.5 && !hc.over, '390 A11: habit day cells 44 px, no overflow ' + JSON.stringify(hc));
     // A12: a toast above an open sheet
-    await nav(B + '?p=4#l/' + P); await ready(ev);
+    await nav(B + '?p=4#l/' + P); await ready(ev, idle);
     await ev(`(() => { toast('Erledigt', () => {}); snoozeSheet(${T[1]}); return 1; })()`);
     // 2.308.0 (#3250): measure once the sheet and the toast stopped moving (same rects twice in a row) instead of after a fixed time
     const TSQ = `(() => { const t = document.querySelector('#toast').getBoundingClientRect(), s = document.querySelector('#pop.sheet').getBoundingClientRect(); return {tb: Math.round(t.bottom), st: Math.round(s.top), tt: Math.round(t.top), overlap: !(t.bottom <= s.top + 1 || t.top >= s.bottom)}; })()`;
@@ -395,7 +397,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await shot('p2130-select-390.png');
     await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`);
     // the keyboard: the chat with a keyboard-sized viewport keeps the newest message in view (#453 N4 still holds)
-    await nav(B + '?p=5#agents/' + AG); await sleep(2000);
+    await nav(B + '?p=5#agents/' + AG); await settle(ev, idle);
     await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 464}}); await sleep(700);
     const kb = await ev(`(() => { const b = document.querySelector('#chat-msgs'); return {kb: document.body.classList.contains('kb-open'), h: Math.round(b.clientHeight), gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight)}; })()`);
@@ -403,20 +405,20 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await shot('p2130-chat-keyboard-390.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await sleep(300);
     // settings with the search and the (i)
-    await nav(B + '?p=6#today'); await ready(ev);
-    await ev(`(() => { settingsModal('general'); return 1; })()`); await sleep(700);
+    await nav(B + '?p=6#today'); await ready(ev, idle);
+    await ev(`(() => { settingsModal('general'); return 1; })()`); await settle(ev, idle);
     const st = await ev(`(() => { const s = document.querySelector('#s-search').getBoundingClientRect(); return {s: s.width > 100 && s.right <= innerWidth, ib: document.querySelectorAll('.smodal .ib').length}; })()`);
     check(st.s && st.ib > 10, '390 P20: the settings search is on screen, (i) buttons ' + JSON.stringify(st));
     await shot('p2130-settings-390.png');
   }, true);
 
   // ---- #429: the font size slider at its ends on a phone: 150 % without sideways overflow, 50 % with 44 px touch targets
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'light') === 200, '#429: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     for (const pct of [150, 50]) {
       await ev(`(() => { localStorage.setItem('tasks.fsize', '${pct}'); return 1; })()`);
-      await nav(B + `?fs=${pct}#l/` + P); await ready(ev);
+      await nav(B + `?fs=${pct}#l/` + P); await ready(ev, idle);
       const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
       check(!r.over && r.h1 && (pct === 150 || !r.small.length), `390 #429 ${pct} %: no sideways overflow, the title shows` + (pct === 50 ? ', touch targets still 44 px ' : ' ') + JSON.stringify(r));
       await shot(`p2130-fontsize-${pct}-390.png`);
@@ -426,10 +428,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
 
   // ---- iPhone behaviour (simulated: iOS keeps innerHeight and only shrinks window.visualViewport): the add sheet and
   // the date sheet sit above the "keyboard", the chat never overflows sideways (390 and 428 wide)
-  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'dark') === 200, `${vw} iOS: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 926}});
-    await nav(B + `?ios=${vw}#l/` + P); await ready(ev);
+    await nav(B + `?ios=${vw}#l/` + P); await ready(ev, idle);
     const FAKE = `(h, top) => { const t = new EventTarget(); Object.assign(t, {height: h, width: innerWidth, offsetTop: top, offsetLeft: 0, pageTop: top, scale: 1}); Object.defineProperty(window, 'visualViewport', {configurable: true, value: t}); vvSync(); }`;
     await ev(`(() => { openQuickSheet(''); return 1; })()`); await sleep(300);
     await ev(`(${FAKE})(560, 0)`); await sleep(200);
@@ -441,7 +443,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const sh = await ev(`(() => { const r = document.querySelector('#pop.sheet').getBoundingClientRect(); return {bottom: Math.round(r.bottom), lim: visualViewport.height + visualViewport.offsetTop}; })()`);
     check(sh.bottom <= sh.lim + 1, `${vw} iOS: a bottom sheet sits above the keyboard ` + JSON.stringify(sh));
     await ev(`(() => { closePop(); return 1; })()`);
-    await nav(B + `?ios2=${vw}#agents/` + AG); await sleep(2200);
+    await nav(B + `?ios2=${vw}#agents/` + AG); await settle(ev, idle);
     await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
     await ev(`(${FAKE})(560, 0)`); await sleep(300);
     const ch = await ev(`(() => { const c = document.querySelector('#chat-in').getBoundingClientRect(), s = document.querySelector('[data-act="chat-send"]').getBoundingClientRect(); return {sw: document.scrollingElement.scrollWidth, iw: innerWidth, send: Math.round(s.right), inBottom: Math.round(c.bottom), lim: visualViewport.height, gap: Math.round(visualViewport.height - c.bottom), meta: document.querySelector('meta[name=viewport]').content}; })()`);
@@ -452,10 +454,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // ---- Fold 904 x 904, touch, dark, French
   await call('PATCH', '/api/settings', {lang: 'fr'});
   await call('PATCH', `/api/lists/${P}`, {view: 'kanban'});
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'dark') === 200, '904: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
-    await nav(B + '?f=1#l/' + P); await ready(ev);
+    await nav(B + '?f=1#l/' + P); await ready(ev, idle);
     // A4: a card held at the right edge: the board scrolls slowly (no jump of 3 columns in 300 ms)
     const k0 = await ev(`(() => { const k = document.querySelector('#view .kanban'); k.style.scrollBehavior = 'auto'; const c = k.querySelector('.kcol .trow .tmain').getBoundingClientRect(), kr = k.getBoundingClientRect(), col = k.querySelector('.kcol').getBoundingClientRect().width; return {id: +k.querySelector('.kcol .trow').dataset.id, sec: S.tasks.get(+k.querySelector('.kcol .trow').dataset.id).section_id, x: c.left + Math.min(60, c.width / 2), y: c.top + c.height / 2, edge: Math.min(innerWidth, kr.right) - 6, col, sw: k.scrollWidth, cw: k.clientWidth}; })()`);
     if (k0.sw > k0.cw + 50) {
@@ -466,7 +468,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       const s300 = await ev(`document.querySelector('#view .kanban').scrollLeft`);
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pause', duration: 900}]}]});
       const s1200 = await ev(`document.querySelector('#view .kanban').scrollLeft`);
-      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerUp', button: 0}]}]}); await cmd('input.releaseActions', {context: ctx}); await sleep(900);
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerUp', button: 0}]}]}); await cmd('input.releaseActions', {context: ctx}); await settle(ev, idle);
       check(s300 < k0.col * .9 && s1200 > s300, `904 A4: edge scroll: after 300 ms ${s300} px (< 1 column of ${Math.round(k0.col)}), then on to ${s1200}`);
       const moved = await ev(`fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.tasks.find(t => t.id === ${k0.id}).section_id)`);
       check(moved !== k0.sec && moved !== undefined, '904 A4: the card was dropped into a column (not discarded): section ' + moved);
@@ -477,14 +479,14 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     check(sf && sf.rail, '904 A15: "Fold the sidebar away" turns it into a drawer ' + JSON.stringify(sf));
     await ev(`(() => { sideFold(false); return 1; })()`);
     // P15: the week view: only the hour grid scrolls
-    await nav(B + '?f=2#cal'); await ready(ev);
-    await ev(`(() => { const b = document.querySelector('[data-cv="week"], [data-act="cal-view"][data-v="week"]'); if (b) b.click(); else { S.calView = 'week'; LS.set('calView', 'week'); renderView(); } return 1; })()`); await sleep(700);
+    await nav(B + '?f=2#cal'); await ready(ev, idle);
+    await ev(`(() => { const b = document.querySelector('[data-cv="week"], [data-act="cal-view"][data-v="week"]'); if (b) b.click(); else { S.calView = 'week'; LS.set('calView', 'week'); renderView(); } return 1; })()`); await settle(ev, idle);
     const cw = await ev(`(() => { const v = document.querySelector('#view'), wb = document.querySelector('#wbody'); return wb ? {view: v.scrollHeight - v.clientHeight, wb: wb.scrollHeight > wb.clientHeight} : null; })()`);
     check(!cw || (cw.view <= 1 && cw.wb), '904 P15: week view: the page does not scroll, the hour grid does ' + JSON.stringify(cw));
     await shot('p2130-week-904-dark-fr.png');
     // P3 (fr): 2.31.0 (#1052): the overdue actions sit in the head of "Overdue" (no card); they fit next to the title
     await call('POST', '/api/tasks', {title: 'En retard', list_id: P, due: day(-2)});
-    await nav(B + '?f=3#today'); await ready(ev);
+    await nav(B + '?f=3#today'); await ready(ev, idle);
     const od = await ev(`(() => { const g = document.querySelector('#view .ghead.over'), o = g && g.querySelector('.odact'); if (!o) return null; const r = g.getBoundingClientRect(), bs = [...o.querySelectorAll('.btn')].map(b => b.getBoundingClientRect()); return {n: bs.length, inside: bs.every(b => b.right <= r.right + 1 && b.left >= r.left), h: Math.min(...bs.map(b => b.height)), card: !!document.querySelector('#view .odban')}; })()`);
     check(od && od.n === 2 && od.inside && od.h >= 24 && !od.card, '904 P3 / P14: the overdue actions in the head of Overdue, inside it, >= 24 px ' + JSON.stringify(od));
     await shot('p2130-today-904-dark-fr.png');
@@ -495,7 +497,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // the main area sits beside the panel (never under it); the draft, the focus and the newest message stay
   await call('PATCH', '/api/settings', {lang: 'de'});
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'dark') === 200, 'Fold chat: login');
     const vp = (w, h) => cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
     const LAY = `(() => { const v = document.querySelector('#view'), m = document.querySelector('#main').getBoundingClientRect(), a = document.querySelector('#achat:not(.hidden)'), ar = a && a.getBoundingClientRect(), sd = document.querySelector('#side'), sr = sd.getBoundingClientRect(), side = getComputedStyle(sd).display !== 'none' && sr.width > 0 && sr.right > 0 && !document.querySelector('#app').classList.contains('side-rail');
@@ -505,21 +507,21 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
         draft: document.querySelector('#chat-in')?.value, focus: document.activeElement?.id, gap: (() => { const b = document.querySelector('#chat-msgs'); return b ? Math.round(b.scrollHeight - b.scrollTop - b.clientHeight) : null; })()}; })()`;
     for (const [w, h] of [[904, 680], [904, 904]]) for (const fold of [false, true]) {
       await vp(w, h);
-      await nav(B + `?fold=${w}${h}${fold}#l/` + P); await ready(ev);
+      await nav(B + `?fold=${w}${h}${fold}#l/` + P); await ready(ev, idle);
       await ev(`(() => { LS.set('sideFold', ${fold}); fitLayout(); render(); return 1; })()`); await sleep(300);
       let L = await ev(LAY);
       check(!L.fab && L.ttl > 200, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the list: no + button next to the add bar, titles get room ` + JSON.stringify(L));
-      await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
+      await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
       L = await ev(LAY);
       check(L.full && L.back && L.panel === -1 && L.main >= w - L.sideW - (w >= 900 ? 72 : 0) - 2 &&  /* 2.152.2 (#2622): + the bar of sidebar B on a computer */ !L.dots && !L.note, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the chat is a full page beside the sidebar, Back, no dots / note ` + JSON.stringify(L));
       await shot(`p2130-fold-chat-${w}x${h}-${fold ? 'folded' : 'sidebar'}.png`);
-      await ev(`(() => { document.querySelector('#view .chback').click(); return 1; })()`); await sleep(800);
+      await ev(`(() => { document.querySelector('#view .chback').click(); return 1; })()`); await settle(ev, idle);
       check(await ev(`location.hash`) === '#l/' + P, `${w}x${h}: Back returns to the list`);
     }
     await ev(`(() => { LS.set('sideFold', false); return 1; })()`);
     // the rotation while the chat is open
-    await vp(1200, 904); await nav(B + '?rot=1#l/' + P); await ready(ev);
-    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
+    await vp(1200, 904); await nav(B + '?rot=1#l/' + P); await ready(ev, idle);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
     await ev(`(() => { const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Entwurf beim Drehen'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     let L = await ev(LAY);
     check(L.panel > 0 && L.mainR <= L.panel + 1 && L.ttl > 200, '1200x904: the panel, the main area beside it (not under it) ' + JSON.stringify(L));
@@ -537,10 +539,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // ---- desktop 1440 x 900, mouse, light then dark, English
   await call('PATCH', '/api/settings', {lang: 'en'});
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
-  for (const theme of ['light', 'dark']) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  for (const theme of ['light', 'dark']) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, theme) === 200, `1440 ${theme}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await nav(B + '?d=1#today'); await ready(ev);
+    await nav(B + '?d=1#today'); await ready(ev, idle);
     const key = k => cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: k}, {type: 'keyUp', value: k}]}]});
     const TAB = '', DOWN = '';
     // headless Firefox never focuses its window, so :focus / :focus-visible never match there: the ring is checked in the
@@ -579,8 +581,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const f5 = await foc();
     check(f5.view && !f5.side, `1440 ${theme} A9: after the skip link Tab lands in the content ` + JSON.stringify(f5));
     // A2: hover shows the quick reactions; helper text tooltip on hover
-    await nav(B + '?d=2#l/' + P); await ready(ev);
-    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
+    await nav(B + '?d=2#l/' + P); await ready(ev, idle);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
     const m = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); m.scrollIntoView({block: 'center'}); const r = m.querySelector('.cbub').getBoundingClientRect(); return {x: r.left + 20, y: r.top + r.height / 2, op: getComputedStyle(m.querySelector('.rxrow .rx.add')).opacity}; })()`);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(m.x), y: Math.round(m.y)}, {type: 'pause', duration: 250}]}]});
     const op2 = await ev(`getComputedStyle([...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)).querySelector('.rxrow .rx.add')).opacity`);
@@ -590,9 +592,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await cmd('input.releaseActions', {context: ctx});
     await ev(`(() => { chatClose(); return 1; })()`);
     // the settings and the list dialog
-    await ev(`(() => { settingsModal('general'); return 1; })()`); await sleep(700);
+    await ev(`(() => { settingsModal('general'); return 1; })()`); await settle(ev, idle);
     await shot(`p2130-settings-1440-${theme}.png`);
-    await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); listModal(${P}); return 1; })()`); await sleep(700);
+    await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); listModal(${P}); return 1; })()`); await settle(ev, idle);
     await shot(`p2130-listdialog-1440-${theme}.png`);
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);
     // P16: the logo in the accent colour; 2.138.2 (#2392, #2389): no logo in the sidebar -- Private's stripe follows the accent
@@ -601,9 +603,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   }, false);
 
   // ---- the sign-in page (P7): 44 px fields, show password, nothing behind it gets the focus
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await nav(B); await sleep(1800);
+    await nav(B); await settle(ev, idle);
     const lg = await ev(`(() => { const p = document.querySelector('#au-pw'), b = document.querySelector('[data-au="pwshow"]'); if (!p || !b) return null; b.click(); return {h: Math.round(p.getBoundingClientRect().height), type: p.type, inert: document.querySelector('#app').hasAttribute('inert')}; })()`);
     check(lg && lg.h >= 43.5 && lg.type === 'text' && lg.inert, '390 P7: sign-in: 44 px fields, "Show password", the app behind is inert ' + JSON.stringify(lg));
     await shot('p2130-login-390.png');

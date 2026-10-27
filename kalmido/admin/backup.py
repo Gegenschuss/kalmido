@@ -545,8 +545,11 @@ def bk_list():
         full = os.path.join(BK_DIR, n)
         if os.path.islink(full) or not os.path.isfile(full):
             continue
-        p["size"] = os.path.getsize(full)
-        p["meta"] = bk_meta(full, p["encrypted"])
+        try:
+            p["size"] = os.path.getsize(full)
+            p["meta"] = bk_meta(full, p["encrypted"])
+        except FileNotFoundError:  # 2.358.0 A (#3279): deleted meanwhile (retention of a running backup): not listed, no 500
+            continue
         out.append(p)
     out.sort(key=lambda x: (x["at"], x["name"]), reverse=True)
     return out

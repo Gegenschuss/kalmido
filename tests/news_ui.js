@@ -1,5 +1,5 @@
 // News UI tests (jsdom). Needs the api_test.py DB (alice en, bob de, carol, eve collab off).
-const {boot, errs, sleep, until} = require('./boot');
+const {boot, errs, sleep, until, idle} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
 const ids = require('./ids.json');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -20,9 +20,9 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check((d.querySelector('#side .srow[data-go="news"] .c')?.textContent || '') === String(nMe || ''), 'sidebar News row with count');
   // 2.6.1 (#403): the bell opens a dropdown with the newest News; "Show all" goes to #news
   const mod0 = w.eval('S.route.mod');
-  bell.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(700);
+  bell.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await idle(w);
   check(w.eval('S.route.mod') === mod0 && d.querySelector('#pop:not(.hidden) .bpop .nitem'), 'bell opens the dropdown, the view stays');
-  d.querySelector('#pop [data-bp="all"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(700);
+  d.querySelector('#pop [data-bp="all"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await idle(w);
   check(w.eval('S.route.mod') === 'news' && d.querySelector('#top h1').textContent === 'News' && d.querySelector('#pop').classList.contains('hidden'), '"Show all" opens #news');
   let rows = [...d.querySelectorAll('#view .nitem')];
   check(rows.length === st.items.length && rows.length > 0, `rows rendered ${rows.length}/${st.items.length}`);
@@ -34,7 +34,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // click opens the task and marks it read
   const first = st.items[0];
   const clicked = JSON.parse(w.eval(`JSON.stringify(S.nf.items[${+rows[0].dataset.i}] || null)`) || 'null');  // 2.80.1: the row's own item
-  rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(800);
+  rows[0].dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await idle(w);
   check(w.eval('S.sel') === (clicked?.task_id ?? first.task_id), 'click opens the task');
   // 2.80.1: by meaning instead of by count (CI saw 4 -> 1 and 4 -> 3, the Mac passes; items with the same time can come
   // in another order in the client's list than in the test's request): the clicked row's own items are read, items of
@@ -49,21 +49,21 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   w.eval('closeDetail()'); await sleep(200);
   // filter
   // 1.9.0: "Mentions & assigned to me" (mentions + assignments) replaced "Only mentions"
-  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await sleep(700);
+  d.querySelector('[data-act="news-filter"][data-f="me"]').click(); await idle(w);
   rows = [...d.querySelectorAll('#view .nitem')];
   check(rows.length > 0 && rows.every(r => ['k-mention', 'k-assign', 'k-unassign'].some(k => r.classList.contains(k))), 'mentions & assigned to me filter');
   check(w.__store['tasks.newsFilter'] === '"me"', 'filter remembered per device');
-  d.querySelector('[data-act="news-filter"][data-f=""]').click(); await sleep(700);
+  d.querySelector('[data-act="news-filter"][data-f=""]').click(); await idle(w);
   // old task not in state: fetched on demand
   const tgt = st.items.find(x => x.task_id)?.task_id;
   w.eval(`S.tasks.delete(${tgt})`);
   // 2.139.1 (#2405): the list is grouped in sections (For you / Also new / Read), so a row's place is not its item index; data-i is
   const row = [...d.querySelectorAll('#view .nitem[data-i]')].find(r => w.eval(`S.nf.items[${r.dataset.i}].task_id`) === tgt);
-  row.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(900);
+  row.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await idle(w);
   check(w.eval('S.sel') === tgt && d.querySelector('#detail #d-title, #detail .dtop'), 'task outside the state opened via GET /api/tasks/<id>');
   w.eval('closeDetail()'); await sleep(200);
   // mark all read
-  d.querySelector('[data-act="news-readall"]')?.click(); await sleep(700);
+  d.querySelector('[data-act="news-readall"]')?.click(); await idle(w);
   check(!d.querySelector('#kbar .bell .nbadge') && !d.querySelector('#view .nitem.unread') && (await api(w, 'GET', '/api/news')).unread === 0, 'mark all as read clears the badge');  // 2.152.3 (#2619): the bell moved into the head bar
   // two users: bob mentions alice while alice's window polls
   wb = await boot({user: 'bob', wait: 800});
@@ -79,7 +79,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   w.close();
   // bob: German, mobile, tab bar
   w = await boot({user: 'bob', mobile: true, hash: 'news', ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'news', 'm:cal'])}}); d = w.document;
-  await sleep(600);
+  await idle(w);
   const txt = d.querySelector('#view').textContent + d.querySelector('#top').textContent;
   check(d.querySelector('#top h1').textContent === 'Neuigkeiten', 'German title');
   check(/hat dich erwähnt|hat kommentiert|Kommentare von|hat dir eine Aufgabe zugewiesen/.test(txt), 'German item texts');
