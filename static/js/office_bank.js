@@ -3,7 +3,7 @@
 // with one tap: money in -> an open invoice (a payment is recorded; less than open = partly paid), money out -> a receipt
 // (its payment day), or private / ignore. Every step has its undo; an import can be taken back while none of it is matched.
 // Server: kalmido/office/bank.py. No bank access.
-const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false};
+const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false, split: false};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed')};  // 2.299.0 C (#3192): noreceipt
 
@@ -53,7 +53,9 @@ function bnkRow(t) {
     <span class="bnkamt ${inn ? 'in' : 'out'}">${esc(bnkAmt(t.amount))}</span></div>`;
   let act;
   if (t.match) {
-    act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}</span>${typeof brl_byRule === 'function' ? brl_byRule(t.match) : ''}<span class="spacer"></span>
+    // 2.355.0 B (#2843): a split names its invoices and the rest of the booking (an overpayment)
+    const rest = t.match.rest && +t.match.rest > 0 ? ` · ${tr('overpaid {0}', ofcMoney(t.match.rest))}` : '';
+    act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}${esc(rest)}</span>${typeof brl_byRule === 'function' ? brl_byRule(t.match) : ''}<span class="spacer"></span>
       ${t.match.kind === 'invoice' ? `<a class="btn sm ghost" href="#office/offers/${t.match.id}">${tr('Open')}</a>` : ''}<button class="btn sm ghost" data-bnk="unmatch" data-id="${t.id}">${ic('undo', 's')}<span>${tr('Undo match')}</span></button></div>`;
   } else {
     const s = (t.suggestions || [])[0];
@@ -68,9 +70,23 @@ function bnkRow(t) {
 }
 function bnkOtherHtml(t) {
   const c = BNK.cand;
+  if (+t.amount > 0 && BNK.split) return bnkSplitHtml(t, c);
   const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
     : `<ul class="ofclist" role="list">${c.map(x => `<li><button type="button" class="ofcrow" data-bnk="match" data-id="${t.id}" data-kind="${x.kind}" data-mid="${x.id}"><span class="ofcn"><b>${esc(x.label || tr(BNK_KIND[x.kind]))}</b><small class="muted">${esc(fmtDateLoc(x.date))}${x.kind === 'invoice' ? ` · ${tr('open')}` : ''}</small></span><span class="rksum">${ofcMoney(x.amount)}</span></button></li>`).join('')}</ul>`;
-  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or customer') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}</div>`;
+  const sp = +t.amount > 0 ? `<button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Split across invoices…')}</button>` : '';
+  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or customer') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}${sp}</div>`;
+}
+// 2.355.0 B (#2843): one booking on several invoices (a collective transfer) or more than the open amount: an amount per
+// invoice, the rest of the booking stays visible as overpaid (server: bank.py bnk_parts)
+function bnkSplitHtml(t, c) {
+  const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
+    : `<ul class="ofclist" role="list">${c.map(x => `<li class="ofcrow"><span class="ofcn"><b>${esc(x.label)}</b><small class="muted">${esc(fmtDateLoc(x.date))} · ${tr('open')} ${ofcMoney(x.amount)}</small></span><input class="numin" inputmode="decimal" maxlength="16" data-bnk-part="${x.id}" data-open="${esc(x.amount)}" value="${esc(BNK.parts?.[x.id] ?? '')}" aria-label="${esc(tr('Amount for {0}', x.label))}" placeholder="${esc(ofcMoney(x.amount))}"></li>`).join('')}</ul>`;
+  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(tr('Number or customer'))}" aria-label="${esc(tr('Search'))}">${rows}
+    <div class="bnkacts"><span class="muted" data-bnk-rest="${t.id}" data-amount="${esc(t.amount)}">${esc(bnkSplitRest(t.amount))}</span><span class="spacer"></span><button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-bnk="splitgo" data-id="${t.id}">${tr('Assign match')}</button></div></div>`;
+}
+function bnkSplitRest(amount) {
+  const sum = Object.values(BNK.parts || {}).reduce((a, v) => a + (ofcNum(v) || 0), 0);
+  return tr('Assigned {0} · rest {1}', ofcMoney(Math.round(sum * 100) / 100), ofcMoney(Math.round((+amount - sum) * 100) / 100));
 }
 function bnkImpHtml() {
   if (!BNK.imports) { setTimeout(() => bnkImpLoad(), 0); return `<p class="muted">${tr('Loading…')}</p>`; }
@@ -80,13 +96,16 @@ function bnkImpHtml() {
 }
 
 // ---- actions (one undo step each)
-async function bnkMatch(tid, kind, mid) {
-  const req = {kind, ...(mid ? {id: +mid} : {})};
+async function bnkMatch(tid, kind, mid, parts) {
+  const req = {kind, ...(mid ? {id: +mid} : {}), ...(parts ? {parts} : {})};  // 2.355.0 B (#2843): parts of a split
   let j;
   try { j = await api('POST', `/api/office/bank/tx/${tid}/match`, req); } catch (x) { toast(x.message || tr('unknown')); return; }
   if (typeof brl_learned === 'function') brl_learned(j);  // 2.299.0 B (#3191): "Always like this?" after the second time
   bnkReload();
-  offerUndo(j?.rule_category ? tr('Matched · category {0} by rule', j.rule_category.category || '') : tr('Matched'), histAdd({label: tr('Bank booking matched'),
+  // 2.355.0 B (#2843): a receipt with another amount than the booking is matched, but said (undo right in the toast)
+  const msg = j?.amount_differs ? tr('Matched, but the receipt says {0} and the booking {1}', ofcMoney(j.amount_differs.receipt), ofcMoney(j.amount_differs.booking))
+    : j?.rule_category ? tr('Matched · category {0} by rule', j.rule_category.category || '') : tr('Matched');
+  offerUndo(msg, histAdd({label: tr('Bank booking matched'),
     undo: async () => { await api('POST', `/api/office/bank/tx/${tid}/unmatch`); bnkReload(); },
     redo: async () => { await api('POST', `/api/office/bank/tx/${tid}/match`, req); bnkReload(); }}));
 }
@@ -119,7 +138,7 @@ async function bnkCand(tid) {
 // UTF-8, else windows-1252, opens a ZIP in memory and merges everything into one preview. after = called once imported (the
 // cash flow loads again).
 // 2.146.0 C (#2455): the date formats of core/csvimport.DATE_FORMATS (the household import offers the same)
-const BNK_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];
+const BNK_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD', 'DD/MM/YYYY'];
 const BNK_ACCEPT = '.xml,.csv,.txt,.sta,.mt940,.mt942,.zip,text/csv,text/plain,application/xml,text/xml,application/zip,application/x-zip-compressed';
 function bnkPick(after) { return bnkImpModal(null, null, after); }
 function bnkHintHtml() {
@@ -224,6 +243,12 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
 
 let bnkQT = null;
 document.addEventListener('input', e => {
+  const pi = e.target.closest?.('[data-bnk-part]');
+  if (pi) {  // 2.355.0 B (#2843): the rest of a split, live
+    (BNK.parts ||= {})[pi.dataset.bnkPart] = pi.value;
+    const r = $('[data-bnk-rest]', pi.closest('.bnkother')); if (r) r.textContent = bnkSplitRest(r.dataset.amount);
+    return;
+  }
   const i = e.target.closest?.('[data-bnk-q]'); if (!i) return;
   BNK.candQ = i.value; clearTimeout(bnkQT); bnkQT = setTimeout(() => bnkCand(+i.dataset.bnkQ), 250);
 });
@@ -236,7 +261,13 @@ document.addEventListener('click', e => {
   else if (a === 'impundo') bnkImpUndo(id);
   else if (a === 'match') bnkMatch(id, b.dataset.kind, b.dataset.mid);
   else if (a === 'unmatch') bnkUnmatch(id);
-  else if (a === 'other') { BNK.other = BNK.other === id ? null : id; BNK.cand = null; BNK.candQ = ''; ofcDraw(); if (BNK.other) bnkCand(id); }
+  else if (a === 'other') { BNK.other = BNK.other === id ? null : id; BNK.cand = null; BNK.candQ = ''; BNK.split = false; BNK.parts = {}; ofcDraw(); if (BNK.other) bnkCand(id); }
+  else if (a === 'split') { BNK.split = !BNK.split; BNK.parts = {}; ofcDraw(); }  // 2.355.0 B (#2843)
+  else if (a === 'splitgo') {
+    const parts = Object.entries(BNK.parts || {}).filter(([, v]) => String(v).trim()).map(([k, v]) => ({id: +k, amount: ofcNum(v)}));
+    if (!parts.length || parts.some(p => !(p.amount > 0))) { toast(tr('Invalid value: {0}', tr('Amount'))); return; }
+    BNK.split = false; BNK.parts = {}; BNK.other = null; bnkMatch(id, 'invoice', null, parts);
+  }
   else return;
   e.preventDefault();
 });

@@ -178,7 +178,7 @@ check([p["title"] for p in rd.get("parts", [])] == ["Interactive module"], f"pri
 pg = pdf_pages(A.get(B + f"{D}/{DOC}/pdf").content)
 if pg is not None and PLAIN_PAGES is not None:
     check(len(pg) == PLAIN_PAGES + 1, f"PDF: one page more for the printed part ({len(pg)} vs {PLAIN_PAGES})")
-    ppg = pg[-2] if len(pg) > 1 and "TRANSFEROFRIGHTS" in "".join(pg[-1].split()) else pg[-1]  # 2.114.1 (#2258): the rights appendix comes after the parts
+    ppg = pg[-2] if len(pg) > 1 and "TRANSFEROFRIGHTS" in "".join(pg[-1].split()) and "interactive module" not in pg[-1].lower() else pg[-1]  # 2.114.1 (#2258): the rights appendix comes after the parts; 2.357.0 (#3182): on the part's page when it fits there
     check("interactive module" in ppg.lower() and "Animation" in ppg and "Booklet" in ppg, "PDF: the part's page has its positions (title in capitals)")
     check(not any("Alternative" in x for x in pg) and not any("Extra shoot" in x for x in pg), "PDF: parts not printed / not used are left out")
     check("Interactive module" in pg[0] and "6,000.00" in pg[0].replace("€", ""), "PDF: the title page has the part line x 5")

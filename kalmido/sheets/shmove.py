@@ -80,9 +80,9 @@ def sheets_move_space(sid):
         raise Denied(403, tr(SHM_ONLY))
     if r["org_id"] and r["created_by"] != uid and not is_org_admin(c, uid, r["org_id"]):
         raise Denied(403, tr(SHM_ONLY))
-    from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
-    if not org_out_ok(c, r["org_id"], to):  # 2.148.1 B (#2483): out of an organisation only by its admin
-        raise Denied(403, tr(OO_ADMIN_ONLY))
+    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
+    if not org_out_ok(c, r["org_id"], to, "sheet", sid):  # 2.148.1 B (#2483): out of an organisation only by its admin
+        raise oo_denied(c, r["org_id"], to, "sheet", sid)  # 2.361.2 (#2923): the maker can ask an admin
     l = c.execute("SELECT id, name, org_id, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None
     unbind = bool(l) and (l["org_id"] or None) != (to or None)
     links = [x for t in tabs for x in shm_links_out(c, t, to)]  # 2.124.0 E (#2116): every sheet of the table
@@ -98,7 +98,8 @@ def sheets_move_space(sid):
                  offers) if offers else "",
              trn("{0} formula uses projects or clients of the old workspace: it shows “No access” there",
                  "{0} formulas use projects or clients of the old workspace: they show “No access” there", formulas) if formulas else "",
-             trn("{0} share with a person or agent ends", "{0} shares with people or agents end", shares) if shares else ""]  # 2.124.0 C (#2113)
+             trn("{0} share with a person or agent ends", "{0} shares with people or agents end", shares) if shares else "",  # 2.124.0 C (#2113)
+             oo_into_note(c, r["org_id"], to)]  # 2.361.2 (#2923): the way back
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))
     ts = iso_ms(now_utc())
@@ -119,7 +120,7 @@ def sheets_move_space(sid):
         # review 2.96 (L2): only a list the person may still write in (like re-binding by hand, sh_may_rebind)
         if k and (k["org_id"] or None) == (to or None) and k["e2e"] is None and list_role(c, back["list_id"], uid) in WRITE_ROLES:
             list_id = back["list_id"]
-    org_out(c, r["org_id"], to, "sheet", r["title"])  # 2.148.1 B (#2483): logged, the organisation's other admins told
+    org_out(c, r["org_id"], to, "sheet", r["title"], obj=sid)  # 2.148.1 B (#2483): logged, the organisation's other admins told
     c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=? WHERE id=?", (to, None if to else uid, list_id, sid))
     ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]  # 2.273.0 B (#3042)
     if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)

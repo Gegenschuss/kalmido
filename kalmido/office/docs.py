@@ -27,6 +27,7 @@ from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
 from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
+from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .invdelete import idt_applies, idt_delete, idt_info, idt_plan, odoc_unlink_refs  # 2.162.0 A (#2603)
@@ -34,6 +35,7 @@ from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .invoices import inv_number_year, inv_pay_add  # 2.355.0 A (#2839, #2847)
 
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
@@ -651,9 +653,12 @@ def clean_doc(c, oid, b, cur, admin):
     if "fx_rate" in b:
         f["fx_rate"] = _num(b.get("fx_rate"), "fx_rate", 0.0001, 100000) or _doc_office_fx(c, oid, f.get("currency") or cur["currency"])
     elif f.get("currency") and f["currency"] != cur["currency"]:  # 2.189.0 (#2475): a new currency takes the office's rate of it
-        r = hc_office_rate(office_settings(c, oid), f["currency"])
+        s_ = office_settings(c, oid)
+        r = hc_office_rate(s_, f["currency"])
         if r is not None and r != 1:
             f["fx_rate"] = float(r)
+        elif (hc_home(s_), f["currency"]) != ("EUR", "USD"):  # 2.355.0 C (#2844): no rate of the former currency / no made-up 1.09
+            f["fx_rate"] = 1  # = no rate: finalising asks for one (invoices.inv_missing)
     if "vat_mode" in b:
         f["vat_mode"] = _choice(b.get("vat_mode"), "vat_mode", ("vat", "novat"))
     if "client_id" in b:
@@ -888,6 +893,8 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     from .legacyimport import fi_number_taken
     write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
+    if ofx_locked(r):  # 2.355.0 A (#2839): read again under the lock -- a document finalised meanwhile keeps its number
+        raise Denied(409, tr(OFX_LOCKED))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document only ever carries a TEST number (no hand-set one, no real counter)
         if manual is not None:
             raise BadInput(tr("A trial document keeps its TEST number"))
@@ -1098,13 +1105,15 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     if cno:
         meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), cno])
     if r["project_ref"]:
-        meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), r["project_ref"]])
+        # 2.357.0 B (#3180): a quotation asks for the client's reference ("Ihre Referenz"); the invoice keeps "Bestellnr. / Referenz"
+        meta.append([L.get("offer_ref") or tr("Your reference|pdf", lg=lang), r["project_ref"]])
     if r["valid_until"]:
         meta.append([L.get("valid_until", tr("Valid until|document", lg=lang)), valid_text])
     sf, st = (r["service_from"] or "", r["service_to"] or "") if "service_from" in r.keys() else ("", "")
     if sf or st:  # 2.36.2: period of service
         per = _fd(sf) if sf == st or not st else (_fd(st) if not sf else f"{_fd(sf)} – {_fd(st)}")
-        meta.append([L.get("service_period", tr("Period of service|document", lg=lang)), per])
+        one = sf == st or not sf or not st  # 2.357.0 D (#3183): one day = service date
+        meta.append([L.get("service_date", tr("Service date|document", lg=lang)) if one else L.get("service_period", tr("Period of service|document", lg=lang)), per])
     rows = [[L.get("net_total", t["labels"]["net"]), fmt_money(t["net"], lang, cur)]]
     if t.get("net_incl_raw") is not None:
         rows.append([L.get("incl_raw", t["labels"]["net_incl_raw"]), fmt_money(t["net_incl_raw"], lang, cur)])
@@ -1149,6 +1158,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
     m["accept_on"] = bwb_accept_on(r, s, snd if locked else None)  # 2.114.4 B (#2270)
+    m["paper"] = pdf_paper((snd if locked else s).get("paper"))  # 2.357.0 A (#3156): a finalised document keeps its size (before: A4)
     if r["kind"] == "offer":  # 2.47.0 (#1215): the printed parts as own pages
         from .parts import tp_render
         tp_render(c, oid, r, m, pack, lang, locked)
@@ -1314,6 +1324,9 @@ def odoc_update(did):
     if f.get("date") and f["date"] != r["date"] and r["kind"] in ("invoice", "credit"):
         from .periodlock import period_need_open
         period_need_open(c, oid, f["date"])  # 2.148.0 A (#2471): an invoice draft cannot move into a locked month
+        y = inv_number_year(inv_scheme(office_settings(c, oid), r["kind"]), r["number"]) if r["number"] and not r["trial"] else None
+        if y is not None and date.fromisoformat(f["date"]).year != y:  # 2.355.0 A (#2839): a numbered draft stays in its number's year
+            raise Denied(409, tr("The number {0} belongs to {1}; the date can only change within that year", r["number"], y))
     from .doclang import fd_lang_swap, fd_put_titles  # 2.40.0 (#1381, #1363): a new language swaps unchanged standard texts
     lang_notes, titles = fd_lang_swap(c, oid, r, b, f)
     if f:
@@ -1374,6 +1387,7 @@ def odoc_number(did):
     A finalised document: 409. 2.126.0 A (#1966): the next number of a kind numbered at finalising only comes then (409).
     2.148.1 E (#2496): office admin / accounting only (a plain member's number comes at finalising)."""
     c, uid, oid = _ctx(admin=True)
+    write_lock(c, f"office_doc_{int(did)}")  # 2.355.0 A (#2839): as finalise (doc -> num): never a number in between finalising
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()
@@ -1393,6 +1407,7 @@ def odoc_number(did):
 def odoc_status(did):
     """{status: draft|sent|accepted|declined}; sent sets sent_at (once). Also for finalised quotations."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_doc_{int(did)}")  # 2.355.0 A (#2839): the status is checked against the state after a parallel finalise / unlock
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
@@ -1418,6 +1433,12 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
         # 2.152.0 C (#2168): reversed payments stay as two lines -> what counts is their sum
         if r["status"] == "paid" and c.execute("SELECT COALESCE(SUM(amount), 0) FROM office_payments WHERE org_id=? AND doc_id=?", (oid, did)).fetchone()[0]:
             raise Denied(409, tr("Payments are recorded on this invoice; remove them first"))  # 2.38.0 review
+        if st == "paid":  # 2.355.0 A (#2847): paid by hand = a payment of the open rest, so status and open amount agree
+            rest = dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"])
+            if rest > 0:
+                inv_pay_add(c, oid, uid, did, {"amount": str(rest), "note": tr("Marked as paid by hand")})  # sets paid / paid_at, invoice.paid
+                ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "paid"}})
+                return
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
               (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))
     if r["kind"] != "offer":
@@ -1444,8 +1465,8 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
-            "reminder_fee_state", "agent_id", "list_id", "dup_times_from",
-            "client_ref"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
+            "reminder_fee_state", "agent_id", "list_id", "dup_times_from",  # 2.355.0 A (#2839): inv_type -- a copy of a final invoice is a plain one
+            "client_ref", "inv_type"}  # 2.269.0 D (#3046): the device's id of the request that made the original  # 2.126.0 A (#1979 F6): a fresh fee state, made by the person copying
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 

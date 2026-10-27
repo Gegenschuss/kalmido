@@ -828,6 +828,11 @@ function autoEmoji(name) {
   const hit = f => AUTO_EMO.find(([, ks]) => ks.split(' ').some(k => words.some(w => f(w, k))));  // the beginning of a word first
   return (hit((w, k) => w === k || (k.length > 3 && w.startsWith(k))) || hit((w, k) => k.length > 4 && w.endsWith(k)) || [''])[0];
 }
+// 2.361.2 (#2923): moving a project into an organisation: a member gets it back only through its admins (they ask for it)
+function lwsBack(org, from) {
+  if (!org || +org === +(from || 0) || (S.me?.workspaces || []).find(w => w.id === +org)?.role === 'admin') return '';
+  return ' ' + tr('Back into your private space only after an admin of the organisation releases it (you ask for it).');
+}
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
   const own = isOwner(l), dis = own ? '' : 'disabled';
@@ -847,7 +852,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
-    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
+    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
@@ -1016,7 +1021,7 @@ function listModal(id, folder = '', o = {}) {
     if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows
       const org = !!e.target.value;
       if (org && $('#l-fam', md)?.value) { $('#l-fam', md).value = ''; }  // an organisation's list has no "Used for"
-      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
+      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
       if (id) autosave(); return;
     }
     if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
@@ -1213,7 +1218,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels', 'wkEd'];  // 2.350.0 B (#3147): the knowledge editor (live preview / plain text)  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels'];  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 // 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
 // Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
 let lookTimer = 0, lookApplying = false;

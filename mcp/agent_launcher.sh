@@ -70,12 +70,14 @@ set +a
 # kalmido-capability: team_listen (2.46.1: team chat messages of lists the agent listens in on, in mcp/agent_run.py)
 # kalmido-capability: team_thread (2.139.0: a team chat message in a thread is answered in that thread, in mcp/agent_run.py)
 # kalmido-capability: rules_block (2.46.6: the fixed rules of mcp/agent_rules.md in front of every prompt, in mcp/agent_run.py)
+# kalmido-capability: control_rules (2.235.0: the control level, goal and one-way steps in the rules block, in mcp/agent_run.py)
 # kalmido-capability: workflow_file (2.46.6: WORKFLOW-KALMIDO.md, asked for once, in mcp/agent_run.py)
 # kalmido-capability: job_wake (2.46.6: a wake run after a job, a lost job continued once; mcp/agent_run.py + agent_job.py)
 # kalmido-capability: job_names (2.59.0: a name per job, part jobs name their leader; mcp/agent_job.py)
 # kalmido-capability: job_msg (2.96.0: a job's result posts job_msg result / error; mcp/agent_job.py)
 # kalmido-capability: layout_answer (2.55.0: the answer to an arrangement proposal, in mcp/agent_run.py)
 # kalmido-capability: chat_pinned (2.62.0: a pinned / unpinned chat message is information only, no run; in mcp/agent_run.py)
+# kalmido-capability: data_lock_info (2.235.0: data_lock_changed is information only, no run; Kalmido enforces the lock itself; in mcp/agent_run.py)
 # kalmido-capability: job_message (2.56.0: a message to a job from its card, in mcp/agent_run.py)
 # kalmido-capability: job_chat (2.153.0: a message typed in a job's own chat is answered there, in mcp/agent_run.py)
 # kalmido-capability: customer_comment (2.63.0: a customer's comment / public answers of a customer report, in mcp/agent_run.py)
@@ -209,6 +211,7 @@ nightly_due() {
   DONE_DAY=$day
   (( STARTED < at ))  # started before tonight's time -> restart now
 }
+# kalmido-capability: standing_rules (2.235.0, #2903: the active standing rules under the rules block, in mcp/agent_run.py)
 # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
 # false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
 CLOSED=""

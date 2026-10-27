@@ -66,6 +66,9 @@ class Kalmido:
         self.base = (url or "").rstrip("/")
         self.token = token or ""
         self.timeout = timeout
+        self.approval = None  # 2.235.0 (#2891): the approved card (use_approval) the next write request carries, once
+        self.approval_step = None  # 2.235.0 A2 (#2891): (method, path) of that card when known: only that call carries it
+        self.cards = {}  # 2.235.0 A2: message id -> step of the approval cards this process sent
 
     def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
         """multipart: (fields dict, [(name, mime, bytes)]) -> a multipart/form-data body (field `file` per file).
@@ -82,6 +85,9 @@ class Kalmido:
             data = json.dumps(body).encode() if body is not None else None
             if data is not None:
                 ctype = {"Content-Type": "application/json"}
+        if self.approval and method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith("/agent/") and \
+                (not self.approval_step or self.approval_step == (method, "/api/v1" + urllib.parse.unquote(path))):
+            ctype["X-Kalmido-Approval"], self.approval = str(self.approval), None  # 2.235.0 (#2891): once, the (matching) next write
         req = urllib.request.Request(url, data=data, method=method, headers={
             "Authorization": "Bearer " + self.token, "Accept": "*/*" if binary_cap else "application/json",
             "User-Agent": f"kalmido-mcp/{SERVER_VERSION}", **ctype})
@@ -319,8 +325,20 @@ def t_send_chat(api, a):
 def t_request_chat_approval(api, a):
     """2.35.0 (#1103): an approval request in the chat (a card with yes / no; the answer comes as chat_choice + approval)."""
     b = {**_pick(a, ("body", "task_id", "reply_to", "job_id", "expires_in")),
-         "approval": _pick(a, ("title", "what", "yes_label", "no_label"))}
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
+         "approval": _pick(a, ("title", "what", "yes_label", "no_label", "step", "recommend", "one_way"))}  # 2.235.0 (#2891 #2901)
+    r = api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
+    st = ((r.get("choices") or {}).get("approval") or {}).get("step") if isinstance(r, dict) else None
+    if isinstance(st, dict) and isinstance(r.get("id"), int):  # 2.235.0 A2: remember the step for use_approval
+        api.__dict__.setdefault("cards", {})[r["id"]] = (st.get("method"), urllib.parse.unquote(st.get("path") or ""))
+    return r
+
+
+def t_use_approval(api, a):
+    """2.235.0 (#2891): the next write request carries the approved card (header X-Kalmido-Approval)."""
+    api.approval = int(a["message_id"])
+    api.approval_step = getattr(api, "cards", {}).get(api.approval)  # 2.235.0 A2 (#2891): only the call of the card's step carries it
+    return {"ok": True, "message_id": api.approval, "note": "the next write call with the card's method and path carries this approval (once)"
+            if api.approval_step else "the next write call carries this approval (once)"}
 
 
 def _b64_files(a):
@@ -419,13 +437,33 @@ TOOLS = [
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
                   "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
-                  "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed.",
+                  "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
+                  "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule). "
+                  "2.235.0 (#2902): data_lock = what your owner locked for you {areas, always, list_ids, tags_count}; that data does "
+                  "not exist for you (never ask for it or work around it). "
+                  "2.235.0 (#2891 #2900 #2901): control = your control level {level approve_all | routine | free | null (none chosen: as "
+                  "before), goal, projects [{list_id, level, effective}], one_way {fixed, custom}, deadline (s), then}; read it again on "
+                  "control_changed. A write it does not allow answers 409 approval_required: ask with request_chat_approval step, then use_approval.",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
     ("get_queue", "2.236.0 (#2906 #2907): your queue -- the open tasks assigned to you that you see: {max_parallel, priority_rule, "
                   "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "
                   "due}]}. Your order (set_queue_order) first, the rest by priority, due date, creation. Work on the active ones only "
                   "(max_parallel 0 = no limit) and choose the next task from it by priority_rule, the owner's rule in their words.",
      _obj({}), lambda api, a: api.call("GET", "/agent/queue")),
+    ("get_rules", "2.235.0 (#2903): your standing rules (\"from now on always ...\" instructions you saved), active and paused: "
+                  "{data: [{id, text, state: active | paused, created_at, source: {kind: chat | comment | manual, id, task_id, user_id, "
+                  "excerpt}}], max, text_max}. Follow the active ones in every run; paused ones do not apply. Your owner (an admin "
+                  "for a team agent) rewords, pauses and deletes them in your settings (event rules_changed).",
+     _obj({}), lambda api, a: api.call("GET", "/agent/rules")),
+    ("add_rule", "2.235.0 (#2903): save a standing rule when the person you work for tells you \"from now on always ...\" (or "
+                 "\"never again ...\", \"in future ...\"): text = the rule in one short sentence in their words (at most 500 "
+                 "characters), source = the chat message (kind chat, id = its message id) or the comment (kind comment, id = the "
+                 "comment id) it came from; it must be visible to you and written by a person who may address you there (else 404). The same text again returns the existing rule "
+                 "(duplicate: true). At most 100 rules. Then confirm it in ONE line (e.g. \"Saved as a standing rule: ...\").",
+     _obj({"text": {"type": "string", "minLength": 1, "maxLength": 500},
+           "source": _obj({"kind": {"type": "string", "enum": ["chat", "comment"]}, "id": {"type": "integer"}}, ["kind", "id"])},
+          ["text", "source"]),
+     lambda api, a: api.call("POST", "/agent/rules", body={"text": a["text"], "source": a["source"]})),
     ("set_queue_order", "2.236.0 (#2906): set the order of your queue: order = task ids (only your own open tasks you see, at most "
                         "500; an unknown / foreign id = 400). The tasks not named follow in the default order. Returns the queue.",
      _obj({"order": {"type": "array", "maxItems": 500, "items": {"type": "integer"}}}, ["order"]),
@@ -821,12 +859,25 @@ TOOLS = [
                               "Use it whenever you need a go-ahead, never only a question in the text. The answer arrives as the event "
                               "chat_choice with approval approved | rejected (only from its Yes / No buttons; a 👍 / 👎 on the card decides nothing); no answer is never a yes. "
                               "expires_in = seconds it stays open; close it with withdraw_chat_choices (outcome denied / expired, never allowed) "
-                              "when it is no longer needed. At most 10 open requests per person (the next one: 409).",
+                              "when it is no longer needed. At most 10 open requests per person (the next one: 409). "
+                              "2.235.0: step = the exact write it approves ({method, path, body} = approval of the 409, e.g. DELETE /tasks/12) when your control level "
+                              "refused it (409 approval_required); after the Yes call use_approval with this message id and repeat that "
+                              "call once with the same body. recommend = your recommended answer (yes / no; taken when the deadline of approvals runs out, "
+                              "never for a one-way step), one_way = true for a one-way step (deleting, costs, login, migration, the owner's own list).",
      _obj({"user_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
+           "step": {"type": "object", "properties": {"method": {"type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"]},
+                                                     "path": {"type": "string", "maxLength": 300},
+                                                     "body": {"type": "object", "description": "the exact body of the call (none = no body)"}},
+                    "required": ["method", "path"]},
+           "recommend": {"type": "string", "enum": ["yes", "no"]}, "one_way": {"type": "boolean"},
            "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
            "body": {"type": "string", "description": "optional text above the card (default: the title)"}, "task_id": S_ID,
            "reply_to": S_ID, "job_id": S_ID, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}},
           ["user_id", "title"]), t_request_chat_approval),
+    ("use_approval", "2.235.0: after the person answered Yes on your approval card with a step (request_chat_approval step), "
+                     "the NEXT write call with exactly that method and path (and the same body) carries this approval once (header X-Kalmido-Approval). "
+                     "Your control level is in get_agent control (approve_all / routine / free, goal, one-way steps, deadline).",
+     _obj({"message_id": S_ID}, ["message_id"]), t_use_approval),
     ("withdraw_chat_choices", "2.30.0: take back the open answer buttons of one of your chat messages (user_id, message_id), "
                               "e.g. when the question is no longer current without a new message. outcome (permission questions "
                               "and 2.35.0 approval requests only): allowed | denied | expired when you decided another way (an answer in words, your time limit).",
@@ -1972,7 +2023,7 @@ TOOLS += [
            "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB, **_CREF}, ["offer_id"]),
      lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by", "client_ref")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
-                       "Never sent by you: a person checks and sends it.",
+                       "Never sent by you: a person checks and sends it. 2.355: only invoices past their due date (409 otherwise).",
      _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["invoice_ids"]),
      lambda api, a: api.call("POST", "/office/reminders", body=_pick(a, ("invoice_ids", "level", "notify", "requested_by", "client_ref")))),
     ("suggest_payment", "2.51.0: suggest an incoming payment for an open invoice, read from what a person gave you (e.g. a pasted bank statement): "
@@ -2179,8 +2230,8 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
 TOOL_SCOPES = {
-    "agent": ("get_agent", "get_queue", "set_queue_order", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
+    "agent": ("get_agent", "get_queue", "set_queue_order", "get_rules", "add_rule", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
+              "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "use_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",

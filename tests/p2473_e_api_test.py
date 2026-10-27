@@ -7,7 +7,7 @@
    client number 400 with a readable text; a period over two fiscal years 400; ?check=1 -> count + file name
  - the file: Windows-1252, CRLF, header line with 31 fields (EXTF;700;21;"Buchungsstapel";13 ...), 125 column names,
    booking lines with 125 fields; decimal comma, document date DDMM, S/H, Belegfeld 1 = invoice number
- - one line per tax rate (19 % -> 8400, 7 % -> 8300 in SKR03), reverse charge 8337, small business 8195 without tax key,
+ - one line per tax rate (19 % -> 8400, 7 % -> 8300 in SKR03), reverse charge EU 8336 (2.355.0, was 8337), small business 8195 without tax key,
    a credit note H, payments bank S / cash; debtor from a numeric customer number, else
    the collective debtor; drafts and documents outside the period are not exported
  - SKR04 + ledger length 5: default accounts stretched (44000), debtor 6 digits (100000)
@@ -187,7 +187,8 @@ check(len(B2) == 1 and g(B2[0], "Konto") == "10000" and g(B2[0], "Gegenkonto (oh
       "a customer number that is no debtor number -> the collective debtor 10000")
 check('""Film""' in g(B2[0], "Buchungstext"), "quotes inside a text field are doubled")
 B3 = [f for f in rows if g(f, "Belegfeld 1") == f'"{N3}"']
-check(len(B3) == 1 and g(B3[0], "Gegenkonto (ohne BU-Schlüssel)") == "8337" and g(B3[0], "Umsatz (ohne Soll/Haben-Kz)") == "2000,00", "reverse charge -> 8337, net = gross")
+# 2.355.0 (#2844): a client in another EU state (AT) = services to EU businesses, default account 8336 (was 8337, now 13b at home)
+check(len(B3) == 1 and g(B3[0], "Gegenkonto (ohne BU-Schlüssel)") == "8336" and g(B3[0], "Umsatz (ohne Soll/Haben-Kz)") == "2000,00", "reverse charge EU -> 8336, net = gross")
 B4 = [f for f in rows if g(f, "Belegfeld 1") == f'"{N4}"']
 check(len(B4) == 1 and g(B4[0], "Gegenkonto (ohne BU-Schlüssel)") == "8195" and g(B4[0], "BU-Schlüssel") == "", "small business -> 8195 without tax key")
 BC = [f for f in rows if g(f, "Belegfeld 1") == f'"{NCR}"']

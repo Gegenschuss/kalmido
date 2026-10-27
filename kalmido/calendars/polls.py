@@ -35,6 +35,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.361.2 B (#2923)
 from ..core.access import Denied, acx_anon_bind, acx_org_ok, need_feat
 from ..core.errors import BadInput
 from ..api.common import hit_limit
@@ -628,13 +629,19 @@ def tpo_move_space(pid):
     smv_same(r["org_id"], to)
     if r["user_id"] != uid:
         raise Denied(403, tr("Only who created this poll can move it"))
+    # 2.361.2 B (#2923): out of an organisation only as its admin, or into the private space with a released request
+    deny = None if org_out_ok(c, r["org_id"], to, "poll", pid) else oo_denied(c, r["org_id"], to, "poll", pid)
+    if deny and not b.get("dry"):
+        raise deny
     drop = [k for k, kind in (("task_id", "task"), ("client_id", "client"), ("list_id", "list"))
             if r[k] and not tpo_ref_ok(c, uid, kind, r[k], to)]
     names = {"task_id": tr("The poll is no longer linked to its task"), "client_id": tr("The poll is no longer linked to its client"),
              "list_id": tr("The poll is no longer linked to its project")}
     notes = [names[k] for k in drop] + ([tr("Every member of the organisation can then see the poll")] if to else [])
-    if b.get("dry"):
-        return jsonify(smv_answer(notes, None, count=1))
+    notes.append(oo_into_note(c, r["org_id"], to))  # 2.361.2 B (#2923): the way back
+    if b.get("dry"):  # 2.361.2 B (#2923): + the creator can ask an admin (out_request)
+        return jsonify(smv_answer(notes, deny.text() if deny else None, count=1, **((deny and deny.data) or {})))
+    org_out(c, r["org_id"], to, "poll", r["title"], obj=pid)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso_ms(now_utc())
     sets = {"org_id": to, "updated_at": ts, **{k: None for k in drop}}
     c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), pid])

@@ -40,8 +40,8 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(col && msgs.style.getPropertyValue('--agcol') === col, 'the message area carries the agent colour (--agcol)');
   const hd = d.querySelector('.chath');
   check(hd && hd.classList.contains('agcol'), 'header still carries the colour for the input box line / name');
-  // 2.350.0 (#3317): the workspace moved from the header into its ⋯ menu ("Workspace: Alpha")
-  check(!hd.querySelector('.chws') && w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).some(x => x.label === 'Workspace: Alpha')`), 'the header menu names the workspace (organisation agent)');
+  const ws = hd.querySelector('.chws');
+  check(ws && ws.querySelector('.chwsn').textContent === 'Alpha' && ws.querySelector('.wsp-dot'), 'header shows the workspace name (organisation agent)');
   check(w.eval(`/class="chws"[^>]*>.*Private/.test(chatWsHtml({id: ${CL}, org_id: null}))`) || w.eval(`chatWsHtml({id: ${CL}, org_id: null}).includes('Private')`), 'a private agent shows "Private"');
   check(w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; const h = chatInner(${CL}); S.me.workspaces = o; return !h.includes('chws'); })()`), 'without organisations the header has no workspace name');
   const css = require('./boot').allCssSync();

@@ -109,7 +109,7 @@ let TOAST_PAGE = '';
 function toastPage() { if (!/^#t\//.test(location.hash)) TOAST_PAGE = location.hash; return TOAST_PAGE; }
 window.addEventListener('hashchange', () => {
   const el = $('#toast'), p = el && el.dataset.page; if (!p || el.classList.contains('hidden')) return;
-  if ((toastPage() || '#') === p) return;  // 2.350.0 D (#3242): an empty hash is the start page ('#'), not 'no page'
+  if (toastPage() === p) return;
   clearTimeout(toastTimer); el.classList.add('hidden'); el.dataset.page = ''; HIST.toastE = null;
 });
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
@@ -119,7 +119,7 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}${undo || (ms || 2500) > 2500 ? `<button class="tx" type="button" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button>` : ''}`;  // 2.49.0 (#1769): a small x closes it without the action
   el.classList.toggle('one', !!undo); el.title = undo ? msg : '';  // 2.46.4 (#1755): one line, the name is cut with an ellipsis, the button stays whole
   el.classList.remove('hidden');
-  el.dataset.page = undo && !label ? toastPage() || '#' : '';  // 2.218.0 B (#2801): an undo message ends with its page
+  el.dataset.page = undo && !label ? toastPage() : '';  // 2.218.0 B (#2801): an undo message ends with its page
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);

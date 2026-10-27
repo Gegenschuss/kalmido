@@ -24,6 +24,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else ""
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+import dbx as dbxm  # noqa: E402  # 2.355.0 D (#2846)
 
 
 if not os.environ.get("P251_NOSTART"):
@@ -190,6 +191,7 @@ r = A.post(B + f"{D}/{INV}/finalize")
 check(r.ok, "the person finalises the invoice " + r.text[:200])
 r = ag("GET", "/docs", params={"kind": "invoice", "open": "1"})
 check(r.ok and [x["id"] for x in r.json()["data"]] == [INV], "#1350: the open invoices " + r.text[:200])
+dbxm.overdue(DATA, [INV])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = ag("POST", "/reminders", json={"invoice_ids": [INV], "level": 1})
 check(r.status_code == 201 and r.json()["doc"]["kind"] == "reminder" and r.json()["doc"]["status"] == "draft" and not r.json()["doc"]["locked"],
       "#1350: a reminder draft " + r.text[:200])

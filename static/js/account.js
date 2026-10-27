@@ -306,6 +306,7 @@ async function wsIconPick(md, oid, how, after) {
 const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
   edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}'),  // 2.56.0 (#1795)
   moveout: N_('{0} moved {1} out of the organisation'),  // 2.148.1 B (#2483)
+  outok: N_('{0} released {1} for its maker to take it back'), outno: N_('{0} declined to give {1} back'),  // 2.361.2 (#2923)
   export: N_('{0} exported {1} with the account export')};  // 2.148.1 C (#2492)
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
@@ -314,11 +315,23 @@ function oadmRow(x) {
     <span class="oadmb">${x.archived ? `<button type="button" class="btn sm" data-oa="restore">${tr('Restore')}</button><button type="button" class="btn sm danger" data-oa="delete">${tr('Delete…')}</button>`
       : `<button type="button" class="btn sm" data-oa="edit">${tr('Edit')}</button><button type="button" class="btn sm" data-oa="archive">${tr('Archive')}</button>`}<button type="button" class="btn sm" data-oa="owner">${tr('Hand over…')}</button></span></div>`;  // 2.56.0 (#1795): + Edit
 }
+// 2.361.2 (#2923): what a member asks back (they brought it in or made it): release = they may move it into their private space
+const OOR_KIND = {list: N_('Project'), sheet: N_('Table'), file: N_('File or folder'), wiki: N_('Knowledge page'), clients: N_('Client'),
+  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft')};  // 2.361.2 B (#2923): + drafts
+const oor_kind = k => OOR_KIND[k] ? tr(OOR_KIND[k]) : k;
+function oorHtml(rs) {
+  const open = (rs || []).filter(r => r.state === 'open');
+  if (!open.length) return '';
+  return `<h4 class="oadmh">${esc(tr('Asked back'))} <span class="muted">${open.length}</span></h4>
+    <div class="shint keep">${esc(tr('These members brought something into the organisation or made it there and ask to take it back into their private space. Release it and they can move it themselves; nobody else in the organisation sees it there afterwards.'))}</div>
+    ${open.map(r => `<div class="mrow oorrow" data-oor="${r.id}"><span class="n"><b>${esc(r.name || '–')}</b><small class="muted">${esc([oor_kind(r.kind), tr('asked by {0}', r.by), fmtWhen(r.created_at)].join(' · '))}</small></span>
+      <span class="oadmb"><button type="button" class="btn sm pri" data-oord="approve">${esc(tr('Release'))}</button><button type="button" class="btn sm" data-oord="decline">${esc(tr('Decline'))}</button></span></div>`).join('')}`;
+}
 function oadmDraw(md, j) {
   md._j = j;
   const live = j.lists.filter(x => !x.archived), arch = j.lists.filter(x => x.archived);
   // 2.39.1 (#1188): grouped by owner (listadmin.js)
-  $('#oadm-body', md).innerHTML = (j.lists.length ? `${lmOadmBody({lists: live}, oadmRow)}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${lmOadmBody({lists: arch}, oadmRow)}` : ''}`
+  $('#oadm-body', md).innerHTML = oorHtml(j.out_requests) + (j.lists.length ? `${lmOadmBody({lists: live}, oadmRow)}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${lmOadmBody({lists: arch}, oadmRow)}` : ''}`
     : `<div class="muted mhint">${tr('The organisation has no projects yet.')}</div>`)
     + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}${ole_logDetail(r)}</small></span></div>`).join('')}</details>` : '');
 }
@@ -332,6 +345,15 @@ async function oadmOpen(oid, name) {
   try { oadmDraw(md, await api('GET', `/api/orgs/${oid}/lists`)); } catch { $('#oadm-body', md).innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; }
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const od = e.target.closest('[data-oord]');
+    if (od) {  // 2.361.2 (#2923): one click releases / declines a member's request
+      od.disabled = true;
+      try { const r = await api('POST', `/api/orgs/${oid}/out-requests/${+od.closest('[data-oor]').dataset.oor}`, {decision: od.dataset.oord});
+        toast(r.state === 'approved' ? tr('Released: the person can take it back now') : tr('Declined'));
+      } catch { /* api() showed it */ }
+      try { oadmDraw(md, await api('GET', `/api/orgs/${oid}/lists`)); } catch { /* offline */ }
+      return;
+    }
     const b = e.target.closest('[data-oa]'); if (!b) return;
     const x = (md._j?.lists || []).find(l => l.id === +b.closest('[data-olid]').dataset.olid); if (!x) return;
     const k = b.dataset.oa, base = `/api/orgs/${oid}/lists/${x.id}`;

@@ -27,6 +27,7 @@ With a separate test runner, only the suites a branch touches (exit 3 = the chan
   <test runner> run --auto      (2.181.0, #2696: --touched against the merge base with main)
 """
 import argparse
+import bisect
 import os
 import re
 import subprocess
@@ -108,6 +109,8 @@ class Repo:
         self._text = {}
         self.tests = sorted(os.path.join("tests", n) for n in os.listdir(os.path.join(root, "tests"))
                             if n.endswith((".py", ".js")))
+        self._corpus = None  # CI fix of 2.351.0: all test files joined once, a token is searched in it once (_files_with)
+        self._hits = {}
 
     def text(self, rel):
         if rel not in self._text:
@@ -136,8 +139,8 @@ class Repo:
         hits, seen, queue = {}, set(), [(t, t) for t in tokens]
         while queue:
             tok, why = queue.pop(0)
-            for rel in self.tests:
-                if rel in seen or tok not in self.text(rel):
+            for rel in self._files_with(tok):
+                if rel in seen:
                     continue
                 seen.add(rel)
                 if rel in self.by_file:
@@ -147,6 +150,30 @@ class Repo:
                     stem = os.path.splitext(os.path.basename(rel))[0]
                     queue.append((stem, f"{why} via tests/{os.path.basename(rel)}"))
         return hits
+
+    def _files_with(self, tok):
+        """The test files (in self.tests order) whose text holds tok. CI fix of 2.351.0: the live train's push of 204 files
+        searched every route of every importer in all 1300 test files one by one (6+ min, the plan job's 5 min limit
+        cancelled the run); now one pass over the joined text per token, cached across the changed files."""
+        if tok in self._hits:
+            return self._hits[tok]
+        if self._corpus is None:
+            starts, parts, pos = [], [], 0
+            for rel in self.tests:
+                starts.append(pos)
+                parts.append(self.text(rel))
+                pos += len(parts[-1]) + 1
+            self._corpus, self._starts = "\0".join(parts), starts
+        out, i, c = [], 0, self._corpus
+        while True:
+            i = c.find(tok, i)
+            if i < 0:
+                break
+            k = bisect.bisect_right(self._starts, i) - 1
+            out.append(self.tests[k])
+            i = self._starts[k + 1] if k + 1 < len(self._starts) else len(c)  # one hit per file is enough
+        self._hits[tok] = out
+        return out
 
 
 def routes(text):
@@ -168,26 +195,42 @@ def py_module(rel):
 
 def importers(repo, rel, depth=3):
     """Server modules that import rel (directly or up to depth steps), rel included."""
-    pyfiles = []
-    for d, _, fs in os.walk(os.path.join(repo.root, "kalmido")):
-        pyfiles += [os.path.relpath(os.path.join(d, f), repo.root) for f in fs if f.endswith(".py")]
     found, frontier = {rel}, {rel}
     for _ in range(depth):
         nxt = set()
         for target in frontier:
-            mod = py_module(target)
-            name = mod.rsplit(".", 1)[-1]
-            pkg = mod.rsplit(".", 1)[0]
-            pat = re.compile(rf"(\b{re.escape(mod)}\b|from \.+ import [^\n]*\b{name}\b|from \.+{name}\b|"
-                             rf"from {re.escape(pkg)} import [^\n]*\b{name}\b)")
-            for p in pyfiles:
-                if p not in found and pat.search(repo.text(p)):
-                    nxt.add(p)
+            nxt |= direct_importers(repo, target) - found
         found |= nxt
         frontier = nxt
         if not frontier:
             break
     return found
+
+
+def direct_importers(repo, target):
+    """The server modules that import target directly (CI fix of 2.351.0: cached per target, the changed modules of one push
+    share most of their importers)."""
+    cache = repo.__dict__.setdefault("_importers", {})
+    if target in cache:
+        return cache[target]
+    if "_pyfiles" not in repo.__dict__:
+        repo._pyfiles = []
+        for d, _, fs in os.walk(os.path.join(repo.root, "kalmido")):
+            repo._pyfiles += [os.path.relpath(os.path.join(d, f), repo.root) for f in fs if f.endswith(".py")]
+    mod = py_module(target)
+    name = mod.rsplit(".", 1)[-1]
+    pkg = mod.rsplit(".", 1)[0]
+    # the module name as a plain test first (every alternative holds it) and two patterns that start with a literal instead
+    # of one alternation (Python tried it at every position: 88 s for kalmido/agents/admin.py)
+    pat = re.compile(rf"\b{re.escape(mod)}\b")
+    pat_from = re.compile(rf"from (?:\.+ import [^\n]*\b{name}\b|\.+{name}\b|{re.escape(pkg)} import [^\n]*\b{name}\b)")
+    out = set()
+    for p in repo._pyfiles:
+        t = repo.text(p)
+        if name in t and (mod in t and pat.search(t) or pat_from.search(t)):
+            out.add(p)
+    cache[target] = out
+    return out
 
 
 def js_tokens(text, stem):
@@ -240,8 +283,9 @@ def run_all_added(base, head, root, path="tests/suites.txt"):
     return new
 
 
-def classify(repo, path, base=None, head=None):
-    """('full', why) | ('suites', {suite: why}) | ('none', why) for one changed file."""
+def classify(repo, path, base=None, head=None, cheap=False):
+    """('full', why) | ('suites', {suite: why}) | ('none', why) for one changed file; cheap=True (CI fix of 2.351.0): only the
+    rules without a search through the test files, ('later', None) where one would be needed."""
     p = path.strip()
     p = p[2:] if p.startswith("./") else p
     name = os.path.basename(p)
@@ -261,6 +305,10 @@ def classify(repo, path, base=None, head=None):
         return "full", "translations changed (not only added)"
     if p.startswith("static/js/") and stem in FULL_CLIENT:
         return "full", "client start file"
+    if cheap:
+        if p.startswith("kalmido/") and p.endswith(".py") and not os.path.exists(os.path.join(repo.root, p)):
+            return "full", "server module removed"
+        return "later", None
     if p.startswith("tests/"):
         if p in repo.by_file:
             return "suites", {s: "its test file" for s in repo.by_file[p]}
@@ -316,16 +364,21 @@ def select(repo, files, base=None, head=None):
     for s in CORE_SUITES:
         if s in repo.group_of:
             why.setdefault(s, "always: core flow")
-    full = []
+    # CI fix of 2.351.0: one file that needs the full run (VERSION, sw.js of every live train push) decides the stage; the
+    # search through the test files for the other files is skipped then (it took 6+ min for the train's 204 files)
+    full = [f"{f} ({res})" for f in files for kind, res in [classify(repo, f, base, head, cheap=True)] if kind == "full"]
+    if full:
+        return "full", "full run needed: " + "; ".join(full[:5]) + (f" (+{len(full) - 5})" if len(full) > 5 else ""), {}, why
     for f in files:
         kind, res = classify(repo, f, base, head)
         if kind == "full":
             full.append(f"{f} ({res})")
+            break  # CI fix of 2.351.0: the stage is decided, the other files are not searched for
         elif kind == "suites":
             for s, w in res.items():
                 why.setdefault(s, f"{f}: {w}")
     if full:
-        return "full", "full run needed: " + "; ".join(full[:5]) + (f" (+{len(full) - 5})" if len(full) > 5 else ""), {}, why
+        return "full", f"full run needed: {full[0]}", {}, why
     groups = {}
     for s, w in why.items():
         groups.setdefault(repo.group_of[s], []).append(f"{s}: {w}")

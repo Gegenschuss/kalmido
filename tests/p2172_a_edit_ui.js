@@ -19,7 +19,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'notes'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Plan', body: 'Hello\n'})).id;
   check(PG, 'setup: a page');
 

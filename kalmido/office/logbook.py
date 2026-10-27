@@ -31,6 +31,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .olock import olk_active, olk_until
 from .rights import ofr_own_uid
 
@@ -876,6 +877,8 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
+    ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
+    A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     lg = "de" if lang == "de" else "en"
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency

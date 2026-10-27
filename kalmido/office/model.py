@@ -81,6 +81,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "producing_on": 0, "raw_on": 0,
                      "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
+                     "sign_offers": 0,  # 2.357.0 C (#3158): quotations / reminders with the signature picture of who finalised them
                      # 2.113.1 (#2251): day rate and factor of "share by amount" (an industry pack's option); None = the
                      # pack's values. prod_quotient / producing_rate above keep their old meaning for older documents
                      "share_rate": None, "share_factor": None,
@@ -117,11 +118,18 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "exempt_reason": "",
                      # 2.120.0 E (#2091): the own letterhead PDF + margins (set only by its own routes, office/letterhead.py)
                      "letterhead": {},
+                     # 2.357.0 A (#3156): the paper size of the office PDFs: "a4" (DIN 5008) or "letter" (US-Letter 8.5 x 11 in)
+                     "paper": "a4",
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
                      "terms": {},
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
                      # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
                      "dunning_suggest": 1, "dunning_grace_days": 7, "girocode": 1,
+                     # 2.355.0 D (#2846): default interest (section 288 BGB: base rate + 5 points, + 9 for businesses) and the
+                     # 40 EUR flat fee (section 288 (5), businesses only) on reminders, both off by default; the base rate in percent
+                     # (Bundesbank, valid from 1 July 2026: 1.52; set by hand each half year, never fetched); who counts as a
+                     # business: "auto" (a client with a VAT ID, buyer reference or Peppol ID), "business" or "consumer" (all clients)
+                     "dunning_interest": 0, "dunning_flat_fee": 0, "base_rate": 1.52, "dunning_client_kind": "auto",
                      # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
                      # switched); empty = everything the country pack offers is on, so offices from before stay as they were
                      "features_off": [],
@@ -429,6 +437,10 @@ def office_settings_clean(c, oid, b, cur):
         elif k in ("skonto_pct", "skonto_days"):  # 2.120.0 A (#2087)
             from .abschlag import abs_settings_clean
             abs_settings_clean(k, v, out)
+        elif k == "paper":  # 2.357.0 A (#3156)
+            if v not in ("a4", "letter"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "exempt_reason":  # 2.296.0 B (#3169): one line of text
             out[k] = " ".join(v.split())[:300] if isinstance(v, str) else ""
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
@@ -449,9 +461,17 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = dk_packs_clean(v)
         elif k in ("dunning_suggest", "girocode"):  # 2.147.1 B (#2054)
             out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k in ("dunning_interest", "dunning_flat_fee"):  # 2.355.0 D (#2846)
+            out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k == "base_rate":  # 2.355.0 D (#2846): percent, may be negative (as in 2013-2022)
+            out[k] = round(_num(v, k, -10, 30), 2)
+        elif k == "dunning_client_kind":  # 2.355.0 D (#2846)
+            if v not in ("auto", "business", "consumer"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""

@@ -184,9 +184,15 @@ ws(A, SP)
 r = A.post(B + "/api/clients", json={"name": "Orgkunde KG", "org_id": ORG})
 OC = r.json()["id"]
 ws(Bo, SP)
-check(mv(Bo, what="clients", ids=[OC], to="private", dry=1).status_code == 403, "a plain member may not take a client somebody else created out of the organisation")
+r = mv(Bo, what="clients", ids=[OC], to="private", dry=1)  # 2.361.2 (#2923): the dry run names it as its block (nothing to ask for)
+check(r.ok and r.json().get("block") and not r.json().get("out_request"), "a plain member may not take a client somebody else created out of the organisation " + r.text[:200])
 r = Bo.post(B + "/api/clients", json={"name": "Bobs Kunde", "org_id": ORG})
 BC = r.json()["id"]
+# 2.361.2 (#2923): a client of their own only after an admin released the request
+r = mv(Bo, what="clients", ids=[BC], to="private", dry=1)
+check(r.ok and r.json().get("out_request") == {"org": ORG, "kind": "clients", "id": BC}, "#2923: own client, no release: block + out_request " + r.text[:200])
+_rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "clients", "id": BC}).json().get("id")
+check(A.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's client")
 check(mv(Bo, what="clients", ids=[BC], to="private", dry=1).ok, "a plain member may move a client of their own")
 r = A.post(B + D, json={"project_title": "Fremder Entwurf", "client_id": BC})
 assert r.status_code == 201, r.text

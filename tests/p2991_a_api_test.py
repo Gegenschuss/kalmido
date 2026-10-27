@@ -223,7 +223,9 @@ CV = r.json()["id"] if r.ok else 0
 check(r.ok and r.json()["client_id"] == CL and r.json()["org_id"] == ORG, "a review at a client")
 check(Bo.get(B + f"{V}?client_id={CL}").json()["reviews"][0]["id"] == CV and Bo.post(B + f"{V}/{CV}/comments", json={"body": "Ton zu leise", "at_sec": 3}).ok,
       "Bob (member) sees the client's review and comments")
-check(Bo.post(B + f"{V}/{CV}/move-space", json={"to": "private", "dry": 1}).status_code == 403, "Bob is neither its creator nor an admin: no move")
+r = Bo.post(B + f"{V}/{CV}/move-space", json={"to": "private", "dry": 1})  # 2.361.2 (#2923): the dry run may name it as its block
+check(r.status_code == 403 or (r.ok and r.json().get("block") and not r.json().get("out_request")), "Bob is neither its creator nor an admin: no move " + r.text[:200])
+check(Bo.post(B + f"{V}/{CV}/move-space", json={"to": "private"}).status_code == 403, "#2923: ... and the move itself 403")
 check(Ca.get(B + f"{V}?client_id={CL}").json()["reviews"] == [], "Carol: no reviews of a foreign client")
 r = A.post(B + V, json={"list_id": L, "url": "https://example.com/film.webm"})
 check(r.ok and r.json()["list_id"] == L and r.json()["versions"][0]["provider"] == "file", "a review at a project list")

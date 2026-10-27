@@ -1,4 +1,5 @@
 """Running Kalmido for others (2.24.0): storage quotas, the maintenance / announcement banner, daily e-mail limits."""
+import hashlib
 import json
 import os
 import re
@@ -266,6 +267,10 @@ def announce_clean(b):
         out["ends_at"] = iso(now_utc() + timedelta(minutes=m))
     if out.get("starts_at") and out.get("ends_at") and out["ends_at"] <= out["starts_at"]:
         return None, tr("The end must be after the start")
+    # 2.351.2 (#1507): the id also follows the content - two notices saved within one second had the same id, so a person
+    # who hid the first one never saw the changed one
+    sig = json.dumps([out["text"], level, out.get("starts_at"), out.get("ends_at")], ensure_ascii=False)
+    out["id"] += "-" + hashlib.sha1(sig.encode(), usedforsecurity=False).hexdigest()[:8]
     return out, None
 
 

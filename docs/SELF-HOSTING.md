@@ -1292,6 +1292,7 @@ Each tool runs as a short-lived process with limits; tune them for small hosts:
 | `KALMIDO_DOCS_SCAN_S` | `60` | Seconds between two looks into the inbox folders "Dokumente/Eingang" |
 | `KALMIDO_DOCS_THUMB_FILL` | `on` | 2.66.1: `off` skips the one-time catch-up of missing previews of imported documents |
 | `KALMIDO_DOCS_THUMB_FILL_S` | `15` | Seconds between two portions (5 documents) of that catch-up |
+| `KALMIDO_OFFICE_STORE_FILL` | `on` | 2.357: `off` skips the one-time catch-up that stores the PDF/XML (with SHA-256) of finalised office documents from versions that did not store them yet |
 | `KALMIDO_FILE_OCR` | `on` | 2.61.0: `off` switches the text recognition of normal files off (below) |
 | `KALMIDO_FILE_OCR_BACKFILL` | `on` | 2.61.0: `off` switches only the catch-up of files stored before off |
 | `KALMIDO_FILE_OCR_BACKFILL_S` | `20` | Seconds between two files of the catch-up |

@@ -14,7 +14,10 @@ FIELD_TXT = {"intro": N_("Introduction"), "closing": N_("Closing text"), "time":
 # the standard invoice closing up to 2.39 (it still counts as a standard text in older drafts)
 LEGACY = {"invoice_closing": {
     "de": "Der Gesamtbetrag wird mit Erhalt dieser Rechnung zur Zahlung fällig. Es gelten unsere allgemeinen Geschäftsbedingungen.",
-    "en": "Please remit the invoice amount to the account specified above. Our general terms and conditions apply."}}
+    "en": "Please remit the invoice amount to the account specified above. Our general terms and conditions apply."},
+    # 2.357.0 D (#3183): the German standard closing up to 2.356 ("allgemeinen" small)
+    "invoice_closing_2": {"de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. "
+                                "Es gelten unsere allgemeinen Geschäftsbedingungen."}}
 
 
 def doc_lg(lang):
@@ -78,7 +81,11 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("Invoice correction|pack"), N_("Invoice correction No.|pack"), N_("Correction of invoice No.|pack"), N_("Correction total|pack"),
              N_("regarding the invoice referenced above we issue the following invoice correction:|pack"), N_("Client VAT ID|pack"),
              N_("Leitweg ID|pack"), N_("Buyer reference|pack"),
-             N_("Reverse charge: VAT to be accounted for by the recipient (section 13b German VAT Act).|pack"))
+             N_("Reverse charge: VAT to be accounted for by the recipient (section 13b German VAT Act).|pack"),
+             # 2.357.0 D (#3183): sentence case, "Description" for the service column, the service date of one day
+             N_("Description|pack"), N_("Unit price|pack"), N_("Net total|pack"), N_("Gross total|pack"), N_("Duration of licence|pack"),
+             N_("Territorial rights|pack"), N_("Rights by medium|pack"), N_("Service date|pack"),
+             N_("regarding the invoice referenced above we issue the following credit note:|pack"))
 
 def _dpk(w, lang):
     # 2.185.0 (#2520): looked up directly, not via tr(): an own text with a "|" must come back whole
@@ -193,6 +200,8 @@ def _defaults(c, oid, s, cur, lang, level, ct):
             cands.add(inv_default_texts(c, oid, s, "invoice", lang)[1])
             if legacy:
                 cands.add(legacy)
+        if kind in ("invoice", "credit") and LEGACY["invoice_closing_2"].get(lang):
+            cands.add(LEGACY["invoice_closing_2"][lang])
         if kind == "reminder":  # any level's standard text counts (the level may change together with the language)
             for lv in (1, 2, 3):
                 cands.add(inv_default_texts(c, oid, s, kind, lang, lv)[1])
@@ -201,6 +210,9 @@ def _defaults(c, oid, s, cur, lang, level, ct):
             icands |= {inv_default_texts(c, oid, s, kind, lang, lv)[0] for lv in (1, 2, 3)}
         out["intro"] = (intro, icands, False)
         out["closing"] = (closing, cands, False)
+    if doc_lg(lang) in ("fr", "es"):  # 2.357.0 D (#3183): their standard intros up to 2.356 began with a small letter
+        i0, ic, im = out["intro"]
+        out["intro"] = (i0, ic | {x[:1].lower() + x[1:] for x in ic if x}, im)
     return out
 
 

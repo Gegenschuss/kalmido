@@ -126,6 +126,8 @@ def cfb_csv_balance(text, mapping, account=None):
     if not seen:
         return []
     desc = seen[0][0] > seen[-1][0]  # newest first: the first row of the newest day is the latest booking
+    if seen[0][0] == seen[-1][0]:  # 2.355.0 B (#2847): one day only -- the order from the balances (row before + amount)
+        desc = _cfb_desc(seen, mapping, len(header), decimal, _parse_amount)
     newest = max(s[0] for s in seen)
     day_rows = [s for s in seen if s[0] == newest]
     pick = day_rows[0] if desc else day_rows[-1]
@@ -136,6 +138,27 @@ def cfb_csv_balance(text, mapping, account=None):
         acct = pick[3][ai].replace(" ", "").upper()
         acct = acct if IBAN_RE.match(acct) else ""
     return [{"account": acct or cfb_account_name(account), "day": newest, "amount": money(pick[2]), "kind": "close"}]
+
+
+def _cfb_desc(seen, mapping, ncols, decimal, parse):
+    """2.355.0 B (#2847): True when the rows of one day are newest first: each balance = the next row's balance + its own
+    amount (oldest first: the row before's balance + its own amount). Unknown (no amount column, no two balances) = False."""
+    cols = {k: _col(mapping, k, ncols) for k in ("amount", "amount_in", "amount_out")}
+
+    def amt(r):
+        get = lambda k: parse(r[cols[k]], decimal) if cols[k] is not None and cols[k] < len(r) else None  # noqa: E731
+        if cols["amount"] is not None:
+            return get("amount")
+        a_in, a_out = get("amount_in"), get("amount_out")
+        return a_in if a_in else -abs(a_out) if a_out else None
+    up = down = 0
+    for (_d, _n, b0, r0), (_d1, _n1, b1, r1) in zip(seen, seen[1:]):
+        a0, a1 = amt(r0), amt(r1)
+        if None in (b0, b1):
+            continue
+        up += a1 is not None and b0 + a1 == b1
+        down += a0 is not None and b1 + a0 == b0
+    return down > up
 
 
 def cfb_guess(header):

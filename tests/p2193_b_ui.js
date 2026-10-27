@@ -132,8 +132,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   touch(w, track(k), 'touchstart', 10 * DWm + 5); const sw2 = touch(w, track(k), 'touchmove', 10 * DWm + 40);
   await sleep(520); touch(w, track(k), 'touchend'); await sleep(150);
   check(!sw2.defaultPrevented && !track(k).querySelector('.tl-ghost') && !d.querySelector('#tl-new-in'), 'a swipe over the empty track starts nothing (it scrolls)');
-  touch(w, track(k), 'touchstart', 10 * DWm + 5); await sleep(520);
-  check(track(k).querySelector('.tl-ghost'), 'the hold shows the ghost bar');
+  touch(w, track(k), 'touchstart', 10 * DWm + 5);
+  check(await until(() => track(k)?.querySelector('.tl-ghost'), 2000), 'the hold shows the ghost bar');
+  // 2.358 (#3402): the live follow-up and a stale view during the hold leave the held ghost alone (drawn after letting go)
+  const gh = track(k)?.querySelector('.tl-ghost');
+  w.eval('lpFollow(); td_renderSoon(); S.viewStale = true; viewSafeRender(); lpViewSafe()'); await sleep(450);
+  check(gh?.isConnected && w.eval('S.viewStale === true'), 'a redraw during the hold keeps the ghost bar (the view stays stale until let go)');
   touch(w, track(k), 'touchmove', 13 * DWm + 5); touch(w, track(k), 'touchend'); await sleep(200);
   const N = w.eval('S.tlNew && [S.tlNew.d0, S.tlNew.d1]');
   check(d.querySelector('#tl-new-in') && N && N[0] === w.eval('addDays(S.tlStart, 10)') && N[1] === w.eval('addDays(S.tlStart, 13)'), 'hold + drag: the title field for that range: ' + JSON.stringify(N));

@@ -97,6 +97,10 @@ const rects = w => {
   te(w, cev, 'touchstart', [[150, y0]]);
   await sleep(450);
   check(!!await until(() => d.querySelector('#view .cgghost') && d.querySelector('#view .wcev.cgsrc'), 20), 'touch: a held event lifts (ghost)');
+  // 2.358 (#3402): the live follow-up and a stale view during the hold leave the held event alone (drawn after letting go)
+  const hg = d.querySelector('#view .cgghost'), hs = d.querySelector('#view .wcev.cgsrc');
+  e('lpFollow(); td_renderSoon(); S.viewStale = true; viewSafeRender(); lpViewSafe()'); await sleep(450);
+  check(hg?.isConnected && hs?.isConnected && e('S.viewStale === true'), 'touch: a redraw during the hold keeps the held event and its ghost');
   te(w, cev, 'touchmove', [[150, y0 + Hh / 2]]); await frame(w);
   te(w, cev, 'touchmove', [[150, y0 + Hh]]); await frame(w);
   te(w, cev, 'touchend', []);

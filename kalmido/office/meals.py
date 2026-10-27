@@ -198,11 +198,12 @@ def bw_calc(lines, tip):
 
 def bw_years(c, oid):
     """2.147.0 (#2459, #2461): the retention of receipts in years of office area oid (its country pack; the neutral base pack:
-    the office's own value). DE stays at 8."""
+    the office's own value). DE stays at 8. 2.355.0 B (#2845): never below 8 (a lower value of a pack or the office counts
+    as 8: entertainment receipts are German receipts)."""
     from .model import office_settings
     from .packs import office_pack_for, pack_retention
     s = office_settings(c, oid)
-    return int(pack_retention(office_pack_for(s), s).get("receipts") or BW_KEEP_YEARS)
+    return max(BW_KEEP_YEARS, int(pack_retention(office_pack_for(s), s).get("receipts") or BW_KEEP_YEARS))
 
 
 def bw_keep_until(d, years=BW_KEEP_YEARS):

@@ -444,6 +444,7 @@ class Stream:
         self.tools, self.context_tokens = 0, 0  # 2.44.0 (#1448 / #1446): tool calls seen, size of the conversation
         self.timed_out, self.err_tail = False, []
         self.aborted = False  # 2.144.0 (#2412): ended by Stop in the chat
+        self.rules_added = False  # 2.235.0 C (#2903): the run saved a standing rule (add_rule) -> read GET /api/v1/agent again
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
     def feed(self, line):
@@ -474,6 +475,8 @@ class Stream:
                     self.text = self.last_text = str(blk["text"]).strip()
                 elif blk.get("type") == "tool_use":
                     self.tools += 1
+                    if str(blk.get("name") or "").endswith("add_rule"):
+                        self.rules_added = True
                     if self.text:
                         self.pending, self.text = self.text, ""
         elif t == "rate_limit_event":
@@ -603,7 +606,60 @@ def rules_block(agent=None):
                "assignments reach you as Kalmido events (Kalmido lets only people who may use you write to you)"
                + (f", and of them only from the account ids {', '.join(ids)}." if ids else "."))
         language = "answer in the language of the person you answer" + (f" (if that is unclear: {lang})." if lang else ".")
-    return text.replace("{{WHO}}", who).replace("{{LANGUAGE}}", language)
+    return (text.replace("{{WHO}}", who).replace("{{LANGUAGE}}", language) + control_block((agent or {}).get("control"))
+            + standing_rules_block(agent))
+
+
+# kalmido-capability: standing_rules (2.235.0, #2903)
+def standing_rules_block(agent):
+    """2.235.0 C (#2903): the agent's ACTIVE standing rules (GET /api/v1/agent "rules", the event rules_changed) under the
+    fixed rules: what it was told "from now on always ..." and its owner keeps in Kalmido (paused ones are not sent). An older
+    server sends no "rules": nothing is added."""
+    rules = [r for r in ((agent or {}).get("rules") or []) if isinstance(r, dict) and str(r.get("text") or "").strip()]
+    if not rules:
+        return ""
+    lines = [f"- {' '.join(str(r['text']).split())} (rule {r.get('id')}, since {str(r.get('created_at') or '')[:10]})" for r in rules]
+    return ("\n\n## Standing rules (kept in Kalmido, changed only there)\n\nFollow them in every run, unless a fixed rule above "
+            "forbids it. A new \"from now on always ...\" of the person you work for: save it with add_rule (source = that message "
+            "or comment) and confirm it in ONE line.\n\n" + "\n".join(lines))
+
+
+# kalmido-capability: control_rules (2.235.0, #2891 #2900 #2901): the agent's control level, goal, project exceptions, one-way
+# steps and the deadline of its approvals (GET /api/v1/agent "control") as a part of the rules block; control_changed is read
+# at once (no run). None / no level chosen (an agent from before 2.235.0): nothing is added.
+CONTROL_LEVELS = {
+    "approve_all": "approve everything: every change waits for an approval card (the server refuses it with 409 approval_required)",
+    "routine": "routine free: create, plan (due / start), comment and tick off tasks without asking; every other change needs an "
+               "approval card first",
+    "free": "free run with a goal: decide yourself towards the goal and change what serves it; every decision is one line in "
+            "the history your owner can undo",
+}
+
+
+def control_block(ctl):
+    """The rules part for GET /api/v1/agent "control" ('' when no level is chosen)."""
+    if not isinstance(ctl, dict) or not ctl.get("chosen") or ctl.get("level") not in CONTROL_LEVELS:
+        return ""
+    out = ["", "", "## Your control level (set in Kalmido; the server enforces it)", "",
+           f"- **Level:** {CONTROL_LEVELS[ctl['level']]}."]
+    if ctl.get("goal"):
+        out.append(f"- **Goal:** {ctl['goal']}")
+    ex = [f"project {p.get('list_id')}: {p.get('effective') or p.get('level')}" for p in ctl.get("projects") or [] if isinstance(p, dict)]
+    if ex:
+        out.append("- **Other levels in these projects:** " + "; ".join(ex) + " (a project never gets more than your owner's own rights there).")
+    ow = [x.get("text") for x in ((ctl.get("one_way") or {}).get("fixed") or []) if isinstance(x, dict)] + list((ctl.get("one_way") or {}).get("custom") or [])
+    out.append("- **One-way steps, on every level only after an approval card:** " + "; ".join(str(x) for x in ow if x) + ".")
+    hdr = ctl.get("approval_header") or "X-Kalmido-Approval"
+    out.append("- **How to get an approval:** a refused write answers 409 `approval_required` (step, level). Send an approval card in "
+               "the chat (send_chat approval {title, what, step: {method, path, body}} = the 409's approval, recommend yes / no when you have a recommendation, "
+               f"one_way true for a one-way step of the list above); after the person's Yes send exactly that request again with the header "
+               f"`{hdr}: <id of the card>`. It works once and only for that method, path and body; a No or silence is never a yes.")
+    if ctl.get("deadline"):
+        then = {"reject": "it counts as rejected", "ask_again": "the person is asked once more, then it counts as rejected",
+                "recommend": "your recommended answer is taken (never for a one-way step: rejected)"}.get(ctl.get("then"), "it counts as rejected")
+        out.append(f"- **Deadline:** an approval card unanswered for {int(ctl['deadline']) // 3600} h ends by itself: {then}; you get "
+                   "the event approval_expired.")
+    return "\n".join(out)
 
 
 
@@ -1524,9 +1580,21 @@ class Runner:
             self.mark_approval(ev)
             if ev.get("_drop"):
                 continue
+            if ev.get("event") == "rules_changed":  # 2.235.0 C (#2903): information, no run (the next prompt has them)
+                self.agent["rules"] = (ev.get("data") or {}).get("rules") or []
+                log("standing rules changed")
+                continue
             if ev.get("event") == "work_style_changed":  # 2.236.0 (#2905): information, no run
                 self.agent["work_style"] = (ev.get("data") or {}).get("work_style") or self.agent.get("work_style")
                 log("work style changed")
+                continue
+            if ev.get("event") == "data_lock_changed":  # kalmido-capability: data_lock_info (2.235.0, #2902): information, no run
+                self.agent["data_lock"] = (ev.get("data") or {}).get("data_lock") or self.agent.get("data_lock")
+                log("data lock changed")
+                continue
+            if ev.get("event") == "control_changed":  # 2.235.0 (#2891): information, no run; the next rules block has it
+                self.agent["control"] = (ev.get("data") or {}).get("control") or self.agent.get("control")
+                log("control level changed")
                 continue
             if ev.get("event") in ("reset", "runtime_changed"):
                 self.refresh_due = True  # 2.44.0 (#1446): the next run reads the runtime again (reset / model)
@@ -1656,6 +1724,8 @@ class Runner:
         for n in (1, 2):
             sess = self.state.data["sessions"].get(key) if key else None
             st, rc = self._exec(self.run_args(args + (["--resume", sess["id"]] if sess else [])), prompt, uid, what, tid)
+            if st is not None and st.rules_added:  # 2.235.0 C (#2903): its own new rule is in the next prompt's rules block
+                self.refresh_agent()
             if st is not None and st.aborted:  # 2.144.0 (#2412): stopped by the person, never a second try
                 return st, rc, "stopped"
             if st is not None and (result_text(st) or rc == 0):

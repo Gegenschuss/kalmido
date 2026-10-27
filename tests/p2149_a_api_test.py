@@ -23,6 +23,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import testclock  # noqa: E402
+import dbx as dbxm  # noqa: E402  # 2.355.0 D (#2846)
 from freelancer_fixture import freelancer  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
@@ -70,7 +71,8 @@ OLD = {
     "Proof of service|document": ("Leistungsnachweis", "Proof of service"), "Quotation|document": ("Angebot", "Quotation"),
     "Invoice no.|document": ("Rechnung Nr.", None), "{0} No.|document": ("{0} Nr.", "{0} No."), "Draft|document number": ("Entwurf", "Draft"),
     "Credit note for invoice no.|document": ("zu Rechnung Nr.", "Credit note for invoice no."), "Ref./PO no.|document": ("Bestellnr. / Referenz", None),  # 2.152.4 (#2630): was Ref./PO-Nr.
-    "Project title|document": ("Betreff", None),  # 2.152.4 (#2652): was Projekttitel "Customer no.|document": ("Kunden-Nr.", "Customer no."), "Date|document": ("Datum", None),
+    # 2.357.0 B (#3181): "Project title|document" is gone (no Betreff row in the head, the bold project title stays)
+    "Customer no.|document": ("Kunden-Nr.", "Customer no."), "Date|document": ("Datum", None),
     "Service period|document": ("Leistungszeitraum", "Service period"), "Period of service|document": ("Leistungszeitraum", "Period of service"),
     "Due on|document": ("Fällig am", "Due on"), "Exchange rate €1|document": ("Wechselkurs 1 €", "Exchange rate €1"),
     "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document": ("Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD",
@@ -183,6 +185,7 @@ def agent_chain(s, hd, uid, client, tag):
     s.patch(B + f"{D}/{inv}", json={"service_from": TODAY, "service_to": TODAY})
     r = s.post(B + f"{D}/{inv}/finalize")
     check(r.ok, f"{tag}: the person finalises the invoice " + r.text[:200])
+    dbxm.overdue(DATA, [inv])  # 2.355.0 D (#2846): reminders only for overdue invoices
     r = ag("POST", "/reminders", hd, json={"invoice_ids": [inv], "level": 1})
     check(r.status_code == 201, f"{tag}: the agent's reminder draft " + r.text[:200])
     rem = r.json()["doc"]["id"] if r.status_code == 201 else 0

@@ -147,6 +147,7 @@ TE = dbx("SELECT id FROM time_entries WHERE billed_doc_id=?", (INV,))[0][0]
 r = A.post(B + f"{D}/{INV}/credit")
 check(r.status_code == 201, "a credit note draft " + r.text[:200])
 CR = r.json().get("id")
+dbxm.overdue(DATA, [INV])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + D + "/reminder", json={"doc_ids": [INV], "level": 1})
 REM = r.json().get("id") if r.status_code == 201 else None
 check(REM, "a reminder over the invoice " + r.text[:200])
@@ -220,6 +221,7 @@ check(ce and ce[0][0] is None, f"cash=0: the entry stays without the reference {
 
 # ================================================================== a reminder over two invoices: 409
 INV4, INV5 = make(A, CL, "Two A"), make(A, CL, "Two B")
+dbxm.overdue(DATA, [INV4, INV5])  # 2.355.0 D (#2846)
 r = A.post(B + D + "/reminder", json={"doc_ids": [INV4, INV5], "level": 1})
 if r.status_code == 201:
     r = delete(A, INV4, number(A, INV4))

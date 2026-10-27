@@ -138,7 +138,7 @@ check(len(rows) == 2 and all(x[0] == ORG for x in rows), f"office_doc_items.org_
 rd = A.get(B + f"{D}/{DOC}/render").json()
 co = rd["company"]
 check(co["lines"] == ["Hafenstraße 12", "20457 Hamburg"] and any("DE02 1203 0000 0000 2020 51" in x for x in co["bank_lines"])
-      and any("12/345/67890" in x for x in co["bank_lines"]) and any("HRB 00000" in x for x in co["register_lines"])
+      and any("12/345/67890" in x for x in co["register_lines"]) and any("HRB 00000" in x for x in co["register_lines"])  # 2.357.0 B (#3180): tax number in the register column
       and any("hallo@nordlicht.example" in x for x in co["contact_lines"]), f"print lines made from the fields: {co}")
 check(rd["locked"] is False and rd["pack_version"], "render: open, with the pack version")
 # period of service
@@ -194,7 +194,7 @@ A.put(B + f"{D}/{OPEN}/items", json={"items": [{"service_id": S1, "qty": 1}]})
 ro = A.get(B + f"{D}/{OPEN}/render").json()
 it0 = next(x for x in ro["lines"] if x["kind"] == "item")
 check(ro["company"]["lines"][0] == "Neuer Weg 1" and ro["company"]["name"] == "Studio Nordlicht GmbH" and it0["rate"] == 2000, f"open documents use the live data: {ro['company']['lines']} {it0['rate']}")
-check(not any("IBAN" in x for x in ro["company"]["bank_lines"]) and any("99/999/99999" in x for x in ro["company"]["bank_lines"]), "an emptied field drops its line")
+check(not any("IBAN" in x for x in ro["company"]["bank_lines"]) and any("99/999/99999" in x for x in ro["company"]["register_lines"]), "an emptied field drops its line")  # 2.357.0 B (#3180): tax number in the register column
 # free lines are the fallback of a group without fields
 A.put(B + O + "/settings", json={"company_fields": {k: "" for k in ("street", "zip", "city", "country")}})
 ro = A.get(B + f"{D}/{OPEN}/render").json()

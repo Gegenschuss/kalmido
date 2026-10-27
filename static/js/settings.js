@@ -84,6 +84,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-favq': ['fav_quiet', N_('Quieter pushes from projects without a star'), 'chk'], 's-favs': ['fav_suggest', N_('Suggest favourites'), 'chk'],  // 2.46.1 (#1361)
   's-tblacc': ['tbl_accept', N_('Accept urgent markings from others'), 'chk'],  // 2.53.0 C (#1424)
   's-pmeta': ['photo_meta_strip', N_('Remove location data from photos'), 'chk'],  // 2.61.0 B (#1819)
+  's-kbda': ['chat_kbd_agent', N_('Close the keyboard after sending (agent chat)'), 'chk'], 's-kbdt': ['chat_kbd_team', N_('Close the keyboard after sending (team chat)'), 'chk'],  // 2.235.0 D (#2899)
   's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
@@ -633,7 +634,7 @@ function settingsModal(focus) {
       <div id="s-ntfyin"></div>
       <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
-      ${typeof trd_setHtml === 'function' ? trd_setHtml(s, chk, hint) : ''}
+      ${typeof trd_setHtml === 'function' ? trd_setHtml(s, chk, hint) : ''}${typeof kbd_setHtml === 'function' ? kbd_setHtml(s, chk, hint) : ''}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
       <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>

@@ -19,6 +19,7 @@ from ..core.errors import BadInput
 from .calc import dstr, money
 from .ledger import ofx_log
 from .model import office_settings
+from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .rights import ofr_own_uid
 from .travel import _csv_safe, _ctx, rk_trips
 from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate
@@ -295,6 +296,8 @@ def vmr_pdf():
     rep = vmr_report(c, oid, year, person, lg)
     from .model import ofx_name1
     co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name") or "")  # 2.99.0 (#2188): up to three lines -> one
+    ppr = pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)
+    A4_H, PDF_CW, PDF_L, _Page = ppr.A4_H, ppr.PDF_CW, ppr.PDF_L, ppr._Page
     cols = [(tr("From"), 0.11, "l"), (tr("to"), 0.11, "l"), (tr("Destination / route"), 0.18, "l"), (tr("Occasion"), 0.17, "l"),
             (tr("Breakdown"), 0.31, "l"), (tr("Per diem"), 0.12, "r")]
     xs, x = [], PDF_L

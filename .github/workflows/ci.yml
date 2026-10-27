@@ -43,7 +43,9 @@ jobs:
   plan:
     name: Shard plan (stage, suite times of the last runs)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # CI fix of 2.351.0: 8 instead of 5 min; tests/stages.py (150 s) and each download of suite times (60 s) have their own
+    # limit below, so a slow step costs a full run instead of a cancelled plan (a cancelled plan skips every shard)
+    timeout-minutes: 8
     permissions:
       contents: read
       actions: read
@@ -63,7 +65,9 @@ jobs:
           CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title }}
         run: |
           # 2.321 (#1368): a package branch (job/**) is tested against its merge base with main (tests/stages.py fetches main)
-          out=$(python3 tests/stages.py --ci --groups-out /tmp/push-groups.txt) || out=$'stage=full\nreason=tests/stages.py failed - full run'
+          # CI fix of 2.351.0: stages.py searched 6+ min for the 204 files of a live train push and the job limit cancelled the
+          # plan; now it decides in seconds, the 150 s limit turns a slow run into the full stage
+          out=$(timeout 150 python3 tests/stages.py --ci --groups-out /tmp/push-groups.txt) || out=$'stage=full\nreason=tests/stages.py failed or took over 150 s - full run'
           stage=$(sed -n 's/^stage=//p' <<<"$out"); reason=$(sed -n 's/^reason=//p' <<<"$out")
           if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
           [ "$stage" = push ] || stage=full
@@ -82,7 +86,7 @@ jobs:
           ids=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status completed --limit 30 \
                   --json databaseId,conclusion --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][:6][].databaseId' || true)
           for id in $ids; do
-            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/$id" || { echo "run $id: no timings"; continue; }
+            timeout 60 gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/$id" || { echo "run $id: no timings"; continue; }
             st=$(cat /tmp/timings/"$id"/*/timings-stage.txt 2>/dev/null | sed -n 1p || true)
             echo "run $id: stage ${st:-full (no stage file)}"
             order="$id $order"; n=$((n + 1))
@@ -252,6 +256,9 @@ jobs:
           python tests/office_einvoice_test.py
           python tests/p2154_b_ubl_test.py  # 2.154.0 B (#1960): UBL (Peppol BIS 3.0, XRechnung UBL, EN 16931), after the CII files
           python tests/p2296_a_pdfa_test.py  # 2.296.0 A (#3178): logo, 16-bit logo, letterhead, draft mark + special characters, long footer
+          python tests/p2357_l_einvoice_test.py  # 2.357.0 (#3217, #3218): zero rated Z, O with the tax number as seller id
+          python tests/p2357_a_paper_pdf_test.py  # 2.357.0 A (#3156): US-Letter invoice with e-invoice, on a letterhead, draft
+          python tests/p2355_c_einvoice_test.py  # 2.355.0 C (#2844): categories K (goods to the EU, deliver-to address) and G (export)
       - name: veraPDF + KoSIT
         run: tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
       - name: Reports on failure

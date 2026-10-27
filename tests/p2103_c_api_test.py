@@ -6,7 +6,7 @@ freelancer-matrix: office
  - #2168 travel expenses: a receipt ticked "in DATEV" or billed on a finalised invoice is kept (409 for the receipt and its
    trip); without the tick it goes as before
  - #2168 booked receipts (VAT rate or paid): into the trash yes, deleted for good 409 "Kept by law until 31.12.<year + 8>";
-   a receipt without booking and one whose period ran out are purged
+   a document that is no receipt and a receipt whose period ran out are purged (2.355.0 #2845: an open receipt is kept)
  - #2168 the undo of an old-invoice import: within 24 hours and untouched only (409 after an edit, 409 after 24 hours)
  - #2168 a payment on a finalised invoice is reversed (a second line with the negative amount, reverses_id), never deleted;
    the balance follows, a second reversal / the reversal of a reversal 409
@@ -178,13 +178,21 @@ def purge(nid):
 R_BOOKED = receipt("software.pdf", "19")
 R_OPEN = receipt("kasse.pdf", None)
 R_OLD = receipt("alt.pdf", "7", "2015-03-01")
-paths = [p for (p,) in sql("SELECT path FROM fs_versions WHERE node_id=?", (R_OPEN,))]
 r = purge(R_BOOKED)
 until = f"31 Dec {int(DAY(5)[:4]) + 8}"  # English (the person's language): "31 Dec <year>"
 check(r.status_code == 409 and "Kept by law until" in r.text and until in r.text, f"#2168: a booked receipt goes into the trash, deleted for good 409 until {until} " + r.text[:200])
 check(sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_BOOKED,)) and sql("SELECT 1 FROM rc_receipts WHERE node_id=?", (R_BOOKED,)), "#2168: the booked receipt and its booking stay")
 check(A.post(B + f"/api/files/nodes/{R_BOOKED}/restore").ok, "#2168: the booked receipt comes back from the trash")
-check(purge(R_OPEN).ok and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_OPEN,)), "#2168: a receipt without VAT rate / payment is deleted for good")
+# 2.355.0 (#2845): an open receipt not booked yet is kept from its arrival (decision of 23.10.2026); a plain document of
+# the office (no receipt) is still deleted for good with its file
+r = purge(R_OPEN)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#2845: a receipt without VAT rate / payment is kept too " + r.text[:200])
+A.post(B + f"/api/files/nodes/{R_OPEN}/restore")
+r = A.post(B + "/api/docs", data={"ws": WSO}, files={"files": ("notiz.pdf", tiny_pdf("Notiz"), "application/pdf")})
+assert r.status_code == 201, r.text
+R_PLAIN = r.json()["ids"][0]
+paths = [p for (p,) in sql("SELECT path FROM fs_versions WHERE node_id=?", (R_PLAIN,))]
+check(purge(R_PLAIN).ok and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_PLAIN,)), "#2168: a document that is no receipt is deleted for good")
 check(paths and not any(os.path.exists(os.path.join(DATA, "attachments", p)) for p in paths), "#2168: ... with its file")
 check(purge(R_OLD).ok, "#2168: a booked receipt of 2015 (period over at the end of 2023) is deleted for good")
 out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.receipts.suggest import olk_fs_locked\n"

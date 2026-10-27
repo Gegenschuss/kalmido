@@ -115,7 +115,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   await until(() => !/plain answer/.test(box().textContent));
   check(card() && !/plain answer/.test(box().textContent) && !box().querySelector(':scope > .cmsg.me') && d.querySelector(`#chat-msgs [data-mid="a:${mq}"]`), 'Jobs: the card and the question, not the plain answer or my message');
   check(w.eval(`LS.get('jcdFilt')`) === 'jobs', 'the filter is kept per device');
-  check(d.querySelector('#jcd-fbtn.jcdfon') && !d.querySelector('#jcd-fbtn .jcdfdot'), 'the menu icon names the filter while it is not All');  // 2.152.2 (#2627); 2.350.0 (#3317): no dot
+  check(d.querySelector('#jcd-fbtn .jcdfdot'), 'the menu icon carries a dot while the filter is not All');  // 2.152.2 (#2627)
   await openFilter();
   click(w, [...d.querySelectorAll('[role=menuitem]')].find(x => /Only me/.test(x.textContent)));
   await until(() => !card() && /plain answer/.test(box().textContent));

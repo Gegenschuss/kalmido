@@ -103,6 +103,7 @@ function dtDocHtml(d) {
       <div class="dtp-form">${ofcRowF('dt-title', tr('Title'), ofcIn('dt-title', d.title, {max: 300}))}
         ${dtRefsHtml(d.client_id, d.list_id, d.doc_id)}
         ${ofcChk('dt-sign', tr('The customer can sign it through a link'), d.sign)}
+        ${ofcChk('dt-sign_image', tr('With my signature'), d.sign_mine)}
         <label for="dt-body" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-body')}<textarea id="dt-body" class="dtp-ta" rows="16" maxlength="60000" spellcheck="true">${esc(d.body || '')}</textarea>${dtHint()}
         <div class="aerr" role="alert" id="dt-err"></div>
         <div class="foot dtp-acts"><button class="btn danger ghost" data-dt="arch" data-id="${d.id}">${ic('archive', 's')}<span>${tr('Archive')}</span></button><span class="spacer"></span>
@@ -139,6 +140,16 @@ async function dtPreview(id, bodyText) {
 let dtPvTimer = null;
 const dtPvSoon = id => { clearTimeout(dtPvTimer); dtPvTimer = setTimeout(() => dtPreview(id, $('#dt-body')?.value ?? ''), 500); };
 
+// 2.357.0 C (#3158): "With my signature": without a picture yet the setup opens first (office_letters.js ltProfileModal)
+async function dtSignImage(x) {
+  const gid = S.route.id;
+  if (!x.checked) { dtSaveSoon(gid); return; }
+  let prof = null;
+  try { prof = await api('GET', '/api/office/letters/profile'); } catch { prof = null; }
+  if (prof?.has_image) { dtSaveSoon(gid); return; }
+  x.checked = false;
+  ltProfileModal({draw: true, profile: prof || {}, done: j => { const el = $('#dt-sign_image'); if (j.has_image && el && S.route.id === gid) { el.checked = true; dtSaveSoon(gid); } }});
+}
 // ---- signature by the customer (link)
 function dtSigHtml(d) {
   if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
@@ -262,13 +273,15 @@ function dtInsertVar(btn) {
   ta.dispatchEvent(new Event('input', {bubbles: true}));
 }
 const dtDraftBody = () => ({title: $('#dt-title')?.value ?? '', body: $('#dt-body')?.value ?? '', client_id: +$('#dt-client')?.value || null, list_id: +$('#dt-list')?.value || null,
-  doc_id: +$('#dt-offer')?.value || null, sign: $('#dt-sign')?.checked ? 1 : 0});
+  doc_id: +$('#dt-offer')?.value || null, sign: $('#dt-sign')?.checked ? 1 : 0, ...($('#dt-sign_image') ? {sign_image: $('#dt-sign_image').checked ? 1 : 0} : {})});
 // a draft saves itself shortly after typing (quiet: the text field stays as it is; a redraw then shows the saved text);
 // "Save" saves at once with an undo step back to the state the document was opened with
 async function dtSave(d, quiet) {
   if (!$('#dt-body')) return true;
-  const body = dtDraftBody(), old = DT.undo && DT.undo.id === d.id ? DT.undo.v : {title: d.title, body: d.body, client_id: d.client_id, list_id: d.list_id, doc_id: d.doc_id, sign: d.sign};
-  const same = ['title', 'body', 'client_id', 'list_id', 'doc_id', 'sign'].every(k => (body[k] ?? null) === (d[k] ?? null));
+  const body = dtDraftBody(), old = DT.undo && DT.undo.id === d.id ? DT.undo.v : {title: d.title, body: d.body, client_id: d.client_id, list_id: d.list_id, doc_id: d.doc_id, sign: d.sign, sign_image: d.sign_mine ? 1 : 0};
+  if (body.sign_image === (d.sign_mine ? 1 : 0)) delete body.sign_image;  // 2.357.0 C (#3158): sent only when this person changed it
+  if (!('sign_image' in body)) delete old.sign_image;  // the undo only takes back this person's own change
+  const same = ['title', 'body', 'client_id', 'list_id', 'doc_id', 'sign'].every(k => (body[k] ?? null) === (d[k] ?? null)) && !('sign_image' in body);
   try {
     if (!same) Object.assign(d, await api('PATCH', `/api/office/gen-docs/${d.id}`, body));
     if (!quiet) { DT.undo = null; toast(tr('Saved'), async () => { await api('PATCH', `/api/office/gen-docs/${d.id}`, old); dtReload(); }); }
@@ -339,6 +352,7 @@ document.addEventListener('change', e => {
     if (id === 'dt-client') { const box = $('#dt-offer'); const offers = (DT.data?.offers || []).filter(o => o.client_id === +x.value); if (box) box.innerHTML = `<option value="">${esc(tr('none'))}</option>` + offers.map(o => `<option value="${o.id}">${esc([o.number || tr('Draft'), o.project_title].filter(Boolean).join(' · '))}</option>`).join(''); }
     dtPvSoon(S.route.id); dtSaveSoon(S.route.id);
   } else if (S.route.mod === 'office' && S.route.tab === 'gendocs' && S.route.id && id === 'dt-sign') dtSaveSoon(S.route.id);
+  else if (S.route.mod === 'office' && S.route.tab === 'gendocs' && S.route.id && id === 'dt-sign_image') dtSignImage(x);
 });
 document.addEventListener('input', e => {
   if (!['dt-body', 'dt-title'].includes(e.target.id) || S.route.mod !== 'office' || S.route.tab !== 'gendocs' || !S.route.id || e.target.closest('.modal')) return;

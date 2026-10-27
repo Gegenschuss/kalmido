@@ -81,6 +81,15 @@ def hc_doc_fx(r, home):
     return fx if fx > 0 else Decimal(1)
 
 
+def hc_rate_missing(r, home):
+    """2.355.0 C (#2844): True when document row r is in a foreign currency without a rate of its own: a new document and an
+    emptied rate field take the office's rate, else 1 (no made-up rate) -- and 1 between two different currencies is no
+    rate (none of HC_CODES is pegged 1:1), its EUR tax would be wrong. USD in a EUR office keeps its 1.09 as before."""
+    from .calc import dec
+    cur = hc_code(r["currency"]) or home
+    return cur != home and dec(r["fx_rate"], "0") in (Decimal(0), Decimal(1))
+
+
 def hc_bookings(c, oid):
     """True when office area oid already has bookings (then the home currency stays as it is)."""
     for sql in ("SELECT 1 FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND status<>'draft' AND trial=0 LIMIT 1",

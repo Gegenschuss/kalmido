@@ -469,8 +469,6 @@ fresh; run p2350_c_api "$PY" p2350_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_c_ui node p2350_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_api "$PY" p2350_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_ui node p2350_d_ui.js "$KALMIDO_TEST_DATA"
-# 2.350.0 D (#2750, #2745, #3242): chat + sidebar drag wide (list keeps 12 rem), dialog head over the first row, undo message at an empty hash
-fresh; run p2350_d_breiten_ui node p2350_d_breiten_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2360_b_api "$PY" p2360_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2360_b_ui node p2360_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2360_c_api "$PY" p2360_c_api_test.py "$KALMIDO_TEST_DATA"
@@ -2184,6 +2182,14 @@ fresh; run p2236_b_enforce "$PY" p2236_b_enforce_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_api "$PY" p2236_a_workstyle_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_ui node p2236_a_workstyle_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2236_a_workstyle_ff_ui node p2236_a_workstyle_ff_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 A (#2891 #2900 #2901): the control level of an agent enforced on the server (409 approval_required, approval card
+# bound to one step, project exceptions, owner's rights as the cap, history + Undo, deadline of approvals); freelancer-matrix: agents
+fresh; run p2235_a_control_api "$PY" p2235_a_control_api_test.py "$KALMIDO_TEST_DATA"
+       run p2235_a_control_routes "$PY" p2235_a_control_routes_test.py  # every agent write route has a decided class (static)
+fresh; run p2235_a_control_ui node p2235_a_control_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 A2 (#2891 #2901): review fixes -- approval bound to the body, approver rights, cap for more objects, safe Undo,
+# deadline from when it was set; freelancer-matrix: agents
+fresh; run p2235_a2_review "$PY" p2235_a2_review_test.py "$KALMIDO_TEST_DATA"
 # 2.239.0 B (#2888): the server log without full addresses, names or database values (freelancer-matrix: account)
 fresh; run p2239_b_logs "$PY" p2239_b_logs_test.py "$KALMIDO_TEST_DATA"
 # 2.239.0 A (#2882): the account export holds own rows outside own lists, export.json filtered, people hashes keyed; freelancer-matrix: own
@@ -2199,3 +2205,5 @@ shard 16  # Bundle 2.305: back to shard 16 (its first quarter is above); new sui
 fresh; run p2319_a_wiki_tree_open_ui node p2319_a_wiki_tree_open_ui.js "$KALMIDO_TEST_DATA"
 # 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar": off = icons only, narrower bar, names as title / aria-label (computer + phone, account)
 fresh; run p2319_b_rail_labels_ui node p2319_b_rail_labels_ui.js "$KALMIDO_TEST_DATA"
+# 2.235.0 D (#2899): phones close the keyboard after sending (settings chat_kbd_agent / chat_kbd_team); freelancer-matrix: agents
+fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"

@@ -135,8 +135,9 @@ check(done(Fr, n2) is not None and booked(n2) == [] and rcs(Fr, n2).get("einvoic
       "#2865: the scanned e-invoice is a suggestion, no receipt")
 assert Fr.delete(B + f"/api/files/nodes/{n2}").ok
 r = Fr.delete(B + f"/api/files/nodes/{n2}?purge=1")
-check(r.ok, f"#2865: the unconfirmed e-invoice can be deleted for good (no retention lock) {r.status_code} {r.text[:200]}")
-check(n2 not in offers(Fr), "gone from the offers")
+# 2.355.0 (#2845): an e-invoice received into the office is kept from its arrival (decision of 23.10.2026), taken over or not
+check(r.status_code == 409 and "Kept by law until" in r.text, f"#2845: the unconfirmed e-invoice goes into the trash, not deleted for good {r.status_code} {r.text[:200]}")
+check(n2 not in offers(Fr), "gone from the offers (in the trash)")
 
 # ---- Take over: booked like before, once
 r = take(Fr, n1)

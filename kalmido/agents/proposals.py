@@ -40,6 +40,7 @@ from ..agents.chat import (
     chat_react_req, chat_reactions_of, chat_unlink_trimmed, cx_notice_post, APPROVAL_PUSH_HOUR,
 )
 from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
+from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 
 
 # ---- 2.3.0 (#260 #261 #262 #263): agent PROPOSALS. Kalmido never runs a model itself and an agent must not silently create
@@ -506,6 +507,7 @@ def proposal_request():
                  (uid,)).fetchone()[0] >= PROP_OPEN_MAX:
         return err(tr("You have {0} open proposal requests: apply or discard some first", PROP_OPEN_MAX), 429)
     inp, title, tid, lid = prop_input(c, uid, kind, b)
+    inp = dl_job_input(c, aid, kind, inp, tid, lid)  # 2.235.0 B2 (#2902): the agent's data lock narrows what the person hands over
     from ..collab.liste2eguard import le2b_list_locked, le2b_off, le2b_task_locked
     if le2b_list_locked(c, lid) or le2b_task_locked(c, tid):  # 2.64.1 B (#1817): agents never get texts of a list with the lock
         return err(le2b_off(), 409)
@@ -1158,7 +1160,8 @@ def v1_agent_job_get(jid):
         raise Denied(404)
     d = job_dict(c, j)
     if j["kind"]:
-        d.update(input=json.loads(j["input"] or "{}"), proposal=json.loads(j["proposal"] or "null"), limits=PROP_LIMITS)
+        d.update(input=dl_job_input(c, aid, j["kind"], json.loads(j["input"] or "{}"), j["task_id"], j["list_id"], strict=False),  # 2.235.0 B2 (#2902): a lock set later counts
+                 proposal=json.loads(j["proposal"] or "null"), limits=PROP_LIMITS)
     return jsonify(d)
 
 

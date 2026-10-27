@@ -7,7 +7,7 @@
 //   a chosen tool and Esc close it; the attach row still opens the file picker
 // - while the agent works: Stop (round, 44 px) takes Send's place as long as the box is empty, typed text brings Send back
 // - the voice message bar covers the whole team chat row (not the plus menu)
-// - desktop 1280 px: the chat panel: icon Send, the box >= 60 % (2.350.0 #2793; before: Send with its text)
+// - desktop 1280 px: no plus, the tools in the row, Send with its text (unchanged)
 const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -78,8 +78,7 @@ window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySele
     await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#chat-in') && !document.querySelector('#chat-in').disabled`, 60), 'desktop: the agent chat box is there');
     let m = await ev(`__row('.chcomp:has(#chat-in)')`);
-    // 2.350.0 (#2793): the narrow chat panel: Send is an icon button (its name in aria-label), the tools in the row or behind the plus
-    check(m && (m.rowTools >= 1 || m.plus) && m.sendText === '' && m.sendName === 'Send' && m.ratio >= 0.6, 'desktop panel: the tools in the row (or the plus), icon Send, the box >= 60 % ' + JSON.stringify(m));
+    check(m && !m.plus && m.rowTools >= 1 && m.sendText === 'Send', 'desktop: no plus, the tools in the row, Send with its text ' + JSON.stringify(m));
     await shot('p2213-1280-agent.png');
 
     for (const [w, h] of [[360, 780], [412, 915]]) {

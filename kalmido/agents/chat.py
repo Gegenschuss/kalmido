@@ -467,7 +467,7 @@ def chat_approval_clean(v, expires_in=None):
             v = json.loads(v)
         except ValueError:
             raise BadInput(tr("Invalid value: {0}", "approval")) from None
-    if not isinstance(v, dict) or any(k not in ("title", "what", "yes_label", "no_label") for k in v):
+    if not isinstance(v, dict) or any(k not in ("title", "what", "yes_label", "no_label", "step", "recommend", "one_way") for k in v):
         raise BadInput(tr("Invalid value: {0}", "approval"))
     title, what = v.get("title"), v.get("what")
     if not isinstance(title, str) or not title.strip() or len(title.strip()) > APPROVAL_TITLE_MAX:
@@ -483,6 +483,8 @@ def chat_approval_clean(v, expires_in=None):
     d = json.loads(chat_choices_clean([{"id": "yes", "label": labels[0] or "Yes", "style": "primary"},
                                        {"id": "no", "label": labels[1] or "No"}], False))
     d["approval"] = {"title": title.strip(), "what": (what or "").strip(), **({"std": 1} if not any(labels) else {})}
+    from ..agents.control import ctl_card_extra  # 2.235.0 A (#2891 #2901): the step it approves, the recommended answer, one-way
+    d["approval"].update(ctl_card_extra(v))
     if expires_in not in (None, ""):
         try:
             expires_in = int(expires_in)
@@ -924,6 +926,9 @@ def chat_add(c, aid, uid, sender, text, tid, choices=None):
         old = iso_ms(now_utc() - timedelta(days=ret_days("chat")))
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.created_at<?", (aid, uid, old))
         c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND created_at<? AND id<>?", (aid, uid, old, mid))
+    if cut or (ret_days("chat") and ret_on("chat")):  # 2.235.0 B2 (#2903): trimmed messages leave no copy in a rule
+        c.execute("""UPDATE agent_rules SET source_excerpt='' WHERE agent_id=? AND source_user_id=? AND source_kind='chat'
+                     AND source_excerpt<>'' AND NOT EXISTS (SELECT 1 FROM agent_chat m WHERE m.id=agent_rules.source_id)""", (aid, uid))
     return c.execute("SELECT * FROM agent_chat WHERE id=?", (mid,)).fetchone()
 
 
@@ -1122,6 +1127,8 @@ def acd_delete(c, aid, uid, mid=None):
     paths = chat_file_paths(c, where, args)
     n = c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=?" + (" AND id=?" if mid is not None else ""),
                   [aid, uid] + ([mid] if mid is not None else [])).rowcount
+    c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='chat' AND agent_id=? AND source_user_id=?"  # 2.235.0 B2 (#2903): nor its copy in a rule
+              + (" AND source_id=?" if mid is not None else ""), [aid, uid] + ([mid] if mid is not None else []))
     g.chat_unlink = getattr(g, "chat_unlink", []) + paths
     return n
 

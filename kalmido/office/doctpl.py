@@ -155,7 +155,7 @@ Between {{company.name}}[[, {{company.address}}]]
 and {{client.name}}[[, {{client.address}}]]
 
 ## 1. Confidential information
-Confidential is all information one party shares with the other in the cooperation[[ in the project {{project.title}}]] that is marked as confidential or is recognisably confidential.
+Confidential information means all information that one party shares with the other in the cooperation[[ in the project {{project.title}}]] and that is marked as confidential or is recognisably confidential.
 
 ## 2. Obligations
 The parties use confidential information only for the project, do not pass it on to third parties and protect it with reasonable care.
@@ -358,15 +358,37 @@ def dt_fill(text, values, mark=False):
         if not s.replace(DT_GAP, "").strip() or (s[:2] in ("- ", "* ") and not got[0]):
             continue  # nothing but empty variables, or a list line none of whose variables has a value
         ind = filled[:len(filled) - len(s)]
-        s = re.sub(r"[ \t]*\x00+[ \t]*", " ", s)
-        s = re.sub(r" {2,}", " ", s)
-        s = re.sub(r" +([.,;:!?)\]])", r"\1", s)
-        s = re.sub(r"([(\[]) +", r"\1", s)
-        s = re.sub(r",([.;:!?])", r"\1", s)
-        s = re.sub(r"([,;:])\1+", r"\1", s)
-        s = re.sub(r", \(", " (", s).strip().lstrip(",;").rstrip(",;").strip()
-        out.append(ind + s)
+        out.append(ind + _dt_close(s))
     return "\n".join(out), miss
+
+
+_DT_GAP_RUN = re.compile(r"[ \t]*\x00(?:[ \t]*\x00)*[ \t]*")
+
+
+def _dt_close(s):
+    """2.357.0 D (#3220): closes up a line around each gap only (was the whole line: an own ", (" or double space
+    elsewhere in the line went as well). Spaces at the gap become one (none at the line's ends or before a
+    punctuation mark); a comma left before a punctuation mark, a doubled comma and an emptied (...) go too."""
+    while True:
+        m = _DT_GAP_RUN.search(s)
+        if not m:
+            return s.strip()
+        pre, post = s[:m.start()], s[m.end():]
+        p, n = pre[-1:], post[:1]
+        if p and n and p in "([" and n in ")]":
+            pre, post = pre[:-1].rstrip(" \t"), post[1:].lstrip(" \t")
+            p, n = pre[-1:], post[:1]
+        if not pre.strip():
+            pre, post = "", post.lstrip(",;").lstrip(" \t")
+        elif not n:
+            pre = pre.rstrip(",;")
+        elif n in ".,;:!?" and p in ",;:":
+            pre = pre[:-1]
+        elif n == "(" and p == ",":
+            pre = pre[:-1] + " "
+        elif p not in "([" and n not in ".,;:!?)]":
+            pre += " "
+        s = pre + post
 
 
 def dt_miss_labels(miss):
@@ -416,6 +438,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     the client's address, title, the text, signature lines (signable documents); signed = {name, at, hash} adds the
     block of the simple electronic signature."""
     from . import pdf as P
+    P = P.pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156): the office's paper size
     lang = doc_lg(d.get("lang"))  # 2.185.0 C (#2520)
     co = dt_company(c, oid, lang)
     cl = client
@@ -441,11 +464,28 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         draft = tr("SAMPLE", lg=lang)  # the watermark word (de MUSTER)
     body_sz, lh = 9.6, 9.6 * 1.42
     mk = d.get("status") == "draft"  # 2.296.0 C (#3165): a draft shows the variables without a value in red
+    # 2.357.0 C (#3158): the own signature picture of the person who finished the document (sign_uid, set only by that
+    # person); a draft / trial document keeps its room free
+    sig_uid = d.get("sign_uid")
+    sig = None
+    if sig_uid:
+        from .letters import lt_sig_pic
+        sig = lt_sig_pic(c, oid, sig_uid)
+        if sig and not draft:  # also no picture on a trial document (SAMPLE)
+            images["Sig"] = sig
     pages = []
+    # 2.357.0 C (#3182): an own letterhead lies under the document as under letters and the other office PDFs (letters.lt_pdf)
+    from .letterhead import bp_letter
+    blh = bp_letter(c, oid)
+    geo = P.bp_geometry(blh) if blh else None
+    BPD = geo["bp"] if geo else None
+    PL, PCW, PAT, PNT = (geo["l"], geo["cw"], geo["addr_top"], geo["next_top"]) if geo else (P.PDF_L, P.PDF_CW, P.PDF_ADDR_TOP, P.PDF_NEXT_TOP)
+    hide_head = bool(BPD and BPD["hide_head"])
     foot = P.pdf_footer_cols(co)  # 2.114.4 A (#2284): the same columns as a quotation (address, contact, register, bank)
-    foot_fit = P.p3f_fit(foot)  # 2.296.0 A (#3164): laid out once; the body ends above the real footer height
+    foot_fit = P.p3f_fit(foot, PCW)  # 2.296.0 A (#3164): laid out once; the body ends above the real footer height
     foot_h = P.p3f_foot_h(foot_fit)
-    body_bottom = P.pdf_body_bottom(foot_h)
+    PBX = P.pdf_body_bottom(foot_h)
+    body_bottom = [(BPD["bottom"][i] if BPD["hide_footer"] else min(BPD["bottom"][i], PBX)) if BPD else PBX for i in (0, 1)]
 
     def dt_line(page, x, y, s, size, bold, mark):
         """2.296.0 C (#3165): one line of the text; mark=True (a draft) draws a left {{key}} in red (the final PDF leaves it out)."""
@@ -463,20 +503,25 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     def new_page(first):
         p = P._Page()
         if first:
-            if logo:
-                sc = min(P.PDF_LOGO_MAX_W / logo[0], P.PDF_LOGO_MAX_H / logo[1])
-                p.image("Logo", P.A4_W - P.PDF_R - logo[0] * sc, P.PDF_TOP + 2 * P.MM, logo[0] * sc, logo[1] * sc)
+            if hide_head:  # 2.357.0 C (#3182): the letterhead brings logo, name and fold marks
+                pass
+            elif logo:
+                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 nl = (co.get("name_lines") or [co.get("name") or ""])[:3]  # 2.99.0 D (#2188): the name lines one under the other
                 for i, ln in enumerate(nl):
-                    p.text(P.PDF_L + P.PDF_CW, P.PDF_TOP + 4 * P.MM + i * 18, ln, 15, True, P.C_INK, align="r", spacing=1.2)
-                p.rect(P.A4_W - P.PDF_R - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(nl) - 1) * 18, 12 * P.MM, 2.2, accent)
-            for y in (105 * P.MM, 148.5 * P.MM, 210 * P.MM):
+                    p.text(PL + PCW, P.PDF_TOP + 4 * P.MM + i * 18, ln, 15, True, P.C_INK, align="r", spacing=1.2)
+                p.rect(PL + PCW - 12 * P.MM, P.PDF_TOP + 4 * P.MM + 24 + (len(nl) - 1) * 18, 12 * P.MM, 2.2, accent)
+            for y in (() if hide_head else P.PDF_MARKS):  # 2.357.0 A (#3156): of the paper size
                 p.line(5 * P.MM, y, 9 * P.MM, y, 0.4, P.C_RULE)
         else:  # 2.294.0 (#3155): the draft / sample word only as the diagonal watermark, no more in the head
-            p.text(P.PDF_L, 12 * P.MM + 2, title, 8, False, P.C_INK2)
-            p.text(P.PDF_L + P.PDF_CW, 12 * P.MM, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
-            p.line(P.PDF_L, 24.5 * P.MM, P.PDF_L + P.PDF_CW, 24.5 * P.MM, 0.5, accent)
+            hy = PNT - 18 * P.MM if BPD else 12 * P.MM  # 2.357.0 C (#3182): above the letterhead's top margin (as letters.lt_pdf)
+            if hy >= 4 * P.MM:
+                p.text(PL, hy + 2, title, 8, False, P.C_INK2)
+                if not hide_head:
+                    p.text(PL + PCW, hy, co.get("name") or "", 9, True, P.C_INK, align="r", spacing=0.6)
+                p.line(PL, hy + 12.5 * P.MM, PL + PCW, hy + 12.5 * P.MM, 0.5, accent)
         pages.append(p)
         return p
 
@@ -484,70 +529,96 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     # the address field (sender line + recipient) and the date on the right
     sender = " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
     sender = P.pdf_sender_line(sender, co.get("name"), (co.get("name_lines") or [""])[0])  # 2.296.0 E (#3170): the address has priority
-    y = P.PDF_ADDR_TOP
-    page.text(P.PDF_L, y, sender, 7, False, P.C_INK2)
-    page.line(P.PDF_L, y + 11, P.PDF_L + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
+    y = PAT
+    page.text(PL, y, sender, 7, False, P.C_INK2)
+    page.line(PL, y + 11, PL + P.PDF_ADDR_W, y + 11, 0.5, P.C_RULE2)
     addr = []
     if cl:
         addr = [cl["name"]] + [x for x in _addr(cl).split(", ") if x]
     yy = y + 16
     for ln in [w for x in addr[:8] for w in P.pdf_wrap(x, body_sz, P.PDF_ADDR_W)]:  # 2.217.0 B (#2800): wraps within the address field
-        page.text(P.PDF_L, yy, ln, body_sz)
+        page.text(PL, yy, ln, body_sz)
         yy += lh
-    info_x = P.PDF_L + P.PDF_ADDR_W + 8 * P.MM
-    info_w = P.PDF_CW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
+    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
     when = (d.get("final_at") or d.get("updated_at") or iso(now_utc()))[:10]
     from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(when, _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
-    y = max(P.PDF_ADDR_TOP + P.PDF_ADDR_H, yy + 4)  # 2.217.0 B (#2800): a longer address pushes the body down
+    y = max(PAT + P.PDF_ADDR_H, yy + 4)  # 2.217.0 B (#2800): a longer address pushes the body down
 
     def room(h):
         nonlocal page, y
-        if y + h > body_bottom:
+        if y + h > body_bottom[len(pages) > 1]:
             page = new_page(False)
-            y = P.PDF_NEXT_TOP
+            y = PNT
+    # 2.357.0 C (#3182): the room the end needs: the signature lines (16 + 30 to the line, two caption lines: 74 pt, was
+    # reserved with 62 -> the lines ran into the footer), else the own signature picture with the name under it
+    sig_h = 0.0
+    if sig:
+        sig_h = 14 * P.MM if d.get("sign") else 16 * P.MM
+        sig_w = min(60 * P.MM, sig[0] * sig_h / sig[1])
+        sig_h = sig_w * sig[1] / sig[0]
+    end_h = (16 + max(30, sig_h + 4) + 28) if d.get("sign") else (sig_h + 6 + lh + 4 if sig else 0)
     blocks = dt_blocks(d.get("body") or "")
     if not blocks or blocks[0][0] != "h1":  # the title as heading when the text brings none
         blocks.insert(0, ("h1", title))
     for i, (k, t) in enumerate(blocks):
+        last = i == len(blocks) - 1
         if k == "h1":
-            room(34 + lh * 2)
-            page.text(P.PDF_L, y + 6, t.upper(), 15, True, P.C_INK, spacing=0.8)
-            page.line(P.PDF_L, y + 6 + 21, P.PDF_L + 14 * P.MM, y + 6 + 21, 1.6, accent)
+            hl = P.pb_wrap(t.upper(), 15, PCW, True, 0.8)  # 2.357.0 C (#3182): a long title wraps (ran out of the page)
+            room(34 + (len(hl) - 1) * 19 + lh * 2)
+            for j, s in enumerate(hl):
+                page.text(PL, y + 6 + j * 19, s, 15, True, P.C_INK, spacing=0.8)
+            y += (len(hl) - 1) * 19
+            page.line(PL, y + 6 + 21, PL + 14 * P.MM, y + 6 + 21, 1.6, accent)
             y += 36
         elif k == "h2":
             room(22 + lh * 2)  # a heading never stays alone at the end of a page
             y += 6
-            for s in P.pdf_wrap(t, 10.4, P.PDF_CW, True):
-                dt_line(page, P.PDF_L, y, s, 10.4, True, mk)
+            for s in P.pdf_wrap(t, 10.4, PCW, True):
+                dt_line(page, PL, y, s, 10.4, True, mk)
                 y += 10.4 * 1.42
             y += 2
         elif k == "li":
-            ls = P.pdf_wrap(t, body_sz, P.PDF_CW - 14)
+            ls = P.pdf_wrap(t, body_sz, PCW - 14)
             for j, s in enumerate(ls):
                 room(lh)
                 if j == 0:
-                    page.text(P.PDF_L + 3, y, "•", body_sz, False, P.pdf_text_color(accent))  # 2.296.0 D (#3172)
-                dt_line(page, P.PDF_L + 14, y, s, body_sz, False, mk)
+                    page.text(PL + 3, y, "•", body_sz, False, P.pdf_text_color(accent))  # 2.296.0 D (#3172)
+                dt_line(page, PL + 14, y, s, body_sz, False, mk)
                 y += lh
             y += 2
         else:
-            for s in P.pdf_wrap(t, body_sz, P.PDF_CW):
-                room(lh)
-                dt_line(page, P.PDF_L, y, s, body_sz, False, mk)
+            ls = P.pdf_wrap(t, body_sz, PCW)
+            # 2.357.0 C (#3182): the last paragraph (the greeting) stays with the signature: the whole of a short one, else its
+            # last two lines
+            g0 = (0 if len(ls) <= 4 else len(ls) - 2) if last and end_h else -1
+            for j, s in enumerate(ls):
+                room(lh + ((len(ls) - j) * lh + lh * 0.6 + end_h - lh if j == g0 else 0))
+                dt_line(page, PL, y, s, body_sz, False, mk)
                 y += lh
             y += lh * 0.6
     if d.get("sign"):  # the lines for a signature on paper (both parties)
-        room(16 + 46)
-        half = (P.PDF_CW - 28) / 2
-        yl = y + 16 + 30
-        for x0, who in ((P.PDF_L, co.get("name") or ""), (P.PDF_L + half + 28, cl["name"] if cl else "")):
+        room(end_h)
+        half = (PCW - 28) / 2
+        yl = y + 16 + max(30, sig_h + 4)
+        if sig and not draft:  # 2.357.0 C (#3158): the own signature above the line of the own side
+            page.image("Sig", PL, yl - 2 - sig_h, sig_w, sig_h)
+        for x0, who in ((PL, co.get("name") or ""), (PL + half + 28, cl["name"] if cl else "")):
             page.line(x0, yl, x0 + half, yl, 0.6, P.C_INK)
             page.text(x0, yl + 3, tr("Place, date, signature", lg=lang), 7.6, False, P.C_INK2)
             if who:
                 page.text(x0, yl + 13, who, 7.6, False, P.C_INK2)
         y = yl + 28
+    elif sig:  # 2.357.0 C (#3158): no lines: the signature picture and the name of the person under the text
+        from .letters import lt_sig_name
+        room(end_h)
+        if not draft:
+            page.image("Sig", PL, y + 2, sig_w, sig_h)
+        y += sig_h + 6
+        page.text(PL, y, lt_sig_name(c, oid, sig_uid), body_sz)
+        y += lh + 4
     if signed:
         rows = [(tr("Signed by", lg=lang), signed.get("name") or ""), (tr("Time (UTC)", lg=lang), (signed.get("at") or "")[:19].replace("T", " ")),
                 (tr("SHA-256 of the text", lg=lang), signed.get("hash") or "")]
@@ -559,11 +630,18 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     total = len(pages)
     for n, p in enumerate(pages, 1):
         # 2.114.4 A (#2282): the page count only from two pages on
-        P.pdf_draw_footer(p, foot, tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else "", foot_fit, foot_h)
+        pg_txt = tr("Page {0} of {1}", n, total, lg=lang) if total >= 2 else ""
+        if BPD and BPD["hide_footer"]:  # 2.357.0 C (#3182): the letterhead has its own footer: only the page count under the body
+            if pg_txt:
+                p.text(PL + PCW, BPD["bottom"][n > 1] + 3 * P.MM, pg_txt, 6.8, False, P.C_INK2, align="r")
+            continue
+        P.pdf_draw_footer(p, foot, pg_txt, foot_fit, foot_h, PL, PCW)
     meta = {"when": now_utc(), "producer": f"Kalmido v{APP_VERSION}"}
     if draft:  # 2.294.0 (#3155): a draft too (was a head line), not only a trial document
         for p in pages:
             p.mark(draft)
+    if BPD:
+        P.bp_finish(pages, BPD)
     return P.pdf_write(pages, images, title=title, author=co.get("name") or "", meta=meta)
 
 
@@ -674,6 +752,19 @@ def dt_meta(c, oid):
             "lang": dt_lang(c, oid), "note": tr(DT_NOTE)}
 
 
+# 2.357.0 D (#3219): a small business (section 19, no VAT) gets the samples with the total instead of "net plus VAT"; only
+# when a sample is taken -- templates already saved stay as they are
+DT_SMALL = (("{{offer.net}} zzgl. USt", "{{offer.gross}}"), ("{{offer.net}} plus VAT", "{{offer.gross}}"))
+
+
+def dt_sample_body(c, oid, text):
+    if not office_settings(c, oid).get("small_business"):
+        return text
+    for a, b in DT_SMALL:
+        text = text.replace(a, b)
+    return text
+
+
 @app.get("/api/office/doc-templates/starters")
 def dt_starters_get():
     """?lang=de|en (default: the office's document language) -> {starters: [{key, kind, name, lang, body}], note}."""
@@ -681,7 +772,8 @@ def dt_starters_get():
     lg = dt_lang(c, oid, request.args.get("lang") or None)
     # 2.117.0 B (#2283): the letters of doctpl_samples after the contract samples; legal = the picker says to check it
     sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
-    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[sl][0], "lang": lg, "body": v[sl][1], "legal": int(k != "confirmation")}
+    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[sl][0], "lang": lg, "body": dt_sample_body(c, oid, v[sl][1]),
+                              "legal": int(k != "confirmation")}
                              for k, v in DT_STARTERS.items()] +
                    [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": v[sl][0], "lang": lg, "body": v[sl][1],
                      "legal": v["legal"]} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
@@ -704,7 +796,7 @@ def dt_tpl_post():
         if sm:
             b = {"kind": sm["kind"], "name": sm[sl][0], "lang": lg, "body": sm[sl][1], "sign": sm["sign"]}
         else:
-            b = {"kind": b["starter"], "name": st[sl][0], "lang": lg, "body": st[sl][1], "sign": 0 if b["starter"] == "confirmation" else 1}
+            b = {"kind": b["starter"], "name": st[sl][0], "lang": lg, "body": dt_sample_body(c, oid, st[sl][1]), "sign": 0 if b["starter"] == "confirmation" else 1}
     row = dt_tpl_clean(c, oid, b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
@@ -775,7 +867,21 @@ def dt_doc_public(c, oid, r, names=None, sigs=None):
             "node_id": d["node_id"], "signed_node_id": d["signed_node_id"], "status": d["status"], "archived": int(d["archived"] or 0),
             "created_at": d["created_at"], "updated_at": d["updated_at"], "final_at": d.get("final_at"),
             "trial": bool(d.get("trial")),  # 2.144.10 A (#2576)
+            # 2.357.0 C (#3158): with the own signature picture (sign_mine: of the person asking; only that person may keep it)
+            "sign_image": bool(d.get("sign_uid")), "sign_mine": bool(d.get("sign_uid")) and d.get("sign_uid") == dt_me(),
             "signoff": sig_public(c, s) if s else None}
+
+
+def dt_me():
+    """2.357.0 C (#3158): the signed-in person (None outside a request)."""
+    from .letters import lt_uid
+    return lt_uid()
+
+
+def dt_sign_uid(v, uid):
+    """2.357.0 C (#3158): sign_image of a request -> the sign_uid to store: the asking person's own id or None (never
+    someone else's signature: the column is only ever set to the person who sets it)."""
+    return uid if v and uid else None
 
 
 def dt_names(c, oid, rows):
@@ -882,7 +988,8 @@ def dt_doc_post():
         src = oc_dec_fields(c, oid, "office_gen_docs", dt_doc(c, oid, b["copy_of"]))
         b = {"template_id": src["template_id"], "client_id": src["client_id"], "list_id": src["list_id"], "doc_id": src["doc_id"],
              "title": src["title"], "body": src["body"], "sign": src.get("sign"), "lang": src.get("lang"), "kind": src["kind"],
-             "trial": src.get("trial")}  # 2.144.10 A (#2576): a copy of a trial document stays one
+             "trial": src.get("trial"),  # 2.144.10 A (#2576): a copy of a trial document stays one
+             "sign_image": bool(src.get("sign_uid")) and src.get("sign_uid") == uid}  # 2.357.0 C (#3158): only the own signature
     t = dt_tpl(c, oid, b["template_id"]) if b.get("template_id") not in (None, "") else None
     row = dt_refs(c, oid, b)
     row["template_id"] = t["id"] if t else None
@@ -891,6 +998,8 @@ def dt_doc_post():
     row["title"] = _text(b.get("title"), "title", TITLE_MAX) or (t["name"] if t else "") or dt_kind_label(row["kind"], row["lang"])
     row["body"] = dt_body(b["body"]) if b.get("body") is not None else (t["body"] if t else "")
     row["sign"] = (1 if b.get("sign") else 0) if "sign" in b and b.get("sign") is not None else (int(t["sign"] or 0) if t else 0)
+    if b.get("sign_image"):  # 2.357.0 C (#3158)
+        row["sign_uid"] = dt_sign_uid(b.get("sign_image"), uid)
     # 2.144.10 A (#2576): a trial document when asked for or when its quotation is one (set at creation only)
     row["trial"] = 1 if trial_flag(b.get("trial")) or (row["doc_id"] and c.execute(
         "SELECT trial FROM office_docs WHERE id=? AND org_id=?", (row["doc_id"], oid)).fetchone()["trial"]) else 0
@@ -923,6 +1032,8 @@ def dt_doc_patch(gid):
         row["body"] = dt_body(b.get("body"))
     if "sign" in b:
         row["sign"] = 1 if b.get("sign") else 0
+    if "sign_image" in b:  # 2.357.0 C (#3158): the own signature on / off
+        row["sign_uid"] = dt_sign_uid(b.get("sign_image"), uid)
     if "lang" in b:
         row["lang"] = dt_lang(c, oid, b.get("lang"))
     if row:
@@ -1006,6 +1117,9 @@ def dt_final(gid):
     if not text.strip():
         raise BadInput(tr("The document has no text."))
     ts = iso(now_utc())
+    if d.get("sign_uid") and d["sign_uid"] != uid:  # 2.357.0 C (#3158): finished by someone else -> without the other's signature
+        d["sign_uid"] = None
+        c.execute("UPDATE office_gen_docs SET sign_uid=NULL WHERE id=? AND org_id=?", (gid, oid))
     d.update(body=text, body_hash=dt_hash(text), status="final", final_at=ts, lang=lang)
     data = dt_pdf(c, oid, d)
     nid = dt_file(c, oid, uid, d, data)

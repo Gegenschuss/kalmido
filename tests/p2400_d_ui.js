@@ -35,7 +35,9 @@ const TEST_IBAN = 'DE02120300000000202051';
   const mk = async () => { const i = await call('POST', '/api/office/docs', {kind: 'invoice', client_id: CL, service_from: '2026-05-01', items: [{title: 'Beratung', qty: 1, rate: 100}]}); const f = await call('POST', `/api/office/docs/${i.id}/finalize`); return f; };
   const inv = await mk();
   check(inv.http === 200 && inv.locked, 'an invoice finalised ' + inv.http + ' ' + JSON.stringify(inv.error || ''));
-  const open2 = await mk();
+  const open2 = await mk(), open3 = await mk();  // 2.355.0 D (#2846): open3 stays not yet due
+  // 2.355.0 D (#2846): reminders only for overdue invoices
+  execFileSync('python3', ['-c', 'import sys, dbx; dbx.overdue(sys.argv[1], sys.argv[2:])', DATA, String(inv.id), String(open2.id)], {cwd: __dirname});
   const rem = await call('POST', '/api/office/docs/reminder', {doc_ids: [inv.id], level: 2, fee: 5});
   check(rem.http === 201, 'a reminder ' + rem.http);
   await call('POST', `/api/office/docs/${rem.id}/finalize`);
@@ -69,12 +71,14 @@ const TEST_IBAN = 'DE02120300000000202051';
   md.querySelector('[data-m="close"]')?.click();
   w.close();
 
-  // ================= #1368 7: the reminder dialog warns (high fee, not yet due)
+  // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelector('[data-ofd="remind"]'), 60);
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length >= 2, 60);
+  // 2.357 (#3221): the server renders the stored files of finalised documents once after its start, the list can come late:
+  // wait for the row itself, not only for two rows
+  await until(() => [...d.querySelectorAll('.ofdlist .ofdrow')].some(x => x.dataset.id === String(inv.id) && /reminder fee open/.test(x.textContent)), 200);
   const rowPaid = [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id));
   check(rowPaid && /reminder fee open: .*5,00/.test(rowPaid.textContent), '#1368 8: the paid invoice shows the open reminder fee: ' + (rowPaid?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   d.querySelector('[data-ofd="remind"]').click();
@@ -84,7 +88,10 @@ const TEST_IBAN = 'DE02120300000000202051';
   if (cb) { cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); }
   const fee = d.querySelector('#ofd-r-fee'); fee.value = '15'; fee.dispatchEvent(new w.Event('input', {bubbles: true}));
   const wt = d.querySelector('#ofd-r-warn');
-  check(wt && !wt.hidden && /actual costs/.test(wt.textContent) && /Not yet due/.test(wt.textContent), '#1368 7: hints for a high fee and an invoice not yet due: ' + (wt?.textContent || ''));
+  check(wt && !wt.hidden && /actual costs/.test(wt.textContent), '#1368 7: hint for a high fee: ' + (wt?.textContent || ''));
+  // 2.355.0 D (#2846): an invoice not yet due can no longer be picked (it was a hint before)
+  const cb3 = d.querySelector(`[data-rid="${open3.id}"]`);
+  check(cb3 && cb3.disabled && !cb3.checked && /not yet overdue/.test(cb3.closest('label')?.textContent || ''), '#2846: the invoice not yet due is greyed out: ' + (cb3?.closest('label')?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   fee.value = '0'; fee.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!/actual costs/.test(wt?.textContent || ''), '#1368 7: no fee hint at 0');
   d.querySelector('.modal [data-m="close"]')?.click();
@@ -94,7 +101,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
+  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);
   const items = [...d.querySelectorAll('.ofdlist > li')];
   const last = items[items.length - 1]?.textContent || '';
   check(/Settled/.test(last) && /fee open: .*5,00/.test(last) && !!d.querySelector('.ofdlist .ofdgrp'), '#1368 9: settled reminder last, under "Settled", with the open fee: ' + last.replace(/\s+/g, ' ').slice(0, 140));
@@ -124,7 +131,8 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= #1381: settings - the English choice shows the English text
   w = await boot({hash: 'office/settings'}); d = w.document;
-  await until(() => d.querySelector('#os-intro-en'), 60);
+  // the text blocks load after the page (office.js ofcLoad('texts')): wait for the choices, not only for the field
+  await until(() => d.querySelectorAll('#os-intro-en option').length > 1 && d.querySelectorAll('#os-intro-de option').length > 1, 200);
   const oe = [...d.querySelectorAll('#os-intro-en option')].map(o => o.textContent).join(' | ');
   const od = [...d.querySelectorAll('#os-intro-de option')].map(o => o.textContent).join(' | ');
   check(/thank you|enquiry/i.test(oe) && !/vielen Dank/.test(oe) && /vielen Dank/.test(od), '#1381: English choice in English, German in German: ' + oe.slice(0, 120));

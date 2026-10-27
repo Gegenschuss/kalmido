@@ -27,6 +27,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, agent_usable, is_agent, lst_brief, need_agent
+from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 
 SCHED_FREQS = ("daily", "weekdays", "weekly", "monthly")
 SCHED_MAX = 20                 # plans per person and agent
@@ -292,6 +293,7 @@ def ast2_sched_triage(c, r, a, now, manual):
     if not state:
         try:
             inp, title, tid, lid = prop_input(c, uid, "triage", {"agent_id": aid, "kind": "triage"})
+            inp = dl_job_input(c, aid, "triage", inp, tid, lid)  # 2.235.0 B2 (#2902): the agent's data lock narrows the basket
         except (BadInput, Denied):
             inp = lid = None
             state = "empty"  # nothing open in the basket: nothing to sort, no event

@@ -25,6 +25,7 @@ from ..core.errors import BadInput
 from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
 from ..accounts.orgs import may_see
 from ..agents.workstyle import WS_NEW
+from ..agents.control import ctl_new  # 2.235.0 A (#2891): a new agent asks before every change
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
 from ..integrations.webhooks import need_wh, wh_allow, wh_err_text, wh_log, wh_public, wh_send, wh_url_check
 from ..agents.core import (
@@ -128,6 +129,8 @@ def make_agent(c, uid):
     # 2.236.0 (#2909): a new agent disturbs only at its limits (agents/workstyle.py WS_NEW)
     c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,1,'idle',?,?) ON CONFLICT DO NOTHING",
               (uid, iso(now_utc()), json.dumps(WS_NEW)))
+    if ctl_new():
+        c.execute("UPDATE agents SET control=? WHERE user_id=? AND control=''", (json.dumps(ctl_new()), uid))
 
 
 def agent_restricted_dict(c, a):

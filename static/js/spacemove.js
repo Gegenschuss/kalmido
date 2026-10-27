@@ -36,6 +36,17 @@ async function smv_post(url, b, key, onStep) {
 // the undo label of a move: "Moved to X", or how far a failed one got
 const smv_label = (r, total) => r.failed ? tr('Only {0} of {1} moved to {2}', r.moved.length, total, wsName(r.to)) : tr('Moved to {0}', wsName(r.to));
 const smv_ws = org => org ? 'org:' + org : 'private';
+// 2.361.2 (#2923): a member asks the admins of an organisation for something they brought in or made ({org, kind, id} from the
+// server's 403 / dry run); an admin releases it with one click, then the usual move takes it into the private space
+async function oor_ask(req) {
+  if (!req?.org) return false;
+  try {
+    const r = await api('POST', `/api/orgs/${req.org}/out-requests`, {kind: req.kind, id: req.id});
+    toast(r.again ? (r.state === 'approved' ? tr('Already released: move it into your private space now') : tr('Already asked: the admins have not decided yet'))
+      : tr('Asked: the admins of the organisation decide. You hear about it in the News.'), null, 6000);
+    return true;
+  } catch { return false; /* api() showed it */ }
+}
 function smv_open({what, from = null, places = null, check, run, option = null, total = 0}) {
   const tos = wsOptions().filter(w => w !== 'all' && w !== smv_ws(from));
   if (!tos.length) { toast(tr('There is no other workspace')); return Promise.resolve(null); }
@@ -58,11 +69,14 @@ function smv_open({what, from = null, places = null, check, run, option = null, 
     const dry = async () => {
       const n = ++seq; ok.disabled = true; blocked = true;
       notes.innerHTML = `<p class="muted">${esc(tr('Checking…'))}</p>`;
-      let r; try { r = await check(toOrg(), place, opt); } catch { r = {block: tr('The check failed. Please try again.')}; }
+      let r; try { r = await check(toOrg(), place, opt); } catch (x) { r = {block: x?.data?.out_request ? x.message : tr('The check failed. Please try again.'), out_request: x?.data?.out_request}; }  // 2.361.2 (#2923)
       if (n !== seq || done) return;
       const ls = (r && r.notes) || [];
       notes.innerHTML = (r && r.block ? `<p class="smv-block">${ic('alert', 's')} ${esc(r.block)}</p>` : '')
+        + (r && r.block && r.out_request ? `<p class="smv-ask"><button type="button" class="btn sm" data-smv="ask">${esc(tr('Ask an admin to release it'))}</button></p>` : '')  // 2.361.2 (#2923)
         + (ls.length ? `<ul>${ls.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
+      const ask = $('[data-smv="ask"]', notes);
+      if (ask) ask.onclick = async () => { ask.disabled = true; if (await oor_ask(r.out_request)) fin(null); else ask.disabled = false; };
       blocked = !!(r && r.block); ok.disabled = blocked;
     };
     const fill = async () => {

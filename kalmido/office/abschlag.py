@@ -23,6 +23,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, inv_calc, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
+from .invoices import inv_paid_map  # 2.355.0 C (#2840)
 from .pdf import pdf_date  # 2.296.0 B (#3175)
 
 ABS_TYPES = ("", "progress", "final")
@@ -102,6 +103,38 @@ def abs_skonto_covered(c, oid, r, credits):
     return paid > 0 and paid + credits >= sk["payable"]
 
 
+def abs_skonto_taken(c, oid, r):
+    """2.355.0 C (#2840): {amount, day} of the cash discount a paid invoice took (in its currency): what the payments and
+    credit notes left open when they covered gross - discount in time (abs_skonto_covered), at most the discount; day = its
+    last payment within the discount period (section 17 UStG: the period of the reduction). None without one."""
+    if r is None or r["kind"] != "invoice" or r["status"] != "paid" or not r["locked_at"]:
+        return None
+    sk = abs_skonto_numbers(r, _j(r["totals"], {}).get("gross") or 0)
+    if sk is None:
+        return None
+    p = inv_paid_map(c, oid, [r["id"]]).get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
+    rest = money(dec(_j(r["totals"], {}).get("gross") or 0)) - p["paid"] - p["credits"]
+    if rest <= 0 or not abs_skonto_covered(c, oid, r, p["credits"]):
+        return None
+    row = c.execute("SELECT MAX(date) AS d FROM office_payments WHERE org_id=? AND doc_id=? AND date<>'' AND date<=? AND amount>0",
+                    (oid, r["id"], sk["deadline"])).fetchone()
+    if not row or not row["d"]:
+        return None
+    return {"amount": min(rest, sk["amount"]), "day": row["d"]}
+
+
+def abs_skonto_rows(c, oid, frm, to):
+    """2.355.0 C (#2840): [(document row, {amount, day})] of the finalised invoices whose cash discount falls in [frm, to]."""
+    out = []
+    for r in c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d LEFT JOIN clients cl "
+                       "ON cl.id=d.client_id WHERE d.org_id=? AND d.kind='invoice' AND d.status='paid' AND d.locked_at IS NOT NULL "
+                       "AND d.trial=0 AND d.number != '' AND d.skonto_pct > 0 AND d.date<=? ORDER BY d.date, d.number", (oid, to)).fetchall():
+        sk = abs_skonto_taken(c, oid, r)
+        if sk and frm <= sk["day"] <= to:
+            out.append((r, sk))
+    return out
+
+
 def abs_skonto_bt20(r):
     """The XRechnung cash discount line of BT-20 (with its closing line break) or ''."""
     sk = abs_skonto(r)
@@ -134,6 +167,8 @@ def abs_clean(b, cur, f):
         v = b.get("inv_type") or ""
         if v not in ABS_TYPES:
             raise BadInput(tr("Invalid value: {0}", "inv_type"))
+        if v == "final" and (_col(cur, "inv_type") or "") != "final":  # 2.355.0 A (#2839): a final invoice only from its quotation (POST .../invoice)
+            raise Denied(409, tr("A final invoice is only made from its quotation"))
         f["inv_type"] = v
 
 

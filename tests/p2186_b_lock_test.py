@@ -160,6 +160,9 @@ r = purge(A, R_EQ)
 check(r.status_code == 409 and f"31 Dec {TODAY.year + 8}" in r.text,
       "#2600: the receipt of an item in use is kept (from this year while it is not archived) " + r.text[:200])
 sql("UPDATE office_equipment SET archived=1 WHERE receipt_node_id=?", (R_EQ,), write=True)
+# 2.355.0 (#2845): an open receipt not booked yet is kept on its own (from its arrival) -- the document here is no receipt
+# any more, so only the equipment item could keep it
+sql("DELETE FROM rc_receipts WHERE node_id=?", (R_EQ,), write=True)
 check(purge(A, R_EQ).ok, "#2600: an archived item of 2014 (36 months, period over) no longer keeps its receipt")
 CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kundenweg 2", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})

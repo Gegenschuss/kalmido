@@ -53,24 +53,20 @@ const V = B + 'api/v1';
   const hello = await say('Hello Alice');
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => cm(d, hello.id));
-  // 2.350.0 (#3317): mode and model moved from the header into its ⋯ menu (chatHeadInfo: the entries with their values)
-  const hi = re => w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).map(x => x.label || '')`).find(x => re.test(x)) || '';
-  check(!d.querySelector('.chath .chmode') && !d.querySelector('.chath .chmodel'), '#1079: no badge / model in the header any more');
-  check(hi(/^Permissions/) === 'Permissions: Host default (Auto)', '#1079: the menu names the host\'s default: ' + hi(/^Permissions/));
-  check(hi(/^Model/) === 'Model: Opus 5.5', '#1079: the model the host runs: ' + hi(/^Model/));
-  click(w, d.querySelector('#jcd-fbtn')); await until(() => [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
-  click(w, [...d.querySelectorAll('[role="menuitem"]')].find(b => /^Permissions/.test(b.textContent.trim())));
-  check(await until(() => [...d.querySelectorAll('[role="menuitem"]')].some(b => /^Host default \(Auto\)/.test(b.textContent.trim()))), '#1079: the mode menu names it too');
+  check(/^Host default \(Auto\)$/.test(d.querySelector('.chmode')?.textContent.trim() || ''), '#1079: the badge names the host\'s default: ' + d.querySelector('.chmode')?.textContent);
+  check(d.querySelector('.chmodel')?.textContent === 'Opus 5.5', '#1079: the model the host runs: ' + d.querySelector('.chmodel')?.textContent);
+  click(w, d.querySelector('.chmode')); await sleep(200);
+  check([...d.querySelectorAll('[role="menuitem"]')].some(b => /Host default \(Auto\)/.test(b.textContent)), '#1079: the menu names it too');
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   await call('PATCH', `/api/admin/agents/${AG}`, {runtime: {model: 'sonnet'}});
   await w.eval('load().then(render)'); await w.eval('chatLoad()'); await sleep(300);
-  check(hi(/^Model/) === 'Model: set: sonnet · runs: Opus 5.5', '#1079: a wished model the host has not taken yet: both ' + hi(/^Model/));
+  check(d.querySelector('.chmodel')?.textContent === 'set: sonnet · runs: Opus 5.5', '#1079: a wished model the host has not taken yet: both ' + d.querySelector('.chmodel')?.textContent);
   await call('PATCH', `/api/admin/agents/${AG}`, {runtime: {model: 'claude-opus-5-5'}});
   await w.eval('load().then(render)'); await w.eval('chatLoad()'); await sleep(300);
-  check(hi(/^Model/) === 'Model: Opus 5.5', '#1079: the same model in another spelling: only the running one ' + hi(/^Model/));
+  check(d.querySelector('.chmodel')?.textContent === 'Opus 5.5', '#1079: the same model in another spelling: only the running one ' + d.querySelector('.chmodel')?.textContent);
   await call('PUT', `/api/agents/${AG}/permission-mode`, {mode: 'ask'});
   await w.eval('load().then(render)'); await w.eval('chatLoad()'); await sleep(300);
-  check(hi(/^Permissions/) === 'Permissions: Ask first · runs: Auto', '#1079: wish and real mode differ: both ' + hi(/^Permissions/));
+  check(d.querySelector('.chmode')?.textContent.trim() === 'Ask first · runs: Auto', '#1079: wish and real mode differ: both ' + d.querySelector('.chmode')?.textContent);
   await call('PUT', `/api/agents/${AG}/permission-mode`, {mode: ''});
 
   // ================= #1081 live steps + #1062 the line under the messages
@@ -194,11 +190,11 @@ const V = B + 'api/v1';
     await o.nav(B + '#l/' + L); await ready(ev);
     await ev(`(() => { chatOpen(${AG}, {float: false}); return 1; })()`); await sleep(1800);
     await ev(`(() => { const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(300);
-    const g = await ev(`(() => { const k = [...document.querySelectorAll('#chat-msgs .csteps')];  /* 2.350.0 (#3317): the model is an entry of the header's ⋯ menu */
+    const g = await ev(`(() => { const m = document.querySelector('.chmodel'), n = document.querySelector('.chn');  /* 2.40.0 (#1345): two-line header, .chnm is display:contents now */ const k = [...document.querySelectorAll('#chat-msgs .csteps')];
       const t = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].pop()?.querySelector('.rxtog');
-      return {model: (chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Model/.test(x.label || '')) || {}).label, inHead: !document.querySelector('.chath .chmodel'), kept: k.length, hist: !!document.querySelector('#chat-msgs details.jobv[open] .jvh'),
+      return {model: m?.textContent, inHead: !!m && m.getBoundingClientRect().right <= n.getBoundingClientRect().right + 1, kept: k.length, hist: !!document.querySelector('#chat-msgs details.jobv[open] .jvh'),
         tog: t ? getComputedStyle(t).opacity : null}; })()`);
-    check(g && g.model === 'Model: Opus 5.5' && g.inHead, `${tag}: #1079 the model in the header's menu ` + JSON.stringify(g));
+    check(g && g.model === 'Opus 5.5' && g.inHead, `${tag}: #1079 the model in the header ` + JSON.stringify(g));
     check(g && g.kept >= 2 && g.hist, `${tag}: #1081 kept steps and the open job history ` + JSON.stringify(g));
     check(g && g.tog === '0', `${tag}: #1062 the smiley waits for the mouse ` + JSON.stringify(g));
     await shot('p2320b-1440-steps-history.png');

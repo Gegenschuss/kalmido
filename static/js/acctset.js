@@ -842,7 +842,8 @@ const ODL_WORDS = {
   // 2.239.0 C (#2874)
   open_receipts: n => trn('{0} receipt', '{0} receipts', n), einvoices: n => trn('{0} invoice', '{0} invoices', n),
   payments: n => trn('{0} payment', '{0} payments', n), signoffs: n => trn('{0} confirmed sign-off', '{0} confirmed sign-offs', n),
-  procdocs: n => trn('{0} version of the procedure documentation', '{0} versions of the procedure documentation', n)};
+  procdocs: n => trn('{0} version of the procedure documentation', '{0} versions of the procedure documentation', n),
+  assets: n => trn('{0} device', '{0} devices', n)};  // 2.355.0 B (#2845): the asset register
 const odlCounts = c => Object.entries(c || {}).filter(([k, n]) => n && ODL_WORDS[k]).map(([k, n]) => ODL_WORDS[k](n)).join(', ');
 // the delete button of the organisations list: lists / files block as before (the server says it); a retired organisation
 // shows its period and the export; content going along or a retirement asks with the numbers and the export first

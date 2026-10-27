@@ -23,7 +23,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'sheets'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
   const T1 = (await call('POST', '/api/sheets', {title: 'Budget', space: 'private'})).id;
   const T2 = (await call('POST', '/api/sheets', {title: 'Alone', space: 'private'})).id;
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Plan', body: `See [[tabelle:${T1}]]\n\n- [ ] One\n- [ ] Two\n`})).id;

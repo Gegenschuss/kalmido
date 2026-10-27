@@ -38,7 +38,7 @@ from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_settings, office_settings_lock, office_settings_save
 from .bpread import BpCopier, BpDoc, BpError, BpPdfaError, bp_check, bp_pdfa_issues
-from .pdf import A4_H, A4_W
+from .pdf import A4_H, A4_W, PAPER_SIZES, pdf_paper  # 2.357.0 A (#3156): + the paper sizes
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.149.0 G (#2517): pulled up from functions
 
@@ -180,7 +180,7 @@ def bp_snapshot(c, oid, s):
             "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0}
 
 
-def bp_emitter(data):
+def bp_emitter(data, paper="a4"):
     """The letterhead bytes -> (pages, emit(objs, i) -> object number) for office.pdf (bp_layout); None when it cannot
     be read (logged; the document is printed without it, never broken)."""
     try:
@@ -198,8 +198,9 @@ def bp_emitter(data):
             run["objs"], run["cp"] = objs, BpCopier(doc, objs)
         x0, y0, x1, y1 = doc.page_box(i)
         w, h = x1 - x0, y1 - y0
-        sc = min(A4_W / w, A4_H / h)
-        return run["cp"].form(i, (sc, 0, 0, sc, (A4_W - w * sc) / 2 - x0 * sc, A4_H - h * sc - y0 * sc))
+        pw, ph = PAPER_SIZES[pdf_paper(paper)]  # 2.357.0 A (#3156): onto the page of the office's paper size
+        sc = min(pw / w, ph / h)
+        return run["cp"].form(i, (sc, 0, 0, sc, (pw - w * sc) / 2 - x0 * sc, ph - h * sc - y0 * sc))
     return n, emit
 
 
@@ -220,7 +221,7 @@ def bp_model(c, oid, did, model):
         return model
     if not data:
         return model
-    em = bp_emitter(data)
+    em = bp_emitter(data, model.get("paper"))  # 2.357.0 A (#3156)
     if em:
         model["letterhead"] = {"m1": lh.get("m1") or BP_DEFAULT["m1"], "m2": lh.get("m2") or BP_DEFAULT["m2"],
                                "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0,
@@ -237,7 +238,7 @@ def bp_letter(c, oid):
     except OSError as e:
         log.warning("letterhead of office %s not readable: %s", oid, e)
         return None
-    em = bp_emitter(data) if data else None
+    em = bp_emitter(data, office_settings(c, oid).get("paper")) if data else None  # 2.357.0 A (#3156)
     if not em:
         return None
     return {"m1": lh.get("m1") or BP_DEFAULT["m1"], "m2": lh.get("m2") or BP_DEFAULT["m2"],
@@ -278,8 +279,10 @@ def bp_upload():
     except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:  # 2.120.0 review H1: + MemoryError
         log.info("letterhead refused: %s", e)
         return err(tr("This PDF cannot be used as letterhead. Please save it again as a plain PDF (not protected, A4)."))
-    if any(abs(w / h - A4_W / A4_H) > 0.03 for w, h in sizes):
-        return err(tr("The letterhead must be an A4 page in portrait format."))
+    pw, ph = PAPER_SIZES[pdf_paper(office_settings(c, oid).get("paper"))]  # 2.357.0 A (#3156): a page of the chosen paper size
+    if any(abs(w / h - pw / ph) > 0.03 for w, h in sizes):
+        return err(tr("The letterhead must be an A4 page in portrait format.") if ph == A4_H else
+                   tr("The letterhead must be a US-Letter page in portrait format."))
     write_lock(c, f"office_letterhead_{int(oid)}")
     sha = hashlib.sha256(raw).hexdigest()
     name = f"letterhead-{sha[:16]}.pdf"
@@ -393,7 +396,7 @@ def bp_sample(c, oid):
             "date": "2026-01-15", "title": tr("Invoice", lg=lang), "company": co, "formats": pack.get("formats") or {},
             "recipient": {"name": "Muster GmbH", "lines": ["Muster GmbH", "Beispielstr. 1", "12345 Musterstadt"]},
             "lines": lines, "totals": {"net": 3000, "tax_lines": [{"pct": 19, "base": 3000, "amount": 570}], "gross": 3570},
-            "draft_mark": tr("Sample", lg=lang)}
+            "draft_mark": tr("Sample", lg=lang), "paper": pdf_paper(s.get("paper"))}  # 2.357.0 A (#3156)
 
 
 @app.get("/api/office/letterhead/preview")
@@ -405,7 +408,7 @@ def bp_preview():
     m = bp_sample(c, oid)
     lh = bp_state(office_settings(c, oid))
     data = bp_read(c, oid, lh["file"]) if lh["file"] else None
-    em = bp_emitter(data) if data else None
+    em = bp_emitter(data, m.get("paper")) if data else None  # 2.357.0 A (#3156)
     if em:
         m["letterhead"] = {"m1": lh["m1"], "m2": lh["m2"], "hide_head": lh.get("hide_head"), "hide_footer": lh.get("hide_footer"),
                            "pages": em[0], "emit": em[1]}

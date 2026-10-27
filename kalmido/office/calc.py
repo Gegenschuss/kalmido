@@ -117,6 +117,8 @@ def dec(v, default="0"):
         s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
     elif "," in s:  # 2.263.0 (#2976): a comma alone in the user's language ("1,500" in English = 1500; stored values have none)
         s = (num_text(s, user_dec()) or "x") if num_text else s.replace(",", ".")
+    elif s.count(".") > 1:  # 2.355.0 A (#2847): "1.234.567" = groups (was no Decimal -> silently the default); "1.2.3" no number
+        s = (num_text(s) or "x") if num_text else s
     try:
         return Decimal(s)
     except InvalidOperation:
@@ -475,7 +477,7 @@ def _num(d):
 
 # ---------------------------------------------------------------- 2.38.0 (#1021, F1): invoices, credit notes, reminders
 INV_ITEM_KINDS = ("service", "text", "heading", "discount")
-INV_VAT_NOTES = ("reverse", "abroad", "small")
+INV_VAT_NOTES = ("reverse", "abroad", "small", "eu_goods", "export")  # 2.355.0 C (#2844): + goods to the EU (K) / a third country (G)
 
 
 def dstr(d):

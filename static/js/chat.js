@@ -188,7 +188,8 @@ async function tcSend() {
   const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text: text || files[0]?.name || '', created_at: m.created_at}; r.last_at = m.created_at; }
   if (!live) { if (typeof cw_has === 'function' && cw_has(k)) cw_patch(k); return; }
   tcPatch(true);
-  if (hadF || !isTouch()) ta.focus({preventScroll: true});
+  if (kbd_close('team')) ta.blur();  // 2.235.0 D (#2899)
+  else if (hadF || !isTouch()) ta.focus({preventScroll: true});
 }
 async function tcReact(mid, emoji) {
   let r; try { r = await rawFetch('POST', `/api/team/messages/${mid}/reactions`, {emoji}); } catch (e) { toast(e.message); return; }

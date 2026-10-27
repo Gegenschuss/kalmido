@@ -53,7 +53,9 @@ def kpi_revenue(c, oid, home, docs, year, today):
     by_id = {r["id"]: r for r in docs}
     to_date = year == int(today[:4])
     sums, ytd = {}, {}
-    for p in c.execute("SELECT doc_id, date, amount FROM office_payments WHERE org_id=? AND date>=? AND date<?",
+    from .books import BK_PAY_DAY  # 2.355.0 C (#2841): a reversal line on the day of its payment, as the books
+    for p in c.execute(f"SELECT p.doc_id, {BK_PAY_DAY} AS date, p.amount FROM office_payments p LEFT JOIN office_payments o "
+                       f"ON o.id=p.reverses_id AND o.org_id=p.org_id WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<?",
                        (oid, f"{year - 1}-01-01", f"{year + 1}-01-01")):
         r = by_id.get(p["doc_id"])
         if r is None or not p["date"]:

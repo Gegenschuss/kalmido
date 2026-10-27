@@ -831,7 +831,7 @@ def vdr_move_space(vid):
     their protocol (signer data sealed with that workspace's key; an open one stops). undo = the id of the space_moves row of
     the move being taken back (the same person, the way back): the place and the links come back where they fit."""
     import json
-    from ..accounts.orgs import is_org_admin
+    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
     from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
     smv_refuse_agent()
     c, uid = db(), me()
@@ -843,8 +843,10 @@ def vdr_move_space(vid):
     smv_same(r["org_id"], to)
     if r["org_id"] is None and r["created_by"] != uid and r["owner_id"] != uid:
         raise Denied(403, tr(VDR_ONLY))
-    if r["org_id"] and r["created_by"] != uid and not is_org_admin(c, uid, r["org_id"]):
-        raise Denied(403, tr(VDR_ONLY))
+    # 2.361.2 B (#2923): out of an organisation only its admin, or the creator into the private space with a released request
+    deny = None if org_out_ok(c, r["org_id"], to, "video", vid) else oo_denied(c, r["org_id"], to, "video", vid)
+    if deny and not b.get("dry"):
+        raise deny
     place = "task_id" if r["task_id"] else "list_id" if r["list_id"] else "client_id" if r["client_id"] else None
     sigs = c.execute("SELECT id, state, revoked_at, expires_at FROM office_signoffs WHERE video_id=?", (vid,)).fetchall()
     live = [s["id"] for s in sigs if s["state"] == "open" and not s["revoked_at"]]
@@ -852,7 +854,8 @@ def vdr_move_space(vid):
               "client_id": tr("The video sign-off is no longer attached to its client")}.get(place, ""),
              tr("Every member of the organisation can then open it") if to else "",
              tr("The customer link stops; its record stays in the old workspace") if live else
-             (tr("The customer's decision stays recorded in the old workspace") if sigs else "")]
+             (tr("The customer's decision stays recorded in the old workspace") if sigs else ""),
+             oo_into_note(c, r["org_id"], to)]  # 2.361.2 B (#2923): the way back
     dest = None
     if b.get("place") not in (None, "", 0):
         try:
@@ -863,6 +866,8 @@ def vdr_move_space(vid):
         if (o or None) != (to or None):
             raise Denied(409, tr("Invalid value: {0}", "place"))
     block = None if dest or b.get("undo") else tr("Choose a project in the target workspace")
+    if deny:  # 2.361.2 B (#2923): the dry run; the creator can ask an admin (out_request)
+        return jsonify(smv_answer(notes, deny.text(), count=1, **(deny.data or {})))
     if b.get("dry") or block:
         return jsonify(smv_answer(notes, block, count=1))
     back = None
@@ -887,6 +892,7 @@ def vdr_move_space(vid):
             pass
     if not any(new.values()):  # 2.99.1 review L2: the old place no longer fits -> a project in the target, no review at nothing
         return jsonify(smv_answer(notes, tr("Choose a project in the target workspace"), count=1))
+    org_out(c, r["org_id"], to, "video", r["title"], obj=vid)  # 2.361.2 B (#2923): logged, admins told, release used
     c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=? WHERE id=?",
               (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
     c.execute("UPDATE video_versions SET org_id=? WHERE review_id=?", (to, vid))

@@ -217,7 +217,7 @@ check(pdf_hex(r.content).count(_w) == len(re.findall(r"2 Tr [^<]*<" + _w + "> Tj
 r = A.post(B + f"{GD}/{G}/final")
 check(r.ok and r.json()["status"] == "final" and r.json()["node_id"], f"finish ({r.status_code} {r.text[:200]})")
 F = r.json()
-check("{{" not in F["body"] and "Unbekannt: [] Datum" in F["body"] and "&lt;" not in F["body"], "finished: variables filled, the unknown one empty")
+check("{{" not in F["body"] and "Unbekannt: Datum" in F["body"] and "&lt;" not in F["body"], "finished: variables filled, the unknown one left out (2.357.0 #3220: its emptied [ ] goes too)")
 check(F["body_hash"] == hashlib.sha256(F["body"].encode()).hexdigest(), "finished: SHA-256 of the frozen text")
 check(A.patch(B + f"{GD}/{G}", json={"body": "neu"}).status_code == 409 and A.post(B + f"{GD}/{G}/final").status_code == 409, "a finished document: PATCH / finish 409")
 NID = F["node_id"]

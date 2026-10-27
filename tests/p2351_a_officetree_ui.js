@@ -125,11 +125,12 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     check(await signIn(ev) === 200, 'phone: carol signs in');
     await nav(B + '#office/offers');
     await ready(ev, `typeof OFC === 'object' && !!OFC.info`, 80);
-    await ev(`(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu')?.click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('#side.open') && !!${node('a:offers')}`, 60), 'phone: the drawer shows Quotes & invoices as a tree node');
+    // CI of 2.351.3: a late route render closes the drawer again (core.js closeSide) - opened again until it stays
+    const drawer = `(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu')?.click(); return !!document.querySelector('#side.open') && !!${node('a:offers')}; })()`;
+    check(await ready(ev, drawer, 60), 'phone: the drawer shows Quotes & invoices as a tree node');
     await openNode(ev, 'a:offers');
     check(await ready(ev, `${node('d:offers:' + Q[20])}?.dataset.sbbdrag === '1' && !${node('d:offers:' + Q[20])}.hasAttribute('draggable')`, 60), 'phone: the quotations are held to drag (no mouse drag)');
-    await ev(`(() => { sbb_tmenu(${node('d:offers:' + Q[20])}); return 1; })()`);
+    await ev(`(() => { const t = ${node('d:offers:' + Q[20])}; if (t) sbb_tmenu(t); return 1; })()`);  // no node = the check above failed, not a JS error on top
     check(await ready(ev, `${menuLabels}.includes('Move…')`, 20), 'phone: a quotation\'s menu has Move…');
     await shot('p2351a-phone-menu.png');
     await pick(ev, 'Move…');

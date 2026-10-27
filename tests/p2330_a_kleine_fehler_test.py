@@ -6,6 +6,7 @@ and figures only. tenant-matrix: life_org
    read-later entry in an organisation project never show in the private view (nor in its monthly / yearly sums); the
    private contract, device and read-later entry do; the organisation's view stays travel + staying in touch only
 usage: p2330_a_kleine_fehler_test.py <datadir>"""
+# kalmido-suite: fresh
 import os
 import subprocess
 import sys
@@ -23,7 +24,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 FEATS = "comments,collab,office,contracts,home,health,reading,travel,care"
 
-if not (os.environ.get("P2330A_NOSTART") or os.environ.get("KMT_NOSTART")):
+if not os.environ.get("P2330A_NOSTART"):
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 

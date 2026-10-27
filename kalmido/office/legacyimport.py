@@ -41,7 +41,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
                     office_settings, office_update)
-from ..core.csvimport import csv_table  # 2.149.0 G (#2517): pulled up from functions
+from ..core.csvimport import amount_text, csv_table  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_seal, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_guard, sc_up  # 2.209.0 D (#1856)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -458,18 +458,9 @@ def fk_other_contact(c, a, dup, rows):
 
 # ---------------------------------------------------------------- preview of a spreadsheet
 def _num(v):
-    s = str(v or "").strip().replace("€", "").replace("EUR", "").replace(" ", "")
-    if not s:
-        return None
-    if "," in s and "." in s:
-        s = s.replace(".", "").replace(",", ".") if s.rfind(",") > s.rfind(".") else s.replace(",", "")
-    else:
-        s = s.replace(",", ".")
-    try:
-        d = Decimal(s)
-    except InvalidOperation:
-        return None
-    if not d.is_finite() or abs(d) > Decimal("1e9"):
+    # 2.355.0 B (#2843): core/csvimport.amount_text (thousand separators only in groups of three; "1,500" unreadable, was 1.5)
+    d = amount_text(v)
+    if d is None or abs(d) > Decimal("1e9"):
         return None
     return float(round(d, 4))
 
@@ -477,34 +468,17 @@ def _num(v):
 # 2.80.0 (#1837): money amounts as people type them: German "2.436,53" / "1.500" (thousand dots), "2436,53", English
 # "2436.53" / "2,436.53", with "€" / "EUR" / spaces. A dot followed by exactly three digit groups is a thousand
 # separator ("1.500" = 1500); anything else that is not a plain number stays invalid (None).
-_AMT_DE = re.compile(r"\d{1,3}(\.\d{3})+(,\d+)?")
-_AMT_EN = re.compile(r"\d{1,3}(,\d{3})+(\.\d+)?")
-
-
 def _amount(v):
     if isinstance(v, bool):
         return None
     if isinstance(v, (int, float, Decimal)):
-        s = str(v)
-    else:
-        s = re.sub(r"\s", "", str(v or "")).replace("€", "")
-        s = re.sub(r"(?i)eur$|^eur", "", s)
-        neg = s.startswith("-")
-        s = s[1:] if neg else s
-        if _AMT_DE.fullmatch(s):
-            s = s.replace(".", "").replace(",", ".")
-        elif _AMT_EN.fullmatch(s) and ("." in s or s.count(",") > 1):
-            s = s.replace(",", "")
-        elif re.fullmatch(r"\d*[.,]?\d+", s):
-            s = s.replace(",", ".")
-        else:
+        try:
+            d = Decimal(str(v))
+        except InvalidOperation:
             return None
-        s = ("-" if neg else "") + s
-    try:
-        d = Decimal(s)
-    except InvalidOperation:
-        return None
-    return d if d.is_finite() and abs(d) <= Decimal("1e9") else None
+    else:
+        d = amount_text(v)  # 2.355.0 B (#2843): the shared reader (core/csvimport; "1,500" unreadable, was 1.5)
+    return d if d is not None and d.is_finite() and abs(d) <= Decimal("1e9") else None
 
 
 def _flag01(v):

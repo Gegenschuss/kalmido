@@ -306,6 +306,7 @@ check(A.post(B + f"{D}/{INV3}/payments", json={"amount": 1}).status_code == 409,
 check(A.get(B + D + "?kind=credit").json()["docs"][0]["kind"] == "credit", "list of credit notes")
 
 # ---------------------------------------------------------------- reminders
+dbxm.overdue(DATA, [IID])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [INV2], "level": 1})
 check(r.status_code == 400, "a paid invoice cannot be reminded of (400)")
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID], "level": 9})
@@ -389,6 +390,7 @@ CLX = r.json()["id"]
 r = A.post(B + D, json={"kind": "invoice", "client_id": CLX, "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 10, "rate": 100}]})
 INVX = r.json()["id"]
 check(A.post(B + f"{D}/{INVX}/finalize").ok, "invoice of a second client finalised")
+dbxm.overdue(DATA, [INVX])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID, INVX], "level": 1})
 check(r.status_code == 400 and "one client" in r.json().get("error", ""), "reminder over invoices of two clients: 400 " + r.text[:120])
 check(A.post(B + f"{D}/reminder", json={"doc_ids": [INVX], "level": 1}).status_code == 201, "reminder over one client's invoice: 201")
@@ -418,8 +420,14 @@ check(r.status_code == 201 and r.json()["status"] == "paid", "the open amount ->
 check(A.post(B + f"{D}/{INVX}/payments", json={"amount": "1"}).status_code == 409, "payment on a paid invoice: 409")
 r = A.post(B + f"{D}/{INVX}/status", json={"status": "sent"})
 check(r.status_code == 409 and "Payments" in r.json().get("error", ""), "paid -> sent by hand with payments recorded: 409 " + r.text[:120])
+# 2.355.0 (#2847): paid by hand books a payment of the open rest -> back to sent only after that payment is reversed
 r = A.post(B + f"{D}/{INV2}/status", json={"status": "sent"})
-check(r.ok and r.json()["status"] == "sent", "paid by hand without payments -> sent again " + r.text[:120])
+check(r.status_code == 409 and "Payments" in r.json().get("error", ""), "paid by hand = a payment: sent by hand 409 " + r.text[:120])
+for p_ in A.get(B + f"{D}/{INV2}/payments").json().get("payments") or []:
+    if float(p_.get("amount") or 0) > 0 and not p_.get("reversed"):
+        A.delete(B + f"{D}/{INV2}/payments/{p_['id']}")
+r = A.get(B + f"{D}/{INV2}").json()
+check(r.get("status") != "paid" and r.get("open") != "0.00", "paid by hand, payment reversed: open again " + str(r.get("status")))
 # sending: a subject with a line break is cleaned (pure function), without SMTP the 409 comes first
 src = open(os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "invoices.py"), encoding="utf-8").read()
 fn = next(x for x in ast.parse(src).body if isinstance(x, ast.FunctionDef) and x.name == "inv_clean_subject")

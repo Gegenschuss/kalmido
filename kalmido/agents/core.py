@@ -14,6 +14,7 @@ from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
+from ..core.dlock import dl_list_locked
 from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
 from ..tasks.validation import valid_hm
@@ -59,6 +60,9 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
                 "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
                 "work_style_changed",  # 2.236.0 (#2904-#2911): its owner changed how it works and reports (work_style)
+                "rules_changed",  # 2.235.0 C (#2903): a person changed its standing rules (rules = the active ones)
+                "data_lock_changed",  # 2.235.0 B (#2902): its owner changed what it may never see (data_lock)
+                "control_changed", "approval_expired", "decision_undone",  # 2.235.0 A (#2891 #2901): its control level, an approval past its deadline, Undo
                 "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
                 "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
                 "chat_choice",  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
@@ -197,6 +201,8 @@ def agent_emit(c, aid, event, data, actor="auto"):
             from ..agents.safety import ids_parse
             if lid not in ids_parse(a["list_ids"]):
                 return None
+        if lid and dl_list_locked(c, aid, lid):
+            return None  # 2.235.0 B (#2902): nothing of a list its data lock leaves out (tasks: acx_task_ok below)
         tk = data.get("task") if isinstance(data.get("task"), dict) else {}
         etid = tk.get("id") or data.get("task_id")
         ids_only = event == "unassigned" and set(tk) <= {"id", "list_id"}  # agent_assign_event: ids, no content

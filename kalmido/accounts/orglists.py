@@ -18,6 +18,7 @@ from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, my_inbox
 from ..accounts.orgs import _need_org_admin, user_orgs
+from .orgoutreq import oor_rows  # 2.361.2 (#2923)
 from ..accounts.pictures import list_icon_url
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
@@ -115,6 +116,7 @@ def _ol_out(c, oid):
     names = user_names(c, list(ids))
     agents = {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind='agent' AND id IN ({','.join(str(int(i)) for i in ids) or 'NULL'})")}
     return {
+        "out_requests": oor_rows(c, oid),  # 2.361.2 (#2923): members asking back what they brought in (open first)
         "lists": [{"id": r["id"], "name": r["name"], "owner_id": r["owner_id"], "owner_name": names.get(r["owner_id"], ""),
                    "owner_agent": r["owner_id"] in agents, "mine": r["owner_id"] == me(), "archived": bool(r["archived"]),
                    "archived_at": r["archived_at"], "open": r["open_n"], "tasks": r["all_n"], "members": r["members"], "folder": r["folder"] or "",

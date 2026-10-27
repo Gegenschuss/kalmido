@@ -298,6 +298,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   }, true);
   await call('PATCH', '/api/settings', {lang: 'de'});
 
+  await call('PATCH', '/api/settings', {chat_kbd_agent: false});  // 2.351.1: N9 is the switch off (2.235.0 D, #2899: phones close the keyboard after sending by default)
   // ---- phones 390 / 428 touch, German: N8 iOS keyboard pushes the page, N9 pill + Send keep the keyboard, F8, F11, F13,
   // helper texts, N5 round circles at 75 %
   for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {

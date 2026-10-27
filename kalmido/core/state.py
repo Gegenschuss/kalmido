@@ -8,6 +8,7 @@ from ..core.config import app, COOKIE, MAX_FILE_MB, IOS_SHORTCUT_URL, NTFY_IN, N
 from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
+from ..core.dlock import dl_list_hidden  # 2.235.0 B (#2902)
 from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
@@ -102,6 +103,7 @@ def visible_lists(c, uid, light=False):
                         WHERE l.id IN {acx_lists_sql(req=False)}""", (uid, uid, uid)).fetchall()  # 2.36.2 (#1142): the one list scope
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
         rows = [r for r in rows if r["life"] not in ("health", "budget")]  # 2.72.0 (#1333): budgets too
+    rows = [r for r in rows if not dl_list_hidden(c, uid, r["id"], r["life"], r["org_id"])]  # 2.235.0 B (#2902): an agent's data lock
     if org_trips_hidden() and uid == g.user["id"]:  # 2.173.0 A (#2680): an organisation's trip: in the app only for now
         rows = [r for r in rows if not (r["life"] == "travel" and r["org_id"])]
         rd = reading_ids(c, [r["id"] for r in rows])  # 2.172.1 A (#2689): read later: in the app only

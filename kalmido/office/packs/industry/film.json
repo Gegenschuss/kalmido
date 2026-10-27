@@ -36,7 +36,7 @@
       "sun_days": "Sonn-/Feiertage", "sun_pct": "Zuschlag Sonn-/Feiertag",
       "staff": "Personal", "share": "Producing", "km": "KFZ-Kilometer", "meals": "Verpflegung", "hotel": "Hotelkosten",
       "set": "Equipment", "free": "Zusatzkosten", "item": "Posten", "qty": "Menge", "rate": "Preis", "total": "Gesamt",
-      "sum": "Summe", "discount": "Rabatt", "net": "Summe Netto", "costs": "Einkauf", "margin": "Marge",
+      "sum": "Summe", "discount": "Rabatt", "net": "Summe netto", "costs": "Einkauf", "margin": "Marge",
       "prep": "inkl. Vorbereitung", "set_days_note": "abweichend von {days} Drehtagen", "set_discount": "{pct} % Rabatt",
       "km_detail": "{km} km x {rate} x {trips} Fahrten", "share_detail": "{pct} % der Personalkosten",
       "meals_detail": "{n} Personen", "hotel_detail": "{n} Nächte"

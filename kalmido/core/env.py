@@ -175,6 +175,7 @@ VARS = (
     _v("KALMIDO_DOCS_SCAN_S", "60", "Seconds between two looks into the document inbox folders.", "files"),
     _v("KALMIDO_DOCS_THUMB_FILL", "on", "Switch: create missing document previews in the background.", "files"),
     _v("KALMIDO_DOCS_THUMB_FILL_S", "15", "Seconds between two portions of previews.", "files"),
+    _v("KALMIDO_OFFICE_STORE_FILL", "on", "Switch: store the files of old finalised office documents once (GoBD).", "files"),  # 2.357.0 (#3221)
     _v("KALMIDO_DOCS_ZIP_MAX_FILES", "2000", "Files per document ZIP download at most.", "files"),
     _v("KALMIDO_DOCS_ZIP_MAX_MB", "1024", "Size in MB of a document ZIP download at most.", "files"),
     _v("KALMIDO_FILES_ZIP_MAX_FILES", "5000", "Files per ZIP download of attachments at most.", "files"),
@@ -239,6 +240,7 @@ VARS = (
     # ---- agents and assistant
     _v("KALMIDO_AGENT_WAITERS", "6", "Agent connections waiting for events on the whole server at the same time.", "agents"),
     _v("KALMIDO_AGENT_EVENTS_STALE_H", "48", "Hours after which unread agent events count as stale.", "agents"),
+    _v("KALMIDO_AGENT_CONTROL_NEW", "approve_all", "Control level a new agent starts with: approve_all, routine, free, or legacy (no level, works as before 2.235.0; the test containers use it).", "agents"),  # 2.235.0 A (#2891)
     _v("KALMIDO_AGENT_PUSH_DAY", "500", "Push notifications per agent and day.", "agents"),
     _v("KALMIDO_USAGE_DAYS", "400", "Days the agent usage records are kept.", "agents"),
     _v("KALMIDO_AUDIT_DAYS", "90", "Days the agent audit log is kept (0 = no log at all; the assistant log keeps only today's rows).", "agents"),

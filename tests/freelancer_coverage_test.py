@@ -508,6 +508,8 @@ ROUTES = {
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",
     "GET /api/orgs/{}/export/file": "office", "GET /api/orgs/{}/lists": "orgadmin",
+    "GET /api/orgs/{}/out-requests": "orgadmin", "POST /api/orgs/{}/out-requests": "orgadmin",  # 2.361.2 (#2923)
+    "POST /api/orgs/{}/out-requests/{}": "orgadmin",
     # 2.223.2 C (#2871): the step-up before a download (POST -> a one-time ticket; p22232_c_offsite_test.py, freelancer too)
     "POST /api/orgs/{}/export/file": "office", "POST /api/retention/me/export.zip": "office", "POST /api/retention/org/{}/export.zip": "orgadmin",
     "PATCH /api/admin/orgs/{}": "orgadmin", "PATCH /api/orgs/{}": "orgadmin", "PATCH /api/orgs/{}/lists/{}": "orgadmin",
@@ -945,6 +947,13 @@ ROUTES = {
     # 2.236.0 (#2904-#2911): the work style of an agent (owner / instance admin, else 404); C (#2906): its queue (p2236_c_queue_test.py)
     "GET /api/agents/{}/work-style": "agents", "PATCH /api/agents/{}/work-style": "agents", "GET /api/agents/{}/queue": "agents",
     "GET /api/v1/agent/queue": "agents", "PUT /api/v1/agent/queue": "agents",
+    # 2.235.0 C (#2903): the standing rules of an agent (the agent itself; owner / instance admin, else 404; p2235_c_rules_api_test.py)
+    "GET /api/v1/agent/rules": "agents", "POST /api/v1/agent/rules": "agents", "GET /api/agents/{}/rules": "agents",
+    "POST /api/agents/{}/rules": "agents", "PATCH /api/agents/{}/rules/{}": "agents", "DELETE /api/agents/{}/rules/{}": "agents",
+    # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
+    "GET /api/agents/{}/data-lock": "agents", "PATCH /api/agents/{}/data-lock": "agents",
+    # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
+    "GET /api/agents/{}/control": "agents", "PATCH /api/agents/{}/control": "agents", "POST /api/agents/{}/control/history/{}/undo": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",

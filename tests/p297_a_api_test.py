@@ -274,6 +274,8 @@ check(mv(Bo, ids=[P1], to=f"org:{ORG2}").status_code == 409, "an organisation Bo
 check(mv(Fr, ids=[P1], to=f"org:{ORG2}").status_code == 404, "someone of another organisation: 404")
 check(mv(Bo, ids=[P1], to=SP).status_code == 409, "the same workspace: 409")
 check(requests.post(B + "/api/bookmarks/move-space", headers=AGH, json={"ids": [P1], "to": "private"}).status_code in (401, 403), "an agent: refused")
+_rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "bookmark", "id": P1}).json().get("id")  # 2.361.2 (#2923): released first
+check(A.post(B + f"/api/orgs/{ORG}/out-requests/{_rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's bookmark")
 r = mv(Bo, ids=[P1], to="private")
 check(r.ok and Bo.get(B + f"/api/bookmarks/{P1}").json()["space"] == "private" and Ca.get(B + f"/api/bookmarks/{P1}").status_code == 404,
       "organisation -> private back (the undo)")

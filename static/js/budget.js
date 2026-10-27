@@ -374,7 +374,7 @@ async function bg_contractsModal() {
 // and never taken over, long imports taken over in parts under one import run, and the last runs can be taken back.
 const BG_ACCEPT = '.csv,.txt,.xml,.sta,.mt940,.mt942,.zip,text/csv,text/plain,text/xml,application/xml,application/zip,application/x-zip-compressed';
 const BG_SHOW = 300, BG_PART = 3000, BG_UPLOAD_MAX = 20 * 1024 * 1024;
-const BG_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD'];  // core/csvimport.DATE_FORMATS
+const BG_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYYMMDD', 'DD/MM/YYYY'];  // core/csvimport.DATE_FORMATS
 function bg_runsHtml(items) {
   const live = (items || []).filter(x => x.left > 0).slice(0, 5);
   if (!live.length) return '';

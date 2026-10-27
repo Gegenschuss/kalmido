@@ -702,6 +702,7 @@ ROUTES = {
     # 2.148.1 A (#2480): only the invited person answers an open invitation (p21481_a_api_test.py: others 404)
     "POST /api/orgs/{}/join": "org", "DELETE /api/orgs/{}/join": "org",
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
+    "GET /api/orgs/{}/out-requests": "org", "POST /api/orgs/{}/out-requests": "org", "POST /api/orgs/{}/out-requests/{}": "org",  # 2.361.2 (#2923)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",
     # 2.56.0 (#1795): an organisation admin changes name, icon and colour of a list of the organisation (p256_b_api_test.py)
@@ -1166,6 +1167,13 @@ ROUTES = {
     # 2.236.0 (#2904-#2911): the work style of an agent (owner / instance admin, else 404); C (#2906): its queue (p2236_c_queue_test.py)
     "GET /api/agents/{}/work-style": "agent", "PATCH /api/agents/{}/work-style": "agent", "GET /api/agents/{}/queue": "agent",
     "GET /api/v1/agent/queue": "agent", "PUT /api/v1/agent/queue": "agent",
+    # 2.235.0 C (#2903): the standing rules of an agent (the agent itself; owner / instance admin, else 404; p2235_c_rules_api_test.py)
+    "GET /api/v1/agent/rules": "agent", "POST /api/v1/agent/rules": "agent", "GET /api/agents/{}/rules": "agent",
+    "POST /api/agents/{}/rules": "agent", "PATCH /api/agents/{}/rules/{}": "agent", "DELETE /api/agents/{}/rules/{}": "agent",
+    # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
+    "GET /api/agents/{}/data-lock": "agent", "PATCH /api/agents/{}/data-lock": "agent",
+    # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
+    "GET /api/agents/{}/control": "agent", "PATCH /api/agents/{}/control": "agent", "POST /api/agents/{}/control/history/{}/undo": "agent",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",

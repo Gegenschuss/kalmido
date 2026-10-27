@@ -32,6 +32,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 DBC = os.environ.get("KALMIDO_TEST_DB_CONTAINER", CT + "-db")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+import dbx as dbxm  # noqa: E402  # 2.355.0 D (#2846)
 TEST_IBAN = "DE02120300000000202051"
 
 
@@ -121,6 +122,7 @@ check(A.post(B + D, json={"kind": "credit", "client_id": CLX}).json().get("einvo
 # ---------------------------------------------------------------- #1368 4 + 6 + 8 + 9: reminders
 RI = inv(recipient={"name": "Mahn GmbH", "lines": ["Weg 2", "10115 Berlin"]})
 fin(RI["id"])
+dbxm.overdue(DATA, [RI["id"]])  # 2.355.0 D (#2846): reminders only for overdue invoices
 rem = {}
 for lv in (1, 2, 3):
     r = A.post(B + D + "/reminder", json={"doc_ids": [RI["id"]], "level": lv, "fee": 5 if lv == 2 else 0})

@@ -147,8 +147,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   click(w, ob.querySelector('[data-act="od-other"]')); await sleep(150);
   check([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim()).join('|') === 'Tomorrow|Next week (Mon)|Pick a date…', 'UX-35: "Another day…" = Tomorrow / Next week / Pick a date');
   w.eval('closePop()');
-  click(w, ob.querySelector('[data-act="od-move"]')); await sleep(400);
-  check(!d.querySelector('#view .ghead.over') && w.eval(`S.tasks.get(${T1}).due`) === w.eval('today()'), 'UX-35: All to today moves them');
+  // 2.351.2 (#1507): the move is a batch request + reload: waited for instead of a fixed 400 ms (a busy CI runner was slower)
+  click(w, ob.querySelector('[data-act="od-move"]'));
+  check(await until(() => !d.querySelector('#view .ghead.over') && w.eval(`S.tasks.get(${T1}).due`) === w.eval('today()')), 'UX-35: All to today moves them ' + w.eval(`JSON.stringify([!!document.querySelector('#view .ghead.over'), S.tasks.get(${T1})?.due, today(), OPT.size, S.route])`));
   // UX-01 / UX-06 / UX-08: the sidebar
   const grps = [...d.querySelectorAll('#side .sgroup')].map(x => (x.className.match(/sg-(\w+)/) || [])[1]).filter(Boolean);
   // 2.45.0 (#1503): Plan, the lists, then Views (folded)
@@ -274,8 +275,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   click(w, bar.querySelector('[data-act="ann-hide"]')); await sleep(100);
   check(!d.querySelector('#annbar'), '#907: hidden on this device');
   await call('PUT', '/api/admin/announcement', {text: 'Update at 23:00'});
+  // 2.351.2 (#1507): saved within the same second as the first one (the id once was only the time, so it stayed hidden)
   await w.eval('load()'); w.eval('render()'); await sleep(100);
-  check(/Update at 23:00/.test(d.querySelector('#annbar')?.textContent || ''), '#907: a changed notice shows again');
+  check(/Update at 23:00/.test(d.querySelector('#annbar')?.textContent || ''), '#907: a changed notice shows again ' + w.eval(`JSON.stringify([S.announce, LS.get('annHidden', ''), !!document.querySelector('#annbar'), S.me?.kid])`));
   // "server in maintenance" while the proxy answers 503
   const of = w.fetch; w.fetch = async () => new w.Response('<html>maintenance</html>', {status: 503, headers: {'content-type': 'text/html'}});
   try { await w.eval(`rawFetch('GET', '/api/version')`); } catch { /* expected */ }

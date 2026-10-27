@@ -153,6 +153,8 @@ def ckd_tick(c, force=False):
             paths = [r[0] for r in c.execute("SELECT f.path FROM chat_files f JOIN agent_chat m ON m.id=f.message_id "
                                              "WHERE m.created_at<?", (old,))]
             c.execute("DELETE FROM agent_chat WHERE created_at<?", (old,))
+            c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='chat' AND source_excerpt<>'' AND NOT EXISTS ("
+                      "SELECT 1 FROM agent_chat m WHERE m.id=agent_rules.source_id)")  # 2.235.0 B2 (#2903): nor their copies in rules
         ret_report(c, "chat", {"messages": n}, kill)
         c.commit()
     if paths:  # the rows are gone for good: now the stored files

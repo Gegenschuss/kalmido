@@ -15,7 +15,8 @@ The private clients move along like in pb_move_post (org_id NULL & created_by ->
 the links of those to private address books end). The letters' links to the owner's private documents and address
 books end (review A2, 2.153.0: the documents stay private, pb_letter_detach); a signature the person has in the target
 already stays, the personal office keeps the other one (review A1).
-What stays in the personal office: its settings and company data (bank, tax: the target's are never overwritten), the
+2.355.0 B (#2845): the locked months go along -- the organisation is locked up to the personal office's last locked month
+too (pl_lock, also its own data of those months; the preview says so). What stays in the personal office: its settings and company data (bank, tax: the target's are never overwritten), the
 start balance and the real balances of the cash flow (the bank account of the company), the number counters (the
 person's own sequence never restarts; a counter the target does not have yet is copied, so the target continues after
 the moved numbers) and a catalogue pack the target has installed itself.
@@ -38,6 +39,7 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .ledger import ofx_log
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
+from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 
 PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
@@ -124,12 +126,15 @@ def pbt_plan(c, uid, src, dst):
     """What a transfer of personal office src into organisation dst would do: {moves, keeps, conflicts, counts, files, ...}."""
     counts, keeps, conflicts, notes = {}, [], [], []
     tables = pbt_tables(c)
-    from .periodlock import pl_first_month, pl_label, pl_through
+    from .periodlock import pl_first_month, pl_hints, pl_label, pl_through  # 2.355.0 E (#2845): + pl_hints
     lk, first = pl_through(c, dst), pl_first_month(c, src)
     if lk and first and first <= lk:  # 2.148.0 A (#2471): nothing lands in a locked month of the organisation
         conflicts.append(tr("The organisation is locked up to {0}; the personal office has data from {1}", pl_label(lk), pl_label(first)))
-    if pl_through(c, src):  # its own locks stay behind: the moved data would be editable again in the organisation
-        conflicts.append(tr("The personal office is locked up to {0}; locked data cannot move", pl_label(pl_through(c, src))))
+    if pl_through(c, src):  # 2.355.0 B (#2845): its locks go along (was a conflict: the moved data would be editable again)
+        notes.append(tr("Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)",
+                        pl_label(pl_through(c, src))))
+        # 2.355.0 E (#2845, review F4): what the lock dialog would point out
+        notes += [tr("In the organisation up to {0}: {1}", pl_label(pl_through(c, src)), h["text"]) for h in pl_hints(c, dst, pl_through(c, src))]
     for t in tables:
         w, n = pbt_where(t)
         if t in PBT_KEEP:
@@ -377,7 +382,13 @@ def pbt_post():
         own_default = c.execute("SELECT 1 FROM office_cashbooks WHERE org_id=? AND is_default=1", (dst,)).fetchone()
         moved_books = [r[0] for r in c.execute("SELECT id FROM office_cashbooks WHERE org_id=?", (src,))]
         unlinked = pb_letter_detach(c, src)
+        # 2.355.0 B (#2843): the bank bookings keep the personal office's fingerprints (keyed per area, the EndToEndId is not
+        # stored to key them anew); key_org tells the duplicate check of the organisation's imports (bank.py _key_orgs)
+        c.execute("UPDATE office_bank_tx SET key_org=? WHERE org_id=? AND key_org IS NULL", (src, src))
         counts = pbt_rows(c, src, dst, p["tables"])
+        locked = pl_through(c, src)
+        if locked:  # 2.355.0 B (#2845): the locked months go along (logged as a lock in the organisation's office log)
+            pl_lock(c, dst, uid, locked)
         if own_default and moved_books:  # the target keeps its own default cash box
             q = ",".join("?" * len(moved_books))
             c.execute(f"UPDATE office_cashbooks SET is_default=0 WHERE org_id=? AND id IN ({q})", (dst, *moved_books))

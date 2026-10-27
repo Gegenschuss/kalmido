@@ -128,7 +128,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     clean_org_id(c, want, uid)
                 from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
                 cur = list_org(c, lid) or None
-                if not org_out_ok(c, cur, want):  # 2.148.1 B (#2483): out of an organisation only through its admin
+                if not org_out_ok(c, cur, want, "list", lid):  # 2.361.2 (#2923): + a released request  # 2.148.1 B (#2483): out of an organisation only through its admin
                     skipped.append({"key": k, "reason": tr(OO_ADMIN_ONLY)})
                     continue
                 bad = [r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (lid,)) if ws_member_problem(c, lid, r[0], org_id=want or 0)]
@@ -138,7 +138,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     continue
                 if not dry:
                     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
-                    org_out(c, cur, want, "list", lname, list_id=lid)  # 2.148.1 B (#2483): logged, admins told
+                    org_out(c, cur, want, "list", lname, list_id=lid, obj=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
                     from ..team.clients import _org_boundary
                     if _org_boundary(c):  # 2.173.1 (#2714): a client of another workspace does not travel along (as in list_org_set)

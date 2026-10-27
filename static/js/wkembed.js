@@ -8,10 +8,8 @@
      own routes (its rights). A locked space works the same: the ids come from the text decrypted here.
    - Read mode: an open checkbox line "- [ ] …" gets a + button (several: "Open items as tasks"): the line becomes a task
      with the quick add syntax (date, #tags, !priority), in a list to choose (default: the basket); the line then ends with
-     #<id> (the task link of the pages, which shows the task's state). Tasks + the page text = ONE undo step.
-   - 2.350.0 C (#3148): with the right to write the page, a checkbox ticks in read mode: the line's [ ] / [x] is saved like a
-     typed change (history, conflict, offline, a locked space); a line with #123 ticks the task along (done / reopened, only
-     with the right to that task) and shows ticked while the task is done. Right click / a long press: "Create as task".
+     #<id> (the task link of the pages, which shows the task's state). Ticking in the page never changes the task.
+     Tasks + the page text = ONE undo step.
    Classic script sharing the global scope with wiki.js (lazyload.js: module "wiki"). */
 'use strict';
 
@@ -36,7 +34,6 @@ async function wem_ask(p) {
   } catch { /* offline / no access: everything stays a placeholder */ }
   files.forEach(id => w.got.add('f' + id)); links.forEach(x => w.got.add('l' + x.toLowerCase()));
   if (S.route.mod === 'wiki' && WK.pg === p && !WK.edit) viewSafeRender();
-  else if (WK.pg === p && WK.edit && typeof wklv_redraw === 'function') wklv_redraw();  // 2.350.0 B (#3147): the live preview's blocks
 }
 // ---- rendering (wiki.js wk_render: wem_cut before the Markdown, wem_put after it, wem_link for [[datei:…]] / [[tabelle:…]])
 const wem_cut = (src, out) => src.replace(WEM_EMBED_RE, (_, bang, label, id) => { out.push({img: !!bang, label, id}); return `⁣WEM${out.length - 1}⁣`; });
@@ -62,13 +59,10 @@ function wem_put(p, h, ems) {
   });
   // the state of a linked task (#123): done = struck through (shown only; the page text does not change)
   h = h.replace(/class="tref" data-tref="(\d+)"/g, (m, id) => taskById(+id)?.status === 2 ? `class="tref wemdone" data-tref="${id}"` : m);
-  return wem_tickHtml(p, wem_cbHtml(p, h));  // 2.350.0 C (#3148)
+  return wem_cbHtml(p, h);
 }
 // ---- open checkbox lines -> tasks
-function wem_cbLines(body) { return wem_cbAll(body).filter(L => !L.on); }  // the open "- [ ] …" lines
-// 2.350.0 C (#3148): every checkbox line as renderMd draws them (no frontmatter, no code blocks), in order: i = its line in
-// the text, on = [x], tid = the task linked in it (#123)
-function wem_cbAll(body) {
+function wem_cbLines(body) {  // the open "- [ ] …" lines as renderMd draws them (no frontmatter, no code blocks), in order
   const ls = String(body || '').split('\n'), out = [];
   let i = 0, code = false;
   if (/^---[ \t]*\r?$/.test(ls[0] || '')) { const e = ls.findIndex((l, k) => k > 0 && /^---[ \t]*\r?$/.test(l)); if (e > 0) i = e + 1; }
@@ -77,68 +71,10 @@ function wem_cbAll(body) {
     if (/^\s*```/.test(ln)) { code = !code; continue; }
     if (code || /^\s*>/.test(ln)) continue;
     const m = /^\s*[-*]\s+\[( |x|X)\]\s*(.*)/.exec(ln);
-    if (m) out.push({i, raw: ln, on: m[1] !== ' ', text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2]), tid: +((WEM_TREF_RE.exec(m[2]) || [''])[0].slice(1)) || 0});
+    if (m && m[1] === ' ') out.push({raw: ln, text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2])});
   }
   return out;
 }
-// ---- 2.350.0 C (#3148): checkboxes tick in read mode
-const wem_mayTick = p => WK.idx[p.space]?.mayWrite !== false;  // the page's own rule for "Edit" (wiki.js wk_pageHtml)
-const wem_tidDone = L => !!L.tid && taskById(L.tid)?.status === 2;
-function wem_tickHtml(p, h) {
-  const all = wem_cbAll(p.body), re = /<li class="cb (?:on)?">(<input type="checkbox" disabled ?(?:checked)?>)/g;
-  if (!all.length || (h.match(re) || []).length !== all.length) return h;  // the drawing does not match the text: stays read only
-  const may = wem_mayTick(p);
-  let k = 0;
-  return h.replace(re, () => {
-    const L = all[k++], on = L.on || wem_tidDone(L);  // a done task shows its line ticked (the text stays as it is)
-    return `<li class="cb ${on ? 'on' : ''}"${may ? ` data-wkcbl="${k - 1}"` : ''}><input type="checkbox" ${may ? `data-wkcb="${k - 1}" aria-label="${esc(L.text || tr('Checkbox'))}"` : 'disabled'}${on ? ' checked' : ''}>`;
-  });
-}
-let WEM_TQ = Promise.resolve();  // the saves of ticks, one after the other (each sends the newest text)
-const wem_tickWait = () => WEM_TQ;
-async function wem_tick(p, k, on, cb) {
-  const L = wem_cbAll(p.body)[k];
-  if (!L) { viewSafeRender(); return; }
-  const ls = String(p.body).split('\n');
-  ls[L.i] = L.raw.replace(/^(\s*[-*]\s+\[)[ xX](\])/, `$1${on ? 'x' : ' '}$2`);
-  cb.closest('li')?.classList.toggle('on', on);
-  if (ls[L.i] !== L.raw) { p.body = ls.join('\n'); WEM_TQ = WEM_TQ.then(() => wem_tickSave(p)).catch(() => {}); }
-  const t = L.tid ? taskById(L.tid) : null;  // the linked task along, with my rights on it (else only the checkbox)
-  if (t && canEdit(t) && (on ? t.status === 0 : t.status === 2)) { try { await toggleTask(t.id); } catch { /* api() said why */ } }
-}
-// saved like a typed change (wiki.js wk_flush): the outbox offline, a conflict asks, a locked space seals it
-async function wem_tickSave(p) {
-  const url = '/api/wiki/pages/' + p.id, patch = {body: p.body, expect_updated_at: p.updated_at};
-  if (p._off || OUT.q.some(x => x.url === url)) { await wko_queue(p, patch); return; }
-  try {
-    const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', url, patch, p.space) : await rawFetch('PATCH', url, patch);
-    Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
-    wko_keep(p.space, r);
-    wk_savedHint(tr('Saved'));
-  } catch (e) {
-    if (e.status === 409 && e.data?.page) { await wk_conflict(p, e.data.page, patch); return; }
-    if (e instanceof Offline) { await wko_queue(p, patch); return; }
-    toast(e.message); viewSafeRender();
-  }
-}
-// right click / a long press on a checkbox line: its menu
-function wem_tickMenu(p, li) {
-  const all = wem_cbAll(p.body), j = +li.dataset.wkcbl, L = all[j]; if (!L) return false;
-  const k = all.slice(0, j).filter(x => !x.on).length, items = [];
-  if (!L.on && !L.has && L.text && wem_mayTask(p)) items.push({label: tr('Create as task'), icon: 'plus', fn: () => wem_cbDlg(p, [k])});
-  if (L.tid && taskById(L.tid)) items.push({label: tr('Open task'), icon: 'check', fn: () => openDetail(L.tid)});
-  if (!items.length) return false;
-  menu(li, items);
-  return true;
-}
-document.addEventListener('change', e => {
-  const cb = /** @type {any} */ (e.target).closest?.('input[data-wkcb]'); if (!cb || !$('#wk-md')?.contains(cb)) return;
-  const p = WK.pg; if (p) wem_tick(p, +cb.dataset.wkcb, cb.checked, cb);
-});
-document.addEventListener('contextmenu', e => {
-  const li = /** @type {any} */ (e.target).closest?.('li[data-wkcbl]'); if (!li || !$('#wk-md')?.contains(li) || !WK.pg) return;
-  if (wem_tickMenu(WK.pg, li)) e.preventDefault();
-});
 const wem_mayTask = p => WK.idx[p.space]?.mayWrite !== false && S.me?.kind !== 'agent' && typeof createTask === 'function';
 function wem_cbHtml(p, h) {
   if (!wem_mayTask(p)) return h;
@@ -157,7 +93,7 @@ function wem_lists() {
   return [ib, ...sideOrder().filter(l => l && !l.is_inbox && !l.archived && canEditList(l.id))].filter(Boolean);
 }
 async function wem_cbDlg(p, ks) {
-  await wk_flush(); await wem_tickWait();  // 2.350.0 C (#3148): a tick still on the way first
+  await wk_flush();
   const all = wem_cbLines(p.body), pick = ks.map(k => all[k]).filter(L => L && !L.has && L.text);
   if (!pick.length) return;
   const ls = wem_lists(), lock = wk_e2e(p.space);
@@ -166,7 +102,7 @@ async function wem_cbDlg(p, ks) {
   const md = modal(`<h3>${ic('check', 's')} ${esc(tr('Create tasks'))}</h3>
     ${pick.length > 1 ? `<ul class="wemcbl">${pick.map((L, i) => `<li><label><input type="checkbox" data-wemi="${i}" checked> <span>${esc(L.text)}</span></label></li>`).join('')}</ul>` : `<p class="wemcb1">${esc(pick[0].text)}</p>`}
     <div class="row"><label for="wem-list">${esc(tr('Project'))}</label><select id="wem-list">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>
-    <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.'))}</p>
+    <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.'))}</p>
     <p class="shint keep wemlock" ${lockHint(ls[0]?.id) ? '' : 'hidden'}>${ic('lock', 's')} ${esc(tr('This page is end-to-end encrypted, the chosen project is not: the task titles are stored without that lock.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-m="ok">${ic('plus', 's')} ${esc(tr('Create tasks'))}</button></div>`);
   md.classList.add('wemdlg');
@@ -219,7 +155,7 @@ function wem_bar(p) {
 }
 // 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
 // a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,
-// so the browser's own undo works; the field's input handler saves like typing. Ctrl/Cmd+B / I in the field (2.350.0 B #3149: K = link, wklive.js).
+// so the browser's own undo works; the field's input handler saves like typing. Ctrl/Cmd+B / I in the field (K stays the command field).
 const WEM_FI = {h: 'M5 4V16M15 4V16M5 10H15', b: 'M6 4H11A3 3 0 0 1 11 10H6ZM6 10H12A3.1 3.1 0 0 1 12 16H6Z', i: 'M9 4H15M5 16H11M12 4L8 16'};
 const wem_fi = k => WEM_FI[k] ? `<svg class="i s" viewBox="0 0 20 20" aria-hidden="true">${icPath(WEM_FI[k])}</svg>` : ic(k, 's');
 const WEM_FMT = [['h', 'h', N_('Heading')], ['b', 'b', N_('Bold')], ['i', 'i', N_('Italic')], ['ul', 'list', N_('List')], ['cb', 'select', N_('Checkbox')], ['ln', 'link', N_('Link')]];
@@ -253,7 +189,7 @@ function wem_fmtLink(ta) {
   const lb = t || tr('Link text'), md = `[${lb}](https://)`;
   wem_rep(ta, s, e, md, t ? s + lb.length + 3 : s + 1, t ? s + md.length - 1 : s + 1 + lb.length);  // text there: the address is next
 }
-const WEM_LP = {ol: /^(\s*)\d{1,9}[.)][ \t]+/, h: /^(\s*)#{1,6}[ \t]+/, ul: /^(\s*)[-*+][ \t]+(?!\[[ xX]\])/, cb: /^(\s*)[-*+][ \t]+\[[ xX]\][ \t]?/};
+const WEM_LP = {h: /^(\s*)#{1,6}[ \t]+/, ul: /^(\s*)[-*+][ \t]+(?!\[[ xX]\])/, cb: /^(\s*)[-*+][ \t]+\[[ xX]\][ \t]?/};
 const WEM_ANY = /^(\s*)(?:#{1,6}[ \t]+|[-*+][ \t]+\[[ xX]\][ \t]?|[-*+][ \t]+|\d{1,9}[.)][ \t]+)/;
 function wem_lines(ta, k) {
   const v = ta.value, s = ta.selectionStart, e0 = ta.selectionEnd;
@@ -261,26 +197,26 @@ function wem_lines(ta, k) {
   const a = v.lastIndexOf('\n', s - 1) + 1, z = v.indexOf('\n', e) < 0 ? v.length : v.indexOf('\n', e);
   const ls = v.slice(a, z).split('\n'), use = ls.map(l => ls.length === 1 || l.trim() !== '');
   const off = ls.every((l, i) => !use[i] || WEM_LP[k].test(l));  // every line has it already: take it away
-  const pre = k === 'h' ? '## ' : k === 'cb' ? '- [ ] ' : k === 'ol' ? '1. ' : '- ';  // 2.350.0 B (#3149): + numbered
+  const pre = k === 'h' ? '## ' : k === 'cb' ? '- [ ] ' : '- ';
   const out = ls.map((l, i) => !use[i] ? l : off ? l.replace(WEM_LP[k], '$1') : l.replace(WEM_ANY, '$1').replace(/^(\s*)/, '$1' + pre)).join('\n');
   if (out === v.slice(a, z)) return;
   if (ls.length === 1) { const c = Math.max(a, Math.min(s + out.length - (z - a), a + out.length)); wem_rep(ta, a, z, out, c, c); }
   else wem_rep(ta, a, z, out, a, a + out.length);
 }
 function wem_fmt(k) {
-  const ta = wk_ta(); if (!ta) return;  // 2.350.0 B (#3147): + the live preview's block
+  const ta = $('#wk-body'); if (!ta) return;
   if (k === 'b') wem_wrap(ta, '**');
   else if (k === 'i') wem_wrap(ta, '*');
   else if (k === 'ln') wem_fmtLink(ta);
   else if (WEM_LP[k]) wem_lines(ta, k);
 }
 function wem_insert(txt, at) {
-  const ta = wk_ta(); if (!ta) return;
+  const ta = $('#wk-body'); if (!ta) return;
   const v = ta.value, a = Math.min(at?.[0] ?? ta.selectionStart ?? v.length, v.length), b = Math.min(at?.[1] ?? ta.selectionEnd ?? a, v.length);
   const pre = v.slice(0, a), sep = pre && !pre.endsWith('\n') ? '\n' : '', post = v.slice(b), tail = post.startsWith('\n') ? '' : '\n';
   ta.value = pre + sep + txt + tail + post;
   const pos = (pre + sep + txt + tail).length; ta.setSelectionRange(pos, pos); ta.focus();
-  ta.dispatchEvent(new Event('input', {bubbles: true}));  // 2.350.0 B (#3147): saves like typing (wiki.js), the live block follows
+  wk_queue();
 }
 async function wem_upload(p, files, at) {
   if (!p || !files.length) return;
@@ -342,7 +278,7 @@ function wem_pick(p, at) {
   setTimeout(() => $('#wem-q', md)?.focus(), 30);
 }
 function wem_insMenu(a, p) {
-  const ta = wk_ta(), at = ta ? [ta.selectionStart, ta.selectionEnd] : null;
+  const ta = $('#wk-body'), at = ta ? [ta.selectionStart, ta.selectionEnd] : null;
   menu(a, [...(wk_e2e(p.space) ? [] : [{label: tr('Upload from this device…'), icon: 'upload', fn: () => wem_device(p, at)}]),
     ...(feat('files') ? [{label: tr('From the file store…'), icon: 'folder', fn: () => wem_pick(p, at)}] : [])]);
 }
@@ -410,18 +346,18 @@ document.addEventListener('click', e => {
   e.preventDefault(); wem_fmt(b.dataset.wemf);
 });
 document.addEventListener('keydown', e => {
-  if (!wk_isTa(e.target) || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  if (/** @type {any} */ (e.target).id !== 'wk-body' || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
   const k = e.key.toLowerCase(); if (k !== 'b' && k !== 'i') return;
   e.preventDefault(); wem_fmt(k);
 });
 document.addEventListener('paste', e => {
-  if (!wk_isTa(e.target)) return;
+  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
   const fs = [...(e.clipboardData?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });
-document.addEventListener('dragover', e => { if (wk_isTa(e.target) && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+document.addEventListener('dragover', e => { if (/** @type {any} */ (e.target).id === 'wk-body' && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
 document.addEventListener('drop', e => {
-  if (!wk_isTa(e.target)) return;
+  if (/** @type {any} */ (e.target).id !== 'wk-body') return;
   const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });

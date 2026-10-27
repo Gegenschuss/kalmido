@@ -51,7 +51,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     // ================= #1378 logo + import through the page's own functions (the header comes from the helper)
     const PNG = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360606060000000050001a5f645400000000049454e44ae426082';
     await ev(`(async () => { const b = new Uint8Array('${PNG}'.match(/../g).map(h => parseInt(h, 16))); await ofcLogoUpload(new File([b], 'logo.png', {type: 'image/png'})); return 1; })()`);
-    check(await ready(ev, `!!OFC.info?.settings?.logo && __t.includes(tr('Logo saved'))`), '#1378: the logo upload of the page works ' + JSON.stringify(await ev('__t')));
+    // 2.357.0 B (#3179): the 1 px test logo gets the "prints small" hint after the upload
+    check(await ready(ev, `!!OFC.info?.settings?.logo && __t.includes(tr('Logo saved. It is only {0} px wide and prints small; 600 px or more print sharp.', 1))`), '#1378: the logo upload of the page works ' + JSON.stringify(await ev('__t')));
     // 2.87.9 (#1940): the import first names the office it goes into (confirmed here)
     await ev(`(async () => { const t = await (await fetch('/api/office/export')).text(); ofcImport(new File([t], 'office.json', {type: 'application/json'}), false); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`), '#1940: the import names its target first');

@@ -151,3 +151,9 @@ const fmtUsd = v => v === null || v === undefined ? '–' : +v > 0 && +v < .01 ?
 const aiuTaskLine = t => t.ai_usage ? `<label>${tr('Agent usage')}</label><div class="aiuse" title="${esc(tr('Model usage agents reported for this task'))}">${ic('chart', 's')}<span>${esc(tr('{0} tokens', fmtTok(t.ai_usage.tokens)))}${t.ai_usage.cost !== null && t.ai_usage.cost !== undefined ? ' · ' + esc(fmtUsd(t.ai_usage.cost)) : ''} · ${esc(trn('{0} report', '{0} reports', t.ai_usage.calls))}</span></div>` : '';
 // 2.65.0 (#1823): the pop-up button follows the window width also before the chat is loaded (agentchat.js redraws it too)
 { let t = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(chatFabDraw, 150); }); }
+
+// 2.235.0 D (#2899): phones: after sending, the keyboard closes so the answer has the whole screen (a tap into the box brings it back); per chat, default on
+const kbd_close = which => isTouch() && S.settings?.['chat_kbd_' + which] !== '0';
+const kbd_setHtml = (s, chk, hint) => ((typeof feat === 'function' && feat('agents')) || (typeof teamOn === 'function' && teamOn())) ? `<h4 id="s-kbd-h">${tr('Chat')}</h4>
+  ${typeof feat === 'function' && feat('agents') ? `<div class="row">${chk('s-kbda', s.chat_kbd_agent !== '0', tr('Close the keyboard after sending (agent chat)'))}</div>` : ''}${typeof teamOn === 'function' && teamOn() ? `<div class="row">${chk('s-kbdt', s.chat_kbd_team !== '0', tr('Close the keyboard after sending (team chat)'))}</div>` : ''}
+  ${hint(tr('On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.'))}` : '';

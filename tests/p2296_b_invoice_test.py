@@ -162,6 +162,7 @@ uo = ein.ein_ubl_build(mo, "peppol")
 check(b"<cbc:ID>O</cbc:ID>" in uo and b"DE123456789" not in uo and ein.ein_ubl_check(uo) == [], "abroad UBL: O, no seller VAT id")
 mg = copy.deepcopy(mo)
 mg["sender_fields"]["register_no"] = ""
+mg["sender_fields"]["tax_number"] = ""  # 2.357.0 (#3218): with a tax number it is O now (BT-29), see p2357_l_einvoice_test.py
 xg = ein.ein_build(mg, "zugferd")
 check({c for c, _ in line_cats(xg)} == {"G"} and "DE123456789" in vat_ids(xg) and ein.ein_check(xg) == [],
       f"abroad without a register number: G as before (BR-CO-26), seller VAT id kept: {line_cats(xg)} {vat_ids(xg)}")

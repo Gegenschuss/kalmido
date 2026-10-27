@@ -384,6 +384,7 @@ def comment_delete(cid):
     files = [a[0] for a in c.execute("SELECT path FROM attachments WHERE comment_id=?", (cid,))]
     c.execute("DELETE FROM attachments WHERE comment_id=?", (cid,))
     c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (iso(now_utc()), cid))
+    c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='comment' AND source_id=?", (cid,))  # 2.235.0 B2 (#2903): nor its copy in a rule
     from ..collab.news import news_forget_comment
     news_forget_comment(c, cid)  # 2.306.0 C (#2889)
     bump(c)

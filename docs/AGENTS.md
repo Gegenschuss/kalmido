@@ -25,6 +25,8 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Behaviour rules template](#behaviour-rules-template) (2.13.1)
 - [Runtime settings](#runtime-settings) (2.4.1)
 - [Work style](#work-style) (2.236.0: budget, work and quiet window, queue, priority rule, report style, pushes, next step)
+- [Standing rules](#standing-rules) (2.235.0: "from now on always ..." with date and source, editable and pausable)
+- [Data the agent never sees](#data-the-agent-never-sees) (2.235.0: areas, projects and tags locked for one agent)
 - [Teaching the agent](#teaching-the-agent) (2.46.6)
 - [Proposals](#proposals) (2.3.0)
 - [Day plans](#day-plans) (2.10.0)
@@ -747,6 +749,11 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `wake` | `POST …/wake` ([Wake endpoint](#wake-endpoint-for-agents-without-an-event-loop)) | `task` and `list` (or none), `user`, `source`: `task` or `chat` |
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `work_style_changed` | 2.236.0: the owner (an admin for a team agent) changed the agent's [work style](#work-style) | `work_style` (with `state`) |
+| `rules_changed` | 2.235.0: the owner (an admin for a team agent) added, reworded, paused, resumed or deleted one of the agent's [standing rules](#standing-rules) (never for the agent's own `add_rule`) | `change` (`added` / `edited` / `paused` / `resumed` / `deleted`), `rules` (the active ones) |
+| `data_lock_changed` | 2.235.0: the owner (an admin for a team agent) changed [what the agent never sees](#data-the-agent-never-sees) | `data_lock` |
+| `control_changed` | 2.235.0: the owner (an admin for a team agent) changed the agent's [control level](#control-level) | `control` |
+| `approval_expired` | 2.235.0: an approval card of the agent passed the [deadline for approvals](#control-level) | `message_id`, `user_id`, `outcome` (`rejected` / `approved` / `asked_again`), `then`, `approval_request` `{title, what, step}` |
+| `decision_undone` | 2.235.0: the owner took one of the agent's own decisions back (*Control* > history > Undo) | `decision` `{id, kind, title, method, path, target_id}`, `user` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
 | `team_message` | 2.17.0: someone @mentions the agent in a project's team chat (the agent is a member of the channel of every project shared with it); 2.46.1: in a project where the agent listens in, every message of a person in its channel, without an @mention (`mentioned` false; never a message of an agent) | `room` `{id, kind, list_id}`, `mentioned`, `listening` (2.46.1), `message` `{id, text, user_id, task_id, created_at, reply_to, reply, attachments, thread_of}` (2.139.0: an attachment with `voice: true` is a voice message, `duration_ms` its length; Kalmido does not transcribe), `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`); 2.139.0 (#2127): `thread_of` set = the message answers in a thread: answer in that thread (`thread_of`) |
@@ -1310,7 +1317,7 @@ Where people see it (2.30.0, only where the agent really writes):
 
 - `working` **with** `task_id`: "Claude is working on it" (with the status text) in the comment area of exactly that task,
   and *working on #51* in the chat header -- not under the chat messages.
-- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working: text", 2.350.0 the one state line) and in the
+- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working · text") and in the
   header chip only (2.32.0: no longer repeated under the last chat message, there only the typing dots); never in a task
   and never in a project's agent band. The status text of such a
   status never appears where other people read along, but keep chat content out of it anyway.
@@ -1323,9 +1330,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
 `host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
-agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
-"Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
-"Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
+agent (`host` in the agent objects people get) and shows them in the chat header: the permission badge says
+"Host default (Auto)" instead of only "Host default", the model stands next to it, and a model set in the runtime settings
 that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"). Unknown fields stay as before.
 2.44.0 (#1517): `host` (max. 80 characters) names the computer; it is kept on the token the request came with, so
 *Set up on a computer* lists each computer by name (the reference launchers send it once at start, `KALMIDO_HOST` or the
@@ -2045,7 +2051,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
-| A reminder draft over open invoices of one client | `POST /api/v1/office/reminders` | `draft_reminder` |
+| A reminder draft over open invoices of one client (2.355: only invoices past their due date, else `409`; the totals carry `interest` / `flat_fee` when the office switched them on) | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
 | 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |
@@ -2537,6 +2543,139 @@ on at `work_resumes_at`; the events stay where they are. The reference starters 
 no session outside the window, `agent_run.py` (event mode) keeps the events in its queue on disk, shows the status
 *paused* with the time it goes on, and reads `work_style_changed` at once (no run for it).
 
+## Standing rules
+
+*Since 2.235.0 (#2903).*
+
+A lasting instruction ("from now on always ...", "never again ...") becomes a **standing rule** of the agent: Kalmido
+keeps it with its date and source, the owner sees it in the agent's settings (*Work style and notifications* >
+*Standing rules*) and can reword, pause, resume or delete it, or add one by hand. Kalmido never reads the messages for
+such instructions (it calls no language model): the agent recognises them itself, saves the rule and confirms it in
+one line.
+
+- `POST /api/v1/agent/rules {"text": "...", "source": {"kind": "chat" | "comment", "id": N}}` (MCP `add_rule`) saves a
+  rule. The source must be a chat message of a person to the agent (in a conversation it still has) or a comment it can
+  see, written by a person who may address the agent in that project (never its own, another agent's or a guest's through
+  an approval link); anything else = 404. The same text as an existing rule returns that rule (200,
+  `duplicate: true`), a new one 201. At most 100 rules per agent, 500 characters each (400 beyond).
+- `GET /api/v1/agent/rules` (MCP `get_rules`) lists all rules with `state` `active` / `paused` and `source`
+  `{kind, id, task_id, user_id, excerpt}` (`kind` `manual` = added by a person). The `excerpt` is empty once the source
+  was deleted (the stored copy goes too) or the agent no longer sees it (e.g. a data lock); the rule itself stays.
+- `GET /api/v1/agent` carries `rules`: only the **active** ones `[{id, text, created_at, source}]`, oldest first. A
+  person's change sends the event `rules_changed` with the same list.
+- Owner routes (the owner of a personal agent, an instance admin for a team agent, everyone else 404):
+  `GET` / `POST /api/agents/{id}/rules`, `PATCH /api/agents/{id}/rules/{rule}` (`text`, `state`), `DELETE ...`.
+  The settings show the excerpt and the link to the source only to a person who may see it themselves.
+
+```
+POST /api/v1/agent/rules {"text": "Always write invoices in English", "source": {"kind": "chat", "id": 812}}
+-> 201 {"rule": {"id": 3, "text": "Always write invoices in English", "state": "active", "source": {"kind": "chat",
+   "id": 812, "task_id": null, "user_id": 2, "excerpt": "From now on always write invoices in English"}, ...},
+   "duplicate": false}
+```
+
+The reference starters put the active rules under their fixed rules block in every prompt (capability
+`standing_rules`; `agent_run.py` reads `rules_changed` at once, no run for it, and reads `GET /api/v1/agent` again after
+a run that called `add_rule`).
+## Data the agent never sees
+
+*Since 2.235.0 (#2902).* The owner of a personal agent (a person without an organisation is their own admin) or, for a
+team agent, an instance admin locks data for one agent in its settings (section *Data the agent never sees*,
+`GET/PATCH /api/agents/{id}/data-lock`, everyone else gets 404):
+
+- **Areas**: private e-mails (tasks that came in by e-mail in a private space; locked by default for every agent, also
+  for agents made before 2.235.0), contracts, home & devices and private trips (the private lists of Home & life). The
+  journal with its mood, health, the household budget and read later are never visible to an agent anyway (they cannot
+  be opened here).
+- **Projects**: single lists.
+- **Tags**: tasks with one of these tags (a personal tag or a project tag), with all their subtasks.
+
+The server enforces it in **every** read path of the agent with one check (lists, tasks, search, filters, calendar,
+comments, attachments, the roadmap, events, the chat context, the input of proposal requests such as *Sort the basket*,
+*Plan my day* or *Break down*, also in `GET /api/v1/agent/jobs/{id}`): a locked project or task does not exist for the agent
+(404, also for writes, so nothing tells it that the data is there) and no event about it is queued. The lock only ever
+narrows what the agent sees; sharing and the organisation boundary stay as they are. The people see everything as before.
+
+The agent reads WHAT is locked, never the names of what it cannot see: `GET /api/v1/agent` (MCP `get_agent`) gives
+
+```
+"data_lock": {"areas": ["journal", "mood", "health", "budget", "reading", "mail"],
+              "always": ["journal", "mood", "health", "budget", "reading"], "list_ids": [12], "tags_count": 1}
+```
+
+and the event `data_lock_changed` (`data.data_lock`, the same object) when the owner changes it. Nothing to do for the
+agent: do not ask for or work around locked data. The reference runner treats the event as information (no run,
+capability `data_lock_info`).
+## Control level
+
+*Since 2.235.0 (#2891 #2900 #2901).* How much the agent may do without asking, set by the same people as the
+[work style](#work-style) in the agent's settings (section *Control*, `GET/PATCH /api/agents/{id}/control`, everyone else
+404). It applies to agents only; people keep their roles and the approvals of takeover and release. **The server enforces
+it**: every write of the agent's token under `/api/v1/` has a class - `meta` (its own channel `/agent/...`: status,
+typing, chat and approval cards, jobs, proposals; always allowed), `routine` (create tasks and subtasks, plan them = only
+`due` / `due_time` / `start`, comment, tick off / reopen, reactions), `one_way` (every `DELETE` and the delete actions:
+emptying the trash, deleting folders, undoing an import, a batch with `action: delete`) or `change` (everything else).
+
+| Level | Allowed without a card |
+|---|---|
+| `approve_all` *Approve everything* (a new agent) | only `meta` |
+| `routine` *Routine free* | `meta` + `routine` |
+| `free` *Free run with a goal* (with `goal`, free text) | `meta` + `routine` + `change` |
+
+A project can have its own level (`projects`), which wins over the agent's. A personal agent never gets more in a project
+than its owner's own rights there (owner / admin = `free`, member who edits = `routine`, reading / commenting =
+`approve_all`). One-way steps (`one_way.fixed`: deleting, anything that costs money, login and registration, migrations
+without a way back; plus the owner's own items, `one_way.custom`) need a card on **every** level; Kalmido enforces deleting,
+the others happen outside Kalmido and are the agent's rule. **An agent made before 2.235.0** has no level (`control.level`
+null, `chosen: false`): it works as before, without any of these checks, until its owner picks one.
+
+A write the level does not allow answers `409`:
+
+```
+{"error": {"code": "approval_required", "message": "...", "step": "change", "level": "routine", "project_id": 12,
+           "approval": {"method": "PATCH", "path": "/api/v1/tasks/345", "body": {"title": "New title"}, "header": "X-Kalmido-Approval"}}}
+```
+
+The way to the approval: an approval card in the chat with the person (`POST /api/v1/agent/chats/{uid}`, MCP
+`request_chat_approval`) whose `approval.step` names exactly that request - `{"method": "PATCH", "path":
+"/api/v1/tasks/345", "body": {"title": "New title"}}` (copy `approval` of the 409; a path without `/api/v1` is completed;
+no `body` = a request without a body; at most 32,000 characters). Optional `approval.recommend` (`yes` / `no`, your
+recommended answer) and `approval.one_way: true` (a one-way step of the owner's list; the server marks a card whose step
+is a one-way step itself). The card shows the person the step, *one-way* and your recommendation. After the person's
+**Yes** send the same request again with the header `X-Kalmido-Approval: <id of the card>` (MCP: `use_approval`, then the
+call). It works **once**, only for that method, path and body (JSON keys in any order; a form request: its fields; uploaded
+files are not bound), only after a Yes (a 👍 on the card decides nothing); a request that fails (4xx / 5xx) gives the
+approval back. Otherwise `409 approval_invalid`. A one-way step needs the Yes of a person (never the deadline's
+`recommend`). The person who said Yes (for a deadline: the person of the card) must be allowed to change every project
+the request touches; a request without a project needs a person who shares a project with the agent.
+
+A personal agent never gets more than its owner's rights in a project: tasks, lists, comments, sections, notes, notepads,
+sheets, team rooms and messages, time entries, videos and attachments are placed in their project (also a `list_id` in
+the body, e.g. a move). A write to an object the server cannot place in a project (wiki pages, events, files, office
+documents, an object without a project, a `list_id` that is no id) counts as at most `routine` for a personal agent.
+
+**History and Undo.** Every step the agent takes without a card (on `routine` / `free`) and every approved step is one
+line in the history of its settings (the newest 50), with *Undo* where the server can: a created task goes to the trash,
+a planned task gets its old dates, a ticked-off task is open again, a comment is deleted. The agent gets
+`decision_undone`. Undo of a plan or a tick only while nobody changed it since (else `409`, the person takes it back by
+hand).
+
+**Deadline for approvals** (`deadline` in seconds, null = none; the owner picks 1 h, 4 h, 1 day or 3 days): an approval
+card left unanswered that long ends by itself, as `then` says - `reject` (default; the card shows *expired*),
+`ask_again` (one more push to the person, after the same time again: rejected) or `recommend` (the card's
+`approval.recommend` is taken; never for a one-way step - those are rejected). The agent gets `approval_expired`. The
+time counts from the card or from when the deadline was set, whichever is later.
+
+```
+GET /api/v1/agent -> {…, "control": {"level": "routine", "chosen": true, "enforced": true, "goal": "",
+    "projects": [{"list_id": 12, "level": "free", "effective": "routine"}],
+    "one_way": {"fixed": [{"id": "delete", "text": "Deleting"}, …], "custom": ["Send invoices"]},
+    "deadline": 14400, "then": "reject", "approval_header": "X-Kalmido-Approval"}}
+```
+
+The reference starters put level, goal, project levels, one-way steps and the way to an approval into the rules block in
+front of every prompt and read `control_changed` at once (capability `control_rules`).
+
 ## Teaching the agent
 
 *Since 2.46.6.*
@@ -2956,8 +3095,7 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
-yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 
@@ -3300,7 +3438,7 @@ those the token's scopes allow). `tests/agent_docs_coverage_test.py` checks that
 endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
-`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,

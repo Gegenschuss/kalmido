@@ -32,6 +32,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+import dbx as dbxm  # noqa: E402  # 2.355.0 D (#2846)
 FEAT = "cal,comments,collab,office,clients,docs,files"
 
 
@@ -213,6 +214,7 @@ check(r.status_code == 201, "setup: an invoice draft " + r.text[:200])
 INV = r.json()["doc"]["id"]
 A.patch(B + f"{D}/{INV}", json={"recipient": {"name": "Musterfirma GmbH", "lines": ["Weg 2", "10115 Berlin"]}, "service_from": "2026-01-05", "service_to": "2026-01-06"})
 check(A.post(B + f"{D}/{INV}/finalize").ok, "setup: the invoice is finalised")
+dbxm.overdue(DATA, [INV])  # 2.355.0 D (#2846): reminders only for overdue invoices
 r = requests.post(V + "/office/reminders", headers=AH, json={"invoice_ids": [INV], "level": 2})
 check(r.status_code == 201, "setup: a reminder draft " + r.text[:200])
 REM = r.json()["doc"]["id"]

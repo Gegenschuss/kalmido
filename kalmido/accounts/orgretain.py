@@ -54,6 +54,10 @@ ODL_LEGAL = (
     ("procdocs", "book", "SELECT substr(created_at, 1, 4) FROM office_procdocs WHERE org_id=?"),
     ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), created_at), 1, 4) FROM office_signoffs "
                            "WHERE org_id=? AND (state='accepted' OR signed_at IS NOT NULL)"),
+    # 2.355.0 B (#2845): the asset register (a book) from the year of a device's last depreciation: purchase month + useful
+    # life (without one the longest of the table, office/assets.py AST_LIFE: the careful side)
+    ("assets", "book", "SELECT CAST(CAST(substr(purchase_date, 1, 4) AS INTEGER) + (CAST(substr(purchase_date, 6, 2) AS INTEGER) - 1 "
+                       "+ COALESCE(life_months, 156)) / 12 AS TEXT) FROM office_equipment WHERE org_id=? AND purchase_date ~ '^[0-9]{4}-[0-9]{2}'"),
 )
 # what goes along with an organisation without legal data: shown before (409), deleted only with ?confirm=1
 ODL_CONTENT = (

@@ -25,6 +25,9 @@ from ..agents.core import (
 from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
 from ..agents.workstyle import ws_public
+from ..agents.control import ctl_public  # 2.235.0 A (#2891)
+from ..agents.datalock import dl_public  # 2.235.0 B (#2902)
+from ..agents.agentrules import ar_public  # 2.235.0 C (#2903)
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -44,6 +47,9 @@ def agent_self(c, aid):
             # null = the host keeps KALMIDO_PERM_USER / the owner
             "perm_user_id": perm_user_of(c, a),
             "work_style": ws_public(c, a),  # 2.236.0 (#2904-#2911): how it works and reports (agents/workstyle.py)
+            "control": ctl_public(c, a),  # 2.235.0 A (#2891 #2900 #2901): control level, goal, one-way steps, approval deadline
+            "data_lock": dl_public(c, a),  # 2.235.0 B (#2902): what it may never see
+            "rules": ar_public(c, a),  # 2.235.0 C (#2903): its active standing rules
             # 2.46.6 (#1715): the language the launcher's rules block asks for (the owner's for a personal agent, else its own)
             "lang": lang_of(usettings(c, p["owner_id"] or aid))}
 

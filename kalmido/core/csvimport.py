@@ -32,7 +32,8 @@ CAMT_AMOUNT_MAX = Decimal("100000000")
 DATE_FORMATS = {"DD.MM.YYYY": r"(\d{1,2})\.(\d{1,2})\.(\d{4})", "YYYY-MM-DD": r"(\d{4})-(\d{1,2})-(\d{1,2})",
                 "DD.MM.YY": r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "MM/DD/YYYY": r"(\d{1,2})/(\d{1,2})/(\d{4})",
                 # 2.146.0 C (#2455): two more layouts of bank exports
-                "DD-MM-YYYY": r"(\d{1,2})-(\d{1,2})-(\d{4})", "YYYYMMDD": r"(\d{4})(\d{2})(\d{2})"}
+                "DD-MM-YYYY": r"(\d{1,2})-(\d{1,2})-(\d{4})", "YYYYMMDD": r"(\d{4})(\d{2})(\d{2})",
+                "DD/MM/YYYY": r"(\d{1,2})/(\d{1,2})/(\d{4})"}  # 2.355.0 B (#2843): British exports (was read as MM/DD)
 # 2.146.0 C (#2455): sign = the column of a debit / credit mark (S/H, Soll/Haben, D/C, -/+) next to an amount without a sign
 MAP_KEYS = ("date", "amount", "amount_in", "amount_out", "title", "counterpart", "sign")
 SIGN_OUT = frozenset(("s", "soll", "d", "db", "dbit", "debit", "-", "lastschrift", "belastung"))
@@ -153,9 +154,13 @@ def csv_table(text, max_rows=CSV_ROWS):
     return d, header, body
 
 
-def csv_amount(s, dec):
-    """'1.234,56' / '-12,30' / '12,30-' / '12.30' / '(12.30)' -> signed Decimal or None."""
-    s = (s or "").strip().replace(" ", "").replace(" ", "")
+def amount_text(s, dec=None):
+    """2.355.0 B (#2843): the one reader of a typed / exported money amount -> unrounded signed Decimal or None (unreadable,
+    never a silent other number). Thousand separators only in groups of three ("1.234,56", "1,234.56", "1'234.56"); dec ","
+    or "." is the decimal mark of the file, dec None reads both (German first: "1.500" = 1500, "1.234,5" / "1,234.5" by the
+    last mark). A single mark before exactly three digits after at most three ("1,500", "1.234" with the decimal point)
+    could be a thousand or three decimals and is unreadable."""
+    s = re.sub(r"[\s\u00a0\u202f]", "", str(s or ""))
     s = re.sub(r"(?i)(eur|€|\$|usd|chf|£)", "", s)
     if not s:
         return None
@@ -168,14 +173,32 @@ def csv_amount(s, dec):
         neg, s = not neg, s[1:]
     elif s.startswith("+"):
         s = s[1:]
-    if dec == ",":
-        s = s.replace(".", "").replace("'", "").replace(",", ".")
-    else:
-        s = s.replace(",", "").replace("'", "")
-    if not re.fullmatch(r"\d{1,9}(\.\d{1,4})?", s):
-        return None
-    v = Decimal(s).quantize(Decimal("0.01"))
+    if dec is None:
+        last = max(s.rfind(","), s.rfind("."))
+        if last < 0:
+            dec = ","
+        elif "," in s and "." in s:
+            dec = s[last]
+        elif s.count(s[last]) > 1 or re.fullmatch(r"\d{1,3}\.\d{3}", s):
+            dec = "," if s[last] == "." else "."  # repeated = thousands; "1.500" = 1500 (German first)
+        else:
+            dec = s[last]
+    grp = "[.']" if dec == "," else "[,']"
+    m = re.fullmatch(rf"(\d{{1,3}}(?:{grp}\d{{3}})+|\d{{1,12}})(?:{re.escape(dec)}(\d{{1,10}}))?", s)
+    if not m or (m.group(2) and len(m.group(2)) == 3 and len(m.group(1)) <= 3):
+        return None  # "1,500" / "1.234" with that decimal mark: a thousand or three decimals -- never guessed
+    v = Decimal(re.sub(r"\D", "", m.group(1)) + ("." + m.group(2) if m.group(2) else ""))
     return -v if neg else v
+
+
+def csv_amount(s, dec):
+    """'1.234,56' / '-12,30' / '12,30-' / '12.30' / '(12.30)' -> signed Decimal or None. 2.355.0 B (#2843): read by
+    amount_text (thousand separators only in groups of three, else unreadable -- "1,234.5" with the decimal comma was
+    1,23), rounded half up like CAMT."""
+    v = amount_text(s, dec)
+    if v is None or abs(v) >= 10 ** 9:
+        return None
+    return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def csv_day(s, fmt):
@@ -243,12 +266,20 @@ def _plain_guess(header, body):
     fmt = "DD.MM.YYYY"
     if g_["date"] is not None:
         ds = [r[g_["date"]] for r in sample if g_["date"] < len(r) and r[g_["date"]]]
-        for f in DATE_FORMATS:
-            if ds and sum(1 for x in ds if csv_day(x, f)) >= max(1, len(ds) * 0.8):
-                fmt = f
-                break
+        fmt = _day_fmt(ds, DATE_FORMATS) or fmt
     g_["date_format"] = fmt
     return g_
+
+
+def _day_fmt(ds, fmts):
+    """2.355.0 B (#2843): the format reading the most of ds (at least 80 %); a tie goes to the day first (DD/MM before
+    MM/DD: 03/04/2026 is the 3rd of April unless a day above 12 says otherwise)."""
+    hits = {f: sum(1 for x in ds if csv_day(x, f)) for f in fmts}
+    best = max(hits.values(), default=0)
+    if not ds or best < max(1, len(ds) * 0.8):
+        return None
+    pick = [f for f in fmts if hits[f] == best]
+    return "DD/MM/YYYY" if "DD/MM/YYYY" in pick else pick[0]
 
 
 def csv_guess(header, body):
@@ -262,10 +293,10 @@ def csv_guess(header, body):
             g_[k] = cols.get(k)
         g_["decimal"] = p["decimal"]
         ds = [r[cols["date"]] for r in body[:50] if cols["date"] < len(r) and r[cols["date"]]]
-        for f in (p["date_format"], *DATE_FORMATS):
-            if not ds or sum(1 for x in ds if csv_day(x, f)) >= max(1, len(ds) * 0.8):
-                g_["date_format"] = f
-                break
+        if not ds or sum(1 for x in ds if csv_day(x, p["date_format"])) >= max(1, len(ds) * 0.8):
+            g_["date_format"] = p["date_format"]
+        else:
+            g_["date_format"] = _day_fmt(ds, DATE_FORMATS) or g_["date_format"]
         g_["preset"], g_["preset_name"] = p["id"], p["name"]
     return g_
 
@@ -314,8 +345,8 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
         a_in = csv_amount(col("amount_in"), m["decimal"]) if m.get("amount_in") is not None else None
         a_out = csv_amount(col("amount_out"), m["decimal"]) if m.get("amount_out") is not None else None
         if a_in:
-            amt = abs(a_in)
-        elif a_out:
+            amt = a_in  # 2.355.0 B (#2843): "-50,00" in the credit column is -50 (a return), never +50
+        elif a_out:  # the debit column: written with or without a minus, always out
             amt = -abs(a_out)
     title = (col("title") or col("counterpart")).strip()
     out["title"] = re.sub(r"\s+", " ", title)[:title_max]
@@ -367,7 +398,9 @@ def camt_version(text):
 def csv_ref_parts(row):
     """2.146.0 C (#2469): the reference parts of a booking for the duplicate check across files and imports: the bank's
     reference (AcctSvcrRef) and the EndToEndId, each with the signed amount (a reference alone is not always unique: an
-    EndToEndId may come back every month). Each caller keys them (HMAC) for its area -- they are never stored plain."""
+    EndToEndId may come back every month). Each caller keys them (HMAC) for its area -- they are never stored plain.
+    2.355.0 B (#2843): with a day in row the EndToEndId part carries it too ("e|<id>|<amount>|<day>": a fixed EndToEndId of a
+    standing order with the same amount every month is a new booking each month); csv_ref_legacy gives the old form."""
     amt = row.get("amount")
     if amt is None:
         return []
@@ -376,8 +409,14 @@ def csv_ref_parts(row):
     for tag, k in (("a", "svc_ref"), ("e", "e2e")):
         v = (row.get(k) or "").strip()
         if v and v.upper() not in REF_NONE:
-            out.append(f"{tag}|{v}|{a}")
+            out.append(f"{tag}|{v}|{a}|{row['day']}" if tag == "e" and row.get("day") else f"{tag}|{v}|{a}")
     return out
+
+
+def csv_ref_legacy(row):
+    """2.355.0 B (#2843): the EndToEndId part without the day, as stored before 2.355 (matched only with a booking of the
+    same day, never rewritten)."""
+    return [x.rsplit("|", 1)[0] for x in csv_ref_parts(row) if x.startswith("e|") and row.get("day")]
 
 
 def camt_local(tag):

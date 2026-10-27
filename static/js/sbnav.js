@@ -58,11 +58,7 @@ async function sbp_pin(k, id, on, name) {
     if (k === 'side_people' && ids.length >= SB_PINS) { toast(tr('At most {0} people in the sidebar: unpin one first', SB_PINS)); return false; }
     ids.push(+id);
   }
-  // 2.350.0 C (#2806): sent as single entries (set_delta): a page state that lags behind (a reload crossing the last save)
-  // no longer sends an older whole list that drops a pin; people no longer shared go along as removals
-  const drop = sbp_ids(k).filter(x => !mine.has(x) && x !== +id).map(String);
-  const sd = add => ({set_delta: {[k]: add ? {remove: drop, add: [String(id)]} : {remove: [String(id), ...drop]}}});
-  return setApply({[k]: ids.join(',')}, `${on ? tr('Pin to the sidebar') : tr('Unpin from the sidebar')} · ${name}`, {send: sd(on), back: sd(!on)});
+  return setApply({[k]: ids.join(',')}, `${on ? tr('Pin to the sidebar') : tr('Unpin from the sidebar')} · ${name}`);
 }
 const sbp_item = (k, id, name) => sbp_is(k, id) ? {label: tr('Unpin from the sidebar'), icon: 'pin', fn: () => sbp_pin(k, id, false, name)}
   : {label: tr('Pin to the sidebar'), icon: 'pin', fn: () => sbp_pin(k, id, true, name)};

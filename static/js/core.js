@@ -584,7 +584,10 @@ async function api(method, url, body) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
       if (method !== 'GET') toast(tr('Offline: only works again with a connection'));
-    } else if (e.message !== 'auth' && !e.shown) toast(e.message);
+    } else if (e.message !== 'auth' && !e.shown) {
+      if (e.data?.out_request && typeof oor_ask === 'function') toast(e.message, () => oor_ask(e.data.out_request), 10000, tr('Ask an admin'));  // 2.361.2 (#2923)
+      else toast(e.message);
+    }
     throw e;
   }
 }
@@ -946,16 +949,11 @@ function optSet(get, vals) {
 async function load(auto) {
   let j;
   try {
-    let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = S.wseq || 0;
       j = await api('GET', auto && !i ? '/api/state?auto=1' : '/api/state');  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
-      crossed = (S.wseq || 0) !== w0;
-      if (!crossed) break;
+      if ((S.wseq || 0) === w0) break;
     }
-    // 2.350.0 C (#2806): still crossed by a write after the third try: the own settings win over that answer (it may predate
-    // the save); the next load brings changes made elsewhere
-    if (crossed && j?.settings && S.settings && j.me?.id === S.me?.id) j.settings = {...j.settings, ...S.settings};
     if (j?.brake) return 'brake';  // 2.280.0 F (#3109): the caller keeps the change pending
     OUT.me = j?.me?.id;  // 2.126.0 D (#1992 O5)
     if (j?.me?.id === LS.get('uid', j?.me?.id)) sessGuard(j?.me);  // 2.238.0 B (#2872): before the outbox is sent (another account: applyState clears all)
@@ -1132,7 +1130,7 @@ const editing = () => {
 };
 // a re-render of the view a live update asked for while someone types in it: done once the field is left (the poll)
 // 2.41.0 (#1376): also while a form in the view has unsaved input (formguard)
-function viewSafeRender() { if ((editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
+function viewSafeRender() { if (lpHold() || (editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
 // 1.9.0 pull-to-refresh (touch, shared lists): pull down at the very top of the list by 4.5rem and let go
 (() => {
   let y0 = null, x0 = 0, pull = 0, el = null;

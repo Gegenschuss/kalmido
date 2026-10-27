@@ -145,7 +145,8 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // ---- sorting (saved, one undo step) and filtering (view only)
   await w.eval(`shvSort(${C[0]}, -1)`);
   check(await until(async () => (await get()).rows[0].id === R[1]), 'sorted descending by A: the 7 first (saved)');
-  check(d.querySelector('#shv-scroll tbody tr').dataset.id === String(R[1]), 'the grid shows the new order');
+  // CI of 2.351.6: a load still running (the option saved above) only marks a reload, the sort's step returns before the grid is drawn
+  check(await until(() => d.querySelector('#shv-scroll tbody tr')?.dataset.id === String(R[1])), 'the grid shows the new order');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await get()).rows[0].id === R[0]), 'undo: the old order');
   w.eval(`shvFilterPop(${C[0]}, document.querySelector('[data-shv="col"][data-c="${C[0]}"]'))`);

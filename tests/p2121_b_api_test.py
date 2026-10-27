@@ -11,7 +11,8 @@ tenant-matrix: office
    open days before it too, no future day
  - links: a receipt of the office's documents (the receipt shows "in the cash book no. X"), an issued invoice; those of
    another organisation / drafts 404
- - CSV (semicolon, decimal comma, formula injection made harmless, closings, change log) and PDF; the EUeR unchanged
+ - CSV (semicolon, decimal comma, formula injection made harmless, closings, change log) and PDF; the EUeR without the cash book
+   (2.355.0 #2843: an invoice paid in cash counts once, as its payment)
  - rights: a member 403, an agent 403, another organisation 404; a person without organisation (personal office) uses all
    of it, another person and the organisation do not reach it
 usage: p2121_b_api_test.py <datadir>      (P2121B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
@@ -286,7 +287,10 @@ check(r.ok and r.content[:5] == b"%PDF-" and len(r.content) > 1500, "PDF")
 check(A.get(B + O + "/cashbook.csv?from=2026-03-01&to=2026-03-02").ok, "CSV of a period (default box)")
 check(A.get(B + O + "/cashbook.csv?from=2026-03-05&to=2026-03-01").status_code == 400, "CSV: from after to 400")
 EUER1 = A.get(B + O + "/books/euer?year=2026").json()
-check(EUER1["income"] == EUER0["income"], f"the EUeR income does not count the cash book {EUER1['income']}")
+# 2.355.0 (#2843): the cash entry "invoice paid in cash" books a cash payment on the invoice: the EUeR counts that payment
+# once (through the invoice), never the cash entry itself
+g0, g1 = (sum(float(x["gross"]) for x in e["income"]) for e in (EUER0, EUER1))
+check(abs(g1 - g0 - 23.80) < 0.001, f"the EUeR income counts the invoice's cash payment once, not the cash book {EUER1['income']}")
 check(abs(sum(float(x["gross"]) for x in EUER1["expenses"]) - 11.90) < 0.001, f"the EUeR expenses: only the receipt (11.90), not its cash entry {EUER1['expenses']}")
 
 # ---------------------------------------------------------------- another organisation, agents

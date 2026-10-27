@@ -18,7 +18,7 @@ from flask import Response, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db
+from ..core.db import db, local_now
 from ..core.orgcrypt import oc_dec_fields
 from ..personal.timetrack import BadInput
 from .calc import dec, money
@@ -212,7 +212,7 @@ def gx_zip(c, oid, frm, to):
 
 
 def _span():
-    y = date.today().year - 1
+    y = local_now().year - 1  # 2.355.0 B (#2847): the office's local year (date.today() is the server's)
     a = (request.args.get("from") or f"{y}-01-01").strip()
     b = (request.args.get("to") or f"{y}-12-31").strip()
     try:

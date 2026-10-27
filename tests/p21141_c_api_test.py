@@ -82,12 +82,16 @@ def scenario(S, who):
                                 "items": [{"title": "Konzept", "qty": 1, "rate": 800}]})
         check(r.status_code == 201, f"{who} {lang}: create quotation {r.status_code} {r.text[:200]}")
         doc = r.json().get("id")
+        # 2.357.0 C (#3182): the appendix stays on the last page when it fits there completely; longer exceptions and a fuller
+        # part page keep it on a page of its own (the case checked here; the short case: p2357_c_signature_test)
+        rt = {**rt, "exceptions": ", ".join(f"Kanal {i + 1} mit eigener Beschreibung" for i in range(30))[:1000]}
         r = S.patch(B + f"{D}/{doc}", json={"rights": rt, "closing": "Wir freuen uns auf die Zusammenarbeit." if lang == "de" else "We look forward to working with you."})
         check(r.ok, f"{who} {lang}: rights set {r.text[:200]}")
         r = S.post(B + f"{D}/{doc}/parts", json={"title": "Interaktives Modul", "print": 1})
         check(r.status_code == 201, f"{who} {lang}: a printed part {r.text[:200]}")
         pid = (r.json().get("part") or {}).get("id")
-        S.put(B + f"{D}/{doc}/parts/{pid}/items", json={"items": [{"title": "Animation", "qty": 2, "rate": 500}]})
+        S.put(B + f"{D}/{doc}/parts/{pid}/items", json={"items": [{"title": "Animation", "qty": 2, "rate": 500}]
+                                                           + [{"title": f"Schritt {i + 1}", "qty": 1, "rate": 100} for i in range(12)]})
         r = S.get(B + f"{D}/{doc}/pdf")
         check(r.status_code == 200 and r.content.startswith(b"%PDF"), f"{who} {lang}: the PDF {r.status_code}")
         pg = pages(r.content)

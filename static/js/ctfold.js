@@ -13,7 +13,7 @@ const CTF = {d: null, v: -1, busy: false, err: ''};
 async function ctf_load(force) {
   if (CTF.busy || (!force && CTF.d && CTF.v !== -1)) return;
   CTF.busy = true;
-  try { CTF.d = await rawFetch('GET', '/api/contacts/folders'); CTF.err = ''; }
+  try { CTF.d = {spaces: [], folders: [], items: [], ...(await rawFetch('GET', '/api/contacts/folders'))}; CTF.err = ''; }
   catch (e) { if (e.message === 'auth') return; CTF.err = e.message; CTF.d = CTF.d || {spaces: [], folders: [], items: []}; }
   finally { CTF.busy = false; CTF.v = S.v; }
   if (S.route.mod === 'contacts' && typeof renderSide === 'function') renderSide();

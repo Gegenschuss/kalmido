@@ -3,7 +3,7 @@
 *Since 2.85.0.* A simple feed reader, part of the area **Reading** (since 2.172.0; before: Home): follow blogs and news
 sites and read their new articles in one list. Switch it on under *Settings > Modules > Reading > Feeds* (off by default).
 
-![Feeds on the phone: one unread article with Open, Read later and Read, one saved article](feeds.png)
+![Feeds on the phone: unread articles of two feeds, each with Open, Read later and Read](feeds.png)
 
 ## Following a feed
 

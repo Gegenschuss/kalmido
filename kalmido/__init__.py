@@ -32,6 +32,7 @@ ORDER = (
     "core.db",
     "core.errors",  # 2.149.0 G (#2517): BadInput, Denied, UnknownFields (re-exported at the old places)
     "core.ctx",  # 2.149.0 G (#2517): me()
+    "core.dlock",  # 2.235.0 B (#2902): THE check of an agent's data lock (core/access.py calls it)
     "core.conflict",  # 2.269.0 C (#3017): expect_updated_at -> 409 with the current state (Conflict, ccf_check)
     "core.ratedb",  # 2.306.0 D1 (#2875): rate limits counted for every web process
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
@@ -101,6 +102,7 @@ ORDER = (
     "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)
     "accounts.tenancy",
     "accounts.orglists",  # 2.35.0 (#1101)
+    "accounts.orgoutreq",  # 2.361.2 (#2923): a member asks back what they brought into an organisation
     "accounts.useradmin",  # 2.88.0 (#1980)
     "accounts.orgretain",  # 2.152.0 A (#2164 #2167)
     "lists.templates",
@@ -144,6 +146,9 @@ ORDER = (
     "agents.schedules",  # 2.34.0 (#272)
     "agents.workstyle",  # 2.236.0 (#2904-#2911)
     "agents.workqueue",  # 2.236.0 C (#2906 #2907)
+    "agents.control",  # 2.235.0 A (#2891 #2900 #2901)
+    "agents.datalock",  # 2.235.0 B (#2902)
+    "agents.agentrules",  # 2.235.0 C (#2903)
     "agents.admin",
     "agents.api",
     "agents.proposals",
@@ -428,6 +433,7 @@ ORDER = (
     "office.fixedimport",  # 2.67.0 A (#1838): fixed costs from a spreadsheet + the monthly check task of the cash flow
     "office.recurring",  # 2.91.0 A (#1923): invoice series (a template invoice every month / quarter / year, drafts or sent)
     "office.subs",  # 2.91.0 B (#1924): subscriptions and tools (fixed costs with notice period, users, renewal reminder)
+    "office.storefill",  # 2.357.0 (#3221): once: the stored files of finalised documents from before they were stored (no routes)
     "office.girocode", "office.dunning",  # 2.147.1 B (#2054): the GiroCode (EPC QR), payment reminders suggested for overdue invoices
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)

@@ -120,7 +120,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const anna = items.find(n => /Anna commented/.test(n.textContent));
   click(w, anna); await until(() => w.eval('S.sel') === T[5]);
   check(w.eval('S.sel') === T[5] && d.querySelector('#pop').classList.contains('hidden'), 'A5: an item opens its task');
-  w.eval('closeDetail()'); await idle(w);
+  // 2.358 (#3402): on a phone the bell opens 260 ms after closeDetail (detail.js), idle() may end before that
+  w.eval('closeDetail()'); await idle(w); await until(() => !d.querySelector('#pop').classList.contains('hidden') && d.querySelector('#pop .bpop'));
   check(!d.querySelector('#pop').classList.contains('hidden') && d.querySelector('#pop .bpop'), 'A5: Back returns to the bell');
   const u0 = w.eval('S.news.unread');
   click(w, d.querySelector('#pop [data-bp="readall"]')); await until(() => /marked as read/.test(d.querySelector('#toast')?.textContent || ''));
