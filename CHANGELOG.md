@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.351.2] - 2026-10-27
+
+Package 2.351.1 (CI fix of the live train 2.351.1).
+### Fixed
+- CI of 2.351.1: a whole-state follow-up redraws the view only when the tasks changed (2.351.0 D redrew every time and dropped the timeline's hold ghost and scroll); the demo answers the address book's folder tree (Contacts no longer crashed there); SQL guards (the agents' e-mail lock keeps its index-friendly LIKE, marked as checked; reasons for system reads in the office's folder side); the suites p2330_a_kleine_fehler (+ _ui) run in CI; older UI tests follow the phone keyboard switch (#2899), the sticky dialog head (#2745), the office tree rows (#3312) and month ends in the timeline.
+
 ## [2.351.1] - 2026-10-27
 
 ### Fixed
@@ -8802,7 +8808,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.351.2...HEAD
+[2.351.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.2
 [2.351.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.1
 [2.351.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.351.0
 [2.323.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.323.1
