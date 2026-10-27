@@ -1127,7 +1127,7 @@ const editing = () => {
 };
 // a re-render of the view a live update asked for while someone types in it: done once the field is left (the poll)
 // 2.41.0 (#1376): also while a form in the view has unsaved input (formguard)
-function viewSafeRender() { if ((editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
+function viewSafeRender() { if (lpHold() || (editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
 // 1.9.0 pull-to-refresh (touch, shared lists): pull down at the very top of the list by 4.5rem and let go
 (() => {
   let y0 = null, x0 = 0, pull = 0, el = null;

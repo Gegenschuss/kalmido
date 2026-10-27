@@ -15,7 +15,10 @@ S.lpN = {render: 0, state: 0, light: 0};  // counters for the measurement (rende
 let lpT = 0, lpAreas = new Set();
 // a form on the screen with unsaved input (formguard.js); drafts of forms not shown any more do not count
 const lpFormBusy = (root = document) => !!root && typeof fgDirty === 'function' && [...root.querySelectorAll('[data-fg]')].some(f => fgDirty(f.dataset.fg));
-const lpBusy = () => editing() || lpFormBusy();
+// 2.358 (#3402): a press / drag that holds an element (drag.js: the timeline's bars and its new-task ghost .tl-ghost; the
+// calendar's held event .cgghost / .cgsrc): a redraw would replace it under the finger (on a phone the held event dropped)
+const lpHold = () => !!((typeof drg_cur !== 'undefined' && drg_cur) || (typeof CG !== 'undefined' && CG.st?.active));
+const lpBusy = () => editing() || lpFormBusy() || lpHold();
 // the areas whose counter moved since the last poll (null: unknown -> the full way)
 // 2.280.0 F (#3109): + those of earlier polls not taken yet (typing, a dialog, a braked reload: S.v stayed behind); lpSettle
 // forgets them once the state reached the polled version
@@ -77,7 +80,7 @@ async function lpFollow() {
     // 2.351.0 D (#2785): the whole state may bring more than the light counters (a task deleted on another device meanwhile):
     // it took S.v, so the poll sees nothing new any more -> drawn bundled like the poll's full way (lpDraw checks only counters);
     // 2.351.1: only when the tasks moved - else a redraw dropped what the view held (the timeline's hold ghost, its scroll)
-    if (lpTaskSig() !== ts) td_renderSoon();
+    if (lpTaskSig() !== ts) { if (lpHold()) S.viewStale = true; else td_renderSoon(); }  // 2.358 (#3402): held: drawn after letting go
   }
   lpDraw(side, rows, areas);
 }
@@ -167,7 +170,7 @@ function lpSideTake(j) {
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
 }
 // the view redrawn by morphing unless a field / form in it is busy (then marked stale, drawn later like viewSafeRender)
-function lpViewSafe() { if ((editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } lpMorphView(); }
+function lpViewSafe() { if (lpHold() || (editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } lpMorphView(); }
 // the view redrawn by morphing: unchanged rows keep their nodes (2.46.2 #1718: calendar and timeline too)
 function lpMorphView() {
   const el = $('#view'); if (!el) return;

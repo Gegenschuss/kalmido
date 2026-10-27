@@ -14,8 +14,5 @@ p2169_a_ui 2026-11-09 #3330 CI v2.323.0; Mac green 20261026-153121, 20261026-154
 p2412_ui 2026-11-09 #3330 CI v2.323.0; Mac green 20261026-153121, 20261026-154743 (same code)
 p2351_a_officetree_ui 2026-11-10 #3398 CI v2.351.3 red, CI v2.351.2 green (same app code); Mac green 20261027-061405, 20261027-061554, 20261027-061718 (same code)
 time_ui 2026-11-10 #3398 CI v2.351.3 red, CI v2.351.2 green (same app code); Mac green 20261027-061405, 20261027-061554, 20261027-061718 (same code)
-p2130_ui 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
 p2146_d_api 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
-p2193_a_ui 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
-p2193_b_ui 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
 p2239_b_logs 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
