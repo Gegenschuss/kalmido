@@ -20,16 +20,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
-**Next release**:
-- **Office**: split bank bookings across invoices; optional default interest and 40 EUR flat fee on reminders; cash discount in accrual VAT and DATEV; e-invoice category K for EU goods.
-- **Office PDFs**: paper size A4 or US Letter per company; your own signature (upload or draw) in letters, templates and optionally quotations / reminders.
-- **Organisations**: members ask an admin to give back what they brought in; one click releases it.
+**2.376** (2026-10-27, eight packages in one train):
+- **Office**: hand in receipts to the bookkeeping, GoBD export, take your part of an organisation's office into your personal one; refunds on credit notes, reverse charge hints, progress and final invoices.
+- **Projects**: show a task in several projects (field "Projects" in the task panel, Alt-drag onto a project).
+- **Knowledge**: live preview editor with "/" commands and tickable checkboxes; search hits show a text snippet.
+- **Offline**: typed text survives a closed tab, an expired session or a failed save; it is sent later, never twice.
+- **Security**: downloads of backups and exports, restores and public links ask for your password first.
 
-**2.351** (2026-10-26, fixes up to 2.351.8 on 2026-10-27):
-- **Agents**: a control level per agent and project (approve everything, routine free, free run with a goal), approval cards for one-way steps on every level, "data the agent never sees" and standing rules.
-- **Office**: Quotes & invoices, Documents, Correspondence and Receipts open as trees in the sidebar; documents, letters, receipts, address books, contacts and contracts can be filed and shared in folders.
-- **Look**: petrol is the brand colour and the default accent; violet stays selectable.
-- **Phones**: the keyboard closes after sending a chat message, so the answer has the whole screen.
+**2.361** (2026-10-27, fixes up to 2.361.3): split bank bookings across invoices, default interest and the 40 EUR flat fee on reminders, paper size A4 or US Letter, your own signature in office PDFs; members ask an admin to give back what they brought in.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
