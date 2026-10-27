@@ -469,6 +469,8 @@ fresh; run p2350_c_api "$PY" p2350_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_c_ui node p2350_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_api "$PY" p2350_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_ui node p2350_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.350.0 D (#2750, #2745, #3242): chat + sidebar drag wide (list keeps 12 rem), dialog head over the first row, undo message at an empty hash
+fresh; run p2350_d_breiten_ui node p2350_d_breiten_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2360_b_api "$PY" p2360_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2360_b_ui node p2360_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2360_c_api "$PY" p2360_c_api_test.py "$KALMIDO_TEST_DATA"

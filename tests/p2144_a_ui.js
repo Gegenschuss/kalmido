@@ -83,7 +83,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   // ================= #2416 Only me and <agent>
   await pick(/Only me/);
   await until(() => !d.querySelector('.jcd'));
-  check(w.eval(`LS.get('jcdFilt')`) === 'me' && fbtn().querySelector('.jcdfdot'), 'Only me: kept, the icon carries the dot');
+  check(w.eval(`LS.get('jcdFilt')`) === 'me' && fbtn().classList.contains('jcdfon') && /Filter: /.test(fbtn().title), 'Only me: kept, the icon names the filter');  // 2.350.0 (#3317): no dot, the title
   check(row(plain) && box().querySelector(':scope > .cmsg.me'), 'Only me: the plain answer and my message');
   check(!d.querySelector('.jcd') && !row(js), 'Only me: no job card, no job message');
   check(!row(jr), 'Only me: the job result WITH buttons is left out (#2416)');
@@ -97,7 +97,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await w.eval('jc_sync(true)'); w.eval('agentPoll()');
   await pick(/Me, Dev Bot and job results/);
   await until(() => row(je));
-  check(w.eval(`LS.get('jcdFilt')`) === 'res' && fbtn().querySelector('.jcdfdot'), 'Results: kept, the icon carries the dot');
+  check(w.eval(`LS.get('jcdFilt')`) === 'res' && fbtn().classList.contains('jcdfon') && /Filter: /.test(fbtn().title), 'Results: kept, the icon names the filter');  // 2.350.0 (#3317)
   check(row(plain) && box().querySelector(':scope > .cmsg.me'), 'Results: the plain answer and my message');
   check(!d.querySelector('.jcd') && !row(js) && !row(jq), 'Results: no job card, no say / progress line');
   check(row(jr) && row(je) && row(jr3), 'Results: the end results (also with buttons) and the error');
@@ -117,7 +117,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await pick(/Jobs/);
   await until(() => d.querySelector('.jcd'));
   check(d.querySelector('.jcd') && row(jr) && row(ja), 'Jobs: the card, the result with buttons, the approval');
-  check(w.eval(`LS.get('jcdFilt')`) === 'jobs' && fbtn().querySelector('.jcdfdot'), 'Jobs: kept, the icon carries the dot');  // 2.180.0 C (#2695): from p2117_c_ui.js
+  check(w.eval(`LS.get('jcdFilt')`) === 'jobs' && fbtn().classList.contains('jcdfon') && /Filter: Jobs/.test(fbtn().title), 'Jobs: kept, the icon names the filter');  // 2.350.0 (#3317)  // 2.180.0 C (#2695): from p2117_c_ui.js
   check(!row(plain) && !box().querySelector(':scope > .cmsg.me'), 'Jobs: not the plain answer, not my message');
   // the rule as a function: a job row with buttons, an answered approval, a main-agent message with buttons
   check(w.eval(`jcd_pass({from: 'agent', choices: {choices: [{id: 1}]}}, 'me', 7)`) === false
@@ -126,7 +126,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
         && w.eval(`jcd_pass({id: 1, from: 'agent', choices: {approval: {title: 'x'}}, choice: {ids: ['yes']}}, 'me', 7)`) === false, 'jcd_pass: the filter rules');
   await pick(/^\s*All/);
   await until(() => row(plain) && d.querySelector('.jcd'));
-  check(row(plain) && d.querySelector('.jcd') && !fbtn().querySelector('.jcdfdot'), 'All: everything again, no dot');
+  check(row(plain) && d.querySelector('.jcd') && !fbtn().querySelector('.jcdfdot') && !fbtn().classList.contains('jcdfon'), 'All: everything again, no dot');
 
   // ================= #2412 Stop
   const stopB = () => d.querySelector('#chat-stop'), ci = () => d.querySelector('#chat-in');

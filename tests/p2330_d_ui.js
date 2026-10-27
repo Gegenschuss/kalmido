@@ -166,6 +166,8 @@ const V = B + 'api/v1';
     check(g && g.right && g.w >= 16 && g.hit >= 24, `${tag}: #1045 the ring right of the name, tap target >= 24 px ` + JSON.stringify(g));
     check(g && /5 hours: 24 %/.test(g.tip) && g.wide, `${tag}: #1045 a tap shows every window, nothing sticks out ` + JSON.stringify(g));
     await shot('p2330d-390-usage-ring.png');
+    // 2.350.0 (#3317): close the pinned ring tip like a user does (Esc) before leaving; the moved ring put it over "Done" below
+    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
     // #1086: Customize Today, scrolled: "Done" stays reachable under the page header
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 520}});
     await o.nav(B + '#today'); await ready(ev);
@@ -173,7 +175,7 @@ const V = B + 'api/v1';
     const h = await ev(`(() => { const v = document.querySelector('#view'), b = document.querySelector('.lyed [data-act="ly-done"]'); if (!b) return null;
       v.scrollTop = v.scrollHeight; const sc = v.scrollTop; const r = b.getBoundingClientRect(), t = document.querySelector('#top').getBoundingClientRect(), vr = v.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return {sc, top: Math.round(r.top), head: Math.round(t.bottom), view: Math.round(vr.top), h: Math.round(r.height), hit: !!hit && (hit === b || b.contains(hit))}; })()`);
+      return {sc, top: Math.round(r.top), head: Math.round(t.bottom), view: Math.round(vr.top), h: Math.round(r.height), hit: !!hit && (hit === b || b.contains(hit)), on: hit && !(hit === b || b.contains(hit)) ? (hit.id || '') + '.' + String(hit.className) + '<' + (hit.parentElement?.id || hit.parentElement?.className || '') : ''}; })()`);
     check(h && h.sc > 0, `${tag}: #1086 the editor scrolls (test needs it) ` + JSON.stringify(h));
     check(h && h.top >= h.head - 1 && h.top >= h.view - 1 && h.hit && h.h >= 32, `${tag}: #1086 "Done" stays under the page header and takes the tap ` + JSON.stringify(h));
     await shot('p2330d-390-customize-today-sticky.png');

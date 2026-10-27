@@ -14376,7 +14376,6 @@
   "Step: {0}": "Schritt: {0}",
   "One-way step – cannot be undone": "Einbahn-Schritt – lässt sich nicht rückgängig machen",
   "The agent recommends: {0}": "Empfehlung des Agenten: {0}",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite ändert die Aufgabe nicht.",
   "Not yet overdue: {0}. A reminder can follow once the due date has passed.": "Noch nicht überfällig: {0}. Eine Mahnung ist erst nach dem Fälligkeitsdatum möglich.",
   "not yet overdue": "noch nicht überfällig",
   "Pick the overdue invoices of one client.": "Die überfälligen Rechnungen eines Kunden auswählen.",
@@ -14578,5 +14577,16 @@
   "Delete and continue": "Löschen und weiter",
   "Files not uploaded: {0}": "Nicht hochgeladene Dateien: {0}",
   "Offline: the files are uploaded once the task is synced": "Offline: Die Dateien werden hochgeladen, sobald die Aufgabe abgeglichen ist",
-  "Not saved yet, trying again": "Noch nicht gespeichert, neuer Versuch folgt"
+  "Not saved yet, trying again": "Noch nicht gespeichert, neuer Versuch folgt",
+  "Write … ([[Page]], #123, / for commands)": "Schreiben … ([[Seite]], #123, / für Befehle)",
+  "Live preview while writing": "Live-Vorschau beim Schreiben",
+  "Numbered list": "Nummerierte Liste",
+  "Picture or file": "Bild oder Datei",
+  "Embed a table": "Tabelle einbetten",
+  "Link to a page": "Verweis auf eine Seite",
+  "Idea": "Idee",
+  "Import running · {0} %": "Import läuft · {0} %",
+  "The import goes on in the background.": "Der Import läuft im Hintergrund weiter.",
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "Den Stand siehst du am Eintrag Wissen in der Leiste und oben auf den Wissensseiten.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datum, #Tags und !Priorität wie bei der Schnelleingabe. Abhaken in der Seite hakt auch die Aufgabe ab."
 }

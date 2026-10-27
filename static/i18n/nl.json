@@ -14376,7 +14376,6 @@
   "Step: {0}": "Stap: {0}",
   "One-way step – cannot be undone": "Eenrichtingsstap – kan niet ongedaan worden",
   "The agent recommends: {0}": "De agent raadt aan: {0}",
-  "Dates, #tags and !priority like in quick add. Ticking it in the page does not change the task.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina wijzigt de taak niet.",
   "Not yet overdue: {0}. A reminder can follow once the due date has passed.": "Nog niet achterstallig: {0}. Een herinnering kan pas na de vervaldatum.",
   "not yet overdue": "nog niet achterstallig",
   "Pick the overdue invoices of one client.": "Kies de achterstallige facturen van één klant.",
@@ -14578,5 +14577,16 @@
   "Delete and continue": "Verwijderen en doorgaan",
   "Files not uploaded: {0}": "Niet geüploade bestanden: {0}",
   "Offline: the files are uploaded once the task is synced": "Offline: de bestanden worden geüpload zodra de taak is gesynchroniseerd",
-  "Not saved yet, trying again": "Nog niet opgeslagen, wordt opnieuw geprobeerd"
+  "Not saved yet, trying again": "Nog niet opgeslagen, wordt opnieuw geprobeerd",
+  "Write … ([[Page]], #123, / for commands)": "Schrijven … ([[Pagina]], #123, / voor opdrachten)",
+  "Live preview while writing": "Live voorbeeld tijdens het schrijven",
+  "Numbered list": "Genummerde lijst",
+  "Picture or file": "Afbeelding of bestand",
+  "Embed a table": "Tabel insluiten",
+  "Link to a page": "Link naar een pagina",
+  "Idea": "Idee",
+  "Import running · {0} %": "Import loopt · {0} %",
+  "The import goes on in the background.": "De import loopt op de achtergrond door.",
+  "Its progress shows at Knowledge in the bar and on top of the knowledge pages.": "De voortgang staat bij Kennis in de balk en bovenaan de kennispagina's.",
+  "Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.": "Datums, #tags en !prioriteit zoals bij snel toevoegen. Afvinken op de pagina vinkt ook de taak af."
 }
