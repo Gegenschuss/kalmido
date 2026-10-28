@@ -56,11 +56,14 @@ function cfstWide(f, t) {
     + `<div aria-hidden="true" style="display:flex;gap:.25rem;margin-top:.25rem;font-size:var(--fs-s)">${names}</div>`
     + `<div class="cfstw-m muted" data-cfst-since="${f.id}" style="text-align:center;font-size:var(--fs-s);margin-top:.25rem">${esc(cfst_sinceText(f, t))}</div></div>`;
 }
-// "since 10:52": the newest change of the field in the task's activity (loaded with the comments; without it no line)
+// "since 10:52": when the field got its value - the task's field_at (the server's time of the last change, 2.410.0 B), else
+// the newest change of the field in the task's activity (loaded with the comments), else the task's creation once the
+// activity is known; before that no line (cfst_since fills it in)
 function cfst_sinceText(f, t) {
-  if (cfst_model(f, t.fields?.[f.id]).cur < 0 || S.tl?.id !== t.id) return '';
-  const a = (S.tl.activity || []).filter(x => x.kind === 'field' && x.data?.id === f.id).pop();
-  return a ? tr('since {0}', fmtWhen(a.created_at)) : '';
+  if (cfst_model(f, t.fields?.[f.id]).cur < 0) return '';
+  let at = t.field_at?.[f.id];
+  if (!at && S.tl?.id === t.id && S.tl.activity) at = (S.tl.activity.filter(x => x.kind === 'field' && x.data?.id === f.id).pop() || {}).created_at || t.created_at;
+  return at ? tr('since {0}', fmtWhen(at)) : '';
 }
 function cfst_since() {  // collab.js drawTimeline: the activity arrived after the panel was drawn
   const t = taskById(S.sel); if (!t) return;

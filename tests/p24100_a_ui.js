@@ -104,11 +104,14 @@ const OPTS = [{name: 'Planned'}, {name: 'Building'}, {name: 'Review'}, {name: 'P
       '#3514: a new choice field offers the switch, the kind per option only when it is on');
     check(await ev(`(() => { const t = document.querySelector('.modal #fd-type'); t.value = 'multiselect'; t.dispatchEvent(new Event('change', {bubbles: true})); return !document.querySelector('.modal #fd-stages'); })()`),
       '#3514: a multiple choice field has no stages');
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    await ev(`(() => { document.querySelector('.modal [data-m="close"]')?.click(); return 1; })()`);
+    // the dialog's history entry (backclose.js) is gone before the page changes: a late history.back() would leave the board
+    check(await ready(ev, `!document.querySelector('.modal') && !history.state?.f8d`), 'the field dialog closed');
 
     // the board card
     await nav(B + 'static/icon.svg'); await nav(B + '#l/' + K);
-    check(await ready(ev, `!!document.querySelector('#view .kanban .cfst')`, 80), '#3514: the board card shows the stage bar');
+    const kb = await ready(ev, `!!document.querySelector('#view .kanban .cfst')`, 120);
+    check(kb, '#3514: the board card shows the stage bar ' + (kb ? '' : await ev(`location.hash + ' kanban=' + !!document.querySelector('#view .kanban') + ' cards=' + document.querySelectorAll('#view .kcards > *').length + ' view=' + (listById(${K})?.view) + ' ' + (document.querySelector('#view')?.textContent || '').slice(0, 160)`).catch(e => e.message)));
     b = await ev(bar('#view .kanban .cfst'));
     check(b && b.stage === '2' && b.cur === 1 && b.done === 1 && b.label === 'Building' && b.labelShown, `#3514: the card: stage 2 with its name ${JSON.stringify(b)}`);
     if (SH) await shot('p24100a-board-1280.png');
