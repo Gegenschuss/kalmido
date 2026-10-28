@@ -113,7 +113,7 @@ function av_logModal(a, done) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m !== 'lim') return;
     b.disabled = true;
-    try { await calReq('PATCH', `/api/my/agents/${a.id}`, aiuLimBody(md)); toast(tr('Saved')); md.remove(); done?.(); }
+    try { await calReq('PATCH', `/api/my/agents/${a.id}`, aiuLimBody(md)); toast(tr('Saved')); md.remove(); done?.(); }  // lazy-ok: opened from Settings > Agents only, settings loads agentchat (LD_NEED)
     catch (x) { const er = $('#avl-err', md); er.textContent = x.message; er.hidden = false; } finally { b.disabled = false; }
   });
 }

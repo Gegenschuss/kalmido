@@ -13,6 +13,7 @@ from ..accounts.session import _token_hash, me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
 from ..accounts.colors import ac_assign
+from ..accounts.orgs import has_workspaces, is_org_admin  # 2.361.4 (#2928)
 from ..accounts.login import seal, unseal
 from ..core.access import Denied
 from ..core.serializers import unlink_files
@@ -452,7 +453,6 @@ def agent_ws_allowed(c, uid, oid):
     everyone everywhere. Off: on a server with organisations each workspace decides -- the private area is the person's own
     (always), an organisation its admins' (orgs.member_agents; its admins themselves always). Without organisations the
     server switch alone (one shared team)."""
-    from ..accounts.orgs import has_workspaces, is_org_admin
     if gsetting(c, "user_agents") == "1":
         return True
     if not has_workspaces(c):
@@ -468,7 +468,6 @@ def agent_ws_allowed(c, uid, oid):
 
 def agent_ws_allowed_any(c, uid):
     """2.361.4 (#2928): uid may create a personal agent somewhere (the server switch, or a workspace that allows it)."""
-    from ..accounts.orgs import has_workspaces
     return gsetting(c, "user_agents") == "1" or has_workspaces(c)
 
 
