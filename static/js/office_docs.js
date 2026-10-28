@@ -751,7 +751,7 @@ async function ofdClick(e) {
   if (a === 'new-ls' || a === 'to-ls') return ls_click(a, d);  // 2.120.0 D (#2089)
   if (a === 'open') { if (typeof ms_lpRecent === 'function' && OFD.lp && ms_lpRecent(OFD.lp)) return; go(ofd_href(b.dataset.id)); return; }
   if (a === 'rowmore') { ofdRowMenu(b.dataset.id, b); return; }
-  if (a === 'back') { OFD.doc = null; OFD.list = null; go(`office/${ofd_sec()}`); return; }  // 2.380.0 B (#3409): the area's list
+  if (a === 'back') { OFD.doc = null; OFD.list = null; go(`office/${ofd_sec()}/${OFD.kind}`); return; }  // 2.380.0 B (#3409): the area's list, its tab named (Back from a later tab returns here)
   if (a === 'kind') { OFD.kind = b.dataset.kind; OFD.status = ''; OFD.list = null; go(`office/${ofd_sec()}/${OFD.kind}`); return; }  // 2.356.0 C (#3004): a history step per tab
   if (a === 'dun-open') { dun_open(); return; }  // 2.147.1 B (#2054): the suggested reminder drafts
   if (a === 'new-inv') {
