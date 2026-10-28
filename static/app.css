@@ -945,6 +945,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .authscreen form{display:flex;flex-direction:column;gap:.625rem}
 .authscreen form .btn{margin-top:.25rem;padding:.625rem .875rem}
 .authscreen .aerr{color:var(--danger);font-size:var(--fs-m);min-height:1em}
+.authscreen .invby{margin:0 0 .5rem;font-weight:500}  /* 2.365.0 (#2802): who invites, into which organisation */
 /* website link (module "links") */
 .meta a.lnk{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);text-decoration:none;max-width:10.625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta a.lnk:hover{color:var(--accent)}
@@ -1377,7 +1378,23 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 /* v1.0: first-run setup, step 2 */
 .authscreen .setupcard{width:min(38rem,100%);max-height:calc(100dvh - 2rem);overflow:auto}
 .authscreen .setupcard h3{margin:.875rem 0 .375rem;font-size:var(--fs-h)}
-.authscreen #su-lang{align-self:flex-start}
+/* 2.365.0 (#2802): the language is a small menu in the card's top right corner (was a row of six buttons on top) */
+.authscreen .setupcard{position:relative}
+.sulang{position:absolute;top:1rem;right:1rem;z-index:3}
+.sulang>summary{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);cursor:pointer;list-style:none;font-size:var(--fs-s);color:var(--text2);background:var(--bg2)}
+.sulang>summary::-webkit-details-marker{display:none}
+.sulang .sulangs{position:absolute;right:0;top:calc(100% + .25rem);display:flex;flex-direction:column;min-width:10rem;padding:.25rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:var(--shadow,0 .5rem 1.5rem rgba(0,0,0,.15))}
+.sulang .sulangs button{text-align:left;padding:.5rem .75rem;min-height:2.75rem;border-radius:var(--radius);color:var(--text)}
+.sulang .sulangs button.on{color:var(--accent);font-weight:600}
+.sulang .sulangs button:hover{background:var(--bg3)}
+/* 2.365.0 (#2802) phone: one scroll bar (the page, not the card in it), the card starts at the top (it was cut off when centred),
+   the start tiles in one column below 400 px (titles were cut) */
+@media (max-width:560px){
+  .modal.modal.authscreen.authscreen:has(.setupcard){place-items:start center;align-items:start;align-content:start;overflow-y:auto;overscroll-behavior:contain}  /* doubled classes: above :root[data-theme] .modal.authscreen (0,4,0) */
+  .modal.authscreen .setupcard{max-height:none;overflow:visible}
+  .modal.authscreen .setupcard .sufoot{bottom:0}
+}
+@media (max-width:399px){ .sustarts.ptcards{grid-template-columns:1fr} }
 .suse-main,.suse-list{display:flex;flex-direction:column;gap:.375rem;margin:0 0 .625rem}
 .suse{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem .625rem;border-radius:var(--radius);cursor:pointer}
 .suse-main .suse{background:var(--bg3)}
@@ -2387,6 +2404,23 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 /* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
    (Chrome reveals the caret 9rem above the bottom edge, the sticky box moves along, the next letter scrolls again) */
 #detail:has(.dbot :focus){scroll-padding-bottom:0}
+/* 2.365.0 (#2824) phone: the task's bottom bar above the comment field (detail.js thumb): date + Today / Tomorrow, project,
+   Complete on the right edge (thumb reach); it steps aside while a comment is typed (the keyboard needs the room) */
+.dthumb{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.375rem .75rem;border-top:1px solid var(--line);background:var(--bg2);container:dthumb / inline-size}
+.dthumb .dchip{flex:1 1 0;min-width:0;min-height:2.75rem;overflow:hidden;justify-content:flex-start;border:1px solid var(--line)}
+.dthumb .dchip .dct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dq{flex:none;min-width:2.75rem;min-height:2.75rem;justify-content:center;border:1px solid var(--line);color:var(--muted)}
+.dthumb .dq.on{border-color:var(--accent);color:var(--accent)}
+.dthumb .dql{display:none}
+.dthumb .dtbr{display:none}
+.dthumb .dtproj{display:inline-flex;align-items:center;gap:.375rem;flex:1 1 0;min-width:2.75rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);color:var(--text2);font-size:var(--fs-s)}
+.dthumb .dtpn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dtdone{flex:none;min-height:2.75rem;gap:.375rem;padding:0 1rem}
+.dthumb .dtdone.on{color:var(--accent);border-color:var(--accent)}
+/* a narrow phone: two rows - the date with its quick buttons, then the project and Complete (the date is never cut short) */
+@container dthumb (max-width:35.99rem){ .dthumb .dtbr{display:block;flex:0 0 100%;height:0} }
+@container dthumb (min-width:36rem){ .dthumb .dtproj{flex:0 1 auto;max-width:14rem} .dthumb .dq[data-d="0"] .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} .dthumb .dq[data-d="0"]{padding:0 .625rem} }
+#detail .dbot:has(.dcomp :focus) .dthumb{display:none}
 .meta .crd{opacity:.75}
 /* 2.0.8 (#321) Settings > AI colleague: lists at a glance */
 .aitbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
@@ -6459,6 +6493,11 @@ html.mini-chat .tcview{grid-template-columns:minmax(0,1fr);border:0;border-radiu
 html.mini-chat body.in-team #view{display:flex;flex-direction:column;overflow:hidden}
 html.mini-chat body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
 html.mini-chat body.in-team .tcview{flex:1;height:auto}
+/* 2.365.0 (#3319) the window is the chat: header, history and composer use its whole width at any size (no 44rem column);
+   only a single bubble stays readable (at most 75 % of the width, about 900 px of text), own ones right, the agent's left */
+html.mini-chat .chview,html.mini-chat body.in-chat .chview{max-width:none;margin:0}
+html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left:.75rem;padding-right:.75rem}
+@media (min-width:40rem){ html.mini-chat .cmsg{max-width:min(75%,56rem)} }  /* a narrow window keeps the usual 88 % */
 /* 2.46.2 C (#1712) never red text on the accent fill: pri + danger reads like danger solid */
 .btn.pri.danger{background:var(--danger);border-color:var(--danger);color:var(--danger-ink)}
 /* 2.46.2 C (#1651) hidden username field before the account password so managers pair the right login */
