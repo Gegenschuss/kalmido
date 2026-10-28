@@ -607,6 +607,3 @@ p2360_0_c_agents_api
 p2360_0_d_hardening
 p23612_a_api
 p23612_b_api
-p2376_a_wiki_snippet_ui
-p2380_l_ui
-p2380_b_buero_ui
