@@ -719,6 +719,19 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
     return cmap, kmap
 
 
+def ofm_copied_already(c, what, rows):
+    """2.407.0 (#3396 #3397): a row a copy move archived (it is a "src" row of a move not undone) is not copied a second time - a
+    parallel request that reads only after the first one's commit sees the same rows before and after the lock."""
+    t = "clients" if what == "clients" else OFM_TABLE.get(what)
+    for r in rows:
+        if t and dict(r).get("archived") and c.execute(
+                "SELECT 1 FROM space_moves WHERE kind=? AND (detail::jsonb->'rows') @> ?::jsonb "
+                "AND COALESCE(detail::jsonb->>'undone', '')='' LIMIT 1",
+                (f"office_{what}", json.dumps([{"t": t, "id": r["id"], "src": 1}]))).fetchone():
+            return True
+    return False
+
+
 @app.post("/api/office/move-space")
 def ofm_move_space():
     smv_refuse_agent()
@@ -738,7 +751,7 @@ def ofm_move_space():
         # saved meanwhile is not overwritten); rows changed while waiting for it (a parallel move that copied / archived them) = 409
         write_lock(c, f"office_move_{int(src)}")
         src2, rows2 = ofm_need(c, uid, what, ids)
-        if src2 != src or [dict(r) for r in rows2] != [dict(r) for r in rows]:
+        if src2 != src or [dict(r) for r in rows2] != [dict(r) for r in rows] or ofm_copied_already(c, what, rows2):
             raise Denied(409, tr("Changed in the meantime"))
     frm_ws = ofm_ws(c, src)
     to = smv_target(c, uid, b.get("to"))
