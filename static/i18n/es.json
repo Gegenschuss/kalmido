@@ -14760,6 +14760,9 @@
   "Diagram": "Diagrama",
   "The diagram could not be drawn": "No se pudo dibujar el diagrama",
   "The formula could not be drawn": "No se pudo componer la fórmula",
+  "Logo size": "Tamaño del logotipo",
+  "Logo position": "Posición del logotipo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado.",
   "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Una clave de proyecto tiene de 2 a 6 mayúsculas o cifras y empieza por una letra (p. ej. APP)",
   "The key {0} is already used by another project of this workspace": "La clave {0} ya la usa otro proyecto de este espacio de trabajo",
   "Ticket key": "Clave de ticket",
@@ -14784,8 +14787,5 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Hola:\n\nAdjuntamos nuestra carta «{0}» en PDF.\n\nSaludos cordiales\n{1}",
   "Please find attached our document “{0}”.": "Le enviamos adjunto nuestro documento «{0}».",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "En relación con la factura indicada arriba, le emitimos la siguiente nota de abono:",
-  "Title or notes contain …": "El título o las notas contienen …",
-  "Logo size": "Tamaño del logotipo",
-  "Logo position": "Posición del logotipo",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado."
+  "Title or notes contain …": "El título o las notas contienen …"
 }

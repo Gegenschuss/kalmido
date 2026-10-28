@@ -26,6 +26,7 @@ from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND
 from ..lists.groups import (
     groups_for, grp_dict, grp_of_user, list_group_del, list_group_set, list_groups_get, need_group, task_take_web,
 )
+from ..lists.fields import fmt_num
 from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
@@ -1009,7 +1010,6 @@ def v1_tasks_more(c, uid, a, where, args):
 
 def v1_field_filter(c, fid, v, where, args):
     """field_<fid>=v: only tasks of the field's list (a list you see) whose value of that field matches."""
-    from ..lists.fields import fmt_num
     f = c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()
     if not f or not list_role(c, f["list_id"]):
         raise BadInput(tr("Invalid value: {0}", f"field_{fid}"))

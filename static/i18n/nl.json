@@ -14760,6 +14760,9 @@
   "Diagram": "Diagram",
   "The diagram could not be drawn": "Het diagram kon niet worden getekend",
   "The formula could not be drawn": "De formule kon niet worden gezet",
+  "Logo size": "Logogrootte",
+  "Logo position": "Logopositie",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat.",
   "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Een projectcode heeft 2 tot 6 hoofdletters of cijfers en begint met een letter (bijv. APP)",
   "The key {0} is already used by another project of this workspace": "De code {0} wordt al gebruikt door een ander project in deze werkruimte",
   "Ticket key": "Ticketcode",
@@ -14784,8 +14787,5 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Goedendag,\n\nIn de bijlage vindt u onze brief ‘{0}’ als pdf.\n\nMet vriendelijke groet\n{1}",
   "Please find attached our document “{0}”.": "In de bijlage vindt u ons document “{0}”.",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "Met betrekking tot de hierboven genoemde factuur verstrekken wij u de volgende creditnota:",
-  "Title or notes contain …": "Titel of notities bevatten …",
-  "Logo size": "Logogrootte",
-  "Logo position": "Logopositie",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat."
+  "Title or notes contain …": "Titel of notities bevatten …"
 }

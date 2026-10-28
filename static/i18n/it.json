@@ -14760,6 +14760,9 @@
   "Diagram": "Diagramma",
   "The diagram could not be drawn": "Impossibile disegnare il diagramma",
   "The formula could not be drawn": "Impossibile comporre la formula",
+  "Logo size": "Dimensione del logo",
+  "Logo position": "Posizione del logo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Per tutti i documenti d’ufficio creati da ora in poi. Nessun effetto se la tua carta intestata nasconde la nostra intestazione.",
   "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Una sigla di progetto ha da 2 a 6 lettere maiuscole o cifre e inizia con una lettera (es. APP)",
   "The key {0} is already used by another project of this workspace": "La sigla {0} è già usata da un altro progetto di questo spazio di lavoro",
   "Ticket key": "Sigla ticket",
@@ -14784,8 +14787,5 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Buongiorno,\n\nIn allegato trova la nostra lettera «{0}» in PDF.\n\nCordiali saluti\n{1}",
   "Please find attached our document “{0}”.": "In allegato trova il nostro documento «{0}».",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "In relazione alla fattura sopra indicata vi emettiamo la seguente nota di credito:",
-  "Title or notes contain …": "Il titolo o le note contengono …",
-  "Logo size": "Dimensione del logo",
-  "Logo position": "Posizione del logo",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Per tutti i documenti d’ufficio creati da ora in poi. Nessun effetto se la tua carta intestata nasconde la nostra intestazione."
+  "Title or notes contain …": "Il titolo o le note contengono …"
 }

@@ -14760,6 +14760,9 @@
   "Diagram": "Diagramm",
   "The diagram could not be drawn": "Das Diagramm ließ sich nicht zeichnen",
   "The formula could not be drawn": "Die Formel ließ sich nicht setzen",
+  "Logo size": "Logo-Größe",
+  "Logo position": "Logo-Position",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet.",
   "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Ein Projektkürzel hat 2 bis 6 Großbuchstaben oder Ziffern und beginnt mit einem Buchstaben (z. B. APP)",
   "The key {0} is already used by another project of this workspace": "Das Kürzel {0} nutzt schon ein anderes Projekt in diesem Arbeitsbereich",
   "Ticket key": "Ticket-Kürzel",
@@ -14784,8 +14787,5 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Guten Tag,\n\nanbei erhalten Sie unser Schreiben „{0}“ als PDF.\n\nMit freundlichen Grüßen\n{1}",
   "Please find attached our document “{0}”.": "anbei erhalten Sie unser Dokument „{0}“.",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
-  "Title or notes contain …": "Titel oder Notiz enthält …",
-  "Logo size": "Logo-Größe",
-  "Logo position": "Logo-Position",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet."
+  "Title or notes contain …": "Titel oder Notiz enthält …"
 }
