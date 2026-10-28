@@ -2,7 +2,7 @@
 follow-up day. Pure data: the app shows them (smart view "Stale"), the agent API / MCP reads them, and the agents of lists
 with "Agent follows up" (lists.agent_followup) get ONE bundled event stale_tasks a day (see stale_events)."""
 import os
-from datetime import date
+from datetime import datetime, timezone
 
 from flask import g, jsonify, request
 
@@ -66,7 +66,9 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
     out = []
     for r in rows:
         try:
-            idle = max(0, (now.date() - date.fromisoformat(r["last"][:10])).days)
+            # full days since the last sign of life (like the WHERE above, the stored time read as UTC); the calendar
+            # days of two dates jumped by one when a request crossed midnight (CI of 2.376.0: 13 instead of 12)
+            idle = max(0, (now - datetime.fromisoformat(r["last"][:19]).replace(tzinfo=timezone.utc)).days)
         except ValueError:
             idle = 0
         out.append({"id": r["id"], "title": r["title"], "list_id": r["list_id"],
