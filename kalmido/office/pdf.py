@@ -73,6 +73,8 @@ P3Q_MAX = 34 * MM        # 2.296.0 E (#3170): the widest quantity column (wider 
 PDF_LOGO_MAX_W = 45 * MM  # 2.114.5 (#2300): smaller logo (was 60 x 22 mm)
 PDF_LOGO_MAX_H = 22 * MM  # 2.357.0 B (#3179): a tall logo gets up to 22 mm (was 16: an upright logo printed 5 mm narrow)
 PDF_LOGO_DPI = 200       # 2.357.0 B (#3179): a small logo is never scaled up beyond this (drawn at its own size, not blurred)
+# 2.406.0 (#3501): the logo frame per size chosen in the office settings (medium = the frame above); the logo fits inside
+PDF_LOGO_SIZES = {"s": (30 * MM, 14 * MM), "m": (PDF_LOGO_MAX_W, PDF_LOGO_MAX_H), "l": (60 * MM, 30 * MM)}
 PDF_LOGO_MAX_PX = 1600   # the upload route scales to this width; the writer accepts anything Pillow reads
 BP = None                # 2.120.0 E (#2091): the own letterhead in effect -- set only in the run of bp_layout
 PDF_MARKS = (105 * MM, 148.5 * MM, 210 * MM)  # 2.357.0 A (#3156): fold and punch marks of the paper size (DIN 5008 form B)
@@ -451,6 +453,14 @@ def qac_sig_block(p, y, rows, head, foot, accent):
         p.text(PDF_L + 120, yy, b, 8 if len(b) > 40 else 8.6, True, C_INK)
         yy += 12
     p.text(PDF_L + 10, yy + 2, foot, 7.6, False, C_INK2)
+
+
+def pdf_logo_frame(co):
+    """2.406.0 (#3501): the logo frame of a company model (logo_size s / m / l, logo_pos l / r) -> (max_w, max_h, left).
+    Without a choice: medium, right (the look before). Large ends 42 mm from the top, above the address field (45 mm)."""
+    co = co or {}
+    w, h = PDF_LOGO_SIZES.get(str(co.get("logo_size") or "m"), PDF_LOGO_SIZES["m"])
+    return w, h, co.get("logo_pos") == "l"
 
 
 def pdf_logo_fit(logo, max_w, max_h):
@@ -1176,8 +1186,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if BP and BP["hide_head"]:  # 2.120.0 E (#2091): logo, name and fold marks come with the letterhead
             return
         if logo:
-            w, h = logo_box(PDF_LOGO_MAX_W, PDF_LOGO_MAX_H)
-            p.image("Logo", A4_W - PDF_R - w, PDF_TOP + 2 * MM, w, h)
+            fw, fh, left = pdf_logo_frame(co)  # 2.406.0 (#3501): size and side from the office settings
+            w, h = logo_box(fw, fh)
+            p.image("Logo", PDF_L if left else A4_W - PDF_R - w, PDF_TOP + 2 * MM, w, h)
         else:
             nl = co_lines or [""]  # 2.99.0 D (#2188): up to three name lines, one under the other
             for i, ln in enumerate(nl):

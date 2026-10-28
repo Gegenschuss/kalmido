@@ -6,7 +6,7 @@ from datetime import date, timezone
 from ..core.config import TZ
 from ..core.db import local_now, parse_iso
 from ..core.i18n import lang, tr, trn
-from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MAX_W, PDF_TOP, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom,
+from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MAX_W, PDF_TOP, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom, pdf_logo_frame,
                   pdf_date, pdf_draw_footer, pdf_footer_cols, pdf_image_object, pdf_money, pdf_wrap, pdf_write)
 from .model import office_settings  # 2.357.0 A (#3156)
 from .letters import lt_sig_pic  # 2.332.0 C (#3301): the approver's signature picture
@@ -41,7 +41,8 @@ def bw_kind_line(ln):
 
 def bw_footer(c, oid, lg):
     """2.296.0 A (#3176): the footer of the receipts (the office PDFs' columns: company, address, contact, register, bank)
-    -> (cols, fit, height, body bottom, logo). 2.357.0 D (#3183): logo = the company's logo as an image object (or None)."""
+    -> (cols, fit, height, body bottom, logo, logo frame). 2.357.0 D (#3183): logo = the company's logo as an image object (or None);
+    2.406.0 (#3501): logo frame = pdf_logo_frame (max_w, max_h, left) of the office settings."""
     from .doctpl import dt_company
     co = dt_company(c, oid, lg)
     cols = pdf_footer_cols(co)
@@ -54,7 +55,7 @@ def bw_footer(c, oid, lg):
                 logo = pdf_image_object(fh.read(16 * 1024 * 1024))
         except OSError:
             logo = None
-    return cols, fit, h, pdf_body_bottom(h), logo
+    return cols, fit, h, pdf_body_bottom(h), logo, pdf_logo_frame(co)
 
 
 def bw_draw_footers(pages, foot, lg):
@@ -95,9 +96,10 @@ def bw_meal_pdf_data(c, oid, m):
     y = 56.0
     logo, images = foot[4], {}
     if logo:  # 2.357.0 D (#3183): the logo top right as on the other office PDFs, the receipt begins below it
-        sc = min(PDF_LOGO_MAX_W / logo[0], 12 * MM / logo[1])
+        fw, _fh, left = foot[5]  # 2.406.0 (#3501): the chosen size scales the receipt's low logo, the side follows the setting
+        sc = min(fw / logo[0], 12 * MM * fw / PDF_LOGO_MAX_W / logo[1])
         images["Logo"] = logo
-        p.image("Logo", PDF_L + PDF_CW - logo[0] * sc, PDF_TOP, logo[0] * sc, logo[1] * sc)
+        p.image("Logo", PDF_L if left else PDF_L + PDF_CW - logo[0] * sc, PDF_TOP, logo[0] * sc, logo[1] * sc)
         y = max(y, PDF_TOP + logo[1] * sc + 16)
 
     def need(h):  # 2.296.0 A (#3176): a new page when h does not fit above the footer

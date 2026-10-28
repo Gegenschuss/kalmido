@@ -14771,5 +14771,8 @@
   "Default of the space": "Predeterminado del espacio",
   "Diagram": "Diagrama",
   "The diagram could not be drawn": "No se pudo dibujar el diagrama",
-  "The formula could not be drawn": "No se pudo componer la fórmula"
+  "The formula could not be drawn": "No se pudo componer la fórmula",
+  "Logo size": "Tamaño del logotipo",
+  "Logo position": "Posición del logotipo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado."
 }

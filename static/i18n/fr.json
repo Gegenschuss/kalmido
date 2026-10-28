@@ -14771,5 +14771,8 @@
   "Default of the space": "Par défaut de l’espace",
   "Diagram": "Diagramme",
   "The diagram could not be drawn": "Impossible de dessiner le diagramme",
-  "The formula could not be drawn": "Impossible d’afficher la formule"
+  "The formula could not be drawn": "Impossible d’afficher la formule",
+  "Logo size": "Taille du logo",
+  "Logo position": "Position du logo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Pour tous les documents de bureau créés à partir de maintenant. Sans effet si ton propre papier à en-tête masque notre en-tête."
 }

@@ -14771,5 +14771,8 @@
   "Default of the space": "Vorgabe des Bereichs",
   "Diagram": "Diagramm",
   "The diagram could not be drawn": "Das Diagramm ließ sich nicht zeichnen",
-  "The formula could not be drawn": "Die Formel ließ sich nicht setzen"
+  "The formula could not be drawn": "Die Formel ließ sich nicht setzen",
+  "Logo size": "Logo-Größe",
+  "Logo position": "Logo-Position",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet."
 }
