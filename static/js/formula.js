@@ -53,6 +53,29 @@ function fxAgg(a, xs, n) {  // xs = the numbers of the shown tasks with a value,
 // for everyone, with undo), the others' choice stays on this device.
 const fxSumCols = (l, lc) => lc.filter(k => k !== 'id').map(k => [k, k.startsWith('f:') ? fieldById(+k.slice(2)) : null]);
 const fxSumAgg = (l, k) => (LS.get('fxsum.' + l.id) || {})[k] || (l.col_sums || {})[k] || 'sum';
+// 2.410.0 (#3437): a budget field ("Budget h", the server's names in timetrack.py) counts once per branch, like the project
+// header: a task whose subtasks carry budgets counts their sum, not its own value (which stays stored and is shown as a hint).
+const FX_BUDGET_NAMES = ['budget h', 'budget (h)', 'budget hours', 'budget std', 'budget (std)', 'budget-stunden', 'budgetstunden'];
+const fxIsBudget = f => !!f && f.type === 'number' && [...FX_BUDGET_NAMES, tr('Budget h').toLowerCase()].includes((f.name || '').trim().toLowerCase());
+function fxOwnBudget(f, t) { const v = t.fields?.[f.id], x = v == null || v === '' ? NaN : Number(v); return Number.isFinite(x) && x > 0 ? x : null; }
+function fxBranch(f, t, seen = new Set()) {  // the budget of a task's branch (null = none anywhere in it)
+  if (seen.has(t.id)) return null;
+  seen.add(t.id);
+  let s = null;
+  for (const k of children(t.id)) { const x = fxBranch(f, k, seen); if (x != null) s = (s || 0) + x; }
+  return s != null ? s : fxOwnBudget(f, t);
+}
+function fxBranchSum(f, ts) {  // the shown tasks; a task under another shown task is counted with it
+  const ids = new Set(ts.map(t => t.id)), under = t => { for (let p = taskById(t.parent_id), n = 0; p && n < 50; p = taskById(p.parent_id), n++) if (ids.has(p.id)) return true; return false; };
+  return ts.filter(t => !under(t)).map(t => fxBranch(f, t)).filter(x => x != null);
+}
+function fxBudgetCell(f, t) {  // '' = the plain cell; else the subtasks' sum, grey, and the own value as a hint when it differs
+  if (!fxIsBudget(f) || !children(t.id).length) return '';
+  const own = fxOwnBudget(f, t), sub = children(t.id).map(k => fxBranch(f, k)).filter(x => x != null);
+  if (!sub.length) return '';
+  const s = sub.reduce((a, x) => a + x, 0), tip = tr('Sum of the subtasks') + (own != null && own !== s ? ' · ' + tr('own value {0}', fxFmt(own, f.options?.unit)) : '');
+  return `<span class="fxbr" title="${esc(tip)}">${esc(fxFmt(s, f.options?.unit))}${own != null && own !== s ? `<small class="fxown">${esc(tr('own value {0}', fxFmt(own, f.options?.unit)))}</small>` : ''}</span>`;
+}
 function fxSumRow(l, lc, tasks) {
   if (!l || !lc || isMobile()) return '';
   const cs = fxSumCols(l, lc);
@@ -60,7 +83,7 @@ function fxSumRow(l, lc, tasks) {
   const ts = tasks.filter(t => t.id && !t.context);
   return `<div class="fxsum" data-lid="${l.id}" role="group" aria-label="${esc(tr('Sum row'))}"><span class="spacer"><span class="fxsn">${esc(trn('{0} task', '{0} tasks', ts.length))}</span></span>${cs.map(([k, f], i) => {
     if (!f || !FX_NUM_TYPES.includes(f.type)) return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"></span>`;
-    const a = fxSumAgg(l, k), xs = ts.map(t => t.fields?.[f.id]).filter(v => v != null && v !== '').map(Number).filter(Number.isFinite);
+    const a = fxSumAgg(l, k), xs = fxIsBudget(f) ? fxBranchSum(f, ts) : ts.map(t => t.fields?.[f.id]).filter(v => v != null && v !== '').map(Number).filter(Number.isFinite);
     const v = fxAgg(a, xs, ts.length), an = tr((FX_AGGS.find(x => x[0] === a) || FX_AGGS[0])[1]);
     if (f.type === 'currency' && a !== 'count' && v != null) {  // 2.156.0 B (#2069): the sum in the field's currency
       const m = cfk_money(v, f.options?.currency);

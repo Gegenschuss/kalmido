@@ -1366,7 +1366,7 @@ function lcCell(k, t, x) {
     case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('blocked')}</span></span>` : '';
     case 'created': return t.created_at ? `<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>` : '';
   }
-  if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fieldCell(f, t.fields?.[f.id], t.list_id, t) : ''; }
+  if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fxBudgetCell(f, t) || fieldCell(f, t.fields?.[f.id], t.list_id, t) : ''; }  // 2.410.0 (#3437): a budget = its subtasks' sum
   return '';
 }
 // "Columns…": tick what the rows show, order by dragging the handle or with the arrows (Alt+↑/↓ on the keyboard). Saved for
