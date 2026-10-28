@@ -103,7 +103,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     force: also the ones the list keeps on its own. Returns [{key, reason}] of what could not be applied (dry: what WOULD not,
     nothing is changed) and the number of changed settings. 2.58.0 (#1422): uid = the person (the callers pass it)."""
     uid = uid or me()
-    from ..accounts.orgs import clean_org_id, list_org, ws_member_problem
+    from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
     lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
@@ -140,9 +140,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
                     org_out(c, cur, want, "list", lname, list_id=lid, obj=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
-                    from ..lists.lmove import lmv_follow
-                    lmv_follow(c, lid, cur)  # 2.401.0 (#2924): its customer reports and bells go along
                     from ..team.clients import _org_boundary
+                    list_space_follow(c, lid, cur, _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
                     if _org_boundary(c):  # 2.173.1 (#2714): a client of another workspace does not travel along (as in list_org_set)
                         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
                                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, want))

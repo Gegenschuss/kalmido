@@ -201,7 +201,7 @@ def lmm_snap(c, lid):
     assign = [list(r) for r in c.execute("""SELECT id, assignee_id FROM tasks WHERE list_id=? AND assignee_id IS NOT NULL
                                             AND assignee_id NOT IN (SELECT owner_id FROM lists WHERE id=?)
                                             AND assignee_id NOT IN (SELECT user_id FROM list_members WHERE list_id=?)""", (lid, lid, lid))]
-    # 2.401.0 (#2924): the clients of its tasks' customer reports (lists/lmove.py lmv_follow unbinds one of another workspace)
+    # 2.401.0 (#2924): the clients of its tasks' customer reports (accounts/orgs.py list_space_follow unbinds one of another workspace)
     tcl = [list(r) for r in c.execute("""SELECT id, client_id FROM portal_tickets WHERE client_id IS NOT NULL
                                          AND task_id IN (SELECT id FROM tasks WHERE list_id=?)""", (lid,))]
     return {"org": l["org_id"], "client": l["client_id"], "vis": [l["org_visibility"] or "", l["org_edit"] or 0], "links": links, "assign": assign,

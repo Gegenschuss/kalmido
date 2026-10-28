@@ -9,9 +9,9 @@ boundary, the opening to the organisation), what goes along (customer reports) a
 tables, video reviews, office documents and deals, approval links, receipts: each has its own move). The move itself stays
 PATCH /api/lists/<id> {org_id}.
 
-lmv_follow runs inside every workspace change of a list (list_org_set, folder_apply): the customer reports (portal_tickets,
-pt_find reads them only in the space of their task's list) and the task bells (task_bell, ignored in another workspace) of
-its tasks go along; a report's client of another workspace is unbound (lmm keeps it for the way back).
+accounts/orgs.py list_space_follow runs inside every workspace change of a list (list_org_set, folder_apply): the customer
+reports (portal_tickets, pt_find reads them only in the space of their task's list) and the task bells (task_bell, ignored in
+another workspace) of its tasks go along; a report's client of another workspace is unbound (lmm keeps it for the way back).
 """
 from flask import jsonify
 
@@ -21,25 +21,6 @@ from ..core.db import body, db
 from ..core.i18n import tr, trn
 from ..accounts.session import me
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
-
-
-def lmv_follow(c, lid, old_org):
-    """List lid just changed its workspace (from old_org): its tasks' customer reports and bells that lived in the old space
-    go along. Returns the number of reports moved. The caller commits."""
-    l = c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
-    if not l or (l["org_id"] or None) == (old_org or None):
-        return 0
-    oid, owner = l["org_id"] or None, None if l["org_id"] else l["owner_id"]
-    n = c.execute("""UPDATE portal_tickets SET org_id=?, owner_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
-                     AND org_id IS NOT DISTINCT FROM ?""", (oid, owner, lid, old_org or None)).rowcount
-    from ..team.clients import _org_boundary
-    if n and _org_boundary(c):  # a client of another workspace is no client of the report there (tenancy portal_client)
-        c.execute("""UPDATE portal_tickets SET client_id=NULL WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
-                     AND client_id IS NOT NULL AND client_id NOT IN (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)""",
-                  (lid, oid))
-    c.execute("""UPDATE task_bell SET org_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
-                 AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
-    return n
 
 
 def _fits_sql(alias, to, owner):

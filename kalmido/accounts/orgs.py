@@ -476,10 +476,9 @@ def list_org_set(c, lid, v):
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
-    from ..lists.lmove import lmv_follow
-    lmv_follow(c, lid, lr["org_id"])  # 2.401.0 (#2924): its customer reports and bells go along
     # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
     from ..team.clients import _org_boundary
+    list_space_follow(c, lid, lr["org_id"], _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
     if _org_boundary(c):
         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
@@ -488,6 +487,25 @@ def list_org_set(c, lid, v):
     # (only this list's files, after the request)
     oc_settle_kick([lid])
     return True
+
+
+def list_space_follow(c, lid, old_org, boundary):
+    """2.401.0 (#2924): list lid just changed its workspace (from old_org): its tasks' customer reports and bells that lived in
+    the old space go along (lists/lmove.py); boundary = team/clients.py _org_boundary: a report's client of another workspace
+    is unbound then. Returns the number of reports moved. The caller commits."""
+    l = c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not l or (l["org_id"] or None) == (old_org or None):
+        return 0
+    oid, owner = l["org_id"] or None, None if l["org_id"] else l["owner_id"]
+    n = c.execute("""UPDATE portal_tickets SET org_id=?, owner_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND org_id IS NOT DISTINCT FROM ?""", (oid, owner, lid, old_org or None)).rowcount
+    if n and boundary:  # a client of another workspace is no client of the report there (tenancy portal_client)
+        c.execute("""UPDATE portal_tickets SET client_id=NULL WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND client_id IS NOT NULL AND client_id NOT IN (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)""",
+                  (lid, oid))
+    c.execute("""UPDATE task_bell SET org_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                 AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
+    return n
 
 
 def ws_default_org(c, uid, folder=""):
