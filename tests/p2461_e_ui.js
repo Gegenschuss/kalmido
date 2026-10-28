@@ -148,7 +148,7 @@ const PH = {mobile: true};  // a phone for jsdom
   await until(() => d.querySelector('.office .ofdbar'), 60);
   await sleep(300);
   check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty.eact [data-ofd="new"]'), '#1637: the empty list has exactly one "New quotation", the big one in the empty state');
-  check(!d.querySelector('.office .empty.eact [data-ofd="new"] ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text');
+  check(!d.querySelector('.office .empty.eact .tri-split ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text (2.380.0 #3418: with its menu beside it)');
   w.eval(`go('office/invoices')`); await until(() => d.querySelector('.office .ofdkinds [data-kind="invoice"]'), 60);  // 2.380.0 (#3409): the invoices' own area
   check(!!d.querySelector('.office .ofdbar'), '#1637: the other kinds keep their bar');
   w.close();
