@@ -1354,7 +1354,7 @@ function colDefault(l) {  // what the default layout shows: the starting point o
 const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + ((S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text') : k);
 const lcOvf = i => [2, 3, 5, 7, 10].filter(n => i >= n).map(n => 'o' + n).join(' ');
 const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x => x[0] === k) || [0, ''])[1];
-const colShort = (l, k) => k === 'time' ? tr('Time') : colName(l, k);  // the title row's label (narrow columns)
+const colShort = (l, k) => k === 'time' ? tr('Tracked') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
   switch (k) {
     case 'due': return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell

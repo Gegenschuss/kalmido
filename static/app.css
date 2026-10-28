@@ -4783,7 +4783,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .wlwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0}
 .wltable{border-collapse:collapse;width:100%;min-width:36rem}
 .wltable th,.wltable td{padding:.375rem .5rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-weight:400}
-.wltable thead th{font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.wltable thead th{font-size:var(--fs-s);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
 .wlp{display:flex;align-items:center;gap:.5rem;min-width:9rem}
 .wln{display:flex;flex-direction:column;min-width:0}
 .wlcap{font-size:var(--fs-xs);color:var(--muted);text-align:left;padding:0;min-height:1.5rem}
@@ -4794,7 +4794,9 @@ button.lkchip:hover{border-color:var(--accent)}
 .wlc.lv-warn .wlbar i,.wlk.lv-warn{background:var(--p3)}
 .wlc.lv-over .wlbar i,.wlk.lv-over{background:var(--danger)}
 .wlk.lv-ok{background:var(--ok)}
-.wlt{font:var(--fs-s)/1.2 var(--mono)}
+.wlt{font:var(--fs-s)/1.2 var(--sans);font-variant-numeric:tabular-nums}  /* 2.380.0 A (#3408): normal type, not the mono face */
+.wlt small{display:block}.wlun{font-size:var(--fs-xs);color:var(--muted)}
+.wltable thead th .wlw1,.wltable thead th .wlw2{display:block}.wltable thead th .wlw2{font-size:var(--fs-xs)}
 .wlc.lv-over .wlt b{color:var(--danger)}
 .wllegend{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;font-size:var(--fs-s)}
 .wlk{display:inline-block;width:.75rem;height:.375rem;border-radius:62.5rem;margin-left:.5rem}
@@ -6046,6 +6048,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .fxsum .lc-f{justify-content:flex-end}
 .fxsb{display:inline-flex;align-items:baseline;gap:.25rem;max-width:100%;min-height:1.5rem;padding:0 .25rem;margin:0 -.25rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:600 var(--fs-s)/1.2 var(--sans);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fxsb i{font:500 var(--fs-xs)/1.2 var(--mono);font-style:normal;color:var(--muted)}
+.fxst{cursor:default}.fxst:hover{background:none}
 .fxsb:hover{background:var(--bg3)}.fxsb:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @media (max-width:899px){ .fxsum{display:none} }
 @container lrows (max-width:48rem){ .fxsum{display:none} }
