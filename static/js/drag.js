@@ -237,3 +237,96 @@ function drg_noClick() {
   document.addEventListener('click', stop, {capture: true, once: true});
   setTimeout(() => document.removeEventListener('click', stop, {capture: true}), 350);
 }
+
+// ---- 2.331.0 E (#3311): a surface with its own zoom (the timelines, the picture view). Two fingers, Ctrl + wheel (a
+// trackpad pinch arrives so in Chrome, Edge, Firefox) and Safari's gesture events zoom only that surface, never the page;
+// everywhere else the browser's page zoom stays (#2810). The calendar keeps its own richer gestures (calgest.js).
+/**
+ * @typedef {Object} PzOpts
+ * @property {(t: Element) => Element|null} area  the zoom surface the target is in, or null (the gesture stays the browser's)
+ * @property {(a: Element, x: number, y: number, src: string) => any} start  the session's data, or a falsy value (no zoom now)
+ * @property {(d: any, k: number, x: number, y: number) => void} move  k = the factor since the start, (x, y) = the point
+ *   between the fingers / under the pointer; at most once per frame
+ * @property {(d: any) => void} end
+ */
+/** @type {any} the running zoom (one at a time) */
+let pz_cur = null;
+const PZ_WHEEL_IDLE = 220;  // ms without a wheel event: the trackpad pinch has ended
+/** @param {HTMLElement|Document} root @param {PzOpts} o */
+function pz_attach(root, o) {
+  const el = t => t instanceof Element ? t : null;
+  const draw = rafThrottle(() => { const c = pz_cur; if (c?.o === o) o.move(c.d, c.k, c.x, c.y); });
+  const begin = (a, x, y, src) => {
+    if (pz_cur) return null;
+    const d = o.start(a, x, y, src); if (!d) return null;
+    return pz_cur = {o, d, src, k: 1, x, y, d0: 1, tg: [], idle: 0};
+  };
+  const finish = () => {
+    const c = pz_cur; if (c?.o !== o) return;
+    draw.flush(); pz_cur = null; clearTimeout(c.idle);
+    for (const t of c.tg) { t.removeEventListener('touchmove', tMove); t.removeEventListener('touchend', tEnd); t.removeEventListener('touchcancel', tEnd); }
+    o.end(c.d);
+  };
+  // fingers: followed on their own targets too (a redraw during the zoom takes them out of the page, cutting the events
+  // off from root); each event counts once
+  const seen = new WeakSet();
+  /** @param {any} e */
+  function tMove(e) {
+    const c = pz_cur; if (c?.o !== o || c.src !== 'touch' || seen.has(e)) return;
+    seen.add(e);
+    if (e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault();  // no page zoom, no scroll: the fingers zoom the surface
+    const [a, b] = e.touches;
+    c.k = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / c.d0; c.x = (a.clientX + b.clientX) / 2; c.y = (a.clientY + b.clientY) / 2;
+    draw();
+  }
+  /** @param {any} e */
+  function tEnd(e) {
+    const c = pz_cur; if (c?.o !== o || c.src !== 'touch' || seen.has(e)) return;
+    seen.add(e);
+    if (!e.touches || e.touches.length < 2) finish();
+  }
+  root.addEventListener('touchstart', ev => {
+    const e = /** @type {any} */ (ev), t = e.touches;
+    if (!t) return;  // a plain Event("touchstart") (tests, synthetic taps)
+    if (t.length > 2) { finish(); return; }
+    if (t.length !== 2 || pz_cur) return;
+    const a = o.area(el(t[0].target)), b = o.area(el(t[1].target));
+    if (!a || a !== b) return;
+    const c = begin(a, (t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2, 'touch'); if (!c) return;
+    c.d0 = Math.max(1, Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY));
+    c.tg = [...new Set([t[0].target, t[1].target])];
+    for (const x of c.tg) { x.addEventListener('touchmove', tMove, {passive: false}); x.addEventListener('touchend', tEnd); x.addEventListener('touchcancel', tEnd); }
+  }, {passive: true});
+  root.addEventListener('touchmove', tMove, {passive: false});
+  root.addEventListener('touchend', tEnd, {passive: true});
+  root.addEventListener('touchcancel', tEnd, {passive: true});
+  // trackpad / mouse: Ctrl + wheel
+  root.addEventListener('wheel', ev => {
+    const e = /** @type {WheelEvent} */ (ev);
+    if (!e.ctrlKey) return;
+    const a = o.area(el(e.target)); if (!a) return;
+    e.preventDefault();  // not the browser's page zoom
+    if (pz_cur && (pz_cur.o !== o || pz_cur.src !== 'wheel')) return;
+    const c = pz_cur || begin(a, e.clientX, e.clientY, 'wheel'); if (!c) return;
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    c.k *= Math.exp(-Math.max(-25, Math.min(25, dy)) * .01); c.x = e.clientX; c.y = e.clientY;
+    draw();
+    clearTimeout(c.idle); c.idle = setTimeout(() => { if (pz_cur === c) finish(); }, PZ_WHEEL_IDLE);
+  }, {passive: false});
+  // Safari (Mac, iPad): a pinch comes as gesture events; on the phone the touch events started the zoom first (the gesture
+  // is only stopped then: no page zoom)
+  for (const [ev, fn] of /** @type {[string, (e: any) => void][]} */ ([
+    ['gesturestart', e => { begin(/** @type {Element} */ (o.area(el(e.target))), e.clientX, e.clientY, 'gesture'); }],
+    ['gesturechange', e => { const c = pz_cur; if (c?.o !== o || c.src !== 'gesture') return; c.k = e.scale || 1; draw(); }],
+    ['gestureend', () => { if (pz_cur?.src === 'gesture') finish(); }],
+  ])) {
+    root.addEventListener(ev, e => {
+      if (!o.area(el(e.target)) && !(pz_cur?.o === o && ev !== 'gesturestart')) return;
+      e.preventDefault();
+      fn(e);
+    });
+  }
+}
+/** @returns {boolean} a zoom of pz_attach runs (other gestures wait) */
+const pz_busy = () => !!pz_cur;

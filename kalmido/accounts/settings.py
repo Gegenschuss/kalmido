@@ -24,7 +24,7 @@ from .layouts import LAYOUT_KEYS
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
@@ -64,6 +64,7 @@ SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo pla
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
+SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
 def clean_setting(k, v):
@@ -258,6 +259,9 @@ def clean_setting(k, v):
         return lp_clean_folder_colors(v)
     if k == "ws_colors":  # 2.57.0 B (#1807): my own colour per workspace
         return wsp_clean_ws_colors(v)
+    if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
+        from .wsareas import wsa_clean_own
+        return wsa_clean_own(v)
     if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
         return clean_look_pref(v)
     if k == "show_done_views":
@@ -278,10 +282,22 @@ def clean_setting(k, v):
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
+    if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
+        try:
+            o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 500 or not all(isinstance(x, str) and re.fullmatch(r"n:\d{1,12}|s:(private|shared|org:\d{1,12})", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
         return clean_cal_list(k, v)
+    if k == "start_page":  # 2.364.0 B (#3031)
+        if sv not in ("home", "inbox", "today", "last"):
+            raise bad
+        return sv
     if k == "side_icons":  # 2.36.0 (#1117)
         if sv not in ("line", "emoji", "dot"):
             raise bad
@@ -312,6 +328,10 @@ def clean_setting(k, v):
         return sv
     if k == "time_currency":
         return sv[:8]
+    if k in SETTINGS_FMT:  # 2.368.0 B (#2982): region / formats, '' = automatic
+        if sv not in SETTINGS_FMT[k]:
+            raise bad
+        return sv
     if k == "lang":
         return sv
     return sv[:200]
@@ -413,6 +433,8 @@ def clean_roadmap_pref(v):
             out[k] = x
         elif k == "z" and x in ("week", "month", "quarter"):
             out[k] = x
+        elif k == "zf" and isinstance(x, (int, float)) and not isinstance(x, bool) and 0.1 <= x <= 10:  # 2.331.0 E (#3311): pinched day width
+            out[k] = x
         elif k == "def" and x in ("auto", "c", "e"):
             out[k] = x
         elif k in ("po", "hd", "nd") and (x is None or isinstance(x, bool)):  # 2.0.6: nd = "No date" rows
@@ -470,7 +492,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd", "wkSt")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor; 2.371.3 (#3152): wkSt = the own reading style
 
 
 def clean_look_pref(v):
@@ -489,6 +511,8 @@ def clean_look_pref(v):
     for k, x in o.items():
         if k not in LOOK_KEYS:
             continue
+        if k == "wkSt" and x not in ("clear", "book", "compact", "notepad"):  # 2.371.3 (#3152): a fixed choice only (a class)
+            continue
         if isinstance(x, bool) or (isinstance(x, str) and len(x) <= 40 and x.isprintable()):
             out[k] = x
         elif isinstance(x, (int, float)) and abs(x) < 10 ** 6:
@@ -500,7 +524,7 @@ def clean_look_pref(v):
 
 # 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
 SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
-SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen")
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards")  # 2.353.0 D (#2759): ab_cards
 
 
 def set_delta_apply(cur, d):

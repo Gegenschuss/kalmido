@@ -267,21 +267,21 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const q2 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet'), focus: document.activeElement?.id}; })()`);
     check(q2.val === 'Half typed task and more' && !q2.sheet && q2.focus === 'qinput', 'N3: unfolding: the text is back in the box, the sheet closed, focus kept ' + JSON.stringify(q2));
     await ev(`(() => { const q = document.querySelector('#qinput'); q.value = ''; q.blur(); return 1; })()`);
-    // N3 inside the phone layout: a tablet / Fold portrait (880 px, docked box) folded to 390 never crosses 899 px
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await sleep(900);
+    // N3 inside the phone layout: a tablet / Fold portrait (720 px, docked box) folded to 390 never crosses 767 px (2.364.0 #3040: the computer layout from 768 px, was 880)
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await sleep(900);
     const q3 = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return false; q.focus(); q.value = 'Docked draft'; q.dispatchEvent(new Event('input', {bubbles: true})); return true; })()`);
     if (q3) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await sleep(1200);
       const q4 = await ev(`(() => { const s = document.querySelector('#qsheet'); return {sheet: !!s, val: s && s.value, focus: document.activeElement?.id}; })()`);
-      check(q4.sheet && q4.val === 'Docked draft' && q4.focus === 'qsheet', 'N3: 880 (docked box) -> 390: the text moves into the quick sheet ' + JSON.stringify(q4));
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await sleep(1200);
+      check(q4.sheet && q4.val === 'Docked draft' && q4.focus === 'qsheet', 'N3: 720 (docked box) -> 390: the text moves into the quick sheet ' + JSON.stringify(q4));
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await sleep(1200);
       const q5 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet')}; })()`);
-      check(q5.val === 'Docked draft' && !q5.sheet, 'N3: 390 -> 880: back in the docked box ' + JSON.stringify(q5));
+      check(q5.val === 'Docked draft' && !q5.sheet, 'N3: 390 -> 720: back in the docked box ' + JSON.stringify(q5));
       // a keyboard (only the height changes) never moves it
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 500}}); await sleep(900);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 500}}); await sleep(900);
       check(!(await ev(`!!document.querySelector('#qsheet')`)), 'N3: a keyboard (height only) never moves the text into the sheet');
       await ev(`(() => { const q = document.querySelector('#qinput'); if (q) { q.value = ''; q.blur(); } return 1; })()`);
-    } else console.log('p2132_ui: no docked box at 880 x 904 (viewport rule), 880 -> 390 part skipped');
+    } else console.log('p2132_ui: no docked box at 720 x 904 (viewport rule), 720 -> 390 part skipped');
     // F3: the matrix at 904 x 680 in French: all quadrants on screen, no horizontal scroll
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 680}});
     await nav(B + '#matrix'); await ready(ev); await sleep(500);

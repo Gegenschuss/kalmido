@@ -201,7 +201,11 @@ def lmm_snap(c, lid):
     assign = [list(r) for r in c.execute("""SELECT id, assignee_id FROM tasks WHERE list_id=? AND assignee_id IS NOT NULL
                                             AND assignee_id NOT IN (SELECT owner_id FROM lists WHERE id=?)
                                             AND assignee_id NOT IN (SELECT user_id FROM list_members WHERE list_id=?)""", (lid, lid, lid))]
-    return {"org": l["org_id"], "client": l["client_id"], "vis": [l["org_visibility"] or "", l["org_edit"] or 0], "links": links, "assign": assign}
+    # 2.401.0 (#2924): the clients of its tasks' customer reports (accounts/orgs.py list_space_follow unbinds one of another workspace)
+    tcl = [list(r) for r in c.execute("""SELECT id, client_id FROM portal_tickets WHERE client_id IS NOT NULL
+                                         AND task_id IN (SELECT id FROM tasks WHERE list_id=?)""", (lid,))]
+    return {"org": l["org_id"], "client": l["client_id"], "vis": [l["org_visibility"] or "", l["org_edit"] or 0], "links": links, "assign": assign,
+            "tclients": tcl}
 
 
 def lmm_after(c, lid, snap, uid=None):
@@ -217,8 +221,10 @@ def lmm_after(c, lid, snap, uid=None):
     for tid, a in snap["assign"]:
         if not c.execute("SELECT assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]:
             d["assign"].append([tid, a])
+    d["tclients"] = [[p, k] for p, k in snap.get("tclients") or []
+                     if c.execute("SELECT 1 FROM portal_tickets WHERE id=? AND client_id IS NULL", (p,)).fetchone()]  # 2.401.0 (#2924)
     out = {k: v for k, v in (("client", 1 if d["client"] else 0), ("visibility", 1 if d["vis"] else 0), ("links", len(d["links"])),
-                             ("assignees", len(d["assign"]))) if v}
+                             ("assignees", len(d["assign"])), ("tclients", len(d["tclients"]))) if v}
     if out:
         insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('list',?,?,?,?,?,?)",
                   (lid, snap["org"], l["org_id"], uid, iso(now_utc()), json.dumps(d, separators=(",", ":"))))
@@ -269,6 +275,10 @@ def lmm_restore(c, lid, prev):
                         ON CONFLICT (task_id, list_id) DO NOTHING""",
                      (k["task_id"], k["list_id"], sid, float(k.get("sort") or 0), x["org_id"], None, iso(now_utc()))).rowcount:
             out["links"] = out.get("links", 0) + 1
+    for p, k in d.get("tclients") or []:  # 2.401.0 (#2924): a customer report's client, where it fits the report's space again
+        if c.execute("""UPDATE portal_tickets SET client_id=? WHERE id=? AND client_id IS NULL AND task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                        AND org_id IS NOT DISTINCT FROM (SELECT org_id FROM clients WHERE id=?)""", (k, p, lid, k)).rowcount:
+            out["tclients"] = out.get("tclients", 0) + 1
     d["restored"] = iso(now_utc())
     c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
     return out

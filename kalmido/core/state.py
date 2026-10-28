@@ -119,12 +119,15 @@ def visible_lists(c, uid, light=False):
     members, names = {}, {}
     if ids and collab_all():
         q = ",".join("?" * len(ids))
-        for m in c.execute(f"""SELECT m.list_id, m.role, m.own_role, m.grole, u.id, u.username, u.display_name FROM list_members m
+        for m in c.execute(f"""SELECT m.list_id, m.role, m.own_role, m.grole, m.frole, u.id, u.username, u.display_name FROM list_members m
                                JOIN users u ON u.id=m.user_id WHERE m.list_id IN ({q}) ORDER BY m.added_at, u.id""", ids):
             members.setdefault(m["list_id"], []).append({"user_id": m["id"], "name": m["display_name"] or m["username"],
                                                          "role": m["role"], "username": m["username"],  # 2.4.2 (#389): @username
                                                          # 2.10.0 (#441): only via a group (no own share) / the role via groups
-                                                         "via_group": bool(m["grole"]) and m["own_role"] is None, "group_role": m["grole"]})
+                                                         "via_group": bool(m["grole"]) and m["own_role"] is None, "group_role": m["grole"],
+                                                         # 2.352.0 A (#2748): only through a folder's share / the role from folders
+                                                         "via_folder": bool(m["frole"]) and m["own_role"] is None and not m["grole"],
+                                                         "folder_role": m["frole"]})
     if ids:
         owners = {r["owner_id"] for r in rows}
         q2 = ",".join("?" * len(owners))
@@ -150,9 +153,9 @@ def visible_lists(c, uid, light=False):
     if collab_all():  # 2.280.0 B (#3116): the owners' limits of all foreign lists at once (cap_hint below reads the cache)
         tpl_prefetch(c, [r["id"] for r in rows if r["owner_id"] != uid], uid)
     _pl = set(plists(c, uid))  # 2.223.7 B (#2918): a participant sees no milestones of the list
-    mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project" and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
+    mss = milestones_of_lists(c, [r["id"] for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
     from ..lists.sprints import spr_of_lists
-    sprs = spr_of_lists(c, [r for r in rows if r["kind"] == "project"])  # 2.60.0 (#343)
+    sprs = spr_of_lists(c, [r for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.60.0 (#343); 2.352.0 G (review N14): like milestones
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
     gshares, gnames = grp_shares_of_lists(c, rows) if has_groups else ({}, {})  # 2.280.0 B (#3116): all lists at once
     from ..lists.playbook import pb_flags
@@ -289,7 +292,7 @@ def state():
     from ..lists.public import public_links_on
     from ..collab.notes import notes_brief
     from ..collab.teamchat import tchat_on, tchat_unread_both
-    from ..accounts.orgs import has_workspaces, workspaces_for, ws_mismatches
+    from ..accounts.orgs import has_workspaces, org_peers, workspaces_for, ws_mismatches
     from ..family.family import kids_for
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
@@ -326,7 +329,8 @@ def state():
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
             # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
             "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
-            "workspaces": (ws := workspaces_for(c, uid)), "sgen": session_gen(u, ws)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]; 2.238.0 B (#2872): + the sign-in mark
+            "workspaces": (ws := workspaces_for(c, uid)), "sgen": session_gen(u, ws),  # 2.28.0 (#935): my organisations [{id, name, icon, role}]; 2.238.0 B (#2872): + the sign-in mark
+            "since": str(u["created_at"] or "")[:10]},  # 2.364.0 B (#3031): the account's first day (Today's review from the second week)
         workspaces=has_workspaces(c),  # 2.28.0 (#935): lists / agents have a workspace (private | an organisation)
         ws_mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},  # 2.28.0: agents of another workspace in my lists
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
@@ -370,10 +374,14 @@ def state():
         time_lists=time_list_totals(c, uid, own=True) if time_all() else {},  # 2.7.0 (#407); 2.144.5 C (#1523): own=True
         time_day_h=time_day_h(c),
         collab_all=collab_all(),
+        org_peers=org_peers(c, uid),  # 2.364.0 D (#3036): someone else in one of my organisations (the client's hasPeers)
         time_all=time_all(),
         about=about_info(c, u),
         calendars={"enabled": CAL_ON, "subs": c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=? AND visible=1", (uid,)).fetchone()[0]},
-        api={"enabled": API_ON}, webhooks={"enabled": WH_ON}, caldav=dav_info(u), public_links=public_links_on(c),
+        # 2.364.0 C (#3044): mine = own API tokens / webhooks (Settings > Access is listed only then, else under Integrations)
+        api={"enabled": API_ON, "mine": API_ON and c.execute("SELECT 1 FROM api_tokens WHERE user_id=? LIMIT 1", (uid,)).fetchone() is not None},
+        webhooks={"enabled": WH_ON, "mine": WH_ON and c.execute("SELECT 1 FROM webhooks WHERE user_id=? AND org_id IS NULL LIMIT 1", (uid,)).fetchone() is not None},
+        caldav=dav_info(u), public_links=public_links_on(c),
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
         notes=notes_brief(c, uid),  # 2.17.0 (#442)

@@ -72,7 +72,8 @@ KINDS = {
     "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace; "
                        "p2199_a_fsref_test.py (2.199.0): an object filed in a folder of another organisation: 404, never filed across workspaces (409); "
-                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space"),
+                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space; "
+                       "p2353_a_lockfolder_test.py (2.353.0): a locked folder of another person 404, agents / API tokens never reach it"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
@@ -191,6 +192,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
+    "GET /api/files/lock/{}": "file", "POST /api/files/lock/{}/start": "file", "GET /api/files/lock/{}/todo": "file", "GET /api/files/lock/{}/raw/{}": "file", "POST /api/files/lock/{}/convert/{}": "file", "POST /api/files/lock/{}/finish": "file", "POST /api/files/lock/{}/stop": "file", "POST /api/files/lock/{}/keys": "file", "POST /api/files/lock/upload": "file", "POST /api/files/lock/folder": "file", "POST /api/files/lock/rename/{}": "file", "POST /api/files/lock/version/{}": "file", "POST /api/files/lock/move/{}": "file",
     # ---- admin (40)
     "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "GET /api/admin/storage-check": "admin",
@@ -596,6 +599,7 @@ ROUTES = {
     "PUT /api/folders/groups/{}": "folder", "DELETE /api/folders/groups/{}": "folder", "GET /api/folders/people": "folder",
     "PUT /api/folders/people": "folder", "DELETE /api/folders/people": "folder", "POST /api/folders/rename": "folder",
     "POST /api/folders/delete": "folder",
+    "GET /api/lists/tree": "folder", "POST /api/lists/folders": "folder", "POST /api/lists/tree/move": "folder",  # 2.352.0 A (#2748)
     "GET /api/folders/agents": "folder", "PUT /api/folders/agents": "folder", "DELETE /api/folders/agents": "folder",  # 2.41.0 (#1420)
     "GET /api/folders/public-links": "folder", "PUT /api/folders/public-links": "folder", "POST /api/folders/owner": "folder",
     "GET /api/folders/repos": "folder", "POST /api/folders/repos": "folder", "PUT /api/lists/{}/folder-repo": "list",  # 2.33.0 (#934)
@@ -920,6 +924,7 @@ ROUTES = {
     "PATCH /api/agents/{}/chat/{}": "agent",
     # 2.44.0 (#1517): one-command setup of an agent on a computer (one-time code, the computers = the agent's tokens)
     "POST /api/my/agents/{}/setup-code": "agent", "GET /api/my/agents/{}/machines": "agent",
+    "GET /api/my/agents/{}/audit": "agent",  # 2.361.4 (#2928): the owner's log of their personal agent
     "DELETE /api/my/agents/{}/machines/{}": "agent", "POST /api/admin/agents/{}/setup-code": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
@@ -937,6 +942,7 @@ ROUTES = {
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
@@ -969,6 +975,8 @@ ROUTES = {
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
+    # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)
+    "POST /api/lists/{}/move-space": "list",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",
@@ -1018,6 +1026,7 @@ ROUTES = {
     # organisation / person: nothing changed, nothing in the ZIP, 404 on the tags of a node, no hit in the tag filter)
     "POST /api/docs/bulk": "document", "POST /api/docs/zip": "document", "GET /api/docs/zip/{}": "document",
     "GET /api/files/nodes/{}/tags": "file", "PUT /api/files/nodes/{}/tags": "file", "GET /api/files/tags": "file", "GET /api/files/tagged": "file",
+    "PUT /api/files/nodes/{}/recognition": "file",  # 2.353.0 D (#2759): p2353_d_ablagedocs_test.py (c): another person 404, read-only 403
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "POST /api/docs/{}/extracted": "document",  # 2.121.0 A (#2092)

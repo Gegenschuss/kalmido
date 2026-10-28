@@ -127,10 +127,14 @@ F2 = A.post(B + "/api/lists", json={"name": "F2", "folder": "Proj"}).json()["id"
 A.put(B + f"/api/lists/{F1}/members", json={"user_id": CL, "role": "edit"})
 r = A.put(B + "/api/folders/people", json={"folder": "Proj", "user_id": CX, "role": "edit"})
 j = r.json()
-check(r.ok and j["shared"] == 1 and [x["id"] for x in j.get("skipped", [])] == [F1] and member(F2, CX) and not member(F1, CX),
-      "one agent: folder share skips the list with another agent and names it " + r.text[:200])
+# 2.352.0 (#2748): a folder shares its projects with several agents like the file store (the list's own agent stays one)
+check(r.ok and j["shared"] == 2 and not j.get("skipped") and member(F2, CX) and member(F1, CX),
+      "2.352.0: a folder's agent reaches the list that has its own agent too " + r.text[:200])
 r = A.post(B + f"/api/agents/{CL}/share-all")
-check(r.ok and F2 in [x["id"] for x in r.json().get("other_agent", [])] and not member(F2, CL), "one agent: share-all names lists with another agent")
+check(r.ok and F2 not in [x["id"] for x in r.json().get("other_agent", [])] and member(F2, CL),
+      "2.352.0: share-all: a folder's agent is not the list's agent, F2 gets its own one")
+r = A.put(B + f"/api/lists/{L}/members", json={"user_id": CX, "role": "edit"})
+check(r.status_code == 409, "one agent: a second own agent is still refused " + r.text[:120])
 
 # ================================================================== #928 agent -> agent (a list that had two agents before)
 L2 = A.post(B + "/api/lists", json={"name": "Legacy"}).json()["id"]
@@ -222,7 +226,9 @@ check(a.get("no_service") is True, "#933: API calls but no event poll for 10 min
 r = A.post(B + "/api/lists", json={"name": "Proj", "kind": "project", "family": "shopping"})
 check(r.status_code == 400, "family: a new project with a family kind is refused " + r.text[:80])
 PJ = A.post(B + "/api/lists", json={"name": "Proj", "kind": "project"}).json()["id"]
-check(A.patch(B + f"/api/lists/{PJ}", json={"family": "shopping"}).status_code == 400, "family: not for an existing project")
+check(A.patch(B + f"/api/lists/{PJ}", json={"kind": "project", "family": "shopping"}).status_code == 400, "family: not together with kind project")
+# 2.352.0 G (#2752, review N15): the stored kind is no longer read -- an old project may become a family list
+check(A.patch(B + f"/api/lists/{PJ}", json={"family": "shopping"}).ok, "family: an old project may become a family list (2.352.0)")
 check(A.patch(B + f"/api/lists/{PJ}", json={"kind": "list", "family": ""}).ok, "family: empty value is fine")
 
 print(f"p2260_api: {OKS[0]} ok, {len(FAILS)} failed")

@@ -32,7 +32,7 @@ function annSync() {
   const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
   if (!on) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
-  const until = a.ends_at ? tr('until {0}', new Date(a.ends_at).toLocaleString(I18N.code || 'en', {weekday: 'short', hour: '2-digit', minute: '2-digit'})) : '';
+  const until = a.ends_at ? tr('until {0}', ((d) => `${WD[d.getDay()]} ${fmtTimeAt(d)}`)(new Date(a.ends_at))) : '';
   const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
   bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
   if (bar.innerHTML !== html) bar.innerHTML = html;
@@ -110,7 +110,7 @@ function tabItem(id) {
   if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
   if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
-  if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
+  if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
   if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Projects')};  // 2.24.0 (UX-36): opens the drawer
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
@@ -134,13 +134,17 @@ function tabBtn(t, on, cls = '') {
 // 2.8.0 (#434): no icon rail any more. The desktop has one sidebar with grouped text navigation (renderSide) and the
 // command bar in the header; the tab bar setting is for phones only.
 // what "Mehr" offers: overflow tabs + enabled modules that are not pinned + search/settings if not pinned
+// 2.364.0 B (#3040): "More" = the drawer's list of areas, the same entries in the same order (sbb_btnHtml decides: switched on,
+// not hidden in the sidebar settings, not private in an organisation's view; pinned ones too), then the conversations not
+// pinned, Search and Settings last. Overflowing pinned tabs stay on top. rest = those, for the groups of tabsMore
+const tabAreaItems = () => { const cur = sbb_area(); return SBB_RAIL.map(r => r[0]).filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, ...(a ? {area: id} : {})}; }); };
 function tabOverflow() {
   const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
-  const rest = items.slice(shown.length);
-  const mods2 = mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m)).filter(t => t && !o3a_hidT(t));
-  const misc = ['home', 'team', 'news', 'agents', 'overview', ...MG_IDS.map(x => 'a:' + x), 'search', 'settings'].filter(k => !items.some(t => t.id === k)).map(tabItem).filter(t => t && !o3a_hidT(t));  // 2.83.0 (#1845)
+  const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
+  const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k)).map(tabItem).filter(t => t && !o3a_hidT(t));
+  const end = ['search', 'settings'].filter(k => !pinned(k)).map(tabItem).filter(Boolean);
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
-  return {shown, more: rest.length || mods2.length ? [...rest, ...mods2, ...misc] : []};
+  return {shown, rest, more: rest.length || areas.some(t => !pinned(t.id)) ? [...rest, ...areas, ...conv, ...end] : []};
 }
 function renderTabs() {
   const {shown, more} = tabOverflow(), all = tabItems(), on = tabOn(all);
@@ -157,18 +161,22 @@ const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
 function sideToLists() {
   const sd = $('#side'), g = $('#side .sg-lists'); if (!sd || !g) return;
+  if (typeof sbm_on === 'function' && sbm_on()) { sd.scrollTop = 0; return; }  // 2.353.0 B (#2776): the phone's drawer has a fixed top: start at the head of the project list
   sd.scrollTop = Math.max(0, sd.scrollTop + g.getBoundingClientRect().top - sd.getBoundingClientRect().top - 8);
 }
 function tabsMore(anchor) {
-  const {more} = tabOverflow();
+  const {more, rest} = tabOverflow();
   // 2.23.0 (#824): who is working, on top of the "More" menu (when the agents are in it)
   const wk = more.some(t => t.id === 'agents') ? (S.agents || []).filter(a => a.enabled && !agentOffline(a) && a.status === 'working') : [];
   // 2.31.0 (#1056): three groups: places to go (Views), the conversations (team chat, news, agents), then search / settings /
   // the tab bar, set apart
-  const grp = t => ['team', 'news', 'agents'].includes(t.id) ? 1 : ['search', 'settings'].includes(t.id) ? 2 : 0;
-  const ord = [0, 1, 2].flatMap(g => [...(g === 1 ? [{head: tr('Conversations|nav')}] : g === 2 ? ['-'] : [{head: tr('Views')}]), ...more.filter(t => grp(t) === g)]);
-  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
+  // 2.364.0 B (#3040): overflowing pinned tabs (Views), the areas (as in the drawer), the conversations, then Search, the tab
+  // bar and Settings fixed at the end
+  const grp = t => rest.includes(t) ? 0 : ['team', 'news'].includes(t.id) ? 2 : t.id === 'search' ? 3 : t.id === 'settings' ? 4 : 1;
+  const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, {head: tr('Conversations|nav')}, '-', null];
+  const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
+  menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)}))]);
 }
 function counts() {
   const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, byme: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
@@ -216,7 +224,7 @@ const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload & absences'), wlShown() /* 2.380.2 (#3407) */], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
+  ['workload', N_('Workload & absences'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -308,7 +316,8 @@ function renderSide0() {
     `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
-  const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
+  // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
+  const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
@@ -321,7 +330,7 @@ function renderSide0() {
     const nmOf = x => em ? listName(x._live ?? x.name).slice(em.length).trim() : listName(x._live ?? x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
-    const shr = (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
+    const shr = ws_prvMark(l) + (l.status && statusFor(l) && rsy_sideDot() ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
       (l.e2e && typeof le2u_sideMark === 'function' ? le2u_sideMark(l) : '') + ovSideMark(l) + (l.shared && collab() && rsy_sideShr() ? licShareHtml(l) : sbc_ph());  // 2.64.1 (#1817): the lock  // 2.56.0 (#1797): the symbol columns come last  // 2.36.2 (#1139): person / robot, always shown; 2.46.0 (#1603): not joined
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
@@ -331,30 +340,32 @@ function renderSide0() {
     return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
-  // 2.4.0 (#361): a tree: top folder, its own lists, then its subfolders (header + lists, one level deeper)
-  const fhead = f => {
-    const sub = !!fParent(f), fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
-    const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
-    const active = fl.some(l => onTasks && k === 'l:' + l.id);
-    const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${rsy_sideShr() ? folderShrHtml(f) : '' /* 2.41.0 (#1428); 2.56.1 (#1799): can be off */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
-      ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
-      : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
-  };
-  const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
+  // 2.352.0 E (#2748): a tree of any depth on the sidebar tree (areas.js sbb_treeHtml): a folder's head, then its body (its own
+  // lists, then its subfolders, one level deeper); dragging a folder, its menu and the touch hold are the tree's (sidebar.js
+  // lf_tree*), a list keeps its own drag (into a folder's head or body). Open / closed stays foldSet / foldClosed (all devices).
+  const fempty = f => `<div class="fempty" data-folder="${esc(f)}">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
   const wsAll = wsCur() === 'all';
   // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
-  for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x)))) {  // 2.28.0: folders with lists here
-    const top = fhead(f), subs = folderSubs(f).filter(sf => wsAll || lists.some(l => fUnder(l.folder, sf)) || sb_folderInWs(sf));
-    lh += top.html;
-    if (top.closed) continue;
-    let body = lists.filter(l => l.folder === f).map(listRow).join('');
-    for (const sf of subs) {
-      const sh = fhead(sf);
-      body += `<div class="fsubw">${sh.html}${sh.closed ? '' : `<div class="fbody" data-folder="${esc(sf)}">${lists.filter(l => l.folder === sf).map(listRow).join('') || fempty()}</div>`}</div>`;
-    }
-    lh += `<div class="fbody" data-folder="${esc(f)}">${body || fempty()}</div>`;
-  }
+  const fShown = x => wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+  const fnode = f => {
+    const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
+    const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
+    const active = fl.some(l => onTasks && k === 'l:' + l.id);
+    const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the arrow folds
+    const mir = fl.some(l => l.mirrored);  // 2.27.0 (#988): the owner arranges a shared folder
+    const after = (S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>`)
+      + (rsy_sideShr() ? folderShrHtml(f) : '')  // 2.41.0 (#1428); 2.56.1 (#1799): can be off
+      + `<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>`
+      + (S.listReorder ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
+        : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`);
+    return {k: 'lf:' + f, name: fName(f), go: keyToHash('folder:' + f), on: (active && closed) || fon, kids: true, cls: 'lfh' + (fParent(f) ? ' fsub' : ''),
+      fold: {open: !closed, attrs: `data-act="folder-toggle" data-folder="${esc(f)}"`}, attrs: `data-act="folder-toggle" data-folder="${esc(f)}"`,  // the row folds as before (the name opens the folder)
+      battrs: `title="${esc(tr('Open {0}', fDisp(f)))}"`, ichtml: `<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span>`,  // the icon column of the project rows
+      ns: 'lf', id: f, par: fParent(f), drag: !mir, drop: !mir, menu: true, after,  // 2.352.0 E (#2748): someone else's folder takes no folder of mine
+      sub: () => { const body = lists.filter(l => l.folder === f).map(listRow).join('') + sbb_treeHtml(folderSubs(f).filter(fShown).map(fnode)); return [{raw: `<div class="fbody" data-folder="${esc(f)}">${body || fempty(f)}</div>`}]; }};
+  };
+  sbb_treeReg('lf', LF_TREE_H);
+  lh += sbb_treeHtml(folderNames().filter(x => !fParent(x) && fShown(x)).map(fnode));
   const archived = S.lists.filter(l => l.archived && inWs(l));
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
   // Focus: the smart lists
@@ -362,7 +373,7 @@ function renderSide0() {
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
   const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
-    ['assigned', row('assigned', ic('user'), tr('My tasks'), c.assigned)],  // 2.40.0 (#1344): right under the basket, always shown
+    ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
     ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
@@ -390,7 +401,7 @@ function renderSide0() {
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
     lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
-    wlShown() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)  // 2.380.2 (#3407): not in Private
+    workloadOn() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)
     officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('wiki') ? mrow('wiki', 'book', tr('Knowledge pages')) : '',  // 2.49.0 (#1199)
     feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
@@ -447,7 +458,7 @@ function renderSide0() {
   const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
   const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
   $('#side').innerHTML = `
-    <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
+    <div class="sbfix${sbb ? ' sbfix-flow' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
     ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${planFix}${sbmTop}</div>
     ${tasksP && sbm ? favSideHtml(lists, listRow, head) : ''}${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
@@ -542,14 +553,13 @@ function renderTop0() {
   const tnew = (!isMobile() || tabletDock()) && !dockView() && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
-    const x = l?.kind === 'project' ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
+    const x = l && !l.is_inbox ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
     return x ? `<span class="hms ${x.day < today() ? 'over' : ''}" title="${esc(tr('Milestone') + ': ' + x.name + ', ' + fmtDateLoc(x.day))}">◆ ${esc(x.name)} · ${esc(dayLabel(x.day))}</span>` : '';
   })();
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
-  const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
   const bar = sbb_on();  // 2.152.3 A (#2619): on a computer search, workspace and bell sit in the head bar over everything (sbb_bar)
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   sbb_bar();  // 2.152.3 A (#2619): the bell's number
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
@@ -1132,7 +1142,7 @@ async function assignMenu(anchor, id) {
   const gs = listGroups(t.list_id);
   menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
-    ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
+    ...[...listPeople(listById(t.list_id)), ...o3a_ovPeople(listById(t.list_id))].filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Read-only') : p.role === 'reader' ? ' · ' + tr('Not joined') : ''),
       ...ac_mi(p.user_id), on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),  // 2.47.1 (#1721): + the person's colour
     ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])], null, null, tr('Assign'));  // 2.354.0 C (#3013): the sheet gets a heading
 }
@@ -1182,7 +1192,7 @@ const cfk_opts = (f, v) => cfk_ids(v).map(id => selOpt(f, id)).filter(Boolean);
 const cfk_max = f => Math.min(10, Math.max(3, +(f.options?.max || 5)));
 function cfk_money(v, cur) {
   const x = +v; if (!Number.isFinite(x)) return String(v ?? '');
-  try { return x.toLocaleString(LOCALE(), {style: 'currency', currency: cur || 'EUR'}); } catch { return numFmt(v) + ' ' + (cur || 'EUR'); }
+  return curMoney(x, cur || 'EUR');  // 2.368.0 C (#2983): one money format (i18n.js curMoney: "$1,234.50", not "US$1,234.50")
 }
 // 2.156.0 B (#2070): the error values of a formula result
 const CFK_FX_ERR = {'#div0': N_('Division by 0'), '#type': N_('Not a number')};
@@ -1539,17 +1549,22 @@ document.addEventListener('pointerdown', e => {
   // 2.39.1 (#1217): the grip sits on the line left of its column (the columns hang on the right edge, so this line moves
   // with the mouse): dragging left widens the column; the title keeps at least LC_TITLE_MIN; an accent line runs down the list
   const sp = g.closest('.lchead').querySelector('.spacer'), room = sp ? Math.max(0, sp.getBoundingClientRect().width / rem - LC_TITLE_MIN) : LCW_MAX;
-  const wMax = w0 + room, guide = lcGuide(g);
-  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
+  const wMax = w0 + room, guide = lcGuide(g), gb = g.getBoundingClientRect(), gx0 = gb.left + gb.width / 2;
+  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag', 'lcwdrag'); g.classList.add('drag');
+  const cover = document.body.appendChild(Object.assign(document.createElement('div'), {className: 'lccover'}));  // 2.331.0 B (#3304): not body::after
   // 2.87.9 (#1965): once per frame and only shown; stored (localStorage) on release
+  // 2.331.0 B (#3304): while dragging only the column title and the guide move (the title's own width, the guide's left from the
+  // start measure: the column's right edge stays): rewriting #lcw-style per frame laid out all rows (300 rows: ~40 frames/s);
+  // the rows take the width once on release
   let cur = null;
-  const show = rafThrottle(x => { cur = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, wMax, w0 - (x - x0) / rem)) * 100) / 100; lcwApply(lid, {...lcwGet(lid), [k]: cur}); lcGuide(g, guide); });
+  const show = rafThrottle(x => { cur = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, wMax, w0 - (x - x0) / rem)) * 100) / 100;
+    cell.style.width = cur + 'rem'; cell.style.maxWidth = 'none'; guide.style.left = Math.round(gx0 - (cur - w0) * rem) + 'px'; });
   const mv = ev => show(ev.clientX);
   const up = () => {
     if (td_lcDrag?.g === g) td_lcDrag = null;
     ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture'].forEach((n, i) => g.removeEventListener(n, i ? up : mv));
-    show.flush(); if (cur != null) { lcwSet(lid, k, cur); cur = null; }
-    document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove();
+    show.flush(); cell.style.width = cell.style.maxWidth = ''; if (cur != null) { lcwSet(lid, k, cur); cur = null; }
+    document.body.classList.remove('pgdrag', 'lcwdrag'); g.classList.remove('drag'); guide.remove(); cover.remove();
   };
   // 2.40.0 (#1430): a render that replaces the grip loses the capture: lostpointercapture (and the sweep after a render) ends it
   td_lcDrag = {g, up};
@@ -1561,8 +1576,8 @@ let td_lcDrag = null;
 function td_lcSweep() {
   if (td_lcDrag && !td_lcDrag.g.isConnected) td_lcDrag.up();
   if (td_lcDrag || document.body.classList.contains('lcmoving')) return;
-  document.querySelectorAll('body > .lcguide').forEach(x => x.remove());
-  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag');
+  document.querySelectorAll('body > .lcguide, body > .lccover').forEach(x => x.remove());
+  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag', 'lcwdrag');
 }
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
 document.addEventListener('keydown', e => {
@@ -1651,25 +1666,18 @@ function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
 }
-// 2.380.2 (#3403): what the text says (!!!, morgen, ~project) wins over a chip picked before; no word in the text = the chip;
-// a chip picked while the text already named the same thing wins (o.win, until the task is added; the word still leaves the title)
-function qovPick(o, r, d) {
-  const w = o.win || {}, txt = (k, v) => v != null && v !== '' && !w[k];
-  return {due: txt('date', r.due) ? r.due : 'due' in o ? o.due : d.due, list_id: (txt('list', r.list_id) && r.list_id) || o.list_id || d.list_id,
-    priority: txt('prio', r.priority) ? r.priority : 'priority' in o ? o.priority : d.priority ?? 0};
-}
-// the chips of the docked composer: what the task will get
+// the chips of the docked composer: what the task will get (a chip set here wins over the text)
 function qdockChips() {
   const box = $('#qdchips'), inp = $('#qinput'); if (!box || !inp) return;
   if (S.qov?.key !== S.route.key) S.qov = {key: S.route.key};
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
-  const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
+  const due = 'due' in o ? o.due : r.due || d.due, lid = o.list_id || r.list_id || d.list_id || inbox()?.id, pr = 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0;
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
-  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
+  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id && q.list_id === o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
-    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && q.priority === o.priority ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
+    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);
@@ -1782,8 +1790,7 @@ function viewListBody() {
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
-  const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
-    (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
+  const ls = S.lists.filter(l => l.archived).sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);

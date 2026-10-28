@@ -107,8 +107,9 @@ p = G[WEB]["list"]["progress"]
 check(p["done"] == 1 and p["total"] == 5, f"progress = the project progress (main tasks, done vs. all): {p}")
 check(G[WEB]["can_edit"] is True, "owner can edit")
 j = A.get(B + "/api/roadmap", params={"projects_only": "1"}).json()
-check(SHOP not in [g["list"]["id"] for g in j["groups"]] and j["projects_only"] is True
-      and not any(g["list"]["is_inbox"] for g in j["groups"]), "projects_only: plain lists and the inbox left out")
+# 2.352.0 (#2752): every list but the inbox is a project: projects_only only leaves out the inbox
+check(SHOP in [g["list"]["id"] for g in j["groups"]] and j["projects_only"] is True
+      and not any(g["list"]["is_inbox"] for g in j["groups"]), "projects_only: the inbox left out, kind list stays")
 j = A.get(B + "/api/roadmap", params={"include_done": "true"}).json()
 check(any(t["id"] == wD and t["status"] == "done" for g in j["groups"] for t in g["tasks"]), "include_done: completed tasks with their status")
 j = A.get(B + "/api/roadmap", params={"from": D(45), "to": D(420)}).json()
@@ -256,7 +257,7 @@ TOK_R = A.post(B + "/api/me/tokens", json={"name": "r", "scopes": ["read"]}).jso
 TOK_W = A.post(B + "/api/me/tokens", json={"name": "w", "scopes": ["read", "write"]}).json()["token"]
 hr, hw = {"Authorization": "Bearer " + TOK_R}, {"Authorization": "Bearer " + TOK_W}
 r = requests.get(B + "/api/v1/roadmap", headers=hr, params={"projects_only": "true"})
-check(r.ok and all(g["list"]["kind"] == "project" for g in r.json()["groups"]), f"v1 roadmap with a read token ({r.status_code})")
+check(r.ok and not any(g["list"]["is_inbox"] for g in r.json()["groups"]), f"v1 roadmap with a read token ({r.status_code})")  # 2.352.0 (#2752)
 check(requests.get(B + "/api/v1/roadmap", headers=hr, params={"foo": 1}).status_code == 400, "v1 roadmap: unknown parameter")
 bad = requests.get(B + "/api/v1/roadmap", headers=hr, params={"from": "x"}).json()
 check(bad.get("error", {}).get("code") and bad["error"].get("message"), f"v1 error format: {bad}")

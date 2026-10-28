@@ -91,7 +91,8 @@ check(lp and "sprints" not in lp and "sprint_cfg" not in lp, "the state has noth
 check(Da.put(B + f"/api/lists/{P}/sprint-settings", json={"on": True}).status_code == 403, "a viewer cannot switch sprints on (403)")
 check(Ca.put(B + f"/api/lists/{P}/sprint-settings", json={"on": True}).status_code == 404, "an outsider: 404")
 check(Ca.get(B + f"/api/lists/{P}/sprints").status_code == 404, "an outsider cannot read the sprints (404)")
-check(A.put(B + f"/api/lists/{PLAIN}/sprint-settings", json={"on": True}).status_code == 409, "a plain list: 409 (projects only)")
+# 2.352.0 (#2752): every list but the inbox is a project
+check(A.put(B + f"/api/lists/{next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])}/sprint-settings", json={"on": True}).status_code == 409, "the inbox: 409 (projects only)")
 check(A.put(B + f"/api/lists/{P}/sprint-settings", json={"on": True, "weeks": 3}).status_code == 400, "weeks 3: 400")
 check(A.put(B + f"/api/lists/{P}/sprint-settings", json={"on": "yes"}).status_code == 400, "on must be a boolean: 400")
 r = A.put(B + f"/api/lists/{P}/sprint-settings", json={"on": True})

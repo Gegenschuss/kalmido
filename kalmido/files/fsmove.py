@@ -34,6 +34,7 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from .fstags import dt_move
 from .store import FS_DIR, DEPTH_MAX, fs_chain, fs_height, fs_log_add, fs_space, fs_visible_sql_c, need_node, safe_fs_name, _free_name, _now, _place
 from .fsroots import fs_area_need_stay, fs_area_root_need_free  # 2.199.0 (#2742, Fable review); 2.200.0 A (#2747)
+from .fslock import fsl_space_guard  # 2.353.0 A (#2758)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 _KEEP = object()   # an item without its own parent: the request's parent
@@ -173,6 +174,7 @@ def fsm_plan(c, uid, b, to, dry, office=False):
         n = need_node(c, nid, write=True)  # 404: not visible / in the trash, 403: no write right
         fs_area_root_need_free(c, nid)  # 2.199.0 (#2742, Fable review): an area's root folder stays in its workspace
         fs_area_need_stay(c, nid)  # 2.200.0 A (#2747): a closed area's folders move with the area only (knowledge: wkmove.py)
+        fsl_space_guard(c, [nid])  # 2.353.0 A (#2758): the folder key belongs to its people: a locked folder stays in its space
         if src is not _KEEP and (src or None) != (n["org_id"] or None):
             raise Denied(400, tr("Choose items of one workspace"))
         src = n["org_id"] or None
@@ -266,6 +268,21 @@ def fsm_plan(c, uid, b, to, dry, office=False):
                              "{0} shares end (people, groups or agents outside the target)", shares))
         if opened:
             notes.append(trn("{0} opening to the whole organisation ends", "{0} openings to the whole organisation end", opened))
+        # 2.361.4 B (#2935): external links end with the move (xl_space_moved), file requests go along (fsm_apply)
+        links = c.execute(f"SELECT COUNT(*) FROM fs_ext_links WHERE node_id IN ({q}) AND revoked_at IS NULL", big).fetchone()[0]
+        if links:
+            notes.append(trn("{0} external link ends (people outside Kalmido can no longer open it)",
+                             "{0} external links end (people outside Kalmido can no longer open them)", links))
+        frq = [r[0] for r in c.execute(f"""SELECT created_by FROM fs_upload_requests WHERE node_id IN ({q})
+                                          AND deleted_at IS NULL AND revoked_at IS NULL""", big)]
+        keep = sum(1 for w in frq if w == uid)  # review: another person's request lives on only with edit rights there (frq_alive)
+        if keep:
+            notes.append(trn("{0} file request goes along: its upload link keeps working",
+                             "{0} file requests go along: their upload links keep working", keep))
+        if len(frq) > keep:
+            notes.append(trn("{0} file request of another person keeps working only if they can still edit the folder there",
+                             "{0} file requests of other people keep working only if they can still edit the folder there", len(frq) - keep))
+        plan.update(links=links, requests=len(frq))
         notes.append(oo_into_note(c, src, to))  # 2.361.2 (#2923): the way back (empty unless a member moves it in)
         lost = sum(1 for r in c.execute(f"SELECT list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", big)
                    if not fsm_list_ok(c, r[0], to, uid))
@@ -547,6 +564,10 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
+        # 2.361.4 B (#2935): a folder's file requests follow it (frq_alive needs the folder's workspace), never die silently
+        c.execute(f"UPDATE fs_upload_requests SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
+        # 2.353.0 F (#2758, review M5): the row of an earlier (now open) lock goes along (a locked one never moves: fsl_space_guard)
+        c.execute(f"UPDATE fs_locks SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
     for n, _, _, _ in plan["roots"]:
         fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
     from .extlinks import xl_space_moved
@@ -568,7 +589,8 @@ def files_move_space():
     plan = fsm_plan(c, uid, b, to, dry)
     if dry:
         return jsonify(smv_answer(plan["notes"], plan["block"], files=plan["files"], folders=plan["folders"], size=plan["size"],
-                                  shares=plan["shares"], **(plan.get("deny") or {})))
+                                  shares=plan["shares"], links=plan.get("links", 0), requests=plan.get("requests", 0),
+                                  **(plan.get("deny") or {})))
     if plan["block"]:
         c.rollback()  # a documents folder the plan made
         raise Denied(plan["code"], plan["block"], data=plan.get("deny"))

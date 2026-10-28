@@ -6,6 +6,7 @@
 // - an existing kind=project project shows the switch on; switching it off saves kind list (autosave), on again project
 // - "New project" in the command palette, the second entry with the switch on
 // - the German dialog says "Fortschritt und Status" and "Neues Projekt"
+// 2.352.0 C (#2751 / #2752): the switch is gone (status instead); the checks of the switch now check that it is gone
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -42,36 +43,30 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   w.eval('listModal()'); await sleep(250);
   let md = lastModal(d);
   check(/^New project$/.test(md.querySelector('h3')?.textContent.trim() || ''), 'new: the title says New project ' + md.querySelector('h3')?.textContent);
-  let kp = md.querySelector('.lkrow input#l-kindp[type="checkbox"]');
-  check(kp && !kp.checked && /Progress and status/.test(md.querySelector('.lkrow').textContent), 'new: the switch Progress and status, off');
+  // 2.352.0 C (#2751 / #2752): the switch "Progress and status" is gone; the Start from cards sit in the folding part
+  // "Project features" (closed for a plain new project, open for "New project with progress and status…")
+  check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), 'new: no switch Progress and status (2.352.0)');
   check(!md.querySelector('#l-kindl') && !md.querySelector('.lkseg') && !/Simple list/.test(md.textContent), 'the type segment Simple list | Project is gone');
-  check(md.querySelector('#l-kind').value === 'list' && md.querySelector('.lptype').hidden, 'off: kind list, no Start from cards');
-  flip(w, kp, true);
-  check(md.querySelector('#l-kind').value === 'project' && !md.querySelector('.lptype').hidden && !md.querySelector('.kproj').hidden, 'on: kind project, the Start from cards and project rows show');
-  check(!/Switch it on for/.test(md.querySelector('#l-khint').textContent), 'on: the hint is no longer the one for switched off ' + md.querySelector('#l-khint').textContent);
-  flip(w, kp, false);
-  check(md.querySelector('#l-kind').value === 'list' && md.querySelector('.lptype').hidden && md.querySelector('.kproj').hidden, 'off again: kind list');
+  check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#lm-sec-proj:not([open]) .lptype'), 'plain new project: the Start from cards folded');
+  md.remove();
+  w.eval(`listModal(null, '', {kind: 'project'})`); await sleep(250);
+  md = lastModal(d);
+  check(md.querySelector('#l-kind').value === 'project' && md.querySelector('#lm-sec-proj[open] .lptype'), 'with progress and status: kind project, the Start from cards open');
   md.remove();
 
-  // ================= an existing kind=project project: the switch is on, off and on again are saved
+  // ================= an existing project: no switch, the status instead (kind stays as stored)
   await until(() => w.eval(`!!listById(${P}) && !!listById(${L})`), 60);
   w.eval(`listModal(${P})`); await sleep(250);
-  md = lastModal(d); kp = md.querySelector('#l-kindp');
-  check(/Edit project/.test(md.querySelector('h3')?.textContent || ''), 'existing: the title says Edit project');
-  check(kp && kp.checked, 'existing kind=project: the switch is on');
-  flip(w, kp, false);
-  check(await until(async () => await kindOf(P) === 'list'), 'switched off: saved as kind list');
-  flip(w, kp, true);
-  check(await until(async () => await kindOf(P) === 'project'), 'switched on again: saved as kind project');
-  md.remove();
-  w.eval(`listModal(${L})`); await sleep(250);
   md = lastModal(d);
-  check(md.querySelector('#l-kindp') && !md.querySelector('#l-kindp').checked, 'a plain project: the switch is off');
+  check(/Edit project/.test(md.querySelector('h3')?.textContent || ''), 'existing: the title says Edit project');
+  check(!md.querySelector('#l-kindp') && !md.querySelector('#l-kind'), 'existing: no switch any more (2.352.0)');
   md.remove();
+  check(await kindOf(P) === 'project', 'opening the dialog leaves kind as it was');
 
   // ================= New project in the command palette
   const pal = w.eval('palAll()').filter(x => x.kind === 'action').map(x => x.label);
-  check(pal.includes('New project') && pal.includes('New project with progress and status…') && !pal.includes('New list'), 'palette: New project and the one with the switch on ' + pal.filter(x => /project|list/i.test(x)).join(' | '));
+  // 2.352.0 B (#2752): no switch any more, so only "New project"
+  check(pal.includes('New project') && !pal.includes('New project with progress and status…') && !pal.includes('New list'), 'palette: only New project ' + pal.filter(x => /project|list/i.test(x)).join(' | '));
   w.close();
 
   // ================= German
@@ -80,7 +75,7 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   await until(() => w.eval('typeof tr') === 'function' && w.eval("tr('New project')") === 'Neues Projekt', 40);
   w.eval('listModal()'); await sleep(250);
   md = lastModal(d);
-  check(/Neues Projekt/.test(md.querySelector('h3')?.textContent || '') && /Fortschritt und Status/.test(md.querySelector('.lkrow').textContent), 'de: Neues Projekt, Fortschritt und Status');
+  check(/Neues Projekt/.test(md.querySelector('h3')?.textContent || '') && /Projekt-Funktionen/.test(md.querySelector('#lm-sec-proj summary')?.textContent || ''), 'de: Neues Projekt, Projekt-Funktionen (2.352.0)');
   check(!/Einfache Liste|Neue Liste/.test(md.textContent), 'de: no Einfache Liste / Neue Liste left in the dialog');
   w.close();
 

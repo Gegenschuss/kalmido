@@ -211,6 +211,9 @@ def _folder_ok(c, uid, pid):
         raise Denied(403)
     if len(chain) >= DEPTH_MAX:
         raise Denied(409, tr("Folders can be nested at most {0} levels deep", DEPTH_MAX))
+    from .fslock import fsl_of_chain, fsl_denied
+    if fsl_of_chain(c, chain) is not None:
+        raise fsl_denied("fs_locked")  # 2.353.0 F (#2758, review M3): an object's plain title never lies in a locked folder
     return chain
 
 
@@ -320,6 +323,9 @@ def fs_ref_rename(c, ref_kind, ref_id, name):
     nm = safe_fs_name(str(name or "").strip())
     if n is None or not nm or nm == n["name"]:
         return
+    from .fslock import fl_is_locked
+    if fl_is_locked(c, n["id"]):
+        return  # 2.353.0 F (#2758, review M3): no plain title over a name in a locked folder (the object keeps its own title)
     c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
               (_ref_free_name(c, _actor(), n["parent_id"], n["owner_id"], n["org_id"], nm, skip=n["id"]), _now(), n["id"]))
 

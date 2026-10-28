@@ -13,11 +13,9 @@ const ln_ok = () => !!(S.me && S.me.kind !== 'agent' && globalThis.crypto?.subtl
 // an own list that is not shared with people (agents may be on it: they never read a locked note); the server decides
 // 2.64.1 (#1817): not in a list with a lock (its texts are encrypted with the list key already)
 const ln_listOk = l => !!l && isOwner(l) && !(l.shared_people > 0) && l.org_visibility !== 'org' && !l.e2e;
-// the lock under an unlocked note (detail.js): only where locking is possible and there is something to lock
-function ln_btnHtml(t, ro) {
-  if (ro || !ln_ok() || !(t.id > 0) || t.note_locked || t.context || !(t.content || '').trim() || !ln_listOk(listById(t.list_id))) return '';
-  return `<div class="lnbar"><button type="button" class="linkbtn lnlock" data-ln="lock" title="${esc(tr('Encrypt the note with your own password'))}">${ic('lock', 's')}<span>${tr('Lock note')}</span></button></div>`;
-}
+// the lock of an unlocked note: only where locking is possible and there is something to lock
+// 2.364.0 D (#3036): an entry of the task's "…" menu (popovers.js), no longer a link under the note
+const ln_canLock = (t, ro) => !(ro || !ln_ok() || !(t.id > 0) || t.note_locked || t.context || !(t.content || '').trim() || !ln_listOk(listById(t.list_id)));
 // the note field of a task with a locked note (instead of the description)
 function ln_html(t, ro) {
   const lock = ic('lock'), mine = !!t.note_locked_mine && ln_ok();

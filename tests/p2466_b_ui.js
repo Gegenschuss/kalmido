@@ -66,6 +66,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // ================= #1708: the workspace in the row + #1709: the setup offer
+  await call('DELETE', `/api/lists/${L1}/members/${PA}`);  // 2.361.4 (#2935): out of the organisation only without its projects
   w.eval(`settingsModal('ai')`); await sleep(500);
   await w.eval(`aiSubShow(document.querySelector('.smodal'), 'setup', false)`);
   const prow = () => d.querySelector(`#s-myown [data-myag="${PA}"]`);
@@ -82,14 +83,14 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(d.querySelector('.smodal details.avwhich'), '#1716: "Which agent when?" in Set up');
   d.querySelector('#myag-user').value = 'deskbot2'; d.querySelector('#myag-name').value = 'Deskbot 2';
   click(w, d.querySelector('[data-myag-act="new"]'));
-  check(await until(() => d.querySelector('.modal:not(.smodal) [data-m="av-setup"]')), '#1709: "Set it up on a computer now?" after creating');
+  // 2.364.0 (#3035): creating opens the one-command setup at once; the token only under "For advanced users"
+  check(await until(() => d.querySelector('.modal:not(.smodal) #ains-dir')), '#1709: the setup dialog right after creating');
   let md = lastModal(d);
-  check(/Set it up on a computer now/.test(md.textContent) && !md.querySelector('#av-tokv'), '#1709: the token is not shown unasked');
+  check(md.querySelector('details#av-adv:not([open])') && !md.querySelector('#av-tokv'), '#1709: the token is not shown unasked');
   click(w, md.querySelector('[data-m="av-tok"]'));
   check(/^abk_/.test(md.querySelector('#av-tokv')?.value || ''), '#1709: the token on request');
-  click(w, md.querySelector('[data-m="av-setup"]'));
-  check(await until(() => lastModal(d)?.querySelector('#ains-dir')), '#1709: Set up opens the setup dialog');
-  check(!md.isConnected, '#1709: the offer is closed (the token is gone with it)');
+  click(w, md.querySelector('[data-m="close"]'));
+  check(!md.isConnected, '#1709: Done closes it (the token is gone with it)');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // #1716: the admin's dialog for a new agent

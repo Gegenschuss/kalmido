@@ -424,7 +424,7 @@ def _aa_digest(c, cfg):
         lines = []
         for r in rows[:25]:
             lines.append(f"- {tr(AA_LABEL.get(r['kind'], r['kind']), lg=lg)}: {aa_row_text(r, lg)}")
-        more = [tr("… and {0} more (Settings > Administration)", len(rows) - 25, lg=lg)] if len(rows) > 25 else []
+        more = [tr("… and {0} more (Settings > Server > Log & errors)", len(rows) - 25, lg=lg)] if len(rows) > 25 else []
         return trn("{0} alert since the last summary:", "{0} alerts since the last summary:", len(rows), lg=lg) + "\n" + "\n".join(lines + more)
     ok = aa_deliver(c, cfg, lambda lg: tr("Kalmido admin: daily summary", lg=lg), body)
     c.execute("UPDATE admin_alerts SET state='summarized', sent_at=?, delivered=? WHERE state='queued' AND id<=?",

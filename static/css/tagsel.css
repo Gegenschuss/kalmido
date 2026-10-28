@@ -22,7 +22,7 @@
 .abpathl{font-size:var(--fs-xs)}
 .abdtags{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .ablist.abselon,.dc-grid.dc-selon{-webkit-user-select:none;user-select:none}
-@media (max-width:899px){
+@media (max-width:767px){
   .tsp{min-height:2.75rem}
   .tsfx{min-height:2.75rem}  /* 2.138.4 A (#2362) */
   .abtags{max-width:30%}

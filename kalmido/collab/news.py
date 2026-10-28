@@ -108,12 +108,13 @@ def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
 
 
 def ws_budget_news_mine(c, uid, r):
-    """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent."""
+    """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent. 2.361.4 (#2928): its usage limits
+    too (the owner sets them)."""
     try:
         d = json.loads(r["data"] or "{}")
     except ValueError:
         return False
-    return bool(isinstance(d, dict) and d.get("budget") and c.execute(
+    return bool(isinstance(d, dict) and c.execute(
         "SELECT 1 FROM agents WHERE user_id=? AND owner_id=?", (r["actor_id"], uid)).fetchone())
 
 

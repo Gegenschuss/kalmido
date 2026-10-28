@@ -60,7 +60,7 @@ const loginUA = async (user, ua) => {
   // ================= Settings > Organisation: invite by e-mail
   w.eval(`settingsModal('org')`);
   const ib = await until(() => d.querySelector('.wsorg [data-oinv="new"]'));
-  check(ib && /Invite by e-mail/.test(ib.textContent), 'the organisation admin: "Invite by e-mail"');
+  check(ib && /Invite people/.test(ib.textContent), 'the organisation admin: "Invite people"');  // 2.364.0 C (#3041): one dialog for e-mail and link
   ib?.click();
   const mi = await until(() => d.querySelector('#oinv-mail'));
   check(mi && d.querySelector('#oinv-role option[value="admin"]'), 'the dialog: address + role');

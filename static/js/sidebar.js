@@ -288,12 +288,13 @@ document.addEventListener('paste', e => {
 });
 
 // ------------------------------------------------------------------ list order (sidebar)
-// 2.4.0 (#361): folders nest one level. A folder is a path "Clients/Company X" (FSEP; a name never holds the separator),
-// per user as before. Tree order: each top folder, then its subfolders (settings order first, then any other folder a
-// list uses; a subfolder's parent always exists). The sidebar shows a folder's own lists first, then its subfolders.
+// 2.4.0 (#361): a folder is a path "Clients/Company X" (FSEP; a name never holds the separator), per user as before.
+// 2.352.0 E (#2748): any depth (the folders are folders of the file store, lists/lffolder.py). Tree order: each folder, then
+// its subfolders, depth first (settings order first, then any other folder a list uses; a subfolder's parents always exist).
+// The sidebar shows a folder's own lists first, then its subfolders.
 const FSEP = '/';
-const fParent = p => String(p || '').includes(FSEP) ? p.slice(0, p.indexOf(FSEP)) : '';
-const fName = p => String(p || '').includes(FSEP) ? p.slice(p.indexOf(FSEP) + 1) : String(p || '');
+const fParent = p => String(p || '').includes(FSEP) ? p.slice(0, p.lastIndexOf(FSEP)) : '';
+const fName = p => String(p || '').includes(FSEP) ? p.slice(p.lastIndexOf(FSEP) + 1) : String(p || '');
 const fDisp = p => String(p || '').split(FSEP).join(' / ');
 const fUnder = (p, top) => !!top && (p === top || String(p || '').startsWith(top + FSEP));
 const fNorm = v => String(v || '').split(FSEP).map(x => x.trim()).filter(Boolean).join(FSEP);  // typed " A / b " -> "A/b"
@@ -303,8 +304,14 @@ function folderNames() {
   try { arr = JSON.parse(S.settings.folders || '[]'); } catch { /* bad json */ }
   const used = S.lists.filter(l => !l.is_inbox && !l.archived && l.folder).map(l => l.folder);
   const all = [...new Set([...arr.filter(x => typeof x === 'string' && x), ...used])];
-  for (const p of [...all]) { const t = fParent(p); if (t && !all.includes(t)) all.push(t); }
-  return folderMirror(all.filter(p => !fParent(p))).flatMap(t => [t, ...folderMirror(all.filter(p => fParent(p) === t))]);
+  for (const p of [...all]) for (let t = fParent(p); t; t = fParent(t)) if (!all.includes(t)) all.push(t);
+  const walk = par => folderMirror(all.filter(p => fParent(p) === par)).flatMap(t => [t, ...walk(t)]);
+  return walk('');
+}
+// 2.352.0 E (#2748): the whole folder order with the folders below par in the order sibs (moving / sorting among siblings)
+function fOrderWith(par, sibs) {
+  const all = folderNames(), walk = p => (p === par ? sibs : all.filter(x => fParent(x) === p)).flatMap(t => [t, ...walk(t)]);
+  return walk('');
 }
 // 2.27.0 (#988): the folders of another person (where I see their lists) keep THEIR order among each other, in the places
 // they take in my sidebar; my own folders stay where I put them
@@ -373,11 +380,29 @@ async function newFolder(thenList, parent = '') {
   const p = parent ? parent + FSEP + n : n;
   if (folderNames().includes(p)) { toast(tr('Folder already exists')); return; }
   const arr = folderNames();
-  if (parent) { const subs = folderSubs(parent), at = arr.indexOf(subs.length ? subs[subs.length - 1] : parent); arr.splice(at + 1, 0, p); } else arr.push(p);
+  if (parent) arr.splice(arr.map(x => fUnder(x, parent)).lastIndexOf(true) + 1, 0, p); else arr.push(p);  // 2.352.0 E (#2748): after the parent's last subfolder
   sb_folderWs(p);
   await saveFolders(arr);
   await sb_folderWsSave(p);
+  await lf_ensure(p);  // 2.352.0 E (#2748): the folder node in the file store at once (it can be shared while still empty)
   if (thenList) setListFolder(thenList, p);
+}
+// 2.352.0 E (#2748): the projects trees of the server (GET /api/lists/tree, asked for before an action: the sidebar itself
+// draws from the paths): my folder node of a path for sharing it and for a new folder
+let LF_TREE = null;
+async function lf_tree() { try { LF_TREE = (await api('GET', '/api/lists/tree')).spaces || []; } catch { LF_TREE = LF_TREE || []; } return LF_TREE; }
+// the workspace of folder f: its setting "Workspace", else the shown one (All = private)
+const lf_wsOf = f => { const e = folderEff(f); if ('org_id' in e) return e.org_id ? 'org:' + e.org_id : 'private'; const w = wsCur(); return w === 'all' ? 'private' : w; };
+const lf_space = ws => (LF_TREE || []).find(x => ws === 'private' ? x.org_id == null : 'org:' + x.org_id === ws) || null;
+// -> the node id of my folder at path f in the tree of its workspace (made on the way, also its parents; the same path in
+// another workspace is another node there), null = not possible (offline, no tree)
+async function lf_ensure(f, fresh = true) {
+  if (!f) return null;
+  if (fresh || !LF_TREE) await lf_tree();
+  const sp = lf_space(lf_wsOf(f)) || lf_space('private'); if (!sp) return null;
+  const n = (sp.folders || []).find(y => y.mine && y.path === f); if (n) return n.id;
+  const pid = fParent(f) ? await lf_ensure(fParent(f), false) : sp.root; if (!pid) return null;
+  try { const j = await api('POST', '/api/lists/folders', {parent_id: pid, name: fName(f)}); (sp.folders = sp.folders || []).push({id: j.id, parent_id: pid, name: fName(f), path: j.path || f, mine: true}); return j.id; } catch { return null; }
 }
 // 2.45.0 (#1532): a new folder belongs to the shown workspace (its folder setting "Workspace", private = 0), so it shows there
 // at once while still empty; a subfolder of a folder with a workspace inherits it
@@ -412,11 +437,17 @@ async function folderMove(from, to, label, noReload) {
   if (noReload) return true;  // 2.46.2 (#1664): the caller saves the order first, then reloads (no stale order from the reload)
   load().then(() => render()).catch(() => {});
 }
-function folderMenu(anchor, f) {
+function folderMenu(anchor, f) { menu(anchor, folderMenuItems(f, () => anchor)); }
+// 2.352.0 E (#2748): the folder's menu items (its "…", a right click, the tree's hold: areas.js sbb_tmenu); any depth: a
+// subfolder in every folder, moving into any folder that is not below it
+function folderMenuItems(f, anchorOf = () => $(`#side .fhead[data-folder="${rmEsc(f)}"]`) || $('#side')) {
   const sub = !!fParent(f), hasSubs = folderSubs(f).length > 0;
-  const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
-  const own = folderLists(f).some(l => isOwner(l)), noOwn = tr('Only your own projects can be shared');
-  menu(anchor, [
+  const into = folderNames().filter(t => t !== f && !fUnder(t, f) && t !== fParent(f));
+  const own = folderLists(f).some(l => isOwner(l)) || !folderLists(f).length, noOwn = tr('Only your own projects can be shared');  // 2.352.0 E (#2748): an empty folder of mine can be shared (its node)
+  // 2.352.0 E (#2748): someone else's folder (its projects are arranged by its owner, #988): only its owner renames, moves,
+  // dissolves it or adds a subfolder (the server says 403), so those entries are not offered
+  const theirs = folderLists(f).some(l => l.mirrored);
+  return [
     ...lp_folderMenuRow(f),  // 2.53.0 (#1426): the folder's colour (new lists in it take it)
     ...fv2_menuRow('folder:' + f),  // 2.57.0 (#1798): a folder can be a favourite
     ...o3c_folderMenuRow(f),  // 2.83.0 C (#1427): the folder's header strip
@@ -424,22 +455,54 @@ function folderMenu(anchor, f) {
     // 2.37.0 (#1158): the folder settings always (they hold for new lists too); without lists of my own the share entries
     // stay visible but greyed out with the reason (lists of others cannot be shared)
     // 2.41.0 (#1420): one Share dialog for people, groups and agents (sharedlg.js); the separate group dialog is part of it
-    ...(collab() ? [{label: tr('Share folder…'), icon: 'users', dis: !own, sub: own ? '' : noOwn, fn: () => folderShareModal(f)}] : []),  // 2.22.0 (#740)
+    ...(collab() ? [{label: tr('Share folder…'), icon: 'users', dis: !own, sub: own ? '' : noOwn, fn: () => lf_share(f)}] : []),  // 2.22.0 (#740); 2.352.0 E (#2748): the one Share dialog
     {label: tr('Folder settings…'), icon: 'sliders', fn: () => folderPropsModal(f)},  // 2.29.0 (#1030 / #929)
-    ...(sub ? [] : [{label: tr('New subfolder…'), icon: 'folder', fn: () => newFolder(null, f)}]),
-    {label: tr('Rename'), icon: 'edit', fn: async () => {
+    ...(theirs ? [] : [{label: tr('New subfolder…'), icon: 'folder', fn: () => newFolder(null, f)}]),
+    ...(theirs ? [] : [{label: tr('Rename'), icon: 'edit', fn: async () => {
       const n = ((await askPrompt(tr('Rename folder'), fName(f), {ok: tr('Rename')})) || '').trim().split(FSEP).join('∕'); if (!n || n === fName(f)) return;
       folderMove(f, sub ? fParent(f) + FSEP + n : n);
-    }},
+    }}]),
     // move into another folder (subfolders, and folders without subfolders) / out to the top level
-    ...(!hasSubs && into.length ? [{label: sub ? tr('Move to another folder…') : tr('Move into a folder…'), icon: 'folder', fn: () => menu(anchor, into.map(t => ({label: fDisp(t), icon: 'folder', fn: () => folderMove(f, t + FSEP + fName(f), tr('Moved {0} to folder {1}', qn(fName(f)), fDisp(t)))})))}] : []),
-    ...(sub ? [{label: tr('Move to the top level'), icon: 'outdent', fn: () => folderMove(f, fName(f), tr('{0} is a top-level folder now', qn(fName(f))))}] : []),
-    '-',
-    {label: tr('Dissolve folder (projects stay)'), icon: 'trash', cls: 'flag-5', fn: async () => {
-      if (!await askConfirm(tr('Dissolve folder “{0}”?', fDisp(f)), hasSubs ? tr('The projects stay; its subfolders become top-level folders.') : sub ? tr('Its projects move up to {0}.', fDisp(fParent(f))) : tr('The projects stay.'), {ok: tr('Dissolve')})) return;
+    ...(into.length && !theirs ? [{label: sub ? tr('Move to another folder…') : tr('Move into a folder…'), icon: 'folder', fn: () => menu(anchorOf(), into.map(t => ({label: fDisp(t), icon: 'folder', fn: () => lf_moveInto(f, t)})))}] : []),
+    ...(sub && !theirs ? [{label: tr('Move to the top level'), icon: 'outdent', fn: () => lf_moveInto(f, '')}] : []),
+    ...(theirs ? [] : ['-', {label: tr('Dissolve folder (projects stay)'), icon: 'trash', cls: 'flag-5', fn: async () => {
+      if (!await askConfirm(tr('Dissolve folder “{0}”?', fDisp(f)), hasSubs ? (sub ? tr('Its projects and subfolders move up to {0}.', fDisp(fParent(f))) : tr('The projects stay; its subfolders become top-level folders.')) : sub ? tr('Its projects move up to {0}.', fDisp(fParent(f))) : tr('The projects stay.'), {ok: tr('Dissolve')})) return;
       await api('POST', '/api/folders/delete', {name: f}); await load(); render();
-    }},
-  ]);
+    }}]),
+  ];
+}
+// 2.352.0 E (#2748): folder f with its lists and subfolders into folder `into` ('' = the top level), any depth; the server
+// moves its node, its shares go along (rights at runtime), the settings follow the path
+async function lf_moveInto(f, into, place) {
+  if (into === fParent(f) && !place) return;
+  if (into && fUnder(into, f)) { toast(tr('A folder cannot go into itself')); return; }
+  { const m = into && folderLists(into).find(l => l.mirrored); if (m) { toast(mirroredMsg(m)); return; } }  // 2.27.0 (#988)
+  const to = (into ? into + FSEP : '') + fName(f);
+  if (to !== f && !await folderMove(f, to, into ? tr('Moved {0} to folder {1}', qn(fName(f)), fDisp(into)) : tr('{0} is a top-level folder now', qn(fName(f))), true)) return;
+  if (place && folderNames().includes(to)) {  // before / after a sibling there
+    const sibs = folderNames().filter(x => fParent(x) === into && x !== to), i = sibs.indexOf(place.at);
+    sibs.splice(i < 0 ? sibs.length : i + (place.after ? 1 : 0), 0, to);
+    await saveFolders(fOrderWith(into, sibs)).catch(() => {});
+  }
+  if (to !== f) load().then(() => render()).catch(() => {});
+}
+// the tree's handlers (areas.js sbb_treeReg, registered by the sidebar's draw: areas.js loads after this file): ids are the
+// folder paths, par = the parent's path ('' = the top level)
+const LF_TREE_H = {
+  move: (f, into) => lf_moveInto(f, into),
+  order: (f, o) => lf_moveInto(f, 'into' in o ? o.into : fParent(f), {at: o.before ?? o.after, after: o.after != null}),
+  menu: f => folderMenuItems(f),
+};
+// 2.352.0 E (#2748): "Share folder…" = the one Share dialog of the file store on the folder's node (people, groups, several
+// agents, a list role each); what only the projects have (default agent, notifications, public link, owner) stays in the
+// folder's own dialog, one link away. Someone else's folder / no node (offline): the folder's own dialog as before.
+async function lf_share(f) {
+  const nid = folderLists(f).some(l => l.mirrored) ? null : await lf_ensure(f);
+  if (!nid) { folderShareModal(f); return; }
+  fs_shareDialog(nid, {listRole: true, org: false, hint: tr('Applies at runtime to every project in the folder, also ones added later; moving a project out or ending the share takes it away again.'),
+    onChange: () => load().then(() => render()).catch(() => {}),
+    extra: box => { box.innerHTML = `<div class="row lfshx"><span class="muted">${esc(tr('Default agent, notifications, public link and owner'))}</span><span class="spacer"></span><button type="button" class="linkbtn" data-m="lf-more">${ic('sliders', 's')} ${tr('More')}</button></div>`;
+      $('[data-m="lf-more"]', box).addEventListener('click', () => { const md = box.closest('.modal'); if (md) modalSub(md, () => folderShareModal(f, {back: true})); else folderShareModal(f); }); }});
 }
 // 2.22.0 (#740) / 2.41.0 (#1420): sharing a whole folder -> folderShareModal (sharedlg.js)
 // the sidebar order (+ folder moves) in one request, as one history step (label: what it was)
@@ -484,16 +547,15 @@ function moveList(id, dir) {
   [order[i], order[j]] = [order[j], order[i]];
   saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(listById(id)))));
 }
-// sidebar drag & drop (desktop): lists before lists, lists into folders (header or empty body),
-// lists out of folders (onto the "Listen" header), folders before folders
-let listDrag = null, folderDrag = null;
+// sidebar drag & drop (desktop): lists before lists, lists into folders (header or empty body), lists out of folders (onto
+// the "Projects" header). 2.352.0 E (#2748): a folder is a node of the sidebar tree (areas.js sbb_treeReg 'lf'): it is
+// dragged, sorted and given its menu there
+let listDrag = null;
 document.addEventListener('dragstart', e => {
   const r = e.target.closest && e.target.closest('#side .srow[data-list][draggable="true"]');
-  const fh = e.target.closest && e.target.closest('#side .fhead[draggable="true"]');
   if (r) { listDrag = +r.dataset.list; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'list:' + listDrag); }
-  else if (fh) { folderDrag = fh.dataset.folder; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'folder:' + folderDrag); }
 });
-const sideDropTarget = (el, folder = folderDrag !== null, y = null) => !el?.closest ? null : folder ? el.closest('#side .fhead, #side .shead.lroot') : el.closest('#side .srow[data-list], #side .fhead, #side .fempty, #side .shead.lroot') || sb_sideEnd(el, y);
+const sideDropTarget = (el, y = null) => !el?.closest ? null : el.closest('#side .srow[data-list], #side .fhead[data-folder], #side .fempty, #side .shead.lroot') || sb_sideEnd(el, y);
 // 2.46.1 (#1612 #1635): the targets in their order (list rows, sections, board columns) and the pointer (clientY, or clientX
 // for columns): the target under it or, in a gap or up to `slack` px past the last one, the nearest; after = the pointer is
 // past its middle (so the last one can be passed: dropped at the very end). null = outside.
@@ -514,73 +576,31 @@ function sb_listToEnd(id, f) {
   order.splice(last + 1, 0, l);
   if (order.map(x => x.id).join() !== was) saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(l))));
 }
-// 2.4.0 (#361): what dropping folder `from` on target t does: 'before' (reorder among siblings), 'into' (a subfolder, or a
-// folder without subfolders, goes into the top folder t; onto a subfolder elsewhere: into its parent, before it), 'top'
-// (a subfolder onto the "Lists" header), null = nothing
-function folderDropKind(from, t, after = false) {
-  if (!t || from == null) return null;
-  if (t.classList.contains('lroot')) return fParent(from) ? 'top' : null;
-  const to = t.dataset.folder;
-  if (!to || to === from || fUnder(to, from)) return null;
-  if (fParent(from) && !fParent(to) && !after) return 'uptop';  // 2.46.2 (#1664): a subfolder on the upper half of a top folder: top-level folder right before it
-  if (fParent(to) === fParent(from)) return 'before';
-  if (folderSubs(from).length) return null;  // a folder with subfolders stays top-level (two levels at most)
-  return to === fParent(from) ? null : 'into';
-}
 // 2.27.0 (#991): the lower half of a list row = after it (so a list can go to the very end of a folder)
 const sideAfter = (t, y) => !!t && t.classList.contains('srow') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
-// 2.46.2 (#1664): the lower half of a folder header (a dragged subfolder goes into it there, above it: before it)
-const sb_headAfter = (t, y) => !!t && t.classList.contains('fhead') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
 const sideMark = (t, drag, y) => {  // the same highlights for mouse and touch; false = not a valid target
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!t || (drag.list && t.dataset.list && +t.dataset.list === drag.list)) return false;
-  if (drag.folder != null) {
-    const kd = folderDropKind(drag.folder, t, sb_headAfter(t, y)); if (!kd) return false;
-    t.classList.add(kd === 'before' || kd === 'uptop' || (kd === 'into' && fParent(t.dataset.folder)) ? 'dropbefore' : 'drop');
-    return true;
-  }
   t.classList.add(t.classList.contains('srow') ? (sideAfter(t, y) ? 'dropafter' : 'dropbefore') : 'drop');
   return true;
 };
 document.addEventListener('dragover', e => {
-  if (!listDrag && folderDrag === null) return;
-  if (sideMark(sideDropTarget(e.target, folderDrag !== null, e.clientY), {list: listDrag, folder: folderDrag}, e.clientY)) e.preventDefault();
+  if (!listDrag) return;
+  if (sideMark(sideDropTarget(e.target, e.clientY), {list: listDrag}, e.clientY)) e.preventDefault();
 });
 document.addEventListener('drop', e => {
-  if (!listDrag && folderDrag === null) return;
+  if (!listDrag) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  const drag = {list: listDrag, folder: folderDrag}; listDrag = null; folderDrag = null;
+  const drag = {list: listDrag}; listDrag = null;
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  const t = sideDropTarget(e.target, drag.folder !== null, e.clientY);
-  sideDrop(drag, t, sideAfter(t, e.clientY) || (drag.folder !== null && sb_headAfter(t, e.clientY)));
+  const t = sideDropTarget(e.target, e.clientY);
+  sideDrop(drag, t, sideAfter(t, e.clientY));
 }, true);
-// one drop in the sidebar (mouse or touch): a folder before a folder, a list into a folder (its header or empty body),
-// out of a folder (the "Lists" header), or before another list (taking over that list's folder). One request; moving
-// into / out of a folder can be undone.
+// one drop of a list in the sidebar (mouse or touch): into a folder (its header or empty body), out of a folder (the
+// "Projects" header), or before another list (taking over that list's folder). One request; moving into / out of a folder
+// can be undone.
 async function sideDrop(drag, t, after = false) {
   if (!t) return;
-  if (drag.folder != null) {
-    const kd = folderDropKind(drag.folder, t, after), from = drag.folder;
-    if (kd === 'before') {
-      const arr = folderNames().filter(x => x !== from);
-      arr.splice(arr.indexOf(t.dataset.folder), 0, from);
-      saveFolders(fParent(from) ? arr : arr.filter(x => !fParent(x)).flatMap(x => [x, ...folderSubs(x)])); return;
-    }
-    if (kd === 'uptop') {  // 2.46.2 (#1664): one toast; the folder is renamed to a top-level one, then placed right before the target
-      const to = t.dataset.folder, np = fName(from);
-      if (!await folderMove(from, np, tr('{0} is a top-level folder now', qn(np)), true)) return;
-      if (!folderNames().includes(from) && folderNames().includes(np)) { const arr = folderNames().filter(x => x !== np); arr.splice(arr.indexOf(to), 0, np); await saveFolders(arr).catch(() => {}); }
-      load().then(() => render()).catch(() => {});
-      return;
-    }
-    if (kd === 'top') { folderMove(from, fName(from), tr('{0} is a top-level folder now', qn(fName(from)))); return; }
-    if (kd === 'into') {
-      const to = t.dataset.folder, par = fParent(to) || to, np = par + FSEP + fName(from);
-      await folderMove(from, np, tr('Moved {0} to folder {1}', qn(fName(from)), fDisp(par)));
-      if (fParent(to) && folderNames().includes(np)) { const arr = folderNames().filter(x => x !== np); arr.splice(arr.indexOf(to), 0, np); saveFolders(arr); }
-    }
-    return;
-  }
   const id = drag.list, l = listById(id); if (!l) return;
   if (l.mirrored) { toast(mirroredMsg(l)); return; }  // 2.27.0 (#988)
   const f0 = l.folder || '';
@@ -599,29 +619,29 @@ async function sideDrop(drag, t, after = false) {
 function folderPick(anchor, id) {
   const cur = listById(id)?.folder || '';
   menu(anchor, [{label: tr('No folder'), icon: 'list', on: !cur, fn: () => setListFolder(id, '')},
-    ...folderNames().map(f => ({label: fParent(f) ? '\u2003' + fName(f) : f, icon: 'folder', on: cur === f, fn: () => setListFolder(id, f)})),
+    ...folderNames().map(f => ({label: '\u2003'.repeat(fDepth(f) - 1) + fName(f), icon: 'folder', on: cur === f, fn: () => setListFolder(id, f)})),  // 2.352.0 E (#2748): any depth
     '-', {label: tr('New folder…'), icon: 'plus', fn: () => newFolder(id)}]);
 }
-// touch (phone drawer, tablets): long-press a list or a folder, then drag -- same targets and highlights as the mouse.
-// Held and let go without moving: the list's menu (edit, type, "Move to folder…") / the folder's menu.
-// 2.28.0 (#976): a right-click on a list or folder in the sidebar opens its menu (mouse; touch uses the long press below)
+// touch (phone drawer, tablets): long-press a list, then drag -- same targets and highlights as the mouse. Held and let go
+// without moving: the list's menu (edit, type, "Move to folder…"). 2.352.0 E (#2748): a folder's hold is the tree's (areas.js).
+// 2.28.0 (#976): a right-click on a list in the sidebar opens its menu (mouse; touch uses the long press below); a folder's: areas.js
 document.addEventListener('contextmenu', e => {
   if (S.listReorder || e.shiftKey) return;
-  const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead[data-folder]');
-  if (!r && !fh) return;
+  const r = e.target.closest?.('#side .srow[data-list]');
+  if (!r) return;
   if (e.pointerType === 'touch') { e.preventDefault(); return; }  // 2.38.0 (#1155): the long press below is the app's, no browser menu
   if (isTouch()) return;
   e.preventDefault();
-  if (r) listMenu(r, +r.dataset.list); else folderMenu(fh, fh.dataset.folder);
+  listMenu(r, +r.dataset.list);
 });
 let sd = null, sdHeld = false;
 document.addEventListener('touchstart', e => {
-  const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead:not(.sbbt)');
+  const r = e.target.closest?.('#side .srow[data-list]');
   // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
   const grip = S.listReorder && e.target.closest('.sgrip');
-  if ((S.listReorder && !grip) || !(r || fh) || e.target.closest('.iconbtn') || (r && listById(+r.dataset.list)?.archived)) { sd = null; return; }
+  if ((S.listReorder && !grip) || !r || e.target.closest('.iconbtn') || listById(+r.dataset.list)?.archived) { sd = null; return; }
   const p = e.touches[0];
-  sd = {el: r || fh, list: r ? +r.dataset.list : null, folder: fh ? fh.dataset.folder : null, x: p.clientX, y: p.clientY, active: false, reorder: !!grip};
+  sd = {el: r, list: +r.dataset.list, x: p.clientX, y: p.clientY, active: false, reorder: !!grip};
   // CI of 2.223.2: a redraw of the sidebar during the hold replaces the touched row; a removed target's touchmove / touchend
   // no longer reach the document, so the row itself listens too (one handling per event, _sd)
   if (!sd.el._sdL) { sd.el._sdL = 1; sd.el.addEventListener('touchmove', sdMove, {passive: false}); sd.el.addEventListener('touchend', sdEnd); sd.el.addEventListener('touchcancel', sdEnd); }
@@ -652,7 +672,7 @@ document.addEventListener('touchmove', sdMove, {passive: false});
 const sdFrame = rafThrottle((x, y) => {
   if (!sd?.active || !sd.ghost) return;
   sd.ghost.style.transform = `translateY(${y - sd.y}px)`;
-  const t = sideDropTarget(document.elementFromPoint(x, y), sd.folder != null, y);
+  const t = sideDropTarget(document.elementFromPoint(x, y), y);
   sideMark(t, sd, y);
   const side = $('#side'), r = side.getBoundingClientRect();
   if (r.height && side.scrollBy) { if (y < r.top + 48) side.scrollBy(0, -12); else if (y > r.bottom - 48) side.scrollBy(0, 12); }
@@ -670,15 +690,15 @@ function sdEnd(e) {
   if (e && e.cancelable) e.preventDefault();
   sdHeld = true; setTimeout(() => { sdHeld = false; }, 500);
   st.ghost.remove(); st.el.classList.remove('dragging');
-  const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.folder != null, st.ly) : null;
+  const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.ly) : null;
   $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!st.moved && st.reorder) return;  // a tap on the grip
-  if (!st.moved) { const el = st.list ? $(`#side .srow[data-list="${st.list}"]`) : $(`#side .fhead[data-folder="${rmEsc(st.folder)}"]`); if (el) st.list ? listMenu(el, st.list) : folderMenu(el, st.folder); return; }
-  if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t, sideAfter(t, st.ly) || (st.folder != null && sb_headAfter(t, st.ly)));
+  if (!st.moved) { const el = $(`#side .srow[data-list="${st.list}"]`); if (el) listMenu(el, st.list); return; }
+  if (t && e?.type === 'touchend') sideDrop({list: st.list}, t, sideAfter(t, st.ly));
 }
 document.addEventListener('touchend', sdEnd);
 document.addEventListener('touchcancel', sdEnd);
-document.addEventListener('dragend', () => { listDrag = null; folderDrag = null; });
+document.addEventListener('dragend', () => { listDrag = null; });
 // 2.220.0 B (#2807): a cut name in the sidebar shows in full as its tooltip (set on hover / focus, only while it is cut;
 // folder names have theirs, "Open …")
 const sbt_tip = e => {
@@ -692,7 +712,7 @@ document.addEventListener('focusin', sbt_tip);
 // "Members may use it", tidying; 2.40.0 #1373: no "Agents may address each other" any more) next to its people and roles ("Share folder"). A new list
 // in the folder gets them; on a change the existing lists follow (or only new ones); a list changed on its own keeps its
 // value ("differs from the folder") until "Back to the folder" in its dialog.
-const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Viewer')]];
+const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Read-only')]];  // 2.364.0 C (#3041)
 const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may see and use the agent'), agent_tidy: N_('Agent may tidy up entries'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed'),  // 2.39.1 (#1214): hide_done
   agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking')};  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
 function folderEff(path) {
@@ -713,8 +733,10 @@ function folderHintHtml(l, id, folder) {
   const eff = folderEff(f), keys = Object.keys(eff).filter(k => FP_KEYS[k] && (k !== 'org_id' || wsOn()));
   const own = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })().filter(k => keys.includes(k)) : [];
   const parts = [];
-  if (keys.length) parts.push(`${ic('folder', 's')} ${esc(tr('From the folder “{0}”:', fDisp(f)))} ${keys.map(k => `<span class="${own.includes(k) ? 'fown' : ''}">${esc(tr(FP_KEYS[k]))}: ${esc(folderValTxt(k, eff[k]))}</span>`).join(' · ')}`);
-  if (own.length) parts.push(`${esc(tr('This project differs: {0}', own.map(k => tr(FP_KEYS[k])).join(', ')))} <button type="button" class="linkbtn" data-freset="${l.id}">${tr('Back to the folder')}</button>`);
+  // 2.352.0 C (#2751): one line (the folder and what it sets), the values and "Back to the folder" fold out; no crossed-out text
+  if (keys.length) parts.push(`<details class="lfhd"><summary>${ic('folder', 's')} <span>${esc(tr('From the folder “{0}”:', fDisp(f)))} ${esc(keys.map(k => tr(FP_KEYS[k])).join(', '))}${own.length ? ' · ' + esc(tr('This project differs: {0}', own.map(k => tr(FP_KEYS[k])).join(', '))) : ''}</span></summary>`
+    + `<ul class="lfhl">${keys.map(k => `<li>${esc(tr(FP_KEYS[k]))}: ${esc(folderValTxt(k, eff[k]))}${own.includes(k) ? ` <span class="muted">· ${esc(tr('Differs from the folder'))}</span>` : ''}</li>`).join('')}</ul>`
+    + `${own.length ? `<button type="button" class="linkbtn" data-freset="${l.id}">${tr('Back to the folder')}</button>` : ''}</details>`);
   const sh = !id && folderSharedIn(f), mine = !id && !sh && folderShareOf(f);  // 2.41.0 (#1428): my shared folder names its people and agents
   if (mine) parts.push(`${ic('users', 's')} ${esc(folderShareSay(mine, N_('It will be shared with {0}.'), N_('It will be shared with {0} and {1}.')))} <button type="button" class="linkbtn" data-fnone="1">${tr('Create it without a folder instead')}</button>`);
   if (sh) parts.push(`${ic('users', 's')} ${esc(trn('It will be shared with everyone in the folder “{1}” ({0} person).', 'It will be shared with everyone in the folder “{1}” ({0} people).', sh.people, fDisp(sh.folder)))} <button type="button" class="linkbtn" data-fnone="1">${tr('Create it without a folder instead')}</button>`);

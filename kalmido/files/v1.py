@@ -209,6 +209,7 @@ def v1_file_create():
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", "parent_id")) from None
     _area_scope(c, pid, write=True)  # 2.200.0 F (#1781, review 3): a folder in the knowledge tree needs wiki:write
+    added = 0  # 2.353.0 D (#2759)
     if kind == "folder":
         owner, org = _place(c, uid, pid, None)
         from ..core.db import insert_id
@@ -227,8 +228,13 @@ def v1_file_create():
             c.rollback()
             raise BadInput(str(e)) from None
         fs_log_add(c, nid, "write")
+        from ..docs.recog import rc_after_add
+        added = rc_after_add(c, nid, uid)  # 2.353.0 D (#2759): into a recognising folder = a document
     bump(c)
     c.commit()
+    if added:
+        from ..docs.recog import rc_kick
+        rc_kick(added)
     return jsonify(_v1_node(c, need_node(c, nid))), 201
 
 
@@ -291,7 +297,9 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "updated_at": {"type": "string"}, "url": {"type": "string"}, "content_url": {"type": "string"},
         "sort_no": {"type": ["integer", "null"], "description": "Order by hand within the folder (null: by name after the sorted ones)"},
         "ref_kind": {"type": "string"}, "ref_id": {"type": ["integer", "null"]},
-        "open": {"type": "string", "description": "kind ref: the app route of the object"}, "label": {"type": "string"}}}
+        "open": {"type": "string", "description": "kind ref: the app route of the object"}, "label": {"type": "string"},
+        "recog": {"type": "string", "enum": ["on", "off"], "description": "2.353.0: the folder's / file's own recognition switch "
+                  "(absent: as the folder above; set by people in the app)"}}}
     schemas["FileNode"] = node
     schemas["FileNodePage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("FileNode")}, "next_cursor": {"type": "null"}}}
     T = "Files"
@@ -315,7 +323,7 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                          [q("q", "Words (a word of 4+ letters also matches as a prefix)", {"type": "string"}),
                                           q("space", "private | org:<id> | shared (default: all)", {"type": "string"})], scope="files:read",
                                          desc="Names, the text of PDFs and the text the server recognised in scans and photos (local OCR). "
-                                              "Each item has hit: name | text. Only files you may open; at most 100, newest first.")}
+                                              "Each item has hit: name | text | doc (2.353.0: sender, type or a tag of a document). Only files you may open; at most 100, newest first.")}
     paths["/files/{id}"] = {"get": op("A folder with its children or a file with its versions (2.48.0)", T, ok(ref("FileNode")) | errs("403", "404"),
                                       [nid], scope="files:read")}
     paths["/files/{id}/content"] = {"get": {**op("Download a file (2.48.0)", T, errs("400", "403", "404", "409"),

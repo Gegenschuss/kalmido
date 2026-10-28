@@ -14,7 +14,7 @@
 .pvfail{display:flex;flex-direction:column;align-items:center;gap:.75rem;text-align:center;padding:3rem 1rem;color:var(--text2);max-width:28rem;margin:0 auto}
 .pvfail>svg{width:2.5rem;height:2.5rem;color:var(--muted)}
 .pvfail .btn{display:inline-flex;align-items:center;gap:.375rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .pvbox{height:100%}
   .pvbar .pvnav{order:8}
   .pvbar .pvzoom{order:9}
@@ -51,7 +51,7 @@
 .dpvpick{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
 .dpvag{display:flex;align-items:center;gap:.5rem;padding:.5rem;border-radius:.375rem;cursor:pointer;min-height:2.75rem}
 .dpvag:has(input:checked){background:var(--accent-soft)}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .dpvbox{height:100%}
   .dpvsum span{display:none}
   .dpvbody{padding:.75rem .75rem calc(.75rem + var(--safe-b))}

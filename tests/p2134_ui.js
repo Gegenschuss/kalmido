@@ -99,7 +99,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     Object.defineProperty(vv, 'offsetTop', {configurable: true, get: () => window.__kb.t});
     window.__setKb = (hh, t) => { window.__kb.h = hh; window.__kb.t = t; vv.dispatchEvent(new Event('resize')); vv.dispatchEvent(new Event('scroll')); return 1; };
     return 1; })()`;
-  for (const [vw, vh] of [[390, 844], [880, 904]]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  // 2.364.0 (#3040): a touch tablet in the phone layout is below 768 px now (was 880)
+  for (const [vw, vh] of [[390, 844], [720, 904]]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
     const tag = String(vw);
     check(await ffLogin({ev, nav}) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});

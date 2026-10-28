@@ -214,7 +214,10 @@ const acz_on = () => !!(S.api?.enabled || S.webhooks?.enabled || aiPaneOn());
 const acz_html = () => acz_on() ? `${apiHtml()}${whHtml()}${aiPaneOn() ? `<h4 id="s-acz-ag-h">${tr('Agents')}</h4>
   <div class="shint">${tr('Each of your agents logs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
   <div class="members" id="s-acz-ags"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}` : '';
-const acz_linkHtml = on => on ? `<div class="row aczlink"><span class="muted">${tr('API tokens, webhooks and agent tokens are in one place.')}</span><button type="button" class="btn sm" data-m="go-access">${ic('key', 's')} ${tr('Open Access')}</button></div>` : '';
+// 2.364.0 C (#3044): Access is listed only with an own API token / webhook (acz_mine); else it waits under "For advanced users"
+const acz_mine = () => !!(S.api?.mine || S.webhooks?.mine);
+const acz_linkHtml = on => { const row = `<div class="row aczlink"><span class="muted">${tr('API tokens, webhooks and agent tokens are in one place.')}</span><button type="button" class="btn sm" data-m="go-access">${ic('key', 's')} ${tr('Open Access')}</button></div>`;
+  return !on ? '' : acz_mine() ? row : `<details class="sdet aczadv"><summary>${tr('For advanced users')}</summary>${row}</details>`; };
 async function acz_draw(md) {
   tokDraw(md); whDraw(md);
   const box = $('#s-acz-ags', md); if (!box) return;
@@ -272,7 +275,7 @@ function whModal(w, j, done, base = '/api/me/webhooks') {  // 2.115.0 A (#2061):
   const md = modal(`<h3>${w ? tr('Edit webhook') : tr('Add webhook')}</h3>
     <div class="row"><label for="wh-name">${tr('Name')}</label><input id="wh-name" maxlength="60" value="${esc(w?.name || '')}" placeholder="${tr('optional')}"></div>
     <div class="row"><label for="wh-url">${tr('URL')}</label><input id="wh-url" type="url" value="${esc(w?.url || '')}" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
+    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Server > Server > Advanced).')}</div>
     <div id="wh-evs">${whEvGrid(evs, on)}</div>
     ${w ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="wh-on" ${w.enabled ? 'checked' : ''}> ${tr('Active')}</label><button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New secret')}</button></div>` : ''}
     <div class="shint keep">${base.startsWith('/api/orgs/') ? tr('Only what belongs to the organisation is sent, never the members’ private areas. The signing secret is shown once after saving.') : tr('Only tasks and projects you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
@@ -431,7 +434,7 @@ function chn_mailHtml(m) {
   return `<h4 id="s-evmail-h">${tr('E-mail for single events')}</h4>
     <div class="row"><label for="s-evm-assign">${tr('Assigned to me')}</label>${chn_mailSel('s-evm-assign', m.assign)}</div>
     <div class="row"><label for="s-evm-mention">${tr('Mentioned')}</label>${chn_mailSel('s-evm-mention', m.mention)}</div>
-    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Users)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
+    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
 }
 async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the box #s-chn)
   const box = $('#s-chn', md); if (!box) return;
@@ -528,7 +531,7 @@ function chn_modal(ch, j, base, done, org) {
     <div class="row"><label for="chn-kind">${tr('Channel type')}</label><select id="chn-kind" ${ch ? 'disabled' : ''}>${Object.entries(CHN_KINDS).map(([k, n]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div class="row"><label for="chn-name">${tr('Name')}</label><input id="chn-name" maxlength="60" value="${esc(ch?.name || '')}" placeholder="${tr('optional')}"></div>
     <div id="chn-fields">${fields(kind)}</div>
-    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
+    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Server > Server > Advanced).')}</div>
     <div class="whevg"><b class="muted">${tr('What to send')}</b><div class="featgrid">${evs.map(e => `<label class="chkl"><input type="checkbox" data-chnev="${esc(e)}" ${on.has(e) ? 'checked' : ''}> ${esc(chn_evName(e, org))}</label>`).join('')}</div></div>
     ${ch ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="chn-on" ${ch.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>` : ''}
     <div class="calerr" role="alert" id="chn-err" hidden></div>

@@ -93,8 +93,8 @@ def _v1_msg(e):
 
 
 def _list_agent(c, lid):
-    r = c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' ORDER BY m.user_id",
-                  (lid,)).fetchone()
+    r = c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' "
+                  "AND NOT (m.frole IS NOT NULL AND m.own_role IS NULL) ORDER BY m.user_id", (lid,)).fetchone()  # 2.352.0 A (#2748): not a folder's agent
     return r[0] if r else None
 
 
@@ -103,7 +103,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     force: also the ones the list keeps on its own. Returns [{key, reason}] of what could not be applied (dry: what WOULD not,
     nothing is changed) and the number of changed settings. 2.58.0 (#1422): uid = the person (the callers pass it)."""
     uid = uid or me()
-    from ..accounts.orgs import clean_org_id, list_org, ws_member_problem
+    from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
     lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
@@ -141,6 +141,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     org_out(c, cur, want, "list", lname, list_id=lid, obj=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
                     from ..team.clients import _org_boundary
+                    list_space_follow(c, lid, cur, _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
                     if _org_boundary(c):  # 2.173.1 (#2714): a client of another workspace does not travel along (as in list_org_set)
                         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
                                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, want))
@@ -283,7 +284,8 @@ def folder_props_get():
     each keeps on its own."""
     from ..lists.lists import clean_folder
     c = db()
-    f = clean_folder(request.args.get("folder") or "", strict=False)
+    from ..lists.lffolder import lf_path_arg
+    f = clean_folder(lf_path_arg(c, request.args.get("folder"), request.args.get("node")) or "", strict=False)  # 2.352.0 A (#2748): or node=
     if not f:
         return err(tr("Invalid value: {0}", "folder"))
     return jsonify(folder_info(c, me(), f))
@@ -298,7 +300,8 @@ def folder_props_put():
     c, b = db(), body()
     if g.user["kind"] == "agent":
         raise Denied(403)
-    f = clean_folder(b.get("folder") or "")
+    from ..lists.lffolder import lf_path_arg
+    f = clean_folder(lf_path_arg(c, b.get("folder"), b.get("node")) or "")  # 2.352.0 A (#2748): or node=
     if not f:
         return err(tr("Invalid value: {0}", "folder"))
     apply = b.get("apply", "all")

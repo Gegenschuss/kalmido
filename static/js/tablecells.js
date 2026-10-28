@@ -9,7 +9,7 @@ document.addEventListener('pointerdown', e => {
   const b = e.target.closest?.('.lchead .lcs[data-colsort]'); if (!b || e.button !== 0 || e.pointerType === 'touch' || isTouch()) return;
   const head = b.closest('.lchead'), l = listById(+head.dataset.lid); if (!l || !canManage(l) || !Array.isArray(l.columns)) return;
   const cell = b.closest('.lc'), k = cell.dataset.k, x0 = e.clientX, y0 = e.clientY;
-  let on = false, guide = null, to = null;
+  let on = false, guide = null, to = null, cover = null;
   const cells = () => [...head.querySelectorAll('.lc[data-k]')].filter(c => c.getClientRects().length);
   // 2.87.9 (#1965): the cells are measured once (again after a scroll), the guide moves once per frame
   let geo = null;
@@ -27,13 +27,13 @@ document.addEventListener('pointerdown', e => {
     guide = lcGuide(cell, guide, gx);
   });
   const mv = ev => {
-    if (!on) { if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return; on = true; cell.classList.add('lcmove'); document.body.classList.add('lcmoving'); document.addEventListener('scroll', reset, true); }
+    if (!on) { if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return; on = true; cell.classList.add('lcmove'); document.body.classList.add('lcmoving'); cover = document.body.appendChild(Object.assign(document.createElement('div'), {className: 'lccover mv'})); document.addEventListener('scroll', reset, true); }
     show(ev.clientX);
   };
   const up = () => {
     document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
     document.removeEventListener('scroll', reset, true); show.flush();
-    guide?.remove(); cell.classList.remove('lcmove'); document.body.classList.remove('lcmoving');
+    guide?.remove(); cover?.remove(); cell.classList.remove('lcmove'); document.body.classList.remove('lcmoving');  // 2.331.0 B (#3304): the cover carries the cursor
     if (!on) return;
     tcMoved = Date.now();
     const next = tcColMove(l.columns, k, to);

@@ -42,13 +42,13 @@ const FEAT = 'cal,comments,collab,time,agents';
   fakeUpd();
   const closeAll = () => d.querySelectorAll('.modal').forEach(m => m.remove());
   const secOn = md => md.querySelector('.snav .on')?.dataset.sec;
-  const admOn = md => md.querySelector('[data-admsub][aria-selected="true"]')?.dataset.admsub;
+  const admOn = md => md.querySelector('.spane:not(.hidden) [data-admsub][aria-selected="true"]')?.dataset.admsub;  // 2.364.0 C (#3041): two areas with sub-tabs
 
   // ================= Administration > Agents
   w.eval(`settingsModal('agentpolicy')`);
   let md = await until(() => d.querySelector('.smodal'));
-  check(secOn(md) === 'users' && admOn(md) === 'agents' && !md.querySelector('#admp-agents').hidden, "settingsModal('agentpolicy') opens Administration > Agents: " + secOn(md) + '/' + admOn(md));
-  check([...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join() === 'users,signin,org,agents,server,log', 'the sub-tabs of Administration: ' + [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join());
+  check(secOn(md) === 'org' && admOn(md) === 'agents' && !md.querySelector('#admp-agents').hidden, "settingsModal('agentpolicy') opens Organisation > Agents: " + secOn(md) + '/' + admOn(md));
+  check([...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join() === 'users,agents,odata,signin,server,log', 'the sub-tabs of Organisation and Server: ' + [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join());
   const ap = md.querySelector('#admp-agents');
   await until(() => ap.querySelector('#s-sclim .sclim') && ap.querySelector('#s-aud'));
   check(ap.querySelector('#s-uag') && ap.querySelector('#s-uagmax') && ap.querySelectorAll('#s-sclim .sclim').length === 2, 'Agents: personal agents for everyone + the permission limit (loaded)');
@@ -73,7 +73,7 @@ const FEAT = 'cal,comments,collab,time,agents';
   w.eval(`settingsModal('modules')`);
   md = await until(() => d.querySelector('.smodal'));
   const marks = [...md.querySelectorAll('[data-pane="modules"] .ad-mark')];
-  check(marks.length === 2 && marks.every(m => m.querySelector('.ad-tag')?.textContent === 'Admin · applies to everyone' && m.querySelector('.ad-open')?.textContent === 'Open in Administration'), 'Modules: two marks "Admin · applies to everyone" + "Open in Administration"');
+  check(marks.length === 2 && marks.every(m => m.querySelector('.ad-tag')?.textContent === 'Admin · applies to everyone' && m.querySelector('.ad-open')?.textContent === 'Open under Server'), 'Modules: two marks "Admin · applies to everyone" + "Open under Server"');  // 2.364.0 C (#3041)
   check(md.querySelector('[data-modrow="collab"] .ad-mark') && md.querySelector('[data-modrow="time"] .ad-mark') && md.querySelector('[data-modrow="collab"] #s-collaball'), 'the marks sit at collaboration and time tracking, next to the switch');
   click(w, md.querySelector('[data-modrow="time"] .ad-open'));
   await sleep(100);
@@ -98,7 +98,7 @@ const FEAT = 'cal,comments,collab,time,agents';
   // ================= old entries
   w.eval(`settingsModal('activity')`);
   md = await until(() => d.querySelector('.smodal'));
-  check(secOn(md) === 'users' && admOn(md) === 'agents', "settingsModal('activity'): Administration > Agents (the log)");
+  check(secOn(md) === 'org' && admOn(md) === 'agents', "settingsModal('activity'): Organisation > Agents (the log)");  // 2.364.0 C (#3041)
   closeAll();
   w.eval(`settingsModal('usage')`);
   md = await until(() => d.querySelector('.smodal'));
@@ -106,7 +106,7 @@ const FEAT = 'cal,comments,collab,time,agents';
   closeAll();
   w.eval(`settingsModal('users')`);
   md = await until(() => d.querySelector('.smodal'));
-  check(secOn(md) === 'users' && admOn(md) === 'users', "settingsModal('users'): Administration > People");
+  check(secOn(md) === 'org' && admOn(md) === 'users', "settingsModal('users'): Organisation > People");  // 2.364.0 C (#3041)
   closeAll();
   w.eval(`LS.set('aiSub', 'log'); settingsModal('ai')`);
   md = await until(() => d.querySelector('.smodal'));
@@ -114,10 +114,10 @@ const FEAT = 'cal,comments,collab,time,agents';
   // the settings search finds the moved parts and opens their sub-tab
   await sleep(400);
   const sq = md.querySelector('#s-search'); sq.dispatchEvent(new w.Event('focus')); sq.value = 'permission limit'; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
-  const hit = await until(() => [...md.querySelectorAll('#s-sres [data-hit]')].find(b => /Administration/.test(b.textContent)));
-  check(hit && /Administration/.test(hit.textContent), 'search: the hit is in Administration: ' + hit?.textContent);
+  const hit = await until(() => [...md.querySelectorAll('#s-sres [data-hit]')].find(b => /Organisation/.test(b.textContent)));  // 2.364.0 C (#3041)
+  check(hit && /Organisation/.test(hit.textContent), 'search: the hit is in Organisation: ' + hit?.textContent);
   if (hit) { click(w, hit); await sleep(100); }
-  check(secOn(md) === 'users' && admOn(md) === 'agents', 'search: the hit opens Administration > Agents: ' + secOn(md) + '/' + admOn(md));
+  check(secOn(md) === 'org' && admOn(md) === 'agents', 'search: the hit opens Organisation > Agents: ' + secOn(md) + '/' + admOn(md));
   closeAll();
   w.close();
 
@@ -136,8 +136,8 @@ const FEAT = 'cal,comments,collab,time,agents';
   w = await boot({user: 'alice'}); d = w.document; await until(() => d.querySelector('#side'));
   w.eval(`settingsModal('modules')`);
   md = await until(() => d.querySelector('.smodal'));
-  check(md.querySelector('.snav [data-sec="users"] span')?.textContent === 'Verwaltung', 'German: the area is called Verwaltung (2.152.4, #2655): ' + md.querySelector('.snav [data-sec="users"] span')?.textContent);
-  check(md.querySelector('.ad-mark .ad-tag')?.textContent === 'Verwaltung · gilt für alle' && md.querySelector('.ad-mark .ad-open')?.textContent === 'In der Verwaltung öffnen', 'German: the mark and the link');
+  check(md.querySelector('.snav [data-sec="users"] span')?.textContent === 'Server', 'German: the area is called Server (2.364.0 C, #3041): ' + md.querySelector('.snav [data-sec="users"] span')?.textContent);
+  check(md.querySelector('.ad-mark .ad-tag')?.textContent === 'Admin · gilt für alle' && md.querySelector('.ad-mark .ad-open')?.textContent === 'Unter Server öffnen', 'German: the mark and the link');  // 2.364.0 C (#3041)
   check(md.querySelector('[data-admsub="agents"]')?.textContent.trim() === 'Agenten', 'German: the sub-tab Agenten');
   closeAll(); w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});

@@ -52,7 +52,7 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   check(md && !md.querySelector('#l-name').disabled && !md.querySelector('#l-emo').disabled, '#1431: admin: name and icon button free');
   check(md && [...md.querySelectorAll('#l-col button')].every(b => !b.disabled), '#1431: admin: colours free');
   check(md && !!md.querySelector('.lipickw .lipick'), '#1431: admin: "Or a picture" is offered');
-  check(md && md.querySelector('#l-kindp')?.disabled === true, '#1431: admin: the type stays grey (owner)');
+  check(md && !md.querySelector('#l-kindp') && md.querySelector('#l-time')?.disabled !== false, '#1431: admin: no type switch any more (2.352.0 C, #2751); the owner\'s settings stay grey');
   check(md && !!md.querySelector('#l-fields [data-m="field-add"]'), '#1192: admin: Custom fields with "+ Field"');
   // a rename from the dialog saves (autosave on change)
   const nm = md.querySelector('#l-name'); nm.value = 'Fair booth'; nm.dispatchEvent(new w.Event('input', {bubbles: true})); nm.dispatchEvent(new w.Event('change', {bubbles: true}));

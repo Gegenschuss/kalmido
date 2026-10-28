@@ -278,7 +278,8 @@ APP_ONLY = [
       "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
     ("2.96.0 (#1941): moving data between the private space and an organisation stays with people in the app -- an agent belongs "
      "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
-     ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space")),
+     ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space",
+      "=POST /api/lists/{}/move-space")),  # 2.401.0 (#2924): the dry run of a project's workspace change
     ("2.89.0 C (#1916): arranging a table stays with people in the app -- trash / restore, removing / restoring / sorting rows and "
      "columns, changing a column, naming and freezing cells, the cursor of others; an agent creates tables with their columns "
      "in one step, writes cells, appends rows / columns and takes back its own calls",
@@ -355,6 +356,10 @@ APP_ONLY = [
     ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
      "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
      ("* /api/docs/scan-keys", "=POST /api/docs/mail-notice", "* /api/docs/folder-watcher/")),
+    # 2.353.0 D (#2759)
+    ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
+     "documents); agents keep their shares, read and change documents with /documents and files with /files",
+     ("=PUT /api/files/nodes/{}/recognition",)),
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "
@@ -370,11 +375,12 @@ APP_ONLY = [
     ("2.49.0 (#1199, #1201) / 2.200.0 C (#1781): knowledge pages -- agents (scopes wiki:read / wiki:write) list, read, write and "
      "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
      "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
-     "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app",
+     "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
+     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
-      "=POST /api/outline/parse")),
+      "=POST /api/outline/parse", "=PUT /api/wiki/style")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
@@ -467,6 +473,9 @@ APP_ONLY = [
     ("folder shares with groups: people only (sharing of a list with a group: /lists/{id}/groups)", ("* /api/folders/groups",)),
     ("2.22.0 (#740): sharing a whole folder with a person (and its future lists): people only; single lists: /lists/{id}/members",
      ("* /api/folders/people",)),
+    ("2.352.0 (#2748): the projects tree of the sidebar (its folders are file store folders: the API has /files, "
+     "/files/{id}/shares and /folders; a folder of the projects is read / shared there)",
+     ("GET /api/lists/tree", "POST /api/lists/folders", "POST /api/lists/tree/move")),
     ("2.41.0 (#1420): a folder's agents, the public links of its lists together and handing all its lists over: people only "
      "(per list: /lists/{id}/members, /lists/{id}/public-link, /lists/{id}/owner)",
      ("* /api/folders/agents", "* /api/folders/public-links", "POST /api/folders/owner")),
@@ -498,6 +507,9 @@ APP_ONLY = [
     # 2.64.2 (#1817): files of a list with the lock, encrypted in the browser with the list key
     ("2.64.2 (#1817): files of a list with the lock are encrypted with the list key in a person's browser; agents and API tokens get 403 "
      "(they see such files only as encrypted)", ("=POST /api/tasks/{}/list-attachments",)),
+    # 2.353.0 A (#2758): locked folders of the file store, encrypted in the browser with a folder key
+    ("2.353.0 A (#2758): locking a folder of the file store, its encrypted upload / rename / move / versions and handing out the "
+     "folder key happen in a person's browser (end-to-end); agents and API tokens never see a locked folder", ("* /api/files/lock/",)),
     ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",

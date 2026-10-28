@@ -9,6 +9,7 @@ from ..core.i18n import lang, tr, trn
 from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MAX_W, PDF_TOP, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom,
                   pdf_date, pdf_draw_footer, pdf_footer_cols, pdf_image_object, pdf_money, pdf_wrap, pdf_write)
 from .model import office_settings  # 2.357.0 A (#3156)
+from .letters import lt_sig_pic  # 2.332.0 C (#3301): the approver's signature picture
 from .pdf import PAPER, pdf_paper, pdf_paper_bind
 
 BW_KIND = {"food": "Food", "drinks": "Drinks"}
@@ -68,6 +69,14 @@ def bw_draw_footers(pages, foot, lg):
 def bw_paper(c, oid):
     """2.357.0 A (#3156): the office's paper size (a4 / letter)."""
     return pdf_paper(office_settings(c, oid).get("paper"))
+
+
+def bw_sig_image(c, oid, m):
+    """2.332.0 C (#3301): the signature picture for the receipt m (an image object of pdf.pdf_image_object): only an
+    approved receipt with sign_image and only the picture of the person who approved it (approved_by), never another's."""
+    if m.get("status") != "approved" or not m.get("sign_image") or not m.get("approved_by"):
+        return None
+    return lt_sig_pic(c, oid, m["approved_by"])  # the same picture as letters / documents (2.357.0 C, #3158)
 
 
 def bw_meal_pdf_data(c, oid, m):
@@ -188,7 +197,13 @@ def bw_meal_pdf_data(c, oid, m):
     y += 22
     # the host's confirmation (with the signature line for the print-out, 2.296.0 A (#3176)) stays together
     conf = tr("I confirm that the details are complete and correct and that the meal was held for business reasons.")
-    need(18 + len(pdf_wrap(conf, 9.2, PDF_CW)) * 9.2 * 1.42 + 10 + 54 + 44)
+    sw = (PDF_CW - 28) / 2
+    sig, sig_w, sig_h = bw_sig_image(c, oid, m), 0, 0
+    if sig:  # 2.332.0 C (#3301): at most 14 mm high and half the width, on the signature line
+        sig_h = 40.0
+        sig_w = min(sw - 8, sig[0] * sig_h / sig[1])
+        sig_h = sig_w * sig[1] / sig[0]
+    need(18 + len(pdf_wrap(conf, 9.2, PDF_CW)) * 9.2 * 1.42 + 10 + 54 + 44 + sig_h)
     p.text(PDF_L, y, tr("Confirmation of the host"), 11, True)
     y += 18
     y += p.para(PDF_L, y, conf, 9.2, PDF_CW)
@@ -202,7 +217,9 @@ def bw_meal_pdf_data(c, oid, m):
         p.text(PDF_L + 10, y + 14, tr("Not confirmed yet (draft)"), 9.6, False, C_INK2)
     y += 54
     # 2.296.0 A (#3176): a line to sign the print-out (the paper receipt is signed by the host)
-    sw = (PDF_CW - 28) / 2
+    if sig:  # standing on the line (moved down by a picture higher than the free space above it)
+        y += max(0.0, sig_h - 20)
+        p.image("Sig", PDF_L + 4, y + 20 - sig_h, sig_w, sig_h)
     p.line(PDF_L, y + 22, PDF_L + sw, y + 22, 0.6, C_INK)
     p.text(PDF_L, y + 25, tr("Place, date, signature"), 7.6, False, C_INK2)
     y += 44
@@ -217,6 +234,8 @@ def bw_meal_pdf_data(c, oid, m):
             need(len(pdf_wrap(t, 8.2, PDF_CW)) * 8.2 * 1.42)
             y += p.para(PDF_L, y, t, 8.2, PDF_CW, color=C_INK2)
     bw_draw_footers(pages, foot, lg)
+    if sig:  # 2.332.0 C (#3301)
+        images["Sig"] = sig
     # 2.357.0 D (#3183): the date in the title as printed (was ISO)
     return pdf_write(pages, images, title=f"{title} {pdf_date(m['date'], lg)}", author=co)
 

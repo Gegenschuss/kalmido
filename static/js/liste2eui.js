@@ -196,7 +196,7 @@ function le2u_listHtml(l, j, err) {
   if (err) return `<div class="muted mhint">${esc(err)}</div>`;
   if (!j) return `<div class="muted mhint">${tr('Loading…')}</div>`;
   const mode = j.mode || null;
-  const sw = (on, dis, title) => `<label class="chkl le2usw"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox" role="switch" id="l-e2e-sw" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} aria-describedby="l-e2e-st"> ${esc(tr('Encrypt the texts of this project in the browser'))}</label>`;
+  const sw = (on, dis, title) => `<label class="chkl le2usw"${title ? ` title="${esc(title)}"` : ''}><input type="checkbox" role="switch" id="l-e2e-sw" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}> ${esc(tr('Encrypt the texts of this project in the browser'))}</label>`;
   if (run || mode === 'encrypting' || mode === 'decrypting') {
     const st = (run ? run.kind === 'stop' : mode === 'decrypting') ? tr('Being decrypted') : tr('Being encrypted');
     return `<div class="row"><span class="tfastate" id="l-e2e-st">${esc(st)}</span></div><div class="le2uprog">${run ? le2u_pbar(run) : ''}</div>
@@ -214,7 +214,8 @@ function le2u_listHtml(l, j, err) {
   // open list
   const may = !!j.can_manage, setup = typeof e2eReady === 'function' && e2eReady(), bl = j.blockers || [];
   const why = !may ? tr('Only the owner and project admins can switch this on') : !setup ? tr('Set up your encryption first') : bl.length ? tr('Not possible yet') : '';
-  return `<div class="row">${sw(false, !!why, why)}</div><div class="muted mhint" id="l-e2e-st">${esc(tr('Off'))}</div>
+  // 2.352.0 C (#2751): no lonely "Off" under the switch (the unticked switch says it); its hint gets the (i) at the switch
+  return `<div class="row">${sw(false, !!why, why)}</div>
     ${may && !setup ? `<div class="shint lhint keep">${esc(tr('Your own encryption is not set up yet: a passphrase and a recovery code in Settings > Account.'))} <button type="button" class="linkbtn" data-le2ul="setup">${esc(tr('Set up'))}</button></div>` : ''}
     ${may ? le2u_blockersHtml(bl) : ''}
     <div class="shint lhint">${esc(tr('Only members can read titles, descriptions, comments and notes. No agents, no tasks by e-mail and no public link in this project.'))}</div>`;

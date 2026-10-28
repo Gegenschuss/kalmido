@@ -126,7 +126,7 @@ def _notify_admins(c, uid):
         if push_reachable(c, aid, s):
             lg = lang_of(s)
             g.pushes.append((aid, tr("Registration waits for approval: {0}", u["display_name"] or u["username"], lg=lg),
-                             tr("Settings > Users", lg=lg), f"{PUBLIC_URL}/#settings/users", push_prio(s)))
+                             tr("Settings > Organisation > People", lg=lg), f"{PUBLIC_URL}/#settings/users", push_prio(s)))
 
 
 def signup_confirmed(c, u):

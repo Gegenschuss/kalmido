@@ -404,12 +404,12 @@ def sh2_links(c, sheet, uid):
 def sh2_offers(c, sheet, uid):
     """What the dialogs need: lists of the space (writable ones for tasks), the office (on? its clients)."""
     lists = []
-    for r in c.execute(f"SELECT id, name, kind, org_id, archived FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL ORDER BY lower(name), id",
+    for r in c.execute(f"SELECT id, name, kind, is_inbox, org_id, archived FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL ORDER BY lower(name), id",
                        (uid, uid)).fetchall():
         if r["org_id"] != sheet["org_id"] or sh_list_ok(c, sheet, uid, r["id"]) in (None, "deleted"):
             continue
         role = list_role(c, r["id"], uid)
-        lists.append({"id": r["id"], "name": r["name"], "project": r["kind"] == "project",
+        lists.append({"id": r["id"], "name": r["name"], "project": not r["is_inbox"],
                       "writable": role in WRITE_ROLES and not r["archived"]})
     oid = sh2_office(c, sheet, uid)
     clients = []

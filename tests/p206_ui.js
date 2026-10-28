@@ -120,7 +120,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.tabbar': JSON.stringify(['m:cal', 'search', 'm:tasks', 'stats'])}}); d = w.document;
   check(!d.querySelector('#rail'), 'no rail');
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
-  check(d.querySelector('#side [data-go="matrix"]') && ['cal', 'habits', 'time', 'review'].every(k => d.querySelector(`#srail [data-sbb="${k}"]`)) /* 2.44.0 (#1187): focus timer + time = Time, statistics = Review */ && d.querySelectorAll('#kbar .kbsrch[data-act="palette"], #side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]') && !d.querySelector('#srail .sset') && d.querySelector('#kbar .kbsw'), 'sidebar: every module, search once (the command-bar field, 2.13.3), settings in the Kalmido menu'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): calendar, habits and the areas are icons of the bar, Settings at its bottom  // 2.152.3 (#2619): the search field moved from the panel into the head bar
+  check(d.querySelector('#side [data-go="matrix"]') && ['cal', 'habits', 'time', 'review'].every(k => d.querySelector(`#srail [data-sbb="${k}"]`)) /* 2.44.0 (#1187): focus timer + time = Time, statistics = Review */ && d.querySelectorAll('#kbar .kbsrch[data-act="palette"], #side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]') && d.querySelector('#srail .sset'), 'sidebar: every module, search once (the command-bar field, 2.13.3), settings');  // 2.152.2 (#2622): calendar, habits and the areas are icons of the bar, Settings at its bottom  // 2.152.3 (#2619): the search field moved from the panel into the head bar
   // settings: the add select offers agents / stats / time / overview / search / settings
   w.eval(`settingsModal('tabbar')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
@@ -256,7 +256,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   check(!w.eval('tabletDock()') && !d.querySelector('#fab').classList.contains('gone'), 'phone: the "+" as before');
   w.close();
   // 2.19.0 (#669): the height part is decided in tdockSync() (html.tdock, without the on-screen keyboard), not in CSS
-  check(/@media \(min-width:600px\) and \(max-width:899px\)\{[\s\S]{0,400}?html\.tdock \.qdock\{display:block;bottom:0;/.test(css) && /html\.tdock #view:has\(> \.lwrap\)\{padding-bottom:calc\(var\(--tabs-h\)/.test(css), 'CSS: the dock shows on portrait tablets (html.tdock), right on the tab bar (2.25.0, UX-39: #view keeps the tab bar as padding)');
+  check(/* 2.364.0 (#3040): the tablet dock 600-767 px */ /@media \(min-width:600px\) and \(max-width:767px\)\{[\s\S]{0,400}?html\.tdock \.qdock\{display:block;bottom:0;/.test(css) && /html\.tdock #view:has\(> \.lwrap\)\{padding-bottom:calc\(var\(--tabs-h\)/.test(css), 'CSS: the dock shows on portrait tablets (html.tdock), right on the tab bar (2.25.0, UX-39: #view keeps the tab bar as padding)');
 
   // ================= #318 a menu from inside a dialog goes above it (phone sheet and desktop)
   for (const mobile of [false, true]) {

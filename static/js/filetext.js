@@ -26,7 +26,7 @@ function ftxtResults() {
   if (!r) return `<p class="muted lempty">${tr('Searching…')}</p>`;
   const items = r.items || [], lfs = r.list_files || [];
   if (!items.length && !lfs.length) return `<div class="empty abempty">${ic('search')}<span>${tr('No results.')}</span></div>`;
-  const why = h => h === 'text' ? tr('Found in the text') : '';
+  const why = h => h === 'text' ? tr('Found in the text') : h === 'doc' ? tr('Found in sender, type or tags') : '';  // 2.353.0 D (#2759): doc
   const fsRows = items.map(n => {
     const meta = [why(n.hit), n.folder ? tr('in {0}', n.folder) : ''].filter(Boolean).join(' · ');
     return `<div class="abrow ftxtrow" role="listitem" data-abid="${n.id}"><button type="button" class="abopen" data-ab="open" data-id="${n.id}">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button><span class="abmeta muted">${esc(meta)}</span><span class="abbadges"></span><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;

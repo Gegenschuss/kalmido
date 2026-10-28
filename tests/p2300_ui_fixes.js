@@ -82,17 +82,17 @@ const NOOVER = sel => `(() => { const box = document.querySelector('${sel}'); if
       await sleep(500);
       if (name === 'share-folder') {
         // #1044 (a) + (b) while the dialog is open
-        // 2.41.0 (#1420): the one Share dialog: the owner row first, then the people (.mrow[data-uid])
-        const fp = await ev(`(() => { const md = document.querySelector('.modal'); const n = md.querySelector('.fpl .mrow[data-uid] .n'); if (!n) return null; const kids = [...n.children];
-          return {cut: kids.filter(k => k.scrollWidth > k.clientWidth + 1).length, kids: kids.length, txt: n.textContent, wide: document.documentElement.scrollWidth,
-            opts: [...md.querySelectorAll('#fp-user option')].map(o => +o.value)}; })()`);
-        // 2.152.2 (#2624): project instead of list
-        check(fp && fp.kids === 2 && fp.cut === 0 && /new projects too/.test(fp.txt) && fp.wide <= 390, `${tag}: #1044 (a) name and "new lists too" not cut ` + JSON.stringify(fp));
-        check(fp && !fp.opts.includes(BOB) && fp.opts.includes(CAR), `${tag}: #1044 (b) Bob (has the folder) is not offered again, Carol is ` + JSON.stringify(fp && fp.opts));
+        // 2.352.0 (#2748): "Share folder…" = the one Share dialog of the file store on the folder's node (list roles); who has a
+        // share is not offered again there either
+        const fp = await ev(`(() => { const md = document.querySelector('.abshdlg'); const n = md && md.querySelector('#ab-shl .mrow[data-sid] .n'); if (!n) return null;
+          return {cut: n.scrollWidth > n.clientWidth + 1 ? 1 : 0, txt: n.textContent, wide: document.documentElement.scrollWidth,
+            opts: [...md.querySelectorAll('#ab-sht option')].map(o => o.value)}; })()`);
+        check(fp && fp.cut === 0 && /Bob/.test(fp.txt) && fp.wide <= 390, `${tag}: #1044 (a) the name is not cut ` + JSON.stringify(fp));
+        check(fp && !fp.opts.includes('user_id:' + BOB) && fp.opts.includes('user_id:' + CAR), `${tag}: #1044 (b) Bob (has the folder) is not offered again, Carol is ` + JSON.stringify(fp && fp.opts));
         await shot('p2300-390-share-folder.png');
-        await ev(`(() => { const md = document.querySelector('.modal'); md.querySelector('#fp-user').value = '${CAR}'; md.querySelector('[data-m="add"]').click(); return 1; })()`);
-        check(await wait(ev, `document.querySelectorAll('.modal .fpl .mrow[data-uid]').length === 2 && !document.querySelector('.modal #fp-user')`),  // 2.41.0 (#1420)
-          `${tag}: #1044 (b) nobody left to add: the "Person" row goes`);
+        await ev(`(() => { const md = document.querySelector('.abshdlg'); md.querySelector('#ab-sht').value = 'user_id:${CAR}'; md.querySelector('[data-abs="add"]').click(); return 1; })()`);
+        check(await wait(ev, `document.querySelectorAll('.abshdlg #ab-shl .mrow[data-sid]').length === 2 && !document.querySelector('.abshdlg #ab-sht option[value="user_id:${CAR}"]')`),
+          `${tag}: #1044 (b) Carol added: no longer offered`);
       } else await shot('p2300-390-folder-settings.png');
       await ev(`(() => { document.querySelector('.modal ${close}').click(); return 1; })()`);
       await wait(ev, `!document.querySelector('.modal')`); await sleep(500);

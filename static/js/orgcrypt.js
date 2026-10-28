@@ -11,7 +11,7 @@ function ocBoxHtml(o, opt = {}) {
 function ocStateHtml(j) {
   if (!j.enabled) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Off: the server has no key (KALMIDO_SECRET_KEY). Bank and tax data, purchase prices and files are stored unencrypted, see SELF-HOSTING.md.'))}</div>`;
   if (j.key_ok === false) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The server key does not match this organisation’s key. Ask the server admin (SELF-HOSTING.md, recovery key).'))}</div>`;
-  const when = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
+  const when = x => x ? fmtDateNum(new Date(x)) : '';  // 2.368.0 B (#2982): one locale source
   // 2.46.0 (#1563): one text, so one "More information" link
   // 2.138.0 C (#1972): show (the same key again) or make a new one (the earlier one stops working); the full renewal of the
   // organisation's key runs on the server's command line (orgcrypt_cli rotate); a key of the earlier kind counts until then
@@ -114,7 +114,7 @@ ocStepUpBack();
 // Administration > Organisation: the instance switch (with the boxes of the organisations I administer)
 const ocAdminHtml = hint => `<h4 id="s-orgenc-h">${tr('Encryption of organisation data')}</h4>
   ${hint(tr('Bank and tax data, purchase prices, framework contract rates and the files of organisations are stored encrypted with a key per organisation, made from the server key KALMIDO_SECRET_KEY. Switched off, new data is stored unencrypted; encrypted data stays readable.'))}
-  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div><div class="ocadm"></div>`;
+  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;  // 2.364.0 C (#3041): no .ocadm: the recovery keys are once, in Organisation > Data above
 async function ocAdminDraw(md) {
   const box = $('#s-orgenc', md); if (!box) return;
   let j, o; try { [j, o] = await Promise.all([api('GET', '/api/admin/orgcrypt'), api('GET', '/api/orgs')]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }

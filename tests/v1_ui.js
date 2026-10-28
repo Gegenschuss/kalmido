@@ -3,7 +3,6 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, errs, sleep} = require('./boot');
-const until = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(80); } return false; };
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -14,14 +13,7 @@ const sql = q => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, 
   sql(`UPDATE settings SET value='1' WHERE key='update_check'`);
   sql(`UPDATE settings SET value='{"checked_at": "2026-09-01T00:00:00Z", "latest": "99.0.0", "url": "https://github.com/example/kalmido/releases/tag/v99.0.0"}' WHERE key='update_info'`);
   let w = await boot({user: 'alice'}), d = w.document;
-  check(d.querySelector('#kbar .kbsw .kbupd'), 'admin: update dot on the Kalmido menu (Settings)'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): Settings at the bottom of the bar
-  // 2.380.2 (#3400): the Kalmido menu (brand button of the head bar) holds Settings, with the update note; clicking opens them
-  d.querySelector('#kbar .kbsw').click(); await sleep(100);
-  const kset = d.querySelector('#pop .kbws-settings');
-  check(kset && /Settings/.test(kset.textContent) && /Update available/.test(kset.textContent), '#3400: Kalmido menu: Settings with "Update available"');
-  kset?.click();
-  check(await until(() => !!d.querySelector('.smodal')), '#3400: the menu entry opens the settings');
-  d.querySelector('.smodal')?.remove(); w.eval('closePop()');
+  check(d.querySelector('#srail .sset[data-act="settings"] .nunread'), 'admin: update dot on the settings gear');  // 2.152.2 (#2622): Settings at the bottom of the bar
   w.eval(`settingsModal('help')`); await sleep(300);
   let md = d.querySelector('.smodal');
   const help = md.querySelector('[data-pane="help"]').textContent;
@@ -47,7 +39,7 @@ const sql = q => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, 
   check(w.eval('collab()') === false && !d.querySelector('.srow[data-go="news"]'), 'off: collaboration UI gone for the admin too');
   md.remove(); w.close();
   w = await boot({user: 'bob'}); d = w.document;
-  check(d.querySelector('#kbar .kbsw') && !d.querySelector('#kbar .kbupd'), 'non-admin: no update dot'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): Settings at the bottom of the bar
+  check(d.querySelector('#srail .sset[data-act="settings"]') && !d.querySelector('#srail .sset[data-act="settings"] .nunread'), 'non-admin: no update dot');  // 2.152.2 (#2622): Settings at the bottom of the bar
   check(!w.eval('S.lists').some(l => l.name === 'Shared'), 'off: bob no longer sees the shared list');
   w.eval(`settingsModal('collab')`); await sleep(300); md = d.querySelector('.smodal');
   check(md.querySelector('[data-feat="collab"]').disabled && !md.querySelector('#s-collaball'), 'non-admin: disabled personal switch, no instance switch');

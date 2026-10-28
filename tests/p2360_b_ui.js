@@ -98,8 +98,9 @@ const NOTES = 'Intro text for the plan.\n\n- [ ] first step\n- [ ] second step\n
   d.querySelector('#toast button')?.click();
   await until(async () => (await srv(T)).locked === 0);
   check((await srv(T)).locked === 0, '#1118: "Unlock" in the hint unlocks the task');
-  await until(() => d.querySelector('#detail [data-act="tlk-toggle"]:not(.on)'));
-  check(d.querySelector('#detail [data-act="tlk-toggle"]:not(.on)') && !d.querySelector('#d-title').readOnly, '#1118: unlocked: the button is no longer pressed, the title editable');
+  // 2.364.0 (#3036): unlocked, the header has no lock button any more (Lock is in "…")
+  await until(() => !d.querySelector('#detail [data-act="tlk-toggle"]') && !d.querySelector('#d-title').readOnly);
+  check(!d.querySelector('#detail [data-act="tlk-toggle"]') && !d.querySelector('#d-title').readOnly, '#1118: unlocked: no lock button in the header, the title editable');
   check(/Unlocked/.test(w.eval('HIST.undo.at(-1)?.label || ""')), '#1118: the history step "Unlocked …" ' + w.eval('HIST.undo.at(-1)?.label || ""'));
   await w.eval(`histStep('undo')`); await until(async () => (await srv(T)).locked === 1);
   check((await srv(T)).locked === 1, '#1118: undo locks it again ' + toastTxt() + ' / ' + w.eval('HIST.undo.length + "/" + HIST.redo.length'));

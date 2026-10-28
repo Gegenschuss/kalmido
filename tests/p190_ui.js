@@ -56,9 +56,9 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(!/HTTP Shortcuts app sends them/.test(pane.textContent), 'old developer-box line gone');
 
   // ---- Administration: users first
-  d.querySelector(`[data-sec="users"]`).click(); await sleep(300);
-  const h4 = d.querySelector('#sp-users h4');
-  check(h4 && h4.textContent === 'Users' && d.querySelector('#sp-users [data-acc="user-new"]'), 'Administration starts with Users (+ New user): ' + h4?.textContent);
+  d.querySelector(`[data-sec="org"]`).click(); await sleep(300);  // 2.364.0 C (#3041): the people are under Organisation > People
+  const h4 = [...d.querySelectorAll('#admp-users h4')].find(h => h.textContent === 'Users');
+  check(h4 && d.querySelector('#admp-users [data-acc="user-new"]') && !d.querySelector('#admp-users').hidden, 'Organisation > People has Users (+ New user): ' + h4?.textContent);
   await sleep(400);
   const brow = [...d.querySelectorAll('#a-users .mrow')].find(r => /Bob Builder/.test(r.textContent));
   check(brow?.querySelector('.avatar.pic img')?.getAttribute('src') === '/static/avatars/headphones.svg', 'admin user list shows Bob\'s picture');
@@ -73,7 +73,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check(d.querySelector('#kbar .kbacct .avatar.pic img')?.getAttribute('src') === '/static/avatars/coffee.svg', 'the account picture in the Kalmido row shows it (2.16.0: #641)');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   check(d.querySelector('#a-avpick [data-av="coffee"]').classList.contains('on') && d.querySelector('.acct .avatar.pic'), 'picker + account row updated');
   // admin sets a preset for bob in the user dialog
-  d.querySelector(`[data-sec="users"]`).click(); await idle(w);
+  d.querySelector(`[data-sec="org"]`).click(); await idle(w);
   d.querySelector(`#a-users [data-acc="user-edit"][data-uid="${bob}"]`).click(); await sleep(300);
   const um = [...d.querySelectorAll('.modal')].at(-1);
   check(um.querySelector('#u-avpick [data-av="headphones"]').classList.contains('on') && !um.querySelector('#u-avpick [data-av="upload"]'), 'user dialog: current preset marked, no upload for others');

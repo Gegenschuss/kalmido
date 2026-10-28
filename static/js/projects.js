@@ -101,12 +101,11 @@ async function statusModal(lid) {
 }
 // ---- "Where is it stuck?" overview (module view, from the state)
 S.ov = {only: LS.get('ovOnly', false)};
-// 2.380.2 (#3407): every view under Projects shows the lists of the shown workspace only ('all' = everything)
-const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l) && (l.status === 'at_risk' || l.status === 'off_track'));
+const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && (l.status === 'at_risk' || l.status === 'off_track'));
 const ovProblems = () => statusOn() ? riskLists().length : 0;
 function ovRows() {
   const open = openTasks(), t0 = today();
-  return S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project' && inWs(l)).map(l => {
+  return S.lists.filter(l => !l.archived && isTracked(l)).map(l => {  // 2.352.0 B (#2752): tracked projects
     const ts = open.filter(t => t.list_id === l.id);
     const overdue = ts.filter(t => t.due && t.due < t0).sort((a, b) => a.due.localeCompare(b.due));
     const blocked = depsOn() ? ts.filter(t => t.blocked) : [];
@@ -127,7 +126,7 @@ function viewOverview() {
   const sum = k => rows.reduce((n, r) => n + r[k].length, 0);
   const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('blocked'), tr('tasks blocked by another task')],
     ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('projects at risk or off track')]] : []),
-    ...(collab() && S.lists.some(l => l.shared && inWs(l)) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
+    ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
   // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
   const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}" title="${esc(s)}"><b>${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`};
   let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All projects')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
@@ -167,7 +166,7 @@ function viewOverview() {
 // Which lists show their overview is remembered per device (LS pov); the list's own view (List / Kanban / Timeline) stays.
 S.pov = new Set(LS.get('pov', []));
 S.povD = {};  // list id -> {j, v, busy, err}
-const povOn = l => !!l && l.kind === 'project' && !l.is_inbox && S.pov.has(l.id);
+const povOn = l => !!l && !l.is_inbox && S.pov.has(l.id);
 function isOverview() { return povOn(routeList()); }
 function povSet(l, on) {
   if (on) S.pov.add(l.id); else S.pov.delete(l.id);
@@ -181,7 +180,7 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   render();
 }
 // 2.13.0: in projects the overview comes first
-const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap'], ...(feat('cal') ? [['calendar', N_('Calendar'), 'cal']] : [])];  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
+const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [['overview', N_('Project page'), 'brief'], ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []), ['mindmap', N_('Mind map'), 'mindmap'], ...(feat('cal') ? [['calendar', N_('Calendar'), 'cal']] : [])];  // 2.49.0 (#1201); 2.156.0 C (#2071): + calendar
 const curView = l => povOn(l) ? 'overview' : listView(l);
 async function povLoad(lid, force) {
   const d = S.povD[lid] || (S.povD[lid] = {});
@@ -226,6 +225,18 @@ function povSec(id, title, body, extra = '', empty = '') {
 const POV_BLOCKS = [['kpis', N_('Key figures'), 'chart', 'full'], ['desc', N_('Description'), 'edit', 'full'], ['status', N_('Status updates'), 'pulse', 'half'], ['ms', N_('Milestones'), 'flag', 'half'],
   ['files', N_('Project files'), 'file', 'full'], ['links', N_('Key links'), 'link', 'half'], ['people', N_('Members'), 'users', 'half'],
   ['notes', N_('Notes'), 'journal', 'half'], ['chat', N_('Team chat'), 'comment', 'half'], ['time', N_('Tracked time'), 'clock', 'half']];
+// 2.331.0 A (#3307): the project's file lists show the first 8 entries; "Show all N" is remembered per project and list,
+// from 9 entries a search field filters by file name (in the DOM, so the field keeps its focus)
+const POV_FL_N = 8;
+const povMdOpen = lid => (LS.get('povMdOpen', []) || []).includes(lid);  // 2.331.0 A (#3310): per project
+const povFlAll = (lid, k) => (LS.get('povFlAll', []) || []).includes(lid + ':' + k);
+function povFlHtml(lid, k, rows, names) {
+  if (!rows.length) return '';
+  const many = rows.length > POV_FL_N, all = povFlAll(lid, k);
+  const items = rows.map((h, i) => h.replace('<div class="povf', `<div data-n="${esc(String(names[i] || '').toLowerCase())}" class="povf`));
+  return `${many ? `<input type="search" class="povfq" data-k="${k}" placeholder="${esc(tr('Search files'))}" aria-label="${esc(tr('Search files'))}" autocomplete="off">` : ''}<div class="povfl${many && all ? ' all' : ''}" data-k="${k}">${items.join('')}</div>`
+    + (many ? `<button type="button" class="linkbtn povmore" data-pov="fl-more" data-k="${k}" aria-expanded="${all}">${all ? tr('Show less') : tr('Show all {0}', rows.length)}</button>` : '');
+}
 function viewProjOv() {
   const l = routeList(), d = S.povD[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
@@ -233,10 +244,10 @@ function viewProjOv() {
   if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? (d.err === 'offline' ? tr('Only available online.') : esc(d.err)) : tr('Loading…')}</div></div>`;
   const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
   // description
-  const ed = S.povEdit === l.id;
+  const ed = S.povEdit === l.id, povLong = !ed && mdIsLong(j.description);  // 2.331.0 A (#3310): a long description folds like a task's
   const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
-      <div class="povbar"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><button class="btn sm" data-pov="desc-hist">${ic('clock', 's')}<span>${tr('Earlier versions')}</span></button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
-    : j.description ? `<div class="md povmd">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
+      <div class="povbar povedit"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><button class="btn sm" data-pov="desc-hist">${ic('clock', 's')}<span>${tr('Earlier versions')}</span></button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
+    : j.description ? `<div class="md povmd${povLong ? (povMdOpen(l.id) ? '' : ' clamp') : ''}">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>${povLong ? `<button type="button" class="linkbtn mdmore" data-pov="md-more" aria-expanded="${povMdOpen(l.id)}">${povMdOpen(l.id) ? tr('Show less') : tr('Show more')}</button>` : ''}`
       : `<div class="muted povempty">${can ? tr('What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
   const P = {}, emp = (c, t) => c ? t : '';
   P.desc = x => povSec('desc', tr('Description'), !ed && !j.description ? '' : desc, (can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '') + x,
@@ -254,13 +265,14 @@ function viewProjOv() {
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
   if (j.role !== 'participant') P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet.')));
   // files
-  const files = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf')).join('');  // 2.48.0 (#1207): + "Show in the file store"
+  const filesA = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf'));
+  const files = filesA.length;  // count; the rows are built by povFlHtml  // 2.48.0 (#1207): + "Show in the file store"
   const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents') + (isTouch() ? '' : '. ' + tr('Or drop files here')))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
   // 2.64.2 B (#1817): a list file (encrypted with the list key): the lock tile, decrypted on a click
-  const tf = j.task_files.map(f => f.enc === 2 && typeof le2eFileHtml === 'function' ? `<div class="povf">${le2eFileHtml(f, '', l.id)}<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(typeof le2eShow === 'function' ? le2eShow(f.task_title) : f.task_title)}</span></button></div>` : isImg(f) || upLocked(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'}${f.mime === 'application/pdf' ? pv_attr({url: attUrl(f), name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''}${dv_is(f) ? dv_attr({url: `/api/attachments/${encodeURIComponent(f.id)}/preview`, name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span>${upMarkHtml(f.up)}</a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('');  // 2.61.0 (#1818): + the scan marks, a locked file as a tile without link
-  const fEmpty = !files && !tf;
-  P.files = x => povSec('files', tr('Project files'), `${files ? `<div class="povfl">${files}</div>` : ''}
-      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}${(j.files_trash || []).length ? povTrashHtml(j, can) : ''}`, fAdd + x, emp(fEmpty && !(j.files_trash || []).length, tr('No files yet: contracts, briefings, plans.')));
+  const tf = j.task_files.map(f => f.enc === 2 && typeof le2eFileHtml === 'function' ? `<div class="povf">${le2eFileHtml(f, '', l.id)}<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(typeof le2eShow === 'function' ? le2eShow(f.task_title) : f.task_title)}</span></button></div>` : isImg(f) || upLocked(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'}${f.mime === 'application/pdf' ? pv_attr({url: attUrl(f), name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''}${dv_is(f) ? dv_attr({url: `/api/attachments/${encodeURIComponent(f.id)}/preview`, name: f.name, size: f.size, dlUrl: attUrl(f, true), aid: f.id}) : ''} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span>${upMarkHtml(f.up)}</a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`);  // 2.61.0 (#1818): + the scan marks, a locked file as a tile without link
+  const tfN = tf.length, fEmpty = !files && !tfN;
+  P.files = x => povSec('files', tr('Project files'), `${povFlHtml(l.id, 'files', filesA, j.files.map(f => f.name))}
+      ${tfN ? `<details class="povtf" ${LS.get('povTf', tfN <= POV_FL_N) /* 2.331.0 A (#3307): from 9 entries closed until opened by hand */ ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary>${povFlHtml(l.id, 'tf', tf, j.task_files.map(f => f.name))}</details>` : ''}${(j.files_trash || []).length ? povTrashHtml(j, can) : ''}`, fAdd + x, emp(fEmpty && !(j.files_trash || []).length, tr('No files yet: contracts, briefings, plans.')));
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
@@ -397,10 +409,20 @@ document.addEventListener('click', async e => {
       if (await askConfirm(tr('Delete “{0}” for good?', nm), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) try { await povApi('DELETE', `/api/list-files/${id}/purge`); } catch { /* shown */ }
       break;
     }
+    case 'md-more': { const lid = routeList().id, cur = LS.get('povMdOpen', []) || [], open = !cur.includes(lid); LS.set('povMdOpen', (open ? [...cur, lid] : cur.filter(x => x !== lid)).slice(-200)); const m = b.parentElement.querySelector('.povmd'); if (m) m.classList.toggle('clamp', !open); b.textContent = open ? tr('Show less') : tr('Show more'); b.setAttribute('aria-expanded', open); break; }  // 2.331.0 A (#3310)
+    case 'fl-more': { const k = b.dataset.k, key = routeList().id + ':' + k, cur = LS.get('povFlAll', []) || []; LS.set('povFlAll', (cur.includes(key) ? cur.filter(x => x !== key) : [...cur, key]).slice(-200)); renderView(); break; }  // 2.331.0 A (#3307)
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });
-document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; autosize(e.target); } });  // 2.380.2 (#3399): grows while typing  // 2.12.2 (#453 B3): the draft survives any re-render
+document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; } });  // 2.12.2 (#453 B3): the draft survives any re-render
+// 2.331.0 A (#3307): the file search filters the rows in place; while searching, every match shows (the 8-row limit is off)
+document.addEventListener('input', e => {
+  const q = e.target.classList?.contains('povfq') ? e.target : null, list = q && q.nextElementSibling;
+  if (!list) return;
+  const v = q.value.trim().toLowerCase();
+  list.classList.toggle('q', !!v);
+  for (const r of list.children) r.hidden = !!v && !(r.dataset.n || '').includes(v);
+});
 document.addEventListener('change', e => {
   if (e.target.id === 'pov-file') { const l = routeList(); if (l) povUpload(l, e.target.files); e.target.value = ''; }
 });

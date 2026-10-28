@@ -956,7 +956,7 @@ def git_add(lid):
     c = db()
     git_need_manage(c, lid)
     if not is_project(c, lid):
-        return err(tr("Switch on progress and status for this project to connect a repository"), 409)
+        return err(tr("The basket has no project functions"), 409)
     b = body()
     try:
         provider, base, owner, name, token = git_clean_input(b)

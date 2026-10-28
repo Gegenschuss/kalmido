@@ -65,10 +65,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 
   // ================= #414 two types + "Show completed at the bottom"
   let w = await boot({user: 'alice', hash: 'l/' + SH}), d = w.document;
-  check(w.eval('LKINDS.map(x => x[0]).join()') === 'list,project', 'two list types');
+  check(w.eval("typeof LKINDS") === 'undefined', 'no list types any more: every list is a project (2.352.0, #2752)');
   w.eval(`listModal(${SH})`); await sleep(200);
   let md = d.querySelector('.modal.lmodal');
-  check(md && md.querySelector('#l-kindp') && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: List / Project + "Show completed at the bottom" (off)');
+  check(md && !md.querySelector('#l-kindp') && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: "Show completed at the bottom" (off), no type switch (2.352.0 C, #2751)');
   md.querySelector('#l-dab').checked = true; md.querySelector('#l-dab').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1);
   check((await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1, 'the dialog saves the option');
@@ -172,8 +172,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const am = d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"]`);
   const up = am && am.querySelector('.rx.add[data-e="up"]');
   check(up && am.querySelectorAll('.rx.add').length === 3, 'quick 👍 👎 ❤️ on the agent\'s message');
-  click(w, up); await sleep(400);
-  check(d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`), 'my 👍 shows');
+  // #1604: the 👍 is drawn only after the reaction POST answers (CI shards slower than 400 ms): wait for it
+  click(w, up);
+  check(await until(() => d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`)), 'my 👍 shows');
   const evs = (await tcall('GET', `/agent/events?since=${cur}`, TOK)).data.filter(e => e.event === 'reaction');
   check(evs.length && evs[evs.length - 1].data.approval === 'approved' && evs[evs.length - 1].data.chat_message.id === ans.id, 'the agent got the approval');
   // offline (no event poll for 5 minutes): "answers later"
@@ -195,7 +196,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-agseg="os"] [data-agsv="win"]')); await sleep(100);
   check(/PowerShell|\.ps1|New-NetFirewallRule|Register-ScheduledTask/i.test(md.querySelector('#s-agguide').textContent), 'Windows: PowerShell steps');
   click(w, md.querySelector('[data-agseg="guide"] [data-agsv="own"]')); await sleep(100);
-  check(/admin has to switch on/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first');
+  check(/its admins allow it/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first (2.361.4, #2928: the organisation admins)');
   md.querySelector('#s-uag').checked = true; md.querySelector('#s-uag').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents);
   check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'admin switches it on');
@@ -207,8 +208,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(!md.querySelector('#s-uag') && md.querySelector('#myag-user'), 'Bob: the create form, no admin switch');
   md.querySelector('#myag-user').value = 'bobs-claude'; md.querySelector('#myag-name').value = 'Bob\'s Claude';
   click(w, md.querySelector('[data-myag-act="new"]')); await sleep(900);
-  // 2.46.6 (#1709): "Set it up on a computer now?" first; the token only behind "Show the token for an own setup"
-  check(await until(() => d.querySelector('.modal:not(.smodal) [data-m="av-setup"]')), 'the setup is offered');
+  // 2.46.6 (#1709): the setup first; the token only behind "Show the token for an own setup"
+  // 2.364.0 (#3035): the one-command setup opens at once, the token under "For advanced users"
+  check(await until(() => d.querySelector('.modal:not(.smodal) #ains-dir')), 'the setup is offered');
   click(w, d.querySelector('.modal:not(.smodal) [data-m="av-tok"]')); await sleep(200);
   check(/^abk_/.test(d.querySelector('.modal:not(.smodal) #av-tokv')?.value || ''), 'the token is shown once');
   check(await until(() => md.querySelector('[data-myag]')), 'his agent in the list');

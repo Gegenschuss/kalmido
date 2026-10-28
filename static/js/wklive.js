@@ -8,16 +8,16 @@
      at the start joins with the block above, Enter on an empty last line starts a new block, Esc shows everything drawn.
      A textarea per block (no contenteditable): the phone's keyboard, selection and undo stay the browser's own.
    - The plain text editor stays as it was (#wk-body): LS "wkEd" = 'text' (an account setting like the appearance,
-     dialogs.js LOOK_KEYS), switched in the page's "…" menu.
+     dialogs.js LOOK_KEYS), switched in the page's "…" menu and, 2.382.0 (#3128), with "Source" / "Preview" in the bar.
    - Slash commands (#3149, both editors): "/" at the start of a line opens a menu (heading, lists, table, code, mind
-     map, picture / file, embedded table, page link, date, templates); typing filters it, arrows / Enter / Esc like the
+     map, formula, diagram (2.382.0 #3153), picture / file, embedded table, page link, date, templates); typing filters it, arrows / Enter / Esc like the
      [[ suggestions (they share #wk-ac). Ctrl/Cmd+K link, Ctrl/Cmd+Shift+7 / 8 / 9 numbered list / list / checkbox.
    Classic script sharing the global scope with wiki.js (lazyload.js: module "wiki"). */
 'use strict';
 
 const wklv_on = () => LS.get('wkEd', '') !== 'text';
 /** @type {any} */
-const WKLV = {pid: 0, body: '', bl: [], k: -1, pre: '', post: '', cache: new Map(), down: false, t: 0};
+const WKLV = {pid: 0, body: '', bl: [], k: -1, pre: '', post: '', cache: new Map(), down: false, t: 0, tk: /** @type {any} */ (null)};  // 2.371.3 (#3333): tk = the task search after "/" -> "Task (#)"
 // ---- the blocks: line ranges [a, b) that cover every line; joined with '\n' they give the text back exactly
 const WKLV_FENCE = /^\s{0,3}(`{3,}|~{3,})/, WKLV_LI = /^\s*(?:[-*+]|\d{1,9}[.)])[ \t]+/, WKLV_HR = /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const wklv_kind = l => /^\s*$/.test(l) ? 'gap' : WKLV_FENCE.test(l) ? 'code' : /^\s{0,3}#{1,6}(\s|$)/.test(l) ? 'h' : WKLV_HR.test(l) ? 'hr'
@@ -183,14 +183,19 @@ function wklv_acPlace(box) {
   const wr = box.parentElement?.getBoundingClientRect(); if (!wr) return;
   box.style.top = Math.round(ta.getBoundingClientRect().bottom - wr.top + 4) + 'px';  // the list sits in .wkedwrap, the field in #wk-live below the bar
 }
-// ---- the editor's "…" entry: plain text <-> live preview (an account setting, LOOK_KEYS)
-function wklv_menuItem() {
-  return {label: tr('Live preview while writing'), icon: 'edit', on: wklv_on(), fn: async () => {
-    await wk_flush();
-    if (wklv_on()) LS.set('wkEd', 'text'); else LS.del('wkEd');
-    WKLV.pid = 0; renderView();
-    if (WK.edit) setTimeout(() => { const ta = wk_ta(); if (ta) ta.focus(); else if (WKLV.k >= 0) wklv_ta()?.focus(); }, 30);
-  }};
+// ---- plain text <-> live preview (an account setting, LOOK_KEYS): the page's "…" entry and, 2.382.0 (#3128), the button
+// "Source" / "Preview" in the formatting bar (wkembed.js wem_bar); both name what a click shows
+async function wklv_toggle() {
+  await wk_flush();
+  if (wklv_on()) LS.set('wkEd', 'text'); else LS.del('wkEd');
+  WKLV.pid = 0; renderView();
+  if (WK.edit) setTimeout(() => { const ta = wk_ta(); if (ta) ta.focus(); else if (WKLV.k >= 0) wklv_ta()?.focus(); }, 30);
+}
+const wklv_toLbl = () => wklv_on() ? N_('Source') : N_('Preview');
+function wklv_menuItem() { return {label: tr(wklv_toLbl()), icon: wklv_on() ? 'code' : 'edit', fn: wklv_toggle}; }
+function wklv_srcBtn() {
+  const t = tr(wklv_toLbl());
+  return `<button type="button" class="btn sm wemsrc" data-wem="src" title="${esc(t)}">${ic(wklv_on() ? 'code' : 'edit', 's')}<span class="wemlbl">${esc(t)}</span></button>`;
 }
 // ---- slash commands (#3149): "/" at the start of a line, in both editors (wiki.js wk_acUpdate / wk_acPick)
 /** @type {any[]} */
@@ -202,10 +207,13 @@ const WKLV_CMDS = [
   ['tb', 'sheet', N_('Table'), 'table tabelle', null],
   ['code', 'code', N_('Code'), 'code', null],
   ['mm', 'mindmap', N_('Mind map'), 'mindmap mind map', null],
+  ['math', 'calc', N_('Formula'), 'formula formel math latex katex', null],  // 2.382.0 (#3153): drawn by diagram.js
+  ['mmd', 'chart', N_('Diagram'), 'diagram diagramm mermaid flowchart chart', null],
   ['file', 'picture', N_('Picture or file'), 'picture image bild file datei upload', null],
   ['emb', 'sheet', N_('Embed a table'), 'embed einbetten table tabelle', '[[tabelle:'],
   ['ln', 'link', N_('Link to a page'), 'link verweis page seite [[', '[['],
   ['date', 'cal', N_('Date'), 'date datum today heute', null],
+  ['task', 'check', N_('Task (#)'), 'task aufgabe # ticket', null],  // 2.371.3 (#3333): a search over the tasks the person sees
 ];
 function wklv_cmds(sp) {
   const e2e = wk_e2e(sp);
@@ -236,7 +244,10 @@ async function wklv_slashPick(ta, c) {
   if (c.k === 'tb') { const h = `| ${tr('Column')} 1 | ${tr('Column')} 2 |\n| --- | --- |\n|  |  |`; put(h, h.length - 5); return; }
   if (c.k === 'code') { put('```\n\n```', 4); return; }
   if (c.k === 'mm') { const t = tr('Topic'), h = `\`\`\`mindmap\n${t}\n  ${tr('Idea')}\n\`\`\``; put(h, 11, 11 + t.length); return; }
+  if (c.k === 'math') { put('```math\nE = mc^2\n```', 8, 16); return; }  // 2.382.0 (#3153): the example selected
+  if (c.k === 'mmd') { const h = '```mermaid\nflowchart LR\n  A --> B\n```'; put(h, 26, 33); return; }
   if (c.k === 'date') { put(fmtDate(today())); return; }
+  if (c.k === 'task') { put('#'); WKLV.tk = {at: a}; wk_acUpdate(ta); return; }  // 2.371.3 (#3333)
   if (c.k === 'file') {
     put('');
     const at = [a, a];
@@ -250,6 +261,73 @@ async function wklv_slashPick(ta, c) {
     if (!ta.isConnected) return;
     put(wk_bodyStrip(t.body).replace(/\n+$/, ''));
   }
+}
+// ---- 2.371.3 (#3333): "/" -> "Task (#)" puts "#" and opens a search over the tasks the person sees: what follows the "#" is
+// the query (the tasks loaded here first, then from 2 characters the server's search GET /api/search, 250 ms after the last
+// key, a newer query drops the older answer); a pick puts "#id ". Only after the command: a "#word" typed by hand stays a tag.
+// Sealed spaces too (#id is plain text in the decrypted page).
+function wklv_tkHit(t) { return {tid: t.id, path: '#' + t.id, _label: '#' + t.id + ' ' + (t.title || '…'), _ic: 'check'}; }
+function wklv_tkLocal(q) {
+  const n = /^\d+$/.test(q) ? +q : 0, w = q.toLowerCase(), out = [];
+  const exact = n && S.tasks.get(n); if (exact) out.push(exact);
+  const all = [...S.tasks.values()].filter(t => t && t.id > 0 && t !== exact && (!w || (t.title || '').toLowerCase().includes(w) || String(t.id).startsWith(w)));
+  all.sort((x, y) => (x.status ? 1 : 0) - (y.status ? 1 : 0) || String(y.updated_at || '').localeCompare(String(x.updated_at || '')));
+  return out.concat(all).slice(0, 8);
+}
+// true = the task search owns the box (wiki.js wk_acUpdate asks it first)
+function wklv_tk(ta, box) {
+  const tk = WKLV.tk; if (!tk) return false;
+  const s = ta.selectionStart, v = ta.value, m = ta.selectionEnd === s && s > tk.at && v[tk.at] === '#' ? /^#([^\s#\[\]]{0,40})$/.exec(v.slice(tk.at, s)) : null;
+  if (!m) { WKLV.tk = null; return false; }
+  const q = m[1].trim();
+  const show = ts => {
+    if (WKLV.tk !== tk || !box.isConnected) return;
+    if (!ts.length) { box.classList.add('hidden'); WK.ac = null; return; }
+    WK.ac = {hits: ts.map(wklv_tkHit), i: 0, from: tk.at, tk: true}; wk_acDraw(box);
+  };
+  const loc = wklv_tkLocal(q).slice(0, q.length < 2 ? 8 : 4);  // room for the server's hits
+  show(loc);
+  clearTimeout(tk.t); tk.q = q;
+  if (q.length < 2 || S.me?.kid || !OUT.online || OUT.down) return true;
+  tk.t = setTimeout(async () => {
+    let r; try { r = await rawFetch('GET', '/api/search?limit=8&q=' + encodeURIComponent(q)); } catch { return; }  // offline / error: the local hits stay
+    if (WKLV.tk !== tk || tk.q !== q) return;
+    const have = new Set(loc.map(t => t.id));
+    show(loc.concat((r.hits || []).map(h => h.task).filter(t => t && !have.has(t.id))).slice(0, 8));
+  }, 250);
+  return true;
+}
+function wklv_tkPick(ta, h) {
+  const a = WK.ac.from, z = ta.selectionStart, txt = '#' + h.tid + ' ';
+  WKLV.tk = null; WK.ac = null; $('#wk-ac')?.classList.add('hidden');
+  wem_rep(ta, a, z, txt, a + txt.length, a + txt.length);
+}
+// ---- 2.371.3 (#3152): reading styles -- a fixed choice (never CSS of its own): the space's default (WK.idx[sp].style, its
+// admins / the private space's person set it, PUT /api/wiki/style) and the person's own choice (the account setting wkSt,
+// LOOK_KEYS: '' = like the space, 'clear' = Clear even when the space says otherwise). Only a known value becomes a class.
+const WKST = {book: N_('Book|reading style'), compact: N_('Compact'), notepad: N_('Notepad')};
+function wkst_of(sp) {
+  const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '';
+  const k = own === 'clear' ? '' : own && WKST[own] ? own : d;
+  return WKST[k] ? k : '';
+}
+const wkst_cls = sp => (k => k ? ' wkst-' + k : '')(wkst_of(sp));
+function wkst_items(p) {
+  if (!p || S.me?.kind === 'agent') return [];
+  return [{label: tr('Reading style…'), icon: 'book', more: wkst_menu(p.space)}];
+}
+function wkst_menu(sp) {
+  const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '', clear = tr('Clear|reading style'), name = k => k ? tr(WKST[k]) : clear;
+  const mine = (k, label) => ({label, on: own === k, fn: () => { if (k) LS.set('wkSt', k); else LS.del('wkSt'); renderView(); }});
+  const items = [{head: tr('For me')}, mine('', tr('Like the space ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
+  if (WK.idx[sp]?.may_style) {
+    items.push({head: tr('Default of the space')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
+      try { await api('PUT', '/api/wiki/style', {space: sp, style: k}); } catch (e) { toast(e.message); return; }
+      if (WK.idx[sp]) WK.idx[sp].style = k;
+      renderView();
+    }})));
+  }
+  return items;
 }
 // Ctrl/Cmd+K: a link (instead of the command field) while writing; Ctrl/Cmd+Shift+7 / 8 / 9: numbered list / list / checkbox
 document.addEventListener('keydown', e => {

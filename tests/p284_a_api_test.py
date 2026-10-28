@@ -155,6 +155,8 @@ assert r.ok, r.text
 P = r.json()["id"]
 check(Bo.patch(B + f"/api/lists/{P}", json={"client_id": ACME}).ok, "setup: project Launch belongs to Acme")
 PLAIN = Bo.post(B + "/api/lists", json={"name": "Plain", "org_id": ORG}).json()["id"]
+# 2.352.0 (#2752): every list is a project now -- the list without an address is a family list (review M5)
+dbx("UPDATE lists SET family='shopping' WHERE id=?", (PLAIN,), write=True)
 
 # ---- addresses (tenant-matrix: hubmail)
 r = Bo.get(B + "/api/hubmail/inbox")
@@ -175,7 +177,7 @@ check(addr(Ca, client_id=PRIVB) == 404, "a private client of another person: 404
 A_P = addr(Bo, list_id=P)
 check(isinstance(A_P, str), "the project's address")
 check(addr(Ca, list_id=P) == 404, "a project carol does not see: 404")
-check(addr(Bo, list_id=PLAIN) == 409, "a plain list has no address")
+check(addr(Bo, list_id=PLAIN) == 409, "a family list has no address")
 check(Bo.post(B + "/api/hubmail/address", json={"client_id": "x"}).status_code == 400, "a wrong id: 400")
 check(AG.get(B + "/api/hubmail/inbox").status_code in (401, 403), "agents: no hub mails")
 check(AG.post(B + "/api/hubmail/address", json={"ws": "private"}).status_code in (401, 403), "agents: no address")
@@ -238,7 +240,8 @@ d = Bo.get(B + f"/api/hubmail/mails/{R['m1']['id']}").json()
 names = {a["name"] for a in d.get("attachments", [])}
 check("brief.txt" in names and any(n.endswith(".eml") for n in names), f"the .eml and the attachment ({names})")
 chain = dbx("SELECT f.name, p.name, r.name FROM fs_nodes f JOIN fs_nodes p ON p.id=f.parent_id JOIN fs_nodes r ON r.id=p.parent_id WHERE f.id=?", (R["m1"]["folder_id"],))
-check(chain and chain[0][1] == "Acme" and chain[0][2] == "E-Mails" and chain[0][0].startswith("2026-10-16 "), f"the folder E-Mails / Acme / <date> <subject> ({chain})")
+# 2.368.0 (#2987): the mail folder is named in the person's language (English here; "E-Mails" before)
+check(chain and chain[0][1] == "Acme" and chain[0][2] == "Emails" and chain[0][0].startswith("2026-10-16 "), f"the folder E-Mails / Acme / <date> <subject> ({chain})")
 check(d.get("folder_id") == R["m1"]["folder_id"], "bob sees the folder in the file store")
 att = next(a for a in d["attachments"] if a["name"] == "brief.txt")
 r = Ca.get(B + f"/api/hubmail/mails/{R['m1']['id']}/files/{att['id']}", params={"dl": 1})
@@ -296,7 +299,7 @@ check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={}).ok, "undo: back to
 check(m3 not in ids(Ca, client_id=ACME), "carol no longer sees it")
 check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"client_id": BETACO}).status_code == 404, "a client of another organisation: 404")
 check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"client_id": PRIVB}).status_code == 409, "a private client for an Alpha mail: 409")
-check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"list_id": PLAIN}).status_code == 409, "a plain list: 409")
+check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"list_id": PLAIN}).status_code == 409, "a family list: 409")
 # 2.360.0 (#2496): carol may not move Acme's mail at all any more (403) - before that, the project she does not see (404)
 check(Ca.post(B + f"/api/hubmail/mails/{R['m1']['id']}/assign", json={"list_id": P}).status_code in (403, 404), "a project carol does not see: 404")
 r = Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"list_id": P})

@@ -97,7 +97,7 @@ def lp_folder_rename(c, uid, old, new):
 # 2.4.0 (#361): a folder is a path of at most FOLDER_DEPTH names joined by FOLDER_SEP ("Clients/Company X"), per user as
 # before (lists.folder for the owner, list_members.folder for a member; the order in the user setting "folders"). A name
 # itself can never hold the separator (folder_seg turns it into the look-alike U+2215).
-FOLDER_SEP, FOLDER_DEPTH = "/", 2
+FOLDER_SEP, FOLDER_DEPTH = "/", 30  # 2.352.0 A (#2748): was 2 -- the folders of the projects tree (files/store.py DEPTH_MAX 32 - root - list)
 
 
 def folder_seg(v):
@@ -346,7 +346,7 @@ def list_create():
     cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id,time_tracking) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      # 2.67.0 B (#1865): "Move dependent tasks along" is on by default in a new project list
-                     clean_list_value("dep_shift", b["dep_shift"] if "dep_shift" in b else kind == "project"), clean_list_value("tickets", b.get("tickets")), oid,
+                     clean_list_value("dep_shift", b["dep_shift"] if "dep_shift" in b else True), clean_list_value("tickets", b.get("tickets")), oid,
                      clean_list_value("time_tracking", b.get("time_tracking"))))
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
@@ -385,8 +385,7 @@ def list_update(lid):
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
     if b.get("family"):  # 2.26.0: a project is never a family list (an existing value stays untouched)
-        knd = b.get("kind") or c.execute("SELECT kind FROM lists WHERE id=?", (lid,)).fetchone()[0]
-        if knd == "project":
+        if b.get("kind") == "project":  # 2.352.0 G (#2752, review N15): the stored kind is no longer read (an old project may become a family list)
             return err(tr("A project with progress and status cannot be a family project"))
     if "agent_members" in b or "agent_peers" in b:  # 2.26.0 (#928)
         from ..agents.core import list_agent_access_update
@@ -816,13 +815,15 @@ def member_set(lid):
     if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
         role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    old = c.execute("SELECT role, grole, frole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     from ..collab.liste2e import le2a_member_problem
-    p = le2a_member_problem(c, lid, uid, role_max(role, old["grole"]) if old else role)  # 2.64.1 (#1817): no agents / participants
+    p = le2a_member_problem(c, lid, uid, role_max(role, old["grole"], old["frole"]) if old else role)  # 2.64.1 (#1817): no agents / participants
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
-    if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
-        eff = role_max(role, old["grole"])
+    from ..lists.lffolder import lf_skip
+    reach = lf_skip(c, lid, uid, False)  # 2.352.0 A (#2748): shared again by hand -> the folder's share reaches them here again too
+    if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups (2.352.0: and folders)
+        eff = role_max(role, old["grole"], old["frole"])
         c.execute("UPDATE list_members SET role=?, own_role=? WHERE list_id=? AND user_id=?", (eff, role, lid, uid))
         if old[0] != eff:
             news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
@@ -841,6 +842,9 @@ def member_set(lid):
         if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
             from ..admin.hosting import agent_joined_notice
             agent_joined_notice(c, lid, uid, me())  # 2.24.0 (#896)
+    if reach:
+        from ..lists.groups import grp_sync
+        grp_sync(c, [lid])
     pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
     bump(c)
     c.commit()
@@ -905,12 +909,12 @@ def _in_folder(path, f):
 
 
 def folder_autoshare(c, lid):
-    """A list of an owner came into one of their shared folders (created there, moved there): the folder's people get it."""
-    r = c.execute("SELECT owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
-    if not r or not r["folder"] or not collab_all():
-        return 0
-    return sum(1 for fp in c.execute("SELECT * FROM folder_people WHERE owner_id=?", (r["owner_id"],)).fetchall()
-               if _in_folder(r["folder"], fp["folder"]) and _folder_member_add(c, lid, fp["user_id"], fp["role"], r["owner_id"]))
+    """A list of an owner came into one of their shared folders (created there, moved there): the folder's people get it.
+    2.352.0 A (#2748): no copy any more -- the shares of its folders reach it at runtime (lists/lffolder.py, list_members.frole);
+    this computes its roles anew -> the number of people it has through its folders."""
+    from ..lists.groups import grp_sync
+    grp_sync(c, [lid])
+    return c.execute("SELECT COUNT(*) FROM list_members WHERE list_id=? AND frole IS NOT NULL", (lid,)).fetchone()[0]
 
 
 @app.get("/api/folders/people")
@@ -967,7 +971,7 @@ def folder_people_diff():
 @app.put("/api/folders/people")
 def folder_people_put():
     """{folder, user_id, role?}: share my folder with a person: every list in it (and its subfolders) now, and every list
-    that comes into it later (DELETE stops that; the lists stay shared)."""
+    that comes into it later. 2.352.0 A (#2748): at runtime -- DELETE takes the lists away again (a share set on a list itself stays)."""
     from ..agents.admin import personal_agent_foreign
     need_collab()
     c, b = db(), body()
@@ -997,31 +1001,33 @@ def folder_people_put():
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
     prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
-    c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
-              "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
     rows = [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
             if _in_folder(r["folder"], f)]
-    # 2.26.0: one agent per list -- lists that already have another agent are skipped and named in the answer
-    skipped = [{"id": r["id"], "name": r["name"]} for r in rows if list_other_agent(c, r["id"], uid)
-               and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (r["id"], uid)).fetchone()]
-    n = sum(1 for r in rows if _folder_member_add(c, r["id"], uid, role, me()))
-    # 2.29.0 (#929): a changed folder role reaches the lists in it where the person is already in (their personal share;
-    # a role via a group stays the higher one, as everywhere)
-    upd = 0
-    # only a CHANGED folder role is carried into the lists (a first share keeps roles set per list by hand)
-    if prev and prev[0] != role and b.get("apply", True) is not False:
-        from ..family.family import is_kid
-        r2 = "participant" if is_kid(c, uid) else role
+    had = {r[0]: r[1] for r in c.execute("SELECT list_id, role FROM list_members WHERE user_id=?", (uid,))}
+    # 2.352.0 A (#2748): the share is one of the folder (fs_shares of its nodes, lists/lffolder.py): no copy into the lists, it
+    # reaches every list in the folder at runtime; a changed role overrides the roles set per list by hand (apply, #929)
+    if prev and prev[0] != role and b.get("apply", True) is False:  # "Only new lists" (#1606): the lists keep the role they have
         for r in rows:
-            upd += c.execute("""UPDATE list_members SET own_role=?, role=CASE WHEN grole IS NOT NULL AND
-                                  (CASE grole WHEN 'admin' THEN 4 WHEN 'edit' THEN 3 WHEN 'participant' THEN 2 ELSE 1 END) >
-                                  (CASE ? WHEN 'admin' THEN 4 WHEN 'edit' THEN 3 WHEN 'participant' THEN 2 ELSE 1 END) THEN grole ELSE ? END
-                                WHERE list_id=? AND user_id=? AND COALESCE(own_role, role)!=?""", (r2, r2, r2, r["id"], uid, r2)).rowcount
+            c.execute("UPDATE list_members SET own_role=role WHERE list_id=? AND user_id=? AND own_role IS NULL AND grole IS NULL",
+                      (r["id"], uid))
+    if prev and prev[0] != role and b.get("apply", True) is not False:
+        for r in rows:
+            # 2.352.0 F (#2748, review M6): the personal share stays one (only its role follows, like before 2.352): a folder's
+            # share revoked later must not take the list away
+            c.execute("UPDATE list_members SET own_role=? WHERE list_id=? AND user_id=? AND own_role IS NOT NULL AND own_role!=?",
+                      (role, r["id"], uid, role))
+    from ..lists.lffolder import lf_folder_share
+    lf_folder_share(c, me(), f, uid, role)
+    now = {r[0]: r[1] for r in c.execute("SELECT list_id, role FROM list_members WHERE user_id=?", (uid,))}
+    n = sum(1 for r in rows if r["id"] not in had and r["id"] in now)
+    upd = sum(1 for r in rows if r["id"] in had and r["id"] in now and had[r["id"]] != now[r["id"]])
+    # the lists the share does not reach (a health / budget list for an agent, another workspace ...) are named in the answer
+    skipped = [{"id": r["id"], "name": r["name"]} for r in rows if r["id"] not in now]
     bump(c)
     c.commit()
     if b.get("email") and not b.get("user_id"):  # 2.41.0 (#1423): the same answer as for an unknown address
         return jsonify(shared=0, updated=0, by_email=True)
-    return jsonify(shared=n, updated=upd, **({"skipped": skipped, "skipped_reason": tr(ONE_AGENT_MSG)} if skipped else {}))
+    return jsonify(shared=n, updated=upd, **({"skipped": skipped, "skipped_reason": tr("Not possible")} if skipped else {}))
 
 
 @app.delete("/api/folders/people")
@@ -1034,7 +1040,8 @@ def folder_people_delete():
         uid = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
         uid = 0
-    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid))
+    from ..lists.lffolder import lf_folder_share
+    lf_folder_share(c, me(), f, uid, None)  # 2.352.0 A (#2748): the folder's share goes -- and with it the roles it gave
     n = 0
     if b.get("remove") is True and f and uid and uid != me():
         c.commit()
@@ -1174,6 +1181,7 @@ def list_agent_set(lid):
     if lr["owner_id"] in agent_ids(c):
         return err(tr("The project belongs to an agent"), 409)
     cur = [r[0] for r in c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' "
+                                   "AND NOT (m.frole IS NOT NULL AND m.own_role IS NULL) "  # 2.352.0 A (#2748): the folders' agents stay
                                    "ORDER BY m.user_id", (lid,))]
     if new is not None and new in cur:
         return jsonify(previous=new, agent_id=new)
@@ -1181,7 +1189,13 @@ def list_agent_set(lid):
         from ..agents.safety import bridge_check
         bridge_check(c, lid, new, ok=b.get("bridge_ok") is True)
     for old in cur:
-        v1_call(member_remove, lid, old)
+        if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=? AND frole IS NOT NULL", (lid, old)).fetchone():
+            # 2.352.0 A (#2748): an agent the folder shares the list with too stays one of the folder's agents
+            c.execute("UPDATE list_members SET own_role=NULL WHERE list_id=? AND user_id=?", (lid, old))
+            from ..lists.groups import grp_sync
+            grp_sync(c, [lid])
+        else:
+            v1_call(member_remove, lid, old)
     if new is not None:
         v1_call(member_set, lid, body={"user_id": new, "role": b.get("role") or "edit", "bridge_ok": b.get("bridge_ok") is True})
     if not g.get("folder_applying") and lr["owner_id"] == me():  # 2.29.0 (#1030): chosen for this list itself
@@ -1273,11 +1287,15 @@ def member_remove(lid, uid):
     role = need_list(c, lid, write=False)
     if uid != me() and role not in MANAGE_ROLES:
         raise Denied(403)
-    mr = c.execute("SELECT grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    mr = c.execute("SELECT grole, frole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     if not mr:
         return err(tr("unknown"), 404)
     from ..collab.liste2e import le2e_mode
     via_group = mr["grole"] and not (mr["grole"] == "participant" and le2e_mode(c, lid))
+    if mr["frole"] and request.args.get("dry") != "1":  # 2.352.0 A (#2748): removed by hand -> the folder's share no longer reaches them here
+        from ..lists.lffolder import lf_skip
+        lf_skip(c, lid, uid)
+        c.execute("UPDATE list_members SET frole=NULL WHERE list_id=? AND user_id=?", (lid, uid))
     if request.args.get("dry") == "1":  # 2.272.0 E2 (#3038): what goes along, for the question in the app (nothing changes)
         if via_group:
             return jsonify(assigned=0, values=0, via_group=True)

@@ -25,6 +25,9 @@ const hashTo = async (w, h) => { w.location.hash = h; await sleep(500); };
   const fu = await call(CA, 'POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   check(fu.http < 300, 'P4: frida (no organisation) ' + fu.http);
   const CF = await login('frida');
+  // 2.364.0 (#3032): accounts an admin made first answer "What do you use Kalmido for?" (p2364_a_tour_ui); answered here, this suite is about the tour
+  const paskDone = () => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE user_settings SET value='done' WHERE key='purpose_ask'"]);
+  paskDone();
   // new accounts start with the tour pending (KALMIDO_ONBOARDING=1); the client can only finish it
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', features: 'cal'});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
@@ -66,6 +69,7 @@ const hashTo = async (w, h) => { w.location.hash = h; await sleep(500); };
   // (4) another new account (no organisation either) in Projects: starts once, the key is set
   const gu = await call(CA, 'POST', '/api/users', {username: 'gina', display_name: 'Gina', password: 'password123', email: 'gina@example.com', orgs: []});
   await call(await login('gina'), 'PATCH', '/api/settings', {lang: 'en'});
+  paskDone();  // 2.364.0 (#3032)
   w = await boot({user: 'gina', hash: 'today'}); d = w.document;
   check(await until(() => shown(d)), 'a new session in Projects: the tour starts ' + w.eval(`JSON.stringify({t: S.settings.tour, m: S.route.mod, wait: TOUR.wait, on: TOUR.on, ss: sessionStorage.length})`));
   check(w.sessionStorage.getItem('kalmido-tour-' + gu.id) === '1', 'once per session (sessionStorage)');

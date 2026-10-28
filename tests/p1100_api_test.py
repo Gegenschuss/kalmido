@@ -385,6 +385,8 @@ check(any(k == "share" and (d if isinstance(d, dict) else json.loads(d))["role"]
 
 # ================================================================== News, pushes, reminders
 open(os.path.join(DATA, "ntfy.log"), "w").close()
+# #1604: a push to pete on T1 < TASKS_PUSH_GAP (3 s) ago held the mention back, the unblock after the gap then reset its count: open the burst gate
+dbx("DELETE FROM task_push WHERE user_id=? AND task_id=?", (ids["pete"], T1))
 P.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})
 c3b = A.post(B + f"/api/tasks/{T3}/comments", json={"body": f"again <@{ids['pete']}> HIDDEN2"}).json()["id"]
 A.post(B + f"/api/tasks/{T2}/comments", json={"body": f"<@{ids['pete']}> PARENT2"})

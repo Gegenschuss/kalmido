@@ -96,7 +96,7 @@
 @media (hover:none) {
   .rm-go{opacity:1}
 }
-@media (max-width:899px) {
+@media (max-width:767px) {
   .tl.rm .tl-scroll{height:min(var(--rm-h),calc(100dvh - 17rem))}
   .rm-bar .seg{flex:1 1 auto}
   .rm-bar .iconbtn,.rm-bar .calnav .btn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
@@ -139,7 +139,7 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
   .tl-new{height:2.75rem;top:.25rem}
   .tl-ghost{top:.25rem;height:2.75rem}
 }
-@media (max-width:899px) {
+@media (max-width:767px) {
   .tl-new{width:min(17rem,calc(100vw - 9rem));left:max(0rem,min(var(--x),calc(100% - min(17rem,calc(100vw - 9rem)))))}
   .tl-nwl{display:none}
   .tl-nws{display:inline}
@@ -163,3 +163,6 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
 .rm-gwrap{gap:.25rem}
 .rm-gwrap .rm-gname{display:flex;align-items:center;flex:1;min-width:0;align-self:stretch}
 .rm-gwrap:hover .rm-go{opacity:1}
+/* 2.331.0 E (#3311): two fingers zoom the timeline itself (timeline.js pz_attach), not the page; one finger still scrolls */
+#view .tl{touch-action:pan-x pan-y}
+.tl.tl-sm .tl-d span{display:none}

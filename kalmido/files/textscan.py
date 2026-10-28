@@ -34,6 +34,7 @@ from ..core.access import Denied, acx_of, vis_sql
 from ..docs import store as S
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from .fslock import fl_is_locked  # 2.353.0 A (#2758)
 
 KINDS = ("att", "list", "fs")
 COL = {"att": "att_id", "list": "list_file_id", "fs": "node_id"}
@@ -79,9 +80,11 @@ def _ref(c, kind, ref_id):
         r = c.execute("""SELECT f.name, f.mime, f.size, f.path, l.org_id, l.owner_id FROM list_files f JOIN lists l ON l.id=f.list_id
                          WHERE f.id=?""", (ref_id,)).fetchone()
     elif kind == "fs":
-        r = c.execute("SELECT name, mime, size, kind, org_id, owner_id FROM fs_nodes WHERE id=?", (ref_id,)).fetchone()
-        if not r or r["kind"] != "file":
+        r = c.execute("SELECT name, mime, size, kind, org_id, owner_id, e2e_gen FROM fs_nodes WHERE id=?", (ref_id,)).fetchone()
+        if not r or r["kind"] != "file" or r["e2e_gen"]:  # 2.353.0 A (#2758): a ciphertext of a locked folder is never read
             return None
+        if fl_is_locked(c, ref_id):
+            return None  # 2.353.0 A (#2758): nor a plain file waiting for its conversion
     else:
         return None
     if not r:
@@ -490,7 +493,7 @@ def ts_files_find(c, uid, raw, space=""):
         where, args = " AND n.owner_id<>?", [uid]
     elif space not in ("", "all"):
         raise Denied(400, tr("Invalid value: {0}", "space"))
-    vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL" + where
+    vis = f"n.id IN {fs_visible_sql_c(c, uid)} AND n.deleted_at IS NULL AND n.e2e_gen = 0" + where  # 2.353.0 A (#2758): the browser searches a locked folder
     hit = {r[0]: "name" for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {vis} AND n.name ILIKE ? ESCAPE '\\' ORDER BY n.id DESC LIMIT ?",
                                            (*args, _like(raw), SEARCH_MAX))}
     if ON and S.index_words(raw):
@@ -501,14 +504,35 @@ def ts_files_find(c, uid, raw, space=""):
             node[r["id"]] = r["node_id"]
         for fid in ts_match(c, cand, raw) or ():
             hit.setdefault(node[fid], "text")
-        docs = {}
-        for r in c.execute(f"SELECT d.node_id, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {vis}", args):
-            docs.setdefault(r["ws"], []).append(r["node_id"])
+    docs = {}
+    for r in c.execute(f"SELECT d.node_id, d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {vis}", args):
+        docs.setdefault(r["ws"], []).append(r["node_id"])
+    if ON and S.index_words(raw):
         for nid in S.search_ids(c, docs, raw) or ():
             hit.setdefault(nid, "text")
+    for nid in _doc_label_hits(c, docs, raw):  # 2.353.0 D (#2759): sender, document type, tags of the documents (before "text":
+        if hit.get(nid) != "name":              # the word index holds the sender too)
+            hit[nid] = "doc"
     ids = sorted(hit, reverse=True)[:SEARCH_MAX]
     rows = c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))})", tuple(ids)).fetchall() if ids else []
     return sorted(rows, key=lambda r: -r["id"]), hit
+
+
+def _doc_label_hits(c, docs, raw):
+    """2.353.0 D (#2759): the documents among docs ({ws: [node ids]}, all visible) whose sender, type or a tag contains raw."""
+    low, out = raw.casefold(), set()
+    for ws, nids in docs.items():
+        mine, got = set(nids), set()
+        for kind, col in (("sender", "sender_id"), ("type", "type_id"), ("tag", None)):
+            ids = [x["id"] for x in S.labels(c, ws, kind) if low in (x["name"] or "").casefold()][:500]
+            if not ids:
+                continue
+            q = ",".join("?" * len(ids))
+            sql = (f"SELECT node_id FROM doc_meta WHERE ws=? AND {col} IN ({q})" if col else
+                   f"SELECT nt.node_id FROM doc_node_tags nt JOIN doc_meta d ON d.node_id=nt.node_id WHERE d.ws=? AND nt.tag_id IN ({q})")
+            got |= {r[0] for r in c.execute(sql, (ws, *ids))}
+        out |= got & mine
+    return out
 
 
 def ts_query():
@@ -520,7 +544,8 @@ def ts_query():
 
 @app.get("/api/files/search")
 def files_search():
-    """2.61.0 (#1820): the Ablage search -- ?q= over the names and the recognised text (documents: their text) of the
+    """2.61.0 (#1820): the Ablage search -- ?q= over the names and the recognised text (documents: their text; 2.353.0 D
+    (#2759): + their sender, type and tags, hit "doc") of the
     nodes the asker can see (not the trash), ?space=private | org:<id> | shared narrows it; plus project files of
     visible project lists. {items: [node + hit: name | text, folder], list_files: [{id, name, mime, size, list_id, list_name, hit}]}"""
     from .web import _items

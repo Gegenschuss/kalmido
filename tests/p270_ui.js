@@ -127,8 +127,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   ln.value = '1d'; change(w, ln); await sleep(900);
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).nag === '1d', 'list default saved: daily');
   // #414 (2.7.2): the type is gone; "Show completed at the bottom" with the cart hint instead
-  const ks = md.querySelector('#l-kind');
-  check(ks && ks.type === 'hidden' && md.querySelector('#l-kindp'), 'the kind: the switch Project features (2.25.0)');
+  // 2.352.0 C (#2751): the switch "Progress and status" (and the hidden kind) left the dialog of an existing project
+  check(!md.querySelector('#l-kind') && !md.querySelector('#l-kindp'), 'the kind: no switch any more (2.352.0)');
   const dab = md.querySelector('#l-dab');
   dab.checked = true; change(w, dab); await sleep(900);
   check(/comes back with one tap/.test(md.textContent) && md.querySelector('.ldabrow'), 'the option with its hint');

@@ -40,6 +40,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await call('PATCH', '/api/settings', {features: ALL, tour: 'done', lang: 'de'}, CC);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  await call('POST', `/api/lists/${L}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): tracked = has a status (the start page's projects card)
   const L2 = (await call('POST', '/api/lists', {name: 'Garden', kind: 'project'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L}/members`, {user_id: CAR, role: 'view'});
@@ -253,7 +254,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w = await boot({user: 'carol', hash: 'home'}); d = w.document; await sleep(400);
   check(d.querySelector('#top h1')?.textContent.includes('Start'), 'German: the dashboard title');
   // 2.43.0 (#1452): the button is a small icon now (the blocks are changed at their "…" menu); its name says it
-  check(d.querySelector('[data-act="dash-custom"]')?.getAttribute('aria-label') === 'Bausteine ordnen…', 'German: Bausteine ordnen…');
+  check(d.querySelector('[data-act="dash-custom"]')?.getAttribute('aria-label') === 'Kacheln ordnen…', 'German: Kacheln ordnen…');  // 2.364.0 C (#3044): everyday words
   w.close();
 
   // ================= Firefox

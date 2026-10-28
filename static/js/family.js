@@ -147,7 +147,7 @@ function viewKid() {
   // as the heading; an empty one says so)
   const shared = kd_sharedLists(), sid = new Set(shared.map(l => l.id)), own = mine.filter(t => !sid.has(t.list_id));
   const ul = ts => `<ul class="kidtasks">${ts.map(t => `<li class="${t.status ? 'done' : ''}"><button type="button" class="kidchk" data-act="kid-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Done: {0}', t.title))}">${t.status ? ic('check') : ''}</button>
-      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`;
+      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + esc(fmtTimeLoc(t.due_time)) : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`;
   return `<div class="kidv"><div class="kidtop"><h2>${esc(hi < 11 ? tr('Good morning, {0}', S.me.display_name) : hi < 18 ? tr('Hello, {0}', S.me.display_name) : tr('Good evening, {0}', S.me.display_name))}</h2>
     <div class="kidbal" role="status" aria-label="${esc(trn('You have {0} star', 'You have {0} stars', k.stars))}"><span aria-hidden="true">★</span><b>${k.stars}</b></div></div>
     <h3 class="kidsec">${tr('My tasks')}</h3>
@@ -725,6 +725,32 @@ function famBar(l) {
 
 // ---- "What do you use Kalmido for?" (setup, welcome tour, Settings > Modules)
 const purposeCards = (cur, attr = 'data-purpose') => `<div class="ptcards purposes" role="radiogroup" aria-label="${esc(tr('What do you use Kalmido for?'))}">${PURPOSES.map(([k, i, n, d]) => `<button type="button" class="ptcard ${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" ${attr}="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>`;
+// 2.364.0 A (#3032): the first start of an account an admin made (user admin, organisation invitation, import) asks only
+// "What do you use Kalmido for?" (the language is set already), preselected with the purpose of the inviting admin, else
+// "For me". The answer switches the modules to exactly that package; the "Getting started" list and the tour follow.
+// Closed without an answer: nothing changes, the question comes again on the next start.
+function paskOpen() {
+  const pre = S.settings.purpose_ask;
+  if (!pre || pre === 'done' || S.me?.kid || $('.paskdlg')) return Promise.resolve(false);
+  let cur = PURPOSES.some(x => x[0] === pre) ? pre : 'me';
+  return new Promise(res => {
+    const md = modal(`<h3>${tr('What do you use Kalmido for?')}</h3><p class="muted">${tr('Pick what fits: it switches the modules. Everything can be changed later under Settings > Modules.')}</p>
+      <div id="pask-c">${purposeCards(cur, 'data-pask')}</div><div class="aerr" role="alert" id="pask-err"></div>
+      <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-pask-go>${tr('Continue')}</button></div>`);
+    md.classList.add('paskdlg');
+    let done = false;
+    onRemove(md, () => { if (!done) res(false); });
+    md.addEventListener('click', async e => {
+      const c = e.target.closest('[data-pask]');
+      if (c) { cur = c.dataset.pask; $('#pask-c', md).innerHTML = purposeCards(cur, 'data-pask'); $(`[data-pask="${cur}"]`, md)?.focus(); return; }
+      if (!e.target.closest('[data-pask-go]')) return;
+      try { await api('POST', '/api/me/purpose', {purpose: cur, only: true}); } catch (err) { $('#pask-err', md).textContent = err.message || tr('Server not reachable.'); return; }
+      done = true; S.settings.purpose_ask = 'done'; md.remove();
+      try { await load(); render(); } catch { /* offline: the next load */ }
+      res(true);
+    });
+  });
+}
 async function purposeSet(p) {
   const n = PURPOSES.find(x => x[0] === p);
   // 2.25.0 (UX-25): the dialog lists what changes (modules on / off, tabs that leave the tab bar)

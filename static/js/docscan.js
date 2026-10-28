@@ -2,11 +2,33 @@
 // 2.207.0 A (#2763): "Scans from your computer" in the document settings (docs.js dc_sDraw): the folder watcher (downloads,
 // the scan inboxes of this workspace, a new inbox shows its setup code once) and the forwarding address with a copy button and
 // the note, shown big once per person, that mail is not end-to-end encrypted.
-const DSCN = {code: '', ws: '', md: null};  // the setup code just made: only while this settings dialog is open
-const dsc_mdNow = () => document.querySelector('.dc-smd');
+const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null)};  // the setup code just made: only while this settings dialog is open
+// 2.353.0 B (#2773): the folder watcher lives in Settings > Integrations (dsc_integrDraw); the document settings keep a short
+// pointer plus the forwarding address, so the download is maintained in one place only
 function dsc_slot(s) {
   const sc = s.scan || {api: false, downloads: [], keys: [], encrypted: false, mail_notice: true};
-  if (DSCN.code && (DSCN.ws !== s.ws || DSCN.md !== dsc_mdNow())) DSCN.code = '';
+  return `<h4>${tr('Scans from your computer')}</h4><div class="dsc-way"><h5>${ic('folder', 's')} ${tr('Folder watcher')}</h5>
+    <p class="muted">${tr('The program that uploads new scans from a folder of your Mac or Windows PC, its download and the scan inboxes are in Settings > Integrations.')}${sc.keys.length ? ' ' + esc(trn('{0} scan inbox set up', '{0} scan inboxes set up', sc.keys.length)) : ''}</p>
+    <button type="button" class="btn sm" data-dsc="tointegr">${ic('gear', 's')} ${tr('Open Integrations')}</button></div>${dsc_mailHtml(s, sc)}`;
+}
+// Settings > Integrations: the whole part (download, set-up code, inboxes with their last use) for the shown workspace
+function dsc_integrHtml() {
+  return `<h4 id="s-scan-h">${tr('Scans from your computer')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+async function dsc_integrDraw(md) {
+  const box = md.querySelector('#s-scan'); if (!box) return;
+  const cur = typeof wsCur === 'function' ? wsCur() : 'private', ws = cur.startsWith('org:') ? cur : 'private';
+  try { DSCN.es = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); } catch { box.innerHTML = ''; return; }
+  if (!box.isConnected) return;
+  dsc_embedDraw(box);
+}
+function dsc_embedDraw(box) {
+  const s = DSCN.es; if (!s || !box) return;
+  box.innerHTML = `<p class="muted">${esc(typeof dc_wsName === 'function' ? dc_wsName(s.ws) : s.ws)}</p>${dsc_watcherHtml(s, box)}`;
+}
+function dsc_watcherHtml(s, host) {
+  const sc = s.scan || {api: false, downloads: [], keys: [], encrypted: false, mail_notice: true};
+  if (DSCN.code && (DSCN.ws !== s.ws || DSCN.md !== host)) DSCN.code = '';  // the set-up code belongs to the box that made it
   const dl = d => `<a class="btn sm" href="/api/docs/folder-watcher/${encodeURIComponent(d.file)}" download="${esc(d.file)}">${ic('download', 's')} ${esc(d.label)}</a>`;
   const small = d => `<a class="linkbtn" href="/api/docs/folder-watcher/${encodeURIComponent(d.file)}" download="${esc(d.file)}">${esc(d.label)}</a>`;
   const main = sc.downloads.filter(d => d.id.startsWith('mac') || d.id === 'windows'), more = sc.downloads.filter(d => !main.includes(d));
@@ -26,7 +48,7 @@ function dsc_slot(s) {
       <div class="row"><label for="dsc-folder">${tr('Into folder')}</label><select id="dsc-folder">${folders.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select></div>
       <p class="muted">${tr('Two scanner profiles = two inboxes, for example your own documents and those of your organisation.')}</p>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dsc="new">${tr('Create inbox')}</button></div></details>`}</div>`;
-  return `<h4>${tr('Scans from your computer')}</h4>${watcher}${dsc_mailHtml(s, sc)}`;
+  return watcher;
 }
 function dsc_codeHtml() {
   return `<div class="dsc-code" role="status"><p><b>${tr('Setup code')}</b> <span class="muted">${tr('Only visible now')}</span></p>
@@ -51,16 +73,18 @@ function dsc_mailHtml(s, sc) {
     ${sc.encrypted ? `<p class="muted">${tr('Mails into this encrypted area were unencrypted on their way before they were filed.')}</p>` : ''}</div>`;
 }
 async function dsc_reload(md) {
-  const s = DC.set; if (!s) return;
+  const em = md.classList.contains('dsc-embed'), s = em ? DSCN.es : DC.set; if (!s) return;
   try { s.scan = await api('GET', `/api/docs/scan-keys?ws=${encodeURIComponent(s.ws)}`); } catch { return; }
-  dc_sDraw(md);
+  if (em) dsc_embedDraw(md); else dc_sDraw(md);
 }
 async function dsc_copy(text) {
   try { await navigator.clipboard.writeText(text); toast(tr('Copied')); } catch { toast(tr('Copy failed, select the text by hand')); }
 }
 document.addEventListener('click', async e => {
-  const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('.dc-smd [data-dsc]')); if (!b) return;
-  const md = /** @type {HTMLElement} */ (b.closest('.dc-smd')), s = DC.set, a = b.dataset.dsc || ''; if (!s) return;
+  const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('.dc-smd [data-dsc], .dsc-embed [data-dsc]')); if (!b) return;
+  const md = /** @type {HTMLElement} */ (b.closest('.dsc-embed, .dc-smd')), a = b.dataset.dsc || '', s = md.classList.contains('dsc-embed') ? DSCN.es : DC.set;
+  if (a === 'tointegr') { const dm = b.closest('.dc-smd'); if (dm) modalClose(dm); settingsModal('scans'); return; }
+  if (!s) return;
   if (a === 'copy') { dsc_copy(DSCN.code); return; }
   if (a === 'mailcopy') { dsc_copy(s.mail?.address || ''); return; }
   if (a === 'notice') {

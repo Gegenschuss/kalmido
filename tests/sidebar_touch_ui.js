@@ -80,10 +80,12 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(async () => (await folderOf(L5)) === '' && (await order()).indexOf(L5) < (await order()).indexOf(L2)), 'dropped before a top-level list: top level, in place');
   // ---- folders: Hobby before Admin
   await call('PATCH', `/api/lists/${L5}`, {folder: 'Hobby'}); await w.eval('load().then(() => render())'); await sleep(200);
+  // 2.352.0 (#2748): a folder is held and dragged by the sidebar tree (areas.js: the upper edge of a folder = before it)
+  { const ad = fold('Admin'); ad.getBoundingClientRect = () => ({top: 50, bottom: 90, left: 0, right: 300, width: 300, height: 40}); }
   touch(w, fold('Hobby'), 'touchstart'); await sleep(420);
-  under = fold('Admin'); touch(w, fold('Hobby'), 'touchmove', 60); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
-  check(fold('Admin').classList.contains('dropbefore'), 'folder drag: insert mark on the other folder');
-  touch(w, fold('Hobby'), 'touchend', 60); under = null;
+  under = fold('Admin'); touch(w, fold('Hobby'), 'touchmove', 52);
+  check(fold('Admin').classList.contains('sbbdbef'), 'folder drag: insert mark on the other folder');
+  touch(w, fold('Hobby'), 'touchend', 52); under = null;
   check(await until(async () => JSON.parse((await st()).settings.folders)[0] === 'Hobby'), 'folders reordered');
   // ---- a closed folder opens while hovered
   w.eval("S.collapsed.add('fold:Admin'); renderSide()");

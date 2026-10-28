@@ -43,7 +43,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);
   // seven active projects, one complete, one on hold
   const P = [];
-  for (const n of ['Spring shoot', 'Image film', 'Website new', 'Brochure', 'Trade fair', 'Podcast', 'Newsletter']) P.push((await call('POST', '/api/lists', {name: n, kind: 'project'})).id);
+  for (const n of ['Spring shoot', 'Image film', 'Website new', 'Brochure', 'Trade fair', 'Podcast', 'Newsletter']) { P.push((await call('POST', '/api/lists', {name: n, kind: 'project'})).id); await call('POST', `/api/lists/${P.at(-1)}/status`, {status: 'on_track', note: ''}); }  // 2.352.0 B (#2752): tracked = has a status
   for (const [n, st] of [['Old catalogue', 'complete'], ['Paused idea', 'on_hold']]) { const id = (await call('POST', '/api/lists', {name: n, kind: 'project'})).id; await call('POST', `/api/lists/${id}/status`, {status: st, note: ''}); }
   const done = (await call('POST', '/api/tasks', {title: 'Pick the location', list_id: P[0]})).id;
   await call('POST', `/api/tasks/${done}/complete`);
@@ -75,7 +75,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   // Today
   const today = d.querySelector('.dc-today');
   check(today.querySelectorAll('.dtl li').length === 4 && /Spring shoot/.test(today.querySelector('.dtl').textContent) && today.querySelector('.dt.over')?.textContent === 'Yesterday', '#1504: Today: 4 tasks, the list as a label, overdue in red');
-  check([...today.querySelectorAll('.dtl li')].some(li => li.querySelector('.dt')?.textContent === '10:00'), '#1504: a time shows as the time');
+  check([...today.querySelectorAll('.dtl li')].some(li => li.querySelector('.dt')?.textContent === w.eval(`fmtTimeLoc('10:00')`)), '#1504: a time shows as the time');
   const inp = d.querySelector('#hp-add');
   check(inp && inp.getAttribute('aria-label') === 'New task for today', '#1504: the box to add a task for today');
   inp.value = 'Call the printer'; inp.closest('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
@@ -99,7 +99,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   check([...d.querySelectorAll('.dcard')].every(c => c.getAttribute('aria-labelledby') && c.querySelector('h3')), '#1504: every card still a named section');
   // agents
   const jobs = [...d.querySelectorAll('.dc-agents .djob')];
-  check(jobs.length === 2 && jobs.every(j => /^since \d\d:\d\d$/.test(j.querySelector('.hpt')?.textContent || '')), '#1504: the agents card: both running jobs, "since HH:MM" ' + jobs.map(j => j.textContent).join(' | '));
+  check(jobs.length === 2 && jobs.every(j => /^since \d{1,2}:\d\d(\s?[AP]M)?$/i.test(j.querySelector('.hpt')?.textContent || '')), '#1504: the agents card: both running jobs, "since HH:MM" ' + jobs.map(j => j.textContent).join(' | '));  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
   w.close();
 
   // ================= an own arrangement keeps its order and cards, the cards are compact
