@@ -409,6 +409,9 @@ def user_delete(uid):
     by = ua8_may_delete(c, u, uid)  # 2.46.0 (#1592): an instance admin as om_admin_all; 2.88.0: or the organisation's admin
     if uid == me():
         return err(tr("You cannot delete yourself"))
+    from ..docs.store import doc_lock_gone
+    doc_lock_gone(c, "node_id IN (SELECT id FROM fs_nodes WHERE owner_id=?) OR org_id IN (SELECT id FROM orgs WHERE personal_of=?)",
+                  (uid, uid))  # #3090: before the first write (no deadlock with a recognition run)
     with system_ctx(c):  # 2.37.0 (#1150): a count over every organisation (lists the admin cannot see still block the deletion)
         n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
     icons, lfiles, audit = [], [], (None, ())
