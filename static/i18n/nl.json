@@ -14597,5 +14597,8 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Een verlofaanvraag houdt haar soort. Verwijder haar en voer de afwezigheid opnieuw in.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Het nieuwe wachtwoord trekt je app-wachtwoorden (CalDAV) en je eigen API-tokens in; maak daarna zo nodig nieuwe aan onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars). Agents behouden hun tokens.",
   "Please type your name without a link or web address.": "Vul uw naam in zonder link of webadres.",
-  "Saved. {0} booking of someone else stays as it was": ["Opgeslagen. {0} boeking van iemand anders blijft zoals hij was", "Opgeslagen. {0} boekingen van anderen blijven zoals ze waren"]
+  "Saved. {0} booking of someone else stays as it was": ["Opgeslagen. {0} boeking van iemand anders blijft zoals hij was", "Opgeslagen. {0} boekingen van anderen blijven zoals ze waren"],
+  "Trial document (SAMPLE)": "Testdocument (MUSTER)",
+  "More ways to create": "Meer manieren om aan te maken",
+  "Archived quotations: {0}": "Gearchiveerde offertes: {0}"
 }

@@ -73,7 +73,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
-  w = await boot({hash: 'office/offers'}); d = w.document;
+  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelector('[data-ofd="remind"]'), 60);

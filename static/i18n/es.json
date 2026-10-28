@@ -14597,5 +14597,8 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Una solicitud de vacaciones conserva su tipo. Elimínala e introduce la ausencia de nuevo.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nueva contraseña revoca tus contraseñas de aplicación (CalDAV) y tus propios tokens de API; si los necesitas, crea otros nuevos en Ajustes > Cuenta (tokens de API: Avanzado · para desarrolladores). Los agentes conservan sus tokens.",
   "Please type your name without a link or web address.": "Escriba su nombre sin enlaces ni direcciones web.",
-  "Saved. {0} booking of someone else stays as it was": ["Guardado. {0} reserva de otra persona queda como estaba", "Guardado. {0} reservas de otras personas quedan como estaban"]
+  "Saved. {0} booking of someone else stays as it was": ["Guardado. {0} reserva de otra persona queda como estaba", "Guardado. {0} reservas de otras personas quedan como estaban"],
+  "Trial document (SAMPLE)": "Documento de prueba (MUSTER)",
+  "More ways to create": "Más formas de crear",
+  "Archived quotations: {0}": "Presupuestos archivados: {0}"
 }

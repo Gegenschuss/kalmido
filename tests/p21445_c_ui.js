@@ -64,7 +64,7 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     await ev(`(() => { const m = document.querySelector('.modal'); (m.querySelector('[data-m="cancel"]') || m.querySelector('.mclose') || {click() {}}).click(); return 1; })()`);
     await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
     // ================= #2021 (a) the invoice list's series section
-    await nav(B + '#office/offers');
+    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     await ev(`(() => { document.querySelector('[data-ofd="kind"][data-kind="invoice"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.rin-sec .rin-it')`, 60), 'the invoice list shows the series');

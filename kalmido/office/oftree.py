@@ -17,14 +17,15 @@ Rights stay as they are: the routes are the area's office routes (/api/office/<a
 area's level), the folders listed are the ones the person sees (fs_role), a document of a folder only when it is one of the
 office's documents of that area (the office's own read). Customers get no folders (#2742: no office route for them).
 
-    GET  /api/office/docs/tree | gen-docs/tree | letters/tree | receipts/tree
+    GET  /api/office/docs/tree | gen-docs/tree | letters/tree | receipts/tree   (2.380.0 B, #3409: docs/tree = Quotations,
+         docs/tree?sec=invoices = Invoices with credit notes, reminders and delivery notes; each its own root folder)
          -> {area, space ('org:<id>' | 'private'), root (null: none yet), can_add, folders: [{id, parent_id, name, sort_no,
             role, shared, outside, path}], docs: [{id, title, sub, folder_id, fnode, fsort, kind, open}] (in shown folders +
             the 20 newest in none), more (more documents in no folder than shown), kind (the reference kind)}
     POST /api/office/<segment>/tree/folders {name, parent_id?} -> {folder}, 201: a folder below parent_id, else at the top
          of the area (below its root, made on the first one)
 """
-from flask import jsonify
+from flask import jsonify, request
 
 from ..core.config import app
 from ..core.db import body, bump, insert_id
@@ -44,7 +45,8 @@ OFT_NEWEST = 20
 OFT_FILED_MAX = 2000
 # area -> (route segment, reference kind, the root folder's name)
 OFT_AREAS = {
-    "offers": ("docs", "office_doc", N_("Quotes & invoices")),
+    "offers": ("docs", "office_doc", N_("Quotations")),  # 2.380.0 B (#3409): an existing root keeps its name
+    "invoices": ("docs", "office_doc", N_("Invoices")),
     "gendocs": ("gen-docs", "office_gendoc", N_("Documents")),
     "letters": ("letters", "office_letter", N_("Correspondence")),
     "receipts": ("receipts", "office_receipt", N_("Receipts")),
@@ -83,11 +85,17 @@ def _in(col, ids, neg):
 
 
 # ---------------------------------------------------------------- the documents of an area (one query each, ids inlined)
-def _docs_offers(c, uid, oid, ids, neg, limit):
-    rows = c.execute(f"SELECT id, kind, number, status, date, project_title, trial, locked_at FROM office_docs WHERE org_id=? AND {_in('id', ids, neg)} "
-                     f"ORDER BY id DESC LIMIT {int(limit)}", (oid,)).fetchall()
-    return [{"id": r["id"], "kind": r["kind"], "title": f"{tr(OFD_KIND_NAME.get(r['kind'], OFD_KIND_NAME['offer']))} {r['number'] or tr('Draft')}",
-             "sub": r["project_title"] or "", "date": r["date"] or "", "locked": bool(r["locked_at"]), "open": f"office/offers/{r['id']}"} for r in rows]
+# 2.380.0 B (#3409): quotations and invoices are two areas over the same documents: the SQL condition of each one's kinds
+OFT_SEC_SQL = {"offers": "kind='offer'", "invoices": "kind<>'offer'"}
+
+
+def _docs_sec(sec):
+    def docs(c, uid, oid, ids, neg, limit):
+        rows = c.execute(f"SELECT id, kind, number, status, date, project_title, trial, locked_at FROM office_docs WHERE org_id=? AND {OFT_SEC_SQL[sec]} "
+                         f"AND {_in('id', ids, neg)} ORDER BY id DESC LIMIT {int(limit)}", (oid,)).fetchall()
+        return [{"id": r["id"], "kind": r["kind"], "title": f"{tr(OFD_KIND_NAME.get(r['kind'], OFD_KIND_NAME['offer']))} {r['number'] or tr('Draft')}",
+                 "sub": r["project_title"] or "", "date": r["date"] or "", "locked": bool(r["locked_at"]), "open": f"office/{sec}/{r['id']}"} for r in rows]
+    return docs
 
 
 def _docs_gendocs(c, uid, oid, ids, neg, limit):
@@ -117,7 +125,7 @@ def _docs_receipts(c, uid, oid, ids, neg, limit):
              "open": f"docs/{r['node_id']}"} for r in rows if not fs_deleted(fs_chain(c, r["node_id"]))]
 
 
-OFT_DOCS = {"offers": _docs_offers, "gendocs": _docs_gendocs, "letters": _docs_letters, "receipts": _docs_receipts}
+OFT_DOCS = {"offers": _docs_sec("offers"), "invoices": _docs_sec("invoices"), "gendocs": _docs_gendocs, "letters": _docs_letters, "receipts": _docs_receipts}
 
 
 def oft_tree(c, uid, oid, area):
@@ -140,6 +148,9 @@ def oft_tree(c, uid, oid, area):
     sp = f"n.org_id = {int(org)}" if org else f"n.org_id IS NULL AND n.owner_id = {int(owner)}"
     nodes = c.execute(f"SELECT n.id, n.parent_id, n.ref_id, n.sort_no FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind=? AND n.deleted_at IS NULL "
                       f"AND {sp} AND n.id IN {fs_visible_sql(uid, c)} ORDER BY n.id LIMIT {OFT_FILED_MAX}", (kind,)).fetchall()
+    if area in OFT_SEC_SQL and nodes:  # 2.380.0 B (#3409): only the folders holding a document of this area's kinds
+        mine = {r[0] for r in c.execute(f"SELECT id FROM office_docs WHERE org_id=? AND {OFT_SEC_SQL[area]} AND id IN ({_ids(n['ref_id'] for n in nodes)})", (oid,))}
+        nodes = [n for n in nodes if n["ref_id"] in mine]
     out_par = {}
     for n in nodes:
         p = n["parent_id"]
@@ -220,7 +231,7 @@ def _folder_new(c, uid, oid, area):
 
 def _ctx(area):
     """The area's office context: gen-docs / letters / receipts are admin routes like the area's own (office_ctx_admin)."""
-    c, uid, oid = office_ctx(AREA_LEGACY[area] == "admin")
+    c, uid, oid = office_ctx(AREA_LEGACY["offers" if area == "invoices" else area] == "admin")  # 2.380.0 B (#3409): invoices = the quotations' rights
     if area == "letters":  # 2.351.0 F (#2823, review M1): the accounting role reads no letters (letters.lt_org)
         lt_org(c, uid)
     return c, uid, oid
@@ -237,14 +248,19 @@ def _post(area):
 
 
 # literal routes (the route guards read them from the source, tests/routes_ast.py)
+# 2.380.0 B (#3409): ?sec=invoices = the area Invoices (the same route and rights as the quotations)
+def _sec():
+    return "invoices" if request.args.get("sec") == "invoices" else "offers"
+
+
 @app.get("/api/office/docs/tree")
 def oft_tree_offers():
-    return _get("offers")
+    return _get(_sec())
 
 
 @app.post("/api/office/docs/tree/folders")
 def oft_folder_offers():
-    return _post("offers")
+    return _post(_sec())
 
 
 @app.get("/api/office/gen-docs/tree")
