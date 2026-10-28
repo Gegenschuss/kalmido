@@ -961,6 +961,7 @@ function listModal(id, folder = '', o = {}) {
   // 2.270.0 A (#3019): the list as this dialog showed it (opened / last saved / synced): the autosave sends only what was
   // changed here, with these values as _prev (a value another device set meanwhile is not set back); lfail = last save failed
   let lbase = {...l}, lfail = false;
+  let wsHold = false;  // 2.401.0 (#2924): a workspace change waits for its dry run / the move dialog (no other save takes it along)
   const lsync = (force = false) => {  // after an undo / redo or a failed save: the dialog shows what is saved
     if (!md.isConnected) return;
     const x = listById(id); if (!x) return;
@@ -996,6 +997,7 @@ function listModal(id, folder = '', o = {}) {
       const cur = listById(id); if (!cur) return;
       const body = formBody(), diff = {}, prev = {};
       for (const k in body) if (lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }  // 2.270.0 A (#3019)
+      if (wsHold) { delete diff.org_id; delete prev.org_id; }  // 2.401.0 (#2924): e.g. the name's focusout while the move dialog opens
       if (!Object.keys(diff).length) { lfail = false; return; }
       if ('folder' in diff && own) {  // 2.39.1 (#1188): a folder with other workspace / agent defaults asks first
         const fa = await lmFolderAsk({[id]: diff.folder}); if (fa === null) { lsync(true); return; }
@@ -1037,7 +1039,8 @@ function listModal(id, folder = '', o = {}) {
       const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
       if (id) {  // 2.401.0 (#2924): the server's dry run first; cancelled = the field goes back
         const sel = e.target, to = sel.value ? +sel.value : null, from = listById(id)?.org_id || null;
-        lwsDry(id, from, to).then(go => {
+        wsHold = true;
+        lwsDry(id, from, to).finally(() => { wsHold = false; }).then(go => {
           if (go) { autosave(); return; }
           if (!sel.isConnected) return;
           sel.value = from ? String(from) : ''; sel.dispatchEvent(new Event('change', {bubbles: true}));
