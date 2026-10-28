@@ -503,6 +503,9 @@ APP_ONLY = [
     # 2.64.2 (#1817): files of a list with the lock, encrypted in the browser with the list key
     ("2.64.2 (#1817): files of a list with the lock are encrypted with the list key in a person's browser; agents and API tokens get 403 "
      "(they see such files only as encrypted)", ("=POST /api/tasks/{}/list-attachments",)),
+    # 2.353.0 A (#2758): locked folders of the file store, encrypted in the browser with a folder key
+    ("2.353.0 A (#2758): locking a folder of the file store, its encrypted upload / rename / move / versions and handing out the "
+     "folder key happen in a person's browser (end-to-end); agents and API tokens never see a locked folder", ("* /api/files/lock/",)),
     ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
      ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",

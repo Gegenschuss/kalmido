@@ -118,7 +118,7 @@ check(j["node"].get("recog_on") is True and j["node"].get("recog_root") is True,
 check(any(x["id"] == D1 and (x.get("doc") or {}).get("state") for x in j["items"]), "(a) its document carries doc {state, review} in the list")
 SUB = folder(Fr, "Insurance", ROOT)
 j = listing(Fr, SUB)
-check(j["node"].get("recog_on") is True and j["node"].get("recog_from") == "Dokumente", f"(a) a subfolder inherits it ({j['node']})")
+check(j["node"].get("recog_on") is True and j["node"].get("recog_from") in ("Dokumente", "Documents"), f"(a) a subfolder inherits it ({j['node']})")
 F1 = file_up(Fr, "policy.pdf", SUB)
 check(is_doc(Fr, F1), "(a) a file uploaded into the recognising subfolder became a document")
 PLAIN = folder(Fr, "Holiday")

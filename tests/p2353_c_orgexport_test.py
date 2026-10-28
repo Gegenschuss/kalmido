@@ -37,7 +37,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # noqa: E402
+from kt import FAILS, OKS, check, sess, su_get  # noqa: E402
 FEAT = FEATURES + ",sheets"
 
 
@@ -80,10 +80,12 @@ def export(s, oid):
     r = s.post(B + f"/api/orgs/{oid}/export")
     check(r.status_code == 202, "organisation export started " + r.text[:120])
     for _ in range(480):
-        if s.get(B + f"/api/orgs/{oid}/export").json().get("state") != "running":
+        st = s.get(B + f"/api/orgs/{oid}/export").json()
+        if st.get("state") != "running":
             break
         time.sleep(0.25)
-    ox = s.get(B + f"/api/orgs/{oid}/export/file").content
+    check(st.get("state") == "done", f"organisation export done {st}")
+    ox = su_get(s, B + f"/api/orgs/{oid}/export/file", "password123").content  # 2.360.0 A (#2496): behind the step-up
     rk = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     check(ox[:13] == b"KALMIDO-ORGX\n" and rk, "organisation export + recovery key")
     return ox, rk

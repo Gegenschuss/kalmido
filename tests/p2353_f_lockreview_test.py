@@ -135,7 +135,7 @@ def unlock(s, fid):
 # the documents folder of alice (made by the first document)
 r = A.post(B + "/api/docs", data={"ws": "private"}, files={"files": ("bill.txt", b"invented bill one", "text/plain")})
 check(r.ok, "a first document " + r.text[:200])
-DROOT = dbx("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND name='Dokumente' ORDER BY id LIMIT 1", (ME,))[0][0]
+DROOT = dbx("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND lower(name) IN ('dokumente','documents') ORDER BY id LIMIT 1", (ME,))[0][0]
 DOC1 = dbx("SELECT id FROM fs_nodes WHERE owner_id=? AND kind='file' AND name='bill.txt'", (ME,))[0][0]
 
 L = folder(A, "Locked box")
