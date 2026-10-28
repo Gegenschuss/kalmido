@@ -47,7 +47,7 @@ const FEAT = 'cal,comments,collab,kanban,timeline';
   const more = md.querySelector('details.lnmore');
   check(more && !more.open && /More options/.test(more.querySelector('summary').textContent), '"More options" is there and closed');
   check(!md.querySelector('#l-name').closest('details') && !ws.closest('details'), 'name and "For whom?" outside');
-  check(['#l-folder', '#l-view', '#l-col', '#l-kindp', '#l-nag'].every(s => md.querySelector(s)?.closest('details.lnmore')), 'folder, view, colour, progress, reminders under "More options"');
+  check(['#l-folder', '#l-view', '#l-col', '#lm-sec-proj', '#l-nag'].every(s => md.querySelector(s)?.closest('details.lnmore')), 'folder, view, colour, project features, reminders under "More options" (2.352.0 B #2752: no progress switch any more)');
   check(md.querySelector('.foot [data-m="save"]') && !md.querySelector('.foot').closest('details'), 'Create stays at the foot');
   // pick the organisation, create
   ws.value = String(org.id); ws.dispatchEvent(new w.Event('change', {bubbles: true}));
