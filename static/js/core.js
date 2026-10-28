@@ -109,7 +109,7 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['budget', N_('Budget')],  // 2.72.0 (#1333): the household budget, off by default
   ['feeds', N_('Feeds')],  // 2.85.0 B (#1162): feeds, off by default
   // 2.23.0 (#463): package "Team, family, clients", each off by default
-  ['clients', N_('Clients')], ['workload', N_('Workload & absences')] /* 2.380.2 (#3407): the view's name (de: Einsatzplan) */, ['forms', N_('Forms')],
+  ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')],
   // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
@@ -189,7 +189,7 @@ const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
 // 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
 const isTracked = l => !!l && !l.is_inbox && !!l.status;
-const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l) && inWs(l))));  // 2.380.2 (#3407): inWs
+const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l))));
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
 const fieldsOn = () => feat('fields');
@@ -538,7 +538,7 @@ async function rawFetch0(method, url, body, key) {
   const keepW = () => { if (key === undefined && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) outStash([{method, url, body: outPrev(method, url, body), uid: S.me?.id, k: outKey()}]); if (typeof savesStash === 'function') savesStash(false); };
   if (r.type === 'opaqueredirect' || ctype.includes('text/html')) {
     if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { keepW(); await authGone(); }  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
-    location.reload();  // login session expired -> login page
+    location.reload();  // Authelia session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));

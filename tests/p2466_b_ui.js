@@ -66,6 +66,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // ================= #1708: the workspace in the row + #1709: the setup offer
+  await call('DELETE', `/api/lists/${L1}/members/${PA}`);  // 2.361.4 (#2935): out of the organisation only without its projects
   w.eval(`settingsModal('ai')`); await sleep(500);
   await w.eval(`aiSubShow(document.querySelector('.smodal'), 'setup', false)`);
   const prow = () => d.querySelector(`#s-myown [data-myag="${PA}"]`);

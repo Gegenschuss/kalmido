@@ -47,7 +47,7 @@ const WS_VIEWS = {
   'static/js/readlater.js': 'draw',           // 2.172.0 B (#2679): read later of the shown workspace (rd_space), loads again when it changed (RDL.sp)
   'static/js/life.js': 'draw',                // 2.173.0 A (#2680): trips + staying in touch of the shown workspace (rd_space), loads again when it changed (LF.sp)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
-  'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea only picks the empty-state text (who creates agents)
+  'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
   'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
@@ -59,11 +59,6 @@ const WS_VIEWS = {
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
-  // 2.380.2 (#3407): the views under Projects read the shown workspace too (they did not, so this guard missed them)
-  'static/js/roadmap.js': 'check:projects',   // the roadmap's lists and people (inWs while drawing)
-  'static/js/projects.js': 'check:projects',  // project status: the projects, the risk counter (inWs while drawing)
-  'static/js/clients.js': 'check:workload',   // the Einsatzplan: a company = its organisation, hidden in Private (hook 'workload')
-  'kalmido/team/workload.py': 'check:workload',  // wl_people: without ?org the saved workspace's organisation
   // 2.87.9: files that read the shown workspace since 2.85 / 2.87.9
   'static/js/areas.js': 'draw',               // private-only modules hidden in an organisation's view, the office menu per workspace (#1917)
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
@@ -236,40 +231,7 @@ function scan() {
   check(await until(() => w.eval('OFC.info && OFC.info.personal') === 1, 60), 'office: Alpha -> Private = the personal office');
   CHECKED.add('office');
 
-  // ================= 2.380.2 (#3407): the views under Projects, the start page's projects and the archive show the lists of
-  // the shown workspace only ('All' = everything); the Einsatzplan takes the company's organisation and is not offered in Private
-  // (independent of whether a file reads the workspace: titles of the other workspace must not show up)
-  const PA = (await call('POST', '/api/lists', {name: 'Alpha launch', kind: 'project', org_id: A})).id;
-  const PP = (await call('POST', '/api/lists', {name: 'Private move', kind: 'project', org_id: null})).id;
-  const OA = (await call('POST', '/api/lists', {name: 'Alpha old', kind: 'project', org_id: A})).id;
-  const OP = (await call('POST', '/api/lists', {name: 'Private old', kind: 'project', org_id: null})).id;
-  for (const [l, n] of [[PA, 'Alpha kickoff'], [PP, 'Pack boxes']]) await call('POST', '/api/tasks', {title: n, list_id: l, due: t});
-  for (const l of [OA, OP]) await call('PATCH', `/api/lists/${l}`, {archived: true});
-  for (const l of [PA, PP]) await call('POST', `/api/lists/${l}/status`, {status: 'at_risk'});
-  await w.eval('load()'); await w.eval(`loadModule('timeline')`);
-  const pj = () => JSON.parse(w.eval(`JSON.stringify({rm: rmModel().rows.filter(r => r.l).map(r => r.l.id).concat(rmProjects().map(l => l.id)), ov: ovRows().map(r => r.l.id),
-    risk: riskLists().map(l => l.id), arch: [...viewArchived().matchAll(/data-list="(\\d+)"/g)].map(m => +m[1]), home: dashCard('projects') || ''})`));
-  const only = (ids, yes, no) => yes.every(x => ids.includes(x)) && no.every(x => !ids.includes(x));
-  const pjOk = (yes, no, yo, no2, ho) => { const j = pj(); return only(j.rm, yes, no) && only(j.ov, yes, no) && only(j.risk, yes, no) && only(j.arch, yo, no2) && ho.every(([x, v]) => j.home.includes(x) === v); };
-  await sw('private'); await w.eval('load()');
-  check(pjOk([PP], [PA], [OP], [OA], [['Private move', true], ['Alpha launch', false]]), '#3407: Private: roadmap, project status, at risk, archive and the start page only show Private\'s projects: ' + JSON.stringify(pj()).slice(0, 300));
-  check(!w.eval('wlShown()') && !w.eval(`sideModEntries().some(x => x[0] === 'workload' && x[2])`), '#3407: Private: the Einsatzplan is not offered');
-  await sw(WA); await w.eval('load()');
-  check(pjOk([PA], [PP], [OA], [OP], [['Alpha launch', true], ['Private move', false]]), '#3407: Alpha: only Alpha\'s projects: ' + JSON.stringify(pj()).slice(0, 300));
-  check(w.eval('wlShown()'), '#3407: Alpha: the Einsatzplan is offered');
-  CHECKED.add('projects');
-  w.eval(`WLV.tab = 'wl'; WLV.org = ${Bo}; WLV.data = null; go('workload')`);
-  check(await until(() => w.eval('WLV.data && WLV.data.org_id') === A, 60) && !d.querySelector('#wl-org'), '#3407: Alpha: the Einsatzplan shows Alpha (not the picked Bravo), no organisation picker');
-  await sw(WB);
-  check(await until(() => w.eval('WLV.data && WLV.data.org_id') === Bo, 60), '#3407: Alpha -> Bravo: the Einsatzplan loads Bravo without opening again');
-  // the server alone (no ?org): the saved workspace's organisation, not the first one
-  check((await call('GET', '/api/workload')).org_id === Bo, '#3407: /api/workload without ?org = the saved workspace (Bravo)');
-  await sw('all'); await w.eval('load()');
-  check(pjOk([PA, PP], [], [OA, OP], [], [['Alpha launch', true], ['Private move', true]]), '#3407: All: every project');
-  check(await until(() => w.eval('WLV.data && WLV.data.org_id') === Bo, 60) && w.eval('wlShown()'), '#3407: All: the Einsatzplan keeps the picked organisation');
-  CHECKED.add('workload');
-
-  // ================= absences + disposition (the area of the saved workspace; 2.380.2 (#3407): Private = the personal area, not the first organisation)
+  // ================= absences + disposition (the area of the saved workspace; Private = the first organisation)
   await sw(WA);
   w.eval(`go('workload')`);
   await until(() => d.querySelector('#view .ab2tabs [data-v="abs"]'), 60);

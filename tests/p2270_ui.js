@@ -123,6 +123,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   md.querySelector('#l-name').value = 'Sprint';
   click(w, md.querySelector('[data-m="save"]'));
   let sp = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Sprint'));
+  // #1604: a new software project opens "Next steps" late (after load() + /api/users); left open it took the focus from the share dialog (#974)
+  (await until(() => d.querySelector('.modal.nsmodal')))?.remove?.();
   check(sp && !(await call('GET', '/api/state')).sections.some(s => s.list_id === sp.id), '#972: created without sections');
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));
   click(w, md.querySelector('[data-pt="agency"]')); md.querySelector('#l-ptsecs').checked = true; md.querySelector('#l-name').value = 'Agency X';

@@ -214,6 +214,7 @@ check(r.ok and any(x["id"] == GEN for x in r.json()["data"]), "agent: lists its 
 r = requests.delete(V + f"/team/rooms/{GEN}/members/{CL}", headers=CLH)
 check(r.status_code == 204 and requests.get(V + f"/team/rooms/{GEN}/messages", headers=CLH).status_code == 404, "agent: leaves the channel")
 # a personal agent of bob in his channel: added by bob only, mentions reach it from bob only
+assert A.patch(B + f"/api/orgs/{ORG}", json={"member_agents": True}).ok  # 2.361.4 (#2928): its admins let members keep own agents
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "comments"], "username": "bobbot", "display_name": "Bobbot", "owner_id": BOB, "org_id": ORG})
 BB, BBH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 check(Ca.post(B + f"/api/team/rooms/{GEN}/members", json={"user_id": BB}).status_code in (400, 403), "personal agent: not added by somebody else")

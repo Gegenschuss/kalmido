@@ -54,6 +54,7 @@ b = agent_in_state(Bo, CL)
 check(b is not None and "list_ids" not in b, "#1761: ... and still not for the member")
 
 # a personal agent of Bob (made by the admin, owner_id): its owner sees the limit, the admin (not its owner) does not
+assert A.patch(B + f"/api/orgs/{ORG}", json={"member_agents": True}).ok  # 2.361.4 (#2928): its admins let members keep own agents
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "bobhelper", "display_name": "Bobs helper", "owner_id": BOB, "org_id": ORG})
 check(r.ok, "#1761: a personal agent for Bob " + r.text[:160])
 if r.ok:
