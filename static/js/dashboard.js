@@ -466,8 +466,7 @@ function hpNewsRow(g) {
 }
 function hpSince(iso) {
   const d = new Date(iso); if (isNaN(d)) return '';
-  const p = x => String(x).padStart(2, '0');
-  return tr('since {0}', d.toDateString() === new Date().toDateString() ? `${p(d.getHours())}:${p(d.getMinutes())}` : fmtDay('short', d));
+  return tr('since {0}', d.toDateString() === new Date().toDateString() ? fmtTimeAt(d) : fmtDay('short', d));  // 2.368.0 B (#2982)
 }
 document.addEventListener('submit', async e => {
   if (!e.target.matches?.('[data-hpadd]')) return;
