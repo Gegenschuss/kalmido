@@ -1651,18 +1651,23 @@ function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
 }
-// the chips of the docked composer: what the task will get (a chip set here wins over the text)
+// 2.380.2 (#3403): what the text says (!!!, morgen, ~project) wins over a chip picked before; no word in the text = the chip
+function qovPick(o, r, d) {
+  return {due: r.due ? r.due : 'due' in o ? o.due : d.due, list_id: r.list_id || o.list_id || d.list_id,
+    priority: r.priority != null ? r.priority : 'priority' in o ? o.priority : d.priority ?? 0};
+}
+// the chips of the docked composer: what the task will get
 function qdockChips() {
   const box = $('#qdchips'), inp = $('#qinput'); if (!box || !inp) return;
   if (S.qov?.key !== S.route.key) S.qov = {key: S.route.key};
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
-  const due = 'due' in o ? o.due : r.due || d.due, lid = o.list_id || r.list_id || d.list_id || inbox()?.id, pr = 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0;
+  const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
-  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
+  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && !r.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
-    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+    `<button type="button" class="qdc set ${o.list_id && !r.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
+    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && r.priority == null ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);

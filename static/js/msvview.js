@@ -366,8 +366,8 @@ async function msvvQuick(input) {
   if (b._r.list_id) return false;  // "~list" names an own list
   delete b._r;
   const o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {}, d = quickDefaults();
-  if ('due' in o) b.due = o.due || undefined; else if (!b.due && d.due) b.due = d.due;
-  if ('priority' in o) b.priority = o.priority;
+  if (!b.due) b.due = ('due' in o ? o.due : d.due) || undefined;  // 2.380.2 (#3403): the text wins over a chip
+  if (b.priority == null && 'priority' in o) b.priority = o.priority;
   if (!b.title) return true;
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
   const n = await msvvAdd(q.sid, q.lid, JSON.parse(JSON.stringify(b)));

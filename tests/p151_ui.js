@@ -263,7 +263,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= (i) sidebar: 2.13.0: search at the top (no longer in the footer); 2.13.3: the command-bar field is the one
   // search entry (no separate "Search" row next to it)
   const rk = [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.go || x.dataset.act || '');  // 2.152.2 (#2622): Settings sits at the bottom of the bar
-  check(!rk.includes('search') && d.querySelector('#kbar .kbsrch[data-act="palette"]') && !d.querySelector('#side .scmd') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings at the bottom of the bar: ' + rk.join(','));  // 2.152.2 (#2622): the search on top of the panel  // 2.152.3 (#2619): the search moved from the top of the panel into the head bar
+  check(!rk.includes('search') && d.querySelector('#kbar .kbsrch[data-act="palette"]') && !d.querySelector('#side .scmd') && !d.querySelector('#side [data-go="search"]') && !d.querySelector('#srail .sset') && !!d.querySelector('#kbar .kbsw'), 'sidebar: the command-bar field at the top is the search, settings in the Kalmido menu: ' + rk.join(','));  // 2.152.2 (#2622): the search on top of the panel  // 2.152.3 (#2619): the search moved from the top of the panel into the head bar  // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
@@ -502,8 +502,23 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(qc()[2] === 'Low', 'priority chip changes it');
   key(w, d.querySelector('#qinput'), 'Enter'); await idle(w);
   const nt = (await st()).tasks.find(t => t.title === 'Draft email');
-  check(nt && nt.priority === 1 && nt.due === T1 && nt.list_id === SIDE, 'Enter adds with the chips (chip wins over the text)');
+  check(nt && nt.priority === 1 && nt.due === T1 && nt.list_id === SIDE, 'Enter adds with the chips (a chip picked after the text wins)');
   check(d.activeElement === d.querySelector('#qinput') && d.querySelector('#qinput').value === '', 'focus stays for the next task');
+  // 2.380.2 (#3403): the chips stay for the next task, but a word in the text wins over a chip picked before
+  click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await sleep(60);
+  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Medium')); await sleep(60);
+  w.eval(`S.qov.due = '${T0}'; qdockChips()`);
+  check(qc()[2] === 'Medium' && qc()[0] === 'Today', '#3403: chips Medium + today picked: ' + qc().join(' | '));
+  const qi2 = d.querySelector('#qinput'); qi2.value = 'Prio from text !!! tomorrow'; qi2.dispatchEvent(new w.Event('input', {bubbles: true})); w.eval(`updateChips(document.querySelector('#qinput'))`);
+  check(qc()[2] === 'High' && qc()[0] === 'Tomorrow', '#3403: the chips show what the text says: ' + qc().join(' | '));
+  key(w, d.querySelector('#qinput'), 'Enter');
+  check(await until(async () => (await st()).tasks.some(t => t.title === 'Prio from text')), '#3403: added');
+  const nt2 = (await st()).tasks.find(t => t.title === 'Prio from text');
+  check(nt2.priority === 5 && nt2.due === T1, '#3403: !!! and tomorrow win over the chips: ' + nt2.priority + ' ' + nt2.due);
+  const qi3 = d.querySelector('#qinput'); qi3.value = 'Prio from chip'; qi3.dispatchEvent(new w.Event('input', {bubbles: true})); w.eval(`updateChips(document.querySelector('#qinput'))`);
+  check(qc()[2] === 'Medium', '#3403: no word in the text = the chip stays: ' + qc().join(' | '));
+  key(w, d.querySelector('#qinput'), 'Enter');
+  check(await until(async () => (await st()).tasks.some(t => t.title === 'Prio from chip' && t.priority === 3 && t.due === T0)), '#3403: added with the chips');
   w.eval(`go('matrix')`); await sleep(200);
   check(!d.querySelector('.qdock'), 'not in the matrix');
 
