@@ -559,6 +559,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js`, `calgest.js` (swipe / pinch, 2.164.0; sideways pinch = 1 to 14 days, 2.290.0) | the calendar view, Settings |
 | `stats` | `stats.js` (the statistics view; the charts stay in `templates.js`) | the statistics view |
 | `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
+| `diagram` | `diagram.js` (2.382.0, #3153: formulas with `static/vendor/katex`, Mermaid diagrams with `static/vendor/mermaid`, each library only for its kind of block) | a knowledge page with a formula / diagram (`wiki.js` `wk_dgNeed`), a shared page with one |
 | `pdf` | `pdfview.js` | a click on a preview link (`data-pview`, the listener is in `lazyload.js`) |
 | `docs` | `docs.js`, `paperless.js`, `receipts.js` | the documents view, the share sheet's "File as document" |
 | `life` | `life.js`, `devlink.js` | Home & life, the daily review, a life list's bar / a life task's details |
