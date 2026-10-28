@@ -20,11 +20,12 @@ const until = async (fn, n = 100) => { for (let i = 0; i < n; i++) { const x = a
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true});
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: FEATURES});
-  const st = await call('GET', '/api/state');
-  const ORG = st.me.workspaces[0].id, ALICE = st.me.id;
-  await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com', orgs: [ORG]});
+  const ALICE = (await call('GET', '/api/state')).me.id;
+  const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha Example', admin_id: ALICE})).id;
+  await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
+  await call('PUT', `/api/orgs/${ORG}/members`, {email: 'bob@example.com', role: 'member'});
   const BK = await login('bob');
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: FEATURES}, BK);
   await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});

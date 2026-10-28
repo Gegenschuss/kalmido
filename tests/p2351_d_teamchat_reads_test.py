@@ -81,6 +81,7 @@ for s, who in ((Bo, "bob"), (No, "nora"), (A, "alice")):
     for rid in ((CH, LR, DM) if who == "bob" else (CH, LR) if who == "alice" else (CH,)):
         check(s.post(B + f"/api/team/rooms/{rid}/read", json={}).ok, f"setup: {who} reads room {rid}")
 check(marks(BOB, (CH, LR, DM)) == {CH, LR, DM}, "setup: bob's three read marks")
+check(A.put(B + f"/api/lists/{L}/members", json={"user_id": NORA, "role": "view"}).ok, "setup: nora in the list too (a group needs people who work together)")
 r = A.post(B + "/api/team/groups", json={"members": [BOB, NORA], "name": "Lunch"})
 GR = r.json().get("id") if r.status_code == 201 else None
 check(GR and Bo.post(B + f"/api/team/rooms/{GR}/read", json={}).ok and marks(BOB, (GR,)) == {GR}, "setup: a group, bob's read mark there " + r.text[:200])

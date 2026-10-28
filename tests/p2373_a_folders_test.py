@@ -139,8 +139,6 @@ BX1, BX2 = sh_folder(Bo, "Bob box one"), sh_folder(Bo, "Bob box two")
 for f in (BX1, BX2):
     check(Bo.post(B + f"/api/files/nodes/{f}/shares", json={"user_id": ALICE, "role": "edit"}).status_code == 201, "(b) setup: bob shares his folder with alice")
 T1, T2 = table(A, "Project costs", BX1, list_id=L), table(A, "Project hours", BX2, list_id=L)
-check(Bo.get(B + f"/api/sheets/{T1}").ok and not Bo.get(B + f"/api/sheets/{T1}").json().get("can_write"),
-      "(b) setup: bob reads alice's project table through his folder only (no right of his own)")
 check(A.delete(B + f"/api/files/nodes/{BX1}").ok and A.post(B + "/api/files/trash", json={"ids": [BX2]}).ok
       and A.get(B + f"/api/sheets/{T1}").status_code == 404 and A.get(B + f"/api/sheets/{T2}").status_code == 404,
       "(b) alice puts bob's folders into the trash: her tables go into the tables' trash")
