@@ -1013,7 +1013,7 @@ CREATE TABLE IF NOT EXISTS e2e_keys (
 -- 2.42.0 (#828): one encrypted note per task and person (body = {v, iv, ct}, only its author reads it)
 CREATE TABLE IF NOT EXISTS task_enc_notes (
   task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  body TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (task_id, user_id));
+  body TEXT NOT NULL, updated_at TEXT NOT NULL, legacy_aad TEXT, PRIMARY KEY (task_id, user_id));  -- 2.362.0 (#3090): legacy_aad
 CREATE INDEX IF NOT EXISTS ix2281_task_enc_notes_user_id ON task_enc_notes(user_id);
 -- 2.47.0 (#1649, #1216): the roles of an organisation, one table for both masters of the shared import (legacyimport):
 -- kind 'freelancer' (Freelancer-Rollen: purchase per day / hour in costs, the service points to it with role_id) and
@@ -3179,6 +3179,9 @@ MIGRATIONS = [
     ("attachments", "legacy_aad", "ALTER TABLE attachments ADD COLUMN IF NOT EXISTS legacy_aad TEXT"),
     ("task_note_locks", "legacy_aad", "ALTER TABLE task_note_locks ADD COLUMN IF NOT EXISTS legacy_aad TEXT"),
     ("e2e_keys", "legacy_aad", "ALTER TABLE e2e_keys ADD COLUMN IF NOT EXISTS legacy_aad TEXT"),
+    # 2.362.0 (#3090): the same for the encrypted task notes ("kalmido-note:v1:<old task id>:<old user id>"), now that the
+    # account import takes them over
+    ("task_enc_notes", "legacy_aad", "ALTER TABLE task_enc_notes ADD COLUMN IF NOT EXISTS legacy_aad TEXT"),
     # 2.67.0 A (#1838): fixed costs of the cash flow: a free category (the list groups by it) and the VAT rate of the net
     # amount (0 / 7 / 19; 0 = as before, nothing shifts)
     ("office_fixed_costs", "category", "ALTER TABLE office_fixed_costs ADD COLUMN category TEXT NOT NULL DEFAULT ''"),

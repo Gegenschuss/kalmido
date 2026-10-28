@@ -9260,7 +9260,6 @@
   "Not taken over into the private space: {0}": "No se transfiere al espacio privado: {0}",
   "A row could not be taken over: {0}": "No se pudo transferir una entrada: {0}",
   "Billed time entries without their invoice were taken over as not billable": "Los tiempos facturados sin su factura se importaron como no facturables",
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Los recibos facturados cuya factura no se importó vuelven a estar abiertos: revísalos antes de facturar",
   "Not taken over because the entry it belongs to is missing: {0}": "No se importó porque falta la entrada a la que pertenece: {0}",
   "Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked space and import that file into the knowledge pages.": "Las páginas de conocimiento cifradas en el navegador no se han transferido: expórtalas como Markdown desde el espacio desbloqueado e importa ese archivo en las páginas de conocimiento.",
   "This thread cannot be answered here": "No se puede responder a este hilo aquí",
@@ -14625,5 +14624,8 @@
   "{0} office document": ["{0} documento de oficina", "{0} documentos de oficina"],
   "{0} approval link": ["{0} enlace de aprobación", "{0} enlaces de aprobación"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Se queda en el espacio anterior y ya no está vinculado al proyecto: {0}. Muévelo por separado si hace falta.",
-  "{0} client of a customer report": ["{0} cliente de un aviso de cliente", "{0} clientes de avisos de clientes"]
+  "{0} client of a customer report": ["{0} cliente de un aviso de cliente", "{0} clientes de avisos de clientes"],
+  "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Los recibos facturados cuya factura no se importó siguen facturados (falta la factura): libéralos en Contabilidad solo si nunca se facturaron",
+  "Billed, the invoice did not come along with the import": "Facturado, la factura no se importó",
+  "{0} project note": ["{0} nota de proyecto", "{0} notas de proyecto"]
 }

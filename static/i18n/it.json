@@ -9260,7 +9260,6 @@
   "Not taken over into the private space: {0}": "Non trasferito nello spazio privato: {0}",
   "A row could not be taken over: {0}": "Non è stato possibile trasferire una voce: {0}",
   "Billed time entries without their invoice were taken over as not billable": "I tempi fatturati senza la relativa fattura sono stati importati come non fatturabili",
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Le ricevute fatturate la cui fattura non è stata importata sono di nuovo aperte: controllale prima di fatturare",
   "Not taken over because the entry it belongs to is missing: {0}": "Non importato perché manca la voce a cui appartiene: {0}",
   "Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked space and import that file into the knowledge pages.": "Le pagine di conoscenza cifrate nel browser non sono state riprese: esportale come Markdown dallo spazio sbloccato e importa quel file nelle pagine di conoscenza.",
   "This thread cannot be answered here": "Non è possibile rispondere a questo thread qui",
@@ -14625,5 +14624,8 @@
   "{0} office document": ["{0} documento d'ufficio", "{0} documenti d'ufficio"],
   "{0} approval link": ["{0} link di approvazione", "{0} link di approvazione"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Resta nello spazio precedente e non è più collegato al progetto: {0}. Spostalo a parte se serve.",
-  "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"]
+  "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"],
+  "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Le ricevute fatturate la cui fattura non è stata importata restano fatturate (fattura mancante): liberale nella contabilità solo se non sono mai state fatturate",
+  "Billed, the invoice did not come along with the import": "Fatturata, la fattura non è stata importata",
+  "{0} project note": ["{0} nota di progetto", "{0} note di progetto"]
 }
