@@ -1395,10 +1395,12 @@ async function route() {
     if (acAsk) history.replaceState(null, '', '#' + keyToHash(r.key));
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
+  wsv_leave();  // 2.397.0 (#3404): the page being left stays its workspace's view
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
   S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
+  wsv_seen(r);  // 2.397.0 (#3404): and its workspace (workspace.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review

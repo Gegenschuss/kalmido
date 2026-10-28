@@ -904,7 +904,7 @@ document.addEventListener('click', async e => {
   if (a === 'pb-move') { pb_move(); return; }  // 2.47.3 (#1360)
   if (a === 'pb-transfer') { pb_transfer(); return; }  // 2.137.0 D (#1981)
   if (a === 'org-out') { ofc_orgOut(); return; }  // 2.356.0 A (#2926)
-  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws); return; }  // 2.47.3 (#1360)
+  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws, {keep: true}); return; }  // 2.47.3 (#1360); 2.397.0 (#3404): the office stays
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
