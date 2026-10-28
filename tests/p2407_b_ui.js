@@ -35,7 +35,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const agent = async name => {
     const a = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write'], username: name, display_name: name});
     await call('PATCH', `/api/admin/agents/${a.id}`, {org_id: ORG});
-    await call('PUT', `/api/lists/${L}/members`, {user_id: a.id, role: 'edit', bridge_ok: true});
+    const lid = (await call('POST', '/api/lists', {name: 'Work ' + name, org_id: ORG})).id;  // one agent per project
+    await call('PUT', `/api/lists/${lid}/members`, {user_id: a.id, role: 'edit', bridge_ok: true});
     return a;
   };
   const plan = await agent('planbot'), api = await agent('apibot');

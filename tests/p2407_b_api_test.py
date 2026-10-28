@@ -33,7 +33,10 @@ def agent(name):
     r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": name, "display_name": name.title()})
     assert r.ok, r.text
     aid = r.json()["id"]
-    check(A.put(B + f"/api/lists/{L}/members", json={"user_id": aid, "role": "edit", "bridge_ok": True}).ok, f"setup: {name} on the shared list")
+    lid = A.post(B + "/api/lists", json={"name": "Work " + name}).json()["id"]  # one agent per project
+    A.put(B + f"/api/lists/{lid}/members", json={"user_id": BOB, "role": "admin"})
+    m = A.put(B + f"/api/lists/{lid}/members", json={"user_id": aid, "role": "edit", "bridge_ok": True})
+    check(m.ok, f"setup: {name} on the shared list {m.status_code} {m.text[:200]}")
     return aid, {"Authorization": "Bearer " + r.json()["token"]}
 
 
