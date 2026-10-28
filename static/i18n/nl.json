@@ -11804,10 +11804,6 @@
   "The columns apply to every CSV file.": "De kolommen gelden voor alle CSV-bestanden.",
   "Not a bank statement (only XML, CSV or ZIP)": "Geen bankafschrift (alleen XML, CSV of ZIP)",
   "Channel type": "Soort",
-  "Unread in other workspaces": "Ongelezen in andere werkruimtes",
-  "1 unread in {0}": "1 ongelezen in {0}",
-  "{0} unread in {1}": "{0} ongelezen in {1}",
-  "Switch": "Wisselen",
   "Tracked time (h)": "Geregistreerde tijd (u)",
   "Created by": "Aangemaakt door",
   "Completed by": "Voltooid door",
@@ -12491,7 +12487,6 @@
   "Sent and filed": "Verzonden en opgeslagen",
   "Signature picture": "Afbeelding van de handtekening",
   "No signature picture yet.": "Nog geen afbeelding van de handtekening.",
-  "The picture is only printed in your own letters.": "De afbeelding staat alleen in je eigen brieven.",
   "Choose picture": "Afbeelding kiezen",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG of JPEG, maximaal 300 KB; een scan van je handtekening op een witte achtergrond.",
   "Marked as delivered": "Gemarkeerd als bezorgd",
@@ -14721,5 +14716,11 @@
   "{0} client of a customer report": ["{0} klant van een klantmelding", "{0} klanten van klantmeldingen"],
   "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Bestanden in de map ‘Dokumente/Eingang’ van de opslag herkennen",
   "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "De bon wordt opgeslagen in de opslag (map ‘Dokumente’) en staat onder Kantoor > Bonnen; bedrag en datum worden herkend.",
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Gefactureerde bonnen waarvan de factuur niet is meegekomen, staan weer open: controleer ze vóór het factureren"
+  "Billed receipts whose invoice did not come along are open again: check them before billing": "Gefactureerde bonnen waarvan de factuur niet is meegekomen, staan weer open: controleer ze vóór het factureren",
+  "Show all {0}": "Alle {0} tonen",
+  "Search files": "Bestanden zoeken",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "De afbeelding verschijnt alleen in je eigen brieven en op de representatiebonnen die jij goedkeurt.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert.",
+  "Please draw your signature first.": "Teken eerst je handtekening.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Je handtekeningafbeelding staat dan op de handtekeningregel van de pdf. Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert."
 }

@@ -11804,10 +11804,6 @@
   "The columns apply to every CSV file.": "Les colonnes valent pour tous les fichiers CSV.",
   "Not a bank statement (only XML, CSV or ZIP)": "Pas un relevé bancaire (uniquement XML, CSV ou ZIP)",
   "Channel type": "Type",
-  "Unread in other workspaces": "Non lus dans d'autres espaces de travail",
-  "1 unread in {0}": "1 non lu dans {0}",
-  "{0} unread in {1}": "{0} non lus dans {1}",
-  "Switch": "Changer",
   "Tracked time (h)": "Temps saisi (h)",
   "Created by": "Créé par",
   "Completed by": "Terminé par",
@@ -12491,7 +12487,6 @@
   "Sent and filed": "Envoyée et classée",
   "Signature picture": "Image de la signature",
   "No signature picture yet.": "Pas encore d'image de signature.",
-  "The picture is only printed in your own letters.": "L'image n'est imprimée que dans tes propres lettres.",
   "Choose picture": "Choisir une image",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG ou JPEG, 300 Ko au maximum ; un scan de ta signature sur fond blanc.",
   "Marked as delivered": "Marquée comme distribuée",
@@ -14721,5 +14716,11 @@
   "{0} client of a customer report": ["{0} client d'un signalement client", "{0} clients de signalements clients"],
   "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Reconnaître les fichiers déposés dans le dossier « Dokumente/Eingang » du classement",
   "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « Dokumente ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus.",
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Les justificatifs facturés dont la facture n’a pas été reprise sont de nouveau ouverts : vérifiez-les avant de facturer"
+  "Billed receipts whose invoice did not come along are open again: check them before billing": "Les justificatifs facturés dont la facture n’a pas été reprise sont de nouveau ouverts : vérifiez-les avant de facturer",
+  "Show all {0}": "Afficher les {0}",
+  "Search files": "Rechercher des fichiers",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "L'image n'apparaît que dans tes propres lettres et sur les justificatifs de frais de réception que tu valides.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Une image de signature n'est pas une signature électronique ; vérifie son acceptation par l'administration fiscale avec ton conseiller fiscal.",
+  "Please draw your signature first.": "Dessine d'abord ta signature.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Ton image de signature figure alors sur la ligne de signature du PDF. Une image de signature n'est pas une signature électronique ; vérifie son acceptation par l'administration fiscale avec ton conseiller fiscal."
 }
