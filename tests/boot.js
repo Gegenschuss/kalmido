@@ -20,9 +20,10 @@ const clockOffset = (() => {
   const at = Number(process.env.KALMIDO_TEST_NOW_AT) * 1000 || Date.now();
   return t - at;
 })();
-const shiftDate = Real => {  // a Date of the same realm whose "now" is shifted by clockOffset
-  if (!clockOffset || Real.__testClock) return Real;
-  const now = () => Real.now() + clockOffset;
+// 2.381.0 (#2713): self-contained (no outer names) - ff.js hands its source to Firefox as a preload script
+const shiftedDate = (Real, off) => {  // a Date of Real's realm whose "now" is shifted by off ms
+  if (!off || Real.__testClock) return Real;
+  const now = () => Real.now() + off;
   function Date(...a) {
     if (!new.target) return new Real(now()).toString();
     return Reflect.construct(Real, a.length ? a : [now()], new.target);
@@ -32,6 +33,9 @@ const shiftDate = Real => {  // a Date of the same realm whose "now" is shifted 
     __testClock: {value: true}});
   return Date;
 };
+const shiftDate = Real => shiftedDate(Real, clockOffset);  // a Date of the same realm whose "now" is shifted by clockOffset
+exports.clockOffset = clockOffset;
+exports.shiftedDate = shiftedDate;
 exports.testClock = w => { if (clockOffset && w) w.Date = shiftDate(w.Date); return w; };  // own windows (new JSDOM without fromURL)
 exports.testNow = () => new Date();  // the suite's "now" (the test time when KALMIDO_TEST_NOW is set)
 if (clockOffset) {
