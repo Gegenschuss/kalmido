@@ -104,9 +104,25 @@ def person(name, role):
 
 Bo, Gi = person("bob", "member"), person("gina", "guest")
 FID, Fr = freelancer(B, A)  # freelancer-matrix: wiki
-code = subprocess.run(["docker", "exec", "-i", CT, "python", "-m", "kalmido.admin.orgcrypt_cli", "encrypt-wiki"],
-                      capture_output=True, text=True, timeout=300).returncode
-check(code == 0, "setup: encrypt-wiki (the texts sealed at rest)")
+def up():  # a real state: the server answers again (after a start or the encryption pass)
+    for _ in range(120):
+        try:
+            if requests.get(B + "/api/health", headers=H, timeout=3).ok:
+                return True
+        except requests.RequestException:
+            pass
+        time.sleep(0.25)
+    return False
+
+
+for _ in range(3):  # 2.371: under load the pass met a server still settling (connection reset): once more when it fails
+    res = subprocess.run(["docker", "exec", "-i", CT, "python", "-m", "kalmido.admin.orgcrypt_cli", "encrypt-wiki"],
+                         capture_output=True, text=True, timeout=300)
+    up()
+    if res.returncode == 0:
+        break
+    print("encrypt-wiki:", res.returncode, (res.stdout + res.stderr)[-600:], flush=True)
+check(res.returncode == 0, "setup: encrypt-wiki (the texts sealed at rest)")
 
 # ================================================================ the tags of a person without an organisation
 TA = ("Planung für #Projekt und #kunde/Nord. Aufgabe #123 bleibt ein Verweis, mail#nein, https://example.com/#frag, "
