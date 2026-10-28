@@ -15,7 +15,7 @@ from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
-from .orgretain import odl_former  # 2.186.0 A (#2599)
+from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -984,7 +984,7 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "payments": ("{0} payment", "{0} payments"), "signoffs": ("{0} confirmed sign-off", "{0} confirmed sign-offs"),
              "procdocs": ("{0} version of the procedure documentation", "{0} versions of the procedure documentation"),
              "assets": ("{0} device", "{0} devices"),  # 2.355.0 B (#2845): the asset register
-             "bookarch": ("{0} archived booking", "{0} archived bookings")}  # 2.414.0 (#3502): the booking archive
+             "bookarch": Nn_("{0} archived booking", "{0} archived bookings")}  # 2.414.0 (#3502): the booking archive
 
 
 def odl_text(counts):
