@@ -65,7 +65,7 @@ const tinyPdf = text => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'erin');
-    await nav(B + '#office/offers');
+    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     await ev(clk('[data-ofd="kind"][data-kind="invoice"]'));
     check(await ready(ev, `!!document.querySelector('[data-dx="extf"]')`, 80), 'the DATEV export button');

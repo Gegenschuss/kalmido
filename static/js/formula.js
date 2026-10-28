@@ -56,9 +56,13 @@ const fxSumAgg = (l, k) => (LS.get('fxsum.' + l.id) || {})[k] || (l.col_sums || 
 function fxSumRow(l, lc, tasks) {
   if (!l || !lc || isMobile()) return '';
   const cs = fxSumCols(l, lc);
-  if (!cs.some(([, f]) => f && FX_NUM_TYPES.includes(f.type))) return '';
+  if (!cs.some(([k, f]) => k === 'time' || f && FX_NUM_TYPES.includes(f.type))) return '';  // 2.380.0 A (#3424): the tracked-time column counts too
   const ts = tasks.filter(t => t.id && !t.context);
   return `<div class="fxsum" data-lid="${l.id}" role="group" aria-label="${esc(tr('Sum row'))}"><span class="spacer"><span class="fxsn">${esc(trn('{0} task', '{0} tasks', ts.length))}</span></span>${cs.map(([k, f], i) => {
+    if (k === 'time') {  // 2.380.0 A (#3424): the sum of the tracked time of the shown tasks, as the cells read
+      const sec = ts.reduce((n, t) => n + (t.id > 0 ? taskTime(t.id)[0] : 0), 0);
+      return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="time">${sec >= 60 ? `<span class="fxsb fxst" title="${esc(tr('Tracked time'))}"><i>${esc(tr('Sum'))}</i> ${esc(fmtDur(sec))}</span>` : ''}</span>`;
+    }
     if (!f || !FX_NUM_TYPES.includes(f.type)) return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"></span>`;
     const a = fxSumAgg(l, k), xs = ts.map(t => t.fields?.[f.id]).filter(v => v != null && v !== '').map(Number).filter(Number.isFinite);
     const v = fxAgg(a, xs, ts.length), an = tr((FX_AGGS.find(x => x[0] === a) || FX_AGGS[0])[1]);

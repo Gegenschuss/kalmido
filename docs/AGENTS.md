@@ -121,17 +121,21 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 *Since 2.7.2.*
 
 Besides the **team agents** an admin creates, people can run their **own personal agent** (for example Claude Code on
-their laptop), if an admin allows it.
+their laptop). **Who allows it (2.361.4):** each workspace decides. In the private area the person is their own admin: a
+person without an organisation creates one without asking anybody. In an organisation its admins decide with the switch
+*Members may have their own agents* (*Settings > Workspaces*, the organisation's entry; `PATCH /api/orgs/{id}
+{"member_agents": true}`, off by default); its admins themselves always may. The server switch *Users may create their own
+agents* (below) allows it for everyone in every workspace. A server without organisations has only the server switch.
 
 **Who is responsible (2.24.0):** a personal agent is connected by the person themselves, with their own AI provider, key
 and computer. What it reads in the projects shared with it goes to that provider, and the person who connects it is
 responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalmido runs no third-party AI). Give the agent
 a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a project, everyone
-in the project gets a News item naming the agent, who added it and where it runs. The organisation's switch *Members may
-connect agents* (Settings > Administration > Organisation; the same policy as below) is off by default.
+in the project gets a News item naming the agent, who added it and where it runs.
 
-- **Admin policy**, *Settings > Agents > Set up* (admins): *Users may create their own agents* (off by default), the
-  limit per person (default 2, at most 20) and optional usage limits that every new personal agent gets.
+- **Admin policy**, *Administration > Agents* (server admins): *Users may create their own agents* (off by default: then
+  each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
+  new personal agent gets.
 
   ```
   GET /api/admin/agent-policy  -> {"user_agents": false, "max_per_user": 2, "limits": null}
@@ -144,17 +148,24 @@ connect agents* (Settings > Administration > Organisation; the same policy as be
 - **A person creates their agent** in *Settings > Agents > Set up > Your personal agents > Create agent*. The token is shown once.
 
   ```
-  GET    /api/my/agents              -> {"allowed": true, "max": 2, "agents": [ … ]}
-  POST   /api/my/agents              {"username": "alice-claude", "display_name": "Alice's Claude", "note": "laptop"}
-                                     -> 201 {…, "token": "abk_…"}   (403 when not allowed, 409 when the limit is reached)
-  PATCH  /api/my/agents/{id}         {"display_name"?, "note"?, "enabled"?}     (enabled false = pause)
+  GET    /api/my/agents              -> {"allowed": true, "server": false, "max": 2, "agents": [ … ]}
+  POST   /api/my/agents              {"username": "alice-claude", "display_name": "Alice's Claude", "note": "laptop", "org_id"?}
+                                     -> 201 {…, "token": "abk_…"}   (403 when not allowed, 409 when the limit is reached,
+                                        400 for an organisation that does not allow it; without org_id: the first
+                                        organisation that allows it, else the private area)
+  PATCH  /api/my/agents/{id}         {"display_name"?, "note"?, "enabled"?, "org_id"?, "limits"?}   (enabled false = pause;
+                                        limits as in Usage and limits, null = none)
+  GET    /api/my/agents/{id}/audit   the agent's audit log (filters and CSV as GET /api/admin/agents/{id}/audit)
   POST   /api/my/agents/{id}/token   -> {"token": "abk_…"}   a new token; every older one stops at once
   DELETE /api/my/agents/{id}         the agent is deleted; projects it created go to its owner
   ```
 - **Owned by its creator.** A personal agent (`owner` in the agent lists, `agents.owner_id`) sees only the projects its
   owner shares with it. Only the owner can share projects with it and chat with it; nobody else finds it in a share
   dialog. Like every agent it is never an admin and cannot sign in to the web app; the usage
-  limits and the audit log apply as for every agent.
+  limits and the audit log apply as for every agent. **The owner (2.361.4)** reads its log and sets its usage limits
+  (*Settings > Agents > Set up*, the chart button of the agent) and gets the News when it reaches one, as admins do.
+- **Changing its workspace** (`org_id`) works only when it is in no project, calendar or address book of another
+  workspace (400 with the number; 2.361.4: also from an organisation into the private area).
 - **Admins keep control.** *Settings > Agents* lists every agent with its owner. Admins pause one
   (`PATCH /api/admin/agents/{id} {"enabled": false}`), change its limits, or delete it: `DELETE /api/admin/agents/{id}` (projects the agent created go to its owner,
   for a team agent to the admin who deletes it).
@@ -442,8 +453,9 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
 
 ### Guide B: a personal agent on your own computer (users)
 
-1. **Allowed?** An admin has to switch on *Users may create their own agents* (*Settings > Agents > Set up*). If
-   *Create agent* is missing in *Settings > Agents > Set up*, ask an admin.
+1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Workspaces*:
+   *Members may have their own agents*), or a server admin for everyone (*Administration > Agents*). If *Create agent* is
+   missing in *Settings > Agents > Set up*, personal agents are off on this server: ask a server admin.
 2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
    the token (shown once) into the env file (paths in the table above), readable only by you.
 3. **Share only what it should see**: *Settings > Agents > Projects*, or a project's *Share* dialog. Nobody else can share

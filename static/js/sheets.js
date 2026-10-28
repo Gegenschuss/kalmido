@@ -248,6 +248,7 @@ function shvTd(sh, rid, col) {
   if (c) {
     cls.push('o-' + (c.frozen ? 'frozen' : c.origin || 'own'));
     if (c.error) cls.push('err');
+    if (c.pend) cls.push('pend');
     if (c.agent) cls.push('ag');
     if (typeof c.value === 'number' || SHV_NUM.includes(col.kind)) cls.push('num');
     if (col.kind === 'select' && !c.error) {
@@ -420,6 +421,30 @@ async function shvSendStep(sid, to, from) {  // one way of an undo step: to = th
   const cf = r?.conflicts || [];
   return {skipped: cf.map(x => tr('Cell {0}', shvAddr(x.row_id, x.col_id))), none: cf.length > 0 && cf.length === to.length};
 }
+// 2.380.0 A (#3423): the typed input stands in the cell at once (a formula keeps its old result, dimmed, until the answer);
+// the returned function puts the old cells back (all, or only the keys given)
+function shvOptimistic(sh, chg) {
+  const was = new Map();
+  for (const x of chg) {
+    const k = x.row_id + ':' + x.col_id, c = shvCell(x.row_id, x.col_id, sh), raw = x.raw ?? '';
+    was.set(k, c);
+    const i = c ? sh.cells.indexOf(c) : -1;
+    if (raw === '' && !(c && (c.name || c.frozen))) { if (i >= 0) sh.cells.splice(i, 1); continue; }
+    const f = raw.startsWith('='), n = {...(c || {row_id: x.row_id, col_id: x.col_id}), raw, pend: f};
+    if (!f) { n.display = raw; n.value = raw; n.error = null; }
+    if (i >= 0) sh.cells[i] = n; else sh.cells.push(n);
+  }
+  shvPrep(sh); shvPatchAll();
+  return keys => {
+    if (SHV.sh !== sh) return;
+    for (const [k, c] of was) {
+      if (keys && !keys.includes(k)) continue;
+      const cur = sh._at.get(k), i = cur ? sh.cells.indexOf(cur) : -1;
+      if (c) { if (i >= 0) sh.cells[i] = c; else sh.cells.push(c); } else if (i >= 0) sh.cells.splice(i, 1);
+    }
+    shvPrep(sh); shvPatchAll();
+  };
+}
 async function shvPut(chg, label) {
   const sh = SHV.sh; if (!sh || !sh.can_write) return null;
   // 2.263.0 (#2977): a slash date in a date column goes as YYYY-MM-DD in the order of the region (en-US 10/23/2026)
@@ -428,8 +453,12 @@ async function shvPut(chg, label) {
   if (!chg.length) return null;
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));
   let r;
-  try { r = await shvSend(sid, chg.map((x, i) => ({...x, prev: old[i].raw}))); } catch (e) { toast(e.message); shvPatchAll(); return null; }
+  const undo0 = shvOptimistic(sh, chg);
+  try { r = await shvSend(sid, chg.map((x, i) => ({...x, prev: old[i].raw}))); } catch (e) { undo0(); toast(e.message); shvPatchAll(); return null; }
   const cf = r?.conflicts || [];
+  // 2.380.0 (#3423, review): a conflict cell the answer already set or emptied (shvMerge) shows the server's state; only the rest goes back
+  const srv = new Set((r?.cells || []).map(c => c.row_id + ':' + c.col_id));
+  if (cf.length) undo0(cf.filter(x => x.cell_id && !srv.has(x.row_id + ':' + x.col_id)).map(x => x.row_id + ':' + x.col_id));
   if (cf.length) toast(tr('Changed elsewhere in the meantime') + ': ' + cf.map(x => shvAddr(x.row_id, x.col_id)).join(', '));
   const keep = new Set(cf.map(x => x.row_id + ':' + x.col_id)), i0 = chg.map((x, i) => i).filter(i => !keep.has(chg[i].row_id + ':' + chg[i].col_id));
   if (!i0.length) return null;  // nothing written: no undo step

@@ -334,8 +334,13 @@ function agSetupPaneHtml(hint) {
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
 function agWhyHtml(g, adm) {
-  return g === 'team' ? esc(tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the projects shared with it, for the people those projects allow.')) + (adm ? '' : ' ' + esc(tr('Ask an admin to create it.')))
+  return g === 'team' ? esc(agTeamWhy(adm))
     : esc(tr('A personal agent is only yours: only you see it, chat with it and share your projects with it. You create it below and run it on your own computer.'));
+}
+// 2.361.4 (#2928): without an organisation (or in the private area) nobody else creates agents: the person's own instead
+function agTeamWhy(adm) {
+  return av_ownArea() && !adm ? tr('In your private area you are your own admin: create a personal agent below instead.')
+    : tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the projects shared with it, for the people those projects allow.') + (adm ? '' : ' ' + tr('Ask an admin to create it.'));
 }
 // 2.29.0 (#1024): the server-wide switches (admins), no longer mixed into "Set up"
 function agAdminPaneHtml(hint) {
@@ -343,7 +348,7 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
-    ${hint(tr('Off by default. You see every agent under Status and can pause or delete it.'))}
+    ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
@@ -357,12 +362,12 @@ async function agSetupDraw(md) {
   for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} project', '{0} projects', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
-    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
-  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
+  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Administration > Agents).')}</div>`)) + add;  // 2.361.4 (#2928)
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
 }
 // 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
@@ -400,6 +405,7 @@ function agSetupWire(md) {
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (k === 'work') { awOpen(a); return; }  // 2.236.0 A (#2904-#2911)
+      if (k === 'log') { av_logModal(a, () => agSetupDraw(md)); return; }  // 2.361.4 (#2928)
       if (k === 'ws') { av_wsMenu(b, a, () => agSetupDraw(md)); return; }  // 2.46.6 (#1708): its workspace
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
@@ -487,7 +493,7 @@ function ad_agentsHtml(hint) {
 function orgAgentsHtml(hint) {
   if (!S.api?.enabled) return '';
   return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
-    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs. Off by default.')}</small></span></label></div>`;
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.')} ${tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.')}</small></span></label></div>`;
 }
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
 function hostHtml(hint) {

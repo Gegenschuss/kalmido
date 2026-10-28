@@ -33,7 +33,7 @@ from ..agents.core import (
 from ..collab.reactions import clean_emoji, ltag_create, ltag_delete, ltag_update, react, with_reactions
 from ..agents.chat import CHAT_FILES_MAX
 from ..agents.safety import access_cleanup
-from ..agents.admin import need_agent_admin
+from ..agents.admin import need_agent_admin, need_own_agent
 from ..agents.workstyle import ws_get
 from ..agents.workqueue import wq_spec
 from ..agents.agentrules import ar_spec  # 2.235.0 C (#2903)
@@ -224,7 +224,7 @@ def usage_refused(c, aid):
 
 
 def usage_alerts(c, aid):
-    """After a report: News + push to the admins when the agent crosses 80 % / 100 % of its soft limit or its hard limit
+    """After a report: News + push to the admins (and the owner of a personal agent) when the agent crosses 80 % / 100 % of its soft limit or its hard limit
     (the highest new level only, each level once per period)."""
     a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
                   (aid,)).fetchone()
@@ -253,8 +253,10 @@ def usage_alerts(c, aid):
     data = {"agent_id": aid, "name": name, "level": level, "used": st["used"], "limit": lim, "metric": st["metric"],
             "period": st["period"]}
     print("agent", aid, "usage", level, st["used"], "/", lim, st["metric"], st["period"], flush=True)
-    for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall():
-        uid = r["id"]
+    rcpt = [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+    if a["owner_id"] and a["owner_id"] not in rcpt:  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
+        rcpt.append(a["owner_id"])
+    for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
         if not notif_ok(c, uid, s, "usage", "push") or not push_reachable(c, uid, s):
@@ -595,9 +597,17 @@ def admin_agents_audit(aid=None):
         need_agent_admin(c, aid)
     else:
         need_admin()
+    return _audit_answer(aid)
+
+
+def _audit_answer(aid, own=False):
+    """own: the owner's view of one personal agent -- only that agent's name (review 2.361.4: never the server's agent list)."""
+    c = db()
     csv_out = request.args.get("format") == "csv"
     rows, more = audit_query(c, request.args, aid, csv_out)
     names = audit_names(c)
+    if own:
+        names = {aid: names.get(aid, f"#{aid}")}
     if csv_out:
         return audit_csv(rows, names, aid or request.args.get("agent_id"))
     data = [audit_dict(r, names) for r in rows]
@@ -628,6 +638,13 @@ def admin_agents_audit(aid=None):
                                  COUNT(*) FILTER (WHERE method=? AND route=?) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
         out["today"] = {"requests": r["n"], "denied": r["den"], "polls": r["poll"]}
     return jsonify(**out)
+
+
+@app.get("/api/my/agents/<int:aid>/audit")
+def my_agent_audit(aid):
+    """2.361.4 (#2928): the owner reads the log of their personal agent (the same filters and answer as the admins' route)."""
+    need_own_agent(db(), aid)
+    return _audit_answer(aid, own=True)
 
 
 @app.get("/api/v1/admin/agents/<int:aid>/audit")

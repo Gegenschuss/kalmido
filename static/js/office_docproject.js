@@ -2,7 +2,7 @@
 /* Kalmido web client, Office & finance: a quotation / invoice / credit note bound to a project (2.168.0 A, #2665).
    The editor's row "Project" (pick one, none, or a new one named "Client – project title") saves over its own route, also
    on a finalised or sent document (only an internal mark; it sits outside the editor's locked fieldset). The project page's
-   section "Quotations & invoices" lists its documents for people with office rights (the server answers office: false
+   section lists its quotations and its invoices (2.380.0 B, #3409: two groups) for people with office rights (the server answers office: false
    for everybody else). Classic script sharing the global scope with the others (module office, lazyload.js). */
 'use strict';
 
@@ -71,7 +71,9 @@ function dpj_projHtml(l) {
       .finally(() => { DPJ.busy[l.id] = false; if (routeList()?.id === l.id) renderView(); });
   }
   if (!x?.office || !x.docs?.length) return '';
-  const row = r => `<li><a class="dpjdoc" href="#office/offers/${r.id}"><span class="dpjk">${ic(r.kind === 'offer' ? 'file' : 'receipt', 's')}<span>${esc(tr(DPJ_KIND[r.kind] || r.kind))}</span></span>
+  const row = r => `<li><a class="dpjdoc" href="#office/${r.kind === 'offer' ? 'offers' : 'invoices'}/${r.id}"><span class="dpjk">${ic(r.kind === 'offer' ? 'file' : 'receipt', 's')}<span>${esc(tr(DPJ_KIND[r.kind] || r.kind))}</span></span>
     <b class="dpjn">${esc(r.number || tr('Draft'))}</b><span class="muted dpjs">${esc(r.status_text || '')}</span><span class="dpja">${esc(r.gross_text || '')}</span></a></li>`;
-  return `<section class="povs dpjpov" id="pov-officedocs"><div class="povh"><h3>${tr('Quotations & invoices')}</h3><span class="spacer"></span><span class="muted">${x.docs.length}</span></div><ul class="dpjlist" role="list">${x.docs.map(row).join('')}</ul></section>`;
+  // 2.380.0 B (#3409): quotations and invoices as two groups (the office's two areas), each with its count
+  const grp = (cls, name, xs) => xs.length ? `<div class="povh ${cls}"><h3>${esc(tr(name))}</h3><span class="spacer"></span><span class="muted">${xs.length}</span></div><ul class="dpjlist" role="list">${xs.map(row).join('')}</ul>` : '';
+  return `<section class="povs dpjpov" id="pov-officedocs">${grp('dpjq', N_('Quotations'), x.docs.filter(r => r.kind === 'offer'))}${grp('dpji', N_('Invoices'), x.docs.filter(r => r.kind !== 'offer'))}</section>`;
 }

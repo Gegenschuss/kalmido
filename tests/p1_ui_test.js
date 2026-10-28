@@ -42,6 +42,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
   check(await until(async () => (await get(t1.id)).status === 0), 'Ctrl+Z undoes while the toast is visible');
   // Ctrl+Z in a text field does nothing
+  // CI 2.376.2: the undo's reload must be done first, else toggleTask reads the old local 'completed' and reopens
+  await until(() => !w.eval('HIST.busy') && w.eval(`taskById(${t1.id})?.status`) === 0 && !w.eval(`UI.pend.has(${t1.id})`), 8000);
   await w.eval(`toggleTask(${t1.id})`); await sleep(300);
   // 2.18.0: the precondition gets more time (the full run on a loaded host was slower than 4 s; the check below failed then)
   check(await until(async () => (await get(t1.id)).status === 2 && !w.eval('HIST.busy'), 12000), 'completed again before the Ctrl+Z check');
@@ -179,8 +181,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(700);
   check(/^#l\/\d+/.test(w.location.hash) && w.eval('routeList()?.name') === 'From kit', 'new list from template opened');
   // settings > data lists templates
-  w.eval(`settingsModal('templates')`); await sleep(500);
-  check(d.querySelectorAll('#s-tpls [data-tpl]').length === 2, 'Settings > Data lists the templates');
+  w.eval(`settingsModal('templates')`);  // CI 2.376.2: the list comes from GET /api/templates - wait for it, not a fixed 500 ms
+  await until(() => d.querySelectorAll('#s-tpls [data-tpl]').length === 2);
+  check(d.querySelectorAll('#s-tpls [data-tpl]').length === 2, 'Settings > Data lists the templates: ' + d.querySelectorAll('#s-tpls [data-tpl]').length);
   d.querySelector('.modal.smodal').remove();
 
   // ================= statistics
