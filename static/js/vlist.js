@@ -113,7 +113,9 @@ function vl_step(v) {
     const yOf = i => { let y = ya; if (i < sg.a) for (let j = sg.a - 1; j >= i; j--) y -= hs(j); else for (let j = sg.a; j < i; j++) y += hs(j); return y; };
     const yb = yOf(sg.b);
     const covers = (sg.a === 0 || ya <= need[0]) && (sg.b === n || yb >= need[1]);
-    if (covers && !(sg.b - sg.a > 30 && (ya < want[0] - vh * 2 || yb > want[1] + vh * 2))) continue;
+    // 2.411.0 (#3517): also a small group (before: only one of more than 30 drawn rows) gives its rows back once they are far
+    // out of view - many small sections (a list of versions with their completed tasks) drew every row while scrolling down
+    if (covers && !(sg.b > sg.a && (ya < want[0] - vh * 2 || yb > want[1] + vh * 2))) continue;
     // the new window: walk from item a (its y is known) to the first item that reaches into want, then to the end of want
     let wa = sg.a, y = ya;
     while (wa > 0 && y > want[0]) y -= hs(--wa);
