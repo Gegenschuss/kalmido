@@ -11,7 +11,7 @@ const LD_MODS = {
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
   office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree
-    'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp
+    'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_bookarch', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp; 2.414.0 A (#3502): office_bookarch
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning

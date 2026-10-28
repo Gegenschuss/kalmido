@@ -1065,3 +1065,27 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rsb-st{flex:none}.rsb-paid,.rsb-processed{color:var(--accent)}.rsb-removed{color:var(--muted)}
 .rsb-in{margin:0 0 1rem}
 .rcl-sub{color:var(--muted)}
+/* 2.414.0 A (#3502): the booking archive (office_bookarch.js) */
+.bka-h{margin:.75rem 0 .25rem}
+.bka-empty{margin:1rem 0}
+.bka-seg{margin:.5rem 0}
+.bka-filt{margin:.5rem 0}
+.bka-filt>summary{display:inline-flex;align-items:center;gap:.375rem;cursor:pointer;color:var(--muted)}
+.bka-fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.5rem .75rem;margin:.5rem 0}
+.bka-f{display:grid;gap:.125rem;font-size:var(--fs-s)}
+.bka-fgrid .lacts{grid-column:1/-1}
+.bka-sum{margin:.5rem 0;font-variant-numeric:tabular-nums}
+.bka-row{align-items:center;gap:.75rem}
+.bka-day{flex:0 0 auto;min-width:5.5rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bka-doc{color:var(--accent);display:inline-flex}
+.bka-sums tbody tr{cursor:pointer}
+.bka-sums tbody tr:hover{background:var(--bg2)}
+.bka-files{display:flex;flex-wrap:wrap;gap:.25rem .75rem;font-size:var(--fs-s)}
+.bka-files a{display:inline-flex;align-items:center;gap:.25rem}
+.bka-undone .ofcn{opacity:.6}
+.bka-raw{max-height:55vh;overflow:auto}
+.bka-rawt{width:100%;border-collapse:collapse;font-size:var(--fs-s)}
+.bka-rawt th,.bka-rawt td{padding:.25rem .5rem;border-bottom:1px solid var(--line2);text-align:left;vertical-align:top;font-weight:400}
+.bka-rawt th{color:var(--muted);width:40%}
+.bka-ro{border-left:.2rem solid var(--accent);padding:.25rem .75rem;margin:.5rem 0}
+@media (max-width:767px){.bka-row{flex-wrap:wrap}.bka-day{min-width:0;flex-basis:100%}.bka-fgrid{grid-template-columns:1fr 1fr}}
