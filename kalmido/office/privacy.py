@@ -328,7 +328,7 @@ def dsb_mail_parts(c, oid, r, d, link):
     code = dsb_code(c, r) if rin else ""
     subject = f"{title} [DS-{code}]" if rin else title
     reply = (mail_addr(f"ds-{code}") or None) if rin else None
-    parts = [tr("Hello,", lg=lg), tr("please find attached our document “{0}”.", title, lg=lg)]
+    parts = [tr("Hello,", lg=lg), tr("Please find attached our document “{0}”.", title, lg=lg)]
     if sign and link:
         parts.append(tr("You can sign it online here: {0}", DSB_LINK, lg=lg))
     if sign and rin:
