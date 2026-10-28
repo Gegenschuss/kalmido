@@ -309,6 +309,11 @@ def list_create():
     color, folder = clean_color(b.get("color", "")), clean_folder(b.get("folder", ""))
     if "color" not in b and folder:  # 2.53.0 (#1426): a new list takes the colour of its folder (the nearest one that has one)
         color = lp_folder_color(db(), me(), folder)
+    if "ptype" not in b and folder and not b.get("family"):  # 2.411.0 (#3516): a new list in a folder gets the folder's project type
+        from ..lists.folders import folder_ptype
+        fpt = folder_ptype(db(), me(), folder)  # (ptype "" in the request = chosen: no type; a chosen type goes first)
+        if fpt:
+            b = {**b, "ptype": fpt, "sections": True}
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):

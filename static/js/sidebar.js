@@ -726,14 +726,24 @@ document.addEventListener('focusin', sbt_tip);
 // value ("differs from the folder") until "Back to the folder" in its dialog.
 const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Read-only')]];  // 2.364.0 C (#3041)
 const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may see and use the agent'), agent_tidy: N_('Agent may tidy up entries'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed'),  // 2.39.1 (#1214): hide_done
-  agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking')};  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
+  agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking'), ptype: N_('Project type')};  // 2.411.0 (#3516): ptype  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
 function folderEff(path) {
   const parts = String(path || '').split(FSEP).filter(Boolean), out = {};
   for (let i = 1; i <= parts.length; i++) Object.assign(out, (S.folderProps || {})[parts.slice(0, i).join(FSEP)] || {});
   return out;
 }
+// 2.411.0 (#3516): the project type a new list in the folder gets (server: lists/folders.py folder_ptype): the folder's
+// default, else the type my projects in it share (those with a type all one type and more than the ones without)
+function folderPtype(path) {
+  const f = String(path || ''); if (!f) return '';
+  const d = folderEff(f).ptype; if (d) return d;
+  const ts = (S.lists || []).filter(l => isOwner(l) && !l.is_inbox && !l.archived && !l.family && (l.folder === f || String(l.folder || '').startsWith(f + FSEP))).map(l => l.ptype || '');
+  const typed = [...new Set(ts.filter(Boolean))];
+  return typed.length === 1 && 2 * ts.filter(Boolean).length > ts.length && PTYPE_UI.some(([k]) => k === typed[0]) ? typed[0] : '';
+}
 function folderValTxt(k, v) {
   if (k === 'org_id') return wsName(v ? 'org:' + v : 'private');
+  if (k === 'ptype') return tr(PTYPE_UI.find(([x]) => x === v)?.[1] || v);
   if (k === 'agent_id') return v ? agentById(v)?.name || personNameAny(v) : tr('No agent');
   if (k === 'agent_tidy') return tr(TIDY_SHORT[v] || v);
   return v ? tr('On') : tr('Off');
@@ -742,7 +752,7 @@ const folderSharedIn = f => (S.foldersSharedIn || []).find(x => f && (f === x.fo
 function folderHintHtml(l, id, folder) {
   const f = id ? l.folder || '' : folder || '';
   if (!f || (id && !isOwner(l))) return '';
-  const eff = folderEff(f), keys = Object.keys(eff).filter(k => FP_KEYS[k] && (k !== 'org_id' || wsOn()));
+  const eff = folderEff(f), keys = Object.keys(eff).filter(k => FP_KEYS[k] && (k !== 'org_id' || wsOn()) && (k !== 'ptype' || !id));  // 2.411.0 (#3516): the type is for new lists only
   const own = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })().filter(k => keys.includes(k)) : [];
   const parts = [];
   // 2.352.0 C (#2751): one line (the folder and what it sets), the values and "Back to the folder" fold out; no crossed-out text
@@ -764,6 +774,7 @@ document.addEventListener('input', e => {
   const h = $('#l-fhint'); if (!h || $('.lhdr', e.target.closest('.modal'))) return;  // a new list only (an existing one shows it after saving)
   h.innerHTML = folderHintHtml({}, 0, fNorm(e.target.value)); h.hidden = !h.innerHTML;
   const ws = $('#l-ws'); const fp = folderEff(fNorm(e.target.value)); if (ws && 'org_id' in fp) ws.value = fp.org_id ? String(fp.org_id) : '';
+  if (typeof lmFolderPtype === 'function') lmFolderPtype(e.target.closest('.modal'), fNorm(e.target.value));  // 2.411.0 (#3516)
 });
 // 2.41.0 (#1423): like the list dialog: switches (a third state "Not set" for a folder), every change saved at once with
 // "Saved · Undo", the same texts and order as the list's agent part. The agents themselves are chosen in the Share dialog
@@ -786,6 +797,7 @@ async function folderPropsModal(f, opt = {}) {
     <p class="muted">${tr('Defaults for every project in the folder, also new ones. Projects changed on their own keep their value.')}</p>
     <div class="shint">${tr('“Not set” again: the projects keep the value they have.')}</div>
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
+    ${sel('fs-pt', 'ptype', PTYPE_UI.filter(([k]) => k).map(([k, n]) => [k, tr(n)]))}<div class="shint lhint">${tr('New projects in the folder start with this type and its sections. Existing projects keep theirs.')}</div>${''/* 2.411.0 (#3516) */}
     ${collab() && agentsOn() ? `<h4 id="fs-ag-h">${tr('Agents')}</h4>
       <div class="row fsagrow"><label>${tr('Agent')}</label><span class="fsags" id="fs-ags">${esc(agNames().join(', ') || tr('No agent'))}</span><button type="button" class="linkbtn" data-m="share-ag">${ic('users', 's')} ${tr('In the Share dialog…')}</button></div>
       <div class="shint lhint">${tr('Which agents work in this folder you choose in its Share dialog; the switches here are the defaults for its projects.')}</div>
@@ -838,7 +850,7 @@ async function folderPropsModal(f, opt = {}) {
     const t = e.target, k = t.dataset?.fk; if (!k) return;
     e.stopPropagation();
     if (t.type === 'checkbox') { put(k, t.checked).then(() => { if (k === 'agent_members' && t.checked && av_folderPersonal(f).length) toast(tr('Saved') + ' · ' + av_personalHint(av_folderPersonal(f)), undefined, 9000); }); return; }  // 2.46.6 (#1680)
-    put(k, t.value === '' ? null : k === 'agent_tidy' ? t.value : +t.value);
+    put(k, t.value === '' ? null : k === 'agent_tidy' || k === 'ptype' ? t.value : +t.value);  // 2.411.0 (#3516): ptype is a key
   });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;

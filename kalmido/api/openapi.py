@@ -305,8 +305,10 @@ def openapi_spec():
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project: stored only, no longer evaluated (2.352.0, every list but the inbox is a project); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
-            "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
-                             "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
+            "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None], "description": "2.4.0: a project of a built-in type (sections, "
+                             "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored. "
+                             "2.411.0 (#3516): left out in a folder = the folder's project type (its default, or the type its projects share) with "
+                             "its standard sections; null / \"\" = no type"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
                          "(e.g. Backlog … Done); without it the project starts without sections"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "

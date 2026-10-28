@@ -14822,5 +14822,6 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Buongiorno,\n\nIn allegato trova la nostra lettera «{0}» in PDF.\n\nCordiali saluti\n{1}",
   "Please find attached our document “{0}”.": "In allegato trova il nostro documento «{0}».",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "In relazione alla fattura sopra indicata vi emettiamo la seguente nota di credito:",
-  "Title or notes contain …": "Il titolo o le note contengono …"
+  "Title or notes contain …": "Il titolo o le note contengono …",
+  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "I nuovi progetti nella cartella partono con questo tipo e le sue sezioni. Quelli esistenti mantengono il loro."
 }

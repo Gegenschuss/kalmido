@@ -22,6 +22,7 @@ FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_list
 FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder; 2.46.1 (#1422): a real default, see lc_done_*
 FOLDER_PROPS += ("agent_followup",)  # 2.41.0 (#1423): "Agent follows up" as a folder default (2.40 ignores the key)
 FOLDER_PROPS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on / off for the lists of the folder (lists.time_tracking)
+FOLDER_PROPS += ("ptype",)  # 2.411.0 (#3516): the project type of NEW lists in the folder (folder_ptype); existing lists keep theirs
 FOLDER_APPLY = ("all", "new")
 
 
@@ -113,7 +114,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     own = set() if force else set(list_own(c, lid))
     skipped, changed = [], 0
     for k in FOLDER_PROPS:
-        if k not in eff or (keys is not None and k not in keys) or k in own:
+        if k not in eff or (keys is not None and k not in keys) or k in own or k == "ptype":  # 2.411.0 (#3516): only list_create takes it
             continue
         v = eff[k]
         try:
@@ -262,7 +263,32 @@ def _clean_props(c, b):
             if v not in TIDY_MODES:
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v
+        elif k == "ptype":  # 2.411.0 (#3516)
+            from ..lists.templates import PTYPES
+            if v not in PTYPES:
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
     return out
+
+
+def folder_ptype(c, owner, folder):
+    """2.411.0 (#3516): the project type a new list of owner in folder gets ('' = none): the folder's default (ptype, also from
+    the folder above); without one the type the owner's projects in the folder (and its subfolders) have -- when those with a
+    type all share it and they are more than the ones without (a few lists made before without a type do not break it)."""
+    if not folder:
+        return ""
+    eff = folder_effective(c, owner, folder)[0]
+    if eff.get("ptype"):
+        return eff["ptype"]
+    from ..lists.lists import folder_under
+    from ..lists.templates import PTYPES
+    ts = [r[1] or "" for r in c.execute("SELECT folder, ptype FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND family=''", (owner,))
+          if folder_under(r[0] or "", folder)]
+    typed = {t for t in ts if t}
+    if len(typed) != 1 or 2 * sum(1 for t in ts if t) <= len(ts):
+        return ""
+    t = typed.pop()
+    return t if t in PTYPES else ""
 
 
 def _norm(props):

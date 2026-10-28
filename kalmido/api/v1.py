@@ -701,6 +701,8 @@ def v1_list_create():
         raise BadInput(tr("Invalid value: {0}", "sections"))
     if b.get("project_type"):
         b = {**{k: v for k, v in b.items() if k not in ("project_type", "kind", "checklist", "done_at_bottom", "tickets")}, "ptype": b["project_type"]}
+    elif "project_type" in b:  # 2.411.0 (#3516): null / "" = chosen: no type (else a list in a folder gets the folder's type)
+        b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": ""}
     if "kind" in b and b["kind"] not in LIST_KINDS and b["kind"] not in LIST_KIND_ALIASES:
         raise BadInput(tr("Invalid value: {0}", "kind"))
     j = v1_call(list_create, body=b)

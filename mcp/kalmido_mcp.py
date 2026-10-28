@@ -1315,8 +1315,9 @@ TOOLS += [
     ("create_list", "Create a project (you become its owner). kind is stored only, no longer evaluated (2.352.0: every project has dependencies, status, overview; tracked = has a status); time_tracking "
                     "true (2.41.0) = time tracking on (any type, default off). "
                     "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
-                    "sections true (2.27.0) = also the type's standard sections (default: none).",
-     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}, "sections": {"type": "boolean"}}, ["name"]),
+                    "sections true (2.27.0) = also the type's standard sections (default: none). "
+                    "2.411.0: project_type left out in a folder = the folder's project type with its standard sections; \"\" = no type.",
+     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private", ""]}, "sections": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a project: name, color, folder (moving your own project into another folder waits for approval), view, kind "
                     "(stored only, no longer evaluated since 2.352.0), archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / project admins: "

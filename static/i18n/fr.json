@@ -14822,5 +14822,6 @@
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Bonjour,\n\nVeuillez trouver ci-joint notre courrier « {0} » au format PDF.\n\nCordialement\n{1}",
   "Please find attached our document “{0}”.": "Veuillez trouver ci-joint notre document « {0} ».",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "Concernant la facture mentionnée ci-dessus, nous vous accordons l'avoir suivant :",
-  "Title or notes contain …": "Le titre ou les notes contiennent …"
+  "Title or notes contain …": "Le titre ou les notes contiennent …",
+  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "Les nouveaux projets du dossier commencent avec ce type et ses sections. Les projets existants gardent le leur."
 }
