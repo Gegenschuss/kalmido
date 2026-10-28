@@ -826,7 +826,8 @@ def ba_check_post():
 
 @app.post("/api/office/books/archive/import")
 def ba_import_post():
-    """Office admin. multipart 'file' -> takes over what the preview showed: 201 {run_id, counts, years}."""
+    """Office admin. multipart 'file' -> takes over what the preview showed: 201 {run_id, counts, years, docs_skipped (receipt files
+    that are no PDF / picture, left out)}."""
     c, uid, oid = _ctx()
     rid, pub, st = ba_import(c, oid, uid, _uploads(False))
     ofx_log(c, oid, "import", target="bookarch", detail={"run_id": rid, "counts": pub["counts"], "years": [y["year"] for y in pub["years"]]})
@@ -837,7 +838,7 @@ def ba_import_post():
         st.done(False)
         raise
     st.done(True)
-    return jsonify(run_id=rid, counts=pub["counts"], years=pub["years"]), 201
+    return jsonify(run_id=rid, counts=pub["counts"], years=pub["years"], docs_skipped=pub["docs_skipped"]), 201
 
 
 @app.post("/api/office/books/archive/runs/<int:rid>/undo")
