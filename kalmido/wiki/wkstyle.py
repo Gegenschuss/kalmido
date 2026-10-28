@@ -13,6 +13,8 @@ from ..core.db import body, db
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
+from ..accounts.orgs import is_org_admin
+from .pages import wiki_space, wiki_space_key
 
 WIKI_STYLES = ("", "book", "compact", "notepad")
 
@@ -27,20 +29,18 @@ def wst_get(c, oid, uid):
 
 def wst_may(c, oid, uid):
     """May uid set the default style of the space? An organisation: its admins; the private space: its person (no agent)."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        return False
-    if not oid:
-        return True
-    from ..accounts.orgs import is_org_admin
-    return is_org_admin(c, uid, oid)
+    try:  # as agents/core.py is_agent (a function-local import there would reach a higher layer)
+        if g.get("user") and (g.user["kind"] or "user") == "agent":
+            return False
+    except (KeyError, IndexError):
+        pass
+    return not oid or is_org_admin(c, uid, oid)
 
 
 @app.put("/api/wiki/style")
 def wiki_style_put():
     """{space: private|org:<id>, style: ''|book|compact|notepad} -- the default reading style of the space (admins of the
     organisation; the private space: the person). Answers {space, style}."""
-    from .pages import wiki_space, wiki_space_key
     c, b, uid = db(), body(), me()
     st = b.get("style")
     if not isinstance(st, str) or st not in WIKI_STYLES:
