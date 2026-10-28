@@ -79,6 +79,11 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
         text: m.textContent.includes('it costs $5.'), code: [...m.querySelectorAll('code')].find(c => !c.closest('pre'))?.textContent}; })()`, 160);
     check(d1 && d1.math === 2 && d1.inl === 1, `${tag}: "$$" lines and the \`\`\`math block are drawn as formulas, the inline \\( \\) too: ${JSON.stringify(d1)}`);
     check(d1 && d1.svgs === 1 && d1.label && !d1.runs, `${tag}: the Mermaid block is an SVG with its labels, nothing in it runs`);
+    // the whole drawing is visible: its content lies inside the SVG's view box and the SVG is as large as its box says
+    const fit = await ev(`(() => { const s = document.querySelector('#wk-md .wkdgmm svg'), vb = s.viewBox.baseVal, b = s.querySelector('g').getBBox(), r = s.getBoundingClientRect(), w = s.parentElement.getBoundingClientRect();
+      return {vb: [vb.x, vb.y, vb.width, vb.height].map(Math.round), bb: [b.x, b.y, b.width, b.height].map(Math.round), r: [r.width, r.height].map(Math.round), wrap: [w.width, w.height].map(Math.round), attrs: [...s.attributes].map(a => a.name + '=' + a.value.slice(0, 80)).join(' | ')}; })()`);
+    console.log('svg fit', JSON.stringify(fit));
+    check(fit && fit.bb[0] >= fit.vb[0] - 1 && fit.bb[0] + fit.bb[2] <= fit.vb[0] + fit.vb[2] + 1 && fit.r[1] > 20 && fit.r[1] <= fit.wrap[1] + 1 && fit.r[0] <= fit.wrap[0] + 1, `${tag}: the diagram is shown whole (${JSON.stringify(fit)})`);
     check(d1 && /could not be drawn/.test(d1.err) && d1.broken.length === 1 && d1.broken[0].includes('this is not a diagram'), `${tag}: a broken diagram keeps its source with a hint`);
     check(d1 && d1.text && d1.code === '\\(code\\)', `${tag}: a single $ stays text, \\( \\) in a code span stays code (${JSON.stringify(d1 && [d1.text, d1.code])})`);
     const l1 = await ev(loaded);
