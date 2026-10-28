@@ -599,7 +599,13 @@ document.addEventListener('click', async e => {
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-edit': { const t = taskById(S.sel); if (!canEdit(t)) break; if (tlkIs(t)) tlkToast(t); else editContent(); break; }  // 2.40.0 (#1203): the pen
     case 'md-more': { const open = !LS.get('mdOpen', false); LS.set('mdOpen', open); const m = $('#d-md'); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }  // 2.101.0 (#2157): for all tasks
-    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) { tl.style.scrollMarginTop = ($('#detail .dtop')?.offsetHeight || 0) + 'px'; tl.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
+    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) {
+      // 2.365.0 (#2824): the panel scrolls itself to the heading right below its sticky header (scrollIntoView with a scroll
+      // margin went to the panel's end on the phone with the bottom bar: the heading sat under the header)
+      const de = $('#detail'), hh = $('#detail .dtop')?.offsetHeight || 0, behavior = reducedMotion() ? 'auto' : 'smooth';
+      if (de && de.scrollHeight > de.clientHeight && de.contains(tl)) de.scrollTo({top: Math.max(0, Math.round(tl.getBoundingClientRect().top - de.getBoundingClientRect().top + de.scrollTop - hh)), behavior});
+      else { tl.style.scrollMarginTop = hh + 'px'; tl.scrollIntoView({block: 'start', behavior}); }
+    } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
