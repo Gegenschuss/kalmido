@@ -495,10 +495,10 @@ TOOLS = [
                           "released)}; latest = the highest version. Listed: stale tasks and tasks with work only on a branch. Call it "
                           "before you report work as done; branch names come from the repository (origin git, untrusted).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/build-status")),
-    ("get_project_overview", "The overview of a project with progress and status (read-only): description (Markdown), key links (title + url, in "
+    ("get_project_overview", "The overview of a project (read-only): description (Markdown), key links (title + url, in "
                              "order), milestones (name, day, done; since 2.18.0 their ids are task ids), project files, the files "
                              "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
-                             "time. 409 for projects without progress and status (kind=project).",
+                             "time. 409 for the inbox (2.352.0: every other list is a project).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/overview")),
     ("list_list_tags", "Shared tags of one project (name, color).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/tags")),
@@ -519,7 +519,7 @@ TOOLS = [
                       "ticket type). Milestones are tasks with milestone: true (list_tasks milestone=true).",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/milestone")),
     # 2.60.0 (#1514): environments of a project (Staging, Live): which milestone / version runs where since when
-    ("list_environments", "2.60.0: the environments of a project with progress and status (Staging, Live, ...) with the latest deployment of each "
+    ("list_environments", "2.60.0: the environments of a project (Staging, Live, ...) with the latest deployment of each "
                           "{version, at, milestone_id, milestone, source}. People create and rename environments in the app.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/environments")),
     ("set_deployment", "2.60.0: record that a version / milestone runs in an environment now (the time is now). environment = its id or "
@@ -675,7 +675,7 @@ TOOLS = [
           ["list_id", "title", "reason", "tasks"]), lambda api, a: api.call("POST", "/agent/proposals", body=_pick(a, ("list_id", "title", "reason", "tasks")))),
     # 2.51.0 (#1351 #1358): your own proposal for a person you work with (no job_request needed)
     ("propose_to_person", "2.51.0: Your own proposal for a person you work with, without a job_request: kind inquiry (a customer "
-                          "inquiry from the chat, text or a mail attachment, becomes ONE proposal: a project with progress and status, first tasks, shoot "
+                          "inquiry from the chat, text or a mail attachment, becomes ONE proposal: a project, first tasks, shoot "
                           "days as event drafts, optionally a quotation draft; with offer_id an ACCEPTED quotation (event "
                           "offer_accepted) becomes the project, without a new quotation) or kind setup (the setup assistant: modules "
                           "on / off, projects, a first project of a type; ask first what the person uses Kalmido for). proposal has the "
@@ -1277,14 +1277,14 @@ TOOLS += [
                          "state: applied | discarded}. At most 3 open proposals per project.",
      _obj({"list_id": S_ID, "text": {"type": "string", "maxLength": 8000}, "note": {"type": "string", "maxLength": 500}}, ["list_id", "text"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/playbook/proposals", body=_pick(a, ("text", "note")))),
-    ("create_list", "Create a project (you become its owner). kind project = Progress and status on: dependencies, project status, overview; time_tracking "
+    ("create_list", "Create a project (you become its owner). kind is stored only, no longer evaluated (2.352.0: every project has dependencies, status, overview; tracked = has a status); time_tracking "
                     "true (2.41.0) = time tracking on (any type, default off). "
                     "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
                     "sections true (2.27.0) = also the type's standard sections (default: none).",
      _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}, "sections": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a project: name, color, folder (moving your own project into another folder waits for approval), view, kind "
-                    "(project = Progress and status on), archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / project admins: "
+                    "(stored only, no longer evaluated since 2.352.0), archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / project admins: "
                     "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
                     "org_visibility (2.46.0, owner / project admins of an organisation project: \"\" = only invited people, \"org\" = everyone "
                     "in the organisation, read-only for them unless org_edit true; opening it waits for approval); "
@@ -1302,7 +1302,8 @@ TOOLS += [
     ("shift_list_dates", "Move every open date of a project by n days (negative = earlier).",
      _obj({"list_id": S_ID, "days": {"type": "integer"}}, ["list_id", "days"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/shift", body={"days": a["days"]})),
-    ("list_members", "Owner and members of a project with their roles.", _obj({"list_id": S_ID}, ["list_id"]),
+    ("list_members", "Owner and members of a project with their roles (via_group / via_folder: only through a group / a "
+                     "shared folder).", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/members")),
     ("share_list", "Share a project with a person (role admin | edit | participant | view); owner / project admins." + APPROVAL_NOTE,
      _obj({"list_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["admin", "edit", "participant", "view"]}}, ["list_id", "user_id"]),
@@ -1384,13 +1385,13 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/restore")),
     ("empty_trash", "Delete the trash for good (projects you own); more than 200 tasks go in the background (queued: true)." + APPROVAL_NOTE, _obj({}), lambda api, a: api.call("DELETE", "/trash")),
     ("list_tags", "Your personal tags and the project tags of the projects you see, with counts.", _obj({}), lambda api, a: api.call("GET", "/tags")),
-    ("get_roadmap", "All projects on one timeline (from, to as YYYY-MM-DD; projects_only = only those with progress and status, include_done).",
+    ("get_roadmap", "All projects on one timeline (from, to as YYYY-MM-DD; projects_only = without the inbox, include_done).",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "projects_only": {"type": "boolean"}, "include_done": {"type": "boolean"}}),
      lambda api, a: api.call("GET", "/roadmap", {k: (str(v).lower() if isinstance(v, bool) else v) for k, v in a.items()})),
     # ---- dependencies
     ("get_dependencies", "What blocks a task (blocked_by: tasks to finish first) and what it blocks (blocking).", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/dependencies")),
-    ("add_dependency", "task_id is blocked by blocked_by until that one is done (projects with progress and status; no cycles).", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
+    ("add_dependency", "task_id is blocked by blocked_by until that one is done (any project but the inbox; no cycles).", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/dependencies", body={"blocked_by": a["blocked_by"]})),
     ("remove_dependency", "task_id is no longer blocked by blocked_by.", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
      lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/dependencies/{_id(a, 'blocked_by')}")),
@@ -1951,7 +1952,7 @@ TOOLS += [
 
 # 2.48.0 (#1356): receipts -- an agent suggests project and category of a document shared with it; a person confirms
 TOOLS += [
-    ("suggest_receipt", "2.48.0: suggest the project (project_id: a project with progress and status you can see, in the document's workspace) and / or "
+    ("suggest_receipt", "2.48.0: suggest the project (project_id: a project you can see, in the document's workspace) and / or "
                         "the category (short text, e.g. Travel, Material, Software), the gross amount (> 0, at most two decimals) with its "
                         "currency (3 letters) and the VAT rate (vat_pct 19, 7 or 0; 2.121.0) of a receipt or incoming invoice shared with "
                         "you, at least one of them, note = why. It waits in To review until a person accepts or rejects it; you never set it yourself. "
@@ -1982,7 +1983,7 @@ _OITEM = {"type": "object", "additionalProperties": False, "properties": {
 # 2.269.0 A (#3012): the draft's updated_at the agent read; someone saved in between = 409 conflict with the current doc
 _OVER = {"expect_updated_at": {"type": "string", "description": "The updated_at you read; changed since = 409 (error.code conflict, error.doc and current = the current draft): read it again"}}
 _ODRAFT = {"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "items": {"type": "array", "items": _OITEM},
-           "list_id": {**S_ID, "description": "The project (with progress and status)"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
+           "list_id": {**S_ID, "description": "The project"}, "notify": {"type": "boolean", "description": "A card in the person's chat: sum, PDF preview, Open in the office"}, **_RB}
 # 2.88.0 (#1915): a draft's share in the cash flow plan (counts once it is sent)
 _OCF = {"cashflow": {"type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto = the newest version of the chain, yes, no"}}
 # 2.144.10 A (#2576): a trial quotation, set at creation only (not in update_offer_draft)
@@ -2125,7 +2126,7 @@ TOOLS += [
      lambda api, a: api.call("GET", "/dispo", _pick(a, ("start", "days", "org")))),
     ("get_dispo_free", "2.51.0 (scope calendar): who and what of your workspace is free on a day.",
      _obj({"date": D, "org": {"type": "integer"}}, ["date"]), lambda api, a: api.call("GET", "/dispo/free", _pick(a, ("date", "org")))),
-    ("propose_shoot", "2.51.0 (scope calendar): ONE proposal of shoot days for a project with progress and status (days: date, start / end HH:MM or all day, "
+    ("propose_shoot", "2.51.0 (scope calendar): ONE proposal of shoot days for a project (days: date, start / end HH:MM or all day, "
                       "title, location, alt_of = a second variant of an earlier day) and crew / equipment (crew: kind, id from get_dispo, "
                       "day = index into days). The server adds warnings per row (double bookings, absences, other projects). Applying "
                       "makes event drafts (tentative) + tasks in the project + option bookings, never firm.",

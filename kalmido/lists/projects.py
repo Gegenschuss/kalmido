@@ -18,6 +18,7 @@ from ..core.access import (
 )
 from ..core.serializers import unlink_files
 from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
+from ..core.dlock import dl_task_sql, dl_tasks_locked  # 2.352.0 (#2752): an agent's data lock in the overview
 from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 from ..core.pages import url_title, valid_link
 from ..tasks.validation import TITLE_MAX, valid_date
@@ -233,15 +234,18 @@ def overview_build(c, lid, uid):
     links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]
     from .envs import env_for_lists
     envs = env_for_lists(c, [lid])
-    ms = [{**ms_compat(r), **({"envs": envs[r["id"]]} if r["id"] in envs else {})} for r in ms_rows(c, [lid])]  # 2.18.0 (#430): milestone tasks (undated ones too, day null); 2.60.0 (#1514): envs
+    msr = ms_rows(c, [lid])
+    dlx = dl_tasks_locked(c, uid, [r["id"] for r in msr])  # 2.352.0 (#2752): an agent's data lock leaves its locked tasks out
+    ms = [{**ms_compat(r), **({"envs": envs[r["id"]]} if r["id"] in envs else {})} for r in msr if r["id"] not in dlx]  # 2.18.0 (#430): milestone tasks (undated ones too, day null); 2.60.0 (#1514): envs
     frows = c.execute("SELECT * FROM list_files WHERE list_id=? AND deleted_at IS NULL ORDER BY id DESC", (lid,)).fetchall()  # 2.272.0 E2 (#3038)
     names = user_names(c, [r["user_id"] for r in frows] + [lst["owner_id"]])
     # the files of the list's tasks (not in the trash; not files of comments): a participant only those of the tasks they
     # fully see (never the parent chain they get as context)
-    cond, args = "", [lid]
+    # 2.352.0 (#2752): an agent's data lock leaves its locked tasks out here too (e-mails, tags; every list has the overview now)
+    cond, args = dl_task_sql(c, uid, "t."), [lid]
     if role == "participant":
         _, wr, _ = pvis(c, uid, lid)
-        cond = f" AND t.id IN ({','.join(str(int(x)) for x in wr) or '0'})"
+        cond += f" AND t.id IN ({','.join(str(int(x)) for x in wr) or '0'})"
     tfiles = [{"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"], "created_at": r["created_at"],
                "task_id": r["task_id"], "task_title": r["title"], **({"enc": 2, "e2e_gen": r["e2e_gen"]} if r["enc"] == 2 else {})}  # 2.64.2 B (#1817)
               for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title, a.enc, a.e2e_gen FROM attachments a
@@ -272,7 +276,7 @@ def overview_build(c, lid, uid):
            "files_trash_days": max(1, ret_days("trash")),
            "files_trash": [{"id": r["id"], "name": r["name"], "size": r["size"], "deleted_at": r["deleted_at"]} for r in c.execute(
                "SELECT id, name, size, deleted_at FROM list_files WHERE list_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id",
-               (lid,))],
+               (lid,))] if role != "participant" else [],  # 2.352.0 G (#2752, review N14): like the project files
            "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}

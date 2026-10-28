@@ -83,7 +83,8 @@ D = B + "/api/folders/people/diff"
 r = A.get(D, params={"folder": F, "user_id": BOB, "role": "view"})
 check(r.ok and r.json()["lists"] == [], f"not shared yet: nothing to ask {r.status_code} {r.text[:200]}")
 check(A.put(B + "/api/folders/people", json={"folder": F, "user_id": BOB, "role": "edit"}).ok, "share the folder with Bob (edit)")
-check(own_role(L1, BOB) == ("edit", "edit") and own_role(L3, BOB) == ("edit", "edit"), f"Bob in the lists: {own_role(L1, BOB)}")
+# 2.352.0 (#2748): the folder's role is no copy any more (own_role NULL, list_members.frole) -- only the effective role counts
+check(own_role(L1, BOB)[1] == "edit" and own_role(L3, BOB)[1] == "edit", f"Bob in the lists: {own_role(L1, BOB)}")
 assert A.put(B + f"/api/lists/{L2}/members", json={"user_id": BOB, "role": "admin"}).ok  # a role set in one list by hand
 assert A.put(B + f"/api/lists/{LX}/members", json={"user_id": BOB, "role": "view"}).ok  # outside the folder
 check(own_role(L2, BOB)[0] == "admin", f"Beta: Bob is admin by hand {own_role(L2, BOB)}")
@@ -109,7 +110,7 @@ check(r.ok and r.json()["updated"] == 0, f"apply false: no list changed {r.text[
 check(own_role(L2, BOB)[0] == "admin" and own_role(L1, BOB)[0] == "edit", f"lists keep their roles {own_role(L1, BOB)} {own_role(L2, BOB)}")
 check(dbx("SELECT role FROM folder_people WHERE user_id=?", (BOB,))[0][0] == "view", "the folder role is view")
 L4 = A.post(B + "/api/lists", json={"name": "Delta", "folder": F}).json()["id"]
-check(own_role(L4, BOB) == ("view", "view"), f"a new list gets the new folder role {own_role(L4, BOB)}")
+check(own_role(L4, BOB) == (None, "view"), f"a new list gets the new folder role (2.352.0: through the folder) {own_role(L4, BOB)}")
 check(own_role(LX, BOB)[0] == "view", "a list outside the folder is untouched")
 # now Alpha, Gamma (edit) and Beta (admin) differ from the folder role view
 r = A.get(D, params={"folder": F, "user_id": BOB, "role": "participant"})
@@ -117,7 +118,7 @@ check(r.ok and [x["list_id"] for x in r.json()["lists"]] == [L1, L2, L3], f"part
 # "Set everywhere"
 r = A.put(B + "/api/folders/people", json={"folder": F, "user_id": BOB, "role": "participant"})
 check(r.ok and r.json()["updated"] == 4, f"set everywhere: 4 lists changed {r.text[:200]}")
-check(all(own_role(x, BOB)[0] == "participant" for x in (L1, L2, L3, L4)), "every list of the folder has the new role")
+check(all(own_role(x, BOB)[1] == "participant" for x in (L1, L2, L3, L4)), "every list of the folder has the new role")  # 2.352.0 (#2748): effective role
 check(own_role(LX, BOB)[0] == "view", "still not the list outside the folder")
 
 # ---- #1606 groups

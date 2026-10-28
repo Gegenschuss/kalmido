@@ -112,13 +112,17 @@ check(folder(A, L1) == "Clients/Company X", f"path normalized: {folder(A, L1)!r}
 L2 = A.post(B + "/api/lists", json={"name": "Retainer", "folder": "Clients"}).json()["id"]
 L3 = A.post(B + "/api/lists", json={"name": "Shop", "folder": "Clients/Company Y"}).json()["id"]
 L4 = A.post(B + "/api/lists", json={"name": "Garden", "folder": "Home"}).json()["id"]
-r = A.post(B + "/api/lists", json={"name": "Deep", "folder": "A/B/C"})
-check(r.status_code == 400 and "2 levels" in r.json().get("error", ""), f"3 levels refused: {r.status_code} {r.text[:80]}")
-check(A.patch(B + f"/api/lists/{L4}", json={"folder": "Home/Outside/Beds"}).status_code == 400, "PATCH: 3 levels refused")
-check(A.post(B + "/api/lists/reorder", json={"ids": [L4], "folder": {str(L4): "a/b/c"}}).status_code == 400, "reorder: 3 levels refused")
+# 2.352.0 (#2748): folders nest 30 levels deep (was 2) -- the projects folders are folders of the file store
+DEEP = "/".join(f"d{i}" for i in range(31))
+r = A.post(B + "/api/lists", json={"name": "Deep", "folder": DEEP})
+check(r.status_code == 400 and "30 levels" in r.json().get("error", ""), f"31 levels refused: {r.status_code} {r.text[:80]}")
+r = A.post(B + "/api/lists", json={"name": "Three", "folder": "A/B/C"})
+check(r.ok and folder(A, r.json()["id"]) == "A/B/C", "2.352.0 (#2748): 3 levels are fine now")
+check(A.patch(B + f"/api/lists/{L4}", json={"folder": DEEP}).status_code == 400, "PATCH: 31 levels refused")
+check(A.post(B + "/api/lists/reorder", json={"ids": [L4], "folder": {str(L4): DEEP}}).status_code == 400, "reorder: 31 levels refused")
 check(A.patch(B + "/api/settings", json={"folders": json.dumps(["Clients", "Clients/Company X", "Clients/Company Y", "Home"])}).ok,
       "folder order with paths")
-check(A.patch(B + "/api/settings", json={"folders": json.dumps(["a/b/c"])}).status_code == 400, "folder order: 3 levels refused")
+check(A.patch(B + "/api/settings", json={"folders": json.dumps([DEEP])}).status_code == 400, "folder order: 31 levels refused")
 check(A.patch(B + "/api/settings", json={"folders_closed": json.dumps(["Clients/Company Y", "Home"])}).ok, "folded folders stored")
 check(json.loads(settings(A)["folders_closed"]) == ["Clients/Company Y", "Home"], "folders_closed in the state")
 check(A.patch(B + "/api/settings", json={"folders_closed": "nope"}).status_code == 400, "folders_closed: bad json 400")
@@ -126,8 +130,8 @@ check(A.patch(B + "/api/settings", json={"folders_closed": json.dumps([1])}).sta
 # API v1
 j = VA.get("/lists").json()["data"]
 check(next(x for x in j if x["id"] == L1)["folder"] == "Clients/Company X", "v1: folder path")
-r = VA.post("/lists", json={"name": "V1 deep", "folder": "x/y/z"})
-check(r.status_code == 400, f"v1: 3 levels refused ({r.status_code})")
+r = VA.post("/lists", json={"name": "V1 deep", "folder": DEEP})
+check(r.status_code == 400, f"v1: 31 levels refused ({r.status_code})")
 r = VA.post("/lists", json={"name": "V1 sub", "folder": "Clients / Company Z"})
 check(r.status_code == 201 and r.json()["folder"] == "Clients/Company Z", "v1: create in a subfolder")
 L5 = r.json()["id"]
@@ -148,14 +152,14 @@ check(A.post(B + "/api/folders/rename", json={"old": "Customers/Company Y", "new
 check(folder(A, L3) == "Home/Company Y", "its list moved along")
 check(A.post(B + "/api/folders/rename", json={"old": "Home/Company Y", "new": "Company Y"}).ok, "subfolder to the top level")
 check(folder(A, L3) == "Company Y", "now top-level")
-r = A.post(B + "/api/folders/rename", json={"old": "Customers", "new": "Home/Customers"})
-check(r.status_code == 400, f"a folder with subfolders cannot become a subfolder ({r.status_code})")
+r = A.post(B + "/api/folders/rename", json={"old": "Customers", "new": "/".join(f"e{i}" for i in range(29)) + "/Customers"})
+check(r.status_code == 400, f"2.352.0 (#2748): a folder whose subfolders would end deeper than 30 levels is refused ({r.status_code})")
 check(folder(A, L1) == "Customers/Company X", "refused: nothing moved")
 check(A.post(B + "/api/folders/rename", json={"old": "Customers", "new": "Customers/x"}).status_code == 400, "not into itself")
 check(A.post(B + "/api/folders/rename", json={"old": "Company Y", "new": "Home/Company Y"}).ok, "a folder without subfolders nests")
 check(folder(A, L3) == "Home/Company Y", "nested")
 check(A.post(B + "/api/folders/rename", json={"old": "Home/Company Y", "new": "Home/Company Y/deeper"}).status_code == 400,
-      "never 3 levels")
+      "not into itself (also one level down)")
 check(Bo.post(B + "/api/folders/rename", json={"old": "Work", "new": "Job"}).ok and folder(Bo, L1) == folder(A, L1), "2.27.0 (#988): a member's rename leaves the owner's placement")
 check(folder(A, L1) == "Customers/Company X", "the owner's placement stays")
 # ---- delete: children move up one level
@@ -304,9 +308,9 @@ d2 = dict(d)
 d2["deps"] = d["deps"] + [[d["deps"][0][1], d["deps"][0][0]]]
 r = A.patch(B + f"/api/templates/{tp['id']}", json={"data": d2})
 check(r.ok and len(r.json()["data"]["deps"]) == 3, f"cycle edge dropped: {r.json()['data'].get('deps')}")
-# a non-relative template (today based) still works, now with dependencies too
+# 2.352.0 (#2752): a list template is always relative now (the flag "relative" is ignored), dependencies kept
 r = A.post(B + "/api/templates", json={"list_id": PJ, "name": "Plain copy"}).json()
-check(r["data"]["rel"] is False and len(r["data"]["deps"]) == 3, "list template: deps kept, not relative")
+check(r["data"]["rel"] is True and len(r["data"]["deps"]) == 3, "list template: deps kept, always relative")
 
 # ================================================================== #187 quick capture
 r = requests.get(B + "/capture?title=Hi&url=https://example.org")

@@ -205,7 +205,6 @@ function palAll() {
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
   add('a:capture', 'action', tr('Capture to the basket'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the basket, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
   add('a:newlist', 'action', tr('New project'), 'list', () => listModal());
-  add('a:newproject', 'action', tr('New project with progress and status…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243); 2.152.2 (#2624): every list is a project, this one with the switch on
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
   {  // 2.27.0 (#974): the open list's agent, in the share dialog
     const rl = S.route.mod === 'tasks' && /^l:\d/.test(S.route.key || '') ? listById(+S.route.key.slice(2)) : null;
@@ -576,8 +575,7 @@ function tourSteps() {
   const tabs = $$('#tabs > button').map(b => (b.querySelector('span:last-child')?.textContent || b.getAttribute('aria-label') || '').trim()).filter(Boolean);
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('The bar at the bottom'), d: tabs.length ? N_('{0}. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), args: tabs.length ? [tabs.join(' · ')] : [], r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
-  const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Modules, language and appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}.') : N_('Modules, language and appearance.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
   return s.slice(0, 6);

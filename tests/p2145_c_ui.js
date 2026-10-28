@@ -1,7 +1,7 @@
 // 2.145.0 UI tests (part C, #2432), own container (start.sh). jsdom + Firefox (screenshot):
 //   "Print" on a project starts with a head: the description (Markdown rendered), the status with its note and who set it,
 //   the period of the tasks + progress, the members with their role, the milestones with date and state; empty parts are left
-//   out (a project without status / milestones); a plain list prints only its name (no head); a person without an organisation
+//   out (a project without status / milestones); a list without kind prints like a project (2.352.0); a person without an organisation
 //   (freelancer-matrix: lists) gets the head of the own project. Screenshot: p2145-c-print.png (P2145C_SHOTS).
 // P2145C_NOSTART=1 = the server already runs.
 const {execFileSync} = require('child_process');
@@ -68,11 +68,14 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(/Alice \(Owner\)/.test(qh), 'the members still show');
   d.querySelector('.tsheet [data-ts="close"]').click();
 
-  // ================= a plain list: only its name
+  // ================= a list without kind (2.352.0, #2752: every list but the inbox is a project): its name, a head only with
+  // what it has (no status, no milestones, no description)
   w.eval(`lexPrint(${N})`);
   await until(() => d.querySelector('.tsheet .lexpage .lxr'));
   await sleep(600);
-  check(!d.querySelector('.lexpage .lxhead') && /Groceries/.test(d.querySelector('.lexpage h1')?.textContent || ''), 'a plain list: name, no head');
+  const nh = d.querySelector('.lexpage .lxhead')?.textContent || '';
+  check(/Groceries/.test(d.querySelector('.lexpage h1')?.textContent || '') && !/Status/.test(nh) && !d.querySelector('.lexpage .lxms') && !d.querySelector('.lexpage .lxdesc'),
+    'a list without kind: name, the head without empty parts ' + nh);
   d.querySelector('.tsheet [data-ts="close"]').click();
   w.close();
 

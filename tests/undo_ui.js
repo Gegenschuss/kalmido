@@ -48,7 +48,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`patchUndoable(${t3}, {list_id: ${HOME}}, 'moved')`);         // 3 move
   const created = await w.eval(`createTask({title: 'Fresh idea', list_id: ${WORK}})`); const tn = created.id;  // 4 create
   await w.eval(`sectionCreate(${WORK}, 'Later')`);                             // 5 section
-  await w.eval(`setListKind(${WORK}, 'project')`);                            // 6 list type
+  await w.eval(`listPatch(${WORK}, {kind: 'project'}, 'Type of “Work”: Project')`);  // 6 list setting (2.352.0 B #2752: setListKind is gone; kind stays an undoable field)
   check(hl('undo') === 6, `six steps recorded (${hl('undo')})`);
   check(!btn('undo').disabled && btn('undo').getAttribute('aria-label') === 'Undo: Type of “Work”: Project', `undo label: ${btn('undo').getAttribute('aria-label')}`);
   check(/Undo: Type of “Work”: Project \((Ctrl\+Shift\+Z|Ctrl\+Z)/.test(btn('undo').title) || btn('undo').title.startsWith('Undo: Type of “Work”: Project'), 'tooltip names the step');

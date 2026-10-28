@@ -173,3 +173,17 @@ def md_forward_from(text):
         m = ADDR_RE.search(v)
         return (_sender(v) if m and _sender(v) != m.group(0) else ""), (m.group(0).lower() if m else "")
     return "", ""
+
+
+def md_trim_view(text):
+    """2.352.0 D (#2754): the shortened text of a filed mail for the reading view: a forwarded mail as md_trim_forward does;
+    a plain mail loses its older quoted replies, its signature and legal notices. Display only -- the original stays as it is."""
+    if not text:
+        return text
+    short = md_trim_forward(text)
+    if short != text:
+        return short
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    lines = _drop_disclaimers(_cut_signature(_cut_quoted(lines)))
+    out = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    return out or text

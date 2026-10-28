@@ -43,7 +43,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);
   // seven active projects, one complete, one on hold
   const P = [];
-  for (const n of ['Spring shoot', 'Image film', 'Website new', 'Brochure', 'Trade fair', 'Podcast', 'Newsletter']) P.push((await call('POST', '/api/lists', {name: n, kind: 'project'})).id);
+  for (const n of ['Spring shoot', 'Image film', 'Website new', 'Brochure', 'Trade fair', 'Podcast', 'Newsletter']) { P.push((await call('POST', '/api/lists', {name: n, kind: 'project'})).id); await call('POST', `/api/lists/${P.at(-1)}/status`, {status: 'on_track', note: ''}); }  // 2.352.0 B (#2752): tracked = has a status
   for (const [n, st] of [['Old catalogue', 'complete'], ['Paused idea', 'on_hold']]) { const id = (await call('POST', '/api/lists', {name: n, kind: 'project'})).id; await call('POST', `/api/lists/${id}/status`, {status: st, note: ''}); }
   const done = (await call('POST', '/api/tasks', {title: 'Pick the location', list_id: P[0]})).id;
   await call('POST', `/api/tasks/${done}/complete`);

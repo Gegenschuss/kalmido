@@ -733,7 +733,7 @@ function settingsModal(focus) {
       <h4>${tr('Formatting (Markdown)')}</h4>
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
       <h4>${tr('Projects')}</h4>
-      <div class="shelp">${tr('Every task list is a project; the switch Progress and status (project menu … > Edit) adds the project modules you switched on. For shopping or packing lists: project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
+      <div class="shelp">${tr('Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. For shopping or packing lists: project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
       <h4>${tr('Favourites')}</h4>
       <div class="shelp">${tr(VW_FAV_HELP)}</div>
       <h4>${tr('Locked notes')}</h4>
@@ -1229,7 +1229,7 @@ function instanceHtml(chk, hint) {
     </div>
     ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
     <div class="row"><label for="s-dayh">${tr('Hours per day')}</label><input id="s-dayh" inputmode="decimal" class="numin" value="${esc(fmtNum(a.time_day_h || S.timeDayH || 8, 2))}"><span class="muted">${tr('h per working day / shift')}</span></div>
-    ${hint(tr('Projects with progress and status show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
+    ${hint(tr('Projects show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
     ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
     ${hint(tr('Calendar subscriptions and webhooks only reach public addresses. List servers in your own network here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}

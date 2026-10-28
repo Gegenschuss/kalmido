@@ -116,8 +116,8 @@ check(A.put(B + f"/api/lists/{P}/layout", json={"layout": "", "scope": "everyone
 check(A.put(B + f"/api/lists/{P}/layout", json={"layout": "", "extra": 1}).status_code == 400, "#983: an unknown field 400")
 check(Da.get(B + f"/api/lists/{P}/layout").status_code == 404 and Da.put(B + f"/api/lists/{P}/layout", json={"layout": json.dumps({"order": ["ms"]})}).status_code == 404,
       "#983: someone outside the project gets 404")
-plain = A.post(B + "/api/lists", json={"name": "Groceries"}).json()["id"]
-check(A.put(B + f"/api/lists/{plain}/layout", json={"layout": json.dumps({"order": ["ms"]})}).status_code in (404, 409), "#983: a plain list has no project page")
+plain = next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])  # 2.352.0 (#2752): every list but the inbox is a project
+check(A.put(B + f"/api/lists/{plain}/layout", json={"layout": json.dumps({"order": ["ms"]})}).status_code in (404, 409), "#983: the inbox has no project page")
 
 # ---- agents: the token API has no route for it, the app routes refuse an agent; nothing stored
 before = settings(A)

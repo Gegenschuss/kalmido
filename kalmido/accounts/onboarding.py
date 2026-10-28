@@ -42,9 +42,9 @@ def onboarding_tasks(feats, touch, mac):
             ("collab", N_("Share this project with someone"), N_("Project menu (…) > Sharing. Tasks in shared projects can be assigned and commented.")),
             ("time", N_("Start a timer on a task"), N_("Task menu (…) > Start timer; reports under Time tracking.")),
             ("timeline+deps", N_("Plan a project in the timeline"),
-             N_("Edit project > Progress and status: on, View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
+             N_("Edit project > View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
              if not touch else
-             N_("Edit project > Progress and status: on, View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
+             N_("Edit project > View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
     for k, t, d in mods:
         if all(x in feats for x in k.split("+")):
             tt.append((t, d, 0, False, []))

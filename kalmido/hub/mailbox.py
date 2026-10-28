@@ -725,7 +725,7 @@ def _context(c, src):
     if src.get("list_id"):
         need_list(c, src["list_id"])
         l = H._list_row(c, src["list_id"])
-        if l["kind"] != "project" or l["e2e"] or list_role(c, l["id"], uid) not in WRITE_ROLES:
+        if l["no_mail"] or l["e2e"] or list_role(c, l["id"], uid) not in WRITE_ROLES:  # 2.352.0 G (#2752, review M5)
             raise Denied(403)
         cid = None
         if l["client_id"]:

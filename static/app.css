@@ -2786,6 +2786,11 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .shsec[open] .shsecst{visibility:hidden}
 .shsec[open]{padding-bottom:.5rem}
 .shsec>summary .ib{order:1}.shsec .shsecst{order:2}.shsec .shchev{order:3}
+/* 2.352.0 C (#2751): the folding parts of the project dialog (lmSec in dialogs.js) */
+.lmsec .lmdot{order:1;flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent)}
+.lmsec .lmsecb>h4:first-child{margin-top:.25rem}
+.lmsec .lacts{flex-wrap:wrap;gap:.5rem}
+.ldabrow .lchks{display:flex;flex-direction:column;gap:.25rem;min-width:0}
 .shmodal #sh-owner{margin-bottom:.25rem}
 #top .shbtn .bl{font-size:var(--fs-s)}
 #top:is(.tl1,.tl2,.tl3,.tl4) .shbtn .bl{display:none}
@@ -5213,7 +5218,8 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 /* 2.37.0 (#1158): the dry run is a warning (not saved yet), never a success look; the hint of a folder without own lists */
 .fsprev.unsaved{border-left:.1875rem solid var(--p3);background:color-mix(in srgb,var(--p3) 10%,var(--bg3))}.fsprev .fsprevh{display:inline-flex;align-items:center;gap:.375rem;color:var(--text)}.fsprev .fsprevh .i{color:var(--p3)}
 .fsnone{margin:0 0 .5rem}
-.lfolderhint .fown{text-decoration:line-through;color:var(--muted)}
+.lfolderhint .lfhd>summary{cursor:pointer;white-space:nowrap;overflow:hidden}.lfolderhint .lfhd>summary>span{display:inline-block;max-width:calc(100% - 2.5rem);overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}  /* 2.352.0 C (#2751): one line, details fold out */
+.lfolderhint .lfhl{margin:.25rem 0;padding-left:1.25rem}
 .lfolderhint .linkbtn{font-size:inherit}
 .lfolderhint{font-size:var(--fs-s);color:var(--text2);line-height:1.5;margin:-.125rem 0 .625rem;padding:.375rem .625rem;background:var(--bg3);border-radius:var(--r-s)}
 .lfolderhint[hidden]{display:none}.lfolderhint svg.i.s{vertical-align:-2px}
@@ -8017,6 +8023,13 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmadlg .card{max-height:85vh;overflow:auto}
 /* 2.141.0 B (#2140, #2139): HTML view of a filed mail (sandboxed frame, light inside also in dark mode), Task / Event from it */
 .hbmdlg .card{max-height:90vh;overflow:auto}
+/* 2.352.0 D (#2754): the reading view is large: wide window of the full height, the mail fills the rest (one scrollbar, the frame's own); phone = full screen */
+.hbmdlg .card{width:min(56rem,80vw);height:min(100dvh - 2rem,60rem);max-height:none;display:flex;flex-direction:column}
+.hbmdlg .card>.hbmview{flex:1 1 auto;min-height:14rem;display:flex;flex-direction:column}
+.hbmdlg .card>.hbmview>.hbmframe,.hbmdlg .card>.hbmview>.hbmtext{flex:1 1 auto;height:auto;min-height:12rem;max-height:none}
+.hbmdlg .card>.foot{margin-top:auto}
+.hbmwhole{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);cursor:pointer}
+@media (max-width:40rem){.hbmdlg{padding:0}.hbmdlg .card{width:100%;height:100dvh;border-radius:0}}
 .hbmactrow{display:flex;gap:.375rem;flex-wrap:wrap;margin:0 0 .5rem}
 .hbmmade{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;margin:0 0 .5rem;font-size:var(--fs-s)}
 .hbmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .375rem}
@@ -8353,6 +8366,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.sbbdaft{box-shadow:inset 0 -.125rem 0 var(--accent)}
 #side .sbbt.dragging{opacity:.5}
 #side .sbbt.sbbauto .sbbtn{color:var(--muted);font-style:italic}
+/* 2.352.0 E (#2748): the projects' folders on the tree (the body indents as before) */
+#side .sbbt.lfh{padding-left:0;gap:.5rem}
+#side .sbbt.lfh .sbbtn{flex:0 1 auto}  /* the number right after the name (#1607), the rest of the row folds */
+.abshdlg.lfshdlg #ab-shl .mrow .n{white-space:normal;overflow-wrap:anywhere}  /* a long name wraps, not cut (#1044) */
 #side .sbbtl{margin:0;padding:.25rem .5rem .25rem calc(1.75rem + var(--sbbl,0)*.875rem);font-size:var(--fs-s)}
 .abview.abdesk{grid-template-columns:minmax(0,1fr)}
 /* 2.152.3 Teil A (#2619): direction 4 (sketch of 22.10.): ONE low head bar over the bar of the areas, the panel and the page

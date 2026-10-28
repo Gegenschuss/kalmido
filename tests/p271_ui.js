@@ -65,7 +65,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline,view-mindmap,view-calendar', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline / Mind map / Calendar: ' + seg());  // 2.49.0 (#1201): + Mind map
   check(d.querySelector('#top [data-act="view-overview"]').title === 'Project page', 'tab title "Project page" (2.25.0)');
   w.eval(`go('l/${PL}')`); await sleep(300);
-  check(!seg().includes('view-overview'), 'a plain list has no overview tab: ' + seg());
+  check(seg().includes('view-overview'), '2.352.0 B (#2752): kind list is a project too: overview tab ' + seg());
   w.eval(`go('l/${P}')`); await sleep(300);
   click(w, d.querySelector('#top [data-act="view-overview"]'));
   await until(() => d.querySelector('#view .pov .povs'));

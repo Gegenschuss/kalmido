@@ -461,8 +461,10 @@ A.post(B + "/api/folders/rename", json={"old": "Home", "new": "House"})
 check(A.get(B + "/api/folders/people", params={"folder": "House"}).json()["people"], "#740: a renamed folder keeps its sharing")
 A.delete(B + "/api/folders/people", json={"folder": "House", "user_id": BOB})
 L5 = A.post(B + "/api/lists", json={"name": "Later", "folder": "House"}).json()["id"]
-check(L5 not in {l["id"] for l in Bo.get(B + "/api/state").json()["lists"]} and L3 in {l["id"] for l in Bo.get(B + "/api/state").json()["lists"]},
-      "#740: stopped: new lists no longer, the shared ones stay")
+# 2.352.0 (#2748): a folder's share works at runtime -- stopping it takes the folder's lists away too (was: "the shared ones stay")
+check(L5 not in {l["id"] for l in Bo.get(B + "/api/state").json()["lists"]} and L3 not in {l["id"] for l in Bo.get(B + "/api/state").json()["lists"]},
+      "#740 / #2748: stopped: new lists no longer, the folder's lists neither")
+A.put(B + f"/api/lists/{L3}/members", json={"user_id": BOB, "role": "view"})  # 2.352.0 (#2748): shared by hand for the check below
 # older shares: sorted in once at the update (migration); a list the person already put into a folder stays there
 dbx("UPDATE list_members SET folder='' WHERE list_id=? AND user_id=?", (L3, BOB))
 dbx("DELETE FROM settings WHERE key='migr_folders2220'")

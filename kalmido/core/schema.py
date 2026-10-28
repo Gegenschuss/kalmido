@@ -2559,6 +2559,14 @@ CREATE INDEX IF NOT EXISTS rate_hits_at ON rate_hits(at);  -- 2.306.0 Fix-1 (#28
 -- key + address, the Unix time; gone after KNOWN_DAYS. New table only: 2.311 ignores it (it remembers them in memory)
 CREATE TABLE IF NOT EXISTS rate_known (u TEXT NOT NULL, a TEXT NOT NULL, at DOUBLE PRECISION NOT NULL, PRIMARY KEY (u, a));
 CREATE INDEX IF NOT EXISTS rate_known_at ON rate_known(at);
+-- 2.352.0 A (#2748): a list's folder share (fs_shares on a folder of the projects area, lists/lffolder.py) does not reach this
+-- person on this list (removed from the list by hand, or the migration found the copy removed / set lower by hand). No org_id
+-- (like list_members: the list decides). New table only: 2.351 ignores it
+CREATE TABLE IF NOT EXISTS list_folder_skip (
+  list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+-- 2.352.0 (#2748): deleting a user (ON DELETE CASCADE) and the fkindex check need the user's side indexed
+CREATE INDEX IF NOT EXISTS list_folder_skip_user ON list_folder_skip(user_id);
 -- 2.361.2 (#2923): a member asks the admins of an organisation to give back what they brought in or made (kind list | sheet |
 -- file ..., accounts/orgout.py OO_KINDS; obj_id = its id; name = what the admins see): state open | approved | declined |
 -- used. An approved request lets that person move that one thing into their private space for a while (OO_GRANT_DAYS).
@@ -3655,6 +3663,12 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.352.0 A (#2748): the role a list gets through the shares of its folders (lists/lffolder.py, computed by lists/groups.py
+    # grp_sync like grole; role = the highest of own_role, grole, frole), and the list role of a share of a projects folder
+    # (admin | edit | participant | view; NULL = its role view / edit). Older versions ignore both (a row with only frole
+    # reads as a personal share there)
+    ("list_members", "frole", "ALTER TABLE list_members ADD COLUMN IF NOT EXISTS frole TEXT"),
+    ("fs_shares", "list_role", "ALTER TABLE fs_shares ADD COLUMN IF NOT EXISTS list_role TEXT"),
     # 2.357.0 C (#3158): a document from a template signed with the own signature picture of this person (office/doctpl.py; set
     # only by that person, NULL = without). Older versions ignore it
     ("office_gen_docs", "sign_uid", "ALTER TABLE office_gen_docs ADD COLUMN IF NOT EXISTS sign_uid BIGINT REFERENCES users(id) ON DELETE SET NULL"),

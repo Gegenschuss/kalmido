@@ -276,7 +276,7 @@ check(carrier in (P1, P2, P5) and dbx("SELECT owner_id, folder FROM git_folders 
 j = A.get(B + "/api/folders/repos", params={"folder": "Apps"}).json()
 st = {x["id"]: x for x in j.get("lists", [])}
 check([x["full_name"] for x in j["repos"]] == ["acme/app"] and st[P1]["uses"] and st[P2]["uses"] and st[P5]["uses"] and not st[P3]["uses"]
-      and st[P3]["off"] and st[P4]["own"] and not st[P4]["uses"] and not st[NP]["project"], "#934: the folder dialog: who uses it " + str(st)[:300])
+      and st[P3]["off"] and st[P4]["own"] and not st[P4]["uses"] and st[NP]["project"] and st[NP]["uses"], "#934 / 2.352.0 (#2752, kind list is a project too): the folder dialog: who uses it " + str(st)[:300])
 check(OUT not in st, "#934: a list outside the folder is not listed")
 # what the lists show
 lr = {lid: A.get(B + f"/api/lists/{lid}/repos").json() for lid in (P1, P3, P4, OUT, carrier)}
@@ -310,8 +310,8 @@ time.sleep(1)
 dbx("UPDATE git_conns SET next_at=0, polled_at=NULL WHERE id=?", (FC,), write=True)  # baseline read
 until(lambda: dbx("SELECT polled_at FROM git_conns WHERE id=?", (FC,))[0][0], 20.0)
 links = lambda: {r[0] for r in dbx("SELECT task_id FROM git_links WHERE conn_id=?", (FC,))}
-check(until(lambda: links() >= {T["p1"], T["p2"], T["p5"]}, 20.0), "#934: #id links tasks of every list that uses it " + str(links()))
-check(not links() & {T["p3"], T["p4"], T["out"], T["np"]}, "#934: never a switched-off list, a list with its own repository, a list outside, a plain list")
+check(until(lambda: links() >= {T["p1"], T["p2"], T["p5"], T["np"]}, 20.0), "#934: #id links tasks of every list that uses it (2.352.0: kind list too) " + str(links()))
+check(not links() & {T["p3"], T["p4"], T["out"]}, "#934: never a switched-off list, a list with its own repository, a list outside")
 pulls = [x for x in git_log() if x.get("path", "").startswith("/api/v3/repos/acme/app/pulls")]
 check(pulls and not [x for x in git_log() if "/acme/app/" in x.get("path", "") and x.get("port") != 8090], "#934: the folder repository is read from its server")
 t2 = until(lambda: (lambda t: t if t and t.get("code", {}).get("prs") else None)(next((x for x in Bo.get(B + "/api/state").json()["tasks"] if x["id"] == T["p2"]), None)), 20.0)

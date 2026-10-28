@@ -47,7 +47,7 @@ def roadmap_build(c, uid, a):
     if hi < lo or (hi - lo).days > ROADMAP_MAX_DAYS:
         raise BadInput(tr("Date range too large"))
     po, inc = _flag(a.get("projects_only"), "projects_only"), _flag(a.get("include_done"), "include_done")
-    lists = [d for d in visible_lists(c, uid) if not d["archived"] and (not po or d.get("kind") == "project")]
+    lists = [d for d in visible_lists(c, uid) if not d["archived"] and (not po or not d.get("is_inbox"))]
     try:
         order = [f for f in json.loads(usettings(c, uid).get("folders") or "[]") if isinstance(f, str) and f]
     except ValueError:

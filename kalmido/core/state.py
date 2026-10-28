@@ -119,12 +119,15 @@ def visible_lists(c, uid, light=False):
     members, names = {}, {}
     if ids and collab_all():
         q = ",".join("?" * len(ids))
-        for m in c.execute(f"""SELECT m.list_id, m.role, m.own_role, m.grole, u.id, u.username, u.display_name FROM list_members m
+        for m in c.execute(f"""SELECT m.list_id, m.role, m.own_role, m.grole, m.frole, u.id, u.username, u.display_name FROM list_members m
                                JOIN users u ON u.id=m.user_id WHERE m.list_id IN ({q}) ORDER BY m.added_at, u.id""", ids):
             members.setdefault(m["list_id"], []).append({"user_id": m["id"], "name": m["display_name"] or m["username"],
                                                          "role": m["role"], "username": m["username"],  # 2.4.2 (#389): @username
                                                          # 2.10.0 (#441): only via a group (no own share) / the role via groups
-                                                         "via_group": bool(m["grole"]) and m["own_role"] is None, "group_role": m["grole"]})
+                                                         "via_group": bool(m["grole"]) and m["own_role"] is None, "group_role": m["grole"],
+                                                         # 2.352.0 A (#2748): only through a folder's share / the role from folders
+                                                         "via_folder": bool(m["frole"]) and m["own_role"] is None and not m["grole"],
+                                                         "folder_role": m["frole"]})
     if ids:
         owners = {r["owner_id"] for r in rows}
         q2 = ",".join("?" * len(owners))
@@ -150,9 +153,9 @@ def visible_lists(c, uid, light=False):
     if collab_all():  # 2.280.0 B (#3116): the owners' limits of all foreign lists at once (cap_hint below reads the cache)
         tpl_prefetch(c, [r["id"] for r in rows if r["owner_id"] != uid], uid)
     _pl = set(plists(c, uid))  # 2.223.7 B (#2918): a participant sees no milestones of the list
-    mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project" and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
+    mss = milestones_of_lists(c, [r["id"] for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.7.1 (#410): timeline markers
     from ..lists.sprints import spr_of_lists
-    sprs = spr_of_lists(c, [r for r in rows if r["kind"] == "project"])  # 2.60.0 (#343)
+    sprs = spr_of_lists(c, [r for r in rows if not r["is_inbox"] and r["id"] not in _pl])  # 2.60.0 (#343); 2.352.0 G (review N14): like milestones
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
     gshares, gnames = grp_shares_of_lists(c, rows) if has_groups else ({}, {})  # 2.280.0 B (#3116): all lists at once
     from ..lists.playbook import pb_flags

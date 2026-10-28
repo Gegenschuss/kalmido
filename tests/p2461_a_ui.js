@@ -165,7 +165,7 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     check(Math.abs(a.fshrR - a.shrR) <= 1.5 && a.menuOp === 1, `${tag}: #1730: phone - the folder's share icon in the column of the lists' share icon ` + JSON.stringify(a));
     // a tap on the arrow folds, a tap on the name opens the folder
     await ev(`(() => { document.querySelector('#side .fhead[data-folder="Family"]').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);  // 2.196.0 (#2737): the drawer's fixed top is taller, the folder may sit below the screen
-    const hit = await ev(`(() => { const r = document.querySelector('#side .fhead[data-folder="Family"] .fcar').getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!el.closest('[data-act="folder-toggle"]') && !el.closest('.fgo, .iconbtn'); })()`);
+    const hit = await ev(`(() => { const r = document.querySelector('#side .fhead[data-folder="Family"] .fcar').getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!el.closest('[data-act="folder-toggle"]') && !el.closest('.fgo, .sbbtn, .iconbtn'); })()`);  // 2.352.0 (#2748): + .sbbtn (the name on the sidebar tree)
     check(hit, `${tag}: #1607: the arrow belongs to the folding part of the row`);
     await shot('p2461a-390-side.png');
     await ev(`(() => { closeSide(); location.hash = '#l/${SEC.list}'; return 1; })()`); await ready(ev, '#view .ghead[data-section]');

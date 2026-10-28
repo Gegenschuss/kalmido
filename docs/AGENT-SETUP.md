@@ -11,7 +11,8 @@ another coding assistant, an n8n flow, a local model or a script) and run it on 
 subscription or API key. Kalmido provides:
 
 - an **agent account**: a user of type *Agent*, never an admin, sees only the projects shared with it
-  (the API calls projects lists: `list_id`, `/api/v1/lists`, `kind=list|project`),
+  (the API calls projects lists: `list_id`, `/api/v1/lists`, `kind=list|project`; since 2.352.0 `kind` is no longer
+  evaluated: every list but the inbox is a project, tracked = has a `status`),
 - an **API token** for it (shown once),
 - **events** (mentions, assignments, chat messages, reactions, jobs) by webhook or long polling,
 - the **MCP server** [`mcp/kalmido_mcp.py`](../mcp/kalmido_mcp.py), so the agent can use Kalmido as a tool,

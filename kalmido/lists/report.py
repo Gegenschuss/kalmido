@@ -70,7 +70,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     reached = [r for r in done_all if r["ms"]]
     opened = c.execute(f"""SELECT {cols},
                              (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE kind='project') AND {tvis(c, uid, 'b.')}) AS open_blockers,
+                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers,
                              (EXISTS (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind!='created' AND a.created_at>=? AND a.created_at<?)
                               OR EXISTS (SELECT 1 FROM comments cm WHERE cm.task_id=t.id AND cm.deleted_at IS NULL AND cm.created_at>=? AND cm.created_at<?)
                               OR EXISTS (SELECT 1 FROM time_entries te WHERE te.task_id=t.id AND te.start>=? AND te.start<?)
@@ -86,7 +86,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     upcoming = [r for r in opened if r["due"] and t0 <= r["due"][:10] <= ahead]
     ms_next = [r for r in opened if r["ms"] and (not r["due"] or r["due"][:10] >= t0)][:5]
     out = {"list": {"id": lid, "name": tr("Basket") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"],
-                    "project": lst["kind"] == "project", "status": lst["status"] or None},
+                    "project": not lst["is_inbox"], "status": lst["status"] or None},
            "from": frm.isoformat(), "to": to.isoformat(), "today": t0,
            "counts": {"done": len(done), "done_subtasks": sum(1 for r in done_all if r["parent_id"] and not r["ms"]),
                       "in_progress": len(progress), "blocked": len(blocked), "overdue": len(overdue), "upcoming": len(upcoming),

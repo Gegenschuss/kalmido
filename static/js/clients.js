@@ -301,13 +301,13 @@ function ckl_pick(md, anchor, i) {
 }
 
 // ---- the list dialog: the client of the list, its forms
-function listDlgTeamHtml(l, id) {
+function listDlgTeamHtml(l, id, part = '') {  // 2.352.0 C (#2751): part client | forms (the project dialog shows them apart)
   if (!id || l.is_inbox) return '';
   const mng = ['owner', 'admin'].includes(l.role || 'owner');
   const cs = (S.clients || []).filter(c => !c.archived || c.id === l.client_id);
   let h = '';
-  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon && !c.icon.startsWith('ic:') ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
-  if (formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button><span class="muted">${tr('a link that creates tasks here')}</span></div>`;
+  if (part !== 'forms' && clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon && !c.icon.startsWith('ic:') ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
+  if (part !== 'client' && formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button></div><div class="shint lhint keep">${tr('a link that creates tasks here')}</div>`;  // 2.352.0 C (#2751): the hint under the button
   return h;
 }
 document.addEventListener('change', async e => {

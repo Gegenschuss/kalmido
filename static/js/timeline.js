@@ -50,7 +50,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
 // empty dashed track. Click a day = due that day, drag across days = start + due (touch: hold, then drag); the bar then
 // moves to its dated place. Header switch "No date" per device: on by default in project lists, off elsewhere.
 const tlNdKey = listId => listId ? 'l' + listId : 'all';
-function tlNdOn(listId) { const o = LS.get('tlnd', {}) || {}, k = tlNdKey(listId); return k in o ? !!o[k] : !!listId && listById(listId)?.kind === 'project'; }
+function tlNdOn(listId) { const o = LS.get('tlnd', {}) || {}, k = tlNdKey(listId); return k in o ? !!o[k] : !!listId && isProject(listId); }
 function tlNdRows(l, ts) {
   const ids = new Set(ts.map(t => t.id)), ord = [];
   const add = t => { ord.push(t); for (const k of ts.filter(x => x.parent_id === t.id).sort(bySort)) add(k); };  // subtasks under their parent
@@ -130,7 +130,7 @@ function viewTimeline(listId, inCal) {
   const undated = all.filter(t => !t.due).length;
   const ndOn = tlNdOn(listId), und = ndOn ? all.filter(t => !t.due) : [];
   // 2.7.1 (#410): milestones of project lists as markers in the list's row (a list with only milestones in range shows too)
-  const msIn = l => l.kind === 'project' && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
+  const msIn = l => !l.is_inbox && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
   // 2.18.0 (#431): the list of a list timeline always has its group (an empty project can be planned right here)
   const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || listId === l.id).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
   let head = '', months = '', lastM = '';

@@ -257,10 +257,13 @@ m = members(Bo, BL["id"])
 check(BL.get("owner_id") == BOB and m.get(ME["id"]) == "admin" and m.get(CAROL) == "participant", "#929: Bob's new list in the shared folder is shared with Alice (admin) and Carol " + str(m))
 # removing: only new lists / also from the lists
 r = A.delete(B + "/api/folders/people", json={"folder": "Clients", "user_id": CAROL})
-check(r.ok and CAROL in members(A, L3["id"]), "#929: stop sharing new lists: the lists stay")
+# 2.352.0 (#2748): a folder's share works at runtime -- revoking it takes the folder's lists away; L3 stays, Carol is a member
+# of it herself (was: "the lists stay")
+check(r.ok and CAROL in members(A, L3["id"]) and CAROL not in members(A, L1["id"]), "#929 / #2748: stop sharing the folder: its lists go, her own share stays")
 A.put(B + "/api/folders/people", json={"folder": "Clients", "user_id": CAROL, "role": "edit"})
 r = A.delete(B + "/api/folders/people", json={"folder": "Clients", "user_id": CAROL, "remove": True})
-check(r.ok and r.json()["removed"] >= 3 and CAROL not in members(A, L3["id"]), "#929: also from the lists: Carol leaves them " + r.text[:100])
+# 2.352.0 (#2748): the folder's own roles end with the share, remove takes her own shares in the folder's lists too (L3)
+check(r.ok and r.json()["removed"] >= 1 and CAROL not in members(A, L3["id"]), "#929: also from the lists: Carol leaves them " + r.text[:100])
 check(not any(l["id"] == L3["id"] for l in state(Ca)["lists"]), "#929: ... Carol no longer sees them")
 
 print(f"p2290_api: {OKS[0]} ok, {len(FAILS)} failed")

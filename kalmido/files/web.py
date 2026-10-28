@@ -293,7 +293,8 @@ def _shares(c, nid):
     if gq:
         gn = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM groups WHERE id IN ({','.join('?' * len(gq))})", gq)}
     return [{"id": r["id"], "user_id": r["user_id"], "group_id": r["group_id"], "agent_id": r["agent_id"], "role": r["role"],
-             "expires_at": r["expires_at"], "name": names.get(r["user_id"] or r["agent_id"]) or gn.get(r["group_id"], "")}
+             "expires_at": r["expires_at"], "name": names.get(r["user_id"] or r["agent_id"]) or gn.get(r["group_id"], ""),
+             **({"list_role": r["list_role"]} if r["list_role"] else {})}  # 2.352.0 A (#2748): a projects folder's list role
             for r in rows]
 
 
@@ -709,6 +710,8 @@ def files_share_add(nid):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
     fs_ref_need_share(c, me(), n, role)  # 2.199.0 F (#2742, review): passing filed documents on needs that role on them
+    if fs_area_of(c, nid) == "lists":  # 2.352.0 F (#2748, review H1): a projects folder's share hands out list roles -- its owner / an admin of every list below
+        fs_ref_need_move(c, me(), n)
     t = _share_targets(c, n)
     key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
@@ -729,6 +732,13 @@ def files_share_add(nid):
             return err(tr("Too many shares"), 409)
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?)",
                         (nid, tid, role, exp, me(), _now()))
+    lr_ = b.get("list_role")  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
+    if lr_ is None and old and fs_area_of(c, nid) == "lists":
+        c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))
+    elif lr_ is not None and fs_area_of(c, nid) == "lists":
+        if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):
+            return err(tr("Invalid value: {0}", "list_role"))
+        c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?", (lr_, "edit" if lr_ in ("admin", "edit") else "view", sid))
     fs_log_add(c, nid, "share", f"{key[:-3]}:{tid}:{role}")
     if key == "agent_id" and not old:
         _agent_event(c, tid, n, role)
@@ -759,9 +769,20 @@ def files_share_patch(sid):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b["expires_at"], b.get("tz")) if "expires_at" in b else s["expires_at"]
     longer = s["expires_at"] is not None and (exp is None or str(exp) > str(s["expires_at"]))
-    if role != s["role"] or longer:  # 2.238.0 A (#2863): extending a share passes the filed documents on as well
+    lists = fs_area_of(c, s["node_id"]) == "lists"
+    if role != s["role"] or longer or (lists and b.get("list_role")):  # 2.238.0 A (#2863): extending a share passes the filed documents on as well
         fs_ref_need_share(c, me(), need_node(c, s["node_id"]), role)  # 2.199.0 F (#2742, review)
+    if lists:  # 2.352.0 F (#2748, review H2): a list role set / changed without a role change was not checked at all
+        fs_ref_need_move(c, me(), need_node(c, s["node_id"]))
     c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, sid))
+    if "list_role" in b and lists:  # 2.352.0 A (#2748)
+        lr_ = b["list_role"]
+        if lr_ is not None and (lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and s["agent_id"])):
+            return err(tr("Invalid value: {0}", "list_role"))
+        c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?",
+                  (lr_, role if lr_ is None else ("edit" if lr_ in ("admin", "edit") else "view"), sid))
+    elif "role" in b and lists:
+        c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))  # a new view / edit replaces the list role
     fs_log_add(c, s["node_id"], "share_change", f"{sid}:{role}")
     bump(c)
     c.commit()

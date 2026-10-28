@@ -201,7 +201,8 @@ def kid_force_participant(c, kid):
     c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)", (kid,))
     c.execute("""UPDATE list_members SET role='participant',
                  own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
-                 grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))
+                 grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END,
+                 frole=CASE WHEN frole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))  # 2.352.0 A (#2748): frole
 
 
 def _jparse(v):

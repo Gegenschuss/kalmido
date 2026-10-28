@@ -6,7 +6,7 @@
 // waiting tasks of `id` I could move (the same stay-put rules as the server; ends a branch like there)
 function dch_waiting(id) { return openTasks().filter(x => (x.blockers || []).includes(id) && dFor(x)); }
 const dch_movable = x => x.status === 0 && x.due && !x.ms && canEdit(x);
-function dch_on(t) { const l = t && listById(t.list_id); return !!l && depsOn() && l.kind === 'project' && !!l.dep_shift; }
+function dch_on(t) { const l = t && listById(t.list_id); return !!l && depsOn() && !l.is_inbox && !!l.dep_shift; }
 // every task the server would move along when t's due date moves `days` later: [task]
 function dch_chainOf(t, days) {
   if (!(days > 0) || !dch_on(t)) return [];
