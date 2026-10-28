@@ -65,10 +65,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 
   // ================= #414 two types + "Show completed at the bottom"
   let w = await boot({user: 'alice', hash: 'l/' + SH}), d = w.document;
-  check(w.eval('LKINDS.map(x => x[0]).join()') === 'list,project', 'two list types');
+  check(w.eval("typeof LKINDS") === 'undefined', 'no list types any more: every list is a project (2.352.0, #2752)');
   w.eval(`listModal(${SH})`); await sleep(200);
   let md = d.querySelector('.modal.lmodal');
-  check(md && md.querySelector('#l-kindp') && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: List / Project + "Show completed at the bottom" (off)');
+  check(md && !md.querySelector('#l-kindp') && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: "Show completed at the bottom" (off), no type switch (2.352.0 C, #2751)');
   md.querySelector('#l-dab').checked = true; md.querySelector('#l-dab').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1);
   check((await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1, 'the dialog saves the option');

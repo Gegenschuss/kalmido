@@ -39,10 +39,14 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const docs = await mk('Docs', PRJ, {due: addD(T0, 5)});
   check((await dep(build, spec)).status < 300 && (await dep(test, build)).status < 300, 'setup: dependencies created');
 
-  // ================= (1) Flow in a project list (default with the dependencies module)
+  // ================= (1) Flow in a project list (2.352.0 B #2752: Priority is the default everywhere, a stored Flow stays)
   let w = await boot({user: 'alice', hash: 'l/' + PRJ}), d = w.document;
   const order = () => [...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id);
-  check(w.eval('sortMode()') === 'flow', 'project list: Flow is the default sort: ' + w.eval('sortMode()'));
+  check(w.eval('sortMode()') === 'prio', '#2752: project list: Priority is the default sort: ' + w.eval('sortMode()'));
+  w.close();
+  check((await call('PATCH', `/api/lists/${PRJ}`, {sort_mode: 'flow'})).status < 300, 'setup: the project keeps its own sort Flow');
+  w = await boot({user: 'alice', hash: 'l/' + PRJ}); d = w.document;
+  check(w.eval('sortMode()') === 'flow', 'project list with its own sort: Flow: ' + w.eval('sortMode()'));
   check(JSON.stringify(order()) === JSON.stringify([spec, build, test, docs]), 'Flow: a task comes after what it waits on (Spec, Build, Test, then Docs by date): ' + order());
   const nextRows = [...d.querySelectorAll('#view .trow.flownext')].map(r => +r.dataset.id);
   check(nextRows.length === 1 && nextRows[0] === spec, 'the first ready task carries the "Next" marker: ' + nextRows);
@@ -56,9 +60,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(onBtn && /Flow/.test(onBtn.textContent), 'sort menu: Flow is the active mode');
   w.eval(`closePop && closePop()`);
   // an explicit choice wins over the default
-  w.eval(`LS.set('sort2.l:${PRJ}', 'date'); render()`); await sleep(100);
-  check(order()[0] === test && !d.querySelector('#view .trow.flownext'), 'Date sort: overdue Test first, no marker');
-  w.eval(`LS.del('sort2.l:${PRJ}'); render()`); await sleep(100);
+  // 2.352.0 B (#2752): the project's own stored sort (Flow) is the owner's setting: the choice goes to the server
+  await call('PATCH', `/api/lists/${PRJ}`, {sort_mode: 'date'}); await w.eval('load().then(render)');
+  check(await until(() => order()[0] === test && !d.querySelector('#view .trow.flownext')), 'Date sort: overdue Test first, no marker');
+  await call('PATCH', `/api/lists/${PRJ}`, {sort_mode: 'flow'}); await w.eval('load().then(render)');
   // ties: start date, then due date + time, then priority, then manual order
   const tie = w.eval(`(() => { const m = (id, o) => ({id, sort: id, priority: 0, due: null, due_time: null, start: null, blockers: [], ...o});
     return flowSort([m(1, {due: '${addD(T0, 3)}'}), m(2, {due: '${addD(T0, 3)}', start: '${T0}'}), m(3, {due: '${T1}', due_time: '10:00'}), m(4, {due: '${T1}', due_time: '09:00'}),

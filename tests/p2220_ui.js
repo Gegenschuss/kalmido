@@ -185,7 +185,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   w.eval(`depPicker(${a1.id}, 'by')`); await sleep(200);
   const grp = [...d.querySelectorAll('.dpmodal .tpkg')];
   // 2.152.2 (#2624): project instead of list
-  check(grp.length === 2 && /This project/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
+  // 2.352.0 B (#2752): every list is a project, so the seeded lists with open tasks are groups too
+  check(grp.length >= 2 && /This project/.test(grp[0].querySelector('.tpkh').textContent) && grp.slice(1).some(g => /Shop/.test(g.querySelector('.tpkh').textContent))
     && grp[0].querySelector('.tpkrow .tpkt') && grp[0].querySelector('.tpkrow .tpkm'), '#685: grouped (this list first, then the others under their name), title + list in their own lines');
   d.querySelector('.dpmodal').remove();
   click(w, d.querySelector('#detail [data-act="wait-on"]')); await sleep(150);

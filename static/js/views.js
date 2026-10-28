@@ -138,12 +138,11 @@ async function setShowDone(on, key = S.route.key) {
 }
 const doneItem = () => ({label: showDone() ? tr('Hide completed') : tr('Show completed'), icon: 'eye', fn: () => setShowDone(!showDone())});
 // default: priority first, manual order (drag) inside each priority. 'sort2.' = new key, old per-view choices reset once.
-// 1.7.0: "Flow" (dependencies module only) is the default of project lists (list view) and of "Now doable"
+// 1.7.0: "Flow" (dependencies module only) is the default of "Now doable" (2.352.0 B #2752: no longer of projects)
 function sortDefault(k = S.route.key) {
   if (!depsOn()) return k === 'doable' ? 'date' : 'prio';
   if (k === 'doable') return 'flow';
-  const l = k.startsWith('l:') ? listById(+k.slice(2)) : null;
-  return l && l.kind === 'project' && !isKanban() && !isTimeline() ? 'flow' : 'prio';
+  return 'prio';  // 2.352.0 B (#2752): priority everywhere; a list's own stored sort (e.g. Flow) stays
 }
 // 2.27.0 (#988): a list's sort is the list's (lists.sort_mode, set by its owner / list admins, the same for everyone); a
 // member's own choice on this device ('sort2.' + key) is a temporary look the view points out (sortOwnHint)
@@ -346,7 +345,7 @@ function staleChipHtml(t) {
 function dsxOn(l) {
   if (!l || l.checklist || l.family === 'shopping') return false;
   if (l.done_in_section != null && l.done_in_section !== '') return !!+l.done_in_section;
-  return l.kind === 'project' || l.ptype === 'software' || S.sections.some(s => s.list_id === l.id);
+  return l.ptype === 'software' || S.sections.some(s => s.list_id === l.id);  // 2.352.0 B (#2752): kind is not read
 }
 const dsxFixedOff = l => !!l && (!!l.checklist || l.family === 'shopping');
 // open tasks of a section (already sorted) + its completed ones: the same sort for both, in Flow (an order of the open

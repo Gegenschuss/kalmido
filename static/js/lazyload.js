@@ -262,12 +262,7 @@ const lifeOn = () => LIFE_MODS.some(m => feat(m));
 const MOD_PRIV = {health: N_('Health data is specially protected. Only you see it, unless you share a list.'),
   review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.')};
 const modPrivHtml = ks => ks.filter(k => MOD_PRIV[k]).map(k => `<small class="modpriv">${ic('info', 's')} ${tr(MOD_PRIV[k])}</small>`).join('');
-function fmtMoney(n) {
-  if (n == null) return '';
-  let s; try { s = new Intl.NumberFormat(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n); } catch { s = n.toFixed(2); }
-  const cur = S.settings.time_currency ?? '€';
-  return cur ? s + ' ' + cur : s;
-}
+const fmtMoney = n => curMoney(n, S.settings.time_currency ?? '€');  // 2.368.0 C (#2983): one money format (i18n.js curMoney)
 window.lifeBar = l => { if (l?.life && !l.archived && (lifeOn() || (l.life === 'reading' && feat('reading')))) ld_later('life'); return ''; };  // 2.172.0 B (#2679): + a read-later project
 window.lifeDetailHtml = t => { if (t?.id > 0 && !t.context && ['contract', 'device', 'upkeep', 'health', 'bookmark'].includes(t.fam?.kind)) loadModule('life').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 window.lifeCareHtml = c => { if (c && feat('care')) ld_later('life'); return ''; };

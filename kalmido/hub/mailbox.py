@@ -725,7 +725,7 @@ def _context(c, src):
     if src.get("list_id"):
         need_list(c, src["list_id"])
         l = H._list_row(c, src["list_id"])
-        if l["kind"] != "project" or l["e2e"] or list_role(c, l["id"], uid) not in WRITE_ROLES:
+        if l["no_mail"] or l["e2e"] or list_role(c, l["id"], uid) not in WRITE_ROLES:  # 2.352.0 G (#2752, review M5)
             raise Denied(403)
         cid = None
         if l["client_id"]:
@@ -857,7 +857,7 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     try:
         with c.savepoint():
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (plain["subject"] or tr("E-mail", lg=lg))
-            folder = fs_folder(c, uid, org, [H.ROOT, cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
+            folder = fs_folder(c, uid, org, [H.hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
         name = ("mail" if sealed else re.sub(r"[\\/:*?\"<>|]+", "-", plain["subject"])[:60].strip() or "mail") + ".eml"
         with c.savepoint():
             eml_id = fs_put(c, uid, folder, name, raw, "message/rfc822", org)

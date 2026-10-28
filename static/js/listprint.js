@@ -41,7 +41,7 @@ function lexHead(l, j) {
 function lexDoc(lid, done, notes, head) {
   const l = listById(lid), groups = lexRows(lid, done);
   const row = ({t, depth}) => {
-    const meta = [t.due ? fmtDateLoc(t.due) + (t.due_time ? ' ' + t.due_time : '') : '', t.priority ? tr(PRIO_NAMES[t.priority] || '') : '',
+    const meta = [t.due ? fmtDateLoc(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : '') : '', t.priority ? tr(PRIO_NAMES[t.priority] || '') : '',
       (t.tags || []).map(g => '#' + g).join(' ')].filter(Boolean);
     return `<li class="lxr ${t.status ? 'done' : ''}" style="margin-left:${depth * 1.5}rem"><span class="lxbox" aria-hidden="true">${t.status === 2 ? '&#10003;' : ''}</span>
       <div class="lxt"><b>${esc(t.title)}</b>${meta.length ? `<span class="muted"> · ${esc(meta.join(' · '))}</span>` : ''}${notes && t.content ? `<div class="lxn">${esc(t.content)}</div>` : ''}</div></li>`;
@@ -56,7 +56,7 @@ function lexPrint(lid) {
   /** @type {any} */
   const el = document.createElement('div');
   el.className = 'tsheet';
-  let head = l.kind === 'project' ? S.povD?.[lid]?.j || null : null;  // 2.145.0 C (#2432): the project page's data, fresh below
+  let head = !l.is_inbox ? S.povD?.[lid]?.j || null : null;  // 2.145.0 C (#2432): the project page's data, fresh below
   const draw = () => {
     const done = LS.get('lexDone', true), notes = LS.get('lexNotes', false);
     if (notes) {  // 2.280.0 A (#3108): long notes are not in the state: loaded first (detail.js), then drawn again
@@ -86,5 +86,5 @@ function lexPrint(lid) {
   el.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
   draw();
   document.title = lname(l);
-  if (l.kind === 'project') rawFetch('GET', `/api/lists/${lid}/overview`).then(j => { head = j; if (el.isConnected) draw(); }, () => {});  // offline / no right: the page without head
+  if (!l.is_inbox) rawFetch('GET', `/api/lists/${lid}/overview`).then(j => { head = j; if (el.isConnected) draw(); }, () => {});  // offline / no right: the page without head
 }

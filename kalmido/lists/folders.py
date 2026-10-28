@@ -93,8 +93,8 @@ def _v1_msg(e):
 
 
 def _list_agent(c, lid):
-    r = c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' ORDER BY m.user_id",
-                  (lid,)).fetchone()
+    r = c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' "
+                  "AND NOT (m.frole IS NOT NULL AND m.own_role IS NULL) ORDER BY m.user_id", (lid,)).fetchone()  # 2.352.0 A (#2748): not a folder's agent
     return r[0] if r else None
 
 
@@ -284,7 +284,8 @@ def folder_props_get():
     each keeps on its own."""
     from ..lists.lists import clean_folder
     c = db()
-    f = clean_folder(request.args.get("folder") or "", strict=False)
+    from ..lists.lffolder import lf_path_arg
+    f = clean_folder(lf_path_arg(c, request.args.get("folder"), request.args.get("node")) or "", strict=False)  # 2.352.0 A (#2748): or node=
     if not f:
         return err(tr("Invalid value: {0}", "folder"))
     return jsonify(folder_info(c, me(), f))
@@ -299,7 +300,8 @@ def folder_props_put():
     c, b = db(), body()
     if g.user["kind"] == "agent":
         raise Denied(403)
-    f = clean_folder(b.get("folder") or "")
+    from ..lists.lffolder import lf_path_arg
+    f = clean_folder(lf_path_arg(c, b.get("folder"), b.get("node")) or "")  # 2.352.0 A (#2748): or node=
     if not f:
         return err(tr("Invalid value: {0}", "folder"))
     apply = b.get("apply", "all")

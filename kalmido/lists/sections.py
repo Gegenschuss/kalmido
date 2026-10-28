@@ -10,7 +10,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..core.access import Denied, need_list
 from ..lists.lists import clean_folder, FOLDER_DEPTH, FOLDER_SEP, folder_under
-from ..lists.groups import grp_list_ids, grp_sync
+from ..lists.groups import grp_list_ids, grp_sync, grp_touch
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -103,7 +103,7 @@ def _folder_move(c, uid, fn):
 def folder_rename():
     """{old, new}: renames or moves a folder (paths, 2.4.0 #361): "A" -> "B" renames, "A/x" -> "B/x" moves a subfolder
     into another folder, "A/x" -> "x" makes it a top-level folder, "A" -> "B/A" nests a folder (only one without
-    subfolders: at most FOLDER_DEPTH levels). Its lists and subfolders go along; an existing target folder is merged."""
+    subfolders: at most FOLDER_DEPTH levels, 2.352.0: 30). Its lists and subfolders go along; an existing target folder is merged."""
     b = body()
     old, new = clean_folder(str(b.get("old") or ""), False), clean_folder(b.get("new") or "")
     if not old or not new:
@@ -115,9 +115,22 @@ def folder_rename():
     c = db()
     uid = me()
     write_lock(c, f"usettings-{int(uid)}")  # 2.269.0 B (#3014): folder order / closed folders read-change-write like PATCH /api/settings
-    subs = any(p != old and folder_under(p, old) for p in _folder_paths(c, uid))
-    if subs and new.count(FOLDER_SEP) + 1 >= FOLDER_DEPTH:
+    # 2.352.0 A (#2748): any depth up to FOLDER_DEPTH (was: a folder with subfolders never became a subfolder)
+    below = max([p.count(FOLDER_SEP) - old.count(FOLDER_SEP) for p in _folder_paths(c, uid) if folder_under(p, old)] or [0])
+    if new.count(FOLDER_SEP) + 1 + below > FOLDER_DEPTH:
         return err(tr("Folders nest at most {0} levels deep", FOLDER_DEPTH))
+    folder_rename_do(c, uid, old, new)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+def folder_rename_do(c, uid, old, new):
+    """Folder path old of uid becomes new: lists, member rows, folder order, shares and every setting keyed by the path go
+    along. 2.352.0 A (#2748): also the folder nodes in the projects trees (lists/lffolder.py; a node moved in the tree calls
+    this after the move). Caller commits."""
+    from ..lists.lffolder import lf_folder_repath
+    lf_folder_repath(c, uid, old, new)
     _folder_move(c, uid, lambda p: new + p[len(old):] if folder_under(p, old) else p)
     for fp in c.execute("SELECT folder, user_id FROM folder_people WHERE owner_id=?", (uid,)).fetchall():  # 2.22.0 (#740)
         if folder_under(fp[0], old):
@@ -136,9 +149,7 @@ def folder_rename():
     lp_folder_rename(c, uid, old, new)  # 2.53.0 (#1426): the folder's colour (and its subfolders') go along
     from ..lists.favorites import fv2_folder_rename
     fv2_folder_rename(c, uid, old, new)  # 2.57.0 (#1798): a favourite folder (and its subfolders) stays a favourite
-    bump(c)
-    c.commit()
-    return jsonify(ok=True)
+    grp_touch(c, uid)  # 2.352.0 A (#2748): the lists' nodes where their new paths say, their roles anew
 
 
 @app.post("/api/folders/delete")
@@ -160,6 +171,8 @@ def folder_delete():
             rest = p[len(name) + 1:]
             return (parent + FOLDER_SEP + rest) if parent else rest
         return p
+    from ..lists.lffolder import lf_folder_dissolve
+    lf_folder_dissolve(c, uid, name)  # 2.352.0 A (#2748): its nodes go, their content one level up (before the paths move)
     _folder_move(c, uid, lambda p: "" if up(p) == "\0" else up(p))
     from ..integrations.gitfolder import gf_folder_removed
     gf_folder_removed(c, uid, lambda p: "" if up(p) == "\0" else up(p))  # 2.33.0 (#934): its repositories go to the parent folder
@@ -167,6 +180,7 @@ def folder_delete():
     pb_folder_removed(c, uid, name, up)  # 2.39.0 (#1168): the subfolders' Playbooks move up; the folder's own one ends empty (history kept)
     c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=?", (uid, name))  # 2.22.0 (#740): the folder is gone
     c.execute("DELETE FROM folder_agents WHERE owner_id=? AND folder=?", (uid, name))  # 2.41.0 (#1420)
+    grp_touch(c, uid)  # 2.352.0 A (#2748)
     bump(c)
     c.commit()
     return jsonify(ok=True)

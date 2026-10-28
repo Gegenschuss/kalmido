@@ -599,6 +599,13 @@ p2177_a_ui
 p2280_c_ui
 p2233_c_chatcolor_ui
 p2240_a_assistant
+p2352_d_mailviewer_ui
+p2352_a_listfolders
+p2352_f_review
+p2352_e_listtree_ui
+p2352_b_project_unify_ui
+p2352_c_listmodal_ui
+p2350_a_chathead_ui
 p2330_a_kleine_fehler
 p2330_a_kleine_fehler_ui
 p2376_a_wiki_snippet_ui
@@ -607,8 +614,6 @@ p2360_0_c_agents_api
 p2380_l_ui
 p2380_b_buero_ui
 p2331_d_dialog_foot_ui
-p2380_l_ui
-p2380_b_buero_ui
 p2360_0_d_hardening
 p23612_a_api
 p23612_b_api

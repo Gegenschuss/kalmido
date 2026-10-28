@@ -139,7 +139,8 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   check(await until(() => /harbour/.test(cards().find(a => a.getAttribute('href') === `#note/${N1}`)?.textContent || '')), '#1516: the first words of a note');
   // filter by list
   const sel = d.querySelector('#sbn-l');
-  check(sel && sel.querySelector('optgroup'), '#1516: a filter by project / list');
+  // 2.352.0 B (#2752): groups only split projects from the basket; without basket notes a flat list of projects
+  check(sel && sel.querySelector(`option[value="${GAR}"]`), '#1516: a filter by project / list');
   sel.value = String(GAR); sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(150);
   check(cards().length === 1 && cards()[0].getAttribute('href') === `#note/${N3}`, '#1516: filtered to Garden');
   sel.value = '0'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(150);

@@ -16,7 +16,8 @@ const I18N_EN = {
   _months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
   _months_short: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   // near: 2-6 days ahead, short: this year, year: other year, long: calendar day view title
-  _date_formats: {near: '{wd}, {mon} {d}', short: '{wd}, {mon} {d}', year: '{wd}, {mon} {d}, {y}', long: '{wdl}, {month} {d}'},
+  // 2.368.0 B (#2982): British order like the locale en-GB ("Mon 26 Oct", not the US "Mon, Oct 26")
+  _date_formats: {near: '{wd} {d} {mon}', short: '{wd} {d} {mon}', year: '{wd} {d} {mon} {y}', long: '{wdl} {d} {month}'},
 };
 let I18N = {code: 'en', dict: {}};
 const I18N_PENDING = {};
@@ -192,6 +193,17 @@ function i18nCached(code) {
 }
 const i18nGet = k => I18N.dict[k] ?? I18N_EN[k];
 const LOCALE = () => i18nGet('_meta')?.locale || I18N.code;
+// 2.368.0 C (#2983): every amount through one helper: the locale places the sign ("1.234,50 €", "€1,234.50", "$1,234.50",
+// like calc.fmt_money on paper); cur = a code or a typed sign (time_currency "€"), other text stays behind the number;
+// loc = a document's language instead of the person's. Plain spaces as on the server, the number itself does not break
+const CUR_SIGNS = {'€': 'EUR', '$': 'USD', '£': 'GBP'};
+function curMoney(n, cur, loc) {
+  if (n == null || n === '' || !Number.isFinite(+n)) return '';
+  const c = String(cur ?? '').trim(), code = CUR_SIGNS[c] || (/^[A-Za-z]{3}$/.test(c) ? c.toUpperCase() : ''), l = loc || LOCALE();
+  if (code) try { return (+n).toLocaleString(l, {style: 'currency', currency: code, currencyDisplay: 'narrowSymbol'}).replace(/[\u00a0\u202f]/g, ' ').replace(/(\d) (?=\d)/g, '$1\u00a0'); } catch { /* an unknown code */ }
+  const s = (+n).toLocaleString(l, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  return c ? s + ' ' + c : s;
+}
 const i18nFmt = (s, a) => a.length ? s.replace(/\{(\d+)\}/g, (m, i) => a[i] ?? m) : s;
 const i18nKey = k => { const bar = k.indexOf('|'); return bar > 0 && !/[<>]/.test(k) ? k.slice(0, bar) : k; };
 /** @param {string} key @param {...any} a @returns {string} */  // 2.102.0 (#1995)

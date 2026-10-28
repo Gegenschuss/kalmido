@@ -180,7 +180,6 @@ const EMOJIS = ['📥', '📌', '⭐', '🔥', '✅', '📅', '⏰', '🎯', '�
 const EMO_RE = /^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)\s*/u;
 // list type (1.2): the choices, a hint per type (project: only the features whose module is on), the menu
 // 2.7.2 (#414): two types only; the old checklist type is the list option "Show completed at the bottom" (lists.checklist)
-const LKINDS = [['list', N_('Project')], ['project', N_('Project')]];
 const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 // 2.4.0 (#243): project types = built-in project templates (server: PTYPES); '' = a blank project. Offered in the "New list"
 // dialog (type Project, next to the person's own list templates, #328), the setup and the welcome tour.
@@ -213,7 +212,7 @@ async function projectNextSteps(lid) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') md.remove();
-    if (b.dataset.m === 'repo') { md.remove(); listModal(lid); setTimeout(() => { const r = $('.lmodal #l-repos-h'); r?.scrollIntoView?.({block: 'start'}); }, 150); }
+    if (b.dataset.m === 'repo') { md.remove(); listModal(lid, '', {open: 'proj'}); setTimeout(() => { const r = $('.lmodal #l-repos-h'); r?.scrollIntoView?.({block: 'start'}); }, 150); }
     if (b.dataset.m === 'share') {
       if (!await agSafeFirst()) return;  // 2.30.0 (#920 / #919)
       try { await bridgeTry(ok => api('PUT', `/api/lists/${lid}/members`, {user_id: +$('#ns-agent', md).value, role: 'edit', ...(ok ? {bridge_ok: true} : {})})); } catch { return; }
@@ -247,22 +246,13 @@ function projectParts() {
   return [depsOn() && (feat('timeline') ? tr('dependencies with the Gantt timeline') : tr('dependencies')),
     progressOn() && tr('progress and status')].filter(Boolean);  // 2.39.1 (#1217): custom fields are in every list
 }
-function kindHint(k) {
-  if (k === 'project') { const p = projectParts(); return p.length ? tr('This project gets {0}.', esc(p.join(', '))) : tr('The project features are switched off (Settings > Modules).'); }
-  return tr('Switch it on for a progress ring, a status, the project page and dependencies.');  // 2.39.1 (#1217); 2.41.0 (#1471): time tracking is a switch of every list; 2.152.2 (#2624): a switch, not a type
-}
-async function setListKind(id, kind) {
-  const l = listById(id); if (!l || (l.kind || 'list') === kind) return;
-  const e = await listPatch(id, {kind}, tr('Type of {0}: {1}', qn(lname(l)), tr(LKINDS.find(x => x[0] === kind)[1])));
-  if (e !== false) offerUndo(tr('Type: {0}', tr(LKINDS.find(x => x[0] === kind)[1])), e);
-}
 // 2.18.0 (#408): the project type of an existing list ('' = none), shown and changed in the list dialog (owner / list
 // admins). The server switches on what the type needs (type Project, ticket types for software, the type's view while
 // the list is empty, its modules for this person) and never deletes anything; one history step takes all of it back.
 const ptypeName = k => k ? tr(PTYPE_UI.find(x => x[0] === k)?.[1] || k) : tr('None|project type');
 const ptypeHint = k => tr(PTYPE_UI.find(x => x[0] === (k || ''))?.[3] || PTYPE_UI[0][3]);
 // the Repository area of a project: for software projects and for every list that already has a repository
-const repoShown = l => (l.ptype === 'software' && (l.kind || 'list') === 'project') || !!(l.repos || []).length;
+const repoShown = l => l.ptype === 'software' || !!(l.repos || []).length;  // 2.352.0 B (#2752): kind is not read
 // 2.22.0 (#746): the software parts of a list's properties (ticket types, repository) only for a software project or a list
 // that has a repository; never for family / household lists, kids or people who set Kalmido up for home or family
 const swArea = l => repoShown(l);
@@ -608,7 +598,7 @@ function shareModal(id, opt = {}) {
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
-  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
+  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}${p.via_folder && cur.folder ? ` <span class="muted lfvia">${esc(tr('via the folder {0}', fDisp(cur.folder)))}</span>` : ''/* 2.352.0 E (#2748) */}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
       ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
@@ -828,6 +818,47 @@ function autoEmoji(name) {
   const hit = f => AUTO_EMO.find(([, ks]) => ks.split(' ').some(k => words.some(w => f(w, k))));  // the beginning of a word first
   return (hit((w, k) => w === k || (k.length > 3 && w.startsWith(k))) || hit((w, k) => k.length > 4 && w.endsWith(k)) || [''])[0];
 }
+// 2.352.0 C (#2751): a folding part of the project dialog, built like the Share dialog's (shSec): closed at first, its
+// short state in the folded line (lmSum), open / closed remembered per device (LS lmSecs), a dot when a setting in it
+// differs from the folder's (folder_own); a part without content is left out. o.open / an archived project open a part
+const LM_FKEYS = {time: ['time_tracking'], show: ['hide_done'], agents: ['agent_id', 'agent_members', 'agent_tidy', 'agent_listen', 'agent_followup']};
+const lmOpen = k => !!(LS.get('lmSecs', {}) || {})[k];
+function lmSec(k, title, inner, fown = [], open = false) {
+  if (!inner.replace(/<[^>]*>/g, '').trim()) return '';  // no text = nothing in it
+  const dot = (LM_FKEYS[k] || []).some(x => fown.includes(x));
+  return `<details class="shsec lmsec" id="lm-sec-${k}" data-lmsec="${k}" ${open || lmOpen(k) ? 'open' : ''}><summary><h4>${title}</h4>${dot ? `<span class="lmdot" role="img" aria-label="${esc(tr('Differs from the folder'))}" title="${esc(tr('Differs from the folder'))}"></span>` : ''}<span class="shsecst muted" id="lm-st-${k}"></span>${ic('chev', 's shchev')}</summary><div class="lmsecb">${inner}</div></details>`;
+}
+// the short state: the switches that are on (the row's label, or the switch's own text in a row with several), the
+// selects not at their default ("label: choice"), the filled number fields, and texts marked .lmsum; else a default
+function lmSum(sec) {
+  const out = [], lab = el => (el.closest('.row')?.querySelector(':scope > label')?.textContent || '').trim();
+  for (const el of sec.querySelectorAll('.lmsecb input, .lmsecb select, .lmsecb .lmsum, .lmsecb #l-e2e-st')) {
+    if (el.closest('[hidden], .members, .emogrid, .pbarea')) continue;
+    if (el.matches('.lmsum, #l-e2e-st')) { if (el.textContent.trim()) out.push(el.textContent.trim()); continue; }
+    if (el.type === 'checkbox') { if (!el.checked) continue; const r = el.closest('.row'), n = r ? r.querySelectorAll('input[type="checkbox"]').length : 0; out.push(n === 1 && lab(el) ? lab(el) : (el.closest('label')?.textContent || '').trim()); continue; }
+    if (el.tagName === 'SELECT') { const d = el.dataset.lmdef ?? el.options[0]?.value; if (el.value !== d && el.selectedOptions[0]) out.push(`${lab(el)}: ${el.selectedOptions[0].textContent.trim()}`); continue; }
+    if (el.type !== 'hidden' && el.type !== 'radio' && el.value.trim() && el.id) out.push(`${lab(el)}: ${el.value.trim()}${el.id === 'l-rate' && S.settings.time_currency ? ' ' + S.settings.time_currency : ''}`);
+  }
+  const k = sec.dataset.lmsec;
+  if (!out.length) out.push(k === 'time' && $('#l-time', sec) ? `${tr('Time tracking')}: ${tr('Off')}` : k === 'sec' ? tr('Off') : k === 'acts' ? '' : tr('Default'));
+  return out.filter(Boolean).join(' · ');
+}
+function lmSecWire(md) {
+  const draw = () => { for (const sec of $$('.lmsec', md)) { const st = $('.shsecst', sec); if (st) st.textContent = lmSum(sec); } };
+  let q = 0; const later = () => { if (!q) q = requestAnimationFrame(() => { q = 0; if (md.isConnected) draw(); }); };
+  md.addEventListener('toggle', e => {  // toggle does not bubble: caught on the way down
+    const k = e.target.dataset?.lmsec; if (!k) return;
+    LS.set('lmSecs', {...(LS.get('lmSecs', {}) || {}), [k]: e.target.open});
+  }, true);
+  md.addEventListener('change', later); md.addEventListener('input', later);
+  new MutationObserver(later).observe(md, {childList: true, subtree: true});  // parts that load later (lock, agents)
+  draw();
+}
+async function lmStatusSet(lid, sel) {  // the status at once, without a note (the status dialog adds one, with the history)
+  const v = sel.value;
+  try { await api('POST', `/api/lists/${lid}/status`, {status: v, note: ''}); } catch { sel.value = listById(lid)?.status || ''; return; }
+  await load(); render(); toast(v ? tr('Status: {0}', statusLabel(v)) : tr('Status cleared'));
+}
 // 2.361.2 (#2923): moving a project into an organisation: a member gets it back only through its admins (they ask for it)
 function lwsBack(org, from) {
   if (!org || +org === +(from || 0) || (S.me?.workspaces || []).find(w => w.id === +org)?.role === 'admin') return '';
@@ -856,69 +887,75 @@ function listModal(id, folder = '', o = {}) {
   const base = l.is_inbox && inboxDef(l.name) ? tr('Basket') : m0 ? l.name.slice(m0[0].length) : l.name;  // inbox keeps its stored name unless renamed
   // 1.5.1: an existing list saves itself like the settings (every change at once, "Saved · Undo", one history step each);
   // a new list keeps Cancel / Create
+  // 2.352.0 C (#2751): the basics stay on top (name, folder, workspace, visibility, client, view, status, sharing); the rest
+  // folds into parts (lmSec), closed at first with a short state in the folded line; "Progress and status" is gone (#2752)
+  const fown = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })() : [];
   const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit project')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New project')}</h3>`}
     <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${adis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${adis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && (own || ladm) ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
-    <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
-    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><span></span><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Progress and status')}</label></div>${''/* 2.152.2 (#2624): the type "Simple list | Project" became this switch; on = kind project */}
-    <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
+    ${id ? '' : `<input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">`}
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
+    <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
     <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
-    <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
-    ${listDlgTeamHtml(l, id)}
+    ${listDlgTeamHtml(l, id, 'client')}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
-    ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow" ${(l.kind || 'list') === 'project' ? 'hidden' : ''}><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
-    ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
-      <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the standard sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
-      <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
-    <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
-    ${id && !l.is_inbox ? ptypeRowHtml(l) : ''}
-    ${own && !l.is_inbox ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
-    <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
-    ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
-    ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
-    ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
-    ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
-    ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
-    <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
-    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
-    ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}
-    ${id ? whiBoxHtml(l) /* 2.115.0 A (#2061): inbound webhooks (hookin.js) */ : ''}
-    ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
-    </div>
-    ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
-    ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label>${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this project')}</label></div>
+    ${id && !l.is_inbox && statusOn() ? `<div class="row lstrow"><label for="l-status">${tr('Status')}</label><select id="l-status" ${canEditList(id) ? '' : 'disabled'}><option value="">${tr('No status')}</option>${STATUSES.map(([k, n]) => `<option value="${k}" ${l.status === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><button type="button" class="btn sm" data-act="status" data-id="${id}">${ic('pulse', 's')} ${tr('History')}</button></div>` : ''}
+    ${id && shareOk(l) ? `<div class="row shsum"><label>${tr(collab() ? N_('Sharing') : N_('Owner'))}</label><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
+    ${lmSec('time', tr('Time and billing'), `
+    ${id && timeOn() && !l.is_inbox ? `<div class="row ltimerow"><label for="l-time">${tr('Time tracking')}</label><label class="chkl"><input type="checkbox" id="l-time" ${l.time_tracking ? 'checked' : ''} ${dis}> ${tr('Track time in this project')}</label></div>
     <div class="shint lhint">${tr('Timer and time entries on the tasks of this project, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
     ${timeOn() ? `<div class="ltimex" ${id && l.time_tracking ? '' : 'hidden'}>` : ''}
-    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h/day · empty = {0}', fmtNum(S.timeDayH || 8))}</span></div>
-      <div class="shint">${tr('Hours per day or shift, for the time sum in the header. Empty = the server default.')}</div>` : ''}
+    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}></div>
+      <div class="shint">${tr('Hours per day or shift, for the time sum in the header. Empty = {0} h.', fmtNum(S.timeDayH || 8))}</div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', numDec())) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
-    ${timeOn() ? '</div>' : ''}
-    ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
-    ${id && own && swOffer(l) ? `<div class="row lswoffer"><span></span><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
-    ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
-    <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
-    ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
-    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
+    ${timeOn() ? '</div>' : ''}`, fown)}
+    ${lmSec('show', tr('Display and behaviour'), `
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
+    ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
+    ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
+    ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
+    ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><span class="lchks"><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label>${id && !l.is_inbox ? `<label class="chkl ldsxrow"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label>` : ''}</span></div>
+    <div class="shint lhint" id="l-dsxhint">${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}${id && !l.is_inbox ? ' ' + tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.') : ''}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
     ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
     ${id ? o3c_rowHtml(l) : ''}${''/* 2.83.0 C (#1427): header strip (listhead.js) */}
+    ${id && !l.is_inbox && collab() ? `<h4>${tr('Project tags')}</h4><div class="shint lhint">${tr('Tags of this project: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the project.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}`, fown)}
+    ${lmSec('remind', tr('Reminders'), `
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('The reminder repeats until done. Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
-    ${id && !l.is_inbox && pbOn(l) ? (l.e2e && typeof le2u_pbHtml === 'function' ? le2u_pbHtml() : pbAreaHtml('list')) : ''}
-    ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
-    ${id && typeof le2u_listRowHtml === 'function' ? le2u_listRowHtml(l) : ''}${''/* 2.64.1 (#1817): the lock of the list (liste2eui.js) */}
-    ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This project')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    ${id && !l.is_inbox && collab() && l.shared ? `<div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('Notifications')}</label><select id="l-bell" data-native data-lmdef="default">${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
-    <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
-    ${id && !l.is_inbox && collab() ? `<h4>${tr('Project tags')}</h4><div class="shint lhint">${tr('Tags of this project: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the project.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
-    <div class="foot">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}<span class="spacer"></span>${id ? (o.back ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : '') : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
+    <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}`, fown)}
+    ${lmSec('agents', tr('Agents'), `
+    ${id && shareOk(l) && collab() && agentsOn() && listAgents(l).length ? `<div class="row lagrow"><label>${tr('Agents')}</label><span class="muted lmsum">${esc([listAgents(l).map(a => a.name || '').filter(Boolean).join(', '), listenLabel(l)].filter(Boolean).join(' · '))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
+    ${id && !l.is_inbox && pbOn(l) ? (l.e2e && typeof le2u_pbHtml === 'function' ? le2u_pbHtml() : pbAreaHtml('list')) : ''}`, fown)}
+    ${lmSec('forms', tr('Forms and software'), `
+    ${listDlgTeamHtml(l, id, 'forms')}
+    ${id && own && swOffer(l) ? `<div class="row lswoffer"><label>${tr('Software')}</label><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
+    ${id ? whiBoxHtml(l) /* 2.115.0 A (#2061): inbound webhooks (hookin.js) */ : ''}
+    ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}`, fown)}
+    ${lmSec('sec', tr('Security|project'), `${id && typeof le2u_listRowHtml === 'function' ? le2u_listRowHtml(l) : ''}${''/* 2.64.1 (#1817): the lock of the list (liste2eui.js) */}`, fown)}
+    ${l.is_inbox ? '' : lmSec('proj', tr('Project features'), `
+    ${id ? '' : `<div class="lptype"><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
+      <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the standard sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
+      <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
+    ${id ? ptypeRowHtml(l) : ''}
+    ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
+    <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
+    ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
+    ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
+    ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
+    <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
+    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
+    ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
+    ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
+    ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`);
+  lmSecWire(md);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }
@@ -941,7 +978,7 @@ function listModal(id, folder = '', o = {}) {
   const pend = new Map();
   const formBody = () => {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
-    const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
+    const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),  // 2.352.0 C (#2752): no kind
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: numBody($('#l-dayh', md).value)} : {}), ...($('#l-time', md) ? {time_tracking: $('#l-time', md).checked} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
       ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
       ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
@@ -968,8 +1005,8 @@ function listModal(id, folder = '', o = {}) {
     const m1 = x.name.match(EMO_RE);
     if (force || document.activeElement !== $('#l-name', md)) { emo = m1 ? m1[1] : ''; $('#l-name', md).value = x.is_inbox && inboxDef(x.name) ? tr('Basket') : m1 ? x.name.slice(m1[0].length) : x.name; $('#l-emo', md).innerHTML = sbiEmo(emo) || ic('list'); }
     if (document.activeElement !== $('#l-folder', md)) $('#l-folder', md).value = fDisp(x.folder || '');
-    $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list'; if ($('#l-kindp', md)) $('#l-kindp', md).checked = (x.kind || 'list') === 'project';
-    $('#l-khint', md).innerHTML = kindHint(x.kind || 'list'); $('.kproj', md).hidden = (x.kind || 'list') !== 'project';
+    $('#l-view', md).value = listView(x);
+    if ($('#l-status', md)) $('#l-status', md).value = x.status || '';  // 2.352.0 C (#2751)
     $$('#l-col button', md).forEach(b => { b.classList.toggle('on', lp_col(x) === b.dataset.c); b.setAttribute('aria-pressed', String(lp_col(x) === b.dataset.c)); });  // 2.53.0 (#1426)
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
@@ -1021,8 +1058,7 @@ function listModal(id, folder = '', o = {}) {
     onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
   }
   md.addEventListener('change', e => {
-    if (e.target.id === 'l-kindp') $('#l-kind', md).value = $('#l-kindp', md).checked ? 'project' : 'list';  // 2.25.0 (UX-52); 2.152.2 (#2624): the switch "Progress and status"
-    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (id && e.target.id === 'l-status') { lmStatusSet(id, e.target); return; }  // 2.352.0 C (#2751): the status instead of the switch "Progress and status"
     if (id && e.target.id === 'l-ptype') {
       // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field
@@ -1151,7 +1187,7 @@ function listModal(id, folder = '', o = {}) {
       md.remove();
     }
     if (a === 'dup') { await autosave(); md.remove(); listDuplicate(id); return; }  // 2.78.0 (#1881)
-    if (a === 'tpl') { await autosave(); md.remove(); saveTemplate({list_id: id, ...((listById(id) || l).kind === 'project' ? {relative: true} : {})}, lname(l)); return; }  // 2.4.0 (#328): projects keep their dates relative to the project start
+    if (a === 'tpl') { await autosave(); md.remove(); saveTemplate({list_id: id, relative: true}, lname(l)); return; }  // 2.4.0 (#328): projects keep their dates relative to the project start; 2.352.0 C (#2752): every project
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) {  // 2.354.0 C (#3013): say why nothing happens, mark the field
@@ -1162,7 +1198,7 @@ function listModal(id, folder = '', o = {}) {
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
       const {rate, nag, day_hours: _dh, ...b0} = body;
-      const pt = body.kind === 'project' ? $('.ptcard.on', md)?.dataset.pt || '' : '';
+      const pt = $('.ptcard.on', md)?.dataset.pt || '';  // 2.352.0 C (#2752): every project may start from a type
       let n;
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }

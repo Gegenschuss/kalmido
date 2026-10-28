@@ -228,7 +228,7 @@ def _after(c, nid):
     """A document recognised out of the inbox folder moves on into the documents folder (unless it was sorted)."""
     n = c.execute("SELECT n.*, p.name AS pname, p.parent_id AS pparent FROM fs_nodes n LEFT JOIN fs_nodes p ON p.id=n.parent_id "
                   "WHERE n.id=?", (nid,)).fetchone()
-    if not n or not n["pparent"] or (n["pname"] or "").lower() != S.INBOX.lower():
+    if not n or not n["pparent"] or not S.is_inbox(n["pname"]):
         return
     root = c.execute("SELECT id, parent_id, name, org_id, owner_id FROM fs_nodes WHERE id=?", (n["pparent"],)).fetchone()
     if root and root["parent_id"] is None and S.root_id(c, S.doc_ws(root["org_id"], root["owner_id"])) == root["id"]:
@@ -238,14 +238,15 @@ def _after(c, nid):
 
 
 def inbox_scan(c):
-    """Files put into an inbox folder ("Dokumente/Eingang" at the root of a workspace) become documents."""
+    """Files put into an inbox folder ("Documents/Inbox" at the root of a workspace, any language) become documents."""
+    ni, nr = S.folder_names(S.INBOX_KEY, S.INBOX), S.folder_names(S.ROOT_KEY, S.ROOT)  # 2.368.0 (#2987): the names in every language
     rows = c.execute("""SELECT n.id, n.org_id, n.owner_id, n.created_by, r.id AS rid, r.owner_id AS rowner FROM fs_nodes n
-                        JOIN fs_nodes f ON f.id=n.parent_id AND f.kind='folder' AND lower(f.name)=lower(?) AND f.deleted_at IS NULL
-                        JOIN fs_nodes r ON r.id=f.parent_id AND r.parent_id IS NULL AND r.kind='folder' AND lower(r.name)=lower(?)
+                        JOIN fs_nodes f ON f.id=n.parent_id AND f.kind='folder' AND """ + S.folder_in_sql("f.name", ni) + """ AND f.deleted_at IS NULL
+                        JOIN fs_nodes r ON r.id=f.parent_id AND r.parent_id IS NULL AND r.kind='folder' AND """ + S.folder_in_sql("r.name", nr) + """
                           AND r.deleted_at IS NULL
                         LEFT JOIN doc_meta d ON d.node_id=n.id
                         WHERE n.kind='file' AND n.deleted_at IS NULL AND d.node_id IS NULL ORDER BY n.id LIMIT 100""",
-                     (S.INBOX, S.ROOT)).fetchall()
+                     (*ni, *nr)).fetchall()
     # a new version of a document's file (the file store's upload with the same name): recognise it again
     c.execute("""UPDATE doc_meta d SET state='wait', tries=0 FROM fs_nodes n WHERE n.id=d.node_id AND d.state IN ('done', 'failed')
                  AND d.version > 0 AND n.cur_version <> d.version""")

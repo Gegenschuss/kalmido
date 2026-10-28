@@ -147,7 +147,7 @@ function viewKid() {
   // as the heading; an empty one says so)
   const shared = kd_sharedLists(), sid = new Set(shared.map(l => l.id)), own = mine.filter(t => !sid.has(t.list_id));
   const ul = ts => `<ul class="kidtasks">${ts.map(t => `<li class="${t.status ? 'done' : ''}"><button type="button" class="kidchk" data-act="kid-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Done: {0}', t.title))}">${t.status ? ic('check') : ''}</button>
-      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`;
+      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + esc(fmtTimeLoc(t.due_time)) : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`;
   return `<div class="kidv"><div class="kidtop"><h2>${esc(hi < 11 ? tr('Good morning, {0}', S.me.display_name) : hi < 18 ? tr('Hello, {0}', S.me.display_name) : tr('Good evening, {0}', S.me.display_name))}</h2>
     <div class="kidbal" role="status" aria-label="${esc(trn('You have {0} star', 'You have {0} stars', k.stars))}"><span aria-hidden="true">★</span><b>${k.stars}</b></div></div>
     <h3 class="kidsec">${tr('My tasks')}</h3>

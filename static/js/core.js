@@ -63,7 +63,7 @@ function parseNum(v, frac) {
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
-const fmtDate = s => pd(s).toLocaleDateString(LOCALE());
+const fmtDate = s => fmtDateNum(pd(s));  // 2.368.0 B (#2982): the chosen order of numbers
 const RR_WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 function dayLabel(s, long) {
   const t = today();
@@ -76,7 +76,7 @@ function dayLabel(s, long) {
 }
 // 2.6.0 (K07): one way to write a task's date everywhere (rows, the date column, the task panel): "Mo, 5. Okt", a range
 // "So, 4. Okt – Mo, 5. Okt", a time after a comma ("Heute, 17:30")
-const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '');
+const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + fmtTimeLoc(t.due_time) : '');  // 2.368.0 B (#2982): fmtTimeLoc
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
 // 2.16.0 (#473, WCAG 1.4.1): the priority as a shape too (! / !! / !!!, like the quick add), named for screen readers
 const PRIO_NAME = {5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};
@@ -86,7 +86,10 @@ const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-la
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
 // a date without its weekday in the language's own short pattern ("4. Okt" / "Oct 4"), with the year if it is not this one
-const dayNoWd = (d, year) => fmtDay(year ? 'year' : 'short', d).replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '').replace(/^\s*[,.]\s*/, '');
+// 2.368.0 B (#2982): the leading weekday is cut by its name ("Mon 26 Oct" -> "26 Oct": the old pattern kept "Mon" when a
+// number followed it without a comma, as in English, Dutch); the old pattern stays for a language that writes it elsewhere
+const dayNoWd = (d, year) => { const s = fmtDay(year ? 'year' : 'short', d), w = WD[d.getDay()];
+  return (s.startsWith(w) ? s.slice(w.length) : s.replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '')).replace(/^\s*[,.]?\s*/, ''); };
 function weekTitle(first) {
   const a = pd(first), b = pd(addDays(first, 6)), y = new Date().getFullYear(), other = a.getFullYear() !== y || b.getFullYear() !== y;
   return `${dayNoWd(a, other && a.getFullYear() !== b.getFullYear())} – ${dayNoWd(b, other)} · ${tr('Week {0}', isoWeek(addDays(first, 3)))}`;
@@ -187,17 +190,19 @@ const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
-const overviewOn = () => progressOn() && (S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project').length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && l.kind === 'project')));
+// 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
+const isTracked = l => !!l && !l.is_inbox && !!l.status;
+const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l))));
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
 const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
-const isProject = lid => listById(lid)?.kind === 'project';
+const isProject = lid => { const l = listById(lid); return !!l && !l.is_inbox; };
 const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
 const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
-const progressFor = l => !!l && progressOn() && l.kind === 'project';
-const statusFor = l => !!l && statusOn() && l.kind === 'project';
+const progressFor = l => !!l && progressOn() && !l.is_inbox;
+const statusFor = l => !!l && statusOn() && !l.is_inbox;
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
 // 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
 const fieldsOf = lid => !fieldsOn() ? [] : td_rc('fo' + lid, () => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id));  // 2.40.0 (#1430): once per render
@@ -536,7 +541,7 @@ async function rawFetch0(method, url, body, key) {
   const keepW = () => { if (key === undefined && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) outStash([{method, url, body: outPrev(method, url, body), uid: S.me?.id, k: outKey()}]); if (typeof savesStash === 'function') savesStash(false); };
   if (r.type === 'opaqueredirect' || ctype.includes('text/html')) {
     if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { keepW(); await authGone(); }  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
-    location.reload();  // login session expired -> login page
+    location.reload();  // Authelia session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));

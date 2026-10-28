@@ -32,7 +32,7 @@ function annSync() {
   const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
   if (!on) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
-  const until = a.ends_at ? tr('until {0}', new Date(a.ends_at).toLocaleString(I18N.code || 'en', {weekday: 'short', hour: '2-digit', minute: '2-digit'})) : '';
+  const until = a.ends_at ? tr('until {0}', ((d) => `${WD[d.getDay()]} ${fmtTimeAt(d)}`)(new Date(a.ends_at))) : '';
   const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
   bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
   if (bar.innerHTML !== html) bar.innerHTML = html;
@@ -333,30 +333,32 @@ function renderSide0() {
     return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
-  // 2.4.0 (#361): a tree: top folder, its own lists, then its subfolders (header + lists, one level deeper)
-  const fhead = f => {
-    const sub = !!fParent(f), fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
-    const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
-    const active = fl.some(l => onTasks && k === 'l:' + l.id);
-    const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ic('chev', 's fcar') /* 2.46.1 (#1607): the arrow before the folder icon */}<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>` /* 2.46.1 (#1607): the number right after the name, the share icon at the right like a list's */}${rsy_sideShr() ? folderShrHtml(f) : '' /* 2.41.0 (#1428); 2.56.1 (#1799): can be off */}<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
-      ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
-      : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
-  };
-  const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
+  // 2.352.0 E (#2748): a tree of any depth on the sidebar tree (areas.js sbb_treeHtml): a folder's head, then its body (its own
+  // lists, then its subfolders, one level deeper); dragging a folder, its menu and the touch hold are the tree's (sidebar.js
+  // lf_tree*), a list keeps its own drag (into a folder's head or body). Open / closed stays foldSet / foldClosed (all devices).
+  const fempty = f => `<div class="fempty" data-folder="${esc(f)}">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
   const wsAll = wsCur() === 'all';
   // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
-  for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x)))) {  // 2.28.0: folders with lists here
-    const top = fhead(f), subs = folderSubs(f).filter(sf => wsAll || lists.some(l => fUnder(l.folder, sf)) || sb_folderInWs(sf));
-    lh += top.html;
-    if (top.closed) continue;
-    let body = lists.filter(l => l.folder === f).map(listRow).join('');
-    for (const sf of subs) {
-      const sh = fhead(sf);
-      body += `<div class="fsubw">${sh.html}${sh.closed ? '' : `<div class="fbody" data-folder="${esc(sf)}">${lists.filter(l => l.folder === sf).map(listRow).join('') || fempty()}</div>`}</div>`;
-    }
-    lh += `<div class="fbody" data-folder="${esc(f)}">${body || fempty()}</div>`;
-  }
+  const fShown = x => wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+  const fnode = f => {
+    const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
+    const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
+    const active = fl.some(l => onTasks && k === 'l:' + l.id);
+    const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the arrow folds
+    const mir = fl.some(l => l.mirrored);  // 2.27.0 (#988): the owner arranges a shared folder
+    const after = (S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>`)
+      + (rsy_sideShr() ? folderShrHtml(f) : '')  // 2.41.0 (#1428); 2.56.1 (#1799): can be off
+      + `<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>`
+      + (S.listReorder ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
+        : `<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`);
+    return {k: 'lf:' + f, name: fName(f), go: keyToHash('folder:' + f), on: (active && closed) || fon, kids: true, cls: 'lfh' + (fParent(f) ? ' fsub' : ''),
+      fold: {open: !closed, attrs: `data-act="folder-toggle" data-folder="${esc(f)}"`}, attrs: `data-act="folder-toggle" data-folder="${esc(f)}"`,  // the row folds as before (the name opens the folder)
+      battrs: `title="${esc(tr('Open {0}', fDisp(f)))}"`, ichtml: `<span class="sic" aria-hidden="true"${lp_folderSty(f) /* 2.53.0 (#1426) */}>${ic('folder', 's')}</span>`,  // the icon column of the project rows
+      ns: 'lf', id: f, par: fParent(f), drag: !mir, drop: !mir, menu: true, after,  // 2.352.0 E (#2748): someone else's folder takes no folder of mine
+      sub: () => { const body = lists.filter(l => l.folder === f).map(listRow).join('') + sbb_treeHtml(folderSubs(f).filter(fShown).map(fnode)); return [{raw: `<div class="fbody" data-folder="${esc(f)}">${body || fempty(f)}</div>`}]; }};
+  };
+  sbb_treeReg('lf', LF_TREE_H);
+  lh += sbb_treeHtml(folderNames().filter(x => !fParent(x) && fShown(x)).map(fnode));
   const archived = S.lists.filter(l => l.archived && inWs(l));
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
   // Focus: the smart lists
@@ -544,14 +546,13 @@ function renderTop0() {
   const tnew = (!isMobile() || tabletDock()) && !dockView() && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
-    const x = l?.kind === 'project' ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
+    const x = l && !l.is_inbox ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
     return x ? `<span class="hms ${x.day < today() ? 'over' : ''}" title="${esc(tr('Milestone') + ': ' + x.name + ', ' + fmtDateLoc(x.day))}">◆ ${esc(x.name)} · ${esc(dayLabel(x.day))}</span>` : '';
   })();
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
-  const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
   const bar = sbb_on();  // 2.152.3 A (#2619): on a computer search, workspace and bell sit in the head bar over everything (sbb_bar)
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   sbb_bar();  // 2.152.3 A (#2619): the bell's number
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
@@ -1184,7 +1185,7 @@ const cfk_opts = (f, v) => cfk_ids(v).map(id => selOpt(f, id)).filter(Boolean);
 const cfk_max = f => Math.min(10, Math.max(3, +(f.options?.max || 5)));
 function cfk_money(v, cur) {
   const x = +v; if (!Number.isFinite(x)) return String(v ?? '');
-  try { return x.toLocaleString(LOCALE(), {style: 'currency', currency: cur || 'EUR'}); } catch { return numFmt(v) + ' ' + (cur || 'EUR'); }
+  return curMoney(x, cur || 'EUR');  // 2.368.0 C (#2983): one money format (i18n.js curMoney: "$1,234.50", not "US$1,234.50")
 }
 // 2.156.0 B (#2070): the error values of a formula result
 const CFK_FX_ERR = {'#div0': N_('Division by 0'), '#type': N_('Not a number')};

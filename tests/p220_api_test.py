@@ -161,7 +161,8 @@ assert A.put(B + f"/api/lists/{OTHER}/members", json={"user_id": ids["bob"], "ro
 
 # ================================================================== connecting
 body = {"provider": "github", "base_url": GH, "repo": "acme/app", "token": TOKEN}
-check(A.post(B + f"/api/lists/{PLAIN}/repos", json=body).status_code == 409, "a plain list cannot connect (project lists only)")
+# 2.352.0 (#2752): every list but the inbox is a project
+check(A.post(B + f"/api/lists/{next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])}/repos", json=body).status_code == 409, "the inbox cannot connect (projects only)")
 check(Bo.post(B + f"/api/lists/{P}/repos", json=body).status_code == 403, "a member (edit) cannot connect")
 check(Ca.post(B + f"/api/lists/{P}/repos", json=body).status_code == 403, "a viewer cannot connect")
 check(ag.post(f"/lists/{P}/repos", json=body).status_code in (404, 405), "no API route to connect (agents never connect)")

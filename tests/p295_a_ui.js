@@ -52,7 +52,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     // the trip view
     await ev(`(() => { document.querySelector('.rklist .ofcrow').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.rkv-card')`), 'the per diem card');
-    check(await ev(`(() => { const c = document.querySelector('.rkv-card').textContent; return /112\\.00/.test(c) && /56\\.00 € per person × 2/.test(c) && /Germany: 2 × 14 € \\+ 1 × 28 € = 56 €/.test(c) && /BMF/.test(c); })()`),
+    // 2.368.0 (#2983): English writes the euro sign in front ("€56.00", "€14")
+    check(await ev(`(() => { const c = document.querySelector('.rkv-card').textContent; return /112\\.00/.test(c) && /€56\\.00 per person × 2/.test(c) && /Germany: 2 × €14 \\+ 1 × €28 = €56/.test(c) && /BMF/.test(c); })()`),
       'the card: total, per person, breakdown, source ' + await ev(`document.querySelector('.rkv-card').textContent`));
     // edit days: breakfast + lunch on the full day
     await ev(`(() => { document.querySelector('[data-rkv="days"]').click(); return 1; })()`);

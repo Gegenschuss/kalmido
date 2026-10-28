@@ -2559,6 +2559,14 @@ CREATE INDEX IF NOT EXISTS rate_hits_at ON rate_hits(at);  -- 2.306.0 Fix-1 (#28
 -- key + address, the Unix time; gone after KNOWN_DAYS. New table only: 2.311 ignores it (it remembers them in memory)
 CREATE TABLE IF NOT EXISTS rate_known (u TEXT NOT NULL, a TEXT NOT NULL, at DOUBLE PRECISION NOT NULL, PRIMARY KEY (u, a));
 CREATE INDEX IF NOT EXISTS rate_known_at ON rate_known(at);
+-- 2.352.0 A (#2748): a list's folder share (fs_shares on a folder of the projects area, lists/lffolder.py) does not reach this
+-- person on this list (removed from the list by hand, or the migration found the copy removed / set lower by hand). No org_id
+-- (like list_members: the list decides). New table only: 2.351 ignores it
+CREATE TABLE IF NOT EXISTS list_folder_skip (
+  list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+-- 2.352.0 (#2748): deleting a user (ON DELETE CASCADE) and the fkindex check need the user's side indexed
+CREATE INDEX IF NOT EXISTS list_folder_skip_user ON list_folder_skip(user_id);
 -- 2.361.2 (#2923): a member asks the admins of an organisation to give back what they brought in or made (kind list | sheet |
 -- file ..., accounts/orgout.py OO_KINDS; obj_id = its id; name = what the admins see): state open | approved | declined |
 -- used. An approved request lets that person move that one thing into their private space for a while (OO_GRANT_DAYS).
@@ -3655,6 +3663,12 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.352.0 A (#2748): the role a list gets through the shares of its folders (lists/lffolder.py, computed by lists/groups.py
+    # grp_sync like grole; role = the highest of own_role, grole, frole), and the list role of a share of a projects folder
+    # (admin | edit | participant | view; NULL = its role view / edit). Older versions ignore both (a row with only frole
+    # reads as a personal share there)
+    ("list_members", "frole", "ALTER TABLE list_members ADD COLUMN IF NOT EXISTS frole TEXT"),
+    ("fs_shares", "list_role", "ALTER TABLE fs_shares ADD COLUMN IF NOT EXISTS list_role TEXT"),
     # 2.353.0 D (#2759): recognition per folder / file of the file store ('' = as the folder above, 'on', 'off'; docs/recog.py).
     # Older versions ignore it (their documents folder recognises as before)
     ("fs_nodes", "recog", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS recog TEXT NOT NULL DEFAULT ''"),
@@ -4131,6 +4145,10 @@ USER_DEFAULTS = {
     # 2.240.0 (#2886): '1' = load YouTube / Vimeo players in video reviews without asking each time (remembered per person)
     "chat_kbd_agent": "1", "chat_kbd_team": "1",  # 2.235.0 D (#2899): phones: the keyboard closes after sending
     "video_ext_ok": "0",
+    # 2.368.0 B (#2982): region / formats ('' = automatic, from the app language and the browser's region; static/js/popovers.js)
+    "week_start": "",           # '' | mon | sun: the first day of the week (calendar, date picker, dispatch, habits)
+    "time_format": "",          # '' | 24 | 12: how times show
+    "date_order": "",           # '' | dmy | mdy | ymd: the order of numeric dates (31.12.2026 / 12/31/2026 / 2026-12-31)
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

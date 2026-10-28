@@ -229,7 +229,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`go('l/${WORK}')`); await sleep(200);
   w.eval(`listModal(${WORK})`); await sleep(200);
   const md = () => d.querySelector('.modal.lmodal');
-  check(md() && !md().querySelector('[data-m="save"]') && !/Cancel/.test(md().querySelector('.foot').textContent), 'no Save / Cancel');
+  check(md() && !md().querySelector('[data-m="save"]') && !/Cancel/.test(md().querySelector('.foot')?.textContent || ''), 'no Save / Cancel');  // 2.352.0 C (#2751): an open project has no footer (actions moved into the "Actions" section)
   check(!!md().querySelector('.lhdr [data-m="close"]'), 'close button in the header');
   const col = [...md().querySelectorAll('#l-col button')].find(x => x.dataset.c && !x.classList.contains('on'));
   click(w, col);
@@ -275,7 +275,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // 2.44.0 (#1187): the area tabs (Time: time tracking / focus timer) may stand above the page; the card is the first thing below them
   const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
   check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
-  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d\d:\d\d/.test(card().textContent), 'card: task, project, start time');
+  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d{1,2}:\d\d/.test(card().textContent), 'card: task, project, start time');  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
   w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await sleep(1300);
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);
   click(w, card().querySelector('.tvr-task')); await sleep(300);
@@ -391,8 +391,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await mk('Loose inbox thing', null);
   await w.eval('load()'); w.eval(`go('today')`); await sleep(300);
   const fh = () => d.querySelector('#side .fhead[data-folder="Jobs"]');
-  check(!!fh().querySelector('.fgo[data-go="folder/Jobs"]'), 'folder name links to the folder view');
-  click(w, fh().querySelector('.fgo')); await sleep(400);
+  check(!!fh().querySelector('.sbbtn[data-go="folder/Jobs"]'), 'folder name links to the folder view');  // 2.352.0 (#2748): the name is the tree's button (.sbbtn)
+  click(w, fh().querySelector('.sbbtn')); await sleep(400);
   check(w.eval('S.route.key') === 'folder:Jobs' && w.location.hash === '#folder/Jobs', 'opens the folder view (own hash)');
   check(fh().classList.contains('on'), 'folder row marked as the current view');
   const heads = [...d.querySelectorAll('#view .ghead')].map(x => x.textContent);

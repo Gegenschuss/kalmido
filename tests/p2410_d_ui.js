@@ -100,8 +100,8 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   w.eval(`listModal(${PRJ})`); await until(() => lastModal(d)?.querySelector('#l-time'));  // 2.308.0 (#3256): wait for the dialog instead of a fixed time
   md = lastModal(d);
   const tt = md.querySelector('#l-time');
-  check(tt && !tt.checked && md.querySelector('.ltimex')?.hidden && !tt.closest('.kproj'), '#1471: the switch "Time tracking", off, not in the project-only part; hours / rate hidden');
-  check(!/time tracking/.test(md.querySelector('#l-khint').textContent), '#1471: the project hint no longer names time tracking');
+  check(tt && !tt.checked && md.querySelector('.ltimex')?.hidden && !tt.closest('#lm-sec-proj'), '#1471: the switch "Time tracking", off, not in the project-only part; hours / rate hidden');
+  check(!md.querySelector('#l-khint'), '#1471: the project hint is gone with the switch (2.352.0 C, #2751)');
   tt.checked = true; change(w, tt);
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PRJ).time_tracking === 1) && !md.querySelector('.ltimex').hidden, '#1471: on: saved at once, hours / rate shown');
   md.remove();

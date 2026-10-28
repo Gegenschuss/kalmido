@@ -11,7 +11,7 @@ const DX_CASES = [['standard', N_('Revenue at the standard rate')], ['reduced', 
   ['reverse_dom', N_('Reverse charge at home (section 13b)')], ['eu_goods', N_('Goods to businesses in the EU')], ['export', N_('Exports of goods')]];
 const DX_CHART = {SKR03: {standard: '8400', reduced: '8300', exempt: '8100', reverse: '8336', abroad: '8338', small: '8195', skonto_standard: '8736', skonto_reduced: '8731', skonto_other: '8730', reverse_dom: '8337', eu_goods: '8125', export: '8120', debtor: '10000', bank: '1200', cash: '1000'},
   SKR04: {standard: '4400', reduced: '4300', exempt: '4100', reverse: '4336', abroad: '4338', small: '4185', skonto_standard: '4736', skonto_reduced: '4731', skonto_other: '4730', reverse_dom: '4337', eu_goods: '4125', export: '4120', debtor: '10000', bank: '1800', cash: '1600'}};
-const dx_months = () => Array.from({length: 12}, (_, i) => [i + 1, new Date(2026, i, 1).toLocaleDateString(S.lang || undefined, {month: 'long'})]);
+const dx_months = () => Array.from({length: 12}, (_, i) => [i + 1, MON[i]]);
 const dx_ph = (st, k) => { const d = (DX_CHART[st.chart] || DX_CHART.SKR03)[k] || ''; return d.padEnd((+st.acct_len || 4) + (k === 'debtor' ? 1 : 0), '0'); };
 
 // the block in Office > Settings > Invoices (admins edit, members see); 2.148.0 D (#2458): + the DATEV import (office_datevimp.js)

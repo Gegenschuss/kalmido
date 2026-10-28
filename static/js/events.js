@@ -209,7 +209,7 @@ async function submitQuick(input, extra = {}) {
     if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
     const tt = t.title || '', tq = tr('“{0}”|quoted', toastClip(tt));  // 2.25.0 (UX-31): which task, where it went
-    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
+    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
   if (d.files?.length && created?.id < 0 && await qfKeep(created.id, d.files)) { toast(tr('Offline: the files are uploaded once the task is synced')); return; }  // 2.359.0 A (#3023)
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
@@ -231,7 +231,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
   popOnClose = () => { an_remove(q); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
-  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
+  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + fmtTimeLoc(preset.due_time) : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
   const qh = $('.qhint', q); if (hint) qh.textContent = hint; else qh.innerHTML = qHelpChips('qsheet');
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
@@ -294,7 +294,7 @@ document.addEventListener('click', async e => {
   if (fm) {
     e.preventDefault(); e.stopPropagation();
     const f = fm.dataset.folder, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f), j = i + +fm.dataset.fmove;
-    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(sib) : sib.flatMap(t => [t, ...folderSubs(t)])); }
+    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fOrderWith(fParent(f), sib)); }  // 2.352.0 E (#2748): any depth
     return;
   }
   // 2.25.0 (UX-02): the "…" of a list / folder in sort mode: up, down, folder
@@ -309,7 +309,7 @@ document.addEventListener('click', async e => {
   if (fs) {
     e.preventDefault(); e.stopPropagation();
     const f = fs.dataset.fsort, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f);
-    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(s2) : s2.flatMap(t => [t, ...folderSubs(t)])); };
+    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fOrderWith(fParent(f), s2)); };  // 2.352.0 E (#2748): any depth
     menu(fs, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: i <= 0, fn: mv(-1)}, {label: tr('Move down'), icon: 'chev', dis: i < 0 || i >= sib.length - 1, fn: mv(1)}]);
     return;
   }
@@ -499,7 +499,7 @@ document.addEventListener('click', async e => {
       if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq, .rxrow'); (q?.querySelector('.rxq') || q?.querySelector('.rx'))?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
-    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project with progress and status…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
+    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
     case 'status': statusModal(id); break;

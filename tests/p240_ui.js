@@ -80,10 +80,11 @@ async function firefox(fn) {
   let w = await boot({user: 'alice', hash: 'l/' + HOME}), d = w.document;
   const fh = f => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   check(fh('Clients') && !fh('Clients').classList.contains('fsub'), 'top folder header');
-  check(fh('Clients/Company X')?.classList.contains('fsub') && fh('Clients/Company X').closest('.fsubw')?.closest('.fbody[data-folder="Clients"]'), 'subfolder inside its folder');
+  // 2.352.0 (#2748): the folders are nodes of the sidebar tree (sbb_treeHtml): a subfolder's head sits right in its folder's body
+  check(fh('Clients/Company X')?.classList.contains('fsub') && fh('Clients/Company X').classList.contains('sbbt') && fh('Clients/Company X').parentElement?.matches('.fbody[data-folder="Clients"]'), 'subfolder inside its folder');
   check(fh('Clients/Company X').querySelector('.n').textContent === 'Company X', 'subfolder shows its own name');
   const kids = [...d.querySelector('#side .fbody[data-folder="Clients"]').children];
-  check(kids[0].matches('.srow[data-list="' + RET + '"]') && kids[1].matches('.fsubw'), "the folder's lists first, then its subfolders");
+  check(kids[0].matches('.srow[data-list="' + RET + '"]') && kids[1].matches('.fhead.fsub'), "the folder's lists first, then its subfolders");  // 2.352.0 (#2748): no .fsubw
   check(d.querySelector(`#side .fbody[data-folder="Clients/Company X"] .srow[data-list="${WEB}"]`), 'list inside the subfolder');
   // fold a subfolder: stored per user
   click(w, fh('Clients/Company X'));
@@ -108,7 +109,7 @@ async function firefox(fn) {
   check(menuTexts(d).includes('New subfolder…') && !menuTexts(d).includes('Move to the top level'), 'top folder menu: New subfolder…');
   w.eval('closePop()');
   w.eval(`folderMenu(document.querySelector('#top h1'), 'Clients/Company Y')`);
-  check(menuTexts(d).includes('Move to the top level') && !menuTexts(d).includes('New subfolder…'), 'subfolder menu: Move to the top level');
+  check(menuTexts(d).includes('Move to the top level') && menuTexts(d).includes('New subfolder…'), 'subfolder menu: Move to the top level, New subfolder… (2.352.0 #2748: any depth)');
   w.prompt = () => 'Company Z';
   menuClick(w, d, /^Rename$/);
   check(await until(async () => (await st()).lists.find(l => l.id === SHOP).folder === 'Clients/Company Z'), 'rename a subfolder keeps it in its folder');
@@ -116,14 +117,15 @@ async function firefox(fn) {
   // drops: a list onto a subfolder, a subfolder onto the "Lists" header
   await w.eval(`sideDrop({list: ${HOME}, folder: null}, document.querySelector('#side .fhead[data-folder="Clients/Company Z"]'))`);
   check(await until(async () => (await st()).lists.find(l => l.id === HOME).folder === 'Clients/Company Z'), 'list dropped into a subfolder');
-  check(w.eval(`folderDropKind('Clients/Company Z', document.querySelector('#side .shead.lroot'))`) === 'top', 'subfolder onto Lists = top level');
-  check(w.eval(`folderDropKind('Clients', document.querySelector('#side .fhead[data-folder="Clients/Company X"]'))`) === null, 'a folder with subfolders cannot become a subfolder');
-  await w.eval(`sideDrop({list: null, folder: 'Clients/Company Z'}, document.querySelector('#side .shead.lroot'))`);
-  check(await until(async () => (await st()).lists.find(l => l.id === SHOP).folder === 'Company Z'), 'subfolder dropped on Lists: top level');
+  // 2.352.0 (#2748): a folder is dragged by the sidebar tree (areas.js sbb_treeReg 'lf'): sorted before a top folder = top level
+  const hd = fh('Clients/Company Z');
+  check(hd?.dataset.sbbns === 'lf' && hd.dataset.sbbid === 'Clients/Company Z' && hd.dataset.sbbpar === 'Clients' && hd.dataset.sbbdrop === '1', 'a folder is a node of the tree (drag, drop, menu)');
+  await w.eval(`SBB_TREE.lf.order('Clients/Company Z', {before: 'Clients', into: ''})`);
+  check(await until(async () => (await st()).lists.find(l => l.id === SHOP).folder === 'Company Z'), 'subfolder sorted among the top folders: top level');
+  check(await until(async () => JSON.parse((await st()).settings.folders || '[]').filter(f => !f.includes('/')).join('|').startsWith('Company Z|Clients')), 'subfolder placed right before the top folder');
   await w.eval('load().then(() => render())'); await sleep(200);
-  check(w.eval(`folderDropKind('Company Z', document.querySelector('#side .fhead[data-folder="Clients"]'))`) === 'before', 'a top folder onto a top folder: reorder');
   w.eval(`folderMenu(document.querySelector('#top h1'), 'Company Z')`);
-  check(menuTexts(d).includes('Move into a folder…'), 'a folder without subfolders: "Move into a folder…"');
+  check(menuTexts(d).includes('Move into a folder…'), 'a top folder: "Move into a folder…"');
   w.eval('closePop()');
   // list dialog: the folder field
   w.eval(`listModal(${WEB})`); await sleep(150);
@@ -144,7 +146,8 @@ async function firefox(fn) {
   check(cards.join(',').startsWith(',agency,software,private,tpl:'), 'Blank, Agency, Software, Personal, own template: ' + cards.join(','));
   check(await until(() => /Dates from the project start/.test(md.querySelector('[data-ptd]')?.textContent || '')), 'own template: says it is relative');
   md.querySelector('#l-kind').value = 'list'; change(w, md.querySelector('#l-kind'));
-  check(md.querySelector('.lptype').hidden, 'type List: no picker');
+  // 2.352.0 B (#2752): no list / project difference any more - the picker stays for every new project
+  check(!md.querySelector('.lptype').hidden, 'type List: the picker stays');
   md.querySelector('#l-kind').value = 'project'; change(w, md.querySelector('#l-kind'));
   click(w, md.querySelector('.ptcard[data-pt="software"]'));
   check(md.querySelector('.ptcard.on')?.dataset.pt === 'software' && md.querySelector('#l-name').value === 'Software / AI dev' && md.querySelector('#l-view').value === 'list', 'software picked: name + (2.22.0 #749) the list view');

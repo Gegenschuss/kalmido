@@ -236,6 +236,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   lastModal(d).remove();
 
   // ================= overview
+  await call('POST', `/api/lists/${HOME}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): tracked = has a status
   await call('POST', '/api/deps', {task_id: t2, blocker_id: t1});
   await w.eval('load().then(render)');
   check(d.querySelector('#side [data-go="overview"]'), 'overview in the sidebar');
@@ -269,6 +270,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
 
   // ================= carol (view only) + her overview
   const cl2 = (await call('POST', '/api/lists', {name: 'Carol stuff', kind: 'project'}, CKc)).id;
+  await call('POST', `/api/lists/${cl2}/status`, {status: 'on_track', note: ''}, CKc);  // 2.352.0 B (#2752): tracked = has a status
   let wc2 = await boot({user: 'carol', hash: 'l/' + WORK}); let dc = wc2.document;
   wc2.eval(`openDetail(${t2})`); await idle(wc2);
   check([...dc.querySelectorAll('#detail [data-cf]')].every(e => e.disabled || e.readOnly), 'view only: field editors read-only');

@@ -599,6 +599,7 @@ ROUTES = {
     "PUT /api/folders/groups/{}": "folder", "DELETE /api/folders/groups/{}": "folder", "GET /api/folders/people": "folder",
     "PUT /api/folders/people": "folder", "DELETE /api/folders/people": "folder", "POST /api/folders/rename": "folder",
     "POST /api/folders/delete": "folder",
+    "GET /api/lists/tree": "folder", "POST /api/lists/folders": "folder", "POST /api/lists/tree/move": "folder",  # 2.352.0 A (#2748)
     "GET /api/folders/agents": "folder", "PUT /api/folders/agents": "folder", "DELETE /api/folders/agents": "folder",  # 2.41.0 (#1420)
     "GET /api/folders/public-links": "folder", "PUT /api/folders/public-links": "folder", "POST /api/folders/owner": "folder",
     "GET /api/folders/repos": "folder", "POST /api/folders/repos": "folder", "PUT /api/lists/{}/folder-repo": "list",  # 2.33.0 (#934)

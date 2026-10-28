@@ -268,7 +268,7 @@ function rf_pvHtml(k) {
     const t = v.t, kids = S.tasks.has(t.id) ? children(t.id) : [], l = listById(t.list_id);
     line('list', l ? lname(l) : '');
     if (t.priority && PRIO_NAMES[t.priority]) line('flag', tr('Priority') + ': ' + tr(PRIO_NAMES[t.priority]));
-    if (t.due) line('cal', dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : ''));
+    if (t.due) line('cal', dayLabel(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : ''));
     if (t.assignee_id) line('user', personNameAny(t.assignee_id));
     if (t.tags?.length) line('tag', t.tags.map(g => '#' + g).join(' '));
     if (kids.length) line('sub', tr('{0} of {1} subtasks done', kids.filter(x => x.status).length, kids.length));
@@ -298,7 +298,7 @@ function rf_pvHtml(k) {
   }
   if (k[0] === 'e') {
     const e = v.e, s = String(e.start || ''), en = String(e.end || '');
-    line('clock', s ? dayLabel(s.slice(0, 10)) + (e.all_day ? '' : ' ' + s.slice(11, 16) + (en.length > 15 ? '–' + en.slice(11, 16) : '')) : '');
+    line('clock', s ? dayLabel(s.slice(0, 10)) + (e.all_day ? '' : ' ' + fmtTimeLoc(s.slice(11, 16)) + (en.length > 15 ? '–' + fmtTimeLoc(en.slice(11, 16)) : '')) : '');
     line('mappin', e.location || '');
     return head('cal', v.name) + rows.join('');
   }
