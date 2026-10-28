@@ -14795,5 +14795,8 @@
   "Ordered (stages): show as a stage bar": "Geordnet (Stufen): als Stufenleiste zeigen",
   "Kind of the option": "Art der Option",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Ein Sonderzustand (z. B. Geparkt) ist keine eigene Stufe: die Leiste zeigt ihn in seiner Farbe an der nächsten Stufe.",
-  "Unknown signal colour": "Unbekannte Signalfarbe"
+  "Unknown signal colour": "Unbekannte Signalfarbe",
+  "Logo size": "Logo-Größe",
+  "Logo position": "Logo-Position",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet."
 }

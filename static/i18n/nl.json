@@ -14795,5 +14795,8 @@
   "Ordered (stages): show as a stage bar": "Geordend (fasen): als fasebalk tonen",
   "Kind of the option": "Soort optie",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Een speciale status (bijv. Geparkeerd) is geen eigen fase: de balk toont hem in zijn kleur bij de volgende fase.",
-  "Unknown signal colour": "Onbekende signaalkleur"
+  "Unknown signal colour": "Onbekende signaalkleur",
+  "Logo size": "Logogrootte",
+  "Logo position": "Logopositie",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat."
 }

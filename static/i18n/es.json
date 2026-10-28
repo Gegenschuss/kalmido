@@ -14795,5 +14795,8 @@
   "Ordered (stages): show as a stage bar": "Ordenado (etapas): mostrar como barra de etapas",
   "Kind of the option": "Tipo de opción",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un estado especial (p. ej. Aparcado) no es una etapa propia: la barra lo muestra con su color en la etapa siguiente.",
-  "Unknown signal colour": "Color de señal desconocido"
+  "Unknown signal colour": "Color de señal desconocido",
+  "Logo size": "Tamaño del logotipo",
+  "Logo position": "Posición del logotipo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado."
 }

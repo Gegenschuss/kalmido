@@ -154,6 +154,7 @@ def heading_color(col):
                           {"kind": "item", "pos": 1, "title": "Leistung", "detail": "", "qty": 1, "qty_text": "1", "unit_text": "Tag", "rate": 100,
                            "rate_text": "100,00 €", "tax_pct": 19, "total": 100, "total_text": "100,00 €"}])
     m["company"] = dict(m["company"], color=col)
+    m["kind"] = "invoice"  # 2.406.0 (#3491): a quotation (look A) prints the heading 2 pt smaller; the colour rule is the same
     pg = PdfReader(io.BytesIO(pdf.office_pdf(m))).pages[0]
     ops = pg.get_contents().get_data().decode("latin-1")
     hit = re.search(r"BT ([\d.]+) ([\d.]+) ([\d.]+) rg /F2 8\.00 Tf 0\.80 Tc", ops)  # the category heading: 8 pt bold, spaced

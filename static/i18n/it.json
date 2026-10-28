@@ -14795,5 +14795,8 @@
   "Ordered (stages): show as a stage bar": "Ordinato (fasi): mostra come barra delle fasi",
   "Kind of the option": "Tipo di opzione",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Uno stato speciale (es. In sospeso) non è una fase a sé: la barra lo mostra con il suo colore sulla fase successiva.",
-  "Unknown signal colour": "Colore di segnalazione sconosciuto"
+  "Unknown signal colour": "Colore di segnalazione sconosciuto",
+  "Logo size": "Dimensione del logo",
+  "Logo position": "Posizione del logo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Per tutti i documenti d’ufficio creati da ora in poi. Nessun effetto se la tua carta intestata nasconde la nostra intestazione."
 }

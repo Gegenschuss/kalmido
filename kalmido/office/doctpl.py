@@ -235,6 +235,7 @@ def dt_company(c, oid, lang):
         logo = p if os.path.isfile(p) else None
     color = s.get("color") or ""
     co["logo_path"] = logo
+    co["logo_size"], co["logo_pos"] = s.get("logo_size") or "m", s.get("logo_pos") or "r"  # 2.406.0 (#3501)
     co["color"] = color if re.fullmatch(r"#[0-9a-fA-F]{6}", color) else "#2f5d8a"
     return co
 
@@ -506,8 +507,9 @@ def dt_pdf(c, oid, d, signed=None, client=None):
             if hide_head:  # 2.357.0 C (#3182): the letterhead brings logo, name and fold marks
                 pass
             elif logo:
-                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
-                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
+                fw, fh, left = P.pdf_logo_frame(co)  # 2.406.0 (#3501): size and side from the office settings
+                lw, lh_ = P.pdf_logo_fit(logo, fw, fh)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL if left else PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 nl = (co.get("name_lines") or [co.get("name") or ""])[:3]  # 2.99.0 D (#2188): the name lines one under the other
                 for i, ln in enumerate(nl):
