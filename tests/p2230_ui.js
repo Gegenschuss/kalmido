@@ -252,7 +252,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
     check(Math.abs(g.gHead - g.gList) <= 1 && Math.abs(g.hHead - g.hList) <= 1, `${tag}: #794: folder head -> first list = list -> list, same height ` + JSON.stringify(g));
     // 2.46.1 (#1607 #1643): the arrow sits before the folder icon (the icon moves right), the lists inside start further in
     // (a tree), no extra room before a folder
-    check(g.topIc.length === 1 && g.fIc > g.topIc[0] && g.kidIc.length === 1 && g.kidIc[0] > g.fIc && Math.abs(g.before - g.gList) <= 1, `${tag}: #794 #1607: one icon column for the top lists, one inside the folder (further in than the folder icon), no extra room before the folder ` + JSON.stringify(g));
+    // 2.406.0 (#3492): one row rule: the folder's icon stands in the column of the top lists (the arrow went to the row end)
+    check(g.topIc.length === 1 && Math.abs(g.fIc - g.topIc[0]) <= 1 && g.kidIc.length === 1 && g.kidIc[0] > g.fIc && Math.abs(g.before - g.gList) <= 1, `${tag}: #794 #1607 #3492: one icon column for the top lists and the folder, one inside the folder (further in), no extra room before the folder ` + JSON.stringify(g));
     await shot(`p2230-${vw}-${th}-side.png`);
     await ev(`(() => { document.querySelector('#side').classList.remove('open'); location.hash = '#clients'; return 1; })()`); await ready(ev, '#view .msclients .ctrow');  // 2.47.3 (#1734): list + card
     check(await sideways(ev) <= 0, `${tag}: clients: nothing sideways`);
