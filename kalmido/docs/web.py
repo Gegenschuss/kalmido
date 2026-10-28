@@ -709,7 +709,7 @@ def _settings_json(c, ws, uid):
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": folders,
-            "root_id": root, "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
+            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 

@@ -550,7 +550,7 @@ async function cmtOrderToggle() {
 }
 const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted user') : tr('Someone'));
 function fmtWhen(iso) {
-  const d = new Date(iso), hmTxt = d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'});
+  const d = new Date(iso), hmTxt = fmtTimeAt(d);  // 2.368.0 B (#2982)
   if (ds(d) === today()) return hmTxt;
   if (ds(d) === addDays(today(), -1)) return tr('Yesterday') + ' ' + hmTxt;
   return fmtDay(d.getFullYear() !== new Date().getFullYear() ? 'year' : 'short', d) + ' ' + hmTxt;

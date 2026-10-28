@@ -76,9 +76,10 @@ function viewMatrix() {
 // ------------------------------------------------------------------ habits
 const HCOLORS = ['#2dd4bf', '#6d8cff', '#6ee7b7', '#4ade80', '#f5b041', '#f87171', '#c084fc', '#f472b6', '#94a3b8'];
 const habitScheduled = (h, d) => h.per_week ? true : h.days.includes(String(((pd(d).getDay() + 6) % 7) + 1));
+// 2.368.0 B (#2982): "x times a week" counts weeks from the chosen first day (weekOf: Monday when automatic)
 const weekDone = (h, mon) => [...Array(7)].reduce((n, _, i) => n + ((h.logs[addDays(mon, i)] || 0) >= h.goal ? 1 : 0), 0);
 function weekStreak(h) {  // "x times a week": consecutive weeks that reached the target (this week counts once reached)
-  let mon = mondayOf(today()), n = 0, guard = 0;
+  let mon = weekOf(today()), n = 0, guard = 0;
   if (weekDone(h, mon) < h.per_week) mon = addDays(mon, -7);
   while (guard++ < 300 && weekDone(h, mon) >= h.per_week) { n++; mon = addDays(mon, -7); }
   return n;
@@ -104,9 +105,9 @@ function habitStats(h) {
   }
   let sched = 0, hit = 0;
   if (h.per_week) {  // best run of weeks + share of the last 4 full weeks that hit the target
-    const first = mondayOf(h.created_at.slice(0, 10)); let mon = mondayOf(today()), run = 0; best = 0;
+    const first = weekOf(h.created_at.slice(0, 10)); let mon = weekOf(today()), run = 0; best = 0;
     for (let g = 0; g < 300 && mon >= first; g++, mon = addDays(mon, -7)) { if (weekDone(h, mon) >= h.per_week) { run++; best = Math.max(best, run); } else if (g) run = 0; }
-    for (let w = 1; w <= 4; w++) { const m = addDays(mondayOf(today()), -7 * w); if (m < first) break; sched++; if (weekDone(h, m) >= h.per_week) hit++; }
+    for (let w = 1; w <= 4; w++) { const m = addDays(weekOf(today()), -7 * w); if (m < first) break; sched++; if (weekDone(h, m) >= h.per_week) hit++; }
     return {total: days.length, best, streak: habitStreak(h), rate: sched ? Math.round(100 * hit / sched) : 0};
   }
   for (let i = 0; i < 30; i++) { const d = addDays(today(), -i); if (d < h.created_at.slice(0, 10)) break; if (habitScheduled(h, d)) { sched++; if ((h.logs[d] || 0) >= h.goal) hit++; } }
@@ -117,7 +118,7 @@ const weekProg = (h, mon) => { const n = weekDone(h, mon); return `<span class="
 function viewHabits() {
   const hs = S.habits.filter(h => !h.archived);
   if (!S.habits.length) return `<div class="empty nempty eact">${ic('habit')}<span>${tr('No habits yet.')}</span><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>`;
-  const mon = mondayOf(today()), t0 = today();
+  const mon = weekOf(today()), t0 = today();
   // U10: the last 7 days up to today (yesterday can always be ticked, also on a Monday)
   const days = [...Array(7)].map((_, i) => addDays(t0, i - 6));
   let h = `<div class="hweek head"><span class="hnh"></span>${days.map(d => `<span class="${d === t0 ? 'today' : ''}" aria-label="${esc(dayLabel(d, true))}">${WD[pd(d).getDay()]}<br>${pd(d).getDate()}</span>`).join('')}<span style="text-align:right">${tr('Streak')}</span></div>`;

@@ -11,7 +11,7 @@ function ocBoxHtml(o, opt = {}) {
 function ocStateHtml(j) {
   if (!j.enabled) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Off: the server has no key (KALMIDO_SECRET_KEY). Bank and tax data, purchase prices and files are stored unencrypted, see SELF-HOSTING.md.'))}</div>`;
   if (j.key_ok === false) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The server key does not match this organisation’s key. Ask the server admin (SELF-HOSTING.md, recovery key).'))}</div>`;
-  const when = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
+  const when = x => x ? fmtDateNum(new Date(x)) : '';  // 2.368.0 B (#2982): one locale source
   // 2.46.0 (#1563): one text, so one "More information" link
   // 2.138.0 C (#1972): show (the same key again) or make a new one (the earlier one stops working); the full renewal of the
   // organisation's key runs on the server's command line (orgcrypt_cli rotate); a key of the earlier kind counts until then

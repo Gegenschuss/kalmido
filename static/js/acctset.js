@@ -24,7 +24,7 @@ function tkh_dropHtml(tok) {
   if (tok) return `<div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly value="${esc(tok)}"><button class="btn sm pri" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>`;
   if (!S.me?.drop_token_set) return `<div class="row"><label>${tr('Upload token')}</label><button class="btn sm pri" data-m="drop-new-tok">${ic('key', 's')} ${tr('Create upload token')}</button></div>`;
-  return `<div class="row"><label>${tr('Upload token')}</label><span class="muted">${at && !isNaN(at) ? esc(tr('Active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Active')}</span><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>`;
+  return `<div class="row"><label>${tr('Upload token')}</label><span class="muted">${at && !isNaN(at) ? esc(tr('Active since {0}', fmtDateNum(at))) : tr('Active')}</span><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>`;
 }
 function tkh_dropDraw(md, tok) { const w = $('#s-dropw', md); if (w) w.innerHTML = tkh_dropHtml(tok); }
 // 2.138.0 C (#1907): every HTTP Shortcuts download carries a new token (the server cannot read the old one back)
@@ -482,7 +482,7 @@ async function tfaDraw(md, j) {
       : tr('Two-factor authentication is available for accounts with a password.'));
     return;
   }
-  const when = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
+  const when = x => x ? fmtDateNum(new Date(x)) : '';  // 2.368.0 B (#2982): one locale source
   const on = j.totp || j.passkeys.length;
   let h = j.required ? hintK(tr('Required on this server: keep at least one method (authenticator app or passkey).')) : '';
   h += `<div class="row"><label>${tr('Authenticator app')}</label><span class="tfastate ${j.totp ? 'on' : ''}">${j.totp ? tr('On') : tr('Off')}</span>

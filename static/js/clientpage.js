@@ -101,11 +101,11 @@ function ms_clView() {
   return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}${MSC.items?.length && !MSC.pick ? oim_link('master') : ''}</div>`}${card}</div></div>`;
 }
 function ms_clCard(c) {
-  const b = c.billing || {}, cur = S.settings.time_currency || '€';
+  const b = c.billing || {}, cur = S.settings.time_currency || '€';  // 2.368.0 C (#2983): amounts through curMoney (i18n.js)
   const ii = k => typeof ux_info === 'function' ? ux_info(k) : '';  // 2.47.3 (D, #1382): the (i) explanations of the office
   const f = (icon, label, val, k) => val ? `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(label)}</span><span>${val}</span></div>${k ? ii(k) : ''}` : '';
   const adr = cdn_addrLine(c);  // 2.97.0 B (#1951): the fixed fields only (with the extra line)
-  const bud = [c.budget_h ? `${fmtNum(c.budget_h, 1)} h` : '', c.budget_amount ? `${fmtNum(c.budget_amount, 2)} ${cur}` : ''].filter(Boolean).join(' · ');
+  const bud = [c.budget_h ? `${fmtNum(c.budget_h, 1)} h` : '', c.budget_amount ? curMoney(c.budget_amount, cur) : ''].filter(Boolean).join(' · ');
   const inv = (MSC.inv || []).filter(x => x.client_id === c.id && x.open > 0 && !['draft', 'cancelled'].includes(x.status));
   const ks = (c.contacts || []).filter(k => k.name);
   return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
@@ -113,7 +113,7 @@ function ms_clCard(c) {
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
       details: `<div class="ctfields">
-      ${f('money', tr('Hourly rate'), c.rate != null ? esc(`${fmtNum(c.rate, 2)} ${cur}`) : '')}
+      ${f('money', tr('Hourly rate'), c.rate != null ? esc(curMoney(c.rate, cur)) : '')}
       ${f('chart', tr('Budget'), esc(bud))}
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
       ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
@@ -191,8 +191,8 @@ function clm_merge(ids) {
   const val = (k, fn) => Object.fromEntries(sel.map(c => [c.id, String(fn(c) ?? '')]));
   const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Default contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
     ['phone', tr('Phone'), c => c.phone],  // 2.97.0 B (#1951): no free address any more (street etc. below)
-    ['rate', tr('Hourly rate'), c => num(c.rate, 2, cur)], ['budget_h', tr('Budget in hours'), c => num(c.budget_h, 1, 'h')],
-    ['budget_amount', tr('Budget as an amount'), c => num(c.budget_amount, 2, cur)], ['note', tr('Note'), c => c.note],
+    ['rate', tr('Hourly rate'), c => curMoney(c.rate, cur)], ['budget_h', tr('Budget in hours'), c => num(c.budget_h, 1, 'h')],
+    ['budget_amount', tr('Budget as an amount'), c => curMoney(c.budget_amount, cur)], ['note', tr('Note'), c => c.note],
     ...OFX_CL_FIELDS.map(([k, n]) => [k, tr(n), c => (c.billing || {})[k]])].map(([k, label, fn]) => ({k, label, vals: val(k, fn)}));
   const send = (target, pick, dry) => rawFetch('POST', '/api/clients/merge', {target, ids, pick, dry});
   ms_merge({title: trn('Merge {0} client', 'Merge {0} clients', sel.length),
