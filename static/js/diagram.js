@@ -41,14 +41,14 @@ function dg_tex(k, tex, display) {
 }
 // the SVG once more without anything that could run (Mermaid's strict mode cleaned it already)
 function dg_clean(svg) {
-  const d = new DOMParser().parseFromString(svg, 'image/svg+xml'), r = d.documentElement;
+  const d = new window.DOMParser().parseFromString(svg, 'image/svg+xml'), r = d.documentElement;
   if (!r || r.nodeName !== 'svg') return '';
   r.querySelectorAll('script, iframe, object, embed, a').forEach(x => { if (x.nodeName === 'a') x.replaceWith(...x.childNodes); else x.remove(); });
   for (const x of [r, ...r.querySelectorAll('*')]) {
     for (const a of [...x.attributes]) if (/^on/i.test(a.name) || (/href$/i.test(a.name) && !/^#/.test(a.value))) x.removeAttribute(a.name);
   }
   r.removeAttribute('height'); r.setAttribute('role', 'img'); r.setAttribute('aria-label', tr('Diagram'));
-  return new XMLSerializer().serializeToString(r);
+  return new window.XMLSerializer().serializeToString(r);
 }
 async function dg_svg(src) {
   const light = dg_light(), key = (light ? 'l' : 'd') + src;
