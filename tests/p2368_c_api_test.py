@@ -51,7 +51,7 @@ out = box("""import json
 from kalmido.office.parts import f8b_fix_cents
 for lang, cur in (("en", "USD"), ("de", "EUR"), ("en", "EUR")):
     rows = [{"kind": "service", "qty": 3, "unit": "day", "rate": "33.33", "tax": "standard", "detail": ""}]
-    print(json.dumps(f8b_fix_cents(rows, {"standard": "100.00"}, lang, cur)[0]["detail"]), end="|" if cur != "EUR" or lang != "en" else "\\n")
+    print(json.dumps(f8b_fix_cents(rows, {"standard": "100.00"}, lang, cur)[0]["detail"], ensure_ascii=False), end="|" if cur != "EUR" or lang != "en" else "\\n")
 """)
 check(out == '"3 × $33.33"|"3 × 33,33 €"|"3 × €33.33"', "the rest-cent detail in the home currency: " + out)
 
