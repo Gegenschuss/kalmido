@@ -5,6 +5,12 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.401.1] - 2026-10-28
+
+### Fixed
+- CI of 2.401.0: p250_a_api and p2460_a_api follow the agent rules of 2.361.4 (#2928, #2935: the agent leaves the organisation's project before it becomes private, the organisation allows members' own agents first), p2661_b_ui lists agentview.js in its workspace guard, and the self-start list (tests/selfstart.txt) drops the leftovers of the reverted package 2.380.0 and a double entry; p23612_a_api keeps its start.sh call directly under its NOSTART guard.
+- CI of 2.401.0: p2191_f2_i18nrobust_ui is skipped until 11.11.2026 (red in CI, green on the same code; its fix is #3533).
+
 ## [2.401.0] - 2026-10-28
 
 Package 2.361.4 (Teil 4/5: Bündel Selbstständige: Org verlassen/löschen, eigener Agent, eigene Firma (2.260 + 2.262)).
@@ -9038,7 +9044,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.401.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.401.1...HEAD
+[2.401.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.401.1
 [2.401.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.401.0
 [2.376.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.3
 [2.376.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.2
