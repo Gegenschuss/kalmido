@@ -574,8 +574,8 @@ def ein_check(xml_bytes):
         amount = _d(_text(t, "ram:CalculatedAmount"))
         seen.add((cat, pct))
         want = (base * pct / 100).quantize(Q2, rounding=ROUND_HALF_UP)
-        # 2.408.0 (#3520): a final invoice adds the taxes its progress invoices rounded each (BT-113 > 0): a few cents apart are
-        # fine (the EN 16931 rule allows 1.00), else exact
+        # 2.408.0 (#3520): with a paid amount (BT-113 > 0, e.g. a final invoice that adds the taxes its progress invoices rounded
+        # each) a few cents apart are fine (the EN 16931 rule allows 1.00); without one exact
         if amount != want and not (bt113 > 0 and abs(amount - want) <= Decimal("0.05")):
             out.append(f"BR-CO-17: tax {amount} for {cat} {pct} % != {want}")
         if by_cat.get((cat, pct), Decimal("0")) != base:

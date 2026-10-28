@@ -424,13 +424,22 @@ def abs_prepaid_view(m, L, lang, pack=None):
     totals rows: subtotal, VAT and total of the whole service, each progress invoice (gross) and the remaining amount. The
     tax of a deduction is its net x rate (as on its progress invoice: one position per rate there). Nothing without them."""
     lines = m.get("lines") or []
-    rx = re.compile("^" + re.escape(_t("deduct", lang, num="QQNUMQQ", date="QQDATEQQ")).replace("QQNUMQQ", ".+?").replace("QQDATEQQ", ".+?") + "$")
+    tot = m.get("totals") or {}
+    lab = L.get("invoice_total", tr("Total|invoice", lg=lang))
+    rows = tot.get("rows") if isinstance(tot.get("rows"), list) else None
+    at = next((i for i, x in enumerate(rows) if x and x[0] == lab), None) if rows is not None else None
+    if rows is not None and at is None:
+        return
+    # the title in every document language (a language changed after drafting, review): the words written by abs_deductions
+    langs = list(dict.fromkeys([lang, "en", "de", "fr", "es", "it", "nl"]))
+    rx = re.compile("^(?:" + "|".join(re.escape(_t("deduct", lg, num="QQNUMQQ", date="QQDATEQQ")).replace("QQNUMQQ", ".+?").replace("QQDATEQQ", ".+?")
+                                      for lg in langs) + ")$")
     ded = [ln for ln in lines if isinstance(ln, dict) and ln.get("kind") == "discount" and rx.match(str(ln.get("title") or ""))]
     if not ded:
         return
+    heads = {_t("heading", lg) for lg in langs}
+    m["lines"] = [ln for ln in lines if not any(ln is d for d in ded) and not (isinstance(ln, dict) and ln.get("kind") == "heading" and ln.get("title") in heads)]
     head = _t("heading", lang)
-    m["lines"] = [ln for ln in lines if not any(ln is d for d in ded) and not (isinstance(ln, dict) and ln.get("kind") == "heading" and ln.get("title") == head)]
-    tot = m.get("totals") or {}
     cur = tot.get("currency") or m.get("currency") or "EUR"
     tls = {tl.get("rate_key"): dict(tl) for tl in tot.get("tax_lines") or [] if isinstance(tl, dict)}
     novat = (tot.get("vat_mode") or m.get("vat_mode")) == "novat"
@@ -442,7 +451,7 @@ def abs_prepaid_view(m, L, lang, pack=None):
         k = ln.get("tax") if ln.get("tax") in TAX_KEYS else "standard"
         title = str(ln.get("title") or "")
         if titles.count(title) > 1:  # one progress invoice with several rates: the rate tells the rows apart
-            title += f" ({_pct_text(pct, lang)} %)"
+            title += f" ({_pct_text(ln.get('tax_pct') or 0, lang)} %)" if not novat else f" ({label(pack, lang, 'tax_' + k, pct='').strip() or k})"
         out.append({"title": title, "detail": str(ln.get("detail") or ""), "tax": k, "pct": format(pct.normalize(), "f"),
                     "net": dstr(net), "vat": dstr(vat), "gross": dstr(net + vat)})
         if novat:
@@ -457,16 +466,11 @@ def abs_prepaid_view(m, L, lang, pack=None):
     full = {"net": dstr(dec(tot.get("net") or 0) + s_net), "tax": dstr(dec(tot.get("tax") or 0) + s_vat),
             "gross": dstr(dec(tot.get("gross") or 0) + s_net + s_vat), "prepaid": dstr(s_net + s_vat),
             "tax_lines": [tls[k] for k in TAX_KEYS if k in tls],
-            "note": "\n".join([head] + [f"{x['title']}: {x['detail']}" if x["detail"] else x["title"] for x in out])}
+            "note": "\n".join([head] + [f"{x['title']}: {_nopaid(x['detail'], lang)}" if x["detail"] else x["title"] for x in out])}
     if tot.get("tax_eur") not in (None, "") and dec(tot.get("fx_rate") or 0) > 0:  # 2.189.0 (#2475): the tax in the home currency too
         full["tax_eur"] = dstr(dec(tot["tax_eur"]) + s_vat / dec(tot["fx_rate"]))
     m["abs_prepaid"], m["abs_full"] = out, full
-    if not isinstance(tot.get("rows"), list):
-        return
-    lab = L.get("invoice_total", tr("Total|invoice", lg=lang))
-    rows = tot["rows"]
-    at = next((i for i, x in enumerate(rows) if x and x[0] == lab), None)
-    if at is None:
+    if rows is None:
         return
     new = [[L.get("subtotal", tr("Subtotal|document", lg=lang)), fmt_money(full["net"], lang, cur)]]
     for tl in full["tax_lines"]:
@@ -478,6 +482,16 @@ def abs_prepaid_view(m, L, lang, pack=None):
     new += [[x["title"], fmt_money(-dec(x["gross"]), lang, cur), {"detail": x["detail"]}] for x in out]
     new.append([_t("rest", lang), rows[at][1]])
     tot["rows"] = new + rows[at + 1:]  # the paid / outstanding rows stay below
+
+
+def _nopaid(detail, lang):
+    """2.408.0 (#3520, review): the detail of a deduction without its " (paid)" / " (open)" of the drafting day (the e-invoice
+    note stays true after a later payment)."""
+    for k in ("paid", "open"):
+        sfx = _t(k, lang)
+        if sfx and detail.endswith(sfx):
+            return detail[:-len(sfx)]
+    return detail
 
 
 def abs_render(r, m, L, lang, pack=None):
