@@ -450,6 +450,9 @@ document.addEventListener('click', async e => {
       {label: tr('Edit a copy'), icon: 'copy', fn: () => ltCopy(d)},
       {label: tr('Save as template'), icon: 'file', fn: () => ltAsTemplate(d)},
       {label: tr('Download PDF'), icon: 'download', fn: async () => { if (d.status !== 'draft' || await ltSave(d, true)) location.assign(ltPdfUrl(d, true)); }},
+      // 2.356.1 (#3344): a draft into another workspace (officemove.py what letters; sent letters stay for the retention)
+      ...(d.status === 'draft' && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? [{label: tr('Move to another workspace…'), icon: 'brief',
+        fn: async () => { if (await ltSave(d, true)) ofm_move({what: 'letters', ids: [d.id], from: ofm_officeFrom(), label: qn(d.subject || d.rcpt_name || tr('Letter')), after: async () => { LT.data = null; LT.cur = null; go('office/letters'); }}); }}] : []),
       {label: tr('Delete'), icon: 'archive', cls: 'danger', fn: () => ltArchive(d)}]);
   }
 });

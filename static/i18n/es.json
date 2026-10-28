@@ -14495,7 +14495,6 @@
   "What you created in this office (clients, drafts, framework contracts, trips, templates) moves into your personal office, for example when you leave an office community. Issued invoices stay here; a read-only copy can go along. Can be undone.": "Lo que creaste en esta oficina (clientes, borradores, contratos marco, viajes, plantillas) pasa a tu oficina personal, por ejemplo cuando dejas una oficina compartida. Las facturas emitidas se quedan aquí; puede ir una copia de solo lectura. Se puede deshacer.",
   "What you created in this office": "Lo que creaste en esta oficina",
   "The own part of an office moves into your personal office only": "La parte propia de una oficina solo puede ir a tu oficina personal",
-  "Only what you created in this office moves; the drafts of the others, the cash book, the books and the bank stay": "Solo se mueve lo que creaste en esta oficina; los borradores de los demás, el libro de caja, la contabilidad y el banco se quedan",
   "“{0}” is still used in the organisation: it stays there and is created anew in your personal office": "«{0}» todavía se usa en la organización: se queda allí y se crea de nuevo en tu oficina personal",
   "{0} trip stays: it lies in a locked month": ["{0} viaje se queda: está en un mes bloqueado", "{0} viajes se quedan: están en un mes bloqueado"],
   "Receipts: {0}": "Justificantes: {0}",
@@ -14888,5 +14887,15 @@
   "Not understood: {0}": "No entendido: {0}",
   "{0} of {1} shown": "{0} de {1} mostrados",
   "No open checkbox matches.": "Ninguna casilla abierta coincide.",
-  "No page matches this query.": "Ninguna página coincide con esta consulta."
+  "No page matches this query.": "Ninguna página coincide con esta consulta.",
+  "Only what you created in this office moves; the drafts of the others, the cash book, the books, the bank and the suppliers stay": "Solo se mueve lo que creaste en esta oficina; los borradores de los demás, el libro de caja, la contabilidad, el banco y los proveedores se quedan",
+  "Bank accounts and suppliers move only with a whole office: a personal office goes along completely with “Transfer into an organisation”": "Las cuentas bancarias y los proveedores solo se mueven con toda la oficina: una oficina personal se traslada por completo con «Transferir a una organización»",
+  "{0} deal moves with its client": ["{0} oportunidad se mueve con su cliente", "{0} oportunidades se mueven con sus clientes"],
+  "{0} deal loses its quotation or project in the old workspace": ["{0} oportunidad pierde su presupuesto o proyecto en el espacio anterior", "{0} oportunidades pierden su presupuesto o proyecto en el espacio anterior"],
+  "{0} letter draft moves": ["{0} borrador de carta se mueve", "{0} borradores de carta se mueven"],
+  "{0} letter draft loses its links in the old workspace (client, contact, template or linked documents)": ["{0} borrador de carta pierde sus vínculos en el espacio anterior (cliente, contacto, plantilla o documentos vinculados)", "{0} borradores de carta pierden sus vínculos en el espacio anterior (cliente, contacto, plantilla o documentos vinculados)"],
+  "{0} sent letter stays in the old workspace (retention)": ["{0} carta enviada se queda en el espacio anterior (conservación)", "{0} cartas enviadas se quedan en el espacio anterior (conservación)"],
+  "{0} set moves with its devices": ["{0} conjunto se mueve con sus equipos", "{0} conjuntos se mueven con sus equipos"],
+  "{0} device moves along": ["{0} equipo se mueve también", "{0} equipos se mueven también"],
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} equipo aún se usa en el espacio anterior (otro conjunto, una reserva o un vínculo): se queda allí y se copia al destino", "{0} equipos aún se usan en el espacio anterior (otro conjunto, una reserva o un vínculo): se quedan allí y se copian al destino"]
 }

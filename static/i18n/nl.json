@@ -14495,7 +14495,6 @@
   "What you created in this office (clients, drafts, framework contracts, trips, templates) moves into your personal office, for example when you leave an office community. Issued invoices stay here; a read-only copy can go along. Can be undone.": "Wat je in dit kantoor hebt aangemaakt (klanten, concepten, raamcontracten, reizen, sjablonen) gaat naar je persoonlijke kantoor, bijvoorbeeld als je een kantoorgemeenschap verlaat. Uitgegeven facturen blijven hier; een alleen-lezen kopie kan mee. Kan ongedaan worden gemaakt.",
   "What you created in this office": "Wat je in dit kantoor hebt aangemaakt",
   "The own part of an office moves into your personal office only": "Het eigen deel van een kantoor kan alleen naar je persoonlijke kantoor",
-  "Only what you created in this office moves; the drafts of the others, the cash book, the books and the bank stay": "Alleen wat je in dit kantoor hebt aangemaakt gaat mee; concepten van anderen, kasboek, boekhouding en bank blijven",
   "“{0}” is still used in the organisation: it stays there and is created anew in your personal office": "‘{0}’ wordt nog gebruikt in de organisatie: blijft daar en wordt opnieuw aangemaakt in je persoonlijke kantoor",
   "{0} trip stays: it lies in a locked month": ["{0} reis blijft: die valt in een vergrendelde maand", "{0} reizen blijven: die vallen in een vergrendelde maand"],
   "Receipts: {0}": "Bonnen: {0}",
@@ -14888,5 +14887,15 @@
   "Not understood: {0}": "Niet begrepen: {0}",
   "{0} of {1} shown": "{0} van {1} getoond",
   "No open checkbox matches.": "Geen open selectievakje past.",
-  "No page matches this query.": "Geen pagina past bij deze zoekopdracht."
+  "No page matches this query.": "Geen pagina past bij deze zoekopdracht.",
+  "Only what you created in this office moves; the drafts of the others, the cash book, the books, the bank and the suppliers stay": "Alleen wat je in dit kantoor hebt aangemaakt gaat mee; concepten van anderen, kasboek, boekhouding, bank en leveranciers blijven",
+  "Bank accounts and suppliers move only with a whole office: a personal office goes along completely with “Transfer into an organisation”": "Bankrekeningen en leveranciers gaan alleen mee met het hele kantoor: een persoonlijk kantoor verhuist volledig met „Overdragen naar een organisatie”",
+  "{0} deal moves with its client": ["{0} deal gaat mee met zijn klant", "{0} deals gaan mee met hun klanten"],
+  "{0} deal loses its quotation or project in the old workspace": ["{0} deal verliest zijn offerte of project in de oude werkruimte", "{0} deals verliezen hun offerte of project in de oude werkruimte"],
+  "{0} letter draft moves": ["{0} briefconcept gaat mee", "{0} briefconcepten gaan mee"],
+  "{0} letter draft loses its links in the old workspace (client, contact, template or linked documents)": ["{0} briefconcept verliest zijn koppelingen in de oude werkruimte (klant, contact, sjabloon of gekoppelde documenten)", "{0} briefconcepten verliezen hun koppelingen in de oude werkruimte (klant, contact, sjabloon of gekoppelde documenten)"],
+  "{0} sent letter stays in the old workspace (retention)": ["{0} verzonden brief blijft in de oude werkruimte (bewaarplicht)", "{0} verzonden brieven blijven in de oude werkruimte (bewaarplicht)"],
+  "{0} set moves with its devices": ["{0} set gaat mee met zijn apparaten", "{0} sets gaan mee met hun apparaten"],
+  "{0} device moves along": ["{0} apparaat gaat mee", "{0} apparaten gaan mee"],
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} apparaat wordt in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): het blijft daar en wordt naar het doel gekopieerd", "{0} apparaten worden in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): ze blijven daar en worden naar het doel gekopieerd"]
 }

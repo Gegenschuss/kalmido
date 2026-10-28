@@ -81,7 +81,7 @@ dialog names what moves and what stays before anything changes:
 Rights: the right to work in both offices (travel expenses, templates and framework contracts: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|office, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|sets|letters|office, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
 Further areas (2.356.0): fixed costs, vehicles (with their logbook: drives, change log and closed months - a month closed
@@ -90,6 +90,16 @@ equipment move from their dialog (*Move to another workspace…*, the office adm
 old office still uses (an issued invoice's position, a set, a framework contract) stays there archived and is created anew
 in the target; a fixed cost or vehicle that is used there stays. Links into the old office end (a drive's client / trip,
 a device's receipt / contract, a service's role) and come back with the undo.
+
+More in 2.356.1: a client takes its **deals** along (a deal no longer keeps the client in the old office; a deal in the
+trash stays; its quotation stays linked when it moves along, a quotation that stays and a project of another workspace
+are unlinked). **Letter drafts** move one by one from the letter's menu (*Move to another workspace…*, the office admin
+of both sides); sent letters stay for the retention, the client, contact, template and the linked documents of the draft
+are unlinked. A **set** moves with its devices (`what: sets`); a device another set of the old office (or a booking, a
+receipt or contract link) still uses is copied into the target and stays, the set then names the copy. Every link that
+ends comes back with the undo. **Bank accounts with their transactions and the suppliers** never move one by one (booked
+data, the suppliers are the DATEV creditor accounts of the import): they move only with a whole personal office
+(*Transfer into an organisation*).
 
 **Your own part of an organisation's office into your personal office** (2.356.0, e.g. when you leave an office community):
 Settings of the organisation's office, *Transfer into your personal office…* (its admins only), the same dialog with preview

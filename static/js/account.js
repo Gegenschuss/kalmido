@@ -335,7 +335,7 @@ function oadmRow(x) {
 }
 // 2.361.2 (#2923): what a member asks back (they brought it in or made it): release = they may move it into their private space
 const OOR_KIND = {list: N_('Project'), sheet: N_('Table'), file: N_('File or folder'), wiki: N_('Knowledge page'), clients: N_('Client'),
-  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft')};  // 2.361.2 B (#2923): + drafts
+  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft'), letters: N_('Letter')};  // 2.361.2 B (#2923): + drafts; 2.356.1 (#3344): + letters
 const oor_kind = k => OOR_KIND[k] ? tr(OOR_KIND[k]) : k;
 function oorHtml(rs) {
   const open = (rs || []).filter(r => r.state === 'open');
