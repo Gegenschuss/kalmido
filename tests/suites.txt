@@ -367,7 +367,7 @@ now wed 10:00; fresh; run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
 # vs. actual, timesheet), workload, approvals, forms -> tasks, sign-in links, self-registration, the agent event task_added,
 # the kind of instance (restarts of the container with KALMIDO_INSTANCE_MODE); then the UI in jsdom and Firefox (390 / Fold 690
 # touch, 1440 mouse, axe, the sidebar folder gaps of #794)
-fresh; run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"  # 2.381.0 (#2713): fixed test time, the browser follows it too
        run p2230_ui node p2230_ui.js "$KALMIDO_TEST_DATA"
 # 2.24.0 "Usability": storage quota (#910), the notice / maintenance banner + API + command (#907), mail limits (#899), agents'
 # provider + the News when one joins (#896), a hosted server (#905, a restart with KALMIDO_HOSTED); then the UI in jsdom:
@@ -425,7 +425,7 @@ fresh; run p2300_agentsafe_api "$PY" p2300_agentsafe_api_test.py "$KALMIDO_TEST_
 # (#1054 phone without tabs, #344 the comments area on a desktop with a draggable split), file tiles and tables
 # (#1050 #1048), grouped menus, one search and the agent sub-tabs (#1056 #1057 #1046), sorting by a column title and
 # the connection dot on your picture (#354 #378); each suite starts its own container
-fresh; run p2310_a_ui node p2310_a_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2310_a_ui node p2310_a_ui.js "$KALMIDO_TEST_DATA"  # 2.381.0 (#2713): fixed test time, the browser follows it too
 fresh; run p2310_b_api "$PY" p2310_b_api_test.py "$KALMIDO_TEST_DATA"
        run p2310_b_ui node p2310_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2310_c_ui node p2310_c_ui.js "$KALMIDO_TEST_DATA"
@@ -647,7 +647,7 @@ fresh; run p2440_d_ui node p2440_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.45.0 part C: #1529 reload safety: service worker 5xx / cache fallback, reload guard (no server needed)
 fresh; run p2450_c_ui node p2450_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.45.0 part D: #1504 the start page as in the draft (sentence, Today with a box, compact News, active projects, slim empty cards, two columns)
-fresh; run p2450_d_ui node p2450_d_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2450_d_ui node p2450_d_ui.js "$KALMIDO_TEST_DATA"  # 2.381.0 (#2713): fixed test time, the browser follows it too
 # 2.45.0 part A: #1502 #1503 #1509 #1516 the sidebar (group More, the order, the messenger, the notes of all lists)
 fresh; run p2450_a_ui node p2450_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.45.0 part B: #1515 self-hosting (one-time setup code, server key file, backups on for a new server; install script,
@@ -1153,7 +1153,7 @@ fresh; run p296_e_api "$PY" p296_e_api_test.py "$KALMIDO_TEST_DATA"
 shard 4  # 2.102.0: the 2.102 suites run in shard 4 (shard 13 near the 45 min limit, shard 4 took 18 min)
 # 2.102.0 part A (#1988 #2003 #2006): organisation trash for deleted lists, calendar invitations
 fresh; run p2102_a_api "$PY" p2102_a_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"
+now wed 10:00; fresh; run p2102_a_ui node p2102_a_ui.js "$KALMIDO_TEST_DATA"  # 2.381.0 (#2713): fixed test time, the browser follows it too
 # 2.102.0 part B (#2197 #2204 #2206): news bundles and counts, chat send hint, selection bar padding
 fresh; run p2102_b_ui node p2102_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.102.0 part C (#2201 #2208 #2210): questionnaire customer link, polls/forms on demand, pin agents
