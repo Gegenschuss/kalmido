@@ -830,7 +830,7 @@ document.addEventListener('change', async e => {
 function wsa_sync(md = $$('.smodal').pop()) {
   if (!md) return;
   for (const el of $$('input[data-wsa]', md)) { const on = wsa_wsOn(el.dataset.wsaws, el.dataset.wsa); el.checked = on; el.closest('[data-wsarow]')?.classList.toggle('off', !on); }
-  for (const d of $$('[data-wsagrp]', md)) { const ws = d.dataset.wsagrp, ins = $$('input[data-wsa]', d), c = $('.mgc', d); if (c) c.textContent = tr('{0} of {1} on', ins.filter(x => x.checked).length, ins.length); }
+  for (const d of $$('[data-wsagrp]', md)) { const ins = $$('input[data-wsa]', d), c = $('.mgc', d); if (c) c.textContent = tr('{0} of {1} on', ins.filter(x => x.checked).length, ins.length); }
 }
 // Settings > Workspaces: the areas an organisation's members see (its admins decide, every member sees it; box._j = GET /api/orgs)
 function wsa_orgPaneDraw(box) {
