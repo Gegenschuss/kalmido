@@ -24,7 +24,10 @@ const orgOf = async id => (await call('GET', '/api/state')).lists.find(l => l.id
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Example Org', lang: 'en', collab_all: true});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients'});
-  const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
+  const AID = (await call('GET', '/api/state')).me.id;
+  const ORG = (await call('POST', '/api/admin/orgs', {name: 'Example Org', admin_id: AID})).id;  // as p2401_a_api_test.py
+  await call('POST', `/api/orgs/${ORG}/join`);  // an added account accepts (2.148.1, #2480)
+  check((await call('GET', '/api/state')).me.workspaces.some(x => x.id === ORG), 'setup: alice is in the organisation');
   await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const W = (await call('POST', '/api/lists', {name: 'Website', org_id: ORG})).id;
   const CL = (await call('POST', '/api/clients', {name: 'Northwind Example GmbH', org_id: ORG})).id;
