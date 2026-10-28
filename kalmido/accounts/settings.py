@@ -413,6 +413,8 @@ def clean_roadmap_pref(v):
             out[k] = x
         elif k == "z" and x in ("week", "month", "quarter"):
             out[k] = x
+        elif k == "zf" and isinstance(x, (int, float)) and not isinstance(x, bool) and 0.1 <= x <= 10:  # 2.331.0 E (#3311): pinched day width
+            out[k] = x
         elif k == "def" and x in ("auto", "c", "e"):
             out[k] = x
         elif k in ("po", "hd", "nd") and (x is None or isinstance(x, bool)):  # 2.0.6: nd = "No date" rows

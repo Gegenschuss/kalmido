@@ -307,17 +307,27 @@ function ltSigClear(url) {
     im.src = url;
   });
 }
-/** the drawing field in el: pointer strokes in ink colour; -> {url(): PNG data URL or '' when empty, clear()} */
+/** the drawing field in el: pointer strokes in ink colour; -> {url(): PNG data URL or '' when empty, clear()}; 2.332.0 C (#3301):
+ * the PNG is transparent and cut to the strokes (plus the line width) */
 function ltSigPad(el) {
   el.innerHTML = `<canvas class="lt-pad" width="${LT_PAD_W}" height="${LT_PAD_H}" aria-label="${esc(tr('Draw your signature here'))}" style="width:100%;max-width:${LT_PAD_W}px;aspect-ratio:3/1;touch-action:none;background:#fff;border:1px solid var(--line, #ccd);border-radius:8px;cursor:crosshair"></canvas>`;
   const cv = /** @type {HTMLCanvasElement} */ ($('canvas', el)), cx = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
-  let drawn = false, last = null;
+  let bb = null, last = null;  // bb = the box around the strokes [x0, y0, x1, y1], null = nothing drawn
   cx.lineWidth = 3; cx.lineCap = 'round'; cx.lineJoin = 'round'; cx.strokeStyle = '#1a2340';
-  const at = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * LT_PAD_W / r.width, (e.clientY - r.top) * LT_PAD_H / r.height]; };
-  cv.addEventListener('pointerdown', e => { e.preventDefault(); try { cv.setPointerCapture?.(e.pointerId); } catch { /* not a live pointer */ } last = at(e); cx.beginPath(); cx.arc(last[0], last[1], 1.4, 0, 7); cx.fillStyle = cx.strokeStyle; cx.fill(); drawn = true; });
-  cv.addEventListener('pointermove', e => { if (!last) return; const p = at(e); cx.beginPath(); cx.moveTo(last[0], last[1]); cx.lineTo(p[0], p[1]); cx.stroke(); last = p; });
+  // inside the border (clientLeft / clientTop), so a stroke lands under the pointer
+  const at = e => { const r = cv.getBoundingClientRect(), w = cv.clientWidth || r.width, h = cv.clientHeight || r.height; return [(e.clientX - r.left - cv.clientLeft) * LT_PAD_W / w, (e.clientY - r.top - cv.clientTop) * LT_PAD_H / h]; };
+  const grow = p => { const x = p[0], y = p[1]; bb = bb ? [Math.min(bb[0], x), Math.min(bb[1], y), Math.max(bb[2], x), Math.max(bb[3], y)] : [x, y, x, y]; };
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); try { cv.setPointerCapture?.(e.pointerId); } catch { /* not a live pointer */ } last = at(e); cx.beginPath(); cx.arc(last[0], last[1], 1.4, 0, 7); cx.fillStyle = cx.strokeStyle; cx.fill(); grow(last); });
+  cv.addEventListener('pointermove', e => { if (!last) return; const p = at(e); cx.beginPath(); cx.moveTo(last[0], last[1]); cx.lineTo(p[0], p[1]); cx.stroke(); last = p; grow(p); });
   for (const t of ['pointerup', 'pointercancel', 'pointerleave']) cv.addEventListener(t, () => { last = null; });
-  return {url: () => drawn ? cv.toDataURL('image/png') : '', clear: () => { cx.clearRect(0, 0, LT_PAD_W, LT_PAD_H); drawn = false; }};
+  const url = () => {
+    if (!bb) return '';
+    const m = 3, x = Math.max(0, Math.floor(bb[0] - m)), y = Math.max(0, Math.floor(bb[1] - m));
+    const o = document.createElement('canvas'); o.width = Math.max(1, Math.min(LT_PAD_W, Math.ceil(bb[2] + m)) - x); o.height = Math.max(1, Math.min(LT_PAD_H, Math.ceil(bb[3] + m)) - y);
+    /** @type {CanvasRenderingContext2D} */ (o.getContext('2d')).drawImage(cv, x, y, o.width, o.height, 0, 0, o.width, o.height);
+    return o.toDataURL('image/png');
+  };
+  return {url, clear: () => { cx.clearRect(0, 0, LT_PAD_W, LT_PAD_H); bb = null; }};
 }
 /** opts.draw: open with the drawing field; done(profile) after saving */
 function ltProfileModal(opts = {}) {
@@ -325,7 +335,7 @@ function ltProfileModal(opts = {}) {
   let img = P.image || '', pad = null;
   const pic = () => img ? `<img src="${esc(img)}" alt="${esc(tr('Signature picture'))}" class="lt-sigimg">` : `<p class="muted">${tr('No signature picture yet.')}</p>`;
   /** @type {any} */
-  const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('The picture is only printed in your own letters.'))}</p>
+  const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('The picture is only printed in your own letters and on the entertainment receipts you approve.'))}</p>
     ${ofcRowF('lt-pgreet', tr('Greeting'), ofcIn('lt-pgreet', P.greeting, {max: 120, ph: P.default_greeting}))}
     ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}
     <div class="row"><label>${tr('Signature picture')}</label><div class="lt-sigbox">${pic()}</div></div>
@@ -334,7 +344,7 @@ function ltProfileModal(opts = {}) {
       <button type="button" class="btn sm" data-m="draw">${ic('edit', 's')} ${tr('Draw')}</button>
       <button type="button" class="btn sm ghost" data-m="padclr" hidden>${tr('Clear')}</button>
       <button type="button" class="btn sm ghost danger" data-m="rm" ${img ? '' : 'hidden'}>${tr('Remove')}</button></div>
-    <p class="muted ofchint">${esc(tr('PNG or JPEG, at most 300 KB; a scan of your signature on a white background.'))} ${esc(tr('A light background is made transparent. Or draw it with your finger or trackpad.'))}</p>
+    <p class="muted ofchint">${esc(tr('PNG or JPEG, at most 300 KB; a scan of your signature on a white background.'))} ${esc(tr('A light background is made transparent. Or draw it with your finger or trackpad.'))} ${esc(tr('A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.'))}</p>
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ofcdlg');
@@ -359,9 +369,10 @@ function ltProfileModal(opts = {}) {
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
-    if (b.dataset.m === 'draw') { padOn(); return; }
+    if (b.dataset.m === 'draw') { padOn(); err(''); return; }
     if (b.dataset.m === 'padclr') { pad?.clear(); return; }
     if (b.dataset.m === 'rm') { img = ''; changed = true; padOff(); $('.lt-sigbox', md).innerHTML = pic(); b.hidden = true; return; }
+    if (pad && !pad.url()) { err(tr('Please draw your signature first.')); return; }  // 2.332.0 C (#3301): an open, empty drawing field says what is missing
     const old = {greeting: P.greeting || '', name: P.name || '', image: P.image || ''};
     if (pad?.url()) { img = pad.url(); changed = true; }
     try {

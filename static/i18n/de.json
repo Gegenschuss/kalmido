@@ -11782,10 +11782,6 @@
   "The columns apply to every CSV file.": "Die Spalten gelten für alle CSV-Dateien.",
   "Not a bank statement (only XML, CSV or ZIP)": "Kein Kontoauszug (nur XML, CSV oder ZIP)",
   "Channel type": "Art",
-  "Unread in other workspaces": "Ungelesen in anderen Arbeitsbereichen",
-  "1 unread in {0}": "1 ungelesene in {0}",
-  "{0} unread in {1}": "{0} ungelesene in {1}",
-  "Switch": "Wechseln",
   "Tracked time (h)": "Erfasste Zeit (h)",
   "Created by": "Erstellt von",
   "Completed by": "Erledigt von",
@@ -12469,7 +12465,6 @@
   "Sent and filed": "Versendet und abgelegt",
   "Signature picture": "Unterschrift-Bild",
   "No signature picture yet.": "Noch kein Unterschrift-Bild.",
-  "The picture is only printed in your own letters.": "Das Bild erscheint nur in deinen eigenen Briefen.",
   "Choose picture": "Bild wählen",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG oder JPEG, höchstens 300 KB; ein Scan deiner Unterschrift auf weißem Grund.",
   "Marked as delivered": "Als zugestellt markiert",
@@ -14617,5 +14612,11 @@
   "{0} external link ends (people outside Kalmido can no longer open it)": ["{0} externer Link endet (Personen außerhalb von Kalmido können ihn nicht mehr öffnen)", "{0} externe Links enden (Personen außerhalb von Kalmido können sie nicht mehr öffnen)"],
   "{0} file request goes along: its upload link keeps working": ["{0} Dateianfrage zieht mit um: ihr Upload-Link funktioniert weiter", "{0} Dateianfragen ziehen mit um: ihre Upload-Links funktionieren weiter"],
   "{0} file request of another person keeps working only if they can still edit the folder there": ["{0} Dateianfrage einer anderen Person funktioniert nur weiter, wenn sie den Ordner dort noch bearbeiten darf", "{0} Dateianfragen anderer Personen funktionieren nur weiter, wenn diese den Ordner dort noch bearbeiten dürfen"],
-  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "Der Server setzt ein Verbrauchslimit für persönliche Agenten: deins kann nur niedriger sein (gleicher Zeitraum und gleiches Maß)"
+  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "Der Server setzt ein Verbrauchslimit für persönliche Agenten: deins kann nur niedriger sein (gleicher Zeitraum und gleiches Maß)",
+  "Show all {0}": "Alle {0} anzeigen",
+  "Search files": "Dateien suchen",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "Das Bild erscheint nur in deinen eigenen Briefen und auf den Bewirtungsbelegen, die du freigibst.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Eine Bild-Unterschrift ist keine elektronische Signatur; die Anerkennung beim Finanzamt mit der Steuerberatung klären.",
+  "Please draw your signature first.": "Bitte zuerst die Unterschrift zeichnen.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Dein Unterschrift-Bild steht dann auf der Unterschriftszeile des PDF. Eine Bild-Unterschrift ist keine elektronische Signatur; die Anerkennung beim Finanzamt mit der Steuerberatung klären."
 }

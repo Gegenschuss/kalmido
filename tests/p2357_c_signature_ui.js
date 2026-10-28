@@ -49,6 +49,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts';
     await ev(`(() => { document.querySelector('#lt-sign_image').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal canvas.lt-pad')`), '#3158: ticking it opens the setup with the drawing field');
     check(await ev(`!document.querySelector('#lt-sign_image').checked`), '#3158: the box stays off until a picture is saved');
+    // 2.331.0 (#3301 merged into this field, rescue #1592): one drawing field only, with its own Clear
+    check(await ev(`document.querySelectorAll('.modal canvas').length === 1 && document.querySelectorAll('.modal [data-m="padclr"]:not([hidden])').length === 1 && !document.querySelector('.modal [data-m="clr"]')`), '#3301: one drawing field (no second pad)');
     // draw a stroke with pointer events
     await ev(`(() => { const c = document.querySelector('.modal canvas.lt-pad'), r = c.getBoundingClientRect();
       const ev = (t, x, y) => c.dispatchEvent(new PointerEvent(t, {bubbles: true, pointerId: 1, clientX: r.left + x, clientY: r.top + y, isPrimary: true}));
@@ -57,6 +59,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts';
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelector('#lt-sign_image')?.checked === true`, 60), '#3158: saving the drawing closes the dialog and ticks the box');
     const pr = await ev(api('GET', '/api/office/letters/profile'));
     check(pr.has_image === true && /^data:image\/png;base64,/.test(pr.image || ''), '#3158: the drawn signature is stored as PNG');
+    const dim = await ev(`new Promise(res => { const im = new Image(); im.onload = () => res([im.width, im.height]); im.onerror = () => res(null); im.src = ${JSON.stringify(pr.image || '')}; })`);
+    check(dim && dim[0] > 100 && dim[0] < 600 && dim[1] < 200, '#3301: the drawn picture is cut to the strokes ' + JSON.stringify(dim));
     check(await ready(ev, `${api('GET', `/api/office/letters/${lt.id}`)}.then(j => j.sign_image === 1)`, 40), '#3158: the letter saved sign_image = 1');
     await nav(B + `#office/gendocs/${gd.id}`);
     check(await ready(ev, `!!document.querySelector('#dt-sign_image')`, 80), '#3158: a document from a template offers "With my signature"');

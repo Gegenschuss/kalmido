@@ -620,7 +620,7 @@ document.addEventListener('click', async e => {
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
-    case 'rm-zoom': if (a.dataset.k !== rmZoom()) { S.rmScrollReset = true; rmSet({z: a.dataset.k}); } break;
+    case 'rm-zoom': if (a.dataset.k !== rmZoom() || rmP().zf) { S.rmScrollReset = true; rmSet({z: a.dataset.k, zf: undefined}); } break;  // 2.331.0 E (#3311): the button = its own day width again
     case 'rm-prev': rmNav(-1); break;
     case 'rm-next': rmNav(1); break;
     case 'rm-today': rmNav(0); break;

@@ -11806,10 +11806,6 @@
   "The columns apply to every CSV file.": "De kolommen gelden voor alle CSV-bestanden.",
   "Not a bank statement (only XML, CSV or ZIP)": "Geen bankafschrift (alleen XML, CSV of ZIP)",
   "Channel type": "Soort",
-  "Unread in other workspaces": "Ongelezen in andere werkruimtes",
-  "1 unread in {0}": "1 ongelezen in {0}",
-  "{0} unread in {1}": "{0} ongelezen in {1}",
-  "Switch": "Wisselen",
   "Tracked time (h)": "Geregistreerde tijd (u)",
   "Created by": "Aangemaakt door",
   "Completed by": "Voltooid door",
@@ -12493,7 +12489,6 @@
   "Sent and filed": "Verzonden en opgeslagen",
   "Signature picture": "Afbeelding van de handtekening",
   "No signature picture yet.": "Nog geen afbeelding van de handtekening.",
-  "The picture is only printed in your own letters.": "De afbeelding staat alleen in je eigen brieven.",
   "Choose picture": "Afbeelding kiezen",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG of JPEG, maximaal 300 KB; een scan van je handtekening op een witte achtergrond.",
   "Marked as delivered": "Gemarkeerd als bezorgd",
@@ -14617,5 +14612,11 @@
   "{0} external link ends (people outside Kalmido can no longer open it)": ["{0} externe link vervalt (mensen buiten Kalmido kunnen hem niet meer openen)", "{0} externe links vervallen (mensen buiten Kalmido kunnen ze niet meer openen)"],
   "{0} file request goes along: its upload link keeps working": ["{0} bestandsverzoek verhuist mee: de uploadlink blijft werken", "{0} bestandsverzoeken verhuizen mee: de uploadlinks blijven werken"],
   "{0} file request of another person keeps working only if they can still edit the folder there": ["{0} bestandsverzoek van iemand anders werkt alleen nog als die de map daar nog mag bewerken", "{0} bestandsverzoeken van anderen werken alleen nog als zij de map daar nog mogen bewerken"],
-  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "De server stelt een verbruikslimiet voor persoonlijke agents in: die van jou kan alleen lager zijn (zelfde periode en maat)"
+  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "De server stelt een verbruikslimiet voor persoonlijke agents in: die van jou kan alleen lager zijn (zelfde periode en maat)",
+  "Show all {0}": "Alle {0} tonen",
+  "Search files": "Bestanden zoeken",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "De afbeelding verschijnt alleen in je eigen brieven en op de representatiebonnen die jij goedkeurt.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert.",
+  "Please draw your signature first.": "Teken eerst je handtekening.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Je handtekeningafbeelding staat dan op de handtekeningregel van de pdf. Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert."
 }

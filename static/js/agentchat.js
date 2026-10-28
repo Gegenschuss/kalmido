@@ -327,7 +327,8 @@ function chatChoiceEdit(mid, cid) {
 // job) and the time, the buttons (a tap sends like a press, the pen puts the text into the box) and X (dismiss, every device).
 // The chat settings per agent (chat-prefs, the header menu): suggestions latest | collect | keep, job results full | line,
 // approvals pinned on | off, notices full | line -- stored on the server per person and agent.
-const ACSET_DEF = {sugg: 'collect', jobs: 'full', pin: 'on', notices: 'full'}, ACSUG_MS = 24 * 3600e3, ACSUG_MAX = 10;
+// 2.331.0 (#3309): the default for suggestions is keep (at their message); stored choices stay.
+const ACSET_DEF = {sugg: 'keep', jobs: 'full', pin: 'on', notices: 'full'}, ACSUG_MS = 24 * 3600e3, ACSUG_MAX = 10;
 const acset_get = k => (S.chat.cp || ACSET_DEF)[k] || ACSET_DEF[k];
 const acsug_old = m => Date.parse(m.created_at) <= Date.now() - (S.chat.off || 0) - ACSUG_MS;
 function acsug_list() {
