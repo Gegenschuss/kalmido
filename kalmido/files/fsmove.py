@@ -266,6 +266,22 @@ def fsm_plan(c, uid, b, to, dry, office=False):
                              "{0} shares end (people, groups or agents outside the target)", shares))
         if opened:
             notes.append(trn("{0} opening to the whole organisation ends", "{0} openings to the whole organisation end", opened))
+        # 2.361.4 B (#2935): external links end with the move (xl_space_moved), file requests go along (fsm_apply)
+        links = c.execute(f"SELECT COUNT(*) FROM fs_ext_links WHERE node_id IN ({q}) AND revoked_at IS NULL", big).fetchone()[0]
+        if links:
+            notes.append(trn("{0} external link ends (people outside Kalmido can no longer open it)",
+                             "{0} external links end (people outside Kalmido can no longer open them)", links))
+        frq = [r[0] for r in c.execute(f"""SELECT created_by FROM fs_upload_requests WHERE node_id IN ({q})
+                                          AND deleted_at IS NULL AND revoked_at IS NULL""", big)]
+        keep = sum(1 for w in frq if w == uid or (to and c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?",
+                                                                    (to, w)).fetchone()))
+        if keep:
+            notes.append(trn("{0} file request goes along: its upload link keeps working",
+                             "{0} file requests go along: their upload links keep working", keep))
+        if len(frq) > keep:
+            notes.append(trn("{0} file request of another person ends (they have no access in the target)",
+                             "{0} file requests of other people end (they have no access in the target)", len(frq) - keep))
+        plan.update(links=links, requests=len(frq))
         notes.append(oo_into_note(c, src, to))  # 2.361.2 (#2923): the way back (empty unless a member moves it in)
         lost = sum(1 for r in c.execute(f"SELECT list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", big)
                    if not fsm_list_ok(c, r[0], to, uid))
@@ -547,6 +563,8 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
+        # 2.361.4 B (#2935): a folder's file requests follow it (frq_alive needs the folder's workspace), never die silently
+        c.execute(f"UPDATE fs_upload_requests SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
     for n, _, _, _ in plan["roots"]:
         fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
     from .extlinks import xl_space_moved
@@ -568,7 +586,8 @@ def files_move_space():
     plan = fsm_plan(c, uid, b, to, dry)
     if dry:
         return jsonify(smv_answer(plan["notes"], plan["block"], files=plan["files"], folders=plan["folders"], size=plan["size"],
-                                  shares=plan["shares"], **(plan.get("deny") or {})))
+                                  shares=plan["shares"], links=plan.get("links", 0), requests=plan.get("requests", 0),
+                                  **(plan.get("deny") or {})))
     if plan["block"]:
         c.rollback()  # a documents folder the plan made
         raise Denied(plan["code"], plan["block"], data=plan.get("deny"))
