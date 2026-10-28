@@ -1329,7 +1329,9 @@ TOOLS += [
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
            "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
            "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
-           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]}}, ["list_id"]),  # 2.144.0 (#2414)
+           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]},  # 2.144.0 (#2414)
+           "ticket_key": {"type": ["string", "null"], "description": "2.390.0: the project's ticket key APP (2-6 capitals / digits, a letter "
+                          "first; owner / project admins; \"\" / null = none): its tasks get keys like APP-12"}}, ["list_id"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED project for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

@@ -2698,8 +2698,8 @@ BEGIN
     IF OLD.ticket_no IS NOT NULL THEN
       SELECT ticket_key INTO k FROM lists WHERE id=OLD.list_id;
       IF k IS NOT NULL THEN
-        INSERT INTO task_keys(prefix, no, task_id, created_at)
-          VALUES (k, OLD.ticket_no, OLD.id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+        INSERT INTO task_keys(prefix, no, task_id, list_id, created_at)
+          VALUES (k, OLD.ticket_no, OLD.id, OLD.list_id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
           ON CONFLICT DO NOTHING;
       END IF;
     END IF;
@@ -2710,10 +2710,15 @@ BEGIN
   SELECT ticket_key INTO k FROM lists WHERE id=NEW.list_id;
   IF k IS NULL THEN RETURN NEW; END IF;
   IF TG_OP = 'UPDATE' THEN  -- back in a project it had a number in (an undo, a move back): that number again while free
-    SELECT tk.no INTO n FROM task_keys tk WHERE tk.task_id=NEW.id AND tk.prefix=k
+    SELECT tk.no INTO n FROM task_keys tk WHERE tk.task_id=NEW.id AND tk.prefix=k AND tk.list_id=NEW.list_id
       AND NOT EXISTS (SELECT 1 FROM tasks x WHERE x.list_id=NEW.list_id AND x.ticket_no=tk.no AND x.id<>NEW.id)
       ORDER BY tk.created_at DESC LIMIT 1;
-    IF n IS NOT NULL THEN NEW.ticket_no := n; RETURN NEW; END IF;
+    IF n IS NOT NULL THEN
+      NEW.ticket_no := n;
+      INSERT INTO list_ticket_seq(list_id, seq) VALUES (NEW.list_id, n)
+        ON CONFLICT (list_id) DO UPDATE SET seq=GREATEST(list_ticket_seq.seq, excluded.seq);
+      RETURN NEW;
+    END IF;
   END IF;
   INSERT INTO list_ticket_seq(list_id, seq) VALUES (NEW.list_id, 1)
     ON CONFLICT (list_id) DO UPDATE SET seq=list_ticket_seq.seq + 1 RETURNING seq INTO n;
@@ -3979,8 +3984,10 @@ CREATE TABLE IF NOT EXISTS list_ticket_seq (
   list_id BIGINT PRIMARY KEY REFERENCES lists(id) ON DELETE CASCADE, seq BIGINT NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS task_keys (
   prefix TEXT NOT NULL, no BIGINT NOT NULL, task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  list_id BIGINT REFERENCES lists(id) ON DELETE SET NULL,  -- the project the key belonged to (a move back reuses only its own)
   created_at TEXT NOT NULL, PRIMARY KEY (prefix, no, task_id));
 CREATE INDEX IF NOT EXISTS task_keys_task ON task_keys(task_id);
+CREATE INDEX IF NOT EXISTS task_keys_list ON task_keys(list_id) WHERE list_id IS NOT NULL;
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)

@@ -1096,8 +1096,12 @@ def v1_task_create():
     b = v1_task_in(raw)
     c = db()
     rid = b.pop("reviewer_id", None)
-    if rid is not None:
-        v1_reviewer_check(c, b.get("list_id") or my_inbox(c), rid)
+    if rid is not None:  # a subtask without list_id lands in its parent's list (review of 2.390: not the inbox)
+        lid0 = b.get("list_id")
+        if not lid0 and b.get("parent_id"):
+            need_task(c, int(b["parent_id"]), write=False)
+            lid0 = c.execute("SELECT list_id FROM tasks WHERE id=?", (int(b["parent_id"]),)).fetchone()[0]
+        v1_reviewer_check(c, lid0 or my_inbox(c), rid)
     again = bool(ref) and c.execute("SELECT 1 FROM tasks WHERE created_by=? AND client_ref=?", (me(), ref)).fetchone()
     j = v1_call(task_create, body={**b, **({"client_ref": ref} if ref else {})})
     if rid is not None and not again:

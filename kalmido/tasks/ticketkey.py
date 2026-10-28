@@ -75,17 +75,18 @@ def tk_set(c, lid, key):
         return key
     if key and tk_taken(c, lid, key):
         raise BadInput(tr("The key {0} is already used by another project of this workspace", key))
+    # the counter row first, locked until the commit: a task made meanwhile (trigger) waits and counts on from our end
+    seq = c.execute("""INSERT INTO list_ticket_seq(list_id, seq) VALUES(?, 0) ON CONFLICT (list_id) DO UPDATE
+                       SET seq=list_ticket_seq.seq RETURNING seq""", (lid,)).fetchone()[0]
     if old:  # the old keys keep finding their tasks
-        c.execute("""INSERT INTO task_keys(prefix, no, task_id, created_at) SELECT ?, ticket_no, id, ? FROM tasks
+        c.execute("""INSERT INTO task_keys(prefix, no, task_id, list_id, created_at) SELECT ?, ticket_no, id, list_id, ? FROM tasks
                      WHERE list_id=? AND ticket_no IS NOT NULL ON CONFLICT DO NOTHING""", (old, iso(now_utc()), lid))
     c.execute("UPDATE lists SET ticket_key=? WHERE id=?", (key, lid))
     if key:
-        seq = c.execute("SELECT COALESCE(MAX(ticket_no), 0) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0]
-        seq = max(seq, (c.execute("SELECT seq FROM list_ticket_seq WHERE list_id=?", (lid,)).fetchone() or [0])[0])
+        seq = max(seq, c.execute("SELECT COALESCE(MAX(ticket_no), 0) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0])
         n = c.execute("""UPDATE tasks t SET ticket_no=? + s.rn FROM (SELECT id, row_number() OVER (ORDER BY created_at, id) AS rn
                          FROM tasks WHERE list_id=? AND ticket_no IS NULL) s WHERE t.id=s.id""", (seq, lid)).rowcount
-        c.execute("""INSERT INTO list_ticket_seq(list_id, seq) VALUES(?, ?) ON CONFLICT (list_id) DO UPDATE SET seq=excluded.seq""",
-                  (lid, seq + max(n, 0)))
+        c.execute("UPDATE list_ticket_seq SET seq=GREATEST(seq, ?) WHERE list_id=?", (seq + max(n, 0), lid))
     _tk_cache().pop(lid, None)
     return key
 

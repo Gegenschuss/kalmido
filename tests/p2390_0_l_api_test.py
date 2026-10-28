@@ -193,4 +193,12 @@ put_state()
 Fr.post(B + f"/api/repos/{r.json().get('id')}/refresh")
 check(until(lambda: ("commit", "w0001") in links(TW), 40), "#3353: a project without a key reads #id as before")
 
+# review of 2.390 (S1): an old key of ANOTHER project is never reused (the same key APP now on Website)
+check(Fr.patch(B + f"/api/lists/{Q}", json={"ticket_key": "APP"}).ok, "setup: Website takes the free key APP")
+seq0 = max(no_of(TW) or 0, 0)
+check(Fr.patch(B + f"/api/tasks/{T5}", json={"list_id": Q}).ok, "setup: MOB-5 (old key APP-5 of Mobile App) moves to Website")
+check(no_of(T5) == seq0 + 1, f"#3353: it gets Website's next number, not 5 from the other project's alias ({no_of(T5)} vs {seq0 + 1})")
+T7 = Fr.post(B + "/api/tasks", json={"title": "Ticket 7", "list_id": Q}).json()["id"]
+check(no_of(T7) == seq0 + 2, "#3353: the next task of Website counts on (no double number)")
+
 sys.exit(kt.done("p2390_0_l_api"))
