@@ -87,7 +87,7 @@ async function dg_one(el) {
     else { d.className = 'wkdg wkdgmath'; d.setAttribute('role', 'math'); d.innerHTML = dg_tex(await dg_katex(), src, true); }
     d.dataset.src = src;
     if (box.isConnected) box.replaceWith(d);
-  } catch (e) { if (box.isConnected) dg_fail(el, tr(mermaid ? 'The diagram could not be drawn' : 'The formula could not be drawn'), e); }
+  } catch (e) { if (box.isConnected) dg_fail(el, mermaid ? tr('The diagram could not be drawn') : tr('The formula could not be drawn'), e); }
 }
 // every block not drawn yet, one after the other (Mermaid renders one at a time)
 function dg_draw(root) {
