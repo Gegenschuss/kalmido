@@ -375,11 +375,12 @@ APP_ONLY = [
     ("2.49.0 (#1199, #1201) / 2.200.0 C (#1781): knowledge pages -- agents (scopes wiki:read / wiki:write) list, read, write and "
      "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
      "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
-     "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app",
+     "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
+     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
-      "=POST /api/outline/parse")),
+      "=POST /api/outline/parse", "=PUT /api/wiki/style")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",

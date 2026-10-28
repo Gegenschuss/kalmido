@@ -492,7 +492,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd", "wkSt")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor; 2.371.3 (#3152): wkSt = the own reading style
 
 
 def clean_look_pref(v):
@@ -510,6 +510,8 @@ def clean_look_pref(v):
     out = {}
     for k, x in o.items():
         if k not in LOOK_KEYS:
+            continue
+        if k == "wkSt" and x not in ("clear", "book", "compact", "notepad"):  # 2.371.3 (#3152): a fixed choice only (a class)
             continue
         if isinstance(x, bool) or (isinstance(x, str) and len(x) <= 40 and x.isprintable()):
             out[k] = x

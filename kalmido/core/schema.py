@@ -3703,6 +3703,10 @@ MIGRATIONS = [
     # 2.409.0 (#3490): the areas the organisation's admins switched off for its members (csv of area ids, accounts/wsareas.py;
     # '' = all on). Older versions ignore it (every area as the person's module switches say)
     ("orgs", "areas_off", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS areas_off TEXT NOT NULL DEFAULT ''"),
+    # 2.371.3 (#3152): the default reading style of the organisation's / the person's private knowledge space (wiki/wkstyle.py
+    # WIKI_STYLES; '' = Clear). Older versions ignore it
+    ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

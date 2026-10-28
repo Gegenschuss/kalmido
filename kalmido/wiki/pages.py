@@ -343,6 +343,8 @@ def wiki_index():
     from ..accounts.orgroles import org_writes
     out = dict(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
                root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more
+    from .wkstyle import wst_get, wst_may  # 2.371.3 (#3152): the space's reading style + whether this person sets it
+    out.update(style=wst_get(c, oid, uid), may_style=wst_may(c, oid, uid))
     if request.args.get("bn") and request.args.get("bodies") == "1" and (e2e or off):
         out["bnext"] = nxt["bnext"]
     return jsonify(out)

@@ -220,6 +220,7 @@ ORDER = (
     "wiki.wkfolder",  # 2.200.0 A (#2747): knowledge pages in folders of the file store (the reference kind 'wiki', the tree)
     "wiki.wkv1",  # 2.200.0 C (#1781): knowledge pages for agents (API v1 + OpenAPI; only what is shared with them)
     "wiki.wkfshare",  # 2.200.0 B (#2747): pages reached through folder / page shares (Shared with me, new pages in a shared folder)
+    "wiki.wkstyle",  # 2.371.3 (#3152): the reading style of a knowledge space (PUT /api/wiki/style)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fslock",  # 2.353.0 A (#2758): locked folders (names and contents encrypted in the browser)

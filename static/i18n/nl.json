@@ -14763,5 +14763,11 @@
   "Only an admin of the organisation can change this.": "Alleen een beheerder van de organisatie kan dit wijzigen.",
   "{0} is off in this workspace. You find it in the workspace {1}.": "{0} staat uit in deze werkruimte. Je vindt het in de werkruimte {1}.",
   "{0} is off in this workspace.": "{0} staat uit in deze werkruimte.",
-  "This area is switched off in this organisation by its admin.": "Dit onderdeel is in deze organisatie uitgeschakeld door de beheerder."
+  "This area is switched off in this organisation by its admin.": "Dit onderdeel is in deze organisatie uitgeschakeld door de beheerder.",
+  "Task (#)": "Taak (#)",
+  "Reading style…": "Leesstijl…",
+  "Like the space ({0})": "Zoals de ruimte ({0})",
+  "Clear|reading style": "Helder",
+  "Book|reading style": "Boek",
+  "Default of the space": "Standaard van de ruimte"
 }

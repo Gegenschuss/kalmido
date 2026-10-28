@@ -151,3 +151,15 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wki-st:hover{background:var(--bg3)}
 .wki-st .wki-stt{font-variant-numeric:tabular-nums}
 .srb .srbd.wki-dot{height:1rem;padding:0 .25rem;border-radius:.5rem;background:var(--accent);color:var(--on-accent,#fff);font:600 .5625rem/1rem var(--mono);white-space:nowrap;cursor:pointer}
+/* 2.371.3 (#3152): reading styles of a knowledge page (a fixed choice, the class on article.wkpage; static/js/wklive.js wkst_cls).
+   Only font, column width, line spacing and background: the accent, light / dark and the contrast come from the theme's variables */
+.wkst-book .wkmd{font-family:Charter,"Bitstream Charter","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:1.0625em;line-height:1.75;max-width:38rem;margin-inline:auto}
+.wkst-book .wkmd :is(h1,h2,h3,h4){font-family:inherit;line-height:1.3}
+.wkst-compact .wkmd{font-size:.9375em;line-height:1.4}
+.wkst-compact .wkmd :is(p,ul,ol,pre,table,blockquote){margin-block:.375rem}
+.wkst-compact .wkmd :is(h1,h2,h3,h4){margin-block:.75rem .25rem}
+.wkst-notepad .wkmd{--wkst-rule:1.75rem;line-height:var(--wkst-rule);padding:.25rem 1rem 1rem 2.25rem;border:1px solid var(--line2);border-radius:var(--r-s);
+  background:linear-gradient(90deg,transparent 1.5rem,var(--line2) 1.5rem,var(--line2) calc(1.5rem + 1px),transparent calc(1.5rem + 1px)),
+  repeating-linear-gradient(180deg,var(--bg2) 0,var(--bg2) calc(var(--wkst-rule) - 1px),var(--line2) calc(var(--wkst-rule) - 1px),var(--line2) var(--wkst-rule))}
+.wkst-notepad .wkmd :is(p,ul,ol){margin-block:0 var(--wkst-rule)}
+@media (forced-colors:active){.wkst-notepad .wkmd{background:Canvas}}

@@ -14763,5 +14763,11 @@
   "Only an admin of the organisation can change this.": "Solo un amministratore dell’organizzazione può modificarlo.",
   "{0} is off in this workspace. You find it in the workspace {1}.": "{0} è disattivato in questo spazio di lavoro. Lo trovi nello spazio di lavoro {1}.",
   "{0} is off in this workspace.": "{0} è disattivato in questo spazio di lavoro.",
-  "This area is switched off in this organisation by its admin.": "Quest’area è disattivata in questa organizzazione dal suo amministratore."
+  "This area is switched off in this organisation by its admin.": "Quest’area è disattivata in questa organizzazione dal suo amministratore.",
+  "Task (#)": "Attività (#)",
+  "Reading style…": "Stile di lettura…",
+  "Like the space ({0})": "Come lo spazio ({0})",
+  "Clear|reading style": "Chiaro",
+  "Book|reading style": "Libro",
+  "Default of the space": "Predefinito dello spazio"
 }
