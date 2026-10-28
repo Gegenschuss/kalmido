@@ -123,7 +123,7 @@ with this exemption reason.
 
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
+- **Sell** - Pipeline, Quotations, Invoices (2.380.0, before one point *Quotes & invoices*), Clients, Contacts, Documents, Framework contracts
 - **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
@@ -153,6 +153,17 @@ only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Rece
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
+has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
+notes, Reminders, Delivery notes and Archive (archived invoices only, filter All / open / paid; the sum line follows the
+filters and the client filter). A document opens in its own area (`#office/invoices/<id>`); an old link
+`#office/offers/<id>` of an invoice, credit note, reminder or delivery note (or `#office/offers/invoice`) moves on by
+itself, so links from mails, agents and bookmarks keep working. Both areas use the rights of the office area
+*Quotes & invoices* (no new right). In the sidebar each area is its own tree with its own root folder (`GET
+/api/office/docs/tree` = quotations, `?sec=invoices` = the invoice kinds; folders are made the same way). *New quotation*
+and *Empty invoice* create the draft at once; *Trial document (SAMPLE)* sits in the menu next to *New quotation* and in
+*New invoice*, the one-time hint about trial documents shows in the head of a trial document's editor.
 
 *Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
 sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20

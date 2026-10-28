@@ -59,7 +59,7 @@ const FEAT = 'cal,comments,collab,office,clients';
       'the series is saved ' + JSON.stringify(ss[0] || {}).slice(0, 200));
     check(await ready(ev, `/Template of series/.test(document.querySelector('.rin-box')?.textContent || '')`), 'the template shows its series');
     // ================= the invoice list: the section of the series
-    await nav(B + '#office/offers');
+    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     await ev(`(() => { document.querySelector('[data-ofd="kind"][data-kind="invoice"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.rin-sec .rin-it')`, 60), 'the invoice list shows the section of the series');

@@ -885,6 +885,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .tri-bar .tri-delall{display:inline-flex;align-items:center;gap:.25rem;min-height:2.75rem;color:var(--danger)}
 .tri-hint{background:var(--accent-soft);border-color:transparent}
 .tri-row .swl{min-width:0}
+/* 2.380.0 B (#3418): "New quotation" + its menu (the trial document) as one button; the trial hint in the editor's head */
+.tri-split{display:inline-flex;gap:1px}.tri-split>.btn:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+.tri-split>.tri-more{border-top-left-radius:0;border-bottom-left-radius:0;padding-inline:6px}
+.ofdhead+.tri-hint{margin:.5rem 0}
 /* 2.148.0 C (#2472): the procedure documentation (office_procdoc.js) */
 .pd-h{margin:.75rem 0 .25rem;font-size:var(--fs-l)}
 .pd-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin:.5rem 0 1rem}

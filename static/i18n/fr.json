@@ -14648,5 +14648,7 @@
   "{0} approval link": ["{0} lien d'approbation", "{0} liens d'approbation"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Reste dans l'ancien espace et n'est plus lié au projet : {0}. Déplacez-le séparément si nécessaire.",
   "{0} client of a customer report": ["{0} client d'un signalement client", "{0} clients de signalements clients"],
-  "Quotations & invoices": "Devis et factures"
+  "Trial document (SAMPLE)": "Document d'essai (MUSTER)",
+  "More ways to create": "Autres façons de créer",
+  "Archived quotations: {0}": "Devis archivés : {0}"
 }

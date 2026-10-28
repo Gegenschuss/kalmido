@@ -67,7 +67,8 @@ const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
-  {key: 'offers', go: 'office/offers', icon: 'receipt', name: N_('Quotes & invoices'), group: 'sell', on: ofm_ofc},
+  {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
+  {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
   {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
   {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
@@ -141,7 +142,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
@@ -171,7 +172,7 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr('Quotes & invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
+  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr(OFD.doc.kind === 'offer' ? 'Quotations' : 'Invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }
