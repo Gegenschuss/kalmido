@@ -833,6 +833,17 @@ function lwsBack(org, from) {
   if (!org || +org === +(from || 0) || (S.me?.workspaces || []).find(w => w.id === +org)?.role === 'admin') return '';
   return ' ' + tr('Back into your private space only after an admin of the organisation releases it (you ask for it).');
 }
+// 2.364.0 D (#3033): "New project" in short: "For whom?" (the workspace) on top, then the name; the rest under "More options"
+// (closed; open when the dialog comes with a project type or a use). The fields stay in the form and are sent as before.
+function lnew_short(md, o) {
+  const h = $('h3', md), box = h?.parentElement, ws = $('.lwsrow', md), wh = $('#l-wshint', md), grid = $('#l-emogrid', md), foot = $('.foot', md);
+  if (!box || !grid || !foot || foot.parentElement !== box) return;
+  if (ws) { const lab = $('label[for="l-ws"]', ws); if (lab) lab.textContent = tr('For whom?'); h.after(ws); if (wh) ws.after(wh); }
+  const det = document.createElement('details');
+  det.className = 'lnmore'; det.innerHTML = `<summary>${esc(tr('More options'))}</summary>`; det.open = !!(o.ptype || o.family);
+  for (let n = grid.nextElementSibling; n && n !== foot;) { const nx = n.nextElementSibling; det.append(n); n = nx; }
+  foot.before(det);
+}
 // 2.401.0 (#2924): the workspace field of an existing project runs the server's dry run first (POST …/move-space {dry: 1}):
 // what the move ends (Undo brings it back), takes along or leaves in the old workspace -- or what refuses it -- shows in the
 // move dialog before anything moves (true = move). Nothing to say = moved at once, as before.
@@ -845,17 +856,6 @@ async function lwsDry(id, from, to) {
   const r = await check(to);
   if (!r.block && !(r.notes || []).length) return true;
   return !!await smv_open({what: qn(lname(listById(id)) || ''), from, only: [smv_ws(to)], check, run: async () => true});
-}
-// 2.364.0 D (#3033): "New project" in short: "For whom?" (the workspace) on top, then the name; the rest under "More options"
-// (closed; open when the dialog comes with a project type or a use). The fields stay in the form and are sent as before.
-function lnew_short(md, o) {
-  const h = $('h3', md), box = h?.parentElement, ws = $('.lwsrow', md), wh = $('#l-wshint', md), grid = $('#l-emogrid', md), foot = $('.foot', md);
-  if (!box || !grid || !foot || foot.parentElement !== box) return;
-  if (ws) { const lab = $('label[for="l-ws"]', ws); if (lab) lab.textContent = tr('For whom?'); h.after(ws); if (wh) ws.after(wh); }
-  const det = document.createElement('details');
-  det.className = 'lnmore'; det.innerHTML = `<summary>${esc(tr('More options'))}</summary>`; det.open = !!(o.ptype || o.family);
-  for (let n = grid.nextElementSibling; n && n !== foot;) { const nx = n.nextElementSibling; det.append(n); n = nx; }
-  foot.before(det);
 }
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
