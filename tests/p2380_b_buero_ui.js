@@ -26,7 +26,7 @@ const FEAT = 'clients,office';
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 async function archive(ck, run, f) {
   const fd = new FormData();
-  fd.append('file', new Blob([PDF], {type: 'application/pdf'}), f.number + '.pdf');
+  fd.append('file', new Blob([PDF, Buffer.from(`% ${f.number}\n`)], {type: 'application/pdf'}), f.number + '.pdf');  // one PDF each (the archive refuses a second copy)
   for (const [k, v] of Object.entries({run_id: run, ...f})) fd.append(k, String(v));
   const r = await fetch(B + 'api/office/legacy/archive', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: ck}, body: fd});
   return r.status;
