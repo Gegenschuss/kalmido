@@ -134,7 +134,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/comes back with one tap/.test(md.textContent) && md.querySelector('.ldabrow'), 'the option with its hint');
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).checklist === 1, 'stored as the option, kind list');
   closeAll(w);
-  check(w.eval(`topMoreItems()`).some(x => x.label === 'Show completed at the bottom' && x.icon === 'cart'), '"…": the option with the cart');
+  check(w.eval(`topMoreItems()`).some(x => x.label === 'Show completed at the bottom' && x.icon === 'donedown'), '"…": the option with its icon');  // 2.410.0 (#3440): donedown instead of the cart
   await call('PATCH', `/api/lists/${L}`, {checklist: false});
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'});
   // ================= #407 the time sum

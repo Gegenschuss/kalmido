@@ -902,7 +902,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
     ${id && own && swOffer(l) ? `<div class="row lswoffer"><span></span><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
-    <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
+    <div class="shint lhint">${ic('donedown', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.')}</div>` : ''}
     ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
     <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}

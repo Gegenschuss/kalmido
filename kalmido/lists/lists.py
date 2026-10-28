@@ -532,6 +532,7 @@ def list_update(lid):
         from ..agents.core import is_agent
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
+        adm += ("checklist",) if role == "admin" else ()  # 2.410.0 (#3440): "Show completed at the bottom", like done_in_section
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this project"), 403)
         if adm and ("name" in vals or "color" in vals):
@@ -543,6 +544,8 @@ def list_update(lid):
             if "name" in vals and vals["name"] != lr["name"]:
                 c.execute("UPDATE lists SET name=? WHERE id=?", (vals["name"], lid))
                 lm_owner_news(c, lr, "lrename", extra={"old": lr["name"], "name": vals["name"]})  # colour / icon: no news
+        if "checklist" in adm and "checklist" in vals:  # 2.410.0 (#3440)
+            c.execute("UPDATE lists SET checklist=? WHERE id=?", (vals["checklist"], lid))
         if adm and "archived" in vals:
             lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:

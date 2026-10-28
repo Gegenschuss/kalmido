@@ -853,11 +853,11 @@ function sortMenu(anchor) {
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
     ...(doneToggleView() ? ['-', doneItem(), ...lmDoneResetItems()] : []),  // 2.39.1 (#1214)
-    ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : []),
+    ...(l && canManage(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : []),
     ...(l && !isOverview() ? lgfItems(l) : [])]);  // 2.144.0 C (#2414): group by a custom field
 }
 // 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)
-const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
+const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'donedown', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});  // 2.410.0 (#3440): donedown, not the cart (every project uses it)
 // 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
 const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
 async function setDab(id, on) {

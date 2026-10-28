@@ -709,7 +709,7 @@ function settingsModal(focus) {
       <h4>${tr('Formatting (Markdown)')}</h4>
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
       <h4>${tr('Projects')}</h4>
-      <div class="shelp">${tr('Every task list is a project; the switch Progress and status (project menu … > Edit) adds the project modules you switched on. For shopping or packing lists: project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
+      <div class="shelp">${tr('Every task list is a project; the switch Progress and status (project menu … > Edit) adds the project modules you switched on. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.')}</div>
       <h4>${tr('Favourites')}</h4>
       <div class="shelp">${tr(VW_FAV_HELP)}</div>
       <h4>${tr('Locked notes')}</h4>

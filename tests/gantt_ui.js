@@ -215,7 +215,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   { const kp = md.querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
   // 2.41.0 (#1471): time tracking is no project feature any more (a switch of every list)
   check(!md.querySelector('.kproj').hidden && /dependencies with the Gantt timeline, progress and status/.test(md.querySelector('#l-khint').textContent) && !/time tracking/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');  // 2.39.1 (#1217): custom fields are in every list, not a project feature
-  check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
+  check(md.querySelector('#l-dab') && /for example in shopping lists/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);

@@ -664,7 +664,7 @@ function topMoreItems0() {
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
   { const cl = m === 'tasks' ? routeList() : null; if (cl && !cl.archived && listView(cl) === 'list' && !isOverview()) sec.push(colItem(cl.id)); }  // 2.14.0 (#425)
   if (doneToggleView()) sec.push(doneItem(), ...lmDoneResetItems());  // 2.39.1 (#1214): "like the default"
-  { const rl = m === 'tasks' ? routeList() : null; if (rl && isOwner(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414)
+  { const rl = m === 'tasks' ? routeList() : null; if (rl && canManage(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414); 2.410.0 (#3440): list admins too
   sec.push(...collapseItems());
   sec.push(...kbGroupResetItems());  // 2.39.1 (#1221)
   sec.push(...favViewItems());  // 2.40.0 (#1361)
