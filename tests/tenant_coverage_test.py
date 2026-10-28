@@ -822,6 +822,9 @@ ROUTES = {
     "POST /api/v1/tasks/{}/restore": "task", "GET /api/v1/tasks/{}/dependencies": "task",
     "POST /api/v1/tasks/{}/dependencies": "task", "DELETE /api/v1/tasks/{}/dependencies/{}": "task",
     "GET /api/v1/tasks/{}": "task", "PATCH /api/v1/tasks/{}": "task", "DELETE /api/v1/tasks/{}": "task",
+    # 2.407.0 (#3513): "agent is working" on a task - the task's visibility + write role decide (task_visible, like /typing)
+    "GET /api/v1/tasks/{}/working": "task", "POST /api/v1/tasks/{}/working": "task", "PATCH /api/v1/tasks/{}/working": "task",
+    "DELETE /api/v1/tasks/{}/working": "task",
     "POST /api/v1/tasks/{}/snippets": "task",  # 2.35.0 (#1095): append a code snippet (p2350_d_api_test.py: other tenant 404)
     "PUT /api/v1/tasks/{}/waiting": "task", "DELETE /api/v1/tasks/{}/waiting": "task",
     "POST /api/v1/tasks/{}/complete": "task", "POST /api/v1/tasks/{}/reopen": "task",
