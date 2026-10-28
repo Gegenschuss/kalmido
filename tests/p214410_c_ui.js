@@ -1,6 +1,6 @@
-// 2.144.10 part C UI test (#2576), own container (start.sh): trial documents in the office. "New quotation" opens a small
-// dialog with the switch "Just to try" (off, Create focused); the first quotation / invoice of an office shows a hint once
-// per person (X or Create remember it in the setting trial_hint_seen, it does not come back after a reload); a trial
+// 2.144.10 part C UI test (#2576), own container (start.sh): trial documents in the office. 2.380.0 (#3418): "New quotation" /
+// "Empty invoice" create at once, "Trial document (SAMPLE)" is an entry of the menu New; a trial document's editor shows a
+// hint once per person (X remembers it in the setting trial_hint_seen, it does not come back after a reload); a trial
 // quotation carries the tag "Trial" in the list and the editor head; the list filter All / Real only / Trial only;
 // "Delete all trial documents" for admins with a confirmation naming the number. Run for a member of an organisation
 // (alice, admin) and a person without one (frida, her own admin). Invented names only.
@@ -49,38 +49,38 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
       w.eval('ofdOffersTab(document.querySelector(".office .ofcbody .pboffers"))');
       check(!!body._ofd && !box._ofd, `${who}: the click listeners sit on the tab body only`);
       box.remove(); }
-    d.querySelector('.office [data-ofd="new"]').click();
-    let md = await until(() => d.querySelector('.modal.tri-dlg'));
-    check(!!md && !!md.querySelector('#ofd-trial-new') && !md.querySelector('#ofd-trial-new').checked, `${who}: dialog with "Just to try", off by default`);
-    check(/TEST number, watermark MUSTER, deletable any time/.test(md?.textContent || ''), `${who}: the explaining line`);
-    check(!!md?.querySelector('.tri-hint[data-trial-hint="offer"]'), `${who}: the first-time hint for the first quotation`);
-    await until(() => d.activeElement === md?.querySelector('[data-m="ok"]'));  // 2.308.0 (#3251): wait for the focus with the default limit (late timers under load)
-    check(d.activeElement === md?.querySelector('[data-m="ok"]'), `${who}: the focus is on Create (${d.activeElement?.outerHTML?.slice(0, 80)})`);
-    md.querySelector('.tri-hint [data-tri="x"]').click();
-    check(!md.querySelector('.tri-hint'), `${who}: X removes the hint`);
-    const seen = await until(async () => { const s = (await call(ck, 'GET', '/api/state')).settings?.trial_hint_seen; return s && String(s).includes(':offer') && s; });
-    check(!!seen, `${who}: the hint is remembered on the server ${seen}`);
-    // a trial quotation
-    md.querySelector('#ofd-trial-new').checked = true;
-    md.querySelector('[data-m="ok"]').click();
-    check(await until(() => d.querySelector('.ofdeditor')), `${who}: the editor opens`);
+    // ================= 2.380.0 (#3418): the trial document is an entry of the menu New (no create dialog any more); its
+    // one-time hint sits in the head of the trial document's editor, X remembers it
+    d.querySelector('.office [data-ofd="new-more"]').click();
+    await until(() => items(d).length);
+    items(d).find(b => b.textContent.trim() === 'Trial document (SAMPLE)')?.click();
+    check(await until(() => d.querySelector('.ofdeditor') && d.querySelector('.ofdhead .tri-tag')), `${who}: the trial quotation opens with "Trial" in the editor head`);
+    check(!d.querySelector('.modal'), `${who}: no create dialog`);
     const tid = w.eval('S.route.id');
     const T = await call(ck, 'GET', '/api/office/docs/' + tid);
     check(T.trial === true && /^TEST-\d+/.test(T.number || ''), `${who}: a trial quotation with a TEST number ${T.trial} ${T.number}`);
-    check(await until(() => d.querySelector('.ofdhead .tri-tag')), `${who}: the editor head shows "Trial"`);
+    let hint = await until(() => d.querySelector('.ofdeditor .tri-hint[data-trial-hint="offer"]'));
+    check(!!hint && /TEST number, watermark MUSTER, deletable any time/.test(hint.textContent) && /locked once finalised/.test(hint.textContent), `${who}: the one-time hint in the editor head`);
+    hint?.querySelector('[data-ofd="tri-x"]')?.click();
+    check(await until(() => !d.querySelector('.tri-hint')), `${who}: X removes the hint`);
+    const seen = await until(async () => { const s = (await call(ck, 'GET', '/api/state')).settings?.trial_hint_seen; return s && String(s).includes(':offer') && s; });
+    check(!!seen, `${who}: the hint is remembered on the server ${seen}`);
     w.close();
 
-    // ================= after a reload the hint does not come back (the office still has no real quotation)
-    w = await boot({user, hash: 'office/offers'}); d = w.document;
+    // ================= after a reload the hint does not come back; "New quotation" creates a real one at once
+    w = await boot({user, hash: 'office/offers/' + tid}); d = w.document;
     w.confirm = m => { asked.push(String(m)); return true; };
-    await until(() => d.querySelector('.office .ofdbar [data-ofd="new"]') && w.eval('Array.isArray(OFD.list) && !OFD.loading && OFD.first != null'));
-    d.querySelector('.office [data-ofd="new"]')?.click();
-    md = await until(() => d.querySelector('.modal.tri-dlg'));
-    check(!!md && !md.querySelector('.tri-hint'), `${who}: after a reload the hint does not come back`);
-    md?.querySelector('[data-m="close"]')?.click();
-    const real = await call(ck, 'POST', '/api/office/docs', {project_title: 'Real film'});
-    check(real.http < 300 && !real.trial, `${who}: a real quotation ${real.http}`);
-    w.eval('ofdLoadList(true)');
+    check(await until(() => d.querySelector('.ofdhead .tri-tag')), `${who}: the trial quotation again`);
+    check(!d.querySelector('.tri-hint'), `${who}: after a reload the hint does not come back`);
+    w.location.hash = '#office/offers/offer';
+    await until(() => d.querySelector('.office .ofdbar [data-ofd="new"]') && w.eval('Array.isArray(OFD.list) && !OFD.loading'));
+    d.querySelector('.office .ofdbar [data-ofd="new"]').click();
+    check(await until(() => d.querySelector('.ofdeditor') && +w.eval('S.route.id') && +w.eval('S.route.id') !== +tid), `${who}: "New quotation" opens the new draft at once`);
+    check(!d.querySelector('.modal') && !d.querySelector('.tri-hint'), `${who}: no dialog, no hint for a real quotation`);
+    const real = await call(ck, 'GET', '/api/office/docs/' + w.eval('S.route.id'));
+    check(real.kind === 'offer' && !real.trial && !/^TEST/.test(real.number || ''), `${who}: a real quotation ${real.kind} ${real.trial} ${real.number}`);
+    w.location.hash = '#office/offers/offer';
+    await until(() => d.querySelector('.office .ofdlist'));
 
     // ================= the list: tag, filter
     check(await until(() => d.querySelector(`.ofdrow[data-id="${tid}"] .tri-tag`)), `${who}: the list tags the trial quotation`);
@@ -94,20 +94,27 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     pick(w, d.querySelector('#ofd-trial'), '');
     check(await until(() => d.querySelector(`.ofdrow[data-id="${real.id}"]`) && d.querySelector(`.ofdrow[data-id="${tid}"]`)), `${who}: filter "All"`);
 
-    // ================= invoices: the "Empty invoice" dialog has the switch and its own first-time hint (Create remembers it)
-    d.querySelector('.ofdkinds [data-kind="invoice"]').click();
-    const ni = await until(() => d.querySelector('.office [data-ofd="new-inv"]'));
+    // ================= invoices: "Empty invoice" creates at once, "Trial document (SAMPLE)" makes a trial invoice with its own hint
+    w.location.hash = '#office/invoices';  // 2.380.0 (#3409): the invoices' own area
+    let ni = await until(() => d.querySelector('.office [data-ofd="new-inv"]'));
     ni.click();
     await until(() => items(d).length);
     items(d).find(b => b.textContent.trim() === 'Empty invoice')?.click();
-    md = await until(() => d.querySelector('.modal.tri-dlg'));
-    check(!!md?.querySelector('#ofd-trial-new') && !!md.querySelector('.tri-hint[data-trial-hint="invoice"]'), `${who}: the invoice dialog with switch + first-time hint`);
-    md.querySelector('#ofd-trial-new').checked = true;
-    md.querySelector('[data-m="ok"]').click();
-    check(await until(() => d.querySelector('.ofdeditor') && d.querySelector('.ofdhead .tri-tag')), `${who}: a trial invoice opens with the tag`);
+    check(await until(() => d.querySelector('.ofdeditor') && w.eval('OFD.doc?.kind') === 'invoice'), `${who}: "Empty invoice" opens the new invoice at once`);
+    check(!d.querySelector('.modal') && !d.querySelector('.ofdhead .tri-tag'), `${who}: no dialog, a real invoice`);
+    const rinv = +w.eval('S.route.id');
+    w.location.hash = '#office/invoices/invoice';
+    ni = await until(() => !w.eval('S.route.id') && d.querySelector('.office [data-ofd="new-inv"]'));
+    ni.click();
+    await until(() => items(d).length);
+    items(d).find(b => b.textContent.trim() === 'Trial document (SAMPLE)')?.click();
+    check(await until(() => d.querySelector('.ofdeditor') && d.querySelector('.ofdhead .tri-tag') && w.eval('OFD.doc?.kind') === 'invoice'), `${who}: a trial invoice opens with the tag`);
     const iid = w.eval('S.route.id');
     check((await call(ck, 'GET', '/api/office/docs/' + iid)).trial === true, `${who}: the invoice is a trial one`);
-    check(await until(async () => String((await call(ck, 'GET', '/api/state')).settings?.trial_hint_seen || '').includes(':invoice')), `${who}: Create remembered the invoice hint`);
+    hint = await until(() => d.querySelector('.ofdeditor .tri-hint[data-trial-hint="invoice"]'));
+    check(!!hint, `${who}: the invoice's own first-time hint`);
+    hint?.querySelector('[data-ofd="tri-x"]')?.click();
+    check(await until(async () => String((await call(ck, 'GET', '/api/state')).settings?.trial_hint_seen || '').includes(':invoice')), `${who}: X remembered the invoice hint`);
     w.close();
 
     // ================= "Delete all trial documents": confirmation with the number, real documents stay
@@ -119,7 +126,7 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     del?.click();
     check(await until(async () => (await call(ck, 'GET', '/api/office/docs/' + tid)).http === 404 && (await call(ck, 'GET', '/api/office/docs/' + iid)).http === 404), `${who}: the trial documents are gone`);
     check(asked.some(m => /2 trial documents/.test(m)), `${who}: the confirmation names the number ${asked.join(' || ')}`);
-    check((await call(ck, 'GET', '/api/office/docs/' + real.id)).http === 200, `${who}: the real quotation stays`);
+    check((await call(ck, 'GET', '/api/office/docs/' + real.id)).http === 200 && (await call(ck, 'GET', '/api/office/docs/' + rinv)).http === 200, `${who}: the real quotation and invoice stay`);
     check(await until(() => !d.querySelector('.tri-bar') && !d.querySelector('#ofd-trial')), `${who}: no delete-all line and no filter left`);
     w.close();
   }
