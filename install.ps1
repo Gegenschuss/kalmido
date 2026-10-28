@@ -222,7 +222,8 @@
     $Rev = "$Version (zip)"
   }
   $verFile = Join-Path $Dir '.kalmido-version'
-  if (Test-Path $verFile) { Copy-Item $verFile "$verFile.prev" -Force }  # 2.359.2 (#2897): the version of before, for the way back
+  # 2.359.2 (#2897): the version of before, for the way back (kept when a second run follows a failed update)
+  if ((Test-Path $verFile) -and ("$(Get-Content $verFile -TotalCount 1)".Trim() -ne $Version)) { Copy-Item $verFile "$verFile.prev" -Force }
   Set-Content -Path $verFile -Value $Version -Encoding ASCII
   New-Item -ItemType Directory -Force -Path (Join-Path $Dir 'data') | Out-Null
   New-Item -ItemType Directory -Force -Path (Join-Path $Dir 'secret') | Out-Null   # the server key (secret\kalmido.key), apart from data\
@@ -403,7 +404,7 @@
   Say "Update:     powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"  (backs up the database first; admins also see new versions in Settings > Help)"
   $prevFile = Join-Path $Dir '.kalmido-version.prev'
   if ($Update -and (Test-Path $prevFile)) {  # 2.359.2 (#2897)
-    $prev = (Get-Content $prevFile -TotalCount 1).Trim()
+    $prev = "$(Get-Content $prevFile -TotalCount 1)".Trim()
     if ($prev -and $prev -ne $Version) {
       Say "Previous:   $prev  (back to it: `$env:KALMIDO_VERSION = '$prev'; then update.ps1 again$(if ($script:DbCopy) { "; the database of before: $($script:DbCopy)" }))"
     }

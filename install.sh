@@ -141,7 +141,10 @@ fetch_code() {
     REV="$VERSION (tarball)"
   fi
   # 2.359.2 (#2897): the version of before, for the way back
-  if [ -f "$DIR/.kalmido-version" ]; then cp "$DIR/.kalmido-version" "$DIR/.kalmido-version.prev"; fi
+  # (not when it names this version already: a second run after a failed update keeps the real one of before)
+  if [ -f "$DIR/.kalmido-version" ] && [ "$(head -n 1 "$DIR/.kalmido-version")" != "$VERSION" ]; then
+    cp "$DIR/.kalmido-version" "$DIR/.kalmido-version.prev"
+  fi
   printf '%s\n' "$VERSION" > "$DIR/.kalmido-version"
 }
 
