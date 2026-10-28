@@ -140,6 +140,11 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     check(pv.in, 'preview: inside the screen at the bottom right corner');
     check(/Write the brief/.test(pv.t) && /Agents/.test(pv.t) && /High/.test(pv.t) && /#studio/.test(pv.t) && /First line of the brief/.test(pv.t) && /1 comment/.test(pv.t),
       'preview: title, list, priority, tag, description, comments ' + pv.t);
+    // 2.408.0 (#3503): a long description shows twice as much as before - 600 characters, cut to 6 lines with an ellipsis
+    const pvl = await ev(`(() => { const t = taskById(${T1}), old = t.content; t.content = 'Word '.repeat(300); const h = rf_pvHtml('t:${T1}'); t.content = old;
+      const d = document.querySelector('.rfpv .rfpvd'), cs = d && getComputedStyle(d); const x = document.createElement('div'); x.innerHTML = h;
+      return {n: (x.querySelector('.rfpvd')?.textContent || '').length, clamp: cs ? (cs.webkitLineClamp || cs.getPropertyValue('-webkit-line-clamp')) : ''}; })()`);
+    check(pvl.n >= 590 && pvl.n <= 600 && String(pvl.clamp) === '6', 'preview: long description up to 600 characters on 6 lines ' + JSON.stringify(pvl));
     // CI of 2.307.3: a late live redraw (the new comment) swaps the link under the open card - hover the new one, so the
     // card belongs to the link on the page before its tooltip is checked
     for (let i = 0; i < 2 && !(await ev(`RFH.a === document.querySelector('#d-tl a.tref[data-tref="${T1}"]')`)); i++) {

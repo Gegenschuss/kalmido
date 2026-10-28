@@ -7036,7 +7036,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .rfpvr{display:flex;align-items:center;gap:.375rem;color:var(--text2);font-size:var(--fs-s);margin-top:.125rem}
 .rfpvr .i{flex:none;color:var(--faint)}
 .rfpvr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:6;line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}  /* 2.408.0 (#3503): twice as much of the description (3 -> 6 lines) */
 @media (prefers-reduced-motion:reduce){.rfpv{transition:none;transform:none}}
 /* 2.53.0 E (#1451 #446) agent tone for comments / News / chat bubbles (own variables, never --accent) + the tags overview */
 :root{--agent-bg:#1d1d27;--agent-ink:#c4c1e4}

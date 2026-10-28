@@ -274,7 +274,7 @@ function rf_pvHtml(k) {
     if (kids.length) line('sub', tr('{0} of {1} subtasks done', kids.filter(x => x.status).length, kids.length));
     const n = [t.comment_count ? trn('{0} comment', '{0} comments', t.comment_count) : '', t.attachments?.length ? trn('{0} attachment', '{0} attachments', t.attachments.length) : ''].filter(Boolean).join('  ·  ');
     line('comment', n);
-    const d = mdPlain(String(t.content || '')).replace(/\s+/g, ' ').trim().slice(0, 300);
+    const d = mdPlain(String(t.content || '')).replace(/\s+/g, ' ').trim().slice(0, 600);  // 2.408.0 (#3503): twice as much text as before (300 -> 600)
     return head(t.status ? 'done' : 'check', `#${t.id} ${v.name}`, t.status ? 'rfdone' : '') + rows.join('') + (d ? `<div class="rfpvd">${esc(d)}</div>` : '');
   }
   if (k[0] === 'l') {
