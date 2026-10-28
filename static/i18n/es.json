@@ -11785,10 +11785,6 @@
   "The columns apply to every CSV file.": "Las columnas se aplican a todos los archivos CSV.",
   "Not a bank statement (only XML, CSV or ZIP)": "No es un extracto bancario (solo XML, CSV o ZIP)",
   "Channel type": "Tipo",
-  "Unread in other workspaces": "Sin leer en otros espacios de trabajo",
-  "1 unread in {0}": "1 sin leer en {0}",
-  "{0} unread in {1}": "{0} sin leer en {1}",
-  "Switch": "Cambiar",
   "Tracked time (h)": "Tiempo registrado (h)",
   "Created by": "Creado por",
   "Completed by": "Completado por",
@@ -12472,7 +12468,6 @@
   "Sent and filed": "Enviada y archivada",
   "Signature picture": "Imagen de la firma",
   "No signature picture yet.": "Aún no hay imagen de la firma.",
-  "The picture is only printed in your own letters.": "La imagen solo se imprime en tus propias cartas.",
   "Choose picture": "Elegir imagen",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG o JPEG, máximo 300 KB; un escaneo de tu firma sobre fondo blanco.",
   "Marked as delivered": "Marcada como entregada",
@@ -14650,5 +14645,11 @@
   "{0} client of a customer report": ["{0} cliente de un aviso de cliente", "{0} clientes de avisos de clientes"],
   "Trial document (SAMPLE)": "Documento de prueba (MUSTER)",
   "More ways to create": "Más formas de crear",
-  "Archived quotations: {0}": "Presupuestos archivados: {0}"
+  "Archived quotations: {0}": "Presupuestos archivados: {0}",
+  "Show all {0}": "Mostrar los {0}",
+  "Search files": "Buscar archivos",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "La imagen solo aparece en tus propias cartas y en los comprobantes de atenciones que tú apruebas.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Una imagen de la firma no es una firma electrónica; aclara su aceptación por Hacienda con tu asesoría fiscal.",
+  "Please draw your signature first.": "Dibuja primero tu firma.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Tu imagen de la firma aparece entonces en la línea de firma del PDF. Una imagen de la firma no es una firma electrónica; aclara su aceptación por Hacienda con tu asesoría fiscal."
 }

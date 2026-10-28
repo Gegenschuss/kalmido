@@ -454,7 +454,7 @@ function renderSide0() {
   const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
   const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
   $('#side').innerHTML = `
-    <div class="sbfix">${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
+    <div class="sbfix${sbb ? ' sbfix-flow' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
     ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${planFix}${sbmTop}</div>
     ${tasksP && sbm ? favSideHtml(lists, listRow, head) : ''}${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
@@ -1546,17 +1546,22 @@ document.addEventListener('pointerdown', e => {
   // 2.39.1 (#1217): the grip sits on the line left of its column (the columns hang on the right edge, so this line moves
   // with the mouse): dragging left widens the column; the title keeps at least LC_TITLE_MIN; an accent line runs down the list
   const sp = g.closest('.lchead').querySelector('.spacer'), room = sp ? Math.max(0, sp.getBoundingClientRect().width / rem - LC_TITLE_MIN) : LCW_MAX;
-  const wMax = w0 + room, guide = lcGuide(g);
-  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
+  const wMax = w0 + room, guide = lcGuide(g), gb = g.getBoundingClientRect(), gx0 = gb.left + gb.width / 2;
+  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag', 'lcwdrag'); g.classList.add('drag');
+  const cover = document.body.appendChild(Object.assign(document.createElement('div'), {className: 'lccover'}));  // 2.331.0 B (#3304): not body::after
   // 2.87.9 (#1965): once per frame and only shown; stored (localStorage) on release
+  // 2.331.0 B (#3304): while dragging only the column title and the guide move (the title's own width, the guide's left from the
+  // start measure: the column's right edge stays): rewriting #lcw-style per frame laid out all rows (300 rows: ~40 frames/s);
+  // the rows take the width once on release
   let cur = null;
-  const show = rafThrottle(x => { cur = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, wMax, w0 - (x - x0) / rem)) * 100) / 100; lcwApply(lid, {...lcwGet(lid), [k]: cur}); lcGuide(g, guide); });
+  const show = rafThrottle(x => { cur = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, wMax, w0 - (x - x0) / rem)) * 100) / 100;
+    cell.style.width = cur + 'rem'; cell.style.maxWidth = 'none'; guide.style.left = Math.round(gx0 - (cur - w0) * rem) + 'px'; });
   const mv = ev => show(ev.clientX);
   const up = () => {
     if (td_lcDrag?.g === g) td_lcDrag = null;
     ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture'].forEach((n, i) => g.removeEventListener(n, i ? up : mv));
-    show.flush(); if (cur != null) { lcwSet(lid, k, cur); cur = null; }
-    document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove();
+    show.flush(); cell.style.width = cell.style.maxWidth = ''; if (cur != null) { lcwSet(lid, k, cur); cur = null; }
+    document.body.classList.remove('pgdrag', 'lcwdrag'); g.classList.remove('drag'); guide.remove(); cover.remove();
   };
   // 2.40.0 (#1430): a render that replaces the grip loses the capture: lostpointercapture (and the sweep after a render) ends it
   td_lcDrag = {g, up};
@@ -1568,8 +1573,8 @@ let td_lcDrag = null;
 function td_lcSweep() {
   if (td_lcDrag && !td_lcDrag.g.isConnected) td_lcDrag.up();
   if (td_lcDrag || document.body.classList.contains('lcmoving')) return;
-  document.querySelectorAll('body > .lcguide').forEach(x => x.remove());
-  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag');
+  document.querySelectorAll('body > .lcguide, body > .lccover').forEach(x => x.remove());
+  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag', 'lcwdrag');
 }
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
 document.addEventListener('keydown', e => {

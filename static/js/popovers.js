@@ -1031,11 +1031,12 @@ document.addEventListener('contextmenu', e => {
 });
 // 2.38.0 (#1173): the installed app (display-mode standalone, iOS: navigator.standalone) does not zoom by pinch or double tap,
 // like a native app: html.nozoom (touch-action pan-x pan-y) + the viewport without user scaling. The browser tab keeps zooming
-// (WCAG 1.4.4, axe meta-viewport). While a picture or a file view (.lightbox) or the timeline is open, pinching works again.
-// Bigger text: the system's font size is still followed (rem based).
+// (WCAG 1.4.4, axe meta-viewport). While a picture or a file view (.lightbox) is open, pinching works again.
+// Bigger text: the system's font size is still followed (rem based). 2.331.0 E (#3311): the timelines zoom themselves
+// (timeline.js), the page stays locked there.
 let tchVp = null;
 const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
-const tch_zoomFree = () => !!document.querySelector('.lightbox') || (S.route?.mod === 'tasks' && (isTimeline() || isRoadmap()));
+const tch_zoomFree = () => !!document.querySelector('.lightbox');
 function tch_zoomSync() {
   if (typeof document === 'undefined' || !document) return;  // a closed window (observer after unload)
   const de = document.documentElement, m = document.querySelector('meta[name="viewport"]'), sa = tch_standalone();

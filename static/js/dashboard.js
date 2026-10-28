@@ -45,7 +45,7 @@ function newsGroupHtml(g, pop) {
   const exp = S.nf.openG === g.key;
   return `<div class="ngroup ${g.unread ? 'unread' : 'read'} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
-      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 && g.unread ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g)) ? esc(newsSummaryLine(g)) + ' · ' : ''}<time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
+      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${newsWsLabel(first) /* 2.331.0 A (#3300) */}${g.items.length > 1 && g.unread ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g)) ? esc(newsSummaryLine(g)) + ' · ' : ''}<time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
         const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt);
         return ex ? `<div class="nexc ngex">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()}</div>
       ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>

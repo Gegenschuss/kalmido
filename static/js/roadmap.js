@@ -30,8 +30,13 @@ function rmSet(patch, how = 'view') {
     if (S.rmLocal === val) S.rmLocal = null;
   }, 350);
 }
-const rmZoom = () => RM_Z[rmP().z] ? rmP().z : 'month';
-const rmDW = () => RM_Z[rmZoom()].px * uiZ() * (isMobile() ? 5 / 6 : 1);
+const rmZoom = () => S.rmLive?.z || (RM_Z[rmP().z] ? rmP().z : 'month');
+// 2.331.0 E (#3311): two fingers / Ctrl + wheel set the day width without steps (pref zf = the factor on the zoom's px, S.rmLive
+// during the gesture); beyond a bound the zoom changes, at the geometric middle of the widths (week 36 / month 12 / quarter 4)
+const RM_PXMIN = 2, RM_PXMAX = 72;
+const rmZFor = px => px >= 21 ? 'week' : px >= 7 ? 'month' : 'quarter';
+const rmPx = () => { if (S.rmLive) return S.rmLive.px; const z = rmZoom(), f = +rmP().zf; return RM_Z[z].px * (f > 0 ? f : 1); };
+const rmDW = () => rmPx() * uiZ() * (isMobile() ? 5 / 6 : 1);
 const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && l.kind === 'project');
 const rmPO = () => rmP().po ?? rmProjects().length > 0;   // "Projects only": default on as soon as one project exists
 const rmHD = () => rmP().hd !== false;                     // "Hide done": default on
@@ -42,7 +47,7 @@ function rmSpan(ts) { let s = null, e = null; for (const t of ts) { const a = tl
 function rmGeo() {
   const z = rmZoom();
   if (!S.rmStart || S.rmStartZ !== z) { S.rmStart = addDays(weekStartOf(today()), -RM_Z[z].lead); S.rmStartZ = z; }
-  const days = RM_Z[z].days;
+  const days = Math.ceil(RM_Z[z].days * Math.max(1, RM_Z[z].px / rmPx()) / 7) * 7;  // 2.331.0 E (#3311): zoomed out = more days
   return {z, dw: rmDW(), start: S.rmStart, end: addDays(S.rmStart, days - 1), days, rh: Math.round((isTouch() ? 52 : 44) * uiZ()), hh: Math.round(52 * uiZ())};
 }
 const rmX = (G, d) => diffDays(G.start, d) * G.dw;
@@ -208,7 +213,7 @@ function viewRoadmap() {
   if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${M.po && !rmProjects().length ? tr('Switch on progress and status for a project to plan it here') : tr('Nothing to show with these filters')}</div>`;
   const hint = isTouch() ? tr('Long-press a project bar to move the whole project. Tap a name to open or close it.') : tr('Drag a project bar to move all its open tasks with a date. Click a name to open or close it.');
   return `${bar}${rmChips(M)}${pick}
-    <div class="tl rm z-${G.z}${S.tlPick ? ' picking' : ''}" style="--dw:${G.dw}px;--days:${G.days};--rh:${G.rh}px;--hh:${G.hh}px;--grid:${G.z === 'week' ? G.dw : 7 * G.dw}px;--rm-h:${H + 2}px">
+    <div class="tl rm z-${G.z}${S.tlPick ? ' picking' : ''}${G.dw < 22 ? ' tl-sm' : ''}" style="--dw:${G.dw}px;--days:${G.days};--rh:${G.rh}px;--hh:${G.hh}px;--grid:${G.z === 'week' ? G.dw : 7 * G.dw}px;--rm-h:${H + 2}px">
     <div class="tl-scroll rm-scroll" id="tlscroll"><div class="tl-inner" style="height:${H}px">
       <div class="tl-row tl-headrow"><div class="tl-name rm-hname">${esc(trn('{0} project', '{0} projects', M.nGroups))}</div><div class="tl-track tl-headtrack"><div class="tl-months">${mt}</div><div class="tl-days">${mb}</div></div></div>
       <div id="rm-rows"></div>

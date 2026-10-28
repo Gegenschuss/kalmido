@@ -363,6 +363,11 @@ body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 
 .modal .row label{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
 .modal .row input,.modal .row select{flex:1}
 .modal .foot{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.125rem;flex-wrap:wrap}
+/* 2.331.0 D (#3308): every dialog footer sticks to the bottom of the card; same resting position as before (no line, so short dialogs look unchanged) */
+.modal .card>.foot{position:sticky;bottom:-1.25rem;z-index:2;margin:.375rem -1.25rem -1.25rem;padding:.75rem 1.25rem 1.25rem;background:var(--bg2)}
+@media (max-width:899px){
+  .modal .card>.foot{bottom:calc(-1.25rem - var(--safe-b));margin-bottom:calc(-1.25rem - var(--safe-b));padding-bottom:calc(1.25rem + var(--safe-b))}
+}
 .colors{display:flex;gap:.375rem;flex-wrap:wrap}
 .colors button{width:1.375rem;height:1.375rem;border-radius:var(--r-s);border:2px solid transparent}
 .colors button.on{border-color:var(--text)}
@@ -794,6 +799,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 #fdhint span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lightbox{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4.375rem}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:.375rem}
+.lightbox>img{touch-action:none}.lightbox.lbz>img{cursor:grab}  /* 2.331.0 E (#3311): the picture zooms itself */
 .lbbar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:.375rem;padding:.75rem 1rem calc(.75rem + var(--safe-b));background:rgba(0,0,0,.6);color:#ddd;font-size:.8125rem}
 .lbbar button,.lbbar a{color:#ddd;padding:.5rem;border-radius:var(--radius);display:inline-flex}
 .lbbar button:hover,.lbbar a:hover{background:rgba(255,255,255,.1)}
@@ -2939,6 +2945,8 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .povmd{cursor:default;font-size:var(--fs-b)}
 #pov-desc-in{width:100%;min-height:10rem;font:inherit;font-size:var(--fs-b);line-height:1.5;resize:vertical}
 .povbar{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:var(--fs-s)}
+.povbar.povedit{position:sticky;bottom:0;z-index:2;background:var(--bg2);border-top:1px solid var(--line);padding:.5rem 0}  /* 2.331.0 A (#3306) */
+@media (max-width:899px){ .povbar.povedit{bottom:calc(var(--tabs-h,0px) + var(--safe-b,0px))} }  /* above the bottom bar */
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
 .povm .chk{margin:0;border-radius:50%}
@@ -2950,6 +2958,9 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .povm.over .pmd{color:var(--p5)}
 .povm.done .pmn span{color:var(--muted);text-decoration:line-through}
 .povfl{display:flex;flex-direction:column}
+.povfl:not(.all):not(.q)>.povf:nth-child(n+9),.povf[hidden]{display:none}  /* 2.331.0 A (#3307) */
+.povfq{width:100%;margin:.25rem 0}
+.povmore{margin-top:.375rem;font-size:var(--fs-s)}
 .povf{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-m);min-width:0}
 .povf:first-child{border-top:0}
 .povf>a,.povf>.i{display:flex;align-items:center;gap:.5rem;flex:1;min-width:0;color:inherit;text-decoration:none}
@@ -3877,7 +3888,10 @@ body.pop-open .pgrip,body.modal-open .pgrip,body.pop-open .lchead .lcg,body.moda
 /* 2.87.9 (#1965): one sheet over the page carries the drag cursor (and keeps hover effects still) instead of a rule on every
    element, which restyled the whole app when a drag started and ended */
 body.pgdrag{cursor:col-resize!important;user-select:none!important;-webkit-user-select:none!important}
-body.pgdrag::after{content:"";position:fixed;inset:0;z-index:59;cursor:col-resize}
+body.pgdrag:not(.lcwdrag)::after{content:"";position:fixed;inset:0;z-index:59;cursor:col-resize}
+/* 2.331.0 B (#3304): a ::after on body rebuilds the whole page's boxes when it comes and goes (~90 ms with 300 rows): the list
+   column drags (width: body.lcwdrag, move: body.lcmoving) put a plain element over the page instead */
+.lccover{position:fixed;inset:0;z-index:59;cursor:col-resize}.lccover.mv{cursor:grabbing}
 @media (max-width:767px){ .pgrip{display:none} }
 /* 2.16.0 (#634): column width grips in the column titles */
 .lchead .lc{position:relative;overflow:visible}
@@ -3899,7 +3913,7 @@ body.pgdrag::after{content:"";position:fixed;inset:0;z-index:59;cursor:col-resiz
 .lcguide{position:fixed;width:2px;margin-left:-1px;background:var(--accent);z-index:60;pointer-events:none;border-radius:1px}
 /* 2.39.1 (#1217): moving a column: the grabbed title dims, the accent line shows where it goes */
 .lchead .lc.lcmove{opacity:.45}
-body.lcmoving,body.lcmoving *{cursor:grabbing!important;user-select:none!important}
+body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 B (#3304): no rule on every element (restyled all rows), the cover carries the cursor */
 /* 2.39.1 (#1327): custom field cells edited in the row: hover / focus show it, empty ones a quiet dash, the open field
    fills the cell; the column title's small arrow (menu) on hover / focus */
 .lcols .lc[data-fe]{cursor:pointer;border-radius:var(--r-s)}  /* same box as the title above (columns stay aligned) */
@@ -4920,6 +4934,7 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .fhead .sgrip{margin-right:-.25rem}
 /* UX-05: the small buttons of a group head (sort, +) sit on the line of its title: their icon centred in the 44 px target */
 #side .shead button{align-items:center;justify-content:center}
+#side .sgh .sgt{justify-content:flex-start;flex:0 0 auto}  /* 2.331.0 A (#3313): the group title never shrinks nor centres, so a head with two buttons (Projects) lines up with the others */
 /* UX-07: a project's progress as a thin line under its name instead of "0 %" */
 #side .srow[data-list]{position:relative}
 #side .srow .sprog{position:absolute;left:2.25rem;right:.5rem;bottom:.1875rem;height:1px;border-radius:0;background:var(--line2);pointer-events:none}  /* 2.36.0 (#1117): 1 px on a faint line */
@@ -7199,7 +7214,9 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
    sticks where it starts (top = the sidebar's top padding, --fv2-top), so it does not move at all */
 #side .sbfix{position:sticky;top:var(--fv2-top,1.25rem);z-index:3;background:var(--sbbg,var(--bg2));padding-bottom:.375rem}
 #side .sbfix::before{content:"";position:absolute;inset:-8rem -.75rem 0;background:inherit;z-index:-1}  /* 2.57.1: as wide as #side's padding (.75rem); 1rem stuck out 4 px and the drawer scrolled sideways */
-#side.fv2-scrolled .sbfix{box-shadow:0 1px 0 var(--line)}
+#side .sbfix.sbfix-flow{position:static;box-shadow:none}  /* 2.331.0 A (#3303): sidebar B head scrolls along */
+#side .sbfix.sbfix-flow::before{content:none}
+#side.fv2-scrolled .sbfix:not(.sbfix-flow){box-shadow:0 1px 0 var(--line)}
 @media (max-width:767px){ #side .sbfix{--fv2-top:calc(.75rem + var(--safe-t,0px))} }
 :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbfix{--fv2-top:.875rem}
 #side .sbfix .sg-favs .shead{min-height:1.625rem}
@@ -8198,6 +8215,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (max-width:767px){ :root:root #side{--sbpt:calc(.375rem + var(--safe-t,0px))} }
 
 /* 2.145.0 A (#2444): unread news in other workspaces */
+.nws{flex:none;margin-left:.375rem;padding:0 .375rem;border:1px solid var(--line);border-radius:var(--radius);color:var(--text2);font-size:var(--fs-s)}  /* 2.331.0 A (#3300) */
 .nelse{display:flex;flex-direction:column;gap:.375rem;margin:.5rem 0}
 .nelse .nerow{display:flex;align-items:center;gap:.75rem;justify-content:space-between;padding:.375rem .75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--text2);font-size:var(--fs-m)}
 .nelse .nerow span{min-width:0;overflow-wrap:anywhere}

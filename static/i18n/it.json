@@ -11785,10 +11785,6 @@
   "The columns apply to every CSV file.": "Le colonne valgono per tutti i file CSV.",
   "Not a bank statement (only XML, CSV or ZIP)": "Non è un estratto conto (solo XML, CSV o ZIP)",
   "Channel type": "Tipo",
-  "Unread in other workspaces": "Non letti in altri spazi di lavoro",
-  "1 unread in {0}": "1 non letta in {0}",
-  "{0} unread in {1}": "{0} non lette in {1}",
-  "Switch": "Passa",
   "Tracked time (h)": "Tempo registrato (h)",
   "Created by": "Creato da",
   "Completed by": "Completato da",
@@ -12472,7 +12468,6 @@
   "Sent and filed": "Inviata e archiviata",
   "Signature picture": "Immagine della firma",
   "No signature picture yet.": "Ancora nessuna immagine della firma.",
-  "The picture is only printed in your own letters.": "L'immagine compare solo nelle tue lettere.",
   "Choose picture": "Scegli immagine",
   "PNG or JPEG, at most 300 KB; a scan of your signature on a white background.": "PNG o JPEG, al massimo 300 KB; una scansione della tua firma su sfondo bianco.",
   "Marked as delivered": "Segnata come consegnata",
@@ -14650,5 +14645,11 @@
   "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"],
   "Trial document (SAMPLE)": "Documento di prova (MUSTER)",
   "More ways to create": "Altri modi per creare",
-  "Archived quotations: {0}": "Preventivi archiviati: {0}"
+  "Archived quotations: {0}": "Preventivi archiviati: {0}",
+  "Show all {0}": "Mostra tutti i {0}",
+  "Search files": "Cerca file",
+  "The picture is only printed in your own letters and on the entertainment receipts you approve.": "L'immagine compare solo nelle tue lettere e sulle ricevute di rappresentanza che approvi tu.",
+  "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "L'immagine di una firma non è una firma elettronica; chiarisci con il tuo consulente fiscale se l'ufficio delle imposte la accetta.",
+  "Please draw your signature first.": "Disegna prima la tua firma.",
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "La tua immagine della firma compare poi sulla riga della firma del PDF. L'immagine di una firma non è una firma elettronica; chiarisci con il tuo consulente fiscale se l'ufficio delle imposte la accetta."
 }
