@@ -141,6 +141,15 @@ const K = {Enter: '', Escape: ''};
     await press('Enter');
     const w2 = `Start\n#${run.t1} \n#${run.t2} `;
     check(await saved(w2) === w2, `${tag}: the second pick saved (${JSON.stringify(await saved(w2))})`);
+    // Esc while the search has no hits ends it: typing on opens nothing (review 2.371.3)
+    await press('Enter'); await type('/task'); await until(acList); await press('Enter');
+    await type('qqqxyz');
+    await until(`(() => !(${acList}))()`);
+    await press('Escape'); await type('a');
+    await sleep(600);
+    check(!(await ev(acList)), `${tag}: after Esc the task search stays closed`);
+    await ev(`(() => { const t = document.querySelector('#wk-body'), i = t.value.lastIndexOf('\\n'); t.setRangeText('', i, t.value.length, 'end'); t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    check(await saved(w2) === w2, `${tag}: the page is back to the two picks`);
     // a "#" typed by hand opens no task search (a tag stays a tag)
     await type('#abc');
     check(!(await ev(acList)), `${tag}: "#abc" typed by hand opens no list`);

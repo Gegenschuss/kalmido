@@ -740,7 +740,8 @@ document.addEventListener('input', async e => {
   else if (e.target.id === 'wk-q') { WK.q = e.target.value; const r = $('#wk-res'); if ($('#view .wkdesk')) { if (WK.dirty) await wk_flush(); renderView(); return; }  /* 2.152.3: save a page being edited before the hits replace it */ if (r) {  /* 2.152.3 B (#2620): the bar of a computer: hits replace the page / folder */ const v = document.createElement('div'); v.innerHTML = viewWiki(); const n = $('#wk-res', v); if (n) r.innerHTML = n.innerHTML; } }
 });
 document.addEventListener('keydown', e => {
-  if (!wk_isTa(e.target) || !WK.ac) return;
+  if (!wk_isTa(e.target)) return;
+  if (!WK.ac) { if (e.key === 'Escape' && typeof WKLV !== 'undefined' && WKLV.tk) { WKLV.tk = null; e.preventDefault(); e.stopPropagation(); } return; }  // 2.371.3 (#3333): Esc also ends a task search without hits
   const box = $('#wk-ac'), n = WK.ac.hits.length;
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); WK.ac.i = (WK.ac.i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; wk_acDraw(box); }
   else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); wk_acPick(WK.ac.i); }
