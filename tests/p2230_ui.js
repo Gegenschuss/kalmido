@@ -52,11 +52,11 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   check(['clients', 'workload', 'forms'].every(k => d.querySelector(`.smodal [data-feat="${k}"]`) && !d.querySelector(`.smodal [data-feat="${k}"]`).checked), 'Settings > Modules: three switches, off');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // #794: the icon column in the sidebar (2.46.1 (#1607): the arrow moved before the folder icon; 2.352.0 (#2748): both in the
-  // tree's buttons, the arrow first)
+  // tree's buttons, the arrow first; 2.406.0 (#3492): one row rule, the arrow sits at the row's end, after the icon)
   const sb = w.eval(`(() => { const f = [...document.querySelectorAll('#side .fhead')].find(x => /Work/.test(x.textContent)); const g = [...document.querySelectorAll('#side .srow[data-list]')].find(x => /Goals/.test(x.textContent));
-    return {fic: !!f?.querySelector('.sic svg'), chevFirst: !!f?.querySelector('.fcar') && !!(f.querySelector('.fcar').compareDocumentPosition(f.querySelector('.sic')) & 4), emo: g?.querySelector('.sic .lemo')?.textContent || (g?.querySelector('.sic .lic svg') && !/🎯/.test(g.textContent) ? 'line' : ''), name: g?.querySelector('.n')?.textContent,
+    return {fic: !!f?.querySelector('.sic svg'), chevLast: !!f?.querySelector('.fcar') && !!(f.querySelector('.fcar').compareDocumentPosition(f.querySelector('.sic')) & 2), emo: g?.querySelector('.sic .lemo')?.textContent || (g?.querySelector('.sic .lic svg') && !/🎯/.test(g.textContent) ? 'line' : ''), name: g?.querySelector('.n')?.textContent,
       dots: [...document.querySelectorAll('#side .srow[data-list]')].every(r => r.querySelector('.sic'))}; })()`);
-  check(sb.fic && sb.chevFirst && sb.emo === 'line' && sb.name === 'Goals' && sb.dots, '#794: folder icon in the icon column, the arrow before it (2.46.1, #1607), the emoji as a line icon in the column (2.36.0, #1117), the name without it ' + JSON.stringify(sb));
+  check(sb.fic && sb.chevLast && sb.emo === 'line' && sb.name === 'Goals' && sb.dots, '#794 #3492: folder icon in the icon column, the arrow at the row end (2.406.0), the emoji as a line icon in the column (2.36.0, #1117), the name without it ' + JSON.stringify(sb));
   w.close();
   await call('PATCH', '/api/settings', {features: BASE + ',clients,workload,forms'});
 
