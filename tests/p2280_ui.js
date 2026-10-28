@@ -41,6 +41,7 @@ const V = B + 'api/v1';
   const st0 = await call('GET', '/api/state');
   const ORG = st0.me.workspaces[0].id, ORGN = st0.me.workspaces[0].name;
   check(st0.workspaces === true && ORG > 0, '#935: the state knows the workspaces ' + JSON.stringify(st0.me.workspaces));
+  await call('PATCH', `/api/orgs/${ORG}`, {member_agents: true});  // 2.361.4 (#2928): its admins let members keep own agents there (Bob bot)
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, AGH = {Authorization: 'Bearer ' + ag.token, 'Content-Type': 'application/json'};
   const my = await call('POST', '/api/admin/agents', {scopes: ['read', 'comments'], username: 'mybot', display_name: 'My bot', owner_id: 1});
