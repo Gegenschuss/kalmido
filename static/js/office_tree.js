@@ -15,9 +15,10 @@ const OFT = {d: {}, busy: {}};
 // 2.380.0 B (#3409): [2] = the query of the area (quotations / invoices share the documents' route)
 const OFT_AREAS = {offers: ['docs', 'file'], invoices: ['docs', 'receipt', '?sec=invoices'], gendocs: ['gen-docs', 'file'], letters: ['letters', 'mail'], receipts: ['receipts', 'ticket']};
 const oft_key = () => `${S.me?.id || ''}:${typeof wsCur === 'function' ? wsCur() : 'all'}`;
-// 2.373.0 (#3337): OFT.busy[area] = the running load; a second call gets it to wait on (ltSentModal's folders)
+// 2.373.0 (#3337): OFT.busy[area] = the running load; a second call gets it to wait on (ltSentModal's folders). The fetch
+// starts only after busy is set (a call while it starts, e.g. a drawing, must not start another one)
 function oft_load(area) {
-  return OFT.busy[area] || (OFT.busy[area] = oft_fetch(area).finally(() => { OFT.busy[area] = null; }));
+  return OFT.busy[area] || (OFT.busy[area] = Promise.resolve().then(() => oft_fetch(area)).finally(() => { OFT.busy[area] = null; }));
 }
 async function oft_fetch(area) {
   const key = oft_key();

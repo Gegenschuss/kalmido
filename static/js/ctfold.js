@@ -15,7 +15,7 @@ const CTF = {d: null, v: -1, at: 0, busy: null, err: ''};
 function ctf_load(force) {
   if (CTF.busy) return CTF.busy;
   if (!force && CTF.d && CTF.v !== -1) return Promise.resolve();
-  return (CTF.busy = ctf_fetch().finally(() => { CTF.busy = null; }));
+  return (CTF.busy = Promise.resolve().then(ctf_fetch).finally(() => { CTF.busy = null; }));  // busy before the fetch starts
 }
 async function ctf_fetch() {
   try { CTF.d = {spaces: [], folders: [], items: [], ...(await rawFetch('GET', '/api/contacts/folders'))}; CTF.err = ''; }
