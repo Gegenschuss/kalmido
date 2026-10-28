@@ -24,7 +24,7 @@ def task_dict(r, tags, full_snips=False):
         d.pop("ms", None)
     if d.get("milestone_id") is None:
         d.pop("milestone_id", None)
-    for k in ("sprint_id", "sprint_at", "points"):  # 2.60.0 (#343 / #1511): only when set
+    for k in ("sprint_id", "sprint_at", "points", "section_at"):  # 2.60.0 (#343 / #1511): only when set; 2.410.0 B (#3515): + section_at
         if d.get(k) is None:
             d.pop(k, None)
     if not d.get("review"):  # 2.60.0 C (#1512): review fields only when a review state is set; the reviewer when one is set

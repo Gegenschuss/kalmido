@@ -999,6 +999,7 @@ function taskRow(t, opts = {}) {
   if (opts.next && !opts.depth && rs('blocked')) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}<span class="nxl">${tr('Ready to start|flow')}</span></button>`);
   if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t) && rs('blocked')) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('blocked')}</span>`);
   if (t.waiting_at && t.status === 0 && !opts.trash && rs('wait')) meta.push(waitChip(t));  // 2.1.0 (#335)
+  if (opts.dwell && !opts.trash) { const d = dw_chip(t, opts.dwell); if (d) meta.push(d); }  // 2.410.0 B (#3515): time in the board column
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
