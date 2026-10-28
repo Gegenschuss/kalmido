@@ -5,6 +5,10 @@ companies and figures only; every logo is made here. freelancer-matrix: office (
 API part with a person without organisation is p2406_lead_api_test.py)
  - #3501 the logo frame per size (small 30 x 14, medium 45 x 22, large 60 x 30 mm) and side (left on the left margin, right
    on the right margin); no choice = medium, right (as before); large ends above the address field (45 mm from the top)
+ - #3491 look A of the quotation: every text 2 pt smaller (never below 6 pt), other documents unchanged (also right after a
+   quotation: no width cache shared); the totals at the bottom of the page when totals + closing fit there; the closing in
+   two columns (thanks + references + terms left, greeting + company right); the reference lines fall away when the rights
+   appendix fits on page 1; a long quotation over two pages stays clean, its references name the page
 usage: p2406_lead_pdf_test.py            (KALMIDO_SRC = the source tree, default ../ next to tests/)"""
 import importlib.util
 import io
@@ -99,5 +103,70 @@ check(len(sz) >= 2 and all(s and s[0] <= 32 * MM + 0.05 and abs(s[2] + s[0] - ri
 P = pdf.pdf_paper_ns("letter")
 lw, lh, x, top = logos(P.office_pdf(dict(model(co={"logo_size": "l", "logo_pos": "l", "logo_path": WIDE}), paper="letter")))[0]
 check(abs(lw - 60 * MM) < 0.05 and abs(x - P.PDF_L) < 0.05, f"#3501: Letter, large left ({lw / MM:.1f} mm, x {x:.1f})")
+
+
+# ---------------------------------------------------------------- #3491 look A of the quotation
+def offer(n=4, rights=True, signature_image=None):
+    m = model(kind="offer", n=n, title="Kostenvoranschlag")
+    m.update(meta=[["Angebot Nr.", "KVA-2026-406"], ["Datum", "28.10.2026"], ["Gültig bis", "27.11.2026"]], number="KVA-2026-406",
+             intro="Sehr geehrte Damen und Herren,\nvielen Dank für Ihre Anfrage.", accept_on=1,
+             closing="Wir freuen uns auf die Zusammenarbeit und stehen für Rückfragen gerne zur Verfügung.",
+             signature="Mit freundlichen Grüßen", terms_line="Es gelten unsere AGB (Stand 15.07.2026), siehe Anhang.",
+             rights={"title": "Rechteübertragung", "rows": [["Zeitliche Auswertung", "unbegrenzt"], ["Räumliche Auswertung", "weltweit"]]} if rights else {})
+    m["totals"] = {"rows": [["Summe netto", money(100 * n), True]], "vat_note": "Alle Preise zuzüglich 19 % MwSt.", "show_tax_lines": False}
+    if signature_image:
+        m["signature_image"] = signature_image
+    return m
+
+
+def find(pages, s, start=False):
+    return [(n, t) for n, p in enumerate(pages, 1) for t in p["texts"] if (t["s"].startswith(s) if start else s in t["s"])]
+
+
+def body_size(pages):
+    return next((t["size"] for p in pages for t in p["texts"] if t["s"] == "Leistung 1"), None)
+
+
+inv = pdfcheck.layout(pdf.office_pdf(model()))
+check(body_size(inv) == 9.6, f"#3491: an invoice keeps 9.6 pt body text ({body_size(inv)})")
+d = pdf.office_pdf(offer())
+q = pdfcheck.layout(d)
+check(body_size(q) == 7.6, f"#3491: a quotation prints 2 pt smaller (9.6 -> 7.6 pt: {body_size(q)})")
+check(min(t["size"] for p in q for t in p["texts"]) >= 6.0, "#3491: no text of the quotation below 6 pt")
+inv2 = pdfcheck.layout(pdf.office_pdf(model()))
+check(body_size(inv2) == 9.6 and [t["x"] for t in inv2[0]["texts"]] == [t["x"] for t in inv[0]["texts"]],
+      "#3491: an invoice right after a quotation is laid out exactly as before (no smaller widths remembered)")
+check(not pdfcheck.problems(d), f"#3491: the short quotation is clean {pdfcheck.problems(d)[:3]}")
+# short quotation with rights: one page, the appendix on it, no reference lines
+check(len(q) == 1 and find(q, "RECHTE"), f"#3491: a short quotation with rights fits on one page ({len(q)} pages)")
+check(not find(q, "Rechteübertragung siehe") and not find(q, "Seite"), f"#3491: no reference lines when the appendix is on page 1 {find(q, 'siehe')}")
+check(find(q, "Es gelten unsere AGB"), "#3491: the terms line stays")
+# the totals at the bottom (above the closing), the closing in two columns
+tot = find(q, "Summe netto")
+check(tot and tot[0][1]["y"] > q[0]["h"] * 0.5, f"#3491: the totals sit low on the page (y {tot[0][1]['y'] if tot else None:.0f} of {q[0]['h']:.0f})")
+nr = pdf.office_pdf(offer(rights=False))
+qn = pdfcheck.layout(nr)
+tot, gr, th, co = find(qn, "Summe netto"), find(qn, "Mit freundlichen"), find(qn, "Wir freuen uns"), find(qn, "Beispielstudio GmbH", True)
+foot = qn[0]["foot"]
+check(tot and foot and foot - tot[0][1]["y"] < 70 * MM, f"#3491: without rights the totals + closing end just above the footer (totals {tot[0][1]['y'] / MM if tot else 0:.0f} mm, footer {(foot or 0) / MM:.0f} mm)")
+check(gr and th and abs(gr[0][1]["y"] - th[0][1]["y"]) < 1 and abs(th[0][1]["x"] - pdf.PDF_L) < 0.5
+      and abs(gr[0][1]["x"] - (pdf.PDF_L + pdf.PDF_CW * 0.64)) < 0.5, f"#3491: thanks left, greeting right on one line {th[:1]} {gr[:1]}")
+check(any(abs(t["x"] - (pdf.PDF_L + pdf.PDF_CW * 0.64)) < 0.5 and t["bold"] and t["y"] > gr[0][1]["y"] for _n, t in co) if gr else False,
+      "#3491: the company bold below the greeting in the right column")
+# a longer quotation: the appendix on its own page, the reference lines on page 1 name the page of the order confirmation
+n7 = next((n for n in range(5, 30) if len(pdfcheck.layout(pdf.office_pdf(offer(n)))) == 2), None)  # the first length that needs page 2
+d7 = pdf.office_pdf(offer(n7 or 30))
+q7 = pdfcheck.layout(d7)
+check(n7 and find(q7, "Rechteübertragung siehe") and find(q7, "auf Seite 2"), f"#3491: {n7} positions: the appendix on page 2, page 1 refers to it ({len(q7)} pages)")
+check(not pdfcheck.problems(d7), f"#3491: clean with the appendix page {pdfcheck.problems(d7)[:3]}")
+# 40 positions: two pages, the totals on the last main page, clean
+d40 = pdf.office_pdf(offer(40, rights=False))
+q40 = pdfcheck.layout(d40)
+check(len(q40) >= 2 and find(q40, "Summe netto")[0][0] == len(q40), f"#3491: 40 positions over {len(q40)} pages, totals on the last")
+check(not pdfcheck.problems(d40), f"#3491: the long quotation is clean {pdfcheck.problems(d40)[:3]}")
+# the own signature picture keeps the old closing (one column, the picture between greeting and name)
+qs = pdfcheck.layout(pdf.office_pdf(offer(rights=False, signature_image=__import__("base64").b64encode(png(300, 100)).decode())))
+gr = find(qs, "Mit freundlichen")
+check(gr and abs(gr[0][1]["x"] - pdf.PDF_L) < 0.5, f"#3491: with a signature picture the greeting stays on the left {gr[:1]}")
 
 sys.exit(done("p2406_lead_pdf"))

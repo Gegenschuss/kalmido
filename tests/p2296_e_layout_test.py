@@ -122,6 +122,12 @@ p1 = [t["s"] for t in lay[0]["texts"]]
 check(all(f"Leistung {i}" in p1 for i in range(1, 6)) and "Summe Netto" in p1, "#3166 no signature + appendix: positions and totals stay on page 1")
 check(len(lay) == 2 and any(t["s"] == "Recht 1" for t in lay[1]["texts"]), f"#3166 no signature + appendix: two pages, the appendix on page 2 ({len(lay)})")
 
+
+
+def FS(size):  # 2.406.0 (#3491): a quotation (look A) prints every text 2 pt smaller, never below 6 pt
+    return round(max(6.0, size - 2), 2)
+
+
 # ---------------------------------------------------------------- 2. #3170 columns
 QW = "12,5 Personentage"
 LW = "Konzeptionsdrehbuchregiekameralichttonschnittfarbemischunggrafikuntertitelmusiklizenzen"  # cut by characters: fills the column
@@ -132,11 +138,11 @@ data = pdf.office_pdf(m)
 clean("#3170 quantities", data)
 p = pdfcheck.layout(data)[0]
 q = next((t for t in p["texts"] if t["s"] == QW), None)
-title_right = max(t["x"] + t["w"] for t in p["texts"] if t["size"] == 9.6 and abs(t["x"] - (pdf.PDF_L + 25)) < 1)  # the service column
+title_right = max(t["x"] + t["w"] for t in p["texts"] if t["size"] == FS(9.6) and abs(t["x"] - (pdf.PDF_L + 25)) < 1)  # the service column
 check(q is not None and q["x"] >= title_right + 2, f"#3170: {QW!r} stays in the quantity column (x {q and round(q['x'], 1)}, the service text ends at {title_right:.1f})")
 rate = next((t for t in p["texts"] if t["s"] == "100,00 €"), None)
 check(q is not None and rate is not None and q["x"] + q["w"] <= rate["x"] - 2, "#3170: the quantity ends left of the price")
-q3 = next((t for t in p["texts"] if t["s"] == "3" and t["size"] == 8.8), None)
+q3 = next((t for t in p["texts"] if t["s"] == "3" and t["size"] == FS(8.8)), None)
 u3 = next((t for t in p["texts"] if t["s"].startswith("Pauschalen")), None)
 check(q3 is not None and u3 is not None and u3["y"] > q3["y"] + 5 and u3["x"] >= title_right, "#3170: a quantity wider than the widest column: the unit on its own line")
 
@@ -157,10 +163,12 @@ CO3 = dict(CO, name="Studio Nordlicht GmbH Film · Foto · Motion Design Niederl
 data = pdf.office_pdf(model(company=CO3))
 clean("#3170 three name lines", data)
 p = pdfcheck.layout(data)[0]
-snd = [t["s"] for t in p["texts"] if t["size"] == 7 and abs(t["y"] - pdf.PDF_ADDR_TOP) < 1]
+snd = [t["s"] for t in p["texts"] if t["size"] == FS(7) and abs(t["y"] - pdf.PDF_ADDR_TOP) < 1]
 check(len(snd) == 1 and "Große Elbstraße 145b" in snd[0] and "20457 Hamburg" in snd[0], f"#3170: the sender line keeps street and town {snd}")
+tok = pdf.PDF_LOOK_A.set(True)  # 2.406.0 (#3491): measured as the quotation prints it
 check(len(snd) == 1 and pdf.pdf_text_width(snd[0], 7) <= pdf.PDF_ADDR_W + 0.1, "#3170: the sender line fits the address field")
-sig = [t["s"] for t in p["texts"] if t["size"] == 9.6]
+pdf.PDF_LOOK_A.reset(tok)
+sig = [t["s"] for t in p["texts"] if t["size"] == FS(9.6)]
 i = sig.index("Jana Muster") if "Jana Muster" in sig else -1
 check(i >= 0 and sig[i + 1:i + 4] == CO3["name_lines"], f"#3170: the signature prints every name line under the name ({sig[i:i + 4]})")
 # one part alone too long: shortened, the address stays
@@ -177,7 +185,8 @@ check(all(a in allt for a in addr), "#3170: every address line printed (was cut 
 hd = "Leistungsblock mit einer sehr langen Überschrift, die über die ganze Breite der Tabelle hinaus reichen würde und noch weiter"
 data = pdf.office_pdf(model(lines=[{"kind": "heading", "title": hd}, item(1)]))
 clean("#3170 long heading", data)
-check("".join(t["s"] for t in pdfcheck.layout(data)[0]["texts"] if t["bold"] and t["size"] == 8).replace(" ", "") == hd.upper().replace(" ", ""),
+# 2.406.0 (#3491): in look A the table head's labels print in the heading's size too (both 6 pt): the heading inside them
+check(hd.upper().replace(" ", "") in "".join(t["s"] for t in pdfcheck.layout(data)[0]["texts"] if t["bold"] and t["size"] == FS(8)).replace(" ", ""),
       "#3170: the long heading wraps, every word printed")
 
 lab = "Ein sehr langes eigenes Feld mit vielen Wörtern im Namen"
