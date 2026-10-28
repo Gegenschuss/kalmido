@@ -14897,5 +14897,13 @@
   "{0} sent letter stays in the old workspace (retention)": ["{0} versendeter Brief bleibt im alten Arbeitsbereich (Aufbewahrung)", "{0} versendete Briefe bleiben im alten Arbeitsbereich (Aufbewahrung)"],
   "{0} set moves with its devices": ["{0} Geräteset wandert mit seinen Geräten", "{0} Gerätesets wandern mit ihren Geräten"],
   "{0} device moves along": ["{0} Gerät wandert mit", "{0} Geräte wandern mit"],
-  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} Gerät wird im alten Arbeitsbereich noch genutzt (anderes Geräteset, Buchung oder Verknüpfung): bleibt dort und wird ins Ziel kopiert", "{0} Geräte werden im alten Arbeitsbereich noch genutzt (anderes Geräteset, Buchung oder Verknüpfung): bleiben dort und werden ins Ziel kopiert"]
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} Gerät wird im alten Arbeitsbereich noch genutzt (anderes Geräteset, Buchung oder Verknüpfung): bleibt dort und wird ins Ziel kopiert", "{0} Geräte werden im alten Arbeitsbereich noch genutzt (anderes Geräteset, Buchung oder Verknüpfung): bleiben dort und werden ins Ziel kopiert"],
+  "Already in the archive (import of {0})": "Schon im Archiv (Import vom {0})",
+  "The same file twice in this upload": "Dieselbe Datei zweimal in diesem Upload",
+  "Not a DATEV file this archive reads": "Keine DATEV-Datei, die das Archiv liest",
+  "The year of the batch cannot be read": "Das Jahr des Stapels ist nicht lesbar",
+  "{0} lines without a readable amount, debit / credit mark or account (only in the original file)": "{0} Zeilen ohne lesbaren Betrag, Soll-/Haben-Kennzeichen oder Konto (nur in der Originaldatei)",
+  "Nothing to take over": "Nichts zu übernehmen",
+  "No tax advice. Whether this archive replaces the DATEV data access for the retention, your tax advisor clarifies.": "Keine Steuerberatung. Ob das Archiv den DATEV-Datenzugriff für die Aufbewahrung ersetzt, klärt deine Steuerberatung.",
+  "{0} archived booking": ["{0} archivierte Buchung", "{0} archivierte Buchungen"]
 }

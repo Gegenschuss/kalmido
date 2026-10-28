@@ -14897,5 +14897,13 @@
   "{0} sent letter stays in the old workspace (retention)": ["{0} lettre envoyée reste dans l’ancien espace (conservation)", "{0} lettres envoyées restent dans l’ancien espace (conservation)"],
   "{0} set moves with its devices": ["{0} kit part avec ses appareils", "{0} kits partent avec leurs appareils"],
   "{0} device moves along": ["{0} appareil part avec", "{0} appareils partent avec"],
-  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} appareil est encore utilisé dans l’ancien espace (autre kit, réservation ou lien) : il y reste et est copié dans la cible", "{0} appareils sont encore utilisés dans l’ancien espace (autre kit, réservation ou lien) : ils y restent et sont copiés dans la cible"]
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} appareil est encore utilisé dans l’ancien espace (autre kit, réservation ou lien) : il y reste et est copié dans la cible", "{0} appareils sont encore utilisés dans l’ancien espace (autre kit, réservation ou lien) : ils y restent et sont copiés dans la cible"],
+  "Already in the archive (import of {0})": "Déjà dans l’archive (import du {0})",
+  "The same file twice in this upload": "Le même fichier deux fois dans cet envoi",
+  "Not a DATEV file this archive reads": "Pas un fichier DATEV que cette archive lit",
+  "The year of the batch cannot be read": "L’année du lot est illisible",
+  "{0} lines without a readable amount, debit / credit mark or account (only in the original file)": "{0} lignes sans montant, sens débit / crédit ou compte lisible (seulement dans le fichier d’origine)",
+  "Nothing to take over": "Rien à reprendre",
+  "No tax advice. Whether this archive replaces the DATEV data access for the retention, your tax advisor clarifies.": "Pas de conseil fiscal. Si cette archive remplace l’accès aux données DATEV pour la conservation, votre conseiller fiscal le précise.",
+  "{0} archived booking": ["{0} écriture archivée", "{0} écritures archivées"]
 }

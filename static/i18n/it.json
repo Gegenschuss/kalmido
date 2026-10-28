@@ -14897,5 +14897,13 @@
   "{0} sent letter stays in the old workspace (retention)": ["{0} lettera inviata resta nel vecchio spazio (conservazione)", "{0} lettere inviate restano nel vecchio spazio (conservazione)"],
   "{0} set moves with its devices": ["{0} set si sposta con i suoi dispositivi", "{0} set si spostano con i loro dispositivi"],
   "{0} device moves along": ["{0} dispositivo si sposta insieme", "{0} dispositivi si spostano insieme"],
-  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} dispositivo è ancora usato nel vecchio spazio (altro set, prenotazione o collegamento): resta lì e viene copiato nella destinazione", "{0} dispositivi sono ancora usati nel vecchio spazio (altro set, prenotazione o collegamento): restano lì e vengono copiati nella destinazione"]
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} dispositivo è ancora usato nel vecchio spazio (altro set, prenotazione o collegamento): resta lì e viene copiato nella destinazione", "{0} dispositivi sono ancora usati nel vecchio spazio (altro set, prenotazione o collegamento): restano lì e vengono copiati nella destinazione"],
+  "Already in the archive (import of {0})": "Già nell’archivio (importazione del {0})",
+  "The same file twice in this upload": "Lo stesso file due volte in questo caricamento",
+  "Not a DATEV file this archive reads": "Non è un file DATEV che questo archivio legge",
+  "The year of the batch cannot be read": "L’anno del lotto non è leggibile",
+  "{0} lines without a readable amount, debit / credit mark or account (only in the original file)": "{0} righe senza importo, segno dare / avere o conto leggibile (solo nel file originale)",
+  "Nothing to take over": "Niente da importare",
+  "No tax advice. Whether this archive replaces the DATEV data access for the retention, your tax advisor clarifies.": "Nessuna consulenza fiscale. Se questo archivio sostituisce l’accesso ai dati DATEV per la conservazione lo chiarisce il tuo consulente fiscale.",
+  "{0} archived booking": ["{0} registrazione archiviata", "{0} registrazioni archiviate"]
 }

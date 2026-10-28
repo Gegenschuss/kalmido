@@ -79,7 +79,6 @@ BA_DUP_UPLOAD = N_("The same file twice in this upload")
 BA_UNKNOWN = N_("Not a DATEV file this archive reads")
 BA_NO_YEAR = N_("The year of the batch cannot be read")
 BA_ROW_BAD = N_("{0} lines without a readable amount, debit / credit mark or account (only in the original file)")
-BA_NO_BOOKING = N_("No booking of the archive points to this receipt")
 BA_NOTHING = N_("Nothing to take over")
 
 _GUID = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")

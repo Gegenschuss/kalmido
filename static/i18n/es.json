@@ -14897,5 +14897,13 @@
   "{0} sent letter stays in the old workspace (retention)": ["{0} carta enviada se queda en el espacio anterior (conservación)", "{0} cartas enviadas se quedan en el espacio anterior (conservación)"],
   "{0} set moves with its devices": ["{0} conjunto se mueve con sus equipos", "{0} conjuntos se mueven con sus equipos"],
   "{0} device moves along": ["{0} equipo se mueve también", "{0} equipos se mueven también"],
-  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} equipo aún se usa en el espacio anterior (otro conjunto, una reserva o un vínculo): se queda allí y se copia al destino", "{0} equipos aún se usan en el espacio anterior (otro conjunto, una reserva o un vínculo): se quedan allí y se copian al destino"]
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} equipo aún se usa en el espacio anterior (otro conjunto, una reserva o un vínculo): se queda allí y se copia al destino", "{0} equipos aún se usan en el espacio anterior (otro conjunto, una reserva o un vínculo): se quedan allí y se copian al destino"],
+  "Already in the archive (import of {0})": "Ya está en el archivo (importación del {0})",
+  "The same file twice in this upload": "El mismo archivo dos veces en esta subida",
+  "Not a DATEV file this archive reads": "No es un archivo DATEV que lea este archivo",
+  "The year of the batch cannot be read": "No se puede leer el año del lote",
+  "{0} lines without a readable amount, debit / credit mark or account (only in the original file)": "{0} líneas sin importe, marca debe / haber o cuenta legibles (solo en el archivo original)",
+  "Nothing to take over": "Nada que importar",
+  "No tax advice. Whether this archive replaces the DATEV data access for the retention, your tax advisor clarifies.": "No es asesoramiento fiscal. Si este archivo sustituye el acceso a los datos de DATEV para la conservación, lo aclara su asesor fiscal.",
+  "{0} archived booking": ["{0} asiento archivado", "{0} asientos archivados"]
 }

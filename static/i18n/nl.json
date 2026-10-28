@@ -14897,5 +14897,13 @@
   "{0} sent letter stays in the old workspace (retention)": ["{0} verzonden brief blijft in de oude werkruimte (bewaarplicht)", "{0} verzonden brieven blijven in de oude werkruimte (bewaarplicht)"],
   "{0} set moves with its devices": ["{0} set gaat mee met zijn apparaten", "{0} sets gaan mee met hun apparaten"],
   "{0} device moves along": ["{0} apparaat gaat mee", "{0} apparaten gaan mee"],
-  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} apparaat wordt in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): het blijft daar en wordt naar het doel gekopieerd", "{0} apparaten worden in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): ze blijven daar en worden naar het doel gekopieerd"]
+  "{0} device is still used in the old workspace (another set, a booking or a link): it stays there and is copied into the target": ["{0} apparaat wordt in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): het blijft daar en wordt naar het doel gekopieerd", "{0} apparaten worden in de oude werkruimte nog gebruikt (andere set, boeking of koppeling): ze blijven daar en worden naar het doel gekopieerd"],
+  "Already in the archive (import of {0})": "Staat al in het archief (import van {0})",
+  "The same file twice in this upload": "Hetzelfde bestand twee keer in deze upload",
+  "Not a DATEV file this archive reads": "Geen DATEV-bestand dat dit archief leest",
+  "The year of the batch cannot be read": "Het jaar van de batch is niet leesbaar",
+  "{0} lines without a readable amount, debit / credit mark or account (only in the original file)": "{0} regels zonder leesbaar bedrag, debet-/creditteken of rekening (alleen in het originele bestand)",
+  "Nothing to take over": "Niets over te nemen",
+  "No tax advice. Whether this archive replaces the DATEV data access for the retention, your tax advisor clarifies.": "Geen belastingadvies. Of dit archief de DATEV-gegevenstoegang voor de bewaarplicht vervangt, verduidelijkt uw belastingadviseur.",
+  "{0} archived booking": ["{0} gearchiveerde boeking", "{0} gearchiveerde boekingen"]
 }
