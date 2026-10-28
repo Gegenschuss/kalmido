@@ -366,10 +366,10 @@ async function msvvQuick(input) {
   if (b._r.list_id) return false;  // "~list" names an own list
   delete b._r;
   const o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {}, d = quickDefaults();
-  const qp = qovPick(o, {due: b.due, priority: b.priority}, d);  // 2.380.2 (#3403): the text wins over a chip picked before
-  b.due = qp.due || undefined; if (qp.priority || 'priority' in o) b.priority = qp.priority;
+  if ('due' in o) b.due = o.due || undefined; else if (!b.due && d.due) b.due = d.due;
+  if ('priority' in o) b.priority = o.priority;
   if (!b.title) return true;
-  input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input);
+  input.value = ''; S.quick.ignore = new Set(); updateChips(input);
   const n = await msvvAdd(q.sid, q.lid, JSON.parse(JSON.stringify(b)));
   if (n) toast(tr('Added on {0}', msvvQLabel(q)), null, 4000);
   else input.value = txt;  // not reachable: the text stays
