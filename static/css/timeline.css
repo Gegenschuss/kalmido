@@ -163,3 +163,6 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
 .rm-gwrap{gap:.25rem}
 .rm-gwrap .rm-gname{display:flex;align-items:center;flex:1;min-width:0;align-self:stretch}
 .rm-gwrap:hover .rm-go{opacity:1}
+/* 2.331.0 E (#3311): two fingers zoom the timeline itself (timeline.js pz_attach), not the page; one finger still scrolls */
+#view .tl{touch-action:pan-x pan-y}
+.tl.tl-sm .tl-d span{display:none}

@@ -192,9 +192,8 @@ def tpl_clean(kind, d):
             # 2.4.0 (#328 / #340): dates relative to the project start (rel), its length in days (span), the dependencies,
             # the list's ticket types + templates and "Move dependent tasks along"
             "rel": bool(d.get("rel")), "span": span(tasks), "deps": deps, "tickets": 1 if d.get("tickets") else 0,
-            # 2.67.0 B (#1865): a template without the setting: on for a project (like a new project list)
-            "ticket_tpl": tt, "dep_shift": (1 if d["dep_shift"] else 0) if "dep_shift" in d else
-            1 if (d.get("kind") if d.get("kind") in LIST_KINDS else "project" if d.get("fields") else "list") == "project" else 0,
+            # 2.67.0 B (#1865): a template without the setting: on (2.352.0 B #2752: every list is a project, like a new one)
+            "ticket_tpl": tt, "dep_shift": (1 if d["dep_shift"] else 0) if "dep_shift" in d else 1,
             # 2.39.0 (#1168): the list's own Playbook (its text; the new list gets it as its first version, source template)
             "playbook": _tpl_playbook(d.get("playbook")),
             # 2.63.0 (#1523): the project page - its notepads, the standard arrangement and the block colours
@@ -384,7 +383,7 @@ def template_create():
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
                 raise Denied(403, tr("View only: the project cannot be saved as a template"))
             _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
-            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=bool(b.get("relative")))
+            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True)  # 2.352.0 B (#2752): dates always relative
             name = data["name"]
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None

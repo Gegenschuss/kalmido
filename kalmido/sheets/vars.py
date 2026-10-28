@@ -178,8 +178,6 @@ def sh_sources(c, sheet, uid, typ):
         rows = [r for r in rows if sheet["org_id"] is None or r["org_id"] == sheet["org_id"]]
     else:
         q = f"SELECT id, name, org_id, kind FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL AND is_inbox=0"
-        if typ == "p":
-            q += " AND kind='project'"
         rows = [r for r in c.execute(q + " ORDER BY id", (uid, uid)).fetchall()
                 if (sheet["org_id"] is None or r["org_id"] == sheet["org_id"]) and sh_list_ok(c, sheet, uid, r["id"]) not in (None, "deleted")]
     out, seen = [], {}

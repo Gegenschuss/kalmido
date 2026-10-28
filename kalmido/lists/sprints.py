@@ -349,7 +349,7 @@ def need_sprint(c, sid, write=False):
 
 def spr_need_project(c, lid):
     if not is_project(c, lid):
-        raise Denied(409, tr("Switch on progress and status in this project to use sprints"))
+        raise Denied(409, tr("The basket has no project functions"))
 
 
 def spr_clean_fields(b, cur=None):

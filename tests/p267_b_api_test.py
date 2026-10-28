@@ -82,7 +82,7 @@ def patch(s, tid, **b):
 P = lst(A, "Launch plan", kind="project")
 PL = lst(A, "Errands")
 check(P["dep_shift"] == 1, f"a new project list: Move dependent tasks along on by default ({P['dep_shift']})")
-check(PL["dep_shift"] == 0, "a plain list: off by default")
+check(PL["dep_shift"] == 1, "#2752: kind list is a project too: on by default")  # 2.352.0 (#2752)
 check(lst(A, "Quiet project", kind="project", dep_shift=False)["dep_shift"] == 0, "an explicit dep_shift false at creation is kept")
 for nm, kd in (("Tpl project", "project"), ("Tpl plain", "list")):
     tp = A.post(B + "/api/templates", json={"kind": "list", "data": {"name": nm, "kind": kd}})
@@ -91,7 +91,8 @@ for nm, kd in (("Tpl project", "project"), ("Tpl plain", "list")):
     assert ap.ok, ap.text
 with db() as cx:
     tl = {r_["name"]: r_["dep_shift"] for r_ in cx.execute("SELECT name, dep_shift FROM lists WHERE name LIKE 'Tpl %'")}
-check(tl == {"Tpl project list": 1, "Tpl plain list": 0}, f"a list template without the setting: on for a project, off for a plain list: {tl}")
+# 2.352.0 (#2752): every list is a project: a template without the setting gets it on, whatever kind it carries
+check(tl == {"Tpl project list": 1, "Tpl plain list": 1}, f"a list template without the setting: on (every list a project): {tl}")
 P, PL = P["id"], PL["id"]
 
 # ================================================================== chain A -> B -> C, gaps kept
@@ -242,7 +243,8 @@ check(r.ok and r.json()["gap"] == 0 and r.json()["shifted"] == [] and row(p2)["s
 check(A.post(B + f"/api/tasks/{w_nod}/chain/pull", json={}).status_code == 400, "pull on a task without a date: 400")
 check(Bo.post(B + f"/api/tasks/{bh}/chain/pull", json={}).ok and A.post(B + f"/api/tasks/{bh}/chain/pull", json={}).status_code == 404,
       "pull on a task I cannot see: 404")
-check(A.post(B + f"/api/tasks/{mk(A, PL, 'Plain', D(1))}/chain/pull", json={}).status_code == 409, "pull in a plain list: 409 (dependencies are for projects)")
+# 2.352.0 (#2752): every list but the inbox is a project
+check(A.post(B + f"/api/tasks/{mk(A, next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"]), 'Plain', D(1))}/chain/pull", json={}).status_code == 409, "pull in the inbox: 409 (dependencies are for projects)")
 
 # ================================================================== v1 + agent token with a list limit
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": "planner", "display_name": "Planner"})

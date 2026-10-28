@@ -36,6 +36,8 @@ for x in (A, Bo, Vi, Pa, Zo):
 P = A.post(B + "/api/lists", json={"name": "Website relaunch", "kind": "project", "time_tracking": True}).json()["id"]
 # 2.41.0 (#1471): time tracking is a switch of each list (default off); the overview shows "time" only with it
 PL = A.post(B + "/api/lists", json={"name": "Groceries"}).json()["id"]
+# 2.352.0 (#2752): every list but the inbox is a project now -- the inbox takes the place of the plain list for the 409s
+INBOX = next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x.get("is_inbox"))
 for u, role in (("bob", "edit"), ("vic", "view"), ("pat", "participant")):
     check(A.put(B + f"/api/lists/{P}/members", json={"user_id": ids[u], "role": role}).ok, f"share with {u} as {role}")
 
@@ -47,7 +49,8 @@ check(o["description"] == "" and o["links"] == [] and o["milestones"] == [] and 
       "empty overview, owner can edit")
 check({m["role"] for m in o["members"]} == {"owner", "edit", "view", "participant"}, f"members with roles: {o['members']}")
 check(o["time"] is not None and o["time"]["day_hours"] == 8 and o["time"]["seconds"] == 0, f"time: {o['time']}")
-check(A.get(B + f"/api/lists/{PL}/overview").status_code == 409, "a plain list has no overview (409)")
+check(A.get(B + f"/api/lists/{INBOX}/overview").status_code == 409, "the inbox has no overview (409)")
+check(A.get(B + f"/api/lists/{PL}/overview").ok, "a list without kind has an overview now (2.352.0, #2752)")
 check(Zo.get(B + f"/api/lists/{P}/overview").status_code == 404, "a stranger: 404")
 check(Vi.get(B + f"/api/lists/{P}/overview").json()["can_edit"] is False, "viewer reads, cannot edit")
 check(Pa.get(B + f"/api/lists/{P}/overview").json()["can_edit"] is False, "participant reads, cannot edit")
@@ -59,7 +62,7 @@ check(Vi.patch(B + f"/api/lists/{P}/overview", json={"description": "x"}).status
 check(Pa.patch(B + f"/api/lists/{P}/overview", json={"description": "x"}).status_code == 403, "participant: 403")
 check(A.patch(B + f"/api/lists/{P}/overview", json={"description": "x" * 20001}).status_code == 400, "description over 20000: 400")
 check(A.patch(B + f"/api/lists/{P}/overview", json={"description": 5}).status_code == 400, "description not text: 400")
-check(A.patch(B + f"/api/lists/{PL}/overview", json={"description": "x"}).status_code == 409, "plain list: 409")
+check(A.patch(B + f"/api/lists/{INBOX}/overview", json={"description": "x"}).status_code == 409, "inbox: 409")
 r = A.patch(B + f"/api/lists/{P}/overview", json={"description": "## Goal\nNew **site** by June", "colour": "x"})
 check(r.ok and "colour" in r.headers.get("X-Kalmido-Unknown-Fields", ""), "unknown web field: named in the header")
 st = A.get(B + "/api/state").json()
@@ -75,7 +78,7 @@ for bad in ("javascript:alert(1)", "ftp://x.example", "", "https://", "data:text
 check(Vi.post(B + f"/api/lists/{P}/links", json={"url": "https://x.example"}).status_code == 403, "viewer cannot add a link")
 check(A.patch(B + f"/api/lists/{P}/links/{L1}", json={"title": "Repository"}).json()["title"] == "Repository", "rename a link")
 check(A.patch(B + f"/api/lists/{P}/links/{L1}", json={"url": "javascript:x"}).status_code == 400, "change to a bad address: 400")
-check(A.patch(B + f"/api/lists/{PL}/links/{L1}", json={"title": "x"}).status_code == 409, "link of another list via a plain list: 409")
+check(A.patch(B + f"/api/lists/{INBOX}/links/{L1}", json={"title": "x"}).status_code == 409, "link of another list via the inbox: 409")
 r = A.put(B + f"/api/lists/{P}/links/order", json={"ids": [L2, L1]})
 check(r.ok and [x["id"] for x in r.json()["data"]] == [L2, L1], "reorder")
 check(A.put(B + f"/api/lists/{P}/links/order", json={"ids": [L2]}).status_code == 400, "reorder with a missing id: 400")
@@ -129,7 +132,7 @@ check(Pa.delete(B + f"/api/list-files/{fp}").status_code == 404, "participant ca
 big = A.post(B + f"/api/lists/{P}/files", files={"file": ("big.bin", b"0" * (1024 * 1024 + 10))})
 check(big.status_code in (400, 413), f"over the size limit (1 MB in the tests): {big.status_code}")
 check(not any(f["name"] == "big.bin" for f in A.get(B + f"/api/lists/{P}/overview").json()["files"]), "too large: nothing stored")
-check(A.post(B + f"/api/lists/{PL}/files", files={"file": ("a.txt", b"x")}).status_code == 409, "plain list: 409")
+check(A.post(B + f"/api/lists/{INBOX}/files", files={"file": ("a.txt", b"x")}).status_code == 409, "inbox: 409")
 check(A.delete(B + f"/api/list-files/{fh}").ok and A.get(B + f"/api/list-files/{fh}").status_code == 404, "delete a project file")
 on_disk = subprocess.run(["docker", "exec", CT, "sh", "-c", f"ls /data/attachments/lists/{P}/"], capture_output=True, text=True).stdout.split()
 # 2.272.0 (#3038): a deleted project file lies in the trash, its file stays on disk until the trash period ends
@@ -190,7 +193,7 @@ check(g.ok and g.content == b"plan" and "attachment" in g.headers.get("Content-D
 check(requests.get(V + f"/lists/{PL}/files/{FV}", headers=R).status_code == 404, "v1: file through another list 404")
 check(any(f["id"] == FV for f in requests.get(V + f"/lists/{P}/files", headers=R).json()["data"]), "v1: files")
 check(requests.delete(V + f"/lists/{P}/files/{FV}", headers=T).status_code == 204, "v1: delete a file")
-check(requests.get(V + f"/lists/{PL}/overview", headers=R).status_code == 409, "v1: plain list 409")
+check(requests.get(V + f"/lists/{INBOX}/overview", headers=R).status_code == 409, "v1: inbox 409")
 spec = requests.get(V + "/openapi.json").json()
 for pth in ("/lists/{id}/overview", "/lists/{id}/links", "/lists/{id}/links/order", "/lists/{id}/links/{link_id}", "/lists/{id}/milestones",
             "/lists/{id}/milestones/{milestone_id}", "/lists/{id}/files", "/lists/{id}/files/{file_id}"):

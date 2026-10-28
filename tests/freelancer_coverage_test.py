@@ -49,8 +49,8 @@ KINDS = {
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
-    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
-                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail"),
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail; 2.352.0 D: the shortened view of a private mail"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
@@ -384,6 +384,7 @@ ROUTES = {
     "POST /api/v1/lists/{}/shop-areas": "lists", "POST /api/v1/lists/{}/sprints/assign": "lists",
     "POST /api/v1/lists/{}/tags": "lists", "POST /api/v1/templates": "lists", "POST /api/v1/templates/{}/apply": "lists",
     "PUT /api/folder-heads": "lists", "PUT /api/folders/agents": "lists", "PUT /api/folders/groups/{}": "lists",
+    "GET /api/lists/tree": "lists", "POST /api/lists/folders": "lists", "POST /api/lists/tree/move": "lists",  # 2.352.0 A (#2748)
     "PUT /api/folders/notify-template": "lists", "PUT /api/folders/people": "lists", "PUT /api/folders/playbook": "lists",
     "PUT /api/folders/props": "lists", "PUT /api/folders/public-links": "lists", "PUT /api/lists/{}/agent": "lists",
     "PUT /api/lists/{}/bell": "lists", "PUT /api/lists/{}/favorite": "lists", "PUT /api/lists/{}/folder-repo": "lists",

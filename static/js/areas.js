@@ -67,7 +67,8 @@ const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
-  {key: 'offers', go: 'office/offers', icon: 'receipt', name: N_('Quotes & invoices'), group: 'sell', on: ofm_ofc},
+  {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
+  {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
   {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
   {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
@@ -141,7 +142,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
@@ -171,7 +172,7 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr('Quotes & invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
+  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr(OFD.doc.kind === 'offer' ? 'Quotations' : 'Invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }
@@ -618,12 +619,16 @@ function sbb_treeAnyOpen() {
 // 2.199.0 A (#2742): a node may also carry ns (the module's handlers, sbb_treeReg), id, par (its parent's key: siblings share
 // it), drag (dragged to move / sort), drop (takes nodes into it), menu (right-click / long press / the context key) and auto
 // (an automatic group: a filter view -- other look, never dragged, dropped on, sorted, shared or given a menu)
+// 2.352.0 E (#2748): + raw (a row the area draws itself: the projects' lists and folder bodies), cls / after (classes of the
+// row, what follows the name: count, share mark, menu button), ichtml (the icon's own markup) and fold ({open, attrs}: the
+// area keeps the open state itself)
 function sbb_treeHtml(nodes, lvl = 0) {
   return nodes.map(n => {
-    const open = !!n.kids && (n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
-    const arrow = n.kids ? `<button type="button" class="sbbtar" data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}" aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
+    if (n.raw != null) return n.raw;
+    const open = !!n.kids && (n.fold ? !!n.fold.open : n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
+    const arrow = n.kids ? `<button type="button" class="sbbtar" ${n.fold ? n.fold.attrs : `data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}"`} aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
     const dn = n.ns && !n.auto ? ` data-sbbns="${esc(n.ns)}" data-sbbid="${esc(String(n.id))}" data-sbbpar="${esc(String(n.par ?? ''))}"${n.drop ? ' data-sbbdrop="1"' : ''}${n.menu ? ' data-sbbmenu="1" aria-haspopup="menu"' : ''}${n.drag && !isTouch() ? ' draggable="true"' : n.drag ? ' data-sbbdrag="1"' : ''}` : '';
-    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}${n.auto ? ' sbbauto' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}${dn}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}${n.auto ? ` title="${esc(tr('Automatic group'))}"` : ''}>${ic(n.icon || (n.auto ? 'filter' : 'folder'), 's')}<span class="n">${esc(n.name)}</span></button></div>`
+    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}${n.auto ? ' sbbauto' : ''}${n.cls ? ' ' + n.cls : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}${dn}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}${n.auto ? ` title="${esc(tr('Automatic group'))}"` : ''}>${n.ichtml ?? ic(n.icon || (n.auto ? 'filter' : 'folder'), 's')}<span class="n">${esc(n.name)}</span></button>${n.after || ''}</div>`
       + (!open ? '' : sub === null ? `<div class="sbbtl muted" style="--sbbl:${Math.min(lvl + 1, 8)}">${esc(tr('Loading…'))}</div>` : sbb_treeHtml(sub, lvl + 1));
   }).join('');
 }

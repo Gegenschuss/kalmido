@@ -79,9 +79,13 @@ function fxBudgetCell(f, t) {  // '' = the plain cell; else the subtasks' sum, g
 function fxSumRow(l, lc, tasks) {
   if (!l || !lc || isMobile()) return '';
   const cs = fxSumCols(l, lc);
-  if (!cs.some(([, f]) => f && FX_NUM_TYPES.includes(f.type))) return '';
+  if (!cs.some(([k, f]) => k === 'time' || f && FX_NUM_TYPES.includes(f.type))) return '';  // 2.380.0 A (#3424): the tracked-time column counts too
   const ts = tasks.filter(t => t.id && !t.context);
   return `<div class="fxsum" data-lid="${l.id}" role="group" aria-label="${esc(tr('Sum row'))}"><span class="spacer"><span class="fxsn">${esc(trn('{0} task', '{0} tasks', ts.length))}</span></span>${cs.map(([k, f], i) => {
+    if (k === 'time') {  // 2.380.0 A (#3424): the sum of the tracked time of the shown tasks, as the cells read
+      const sec = ts.reduce((n, t) => n + (t.id > 0 ? taskTime(t.id)[0] : 0), 0);
+      return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="time">${sec >= 60 ? `<span class="fxsb fxst" title="${esc(tr('Tracked time'))}"><i>${esc(tr('Sum'))}</i> ${esc(fmtDur(sec))}</span>` : ''}</span>`;
+    }
     if (!f || !FX_NUM_TYPES.includes(f.type)) return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"></span>`;
     const a = fxSumAgg(l, k), xs = fxIsBudget(f) ? fxBranchSum(f, ts) : ts.map(t => t.fields?.[f.id]).filter(v => v != null && v !== '').map(Number).filter(Number.isFinite);
     const v = fxAgg(a, xs, ts.length), an = tr((FX_AGGS.find(x => x[0] === a) || FX_AGGS[0])[1]);
@@ -96,7 +100,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('.fxsum [data-fxsum]'); if (!b) return;
   const l = listById(+b.closest('.fxsum').dataset.lid), k = b.dataset.fxsum; if (!l) return;
   const cur = fxSumAgg(l, k), f = fieldById(+k.slice(2));
-  const kp = canManage(l) && !l.archived && l.kind === 'project' && f ? ['-', {label: tr('Key figure on the project page…'), icon: 'chart',
+  const kp = canManage(l) && !l.archived && !l.is_inbox && f ? ['-', {label: tr('Key figure on the project page…'), icon: 'chart',
     fn: () => fxKpiModal(l.id, {title: f.name, agg: cur === 'avg' ? 'avg' : cur === 'count' ? 'count' : 'sum', field: f.id, state: 'all'})}] : [];
   menu(b, [...FX_AGGS.map(([a, n]) => ({label: tr(n), on: a === cur, fn: () => fxSumSet(l.id, k, a)})), ...kp]);
 });

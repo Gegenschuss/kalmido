@@ -1,7 +1,7 @@
 """2.48.0 (#1356): agents suggest the project and category of a receipt; a person confirms.
 
 A receipt here is a document (kalmido/docs) -- an incoming invoice, a receipt -- of a workspace. Its assignment
-(rc_receipts) is a project (a list of kind 'project' of the same workspace) and a category (short free text; the
+(rc_receipts) is a project (any list but the inbox of the same workspace) and a category (short free text; the
 workspace's categories are the ones already used). Only people set it. An agent the document is shared with (view is
 enough, its file or a folder above it) hands in a SUGGESTION (rc_suggest, POST /api/v1/documents/<id>/receipt-suggestion):
 the document goes to "To review" and a person accepts (optionally changed) or rejects it, one undo step each (reopen). The
@@ -74,8 +74,8 @@ def rc_office_need(c, m, uid, level="edit", own_uid=None):
 
 def rc_project_ok(c, lid, node, uid, agent=False):
     """Is lid a project uid may see, in the document's workspace? (agents: within their list restriction as well)"""
-    r = c.execute("SELECT kind, org_id, archived FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
-    if not r or r["kind"] != "project" or r["archived"]:
+    r = c.execute("SELECT is_inbox, org_id, archived FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    if not r or r["is_inbox"] or r["archived"]:  # 2.352.0 B (#2752): every list but the inbox is a project
         return False
     if (r["org_id"] or None) != (node["org_id"] or None):
         return False
@@ -208,7 +208,7 @@ def rc_state(c, node, m, uid):
            "vat_pct": r["vat_pct"] if r else None, "paid_at": r["paid_at"] if r else None, "is_receipt": bool(r)}  # 2.90.0 A (#1921)
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
     projects = [{"id": x["id"], "name": x["name"]} for x in c.execute(
-        "SELECT id, name FROM lists WHERE kind='project' AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
+        "SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
         (node["org_id"],)) if list_role(c, x["id"], uid)][:300]
     return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects,
             "can_edit": node["role"] in ("owner", "edit") and rc_office_ok(c, m, uid), "confirmed": rc_confirmed(c, node["id"], r),

@@ -123,7 +123,7 @@ with this exemption reason.
 
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
+- **Sell** - Pipeline, Quotations, Invoices (2.380.0, before one point *Quotes & invoices*), Clients, Contacts, Documents, Framework contracts
 - **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
@@ -153,6 +153,17 @@ only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Rece
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
+has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
+notes, Reminders, Delivery notes and Archive (archived invoices only, filter All / open / paid; the sum line follows the
+filters and the client filter). A document opens in its own area (`#office/invoices/<id>`); an old link
+`#office/offers/<id>` of an invoice, credit note, reminder or delivery note (or `#office/offers/invoice`) moves on by
+itself, so links from mails, agents and bookmarks keep working. Both areas use the rights of the office area
+*Quotes & invoices* (no new right). In the sidebar each area is its own tree with its own root folder (`GET
+/api/office/docs/tree` = quotations, `?sec=invoices` = the invoice kinds; folders are made the same way). *New quotation*
+and *Empty invoice* create the draft at once; *Trial document (SAMPLE)* sits in the menu next to *New quotation* and in
+*New invoice*, the one-time hint about trial documents shows in the head of a trial document's editor.
 
 *Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
 sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20
@@ -1370,6 +1381,11 @@ person without an organisation in the personal office). A receipt is entered as 
   access log.
 - **PDF**: the own receipt (Eigenbeleg) with the details block, the amounts per rate with VAT and net, the tip, 70 / 30,
   the host's confirmation and the log; a draft is marked as such.
+- **Signature picture** (2.332.0): when the approving person has a signature picture (Correspondence -> *Signature*, upload
+  or draw), the approval asks *With my signature* (on by default). The PDF of the approved receipt then shows that
+  picture on the line "Place, date, signature" - only the picture of the person who approved it, never another person's;
+  "Confirmed digitally by ..." with the time stays. Drafts and receipts whose approval was undone show no picture. A
+  picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.
 - **Row menu**: Open, PDF, Duplicate (a new draft with the same data, without the bill), Move to another workspace
   (drafts), Undo approval (approved ones), Delete (drafts; one undo step).
 - **Filters** like the travel expenses: year, person (host or guest; hidden when only one person occurs) and occasion
@@ -1385,7 +1401,8 @@ person without an organisation in the personal office). A receipt is entered as 
 
 Routes (admins of the office area; members 403, another office area 404, agents never): `GET /api/office/meals?year=`,
 `POST /api/office/meals`, `GET/PATCH/DELETE /api/office/meals/<id>`, `POST /api/office/meals/<id>/restore`,
-`POST /api/office/meals/<id>/approve`, `POST /api/office/meals/<id>/unlock` `{reason?}`, `POST /api/office/meals/<id>/file`
+`POST /api/office/meals/<id>/approve` `{sign_image?}` (2.332.0: default on when the approver has a picture),
+`POST /api/office/meals/<id>/unlock` `{reason?}`, `POST /api/office/meals/<id>/file`
 (multipart `file`), `GET/DELETE /api/office/meals/<id>/file/<fid>`, `POST /api/office/meals/<id>/file/<fid>/restore`,
 `GET /api/office/meals/<id>/pdf`, `GET /api/office/meals/report?year=|from=&to=&person=u<id>|n:<name>&occasion=&format=csv|pdf`,
 `GET/POST /api/office/meals/choices`, `PATCH/DELETE /api/office/meals/choices/<id>`. A locked receipt answers `409` to
@@ -2173,7 +2190,11 @@ client's letters.
 
 **Signature**: per person and office area a greeting, a name and optionally a picture of the handwritten signature (PNG
 or JPEG, at most 300 KB). New letters take greeting and name from it; the picture is only printed in the letters of the
-person it belongs to.
+person it belongs to and on the entertainment receipts that person approves. *Draw* opens a field to sign with a finger,
+pen or mouse (the same field opens when *With my signature* is ticked without a picture); *Save* stores the strokes as a
+PNG with a transparent background, cut to the strokes (2.332.0), through the same route and virus scan as an uploaded
+picture; Save with an empty field asks to draw first; *Clear* starts again. A picture of a signature is not an electronic
+signature; clarify its acceptance by the tax office with your tax adviser.
 
 Routes (office admins only): `GET/POST /api/office/letters` (`?status=&client_id=&q=&archived=1&brief=1`; `POST` with
 `{copy_of: id}`, `{template_id, client_id?}` or `{answers: <document id>}`), `GET /api/office/letters/recipients?q=`,

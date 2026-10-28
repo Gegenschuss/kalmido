@@ -105,11 +105,28 @@ function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the addr
   let i = Math.max(0, imgs.findIndex(a => a.id === id));
   const m = document.createElement('div');
   m.className = 'lightbox';
-  const draw = () => { const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1" title="${esc(tr('Previous image'))}" aria-label="${esc(tr('Previous image'))}">${ic('left')}</button><button data-lb="1" title="${esc(tr('Next image'))}" aria-label="${esc(tr('Next image'))}">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
+  // 2.331.0 E (#3311): the picture zooms itself (two fingers, Ctrl + wheel, Safari's pinch), not the page; dragging moves a
+  // zoomed picture, a tap on it then does not close the view
+  let z = 1, tx = 0, ty = 0, pan = null, moved = false;
+  const img = () => $('img', m);
+  const put = () => { const el = img(); if (el) el.style.transform = z === 1 ? '' : `translate(${tx}px, ${ty}px) scale(${z})`; m.classList.toggle('lbz', z > 1); };
+  const draw = () => { z = 1; tx = ty = 0; m.classList.remove('lbz'); const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1" title="${esc(tr('Previous image'))}" aria-label="${esc(tr('Previous image'))}">${ic('left')}</button><button data-lb="1" title="${esc(tr('Next image'))}" aria-label="${esc(tr('Next image'))}">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
   draw();
+  pz_attach(m, {area: t => t && !t.closest('.lbbar') ? img() : null,
+    start: (el, x, y) => { const r = el.getBoundingClientRect(), cx = r.left + r.width / 2 - tx, cy = r.top + r.height / 2 - ty; return {cx, cy, z0: z, ux: (x - cx - tx) / z, uy: (y - cy - ty) / z}; },
+    move: (d, k, x, y) => { z = Math.max(1, Math.min(6, d.z0 * k)); tx = z === 1 ? 0 : x - d.cx - z * d.ux; ty = z === 1 ? 0 : y - d.cy - z * d.uy; put(); },
+    end: () => { if (z < 1.02) { z = 1; tx = ty = 0; put(); } }});
+  m.addEventListener('pointerdown', e => { if (z === 1 || pz_busy() || e.target !== img()) return; pan = {id: e.pointerId, x: e.clientX - tx, y: e.clientY - ty, x0: e.clientX, y0: e.clientY}; moved = false; try { img().setPointerCapture(e.pointerId); } catch { /* not capturable */ } });
+  m.addEventListener('pointermove', e => {
+    if (!pan || e.pointerId !== pan.id) return;
+    if (pz_busy()) { pan = null; return; }  // a second finger: the zoom
+    tx = e.clientX - pan.x; ty = e.clientY - pan.y; moved = moved || Math.hypot(e.clientX - pan.x0, e.clientY - pan.y0) > 4; put();
+  });
+  for (const t of ['pointerup', 'pointercancel']) m.addEventListener(t, () => { pan = null; });
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-lb]');
     if (b && b.dataset.lb !== 'x') { i = (i + +b.dataset.lb + imgs.length) % imgs.length; draw(); return; }
+    if (!b && e.target.tagName === 'IMG' && (z > 1 || moved)) { moved = false; return; }  // 2.331.0 E (#3311): zoomed / moved
     if (b || e.target === m || e.target.tagName === 'IMG') m.remove();
   });
   document.body.appendChild(m);

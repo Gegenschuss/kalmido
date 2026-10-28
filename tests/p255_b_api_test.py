@@ -158,7 +158,11 @@ for who, sess_, uid, what in ((AGS, "team", ERIN, "a person who does not share a
     check(r.status_code == 404, f"{sess_} agent, {what}: 404 ({r.status_code})")
 r = PAGS.get(V + "/layouts/view_time")
 check(r.ok and r.json()["user_id"] == ERIN, f"a personal agent works for its owner by default ({r.status_code} {r.text[:120]})")
-for key, what in ((f"list:{PX}", "a project not shared with the agent"), (f"list:{L}", "a list that is no project"),
+# 2.352.0 (#2752): every list but the inbox is a project now -- the list without kind has a project page, the inbox has none
+INB = next(x["id"] for x in Bo.get(B + "/api/state").json()["lists"] if x.get("is_inbox"))
+r = AGS.get(V + f"/layouts/list:{L}", params={"user_id": BOB})
+check(r.ok, f"a list without kind is a project page now ({r.status_code} {r.text[:120]})")
+for key, what in ((f"list:{PX}", "a project not shared with the agent"), (f"list:{INB}", "the inbox (no project)"),
                   ("list:999999", "a list that does not exist")):
     r = AGS.get(V + f"/layouts/{key}", params={"user_id": BOB})
     check(r.status_code == 404, f"{what}: 404 ({r.status_code})")

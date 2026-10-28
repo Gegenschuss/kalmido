@@ -1906,6 +1906,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     pages = []
     page = None
+    # 2.380.0 A (#3415) + 2.357.0 C (#3182), rescue #1592: the totals' air held at its minimum gap (the least #3415 allows); the
+    # appendix decision and the last fallback count with it instead of with no air at all
+    air_min = {"sum": max(0.0, PDF_SUM_GAP_MIN - 8) / max(1.0, PDF_SUM_GAP - 8 + PDF_SUM_AFTER)}
     if rh_at:  # 2.357.0 C (#3182): the appendix without its page break when that saves a page and it stays whole on one page;
         # then without the reference lines ("see appendix", "order confirmation on page n") and with the compact order confirmation
         keep = [(i, dict(blocks[i])) for i in rh_ref + rh_acc]
@@ -1917,10 +1920,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         app_hs = [b["h"] for b in blocks[rh_at[0]:]]
         for b in blocks[rh_at[0]:]:
             b["h"] = 0.0
-        n_main = lay(True, {})[0]  # the pages without the appendix
+        n_main = lay(True, air_min)[0]  # the pages without the appendix
         for b, h in zip(blocks[rh_at[0]:], app_hs):
             b["h"] = h
-        if lay(True, {})[0] > n_main:  # it does not fit completely on the last page: as before on a page of its own
+        if lay(True, air_min)[0] > n_main:  # it does not fit completely on the last page: as before on a page of its own
             blocks[rh_at[0]]["brk"] = True
             for i, b in keep:
                 blocks[i].update(b)

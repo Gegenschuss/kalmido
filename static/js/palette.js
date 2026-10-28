@@ -205,7 +205,6 @@ function palAll() {
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
   add('a:capture', 'action', tr('Capture to the basket'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the basket, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
   add('a:newlist', 'action', tr('New project'), 'list', () => listModal());
-  add('a:newproject', 'action', tr('New project with progress and status…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243); 2.152.2 (#2624): every list is a project, this one with the switch on
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
   {  // 2.27.0 (#974): the open list's agent, in the share dialog
     const rl = S.route.mod === 'tasks' && /^l:\d/.test(S.route.key || '') ? listById(+S.route.key.slice(2)) : null;
@@ -352,7 +351,7 @@ function pg_dedupe(it) {
 // rights, country pack and switches are checked there), so a regrouped bar (package 2.276) needs no second list here
 function pg_officeItems(add) {
   if (S.me?.kid || !mg_on('office') || o3a_hid('office') || typeof ofm_items !== 'function') return;
-  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'offers' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
+  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'invoices' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
 }
 // 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
 function pg_actions(add) {
@@ -364,7 +363,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_newDialog('invoice')), {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
@@ -567,8 +566,7 @@ function tourSteps() {
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
-  const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Modules, language and appearance. Switch on Progress and status for a project (Edit project > Progress and status) to get {0}.') : N_('Modules, language and appearance.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
   return s.slice(0, 6);

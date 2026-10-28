@@ -193,7 +193,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   await call('PATCH', '/api/settings', {dashboard: ''});
 
   // ================= the projects overview and the Agents overview (#1063)
-  await call('POST', '/api/lists', {name: 'Second project', kind: 'project'});
+  const P2nd = (await call('POST', '/api/lists', {name: 'Second project', kind: 'project'})).id;
+  for (const id of [P, P2nd]) await call('POST', `/api/lists/${id}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): tracked = has a status
   w = await boot({user: 'alice', hash: 'overview'}); d = w.document;
   await until(() => d.querySelector('#view .lygrid[data-ly="projects"] .lyb'));
   const pb = () => [...d.querySelectorAll('#view .lygrid[data-ly="projects"] > .lyb')].map(b => b.dataset.lyk);

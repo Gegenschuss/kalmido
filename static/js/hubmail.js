@@ -72,7 +72,7 @@ function hbm_clientHtml(c) {
   return `<div class="ctsec hbmsec"><h4>${ic('mail', 's')} ${tr('E-mails')}</h4>${hbm_bodyHtml(key)}</div>`;
 }
 function hbm_projHtml(l) {
-  if (!l || l.kind !== 'project' || l.e2e) return '';
+  if (!l || l.is_inbox || l.e2e) return '';
   const key = 'list:' + l.id, j = hbm_state(key).j;
   if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
@@ -120,14 +120,18 @@ async function hbm_open(id, key) {
 // popups leave the sandbox so the opened page works normally); external pictures only after "Load images" (this view only)
 const HBMV = {};  // mail id -> {v: 'html' | 'text', img: bool} while its reading view is open
 function hbm_viewHtml(m, key) {
-  const st = HBMV[m.id] = HBMV[m.id] || {v: m.html ? 'html' : 'text', img: false};
+  const st = HBMV[m.id] = HBMV[m.id] || {v: m.html ? 'html' : 'text', img: false, full: false};
   const html = m.html && st.v === 'html';
+  // 2.352.0 D (#2754): shortened by default (forwarding header as one line, no older quotes / signature); "Whole mail" shows it all
   const seg = m.html ? `<div class="seg hbmseg" role="group" aria-label="${esc(tr('Show as'))}">${[['text', N_('Text')], ['html', N_('HTML')]].map(([k, n]) =>
     `<button type="button" data-hbmv="${k}" class="${st.v === k ? 'on' : ''}" aria-pressed="${st.v === k}">${tr(n)}</button>`).join('')}</div>` : '';
+  const anyShort = m.html_short || (m.body_short ?? m.body) !== (m.body || '');
+  const whole = anyShort ? `<label class="hbmwhole"><input type="checkbox" data-hbmv="whole"${st.full ? ' checked' : ''}> <span>${tr('Whole mail')}</span></label>` : '';
   const img = html && m.html_ext && !st.img ? `<div class="hbmimg muted">${ic('picture', 's')}<span>${tr('External images are blocked.')}</span><button type="button" class="linkbtn" data-hbmv="img">${tr('Load images')}</button></div>` : '';
+  const q = [!st.full && m.html_short ? 'short=1' : '', st.img ? 'images=1' : ''].filter(Boolean).join('&');
   const body = html ? `<iframe class="hbmframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="${esc(m.subject || tr('E-mail'))}"
-      src="/api/hubmail/mails/${m.id}/html${st.img ? '?images=1' : ''}"></iframe>` : `<div class="hbmtext">${esc(m.body || '')}</div>`;
-  return `<div class="hbmview" data-hbmview="${m.id}">${seg || img ? `<div class="hbmvbar">${seg}${img}</div>` : ''}${body}</div>`;
+      src="/api/hubmail/mails/${m.id}/html${q ? '?' + q : ''}"></iframe>` : `<div class="hbmtext">${esc(st.full ? m.body || '' : m.body_short ?? m.body ?? '')}</div>`;
+  return `<div class="hbmview" data-hbmview="${m.id}">${seg || img || whole ? `<div class="hbmvbar">${seg}${whole}${img}</div>` : ''}${body}</div>`;
 }
 // ---- 2.141.0 B (#2139): Task / Event from the mail (in its workspace), and what was made from it already. Part A's "Reply"
 // sits in the same row (hbm_actRowHtml)
@@ -147,7 +151,7 @@ function hbm_viewClick(e, md, m, key) {
   const v = e.target.closest('[data-hbmv]');
   if (v) {
     const st = HBMV[m.id];
-    if (v.dataset.hbmv === 'img') st.img = true; else st.v = v.dataset.hbmv;
+    if (v.dataset.hbmv === 'img') st.img = true; else if (v.dataset.hbmv === 'whole') st.full = v.checked; else st.v = v.dataset.hbmv;
     const box = md.querySelector('[data-hbmview]'); if (box) box.outerHTML = hbm_viewHtml(m, key);
     return true;
   }

@@ -142,17 +142,19 @@ r = A.post(B + "/api/time/start", json={"task_id": pt})
 check(r.status_code == 409 and "time tracking" in r.json().get("error", ""), f"list without time tracking: timer refused with a clear message: {r.status_code} {r.text[:120]}")
 r = A.post(B + "/api/time/entries", json={"list_id": PL, "start": D(-1) + "T09:00", "minutes": 30})
 check(r.status_code == 409, f"plain list: time entry refused: {r.status_code}")
+# 2.352.0 B (#2752): kind is not read any more, every list but the inbox is a project: dependencies work here too
 r = A.post(B + "/api/deps", json={"task_id": pt, "blocker_id": t3})
-check(r.status_code == 409 and "projects" in r.json().get("error", ""), f"dependency needs both lists to be projects: {r.text[:120]}")
-r = A.post(B + "/api/deps", json={"task_id": t3, "blocker_id": pt})
-check(r.status_code == 409, "... also the other way round")
+check(r.ok, f"kind list: dependency allowed (2.352.0): {r.status_code} {r.text[:120]}")
+A.delete(B + f"/api/deps/{pt}/{t3}")
 # 2.39.1 (#1217): custom fields in plain lists too; a field of another list stays unknown (400)
 r = A.post(B + f"/api/lists/{PL}/fields", json={"name": "X", "type": "text"})
 check(r.ok, f"plain list: custom fields allowed (2.39.1): {r.status_code} {r.text[:120]}")
 check(A.patch(B + f"/api/tasks/{pt}", json={"fields": {str(r.json().get("id", 0)): "3"}}).ok, "plain list: its own field values (2.39.1)")
 check(A.patch(B + f"/api/tasks/{pt}", json={"fields": {str(fid): "3"}}).status_code == 400, "plain list: a field of another list 400")
 A.delete(B + f"/api/fields/{r.json().get('id', 0)}")  # the migration below treats a list with fields as a project
-check(A.post(B + f"/api/lists/{PL}/status", json={"status": "on_track"}).status_code == 409, "plain list: no project status")
+# 2.352.0 B (#2752): a status = tracked, also for kind list; clearing it = not tracked
+check(A.post(B + f"/api/lists/{PL}/status", json={"status": "on_track"}).ok and lst(A, PL)["status"] == "on_track", "kind list: project status (2.352.0)")
+check(A.post(B + f"/api/lists/{PL}/status", json={"status": ""}).ok and not lst(A, PL)["status"], "kind list: status cleared")
 check(A.post(B + "/api/tasks", json={"list_id": PL, "title": "x", "fields": {str(fid): "1"}}).status_code == 400, "plain list: another list's field on create 400")
 CKL = A.post(B + "/api/lists", json={"name": "Shopping", "checklist": True}).json()["id"]
 check(lst(A, CKL)["kind"] == "list" and lst(A, CKL)["checklist"] == 1, "compat: checklist=true = a list with completed at the bottom (2.7.2)")
@@ -182,7 +184,8 @@ rep_ = lambda: A.get(B + "/api/time/report", params={"from": D(-3), "to": D(0)})
 s0 = rep_()
 check(s0 >= 5400 and task(A, tp2)["blocked"] == 1, "project: time in the report, the task waits")
 A.patch(B + f"/api/lists/{TP}", json={"kind": "list"})
-check(rep_() == s0 and task(A, tp2)["blocked"] == 0, "back to a list: no waiting; its tracked time stays in the reports (2.41.0, #1471)")
+# 2.352.0 (#2752): kind is not read any more: "back to a list" changes nothing, the task still waits
+check(rep_() == s0 and task(A, tp2)["blocked"] == 1, "kind list: still waiting; its tracked time stays in the reports (2.41.0, #1471)")
 with db() as c:
     check(c.execute("SELECT COUNT(*) FROM time_entries WHERE task_id=?", (tp1,)).fetchone()[0] == 1 and c.execute("SELECT COUNT(*) FROM task_deps WHERE task_id=?", (tp2,)).fetchone()[0] == 1, "... nothing deleted")
 A.patch(B + f"/api/lists/{TP}", json={"kind": "project"})

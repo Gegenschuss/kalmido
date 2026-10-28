@@ -301,13 +301,13 @@ function ckl_pick(md, anchor, i) {
 }
 
 // ---- the list dialog: the client of the list, its forms
-function listDlgTeamHtml(l, id) {
+function listDlgTeamHtml(l, id, part = '') {  // 2.352.0 C (#2751): part client | forms (the project dialog shows them apart)
   if (!id || l.is_inbox) return '';
   const mng = ['owner', 'admin'].includes(l.role || 'owner');
   const cs = (S.clients || []).filter(c => !c.archived || c.id === l.client_id);
   let h = '';
-  if (clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon && !c.icon.startsWith('ic:') ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
-  if (formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button><span class="muted">${tr('a link that creates tasks here')}</span></div>`;
+  if (part !== 'forms' && clientsOn() && (mng || l.client_id)) h += `<div class="row"><label for="l-client">${tr('Client')}</label><select id="l-client" data-lid="${id}" ${mng ? '' : 'disabled'}><option value="">${tr('None')}</option>${cs.map(c => `<option value="${c.id}" ${c.id === l.client_id ? 'selected' : ''}>${esc((c.icon && !c.icon.startsWith('ic:') ? c.icon + ' ' : '') + cdn_label(c))}</option>`).join('')}</select>${mng ? `<button type="button" class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>` : ''}</div>`;
+  if (part !== 'client' && formsOn() && mng) h += `<div class="row"><label>${tr('Forms')}</label><button type="button" class="btn sm" data-act="forms-open" data-lid="${id}">${ic('file', 's')} ${tr('Forms…')}</button></div><div class="shint lhint keep">${tr('a link that creates tasks here')}</div>`;  // 2.352.0 C (#2751): the hint under the button
   return h;
 }
 document.addEventListener('change', async e => {
@@ -333,12 +333,14 @@ function viewWorkload() {
   const d = WLV.data;
   if (!d) return `<div class="dash wload"><p class="muted lempty">${tr('Loading…')}</p></div>`;
   if (d.error) return `<div class="dash wload"><div class="empty">${tr('The workload could not be loaded.')}</div></div>`;
-  const wk = w => { const a = pd(w.start), b = pd(w.end); return `${a.toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'})} – ${b.toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'})}`; };
+  // 2.380.0 A (#3408): short two-line week heads (start above, "– end" below), never wider than the column
+  const wd = x => pd(x).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'numeric'});
+  const wk = w => `<span class="wlw1">${esc(wd(w.start))}</span><span class="wlw2">– ${esc(wd(w.end))}</span>`;
   const cell = (p, c, i) => {
     const h = c.minutes / 60, lv = c.level || 'none';
     const tip = tr('{0}: {1} of {2} h planned, {3}', p.display_name, fmtNum(h, 1), fmtNum(c.capacity_h ?? p.capacity_h, 1), trn('{0} task', '{0} tasks', c.tasks)) + (c.unestimated ? ' · ' + trn('{0} without an estimate', '{0} without an estimate', c.unestimated) : '')
       + (c.absent_days ? ' · ' + tr('Away: {0}', trn('{0} day', '{0} days', c.absent_days)) : '');  // 2.50.0 (#1195): the week's capacity after absences
-    return `<td class="wlc lv-${lv}${c.absent_days ? ' ab2wl' : ''}"><button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="${i}" ${c.tasks ? '' : 'disabled'} title="${esc(tip)}" aria-label="${esc(tip)}"><span class="wlbar"><i style="width:${Math.min(100, c.pct || 0)}%"></i></span><span class="wlt"><b>${fmtNum(h, 1)} h</b>${c.pct != null ? ` <small>${c.pct} %</small>` : ''}${c.unestimated ? ` <small class="muted">+${c.unestimated}</small>` : ''}</span></button></td>`;
+    return `<td class="wlc lv-${lv}${c.absent_days ? ' ab2wl' : ''}"><button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="${i}" ${c.tasks ? '' : 'disabled'} title="${esc(tip)}" aria-label="${esc(tip)}"><span class="wlbar"><i style="width:${Math.min(100, c.pct || 0)}%"></i></span><span class="wlt"><b>${fmtNum(h, 1)} h</b>${c.pct != null ? ` <small>${c.pct} %</small>` : ''}${c.unestimated ? `<small class="muted wlun">${esc(trn('{0} without an estimate', '{0} without an estimate', c.unestimated))}</small>` : ''}</span></button></td>`;
   };
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<span class="wln"><b>${esc(p.display_name)}</b><button type="button" class="linkbtn wlcap" data-act="wl-cap" data-uid="${p.id}" ${p.own || S.me?.is_admin ? '' : 'disabled'} title="${esc(tr('Hours per week'))}">${esc(tr('{0} h / week', fmtNum(p.capacity_h, 1)))}</button></span></span></th>${p.weeks.map((c, i) => cell(p, c, i)).join('')}<td class="wlc wlnd">${p.nodate.tasks ? `<button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="nd"><span class="wlt">${esc(trn('{0} task', '{0} tasks', p.nodate.tasks))}</span></button>` : ''}</td></tr>`).join('');
   return `<div class="dash wload">${ab2_tabs('wl')}<div class="clhead"><span class="spacer"></span>
@@ -346,7 +348,7 @@ function viewWorkload() {
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
     <div class="muted wlnote">${tr('Only what you can see.')}<div class="shint">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate.')}</div></div>
-    <div class="wlwrap"><table class="wltable"><thead><tr><th scope="col">${tr('Person')}</th>${d.weeks.map(w => `<th scope="col">${esc(wk(w))}</th>`).join('')}<th scope="col">${tr('No date')}</th></tr></thead><tbody>${rows || `<tr><td colspan="${d.weeks.length + 2}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
+    <div class="wlwrap"><table class="wltable"><thead><tr><th scope="col">${tr('Person')}</th>${d.weeks.map(w => `<th scope="col" title="${esc(pd(w.start).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'}) + ' – ' + pd(w.end).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'}))}">${wk(w)}</th>`).join('')}<th scope="col">${tr('No date')}</th></tr></thead><tbody>${rows || `<tr><td colspan="${d.weeks.length + 2}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <p class="muted wllegend"><span class="wlk lv-ok"></span>${tr('below 80 %')} <span class="wlk lv-warn"></span>${tr('80–100 %')} <span class="wlk lv-over"></span>${tr('over capacity')}</p></div>`;
 }
 async function wlCap(uid) {

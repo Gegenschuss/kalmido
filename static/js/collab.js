@@ -44,7 +44,7 @@ function newsPlainHtml(shown, dms, pop, dmHtml) {
 function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = bellCount(), nAll = S.news?.unread || 0;
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; }); }
-  const all0 = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep) && newsInWs(it));
+  const all0 = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep));
   const forMe = all0.filter(([it]) => newsForMe(it)), act = all0.filter(([it]) => !newsForMe(it));
   const all = [...forMe, ...act];  // "For you" first, then the activity
   const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
@@ -287,7 +287,7 @@ function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
-    : it.task_id ? `<div class="ntask"><span class="nt">${it.enc ? ic('lock', 's') + ' ' : ''}${esc(it.enc ? le2u_newsTitle(it) : it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
+    : it.task_id ? `<div class="ntask"><span class="nt">${it.enc ? ic('lock', 's') + ' ' : ''}${esc(it.enc ? le2u_newsTitle(it) : it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span>${newsWsLabel(it)}</div>` : '';
   const ex = it.excerpt && !it.enc ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
   return `<div class="nitem ${it.read ? '' : 'unread'}${it.actor_id && isAgentUser(it.actor_id) ? ' agc' : ''} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
@@ -307,10 +307,10 @@ function viewNews() {
   const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarizes your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarize')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
-  const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it) && newsInWs(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it) && newsInWs(it)).length;
+  const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it)).length;
   if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'news') renderView(); }); }
   const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), nMe + nAct], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
-  const inTab = it => newsInWs(it) && (tab === 'all' || (tab === 'me') === newsForMe(it));
+  const inTab = it => (tab === 'all' || (tab === 'me') === newsForMe(it));
   const bar = tabs + bar0 + fchips((mine0 || []).filter(it => (!S.nf.unread || !it.read || it.keep) && inTab(it)));
   if (S.nf.err && !S.nf.items) return bar + `<div class="empty">${S.nf.err === 'offline' ? tr('News are only available online.') : esc(S.nf.err)}</div>`;
   const mine = S.nf.items && S.nf.f === f ? S.nf.items : null;
@@ -321,27 +321,19 @@ function viewNews() {
   const dmh = dms.length ? `<div class="nlist ndms">${dms.map(dmRowHtml).join('')}</div>` : '';
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
-  const nelse = newsElseHtml(mine);
-  if (mine && mine.length && !vis.length && !dms.length) return bar + nelse + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('All read.')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
+  if (mine && mine.length && !vis.length && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('All read.')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if ((!mine || !mine.length) && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
   if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
   const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
     return `<div class="nlist">${newsPlainHtml(shown, dms, false, dmh)}</div>`; };
-  return bar + nelse + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${newsBundled() ? '' : hintOnce('nswipe', tr('Swipe an item sideways to remove it.'), 'nswipe')}`;
+  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${newsBundled() ? '' : hintOnce('nswipe', tr('Swipe an item sideways to remove it.'), 'nswipe')}`;
 }
-// 2.145.0 A (#2444): the bell counts what is meant for me in ALL workspaces, the list shows the current one: one hint row
-// per other workspace with unread items for me (counted from the loaded items) and a button that switches there
-function newsElseHtml(items) {
-  if (!wsOn() || wsCur() === 'all') return '';
-  const by = {};
-  for (const it of items || []) {
-    if (it.read || !newsForMe(it) || !it.list_id || newsInWs(it)) continue;
-    const ws = wsOf(listById(it.list_id));
-    by[ws] = (by[ws] || 0) + 1;
-  }
-  const rows = Object.entries(by).filter(([ws]) => wsOptions().includes(ws));
-  return rows.length ? `<div class="nelse" role="group" aria-label="${esc(tr('Unread in other workspaces'))}">${rows.map(([ws, n]) => `<div class="nerow"><span>${esc(n === 1 ? tr('1 unread in {0}', wsName(ws)) : tr('{0} unread in {1}', n, wsName(ws)))}</span><button type="button" class="btn sm" data-act="news-ws" data-ws="${esc(ws)}">${tr('Switch')}</button></div>`).join('')}</div>` : '';
+// 2.331.0 A (#3300): bell and list both cover ALL workspaces; an item from another workspace than the current one gets a small label
+function newsWsLabel(it) {
+  if (!wsOn() || wsCur() === 'all' || !it.list_id) return '';
+  const l = listById(it.list_id);
+  return l && !inWs(l) ? `<span class="nws">${esc(wsName(wsOf(l)))}</span>` : '';
 }
 async function loadNews() {
   if (S.nf.loading) return;
@@ -482,7 +474,7 @@ const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);
   if (cur < 0) return -1;
-  const ok = it => !it.read && it.task_id && !NSW_SKIP.test(it.kind || '') && newsInWs(it) && newsKindOk(it)
+  const ok = it => !it.read && it.task_id && !NSW_SKIP.test(it.kind || '') && newsKindOk(it)
     && (newsTab() === 'all' || (newsTab() === 'me') === newsForMe(it));
   for (let i = cur + dir; i >= 0 && i < its.length; i += dir) if (ok(its[i])) return i;
   return -1;

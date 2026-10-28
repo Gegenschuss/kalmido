@@ -82,10 +82,11 @@ def cursor():
 
 # ================================================================== the settings
 r = prefs()
-check(r.ok and r.json()["prefs"] == {"sugg": "collect", "jobs": "full", "pin": "on", "notices": "full"}, "defaults " + r.text[:200])
-check(chat()["chat_prefs"]["sugg"] == "collect", "the chat carries chat_prefs")
+# 2.331.0 (#3309): the default for suggestions is keep (was collect); the server answers keep like collect
+check(r.ok and r.json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full"}, "defaults " + r.text[:200])
+check(chat()["chat_prefs"]["sugg"] == "keep", "the chat carries chat_prefs")
 r = prefs(jobs="line")
-check(r.ok and r.json()["prefs"]["jobs"] == "line" and r.json()["prefs"]["sugg"] == "collect", "one key changes, the others stay " + r.text[:200])
+check(r.ok and r.json()["prefs"]["jobs"] == "line" and r.json()["prefs"]["sugg"] == "keep", "one key changes, the others stay " + r.text[:200])
 check(prefs().json()["prefs"]["jobs"] == "line", "... stored on the server (every device)")
 check(prefs(sugg="maybe").status_code == 400, "a bad value -> 400")
 check(prefs(colour="red").status_code == 400, "an unknown key -> 400")
@@ -93,7 +94,7 @@ check(A.put(B + f"/api/agents/{CL}/chat-prefs", json=["latest"]).status_code == 
 check(prefs(Bo).status_code == 404 and prefs(Bo, sugg="latest").status_code == 404, "an agent not shared with the person -> 404")
 A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": BOB, "role": "admin"})  # a list admin may address the agent
 check(prefs(Bo).ok and prefs(Bo).json()["prefs"]["jobs"] == "full", "another person has their own settings (defaults)")
-check(prefs(pin="off", notices="line").ok and prefs().json()["prefs"] == {"sugg": "collect", "jobs": "line", "pin": "off", "notices": "line"},
+check(prefs(pin="off", notices="line").ok and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "line", "pin": "off", "notices": "line"},
       "several keys at once")
 # autosave: three fields saved at the same moment (three devices / quick taps) all stay -- merged in the database
 SS = [sess("alice") for _ in range(3)]
@@ -104,7 +105,7 @@ for t in ths:
     t.start()
 for t in ths:
     t.join()
-check(res == [200] * 3 and prefs().json()["prefs"] == {"sugg": "collect", "jobs": "full", "pin": "on", "notices": "full"},
+check(res == [200] * 3 and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full"},
       "three parallel saves: none lost " + str((res, prefs().json()["prefs"])))
 
 # ================================================================== collected suggestions
@@ -166,8 +167,8 @@ check(prefs(sugg="latest").ok, "sugg latest")
 check(st(qs[11]["id"]) == "expired" and chat()["suggestions"] == [] and press(qs[11]["id"]).status_code == 409, "only the newest: expired, 409 as before")
 check(prefs(sugg="keep").ok and st(qs[11]["id"]) == "collected", "keep all at the message: answerable again")
 check(press(qs[11]["id"]).ok, "... a press is accepted")
-check(prefs(Bo).json()["prefs"]["sugg"] == "collect", "Bob's settings are untouched by Alice's")
-prefs(sugg="collect")
+check(prefs(sugg="collect").ok and prefs().json()["prefs"]["sugg"] == "collect" and prefs(Bo).json()["prefs"]["sugg"] == "keep",
+      "2.331.0 (#3309): a stored choice stays (collect), the default of another person is keep")
 
 # ================================================================== freelancer-matrix: agents
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
@@ -176,7 +177,7 @@ ag = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": 
 check(ag.status_code in (200, 201), "freelancer: an own agent " + ag.text[:200])
 FA = ag.json().get("id")
 FH = {"Authorization": "Bearer " + F.post(B + f"/api/my/agents/{FA}/token").json().get("token", ""), "X-Requested-With": "kalmido"}
-check(prefs(F, FA).ok and prefs(F, FA).json()["prefs"]["sugg"] == "collect", "freelancer: the settings of the own agent")
+check(prefs(F, FA).ok and prefs(F, FA).json()["prefs"]["sugg"] == "keep", "freelancer: the settings of the own agent")
 check(prefs(F, FA, notices="line").ok and prefs(F, FA).json()["prefs"]["notices"] == "line", "freelancer: changes them")
 check(prefs(A, FA).status_code == 404, "freelancer: the admin does not see them (404)")
 f1 = ask("tidy up", FU, FH)

@@ -309,7 +309,7 @@ def errhook_set(lid):
         c.execute("DELETE FROM issue_hooks WHERE list_id=?", (lid,))
     else:
         if not is_project(c, lid):
-            return err(tr("Switch on progress and status for this project to connect a repository"), 409)
+            return err(tr("The basket has no project functions"), 409)
         tok = secrets.token_urlsafe(32)
         c.execute("""INSERT INTO issue_hooks(list_id,token_hash,created_by,created_at) VALUES(?,?,?,?)
                      ON CONFLICT(list_id) DO UPDATE SET token_hash=excluded.token_hash, created_by=excluded.created_by,

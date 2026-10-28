@@ -107,14 +107,14 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await until(() => d.querySelector('#view .trow'));
   w.eval(`listModal(${L})`); let md = await until(() => d.querySelector('.modal.lmodal'));
   const rowsOrder = [...md.querySelectorAll('.card > .row, .card > .lhdr, .card > .row.lkrow')].map(x => x.className);
-  // 2.152.2 (#2624): the type segment became the checkbox "Progress and status" (#l-kindp)
-  check(md.querySelector('.lkrow #l-kindp') && !md.querySelector('#l-kindp').checked && md.querySelector('.lkrow')?.textContent.includes('Progress and status'), '#977: Type: Simple list | Project, Simple list on');
-  check(md.querySelector('.lkrow').compareDocumentPosition(md.querySelector('#l-folder')) & 4, '#977: the type sits at the top (before the folder) ' + rowsOrder.slice(0, 4));
+  // 2.352.0 C (#2751 / #2752): no switch "Progress and status" any more; "Used for" for every project, the project rows
+  // in the folding part "Project features"
+  check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), '#977: no type switch any more ' + rowsOrder.slice(0, 4));
   check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#977: "Used for" for a simple list');
-  click(w, md.querySelector('#l-kindp')); md.querySelector('#l-kindp').checked = true; md.querySelector('#l-kindp').dispatchEvent(new w.Event('change', {bubbles: true}));
-  await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L).kind === 'project');
-  // 2.152.2 (#2624): the type segment became the checkbox "Progress and status" (#l-kindp)
-  check(md.querySelector('.lfamrow').hidden && !md.querySelector('.kproj').hidden && md.querySelector('#l-kindp').checked, '#966: a project: no "Used for", the project fields');
+  md.remove();
+  await call('PATCH', `/api/lists/${L}`, {kind: 'project'}); await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`listModal(${L})`); md = await until(() => d.querySelector('.modal.lmodal'));
+  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: "Used for" too (2.352.0), the project fields');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));
@@ -248,9 +248,10 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     await ev(`(() => { closePop(); return 1; })()`); await sleep(200);
     check(await ev(`[...document.querySelectorAll('.pgrip')].filter(g => !g.hidden).every(g => getComputedStyle(g).visibility === 'visible')`), `${tag}: #976 back after the menu`);
     check(await ev(`(() => { const g = document.querySelector('#pgrip-chat'); return !g || g.hidden && getComputedStyle(g).display === 'none'; })()`), `${tag}: #978 no chat grip while the chat is closed`);
-    // #966: a hidden row is invisible
+    // #966: a hidden row is invisible; 2.352.0 C (#2751 / #2752): "Used for" is offered for every project, folded in
+    // "Display and behaviour" (closed at first)
     await ev(`(() => { closeDetail(); listModal(${PRJ}); return 1; })()`); await sleep(500);
-    check(await ev(`(() => { const r = document.querySelector('.lfamrow'); return !r || r.offsetParent === null; })()`), `${tag}: #966 "Used for" really invisible in a project`);
+    check(await ev(`(() => { const r = document.querySelector('.lfamrow'); return !r || (!r.hidden && !!r.closest('details.lmsec:not([open])')); })()`), `${tag}: #966 "Used for" folded away in a project`);
     await shot(`p2270-${th}-1440-listdialog.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
     // the version bar

@@ -23,6 +23,7 @@ const wait = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (awa
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
   const P1 = (await call('POST', '/api/lists', {name: 'Relaunch', view: 'timeline', kind: 'project'})).id;
   const P2 = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  for (const id of [P1, P2]) await call('POST', `/api/lists/${id}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): tracked = has a status
   for (const [t, l, due, start] of [['Design', P1, ds(3), ds(-2)], ['Build', P1, ds(9), ds(4)], ['Launch', P1, null, null], ['Copy', P2, ds(-1), null], ['Photos', P2, ds(5), null]])
     await call('POST', '/api/tasks', {title: t, list_id: l, due, ...(start ? {start} : {})});
   // a task with every row icon: pin, repeat, reminder, description, two subtasks (one done)

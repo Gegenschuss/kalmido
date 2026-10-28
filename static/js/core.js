@@ -187,17 +187,19 @@ const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
-const overviewOn = () => progressOn() && (S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project').length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && l.kind === 'project')));
+// 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
+const isTracked = l => !!l && !l.is_inbox && !!l.status;
+const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l))));
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
 const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
-const isProject = lid => listById(lid)?.kind === 'project';
+const isProject = lid => { const l = listById(lid); return !!l && !l.is_inbox; };
 const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
 const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
-const progressFor = l => !!l && progressOn() && l.kind === 'project';
-const statusFor = l => !!l && statusOn() && l.kind === 'project';
+const progressFor = l => !!l && progressOn() && !l.is_inbox;
+const statusFor = l => !!l && statusOn() && !l.is_inbox;
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
 // 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
 const fieldsOf = lid => !fieldsOn() ? [] : td_rc('fo' + lid, () => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id));  // 2.40.0 (#1430): once per render
@@ -536,7 +538,7 @@ async function rawFetch0(method, url, body, key) {
   const keepW = () => { if (key === undefined && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) outStash([{method, url, body: outPrev(method, url, body), uid: S.me?.id, k: outKey()}]); if (typeof savesStash === 'function') savesStash(false); };
   if (r.type === 'opaqueredirect' || ctype.includes('text/html')) {
     if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { keepW(); await authGone(); }  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
-    location.reload();  // login session expired -> login page
+    location.reload();  // Authelia session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));

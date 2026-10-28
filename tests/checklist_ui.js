@@ -59,7 +59,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   // list dialog: switch + public link
   w.eval(`listModal(${L.id})`); await idle(w);
   let md = d.querySelector('.modal');
-  check(md.querySelector('#l-kind')?.value === 'list' && md.querySelector('#l-dab')?.checked && !md.querySelector('#l-dab').disabled, 'list dialog: List + "Show completed at the bottom" on (owner, 2.7.2)');
+  check(!md.querySelector('#l-kindp') && md.querySelector('#l-dab')?.checked && !md.querySelector('#l-dab').disabled, 'list dialog: List + "Show completed at the bottom" on (owner, 2.7.2)');
   // 2.6.0 (K12): the public link lives in the Share dialog
   md.remove(); w.eval(`shareModal(${L.id})`); await idle(w);
   md = d.querySelector('.modal.shmodal');
@@ -161,7 +161,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w = await boot({user: 'bob', hash: 'l/' + L.id}); d = w.document;
   w.eval(`listModal(${L.id})`); await idle(w);
   md = d.querySelector('.modal');
-  check(md.querySelector('#l-kindp')?.disabled && !md.querySelector('#l-pub'), 'member: type selector disabled, no public link section');
+  check(!md.querySelector('#l-kindp') && !md.querySelector('#l-pub'), 'member: no type switch (2.352.0 C, #2751), no public link section');
   md.remove(); w.close();
   // ---- German
   await call(ca, 'PATCH', '/api/lists/' + L.id, {checklist: true});
@@ -171,7 +171,8 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   check(/Erledigt/.test(d.querySelector('#view .ckdone .ghead')?.textContent || '') && d.querySelector('[data-act="ck-uncheck"]')?.textContent.includes('Alle zurücksetzen'), 'German: Done section');
   w.eval(`listModal(${L.id})`); await idle(w);
   // 2.152.2 (#2624): project instead of list (the type segment became the switch "Fortschritt und Status")
-  check(/Fortschritt und Status/.test(d.querySelector('.modal .lkrow').textContent) && /Erledigte unten anzeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  // 2.352.0 C (#2751): no switch any more; the folding parts in German
+  check(/Projekt-Funktionen/.test(d.querySelector('.modal #lm-sec-proj summary')?.textContent || '') && /Erledigte unten anzeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
   d.querySelector('.modal').remove();
   w.eval(`shareModal(${L.id})`); await idle(w);
   check(/Öffentlicher Link/.test(d.querySelector('.modal.shmodal')?.textContent || ''), 'German: Share dialog');

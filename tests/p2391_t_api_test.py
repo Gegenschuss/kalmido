@@ -82,7 +82,9 @@ FP = A.post(B + f"/api/lists/{P}/fields", json={"name": "Budget", "type": "numbe
 check(A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FP): "3"}}).status_code == 400, "#1217: a field of another list: 400")
 check(A.post(B + "/api/time/start", json={"task_id": T1}).status_code == 409, "#1217: no time tracking in a plain list (409; 2.41.0 #1471: the list's switch, off by default)")
 TP = A.post(B + "/api/tasks", json={"title": "p", "list_id": P}).json()["id"]
-check(A.post(B + "/api/deps", json={"task_id": T1, "blocker_id": TP}).status_code == 409, "#1217: dependencies stay project-only (409)")
+# 2.352.0 (#2752): every list but the inbox is a project: dependencies in a kind=list list too
+check(A.post(B + "/api/deps", json={"task_id": T1, "blocker_id": TP}).ok, "#2752: dependencies in every project")
+A.delete(B + f"/api/deps/{T1}/{TP}")
 # a template of the plain list keeps its fields
 r = A.post(B + "/api/templates", json={"list_id": L})
 check(r.ok and any(f.get("name") == "Amount" for f in (r.json().get("data") or {}).get("fields") or []), f"#1217: a list template keeps the fields of a plain list: {r.text[:200]}")
