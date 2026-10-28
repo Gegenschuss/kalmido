@@ -22,7 +22,7 @@ from ..core.errors import BadInput, UnknownFields
 from ..agents.core import need_chat_agent
 from ..agents.chat import _jload, _newer_than, chat_newest, chat_one, choice_state
 
-CP_DEFAULTS = {"sugg": "collect", "jobs": "full", "pin": "on", "notices": "full"}
+CP_DEFAULTS = {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full"}  # 2.331.0 (#3309): suggestions stay at their message by default (was collect)
 CP_VALUES = {"sugg": ("latest", "collect", "keep"), "jobs": ("full", "line"), "pin": ("on", "off"), "notices": ("full", "line")}
 SUGG_HOURS = 24
 SUGG_MAX = 10

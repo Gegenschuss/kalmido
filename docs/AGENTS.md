@@ -1548,12 +1548,13 @@ ends every open button, a message of the agent only those of its own source -- t
 or the same job (`job_id`). A job's progress or result leaves the agent's open suggestion standing and the other way
 round; a job that offers buttons replaces only its own older ones. **Collected suggestions (2.233.0):** by default the
 person keeps older suggestions: buttons a newer message ended get `choice_state` `collected` (not `expired`), the app
-gathers them above the message box ("Earlier suggestions"), and a press there is accepted -- you get the usual
+leaves them answerable at their message (default since 2.331.0) or gathers them above the message box ("Earlier
+suggestions"), and a press there is accepted -- you get the usual
 `chat_choice` with `collected: true` (the person answers an older question; treat it like a normal message about that
 question, a host may hand it on as such). A collected suggestion stays answerable for 24 hours, at most the newest 10
 per conversation; afterwards, or when the person put it away (`choices.dismissed_at`), it is `expired` and a press
 answers `409` as before. Each person chooses per agent in the chat settings: only the newest (the 2.30.0 behaviour),
-collect (default) or keep them all at their message (answerable like collected ones). Permission questions and approval
+collect them above the message box, or keep them all at their message (answerable like collected ones; the default). Permission questions and approval
 requests keep their own rules. To take buttons back without a new message:
 
 ```

@@ -78,12 +78,11 @@ const FEAT = 'cal,comments,collab';
     console.log('EXP', await ev(`(() => { const f = document.querySelector('#side .sbfix'), o = []; for (const [k, v] of [['top', '0px'], ['top', '3px'], ['position', 'relative'], ['position', 'static']]) { f.style[k] = v; o.push(k + v + ':' + f.getBoundingClientRect().top); } f.style.cssText = ''; return o.join(' '); })()`)); check(m && Math.abs(m[0] - m[1]) <= 2.5, '#2438: desktop, the head and the page header share a middle: ' + JSON.stringify(m) + ' ' + await ev(dbg));
     // ===== #2444 desktop: the hint, then Switch
     check(await ready(ev, `S.news && S.news.unread_me >= 1`, 60), '#2444: the bell counts the assignment ' + JSON.stringify(await ev(`S.news`)));
-    check(await ready(ev, `wsCur() === 'private' && !!document.querySelector('#view .nelse')`, 60), '#2444: the empty view hints at the other workspace');
-    const hint = await ev(`(document.querySelector('#view .nelse') || {}).textContent || ''`);
-    check(/1 unread in Alpha/.test(hint) && /Switch/.test(hint), '#2444: the hint names the workspace: ' + hint);
+    // 2.331.0 A (#3300): the list covers ALL workspaces: the item shows in Private with a small label "Alpha", no hint row, no switching
+    check(await ready(ev, `wsCur() === 'private' && /Angebot pruefen/.test(document.querySelector('#view').textContent)`, 60), '#3300: the item of the other workspace is listed');
+    const lab = await ev(`(document.querySelector('#view .nws') || {}).textContent || ''`);
+    check(lab === 'Alpha' && !(await ev(`!!document.querySelector('#view .nelse')`)), '#3300: the label names the workspace, no hint row: ' + lab + ' ' + await ev(`JSON.stringify([wsCur(), wsOn(), (document.querySelector('#view .nitem')||{}).outerHTML, S.nf.items.map(i => [i.kind, i.list_id, !!listById(i.list_id)])])`));
     await shot('p2145-a-news-hint.png');
-    await ev(`(() => { document.querySelector('#view .nelse [data-act="news-ws"]').click(); return 1; })()`);
-    check(await ready(ev, `wsCur() === '${WS}' && !document.querySelector('#view .nelse') && /Angebot pruefen/.test(document.querySelector('#view').textContent)`, 60), '#2444: Switch shows the news in the organisation, the hint is gone');
     await ev(`(() => { fetch('/api/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({workspace: 'private'})}); return 1; })()`);
     // ===== phone: open drawer
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

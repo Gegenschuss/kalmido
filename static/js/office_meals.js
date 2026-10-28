@@ -101,12 +101,14 @@ async function bw_unlock(m, md) {
   if (why == null) return;
   try {
     const j = await api('POST', `${BW_U}/${m.id}/unlock`, {reason: why.trim()}); md?.remove(); bw_reload();
-    toast(tr('Approval undone'), async () => { await api('POST', `${BW_U}/${m.id}/approve`); bw_reload(); });
+    toast(tr('Approval undone'), async () => { await api('POST', `${BW_U}/${m.id}/approve`, {sign_image: m.sign_image ? 1 : 0}); bw_reload(); });
     if (md) bw_modal(j);
   } catch (x) { toast(x.message || tr('unknown')); }
 }
-async function bw_approve(id) {
-  const j = await api('POST', `${BW_U}/${id}/approve`); bw_reload();
+// 2.332.0 C (#3301): the approver's signature picture (letters profile) on the receipt PDF
+const BW_SIG_HINT = N_('Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.');
+async function bw_approve(id, sig) {
+  const j = await api('POST', `${BW_U}/${id}/approve`, {sign_image: sig ? 1 : 0}); bw_reload();
   toast(tr('Approved and locked'), async () => { await api('POST', `${BW_U}/${id}/unlock`, {reason: tr('Undone right after approving')}); bw_reload(); });
   return j;
 }
@@ -174,6 +176,7 @@ function bw_modal(m0) {
     </fieldset>
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
+    ${(hostOk || (!ro && m?.own_host !== 0)) && BW.data?.my_sig ? `${ofcChk('bw-sig', tr('With my signature'), true)}<p class="muted ofchint">${esc(tr(BW_SIG_HINT))}</p>` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot bwfoot">${m?.own_ro ? '' : ro ? `<button class="btn" data-bwm="unlock">${ic('undo', 's')}<span>${tr('Undo approval…')}</span></button>` : m ? `<button class="btn danger" data-bwm="del">${tr('Delete')}</button>` : ''}
       <span class="spacer"></span>${m ? `<button class="btn" data-bwm="pdf">${ic('pdf', 's')}<span>PDF</span></button>` : ''}
@@ -260,9 +263,10 @@ function bw_modal(m0) {
       }
       if (a === 'save') { await save(); md.remove(); bw_reload(); return; }
       if (a === 'approve') {
-        if (hostOk) { await bw_approve(m.id); md.remove(); return; }  // 2.187.1 B (#2735): nothing to save
+        const sig = $('#bw-sig', md) ? ($('#bw-sig', md).checked ? 1 : 0) : 0;  // 2.332.0 C (#3301)
+        if (hostOk) { await bw_approve(m.id, sig); md.remove(); return; }  // 2.187.1 B (#2735): nothing to save
         await save(); bw_reload();
-        try { await bw_approve(m.id); md.remove(); }
+        try { await bw_approve(m.id, sig); md.remove(); }
         catch (x) { md.remove(); bw_modal(m).querySelector('.aerr').textContent = tr('Saved as a draft.') + ' ' + (x.message || ''); }
       }
     } catch (x) { err(x.message); }
