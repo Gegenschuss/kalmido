@@ -170,6 +170,14 @@ def openapi_spec():
                                   description="2.111.0: a reminder at a fixed local date and time (server time zone, like due / "
                                   "due_time), with or without a due date; null = none. Fires once, like the reminders before the "
                                   "due time; on a recurring task it moves along with the due date")
+    # 2.390.0 B (#3355): the sprint, the reviewer and the review state
+    task_props["sprint_id"] = nul("integer", description="2.390.0: the sprint of the task's project it is planned in (null = "
+                                  "backlog). Writable: an open sprint of the same project (edit rights); a task moved to another "
+                                  "project leaves its sprint")
+    task_props["reviewer_id"] = nul("integer", description="2.390.0: who reviews the task (a person or agent with access to the "
+                                    "project; null = none). Writable, with the checks of POST /tasks/{id}/review action reviewer")
+    task_props["review"] = nul("string", enum=["pending", "approved", "changes", None], description="2.390.0: the review state "
+                               "(null = none; read only, changed with POST /tasks/{id}/review)")
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -547,6 +555,17 @@ def openapi_spec():
                      q("milestone", "2.18.0: true = only milestones, false = only the other tasks", {"type": "boolean"}),
                      q("milestone_id", "2.18.0: only the tasks of this milestone", {"type": "integer"}),
                      q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
+                     # 2.390.0 B (#3355): the further filters and the sort
+                     q("priority", "2.390.0: none, low, medium or high; several comma separated (or the parameter repeated)"),
+                     q("priority_min", "2.390.0: at least this priority", {"type": "string", "enum": ["none", "low", "medium", "high"]}),
+                     q("section_id", "2.390.0: a column (section) id, or none = no column"),
+                     q("sprint_id", "2.390.0: a sprint id, current = the active sprint of the task's project, none = backlog"),
+                     q("created_by", "2.390.0: me or a user id"), q("reviewer", "2.390.0: me, none or a user id"),
+                     q("review", "2.390.0: the review state", {"type": "string", "enum": ["pending", "approved", "changes", "none"]}),
+                     q("q", "2.390.0: words in the title or notes (all of them, each as a word start)"),
+                     q("sort", "2.390.0: priority, due, created, updated, title or manual; a leading - sorts descending (tasks "
+                               "without a due date stay last). The cursor keeps the sort, pages stay stable with equal values",
+                       {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)]}),
                      limit, cursor]
     paths = {
         "/me": {"get": op("The token's user, scopes and switched-on modules", "Account", ok(ref("Me")) | errs())},
@@ -593,7 +612,9 @@ def openapi_spec():
                                [q("from", "First day (default: 14 days ago)", date_s), q("to", f"Last day (default: from + 194 days, at most {ROADMAP_MAX_DAYS} days)", date_s),
                                 q("projects_only", "true = only projects with progress and status (kind=project)", {"type": "boolean"}),
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
-        "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
+        "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first (or by sort). 2.390.0: also "
+                             "field_<id>=value, a custom field of a project you see (only its tasks): select = option id or name, "
+                             "text = contains, number, checkbox true / false, other types the stored value", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
                    "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | ok(ref("Task"), "Already created with this client_ref") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
