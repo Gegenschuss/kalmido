@@ -56,6 +56,12 @@ const K = {Enter: '', Escape: ''};
   ix = await call(CB, 'GET', `/api/wiki?space=${OS}`);
   check(ix.style === 'notepad' && ix.may_style === false, `#3152: bob's index of Alpha: notepad, may_style false ${JSON.stringify([ix.style, ix.may_style])}`);
   check((await call(CA, 'GET', '/api/wiki?space=private')).style === '', '#3152: alice\'s private space stays Clear (the styles are per space)');
+  await call(CB, 'PATCH', '/api/settings', {look: JSON.stringify({wkSt: 'body{display:none}', theme: 'dark'})});
+  let lk0 = (await call(CB, 'GET', '/api/state')).settings?.look || '';
+  check(!/wkSt/.test(lk0) && /"theme":"dark"/.test(lk0), `#3152: the own style keeps only a known value (${lk0})`);
+  await call(CB, 'PATCH', '/api/settings', {look: JSON.stringify({wkSt: 'book'})});
+  lk0 = (await call(CB, 'GET', '/api/state')).settings?.look || '';
+  check(/"wkSt":"book"/.test(lk0), `#3152: a known own style is kept (${lk0})`);
 
   // ---- tasks for #3333 (their own, in the inbox) and the pages
   const runs = [];
