@@ -171,8 +171,10 @@ def gx_tables(c, oid, frm, to, gaps=None):
     out.append(t)
 
     # 2.414.0 (#3502): the booking archive of past years (office/bookarch.py) -- its lines of the period unchanged, only when there are any
+    # (review F7: a line without a readable date comes with its fiscal year when the period covers that whole year)
     arch = c.execute("SELECT b.* FROM office_bookarch b JOIN office_import_runs r ON r.id=b.run_id WHERE b.org_id=? AND r.undone_at IS NULL "
-                     "AND b.day>=? AND b.day<=? ORDER BY b.year, b.day, b.run_id, b.line, b.id", (oid, frm, to)).fetchall()
+                     "AND ((b.day>=? AND b.day<=?) OR (b.day='' AND b.year>=? AND b.year<=?)) ORDER BY b.year, b.day, b.run_id, b.line, b.id",
+                     (oid, frm, to, int(frm[:4]) + (frm[5:] != "01-01"), int(to[:4]) - (to[5:] != "12-31"))).fetchall()
     if arch:
         t = _Tbl("archive_bookings.csv", "Buchungsarchiv", "Buchungen der Altjahre aus dem DATEV-Buchungsstapel (Buchungsarchiv, unveraendert)",
                  [("ID", A), ("Wirtschaftsjahr", A), ("Zeile", A), ("Belegdatum", D), ("Konto", A), ("Gegenkonto", A), ("Soll/Haben", A),
@@ -184,13 +186,13 @@ def gx_tables(c, oid, frm, to, gaps=None):
                   r["doc1"], r["doc2"], r["text"], r["link"])
         out.append(t)
         t = _Tbl("archive_accounts.csv", "Kontenbeschriftungen", "Beschriftungen der Konten des Buchungsarchivs (Sachkonten, Personenkonten)",
-                 [("Konto", A), ("Wirtschaftsjahr", A), ("Beschriftung", A), ("Art", A)], key=2)
+                 [("ID", A), ("Konto", A), ("Wirtschaftsjahr", A), ("Beschriftung", A), ("Art", A)])
         years = sorted({r["year"] for r in arch})
         for r in c.execute("SELECT a.* FROM office_bookarch_accts a JOIN office_import_runs r ON r.id=a.run_id WHERE a.org_id=? "
                            "AND r.undone_at IS NULL AND (a.year IS NULL OR (a.year>=? AND a.year<=?)) ORDER BY a.account, a.year, a.id",
                            (oid, years[0], years[-1])).fetchall():
             r = oc_dec_fields(c, oid, "office_bookarch_accts", r)
-            t.add(r["account"], r["year"] or "", r["label"], "Personenkonto" if r["kind"] == "person" else "Sachkonto")
+            t.add(r["id"], r["account"], r["year"] or "", r["label"], "Personenkonto" if r["kind"] == "person" else "Sachkonto")
         out.append(t)
 
     t = _Tbl("log.csv", "Protokoll", "Aenderungsprotokoll des Bueros (GoBD), ohne Inhalte der Aenderungen",

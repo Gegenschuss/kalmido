@@ -146,19 +146,22 @@ def ba_unlink(oid, names):
 
 
 # ---------------------------------------------------------------- reading the upload
-def _unpack(items, with_docs, depth=0):
-    """[(name, bytes)] of the upload -> ([(name, bytes)] files, [names] receipt files left unread (check), [errors])."""
+def _unpack(items, with_docs, depth=0, left=None):
+    """[(name, bytes)] of the upload -> ([(name, bytes)] files, [names] receipt files left unread (check), [errors]).
+    left: the unpacked bytes still allowed, shared by every level (review F1: a ZIP in a ZIP never doubles the budget)."""
     out, names, errors = [], [], []
+    left = left if left is not None else [BA_TOTAL_MAX]
     exts = (".csv", ".txt", ".xml", ".zip") + (BA_DOC_EXT if with_docs else ())
     for name, data in items:
         if is_zip(name, data) and depth < 2:
             try:
-                z = zip_read(data, exts, BA_FILE_MAX, BA_TOTAL_MAX, BA_ENTRIES_MAX, BA_ENTRIES_MAX)
+                z = zip_read(data, exts, BA_FILE_MAX, max(1, left[0]), BA_ENTRIES_MAX, BA_ENTRIES_MAX)
             except ZipLimit as e:
                 raise BadInput(str(e)) from None
+            left[0] -= z.size
             errors += [{"file": x["file"] or name, "error": x["error"]} for x in z.errors]
             names += [n for n in z.skipped if n.casefold().endswith(BA_DOC_EXT)]
-            f, n, e = _unpack(z.files, with_docs, depth + 1)
+            f, n, e = _unpack(z.files, with_docs, depth + 1, left)
             out, names, errors = out + f, names + n, errors + e
         elif is_zip(name, data):
             errors.append({"file": name, "error": tr("The ZIP file cannot be read")})
@@ -172,21 +175,23 @@ def _docs_xml(data):
     text = di_decode(data)
     if re.search(r"<!\s*(DOCTYPE|ENTITY)", text, re.I):
         raise BadInput(tr("The file contains a DOCTYPE or an ENTITY and is not read"))
+    text = re.sub(r"^\s*<\?xml[^>]*\?>", "", text)  # review F5: decoded already (a declared windows-1252 is no UTF-8 for the parser)
     try:
         root = ET.fromstring(text.encode("utf-8"))
     except ET.ParseError:
         return None
-    out = []
+    out, seen = [], False
     for el in root.iter():
         if el.tag.rsplit("}", 1)[-1] != "document":
             continue
+        seen = True
         g = _GUID.search(el.get("guid") or "")
         if not g:
             continue
         for x in el.iter():
             if x.tag.rsplit("}", 1)[-1] == "extension" and x.get("name"):
                 out.append((g.group(0).lower(), base_name(x.get("name"))))
-    return out
+    return out if seen else None  # review F10: an XML without <document> is no document.xml
 
 
 def _guid(link):
@@ -212,7 +217,7 @@ def _batch(p):
     pf = _period_from(p)
     year = (p["fy_start"] or pf).year if (p["fy_start"] or pf) else None
     names = p["names"]
-    rows, bad, debit, credit, no_ctr = [], 0, Decimal(0), Decimal(0), 0
+    rows, bad, debit, credit, no_ctr, ls, lh = [], 0, Decimal(0), Decimal(0), 0, Decimal(0), Decimal(0)
     for i, r in enumerate(p["rows"]):
         acct, ctr = re.sub(r"\s+", "", _cell(p, r, "account"))[:12], re.sub(r"\s+", "", _cell(p, r, "counter"))[:12]
         side, amt = _cell(p, r, "side").strip().upper()[:1], _amount(_cell(p, r, "amount"))
@@ -227,10 +232,14 @@ def _batch(p):
                      "currency": (_cell(p, r, "currency").strip().upper() or "EUR")[:3], "bu": _cell(p, r, "bu").strip()[:4],
                      "doc1": _cell(p, r, "doc1").strip()[:36], "doc2": _cell(p, r, "doc2").strip()[:12],
                      "text": _cell(p, r, "text").strip()[:200], "link": _guid(_cell(p, r, "link")), "raw": json.dumps(raw, ensure_ascii=False)})
+        # the control: every line books on its account AND on its counter account (the other side); a line without counter
+        # account books one side only -> debit != credit. ls / lh: the sums of the lines marked S / H (review F4: shown too)
         if side == "S":
             debit += amt
+            ls += amt
         else:
             credit += amt
+            lh += amt
         if ctr:
             if side == "S":
                 credit += amt
@@ -242,7 +251,7 @@ def _batch(p):
         days = sorted(x["day"] for x in rows if x["day"])
         year = int(days[0][:4]) if days else None
     days = sorted(x["day"] for x in rows if x["day"])
-    return {"year": year, "rows": rows, "bad": bad, "debit": debit, "credit": credit, "no_counter": no_ctr,
+    return {"year": year, "rows": rows, "bad": bad, "debit": debit, "credit": credit, "no_counter": no_ctr, "lines_s": ls, "lines_h": lh,
             "first": days[0] if days else "", "last": days[-1] if days else ""}
 
 
@@ -314,11 +323,14 @@ def ba_plan(c, oid, uid, items, with_docs):
             else:
                 plan["batches"].append({"item": item, "data": data, "ck": ck, **b})
                 y = plan["years"].setdefault(b["year"], {"year": b["year"], "bookings": 0, "debit": Decimal(0), "credit": Decimal(0),
-                                                          "no_counter": 0, "bad": 0, "first": "", "last": ""})
+                                                          "no_counter": 0, "bad": 0, "first": "", "last": "", "lines_s": Decimal(0),
+                                                          "lines_h": Decimal(0)})
                 y["bookings"] += len(b["rows"])
                 y["debit"] += b["debit"]
                 y["credit"] += b["credit"]
                 y["no_counter"] += b["no_counter"]
+                y["lines_s"] += b["lines_s"]
+                y["lines_h"] += b["lines_h"]
                 y["bad"] += b["bad"]
                 y["first"] = min(x for x in (y["first"], b["first"]) if x) if (y["first"] or b["first"]) else ""
                 y["last"] = max(y["last"], b["last"])
@@ -335,7 +347,14 @@ def ba_plan(c, oid, uid, items, with_docs):
             item.update(kind="labels", year=year, rows=len(labels))
             plan["labels"].append({"item": item, "data": data, "year": year, "labels": labels})
         else:
-            dp, _mplan, counts = di_plan(c, oid, data, ofr_allows(c, uid, oid, "offers", "edit"))
+            try:  # review F3: a master data file over the DATEV import's limits is this file's problem, not the upload's
+                dp, _mplan, counts = di_plan(c, oid, data, ofr_allows(c, uid, oid, "offers", "edit"))
+            except Denied as e:
+                item.update(kind="unknown", reason=e.text())
+                continue
+            except BadInput as e:
+                item.update(kind="unknown", reason=str(e) or tr(BA_UNKNOWN))
+                continue
             names = {}
             for r in dp["rows"]:  # read with the DATEV import's columns (the names)
                 a = re.sub(r"\s+", "", _cell(dp, r, "account"))[:12]
@@ -384,6 +403,7 @@ def ba_public(plan):
     for y in sorted(plan["years"].values(), key=lambda x: x["year"]):
         years.append({"year": y["year"], "bookings": y["bookings"], "debit": _cents(y["debit"]), "credit": _cents(y["credit"]),
                       "balanced": y["debit"] == y["credit"], "no_counter": y["no_counter"], "bad": y["bad"], "first": y["first"],
+                      "lines_debit": _cents(y["lines_s"]), "lines_credit": _cents(y["lines_h"]),
                       "last": y["last"]})
     dn = plan["doc_note"]
     files = [{k: x.get(k) for k in ("name", "kind", "year", "rows", "reason", "bytes", "counts")} for x in plan["files"]]
@@ -397,6 +417,11 @@ def ba_public(plan):
 
 
 # ---------------------------------------------------------------- import, undo
+def _fname(c, oid, name):
+    """review F8: the name of an original file may carry a client's name -> encrypted at rest like the texts."""
+    return oc_enc_fields(c, oid, "office_bookarch_files", {"file_name": name[:200]})["file_name"]
+
+
 def _fields_batch(c, oid, rows):
     """The protected columns (core/orgcrypt.py FIELDS) of many rows."""
     return [oc_enc_fields(c, oid, "office_bookarch", r) for r in rows]
@@ -417,7 +442,7 @@ def ba_import(c, oid, uid, items):
             f = st.put(b["data"], ".csv")
             c.execute("INSERT INTO office_bookarch_files(org_id, run_id, kind, year, file_name, file, sha256, content_key, bytes, nrows, "
                       "created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                      (oid, rid, "batch", b["year"], b["item"]["name"][:200], f, b["item"]["sha256"], b["ck"], len(b["data"]), len(b["rows"]), uid, ts))
+                      (oid, rid, "batch", b["year"], _fname(c, oid, b["item"]["name"]), f, b["item"]["sha256"], b["ck"], len(b["data"]), len(b["rows"]), uid, ts))
             sql = ("INSERT INTO office_bookarch(org_id, run_id, year, line, day, account, counter, side, amount, currency, bu, doc1, doc2, text, "
                    "link, raw) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             for k in range(0, len(b["rows"]), BA_INS):
@@ -430,7 +455,7 @@ def ba_import(c, oid, uid, items):
             f = st.put(lb["data"], ".csv")
             c.execute("INSERT INTO office_bookarch_files(org_id, run_id, kind, year, file_name, file, sha256, content_key, bytes, nrows, "
                       "created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                      (oid, rid, kind, year, lb["item"]["name"][:200], f, lb["item"]["sha256"], "", len(lb["data"]), len(lb["labels"]), uid, ts))
+                      (oid, rid, kind, year, _fname(c, oid, lb["item"]["name"]), f, lb["item"]["sha256"], "", len(lb["data"]), len(lb["labels"]), uid, ts))
             rows = [oc_enc_fields(c, oid, "office_bookarch_accts", {"account": a, "label": t}) for a, t in lb["labels"].items()]
             c.executemany("INSERT INTO office_bookarch_accts(org_id, run_id, year, account, label, kind) VALUES(?,?,?,?,?,?)",
                           [(oid, rid, year if kind == "labels" else None, x["account"], x["label"], "person" if kind == "master" else "ledger")
@@ -438,15 +463,17 @@ def ba_import(c, oid, uid, items):
         for m in plan["masters"]:  # the DATEV import's own run (clients / suppliers fill empty fields), undone with this one
             mrid, _p, _pl, _cn = di_import(c, oid, uid, m["data"], ofr_allows(c, uid, oid, "offers", "edit"))
             detail["master_runs"].append(mrid)
-        ndocs, xml_years = 0, {}
+        ndocs, xml_years, skipped_docs = 0, {}, []
         for d in plan["docs"]:
             name, data = plan["doc_files"].get(d["key"], (None, None))
             mime = _mime(data) if data else None
-            if not mime:
+            if not mime:  # review F9: no PDF / picture -> left out and named
+                skipped_docs.append(d["name"])
                 continue
             f = st.put(data, BA_DOC_MIME[mime])
+            row = oc_enc_fields(c, oid, "office_bookarch_docs", {"file_name": (name or d["name"])[:200]})
             c.execute("INSERT INTO office_bookarch_docs(org_id, run_id, year, guid, file_name, file, mime, sha256, bytes, created_at) "
-                      "VALUES(?,?,?,?,?,?,?,?,?,?)", (oid, rid, d["year"], d["guid"], (name or d["name"])[:200], f, mime,
+                      "VALUES(?,?,?,?,?,?,?,?,?,?)", (oid, rid, d["year"], d["guid"], row["file_name"], f, mime,
                                                        hashlib.sha256(data).hexdigest(), len(data), ts))
             ndocs += 1
             xml_years[d["xml"]] = max(xml_years.get(d["xml"]) or 0, int(d["year"]))
@@ -456,7 +483,7 @@ def ba_import(c, oid, uid, items):
             f = st.put(data, ".xml")
             c.execute("INSERT INTO office_bookarch_files(org_id, run_id, kind, year, file_name, file, sha256, content_key, bytes, nrows, "
                       "created_by, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                      (oid, rid, "docs", xml_years[item["sha256"]], item["name"][:200], f, item["sha256"], "", len(data), item["rows"], uid, ts))
+                      (oid, rid, "docs", xml_years[item["sha256"]], _fname(c, oid, item["name"]), f, item["sha256"], "", len(data), item["rows"], uid, ts))
         pub = ba_public(plan)
         counts = {"bookings": pub["counts"]["bookings"], "labels": pub["counts"]["labels"], "docs": ndocs,
                   "files": len(plan["batches"]) + len(plan["labels"]) + len(plan["masters"]), "skipped": pub["counts"]["duplicates"]}
@@ -465,6 +492,8 @@ def ba_import(c, oid, uid, items):
         st.done(False)
         raise
     pub["counts"]["docs"] = ndocs
+    pub["counts"]["docs_skipped"] = len(skipped_docs)
+    pub["docs_skipped"] = skipped_docs[:BA_PREVIEW]
     return rid, pub, st
 
 
@@ -572,9 +601,10 @@ def ba_bookings(c, oid, year):
         raise BadInput(tr("Invalid value: {0}", "offset")) from None
     base = f"FROM office_bookarch b JOIN office_import_runs r ON r.id=b.run_id WHERE {sql}"
     order = " ORDER BY b.day, b.run_id, b.line, b.id"
+    cols = "b.id, b.year, b.line, b.day, b.account, b.counter, b.side, b.amount, b.currency, b.bu, b.doc1, b.doc2, b.text, b.link"  # review F2: never raw
     if q or doc:
         rows = []
-        for r in c.execute(f"SELECT b.* {base}{order}", args):
+        for r in c.execute(f"SELECT {cols} {base}{order}", args):
             r = oc_dec_fields(c, oid, "office_bookarch", r)
             if doc and doc not in (r["doc1"] or "").casefold() and doc not in (r["doc2"] or "").casefold():
                 continue
@@ -589,7 +619,7 @@ def ba_bookings(c, oid, year):
         s = c.execute(f"SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN b.side='S' THEN b.amount ELSE 0 END), 0) AS d, "
                       f"COALESCE(SUM(CASE WHEN b.side='H' THEN b.amount ELSE 0 END), 0) AS h {base}", args).fetchone()
         total, debit, credit = s["n"], s["d"], s["h"]
-        page = [oc_dec_fields(c, oid, "office_bookarch", r) for r in c.execute(f"SELECT b.* {base}{order} LIMIT ? OFFSET ?", [*args, limit, offset])]
+        page = [oc_dec_fields(c, oid, "office_bookarch", r) for r in c.execute(f"SELECT {cols} {base}{order} LIMIT ? OFFSET ?", [*args, limit, offset])]
     links = sorted({r["link"] for r in page if r["link"]})
     docs = {}
     if links:
@@ -640,7 +670,8 @@ def ba_overview(c, oid):
         except ValueError:
             counts = {}
         fl = [{"id": f["id"], "name": f["file_name"], "kind": f["kind"], "year": f["year"], "rows": f["nrows"], "bytes": f["bytes"],
-               "sha256": f["sha256"]} for f in c.execute("SELECT * FROM office_bookarch_files WHERE org_id=? AND run_id=? ORDER BY id", (oid, r["id"]))]
+               "sha256": f["sha256"]} for f in (oc_dec_fields(c, oid, "office_bookarch_files", x) for x in
+                                                c.execute("SELECT * FROM office_bookarch_files WHERE org_id=? AND run_id=? ORDER BY id", (oid, r["id"])))]
         runs.append({"id": r["id"], "created_at": r["created_at"], "user_name": users.get(r["created_by"], ""), "undone_at": r["undone_at"],
                      "counts": counts, "files": fl})
     return {"years": years, "runs": runs, "note": tr(BA_NOTE)}
@@ -762,6 +793,7 @@ def ba_doc_get(did):
     p = ba_path(oid, r["file"]) if r else None
     if not p:
         raise Denied(404)
+    r = oc_dec_fields(c, oid, "office_bookarch_docs", r)
     ofx_log(c, oid, "open", target="bookarch_doc", detail={"doc_id": did}, dedupe_min=10)
     c.commit()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", r["file_name"] or "").strip("-") or f"beleg-{did}{BA_DOC_MIME.get(r['mime'], '')}"
@@ -776,6 +808,7 @@ def ba_file_get(fid):
     p = ba_path(oid, r["file"]) if r else None
     if not p:
         raise Denied(404)
+    r = oc_dec_fields(c, oid, "office_bookarch_files", r)
     ofx_log(c, oid, "export", target="bookarch_file", detail={"file_id": fid}, dedupe_min=10)
     c.commit()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", r["file_name"] or "").strip("-") or f"datev-{fid}.csv"

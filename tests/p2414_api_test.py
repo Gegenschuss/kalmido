@@ -105,18 +105,19 @@ def extf16(rows):
 
 
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
-G1, G2, G3 = str(uuid.uuid4()).upper(), str(uuid.uuid4()), str(uuid.uuid4())
+G1, G2, G3, G4 = str(uuid.uuid4()).upper(), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
 
 
 def docs_zip(entries, files):
     """The DATEV XML interface: document.xml + files, packed into an outer ZIP (as Kalmido's own DATEV export does)."""
-    xml = ('<?xml version="1.0" encoding="utf-8"?>\n<archive xmlns="http://xml.datev.de/bedi/tps/document/v05.0" version="5.0">\n'
+    # review F5: written in Windows-1252 as declared (an umlaut in a file name)
+    xml = ('<?xml version="1.0" encoding="windows-1252"?>\n<archive xmlns="http://xml.datev.de/bedi/tps/document/v05.0" version="5.0">\n'
            '  <content>\n' + "".join(f'    <document guid="{g}"><description>Beleg</description>'
                                      f'<extension xsi:type="File" name="{n}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></document>\n'
                                      for g, n in entries) + "  </content>\n</archive>\n")
     inner = io.BytesIO()
     with zipfile.ZipFile(inner, "w") as z:
-        z.writestr("document.xml", xml)
+        z.writestr("document.xml", xml.encode("cp1252"))
         for n, data in files:
             z.writestr(n, data)
     outer = io.BytesIO()
@@ -132,14 +133,16 @@ def up(s, path, files):
 ROWS1 = [("1190,00", "S", "1200", "8400", "1501", "RE-1", "Honorar Beispiel GmbH", f'BEDI "{G1}"'),
          ("-200,00", "S", "4210", "1200", "0102", "M-02", "Miete Februar", ""),  # negative: credit 4210
          ("300,50", "H", "1200", "4930", "2003", "B-7", "Buerobedarf", f"BEDI {G2}"),  # its receipt is missing in the ZIP
-         ("50,00", "S", "4970", "", "3112", "K-1", "Nebenkosten ohne Gegenkonto", ""),  # no counter account: debit != credit
+         ("50,00", "S", "4970", "", "3112", "K-1", "Nebenkosten ohne Gegenkonto", f'BEDI "{G4}"'),  # no counter account: debit != credit
          ("abc", "S", "1200", "8400", "0101", "X", "kaputt", "")]  # not readable: only in the original file
 ROWS2 = [("100,00", "S", "1200", "8400", "1001", "RE-9", "Honorar Zwei", ""),
-         ("100,00", "H", "1200", "4930", "1101", "B-9", "Material", "")]
+         ("100,00", "H", "1200", "4930", "1101", "B-9", "Material", ""),
+         ("10,00", "S", "1200", "8400", "9999", "D-0", "Ohne lesbares Datum", "")]  # no valid date: kept, day empty
 F1, F2 = extf21(Y1, ROWS1), extf21(Y2, ROWS2)
 F20 = extf20(Y1, [("1200", "Bank"), ("8400", "Erlöse 19 % USt"), ("4210", "Miete")])
 F16 = extf16([("10001", "Archiv Kunde GmbH", "Köln"), ("70001", "Archiv Lieferant KG", "Bonn")])
-FZ = docs_zip([(G1, "re1.pdf"), (G2, "lost.pdf"), (G3, "nobooking.pdf")], [("re1.pdf", PDF), ("nobooking.pdf", PDF)])
+FZ = docs_zip([(G1, "re1-ä.pdf"), (G2, "lost.pdf"), (G3, "nobooking.pdf"), (G4, "fake.pdf")],
+             [("re1-ä.pdf", PDF), ("nobooking.pdf", PDF), ("fake.pdf", b"no receipt at all")])
 UPLOAD = [(f"EXTF_Buchungsstapel_{Y1}.csv", F1), (f"EXTF_Buchungsstapel_{Y2}.csv", F2), ("EXTF_Kontenbeschriftungen.csv", F20),
           ("EXTF_Debitoren.csv", F16), ("Belege.zip", FZ), ("notes.txt", b"just a note")]
 
@@ -153,17 +156,17 @@ j = r.json()
 ys = {y["year"]: y for y in j["years"]}
 check(sorted(ys) == [Y1, Y2], f"two years {sorted(ys)}")
 check(ys[Y1]["bookings"] == 4 and ys[Y1]["bad"] == 1 and ys[Y1]["no_counter"] == 1 and not ys[Y1]["balanced"]
-      and ys[Y1]["debit"] == "1740.50" and ys[Y1]["credit"] == "1690.50",
-      f"{Y1}: 4 lines, 1 unreadable, the line without counter account breaks debit = credit {ys[Y1]}")
-check(ys[Y2]["balanced"] and ys[Y2]["debit"] == ys[Y2]["credit"] == "200.00", f"{Y2}: debit = credit {ys[Y2]}")
+      and ys[Y1]["debit"] == "1740.50" and ys[Y1]["credit"] == "1690.50" and ys[Y1]["lines_debit"] == "1240.00" and ys[Y1]["lines_credit"] == "500.50",
+      f"{Y1}: 4 lines, 1 unreadable, the line without counter account breaks debit = credit, the S / H lines apart {ys[Y1]}")
+check(ys[Y2]["balanced"] and ys[Y2]["debit"] == ys[Y2]["credit"] == "210.00", f"{Y2}: debit = credit {ys[Y2]}")
 kinds = {f["name"]: f["kind"] for f in j["files"]}
 check(kinds.get(f"EXTF_Buchungsstapel_{Y1}.csv") == "batch" and kinds.get("EXTF_Kontenbeschriftungen.csv") == "labels"
       and kinds.get("EXTF_Debitoren.csv") == "master" and kinds.get("document.xml") == "docs" and kinds.get("notes.txt") == "unknown",
       f"the kinds of the files {kinds}")
 c = j["counts"]
-check(c["docs"] == 1 and c["docs_no_booking"] == 1 and c["docs_missing"] == 1 and j["docs_missing"] == ["lost.pdf"]
-      and j["docs_no_booking"] == ["nobooking.pdf"], f"receipts: 1 linked, 1 without booking, 1 missing {c} {j['docs_missing']}")
-check(j["ok"] and c["bookings"] == 6 and c["labels"] == 3 and c["masters"] == 1, f"counts {c}")
+check(c["docs"] == 2 and c["docs_no_booking"] == 1 and c["docs_missing"] == 1 and j["docs_missing"] == ["lost.pdf"]
+      and j["docs_no_booking"] == ["nobooking.pdf"], f"receipts: 2 linked (a Windows-1252 document.xml), 1 without booking, 1 missing {c} {j['docs_missing']}")
+check(j["ok"] and c["bookings"] == 7 and c["labels"] == 3 and c["masters"] == 1, f"counts {c}")
 check(not sql("SELECT 1 FROM office_bookarch") and not sql("SELECT 1 FROM office_bookarch_files")
       and not sql("SELECT 1 FROM office_import_runs WHERE kind='datev_archive'"), "the check writes nothing")
 
@@ -172,21 +175,27 @@ nclients = len(A.get(B + "/api/clients").json()["clients"])
 r = up(A, BA + "/import", UPLOAD)
 check(r.status_code == 201, "import " + r.text[:300])
 RUN = r.json().get("run_id")
-check(r.json().get("counts", {}).get("bookings") == 6 and r.json()["counts"].get("docs") == 1, f"import counts {r.json().get('counts')}")
+check(r.json().get("counts", {}).get("bookings") == 7 and r.json()["counts"].get("docs") == 1 and r.json()["counts"].get("docs_skipped") == 1
+      and r.json().get("docs_skipped") == ["fake.pdf"], f"import counts: a receipt that is no PDF / picture is left out and named {r.json()}")
 rows = sql("SELECT year, line, account, counter, side, amount, text, raw, doc1, link FROM office_bookarch WHERE org_id=? ORDER BY year, line", (ORG,))
-check(len(rows) == 6, f"6 lines kept {len(rows)}")
+check(len(rows) == 7, f"7 lines kept {len(rows)}")
+check([tuple(x) for x in sql("SELECT day FROM office_bookarch WHERE org_id=? AND year=? AND line=5", (ORG, Y2))] == [("",)],
+      "a line without a valid date is kept (day empty)")
 check(all(str(x[6]).startswith("kenc1:") and str(x[7]).startswith("kenc1:") and str(x[8]).startswith("kenc1:") for x in rows),
       "text, raw and receipt field encrypted at rest")
 neg = [x for x in rows if x[2] == "4210"]
-check(neg and neg[0][4] == "H" and str(neg[0][5]) in ("200.00", "200"), f"a negative amount: the other side, positive {neg}")
+check(neg and neg[0][4] == "H" and float(neg[0][5]) == 200, f"a negative amount: the other side, positive {neg}")
 check(any(x[9] == G1.lower() for x in rows), "the GUID of the Beleglink in lower case")
 files = sql("SELECT kind, year, sha256, file, nrows FROM office_bookarch_files WHERE org_id=? ORDER BY id", (ORG,))
 fk = sorted(x[0] for x in files)
 check(fk == ["batch", "batch", "docs", "labels", "master"], f"the original files kept {fk}")
 check(any(x[2] == hashlib.sha256(F1).hexdigest() for x in files), "the SHA-256 of the original batch")
+check(all(str(x[0]).startswith("kenc1:") for x in sql("SELECT file_name FROM office_bookarch_files WHERE org_id=? "
+                                                      "UNION ALL SELECT file_name FROM office_bookarch_docs WHERE org_id=?", (ORG, ORG))),
+      "review F8: the names of the original files / receipts encrypted at rest")
 docs = sql("SELECT guid, mime, year FROM office_bookarch_docs WHERE org_id=?", (ORG,))
 check(docs == [(G1.lower(), "application/pdf", Y1)] or [tuple(d) for d in docs] == [(G1.lower(), "application/pdf", Y1)], f"the receipt image {docs}")
-cl = {x.get("customer_no"): x for x in A.get(B + "/api/clients").json()["clients"]}
+cl = {(x.get("customer_no") or (x.get("billing") or {}).get("customer_no")): x for x in A.get(B + "/api/clients").json()["clients"]}
 check("10001" in cl and len(cl) >= nclients + 1, "the debtor became a client (the DATEV import's run)")
 mr = sql("SELECT id FROM office_import_runs WHERE org_id=? AND kind='datev' AND undone_at IS NULL", (ORG,))
 check(len(mr) == 1, f"one DATEV run of the master data {mr}")
@@ -202,6 +211,8 @@ for f in ("books.py", "kpi.py", "cashflow.py", "bkexport.py", "datev.py", "taxda
 
 # ---------------------------------------------------------------- the view
 ov = A.get(B + BA).json()
+check(ov["runs"] and {f["name"] for f in ov["runs"][0]["files"]} >= {"document.xml", f"EXTF_Buchungsstapel_{Y1}.csv"},
+      "the file names readable in the view (decrypted)")
 check([y["year"] for y in ov["years"]] == [Y2, Y1] and ov["years"][1]["docs"] == 1 and ov["years"][1]["keep_until"] == f"{Y1 + 10}-12-31",
       f"years, newest first, with receipts and the end of keeping {ov['years']}")
 check(ov["runs"] and ov["runs"][0]["id"] == RUN and len(ov["runs"][0]["files"]) == 5 and ov["runs"][0]["user_name"] == "Alice Admin",
@@ -245,12 +256,15 @@ f = A.get(B + BA + f"/files/{fid}")
 check(f.ok and f.content in (F1, F2, F20, F16) and "attachment" in f.headers.get("Content-Disposition", ""), "an original file unchanged (download)")
 
 # ---------------------------------------------------------------- the same again
-r = up(A, BA + "/check", [("again.csv", F1), ("nobom.csv", extf21(Y2, ROWS2, bom=False))])
+BIG16 = extf16([(str(10000 + i), f"Firma {i}", "Ort") for i in range(20001)])  # over the DATEV import's 20,000 rows
+r = up(A, BA + "/check", [("again.csv", F1), ("nobom.csv", extf21(Y2, ROWS2, bom=False)), ("other.xml", b"<root><x/></root>"),
+                          ("big16.csv", BIG16)])
 j = r.json()
-check(r.ok and [f["kind"] for f in j["files"]] == ["duplicate", "duplicate"] and not j["ok"] and j["counts"]["duplicates"] == 2,
-      f"the same file and the same batch content (other bytes) are recognised {j.get('files')}")
+check(r.ok and [f["kind"] for f in j["files"]] == ["duplicate", "duplicate", "unknown", "unknown"] and not j["ok"] and j["counts"]["duplicates"] == 2,
+      f"the same file and the same batch content (other bytes) are recognised; an XML without documents and a master data file "
+      f"over the limits are unknown files, not a refused upload (review F10, F3) {j.get('files')}")
 r = up(A, BA + "/import", [("again.csv", F1)])
-check(r.status_code == 400 and sql("SELECT COUNT(*) FROM office_bookarch WHERE org_id=?", (ORG,))[0][0] == 6, "nothing is taken twice")
+check(r.status_code == 400 and sql("SELECT COUNT(*) FROM office_bookarch WHERE org_id=?", (ORG,))[0][0] == 7, "nothing is taken twice")
 
 # ---------------------------------------------------------------- GoBD export: the archive's lines of the period
 r = A.get(B + O + "/gobd/export", params={"from": f"{Y1}-01-01", "to": f"{Y2}-12-31"})
@@ -261,8 +275,8 @@ check("archive_bookings.csv" in names and b"archive_bookings.csv" in z.read("ind
       f"the archive in the GoBD export {names}")
 if "archive_bookings.csv" in names:
     lines = list(csv.reader(io.StringIO(z.read("archive_bookings.csv").decode("utf-8"), newline=""), delimiter=";"))
-    check(len(lines) == 6 and any("Honorar Beispiel GmbH" in x for x in lines) and any("1.190,00" in x or "1190,00" in x for x in lines),
-          f"its lines, decrypted, decimal comma {lines[:2]}")
+    check(len(lines) == 7 and any("Honorar Beispiel GmbH" in x for x in lines) and any("1.190,00" in x or "1190,00" in x for x in lines)
+          and any("Ohne lesbares Datum" in x for x in lines), f"its lines (also the one without date, review F7), decrypted, decimal comma {lines[:2]}")
 r = A.get(B + O + "/gobd/export", params={"from": f"{NOW - 1}-01-01", "to": f"{NOW - 1}-12-31"})
 check(r.ok and "archive_bookings.csv" not in zipfile.ZipFile(io.BytesIO(r.content)).namelist(), "a period without archive lines: no table")
 
@@ -279,7 +293,7 @@ r = up(Er, BA + "/import", [("own.csv", extf21(Y2, [("42,00", "S", "1000", "8400
 check(r.status_code == 201, "freelancer: imports into the personal office " + r.text[:200])
 ej = Er.get(B + BA + "/bookings", params={"year": Y2}).json()
 check(ej["total"] == 1 and ej["items"][0]["text"] == "Eigenes", "freelancer: sees its own line only")
-check(A.get(B + BA + "/bookings", params={"year": Y2}).json()["total"] == 2, "Alpha does not see the freelancer's line")
+check(A.get(B + BA + "/bookings", params={"year": Y2}).json()["total"] == 3, "Alpha does not see the freelancer's line")
 ERUN = r.json().get("run_id")
 check(Er.post(B + BA + f"/runs/{RUN}/undo").status_code == 404, "freelancer: 404 on Alpha's run")
 
@@ -308,16 +322,17 @@ check(sql("SELECT COUNT(*) FROM office_bookarch WHERE year=?", (YOLD,))[0][0] ==
       "switch on: the year past its 10 years goes with its original file")
 ls = box(f"import os\nfrom kalmido.core.config import OFFICE_DIR\nprint(' '.join(os.listdir(os.path.join(OFFICE_DIR, '{ORG}'))))")
 check(OLDFILE not in ls and "bka-" in ls, f"the old file is gone from the disk, the others stay {OLDFILE}")
-check(sql("SELECT COUNT(*) FROM office_bookarch WHERE org_id=?", (ORG,))[0][0] == 6, "the younger years stay")
+check(sql("SELECT COUNT(*) FROM office_bookarch WHERE org_id=?", (ORG,))[0][0] == 7, "the younger years stay")
 
 # ---------------------------------------------------------------- undo
 r = A.post(B + BA + f"/runs/{RUN}/undo")
-check(r.ok and r.json()["removed"]["bookings"] == 6 and r.json()["removed"]["docs"] == 1 and r.json()["removed"]["master"] == 1,
+check(r.ok and r.json()["removed"]["bookings"] == 7 and r.json()["removed"]["docs"] == 1 and r.json()["removed"]["master"] == 1,
       "undo: lines, receipt and the DATEV run of the master data " + r.text[:300])
 check(not sql("SELECT 1 FROM office_bookarch WHERE run_id=?", (RUN,)) and not sql("SELECT 1 FROM office_bookarch_files WHERE run_id=?", (RUN,)),
       "undo: nothing of the run is left")
 check(A.get(B + BA + f"/files/{fid}").status_code == 404 and A.get(B + BA + f"/docs/{it['RE-1']['doc_id']}").status_code == 404, "undo: files 404")
-check("10001" not in {x.get("customer_no") for x in A.get(B + "/api/clients").json()["clients"]}, "undo: the client of the master data is gone")
+check("10001" not in {x.get("customer_no") or (x.get("billing") or {}).get("customer_no") for x in A.get(B + "/api/clients").json()["clients"]},
+      "undo: the client of the master data is gone")
 check(A.post(B + BA + f"/runs/{RUN}/undo").status_code == 409, "a second undo 409")
 runs = {x["id"]: x for x in A.get(B + O + "/legacy/runs").json()["runs"]}
 check(runs.get(RUN, {}).get("kind") == "datev_archive" and runs[RUN]["undone_at"], "the import page lists the run as undone")

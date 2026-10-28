@@ -94,6 +94,7 @@ FIELDS = {
     "office_procdocs": ("data",),  # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot)
     "office_suppliers": ("name", "street", "zip", "city", "vat_id", "iban"),  # 2.148.0 D (#2458): creditors of the DATEV import
     "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
+    "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
     "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
     "office_letter_blocks": ("body",), "office_letter_profiles": ("image",),  # 2.153.0 (#2030, #2028): text blocks, signature picture
     "office_deals": ("value", "contact", "note", "lost_reason",
@@ -142,6 +143,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472)
                  "office_suppliers": N_("Suppliers of the DATEV import"),  # 2.148.0 D (#2458)
                  "office_bookarch": N_("Booking archive"), "office_bookarch_accts": N_("Booking archive"),  # 2.414.0 (#3502)
+                 "office_bookarch_docs": N_("Booking archive"), "office_bookarch_files": N_("Booking archive"),
                  "office_letters": N_("Letters"), "office_letter_blocks": N_("Letters"), "office_letter_profiles": N_("Letters"),  # 2.153.0 (#2028)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
