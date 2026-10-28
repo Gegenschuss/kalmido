@@ -187,7 +187,7 @@ function rf_palItems(q) {
   for (const n of (typeof AB !== 'undefined' && AB.data?.items) || []) if (n.kind !== 'link') add('f:' + n.id, 'Document', n.name, n.kind === 'folder' ? 'folder' : 'file');
   rf_palAsk(q);
   if (!q) return it.filter(x => x.kind === 'list').slice(0, 12).concat(it.filter(x => x.kind === 'tasks').slice(0, 8));
-  const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+  const nm = q.match(/^#?(\d{1,9})$/), hit = (nm && taskById(+nm[1])) || tkFind(q);  // 2.390.0 (#3353): + "APP-12"
   const hits = it.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)})).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 60);
   return hit ? [{id: 'rf:t:' + hit.id, kind: 'tasks', label: `#${hit.id} ${mdPlain(hit.title)}`, icon: 'hash', fn: () => rf_pick('t:' + hit.id)}, ...hits] : hits;
 }

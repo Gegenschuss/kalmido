@@ -2684,6 +2684,44 @@ CREATE OR REPLACE TRIGGER kalmido_revoked_api_tokens AFTER DELETE ON api_tokens 
   EXECUTE FUNCTION kalmido_revoked_note('token_hash');
 CREATE OR REPLACE TRIGGER kalmido_revoked_app_passwords AFTER DELETE ON app_passwords FOR EACH ROW
   EXECUTE FUNCTION kalmido_revoked_note('pw_hash')"""
+# 2.390.0 (#3353): the running ticket number of a task in a project with a key (lists.ticket_key). Every way a task is
+# made or moves (app, API, import, agents, rules) passes here: a new task in such a project gets the next number
+# (list_ticket_seq), a task that leaves its project keeps its old key as an alias (task_keys) and gets a new number in the
+# new project if that one has a key (else none; back in a project it had a number in, that number again while it is free).
+# A number given on insert stays (restores). Re-created on every
+# start (init_db); a restore leaves functions / triggers out.
+TICKET_NO_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_ticket_no() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE k TEXT; n BIGINT;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.list_id IS NOT DISTINCT FROM OLD.list_id THEN RETURN NEW; END IF;
+    IF OLD.ticket_no IS NOT NULL THEN
+      SELECT ticket_key INTO k FROM lists WHERE id=OLD.list_id;
+      IF k IS NOT NULL THEN
+        INSERT INTO task_keys(prefix, no, task_id, created_at)
+          VALUES (k, OLD.ticket_no, OLD.id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+          ON CONFLICT DO NOTHING;
+      END IF;
+    END IF;
+    NEW.ticket_no := NULL;
+  ELSIF NEW.ticket_no IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT ticket_key INTO k FROM lists WHERE id=NEW.list_id;
+  IF k IS NULL THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' THEN  -- back in a project it had a number in (an undo, a move back): that number again while free
+    SELECT tk.no INTO n FROM task_keys tk WHERE tk.task_id=NEW.id AND tk.prefix=k
+      AND NOT EXISTS (SELECT 1 FROM tasks x WHERE x.list_id=NEW.list_id AND x.ticket_no=tk.no AND x.id<>NEW.id)
+      ORDER BY tk.created_at DESC LIMIT 1;
+    IF n IS NOT NULL THEN NEW.ticket_no := n; RETURN NEW; END IF;
+  END IF;
+  INSERT INTO list_ticket_seq(list_id, seq) VALUES (NEW.list_id, 1)
+    ON CONFLICT (list_id) DO UPDATE SET seq=list_ticket_seq.seq + 1 RETURNING seq INTO n;
+  NEW.ticket_no := n;
+  RETURN NEW;
+END $fn$;
+CREATE OR REPLACE TRIGGER kalmido_ticket_no BEFORE INSERT OR UPDATE OF list_id ON tasks FOR EACH ROW
+  EXECUTE FUNCTION kalmido_ticket_no()"""
 # additive migrations: (table, column, ddl). 2.102.0 D (#1996): append new ones at the end as before; each gets its id from
 # table + column (not from its place, so parallel releases may add theirs anywhere), a start runs only the ones not yet in
 # kalmido_migrations (core/db.py mig_apply). A second step for the same column (e.g. an UPDATE filling it) runs with the first.
@@ -3673,6 +3711,13 @@ MIGRATIONS = [
     # fq_client: a suggestion, the evaluation marks it unconfirmed); 0 = the list's client, the client link or a new client.
     # Older versions ignore it
     ("form_entries", "client_typed", "ALTER TABLE form_entries ADD COLUMN IF NOT EXISTS client_typed BIGINT NOT NULL DEFAULT 0"),
+    # 2.390.0 (#3353): readable ticket keys APP-123. lists.ticket_key = the project's key (2-6 capitals / digits, a letter
+    # first, unique per workspace; NULL = none, as before), tasks.ticket_no = the running number of the task in its project
+    # (set by the trigger TICKET_NO_TRIGGER on insert / move), git_conns.hash_ids = a repository of a project with a key still
+    # reads "#123" (1 = yes: every connection made before 2.390.0, new ones start with 0). Older versions ignore all three
+    ("lists", "ticket_key", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS ticket_key TEXT"),
+    ("tasks", "ticket_no", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ticket_no BIGINT"),
+    ("git_conns", "hash_ids", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS hash_ids BIGINT NOT NULL DEFAULT 1"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3923,6 +3968,18 @@ CREATE INDEX IF NOT EXISTS agent_decisions_list ON agent_decisions(list_id) WHER
 CREATE INDEX IF NOT EXISTS hub_mails_org ON hub_mails(org_id) WHERE org_id IS NOT NULL;
 -- 2.209.0 C (#2589): the documents whose split preview waits for the queue's page scan (the idle look stays an index read)
 CREATE INDEX IF NOT EXISTS doc_meta_split_wait ON doc_meta(node_id) WHERE split_scan ILIKE '%"state":"scan"%';
+-- 2.390.0 (#3353): ticket keys. A key is unique per workspace (organisation, else the owner's private one, a list in the
+-- trash keeps its key). list_ticket_seq = the last number given per project (its own table, so a new task does not touch
+-- the lists row), task_keys = the keys a task had before (moved out of the project, the project's key changed), so old
+-- commits, links and "APP-12" in texts still find it. New tables + indexes only: older versions ignore them
+CREATE UNIQUE INDEX IF NOT EXISTS lists_ticket_key ON lists(COALESCE(org_id, -owner_id), ticket_key) WHERE ticket_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tasks_ticket_no ON tasks(list_id, ticket_no) WHERE ticket_no IS NOT NULL;
+CREATE TABLE IF NOT EXISTS list_ticket_seq (
+  list_id BIGINT PRIMARY KEY REFERENCES lists(id) ON DELETE CASCADE, seq BIGINT NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS task_keys (
+  prefix TEXT NOT NULL, no BIGINT NOT NULL, task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (prefix, no, task_id));
+CREATE INDEX IF NOT EXISTS task_keys_task ON task_keys(task_id);
 """
 # 2.40.0 (#1336): office_doc_log_action serves the daily count of own-text mails (N7), which now reads one day's sends only
 MAX_DEPTH = 5  # 2.156.0 A (#1949): levels of tasks (task > subtask > ... ); the one number, the client gets it via /api/state (max_depth)

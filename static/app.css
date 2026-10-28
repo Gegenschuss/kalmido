@@ -7327,6 +7327,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .sptvel .sptavg{stroke:var(--text2);stroke-width:1;stroke-dasharray:4 3}
 .sptvel .sptavgt{margin:0;color:var(--text2);font-size:var(--fs-s)}
 @media (forced-colors:active){.meta .sptm{border:1px solid ButtonText}}
+/* 2.390.0 (#3353): the ticket key APP-12 in the task row (small, muted, monospace) */
+.meta .tkey{font:500 var(--fs-xs) var(--mono);color:var(--muted);letter-spacing:.01em;white-space:nowrap}
 /* 2.60.0 A (#343): sprints -- the sprint header above a list / Kanban (filter, progress, burndown), the sprint in the task
    row, the review dialog and the list of sprints. One accent; the header folds away on the phone */
 .sprh{margin:.25rem 0 .75rem;padding:.5rem .75rem;border:1px solid var(--line2);border-radius:.75rem;background:var(--bg2);font-size:.8125rem;color:var(--muted)}

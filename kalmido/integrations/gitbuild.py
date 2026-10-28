@@ -9,8 +9,8 @@ from ..core.i18n import tr
 from ..core.access import need_list, plists, pvis
 from ..core.pg import st_ids
 from ..api.v1 import v1_args, v1_view
-from .git import (CalError, git_api, git_branch_id, git_commit_norm, git_conn_lists, git_conns_of_list, git_http, git_items,
-                  git_need_manage, git_take_commits, git_task_ids, git_urls, git_version, GitRate, GIT_ITEMS, _gs)
+from .git import (CalError, git_api, git_commit_norm, GitMatch, git_conn_lists, git_conns_of_list, git_http, git_items,
+                  git_need_manage, git_take_commits, git_urls, git_version, GitRate, GIT_ITEMS, _gs)
 
 
 # ---------------------------------------------------------------- 2.151.0 A (#2558): what was built for a task, and is it live
@@ -226,8 +226,9 @@ def gb_branches(c, r, k, get, prov):
             n, sha = _gb_branch_of(x, prov)
             if n and n != default:
                 heads[n] = sha
-        ids = {n: git_branch_id(n) for n in heads}
-        live = git_task_ids(c, git_conn_lists(c, r), {i for i in ids.values() if i})
+        gm = GitMatch(c, r, git_conn_lists(c, r))  # 2.390.0 (#3353): also "app-123-..." branches
+        ids = {n: min(gm.named("", n), default=None) for n in heads}
+        live = {i for i in ids.values() if i}
         pr = {x["head_ref"]: x["tid"] for x in c.execute(
             """SELECT p.head_ref, MIN(l.task_id) AS tid FROM git_prs p JOIN git_links l ON l.conn_id=p.conn_id AND l.kind='pr'
                AND l.ref=CAST(p.number AS TEXT) WHERE p.conn_id=? AND p.state='open' AND p.head_ref<>'' GROUP BY p.head_ref""", (cid,))}

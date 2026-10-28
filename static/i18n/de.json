@@ -14597,5 +14597,17 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Eine Urlaubsanfrage behält ihre Art. Lösche sie und trage die Abwesenheit neu ein.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Das neue Passwort widerruft deine App-Passwörter (CalDAV) und deine eigenen API-Tokens; lege danach bei Bedarf neue unter Einstellungen > Konto an (API-Tokens: Erweitert · für Entwickler). Agenten behalten ihre Tokens.",
   "Please type your name without a link or web address.": "Bitte geben Sie Ihren Namen ohne Link oder Web-Adresse ein.",
-  "Saved. {0} booking of someone else stays as it was": ["Gespeichert. {0} Buchung einer anderen Person bleibt, wie sie war", "Gespeichert. {0} Buchungen anderer bleiben, wie sie waren"]
+  "Saved. {0} booking of someone else stays as it was": ["Gespeichert. {0} Buchung einer anderen Person bleibt, wie sie war", "Gespeichert. {0} Buchungen anderer bleiben, wie sie waren"],
+  "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Ein Projektkürzel hat 2 bis 6 Großbuchstaben oder Ziffern und beginnt mit einem Buchstaben (z. B. APP)",
+  "The key {0} is already used by another project of this workspace": "Das Kürzel {0} nutzt schon ein anderes Projekt in diesem Arbeitsbereich",
+  "Ticket key": "Ticket-Kürzel",
+  "Tasks get keys like {0}-12 for commits, branches and links; “#12” keeps working. Empty = none.": "Aufgaben bekommen Kennungen wie {0}-12 für Commits, Branches und Links; „#12“ geht weiter. Leer = keins.",
+  "Ticket key of {0}: {1}": "Ticket-Kürzel von {0}: {1}",
+  "Ticket key of {0} removed": "Ticket-Kürzel von {0} entfernt",
+  "Ticket key of {0}": "Ticket-Kürzel von {0}",
+  "Stop reading #number (use the key)": "#Nummer nicht mehr erkennen (Kürzel nutzen)",
+  "Also read #number": "#Nummer weiter erkennen",
+  "“#123” in commits and pull requests is the task id; it can clash with the issue numbers of the Git server. With a project key, APP-123 always works.": "„#123“ in Commits und Pull Requests ist die Aufgaben-ID; sie kann mit den Issue-Nummern des Git-Servers kollidieren. Mit Projektkürzel geht APP-123 immer.",
+  "#number and {0}-123": "#Nummer und {0}-123",
+  "only {0}-123": "nur {0}-123"
 }

@@ -14597,5 +14597,17 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Una richiesta di ferie mantiene il suo tipo. Eliminala e inserisci di nuovo l’assenza.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nuova password revoca le tue password per app (CalDAV) e i tuoi token API; se servono, creane di nuovi in Impostazioni > Account (token API: Avanzate · per sviluppatori). Gli agenti mantengono i loro token.",
   "Please type your name without a link or web address.": "Inserisca il suo nome senza link né indirizzi web.",
-  "Saved. {0} booking of someone else stays as it was": ["Salvato. {0} prenotazione di un'altra persona resta com'era", "Salvato. {0} prenotazioni di altre persone restano com'erano"]
+  "Saved. {0} booking of someone else stays as it was": ["Salvato. {0} prenotazione di un'altra persona resta com'era", "Salvato. {0} prenotazioni di altre persone restano com'erano"],
+  "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Una sigla di progetto ha da 2 a 6 lettere maiuscole o cifre e inizia con una lettera (es. APP)",
+  "The key {0} is already used by another project of this workspace": "La sigla {0} è già usata da un altro progetto di questo spazio di lavoro",
+  "Ticket key": "Sigla ticket",
+  "Tasks get keys like {0}-12 for commits, branches and links; “#12” keeps working. Empty = none.": "Le attività ricevono sigle come {0}-12 per commit, branch e link; “#12” continua a funzionare. Vuoto = nessuna.",
+  "Ticket key of {0}: {1}": "Sigla ticket di {0}: {1}",
+  "Ticket key of {0} removed": "Sigla ticket di {0} rimossa",
+  "Ticket key of {0}": "Sigla ticket di {0}",
+  "Stop reading #number (use the key)": "Non leggere più #numero (usare la sigla)",
+  "Also read #number": "Leggere anche #numero",
+  "“#123” in commits and pull requests is the task id; it can clash with the issue numbers of the Git server. With a project key, APP-123 always works.": "“#123” in commit e pull request è l’id dell’attività; può entrare in conflitto con i numeri delle issue del server Git. Con una sigla di progetto APP-123 funziona sempre.",
+  "#number and {0}-123": "#numero e {0}-123",
+  "only {0}-123": "solo {0}-123"
 }

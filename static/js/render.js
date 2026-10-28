@@ -985,6 +985,7 @@ function taskRow(t, opts = {}) {
   const lst = opts.showList && listById(t.list_id) ? lname(listById(t.list_id)) : '';
   let time = null, who = '';
   const rs = opts.trash ? () => true : rsy_on;  // 2.56.1 (#1799): the row's symbol level (rowsym.js RSY_SYMS); the trash shows all
+  if (t.ticket_no && !opts.trash) { const kc = tkChip(t); if (kc) meta.push(kc); }  // 2.390.0 (#3353): the ticket key APP-12
   if (t.ttype && !opts.trash && ticketsOn(t.list_id) && rs('ttype')) meta.push(ttChip(t));  // 2.4.0 (#340)
   if (t.points && !opts.trash && spt_on(t.list_id)) meta.push(spt_chip(t));  // 2.60.0 (#1511): story points (own switch per list, not part of the row's symbol level)
   if (isMs(t)) { if (rs('ms')) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`); }  // 2.18.0 (#430)
@@ -1834,7 +1835,7 @@ async function doSearch(q) {
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = one ? {tasks: []} : await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
-    const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+    const nm = q.trim().match(/^#?(\d{1,9})$/), hit = (nm && taskById(+nm[1])) || tkFind(q);  // 2.390.0 (#3353): + "APP-12"
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
     if (one && !hit) { if (S.searchQ === q) { S.searchRes = null; $('#sresults').innerHTML = ''; } return; }
     if (!one && typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
@@ -1847,7 +1848,7 @@ async function doSearch(q) {
 // typed may still be on their way: then it opens once they are there)
 function searchEnterOpen(q) {
   const nm = q.trim().match(/^#?(\d{1,9})$/), r = S.searchResQ === q ? S.searchRes || [] : [];
-  const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : r.length === 1 ? r[0] : null;
+  const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : tkFind(q) || (r.length === 1 ? r[0] : null);  // 2.390.0 (#3353): + "APP-12"
   if (!t) return false;
   if (isMobile()) $('#searchq')?.blur();
   openDetail(t.id); return true;

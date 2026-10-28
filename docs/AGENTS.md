@@ -3279,6 +3279,12 @@ Kalmido's part:
   with `approval: null`: they are not a go.
 - While the agent reports `working` with the task (`set_status` with `task_id`), the task shows *<agent> is working on it*.
 - `fixes #<id>` in the merged pull request completes the task (once; *Undo* in the history).
+- Ticket keys (2.390.0): a project can have a key (*Ticket key* in the project dialog, e.g. `APP`); its tasks then carry
+  `key` (`APP-12`) next to `id`. `APP-12` in a commit, pull request title / text or a branch name (`app-12-login`,
+  `feature/APP-12`) links like `#12`, `fixes APP-12` completes. `GET /api/v1/tasks/APP-12` (MCP `get_task` with `key`)
+  reads the task, also by an old key (moved, key changed). In a project with a key, `#<id>` counts only while the
+  repository's switch *Also read #number* is on (on for repositories connected before 2.390.0, off for new ones: no
+  clash with the Git server's issue numbers).
 
 What Kalmido never does: it never gets write access to a repository (a read-only token is enough), never merges, never
 hands the repository token to anyone (agents cannot read or set it and cannot connect repositories). The agent pushes and
@@ -3323,7 +3329,7 @@ You are the coding agent of the Kalmido project "<project>". You work through th
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).

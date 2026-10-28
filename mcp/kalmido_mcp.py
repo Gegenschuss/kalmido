@@ -239,7 +239,15 @@ def t_list_tasks(api, a):
 
 
 def t_get_task(api, a):
-    tid = int(a["task_id"])
+    if a.get("key") and not a.get("task_id"):  # 2.390.0 (#3353): by its ticket key "APP-12"
+        key = str(a["key"]).strip()
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,5}-\d{1,9}", key):
+            raise ApiError(400, "key: a ticket key like APP-12")
+        tid = int(api.call("GET", f"/tasks/{key}")["id"])
+    elif a.get("task_id"):
+        tid = int(a["task_id"])
+    else:
+        raise ApiError(400, "task_id or key is required")
     task = api.call("GET", f"/tasks/{tid}")
     try:
         task["comments"] = api.call("GET", f"/tasks/{tid}/comments").get("data", [])
@@ -577,8 +585,9 @@ TOOLS = [
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
                  "suggested branch name kalmido-<id>). 2.151.0: code.build / repo.build = its build state (state released | main | "
                  "branch | none, version, branches ahead of the default branch, package field vs. the version tags, stale = "
-                 "open although released; see list_build_status).",
-     _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
+                 "open although released; see list_build_status). 2.390.0: key = the ticket key \"APP-12\" instead of task_id "
+                 "(field key of a task; null when its project has no key).",
+     _obj({"task_id": S_ID, "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}-[0-9]{1,9}$"}}, []), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a project the agent may change. 2.270.0: client_ref = your own id "
                     "of the new task; calling again with the same client_ref (after a timeout) returns the task made the first time.",
      _obj({**TASK_FIELDS, "client_ref": {"type": "string", "maxLength": 64}}, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),

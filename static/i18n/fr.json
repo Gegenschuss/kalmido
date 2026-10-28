@@ -14597,5 +14597,17 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Une demande de congés garde son type. Supprime-la et saisis l’absence à nouveau.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Le nouveau mot de passe révoque tes mots de passe d'application (CalDAV) et tes propres tokens API ; crée-en de nouveaux ensuite si besoin sous Paramètres > Compte (tokens API : Avancé · pour les développeurs). Les agents gardent leurs tokens.",
   "Please type your name without a link or web address.": "Veuillez saisir votre nom sans lien ni adresse web.",
-  "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"]
+  "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"],
+  "A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)": "Une clé de projet compte 2 à 6 majuscules ou chiffres et commence par une lettre (p. ex. APP)",
+  "The key {0} is already used by another project of this workspace": "La clé {0} est déjà utilisée par un autre projet de cet espace de travail",
+  "Ticket key": "Clé de ticket",
+  "Tasks get keys like {0}-12 for commits, branches and links; “#12” keeps working. Empty = none.": "Les tâches reçoivent des clés comme {0}-12 pour les commits, branches et liens ; « #12 » fonctionne toujours. Vide = aucune.",
+  "Ticket key of {0}: {1}": "Clé de ticket de {0} : {1}",
+  "Ticket key of {0} removed": "Clé de ticket de {0} supprimée",
+  "Ticket key of {0}": "Clé de ticket de {0}",
+  "Stop reading #number (use the key)": "Ne plus lire #numéro (utiliser la clé)",
+  "Also read #number": "Lire aussi #numéro",
+  "“#123” in commits and pull requests is the task id; it can clash with the issue numbers of the Git server. With a project key, APP-123 always works.": "« #123 » dans les commits et pull requests est l’id de la tâche ; il peut entrer en conflit avec les numéros d’issue du serveur Git. Avec une clé de projet, APP-123 fonctionne toujours.",
+  "#number and {0}-123": "#numéro et {0}-123",
+  "only {0}-123": "seulement {0}-123"
 }

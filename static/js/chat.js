@@ -762,12 +762,13 @@ async function ntWrite(n, patch) {
 // every tag is skipped whole (no match inside an attribute), "&#39;" is no task number
 function mdTaskRefs(html, compact) {
   let skip = 0;
-  return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\b[Jj][Oo][Bb] ?#?(\d{1,9})\b|(?<![&\w/#])#(\d{1,9})\b/g, (m, cl, tag, jid, id) => {
+  // 2.390.0 (#3353): + "APP-12" (the current key of a task I see)
+  return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\b[Jj][Oo][Bb] ?#?(\d{1,9})\b|(?<![&\w/#])#(\d{1,9})\b|(?<![\w-])([A-Z][A-Z0-9]{1,5}-\d{1,9})\b/g, (m, cl, tag, jid, id, key) => {
     if (tag) { if (/^(code|a|pre|button)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
     if (jid) return jobRefHtml(+jid, m);  // 2.36.2 (#1141): "Job #50" / "job 50" is a job, not task #50
-    const t = taskById(+id); if (!t) return m;  // not visible to me: stays text (no title leaks)
-    return trefHtml(t, compact);
+    const t = key ? tkFind(key) : taskById(+id); if (!t) return m;  // not visible to me: stays text (no title leaks)
+    return trefHtml(t, compact, key);
   });
 }
 // 2.36.2 (#1141): a job number links to the job (#job/<id>: Agents > Jobs, that job unfolded with its history), only a job
@@ -790,7 +791,7 @@ function jobRefAsk(id) {
       for (const e of document.querySelectorAll(`.jrefq[data-jq="${id}"]`)) if (JOBREF.ok.has(id) || JOBREF.no.has(id)) e.outerHTML = jobRefHtml(id, e.innerHTML);
     });
 }
-const trefHtml = (t, compact) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(mdPlain(t.title))}">#${t.id}${compact ? '' : ' ' + esc(mdPlain(t.title).slice(0, 60))}</a>`;  // 2.40.0 (#1409): plain
+const trefHtml = (t, compact, key) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(mdPlain(t.title))}">${key ? esc(key) : '#' + t.id}${compact ? '' : ' ' + esc(mdPlain(t.title).slice(0, 60))}</a>`;  // 2.40.0 (#1409): plain
 // a tap on a task number opens the task on top of where I am (the chat stays open below it; on a phone Back closes the
 // task and shows the chat again); Ctrl / Cmd / middle click open it in a new tab as any link
 function trefOpen(e) {

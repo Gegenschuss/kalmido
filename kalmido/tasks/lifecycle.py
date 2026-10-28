@@ -422,7 +422,8 @@ def do_complete(c, tid, status=2, undo=None):
         c.execute("UPDATE tasks SET repeat='' WHERE id=?", (tid,))
     if nxt:
         # keep a completed copy in the history, move the original forward
-        cols = [k for k in t.keys() if k not in ("id", "tt_id", "client_ref")]  # 2.126.0 D (#1990): client_ref
+        # 2.390.0 (#3353): ticket_no -- the copy gets the next number of its project, the original keeps its key
+        cols = [k for k in t.keys() if k not in ("id", "tt_id", "client_ref", "ticket_no")]  # 2.126.0 D (#1990): client_ref
         vals = {k: t[k] for k in cols}
         vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who, rotation="")
         cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",

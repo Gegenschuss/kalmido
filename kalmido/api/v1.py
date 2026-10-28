@@ -28,6 +28,7 @@ from ..lists.groups import (
 from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
+from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
 from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, user_names
@@ -270,6 +271,7 @@ def waiting_of(r):
 def v1_task(d):
     out = task_core(d, d["tags"], d.get("fields") or {})
     out["list_tags"] = d.get("ltags") or []
+    out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -293,7 +295,7 @@ def task_for(c, row, uid):
     if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
         from ..lists.formula import fx_fill
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
-    out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
+    out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
@@ -411,6 +413,7 @@ def v1_list(d):
             "stale_days": d.get("stale_days"), "agent_followup": bool(d.get("agent_followup")),
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
+            "ticket_key": d.get("ticket_key") or None,  # 2.390.0 (#3353): the project's key APP (its tasks: APP-1, APP-2, ...)
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
@@ -718,6 +721,7 @@ def v1_list_patch(lid):
                                                "stale_days", "agent_followup", "folder_adopt", "time_tracking",
                                                "org_visibility", "org_edit", "sort_mode", "group_field"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
     unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (the owner)
+    unknown = [k for k in unknown if k != "ticket_key"]  # 2.390.0 (#3353): the project's ticket key (owner / list admins)
     if "points_on" in b and not isinstance(b["points_on"], bool):
         raise BadInput(tr("Invalid value: {0}", "points_on"))
     if unknown:
@@ -934,6 +938,25 @@ def v1_task_get(tid):
     c = db()
     need_task(c, tid, write=False)
     return jsonify(v1_one(c, tid))
+
+
+@app.get("/api/v1/tasks/<key>")
+@v1_view
+def v1_task_by_key(key):
+    """2.390.0 (#3353): a task by its ticket key "APP-12" (also an old key of a task that moved or whose project's key
+    changed); 404 when no task the caller sees has it. Several (the same key in two workspaces the caller sees): the one
+    with the current key first, then the lowest id."""
+    v1_args(())
+    c, pair = db(), tk_parse(key)
+    if not pair:
+        raise Denied(404)
+    for tid in tk_ids_ordered(c, pair):
+        try:
+            need_task(c, tid, write=False)  # the same checks as GET /api/v1/tasks/<id> (token lists, participants)
+        except Denied:
+            continue
+        return jsonify(v1_one(c, tid))
+    raise Denied(404)
 
 
 def _v1_live(c, tid, write=True, full=False):

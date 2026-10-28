@@ -14,6 +14,7 @@ from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sor
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
@@ -438,6 +439,14 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "done_in_section"))
         c.execute("UPDATE lists SET done_in_section=? WHERE id=?", (None if dv in (None, "") else int(dv), lid))
         b = {k: v for k, v in b.items() if k != "done_in_section"}
+    if "ticket_key" in b:  # 2.390.0 (#3353): the project's ticket key APP (owner / list admins; '' / null = none)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and project admins can change this setting"), 403)
+        try:
+            tk_set(c, lid, b["ticket_key"])
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "ticket_key"}
     if "tap_done" in b:  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins; 0 / 1)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change this setting"), 403)

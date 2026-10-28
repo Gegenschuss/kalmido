@@ -104,6 +104,8 @@ def openapi_spec():
     prio = {"type": "string", "enum": list(PRIO_VALUES)}
     task_props = {
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "section_id": nul("integer"), "parent_id": nul("integer"),
+        "key": nul("string", description="2.390.0: the ticket key APP-12 (project key + running number); null = the project has no key. "
+                   "GET /tasks/APP-12 reads the task, commits / pull requests / branch names with it link to the task"),
         "title": {"type": "string"}, "notes": {"type": "string", "description": "Markdown"}, "priority": prio,
         "status": {"type": "string", "enum": list(STATUS_NAMES.values())}, "due": nul("string", format="date"),
         "due_time": nul("string", pattern="^[0-2][0-9]:[0-5][0-9]$", description="HH:MM, local time of the server; null = all day"),
@@ -252,6 +254,8 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
+            "ticket_key": nul("string", description="2.390.0: the project's ticket key (2-6 capitals / digits, a letter first, unique per workspace); "
+                              "its tasks get keys like APP-12 (field key of a task); null = none"),
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
@@ -304,6 +308,8 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
             "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "ticket_key": nul("string", description="2.390.0: the project's ticket key APP (owner / project admins; null / \"\" = none). "
+                              "The tasks get running numbers (APP-1, APP-2, ... in the order they were made), old keys keep finding their tasks"),
             "org_id": nul("integer", description="2.28.0: the project's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life projects and the inbox)"),
             "client_id": nul("integer", description="2.23.0: the client of the project (owner / project admins; a client you see); null = none"),
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the project is for in "
@@ -596,7 +602,7 @@ def openapi_spec():
         "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
                    "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | ok(ref("Task"), "Already created with this client_ref") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
-        "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
+        "/tasks/{id}": {"get": op("One task (2.390.0: id may also be a ticket key like APP-12, a current or an old one)", T, ok(ref("Task")) | errs("404"), [pid()]),
                         "patch": op("Change a task (only the fields you send; send expect_updated_at)", T, ok(ref("TaskChanged")) | errs("400", "403", "404", "409"), [pid()],
                                     body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
