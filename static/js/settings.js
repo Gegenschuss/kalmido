@@ -112,7 +112,7 @@ async function setApply(patch, label, o = {}) {
   if (Object.keys(patch).every(k => String(before[k]) === String(patch[k]))) return null;
   // 2.41.2 (#1501): the value counts at once (a view that reads it while the request runs), put back on an error
   // 2.269.0 B (#3014): o.send / o.back = the request body of the change / of its undo (e.g. set_delta: one entry, not the whole value)
-  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
+  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(o.keep); return false; }  // 2.359.2 B (#3049): o.keep = a typed field that keeps its text
   await setAfter(patch);
   const e = histAdd({label: tr('Changed setting: {0}', label), sett: true, post: settingsSync,
     undo: () => setStep(before, patch, label, o.back), redo: () => setStep(patch, before, label, o.send)});
@@ -154,11 +154,11 @@ function setSaved(e) {
   clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('on'); el._e = null; }, 6000);
 }
 // the dialog shows what the settings are now (after an undo / redo or a change on another device)
-function settingsSync() {
+function settingsSync(keep = null) {
   const md = $$('.smodal').pop(); if (!md) return;
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
-    const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
+    const el = $('#' + id, md); if (!el || el === document.activeElement || el === keep) continue;
     if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' || k === 'side_count' || k === 'side_dots' || k === 'side_share' ? s[k] !== '0' : s[k] === '1';  // 2.56.1 (#1799): side_*
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
@@ -776,7 +776,7 @@ function settingsModal(focus) {
     const v = setVal(el, d[2]);
     if (v === undefined) { settingsSync(); return; }  // not a valid value: back to what is saved
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
-    await setApply({[d[0]]: v}, tr(d[1]));
+    await setApply({[d[0]]: v}, tr(d[1]), d[2] === 'chk' || d[2] === 'sel' ? {} : {keep: el});  // 2.359.2 B (#3049): a failed save leaves the typed text
     if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
     if (d[0] === 'tz' || d[0] === 'time_split_midnight') S.tv.key = '';  // 2.125.0 B (#2120): the time report again
     if (d[0] === 'chat_read_receipts' && typeof teamChanged === 'function') teamChanged();  // 2.139.0 A (#2129): "Read by" comes / goes

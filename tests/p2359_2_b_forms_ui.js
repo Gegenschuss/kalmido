@@ -2,6 +2,8 @@
 // - quick entry (docked composer), board "+ Task", matrix "+ Task", the tag field, the shopping mode: a 500 / 409 leaves the text
 //   (and pasted images) in the field; a second Enter while the first still saves sends nothing twice; emptied once saved
 // - a task's detail drawn again while the tag field is typed in (the video section arrives late) keeps the text
+// - settings: a failed autosave leaves the typed value in its field (not reset to the saved one)
+// - a custom field of a task: a failed save leaves the typed value; leaving the field again saves it
 // - the list dialog: "Close" with a failed save keeps the dialog and the typed name ("Discard changes?" first); Esc too
 // kalmido-suite: fresh
 const {boot, errs, B, login, until, sleep} = require('./boot');
@@ -16,15 +18,17 @@ const stub = (w, fake) => { const calls = [], of = w.fetch; w.fetch = (u, o = {}
   if (m !== 'GET') calls.push({m, p, body: typeof o.body === 'string' ? o.body : ''});
   const r = fake && fake(m, p, () => of(u, o)); return r ? Promise.resolve(r) : of(u, o); }; return calls; };
 const enter = (w, el) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+const toastErr = (d) => { const t = d.querySelector('#toast'); return !!t && !t.classList.contains('hidden') && /Server error/.test(t.textContent); };
 const titles = async () => (await call('GET', '/api/state')).tasks.map(t => t.title);
 
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'kanban,matrix,family'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'kanban,matrix,family,fields,pomo'});
   const P = (await call('POST', '/api/lists', {name: 'Garden'})).id;
   const SH = (await call('POST', '/api/lists', {name: 'Groceries', family: 'shopping'})).id;
   const T1 = (await call('POST', '/api/tasks', {title: 'Plant tulips', list_id: P})).id;
+  const FB = (await call('POST', `/api/lists/${P}/fields`, {name: 'Supplier', type: 'text'})).id;
   const w = await boot({user: 'alice', hash: 'l/' + P}), d = w.document;
   let fake = null;
   const calls = stub(w, (m, p, go) => fake && fake(m, p, go));
@@ -129,6 +133,32 @@ const titles = async () => (await call('GET', '/api/state')).tasks.map(t => t.ti
   lmd.querySelector('[data-m="close"]').click();
   check(await until(() => !lmd.isConnected), 'list dialog: closes once saved');
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === P)?.name === 'Garden and yard'), 'list dialog: the name is saved');
+
+  // ================= settings: a failed autosave keeps the typed value
+  w.eval(`settingsModal('modules')`);
+  check(await until(() => !!d.querySelector('.smodal #s-pf')), 'settings: the focus length field');
+  fake = (m, p) => m === 'PATCH' && p === '/api/settings' ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
+  w.document.querySelector('#toast')?.classList.add('hidden');
+  const pf = d.querySelector('.smodal #s-pf'); pf.focus(); pf.value = '42'; pf.blur();  // left: settingsSync no longer skips it as the focused field
+  pf.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(() => calls.some(c => c.p === '/api/settings') && toastErr(d)), 'settings: the save was tried and failed');
+  await sleep(100);
+  check(d.querySelector('.smodal #s-pf')?.value === '42', 'settings 500: the typed value stays (' + d.querySelector('.smodal #s-pf')?.value + ')');
+  fake = null;
+  d.querySelector('.smodal')?.remove();
+
+  // ================= a custom field of a task: a failed save keeps the typed value
+  w.eval(`go('l/${P}'); openDetail(${T1})`);
+  check(await until(() => !!d.querySelector(`#detail [data-cf="${FB}"]`)), 'field: the "Supplier" field');
+  fake = (m, p) => m === 'PATCH' && p === '/api/tasks/' + T1 ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
+  w.document.querySelector('#toast')?.classList.add('hidden');
+  let cf = d.querySelector(`#detail [data-cf="${FB}"]`); cf.focus(); cf.value = 'Bulb shop'; cf.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(() => calls.some(c => c.p === '/api/tasks/' + T1) && toastErr(d)), 'field: the save was tried and failed');
+  await sleep(100);
+  check(d.querySelector(`#detail [data-cf="${FB}"]`)?.value === 'Bulb shop', 'field 500: the typed value stays (' + d.querySelector(`#detail [data-cf="${FB}"]`)?.value + ')');
+  fake = null;
+  cf = d.querySelector(`#detail [data-cf="${FB}"]`); cf.dispatchEvent(new w.FocusEvent('blur'));
+  check(await until(async () => (await call('GET', '/api/tasks/' + T1)).fields?.[FB] === 'Bulb shop'), 'field: leaving it again saves it');
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();
