@@ -107,7 +107,7 @@ OFM_FK.update({"office_equipment": {"agreement_id": "office_agreements", "receip
 OFM_WHAT += ("letters",)
 OFM_ADMIN += ("letters",)
 OFM_TABLE["letters"] = "office_letters"
-OFM_LETTER_CLEAR = ("client_id", "contact_id", "template_id", "node_id", "agent_id")
+OFM_LETTER_CLEAR = ("client_id", "contact_id", "template_id", "node_id", "agent_id", "followup_task_id")
 OFM_FK["office_letters"] = {"client_id": "clients", "contact_id": "contacts", "template_id": "office_doc_templates", "node_id": "fs_nodes"}
 # 2.356.1 (#3345): a set with its devices (office_sets.items = JSON list naming equipment_id, no foreign key). A device moves
 # by the rules of what "equipment"; one that something else in the old office still uses (another set there, a booking,
@@ -990,6 +990,7 @@ def ofm_move_space():
             ofm_move_row(c, rec, "office_deals", r, src, dst, dst, {
                 "client_id": cmap.get(r["client_id"]) if r["client_id"] else None, "lead_client_id": cmap.get(r["lead_client_id"]) if r["lead_client_id"] else None,
                 "offer_id": r["offer_id"], "list_id": r["list_id"], **p["deal_clear"].get(r["id"], {}), "updated_at": ts})
+            ofm_detach(c, rec, "appt_bookings", "deal_id", r["id"], "office_deals")  # review: a booking of the old office's page lets go
         for r in p["trips"]:
             ofm_move_row(c, rec, "office_trips", r, src, dst, dst, {"client_id": None, "updated_at": ts})
             for it in c.execute("SELECT * FROM office_trip_items WHERE trip_id=? ORDER BY id", (r["id"],)).fetchall():
@@ -1372,6 +1373,12 @@ def rmv_unmake(c, m, dst, gone):
             gone.append(rmv_path(dst, r["file"]))
         return 0
     if not c.execute(f"SELECT 1 FROM {t} WHERE id=? AND org_id=?", (rid, dst)).fetchone():
+        return 0
+    # 2.356.1 (#3345, review): a device / set copy the target has put into a set or booked since stays (no foreign key there)
+    if t in ("office_equipment", "office_sets") and (c.execute(
+            "SELECT 1 FROM hub_bookings WHERE org_id=? AND resource_kind=? AND resource_id=? AND deleted_at IS NULL LIMIT 1",
+            (dst, "equipment" if t == "office_equipment" else "set", rid)).fetchone() or t == "office_equipment" and any(
+            rid in {ofm_set_eid(i) for i in ofm_set_items(x["items"])} for x in c.execute("SELECT items FROM office_sets WHERE org_id=?", (dst,)).fetchall())):
         return 0
     if ofm_refs(c, t, rid):
         return 1 if t == "office_contracts" else 0  # used in the target since: it stays
