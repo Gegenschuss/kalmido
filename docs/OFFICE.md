@@ -296,7 +296,7 @@ mode: not checked yet) keeps its line in the list without the file (2.306.0).
   same invoice as an older one is marked *Possibly a duplicate of ...* with a link and *No duplicate*. The DATEV export
   leaves such receipts out unless *Include possibly duplicate receipts* is ticked.
 - **Bank** (admins, 2.90) - bank reconciliation, see below.
-- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo, own letterhead PDF (2.120, see "Own letterhead"),
+- **Settings** - company name and address lines, contact / register / bank lines (printed in the footer), logo with its size (small 30 x 14 / medium 45 x 22 / large 60 x 30 mm, settings key `logo_size` s | m | l) and side (`logo_pos` l | r, default medium + right; 2.406), own letterhead PDF (2.120, see "Own letterhead"),
   brand colour (accent in the print only), document language (de / en), home currency (base pack, 2.189), currency of new documents + rate, number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
   default rights, country pack with its tax rates, and the import / export of the master data.
@@ -1595,7 +1595,7 @@ Finalising freezes it:
 - the number is assigned if it has none yet;
 - the totals are stored and never recomputed; every position keeps its tax rate, net amount and tax amount as decimal
   text (`tax_pct`, `net`, `tax_amount`);
-- the sender (company lines and fields, colour, the logo by its SHA-256 - the file is kept as `logo-<hash>.png`), the
+- the sender (company lines and fields, colour, the logo by its SHA-256 - the file is kept as `logo-<hash>.png` - with its size and side), the
   recipient (with the client's billing fields) and the country pack's rates, formats and print words (`pack_version`)
   are stored in the document.
 

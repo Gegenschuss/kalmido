@@ -8382,6 +8382,33 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.lfh .sbbtn{flex:0 1 auto}  /* the number right after the name (#1607), the rest of the row folds */
 .abshdlg.lfshdlg #ab-shl .mrow .n{white-space:normal;overflow-wrap:anywhere}  /* a long name wraps, not cut (#1044) */
 #side .sbbtl{margin:0;padding:.25rem .5rem .25rem calc(1.75rem + var(--sbbl,0)*.875rem);font-size:var(--fs-s)}
+/* 2.406.0 A (#3492): ONE row rule for the sidebar: a tree row (sbb_treeHtml) and a folder head look like a plain #side .srow
+   -- the same font size, a 1 rem symbol at the same left edge, no extra gap above; the fold arrow sits small and grey at the
+   row's end and turns with .closed; each level steps in by one symbol + gap (1.5 rem), so a child's symbol stands under its
+   parent's name */
+#side .fhead.sbbt{margin:0;padding:0 .25rem 0 calc(.5rem + var(--sbbl,0)*1.5rem);gap:.25rem;font-size:var(--fs-b)}
+#side .sbbtar{color:var(--faint)}
+#side .sbbtar .fcar{width:.75rem;height:.75rem;margin:0}
+#side .sbbtl{padding-left:calc(.5rem + var(--sbbl,0)*1.5rem)}
+#side .sbbt .sbbtn .n,#side .fhead:not(.sbbt) .n{font-size:inherit;font-weight:400;color:inherit;letter-spacing:normal}
+#side .fhead.on .n,#side .sbbt.on .n{font-weight:600}
+#side .fhead:not(.sbbt){font-size:var(--fs-b);color:var(--text2)}
+#side .fhead .sic svg,#side .sbbtn>svg.i,#side .sbbtn>.orgic{width:1rem;height:1rem}  /* also a small symbol put in by a module (the wiki's space) */
+#side .fhead:not(.sbbt) .c{order:1;margin-right:0}
+#side .fhead:not(.sbbt) .fcar{order:2;width:.75rem;height:.75rem;margin:0 0 0 auto;color:var(--faint)}
+#side .fhead:not(.sbbt)>:not(.sgrip,.sic,.n,.c,.fcar,.fmenu){order:3}
+#side .fhead:not(.sbbt) .fmenu{order:4}
+/* a project folder head drawn by the tree (2.352.0 E, .lfh): the same order -- number after the name, the arrow at the row's
+   end, then the share mark and the "..." -- and the lists' right edge, so the share marks stand in one column */
+#side .fhead.sbbt.lfh{padding-right:.5rem;gap:.5rem}  /* as #side .srow */
+#side .sbbt.lfh>.c{order:1;margin-right:0}
+#side .sbbt.lfh>.sbbtar{order:2;margin-left:auto}
+#side .sbbt.lfh>:not(.sbbtn,.c,.sbbtar,.fmenu){order:3}
+#side .sbbt.lfh>.fmenu{order:4}
+@media (min-width:900px) and (hover:hover){ #side .fhead:not(.sbbt):not(:has(.sbc-sl)){padding-right:2rem} }  /* no share column: room for the "…" shown on hover */
+#side .fbody .srow,#side .fhead.fsub{padding-left:calc(1.125rem - 1px)}
+#side .fsubw .fbody .srow{padding-left:calc(1.75rem - 2px)}
+@media (min-width:900px) and (pointer:coarse){ #side .fhead.sbbt,#side .fhead:not(.sbbt),#side .sbbtn{font-size:var(--fs-m)} }  /* as #side .srow there */
 .abview.abdesk{grid-template-columns:minmax(0,1fr)}
 /* 2.152.3 Teil A (#2619): direction 4 (sketch of 22.10.): ONE low head bar over the bar of the areas, the panel and the page
    on a computer (#kbar, areas.js sbb_barHtml): brand + workspace switch left, the search, the bell, the dot and the account

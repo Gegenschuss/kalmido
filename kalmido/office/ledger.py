@@ -363,6 +363,7 @@ def ofx_finalize(c, oid, uid, did):
     sender = {"company": ofx_company_print(fields, s.get("company") or {}, lang, pack), "fields": fields, "color": color,
               "logo": logo, "logo_sha256": sha, "pack": pack.get("code") or s["pack"]}
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
+    sender["logo_size"], sender["logo_pos"] = s.get("logo_size") or "m", s.get("logo_pos") or "r"  # 2.406.0 (#3501): frozen
     sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
     if s.get("exempt_reason"):
         sender["exempt_reason"] = s["exempt_reason"]  # 2.296.0 B (#3169): the exemption reason, frozen (invoices.inv_render)

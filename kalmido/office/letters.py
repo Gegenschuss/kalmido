@@ -504,8 +504,9 @@ def lt_pdf(c, oid, d):
             if hide_head:  # the letterhead brings logo, name and fold marks
                 pass
             elif logo:
-                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
-                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
+                fw, fh, left = P.pdf_logo_frame(co)  # 2.406.0 (#3501): size and side from the office settings
+                lw, lh_ = P.pdf_logo_fit(logo, fw, fh)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL if left else PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 # bundle 2.305 (#3170): the name lines one under the other, as the templates and the other office PDFs print
                 # them (2.99.0 D #2188; the joined name of several lines ran out of the page on the left)
