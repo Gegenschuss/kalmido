@@ -12662,7 +12662,6 @@
   "{0}: away": "{0}: afwezig",
   "My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.": "Je afwezigheid en de feestdagen van je deelstaat, voor de agenda-app van je telefoon. Afwezigheid van anderen staat er niet in; ziekteverlof verschijnt als ‘Afwezig’.",
   "One subtask per line, indent with two spaces for a further level (at most {0} levels in total).": "Eén subtaak per regel, spring in met twee spaties voor een volgend niveau (maximaal {0} niveaus in totaal).",
-  "Board": "Bord",
   "Columns by": "Kolommen op",
   "Pick a day in the task": "Kies de dag in de taak",
   "Section templates": "Sectiesjablonen",
@@ -13390,7 +13389,6 @@
   "Delete project permanently…": "Project definitief verwijderen…",
   "Restore project from the archive": "Project uit het archief halen",
   "To a project": "Naar een project",
-  "From your projects, without a date": "Uit je projecten, zonder datum",
   "The project is shared: {0} other person loses it.": ["Het project is gedeeld: {0} andere persoon verliest het.", "Het project is gedeeld: alle {0} andere personen verliezen het."],
   "The folder has defaults that change this project:": "De map heeft standaardinstellingen die dit project wijzigen:",
   "Moving into a workspace changes who can be in the project; members and agents outside it may lose access. Cancel leaves the project where it is.": "Een andere werkruimte verandert wie in het project kan zijn; leden en agents daarbuiten kunnen de toegang verliezen. Annuleren laat het project waar het is.",
@@ -15064,5 +15062,12 @@
   "The company “{0}” is set up": "Het bedrijf „{0}” is aangemaakt",
   "Only a person can create a company": "Alleen een persoon kan een bedrijf aanmaken",
   "You already have {0} companies of your own": "Je hebt al {0} eigen bedrijven",
-  "Only an admin of this server sets the e-mail domains of this company": "Alleen een beheerder van deze server stelt de e-maildomeinen van dit bedrijf in"
+  "Only an admin of this server sets the e-mail domains of this company": "Alleen een beheerder van deze server stelt de e-maildomeinen van dit bedrijf in",
+  "Unassigned in your projects": "Zonder verantwoordelijke in je projecten",
+  "New tasks without a project land in the Basket, down in the bar. Today, Tomorrow and Next 7 days collect from all projects.": "Nieuwe taken zonder project komen in de Mand, onderaan in de balk. Vandaag, Morgen en Komende 7 dagen verzamelen uit alle projecten.",
+  "Here you create clients and quotations.": "Hier maak je klanten en offertes aan.",
+  "Work as a team": "Samenwerken in een team",
+  "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Deel een project via het menu ‘…’: wie je toevoegt, ziet alleen wat je deelt, en met @naam wijs je taken toe.",
+  "{0} invites you to {1}.": "{0} nodigt je uit voor {1}.",
+  "You are invited to {0}.": "Je bent uitgenodigd voor {0}."
 }

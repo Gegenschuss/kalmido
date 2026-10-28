@@ -12638,7 +12638,6 @@
   "{0}: away": "{0}: abwesend",
   "My absences and the public holidays of my state, for the calendar app of your phone. Nobody else’s absences are in it; a sick leave shows as “Away”.": "Deine Abwesenheiten und die Feiertage deines Bundeslands, für die Kalender-App deines Handys. Abwesenheiten anderer sind nicht dabei; eine Krankmeldung erscheint als „Abwesend“.",
   "One subtask per line, indent with two spaces for a further level (at most {0} levels in total).": "Eine Unteraufgabe pro Zeile, zwei Leerzeichen Einzug für eine weitere Ebene (insgesamt höchstens {0} Ebenen).",
-  "Board": "Board",
   "Columns by": "Spalten nach",
   "Pick a day in the task": "Wähle den Tag in der Aufgabe",
   "Section templates": "Abschnitts-Vorlagen",
@@ -13389,7 +13388,6 @@
   "Delete project permanently…": "Projekt endgültig löschen…",
   "Restore project from the archive": "Projekt aus dem Archiv holen",
   "To a project": "In ein Projekt",
-  "From your projects, without a date": "Aus deinen Projekten, ohne Termin",
   "The project is shared: {0} other person loses it.": ["Das Projekt ist geteilt: {0} weitere Person verliert es.", "Das Projekt ist geteilt: Alle {0} weiteren Personen verlieren es."],
   "The folder has defaults that change this project:": "Der Ordner hat Vorgaben, die dieses Projekt ändern:",
   "Moving into a workspace changes who can be in the project; members and agents outside it may lose access. Cancel leaves the project where it is.": "Ein anderer Arbeitsbereich ändert, wer im Projekt sein kann; Mitglieder und Agenten außerhalb können den Zugriff verlieren. Abbrechen lässt das Projekt, wo es ist.",
@@ -15064,5 +15062,12 @@
   "The company “{0}” is set up": "Die Firma „{0}“ ist angelegt",
   "Only a person can create a company": "Nur eine Person kann eine Firma anlegen",
   "You already have {0} companies of your own": "Du hast schon {0} eigene Firmen",
-  "Only an admin of this server sets the e-mail domains of this company": "Die E-Mail-Domains dieser Firma setzt nur ein Admin dieses Servers"
+  "Only an admin of this server sets the e-mail domains of this company": "Die E-Mail-Domains dieser Firma setzt nur ein Admin dieses Servers",
+  "Unassigned in your projects": "Ohne Zuständigen in deinen Projekten",
+  "New tasks without a project land in the Basket, down in the bar. Today, Tomorrow and Next 7 days collect from all projects.": "Neue Aufgaben ohne Projekt landen im Eingang, unten in der Leiste. Heute, Morgen und Nächste 7 Tage sammeln aus allen Projekten.",
+  "Here you create clients and quotations.": "Hier legst du Kunden und Angebote an.",
+  "Work as a team": "Im Team arbeiten",
+  "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Teile ein Projekt über sein Menü „…“: Wen du hinzufügst, sieht nur, was du teilst, und mit @Name weist du Aufgaben zu.",
+  "{0} invites you to {1}.": "{0} lädt dich zu {1} ein.",
+  "You are invited to {0}.": "Du bist zu {0} eingeladen."
 }

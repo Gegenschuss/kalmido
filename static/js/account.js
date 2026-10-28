@@ -519,6 +519,7 @@ async function inviteScreen(tok) {
   } else {
     el.innerHTML = `<div class="card">${logo}
       <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
+      ${info.kind === 'invite' && (info.invited_by || info.org_name) ? `<p class="invby">${esc(info.invited_by ? tr('{0} invites you to {1}.', info.invited_by, info.org_name || APP_NAME) : tr('You are invited to {0}.', info.org_name))}</p>` : ''}${''/* 2.365.0 (#2802): who invites, into which organisation */}
       <p class="muted">${esc(info.kind === 'reset' ? tr('Choose a new password for “{0}”.', info.username) : tr('Choose your own password to finish your account.'))}</p>
       <form id="inv-form" autocomplete="on">
         <label class="aulab" for="inv-user">${tr('Username')}</label><input id="inv-user" name="username" autocomplete="username" readonly value="${esc(info.username)}">
@@ -1178,7 +1179,7 @@ async function setupChoices(el, logo) {
   const suPriv = () => modPrivHtml(['a:life', 'a:review'].filter(x => picked.has(x)).flatMap(x => MG_SU_AREA[x]));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
-      <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
+      ${''/* 2.365.0 (#2802): the language as a small menu top right (it took half a phone screen; the browser's language is preselected) */}<details class="sulang" id="su-lang"><summary title="${esc(tr('Language'))}">${ic('globe', 's')}<span>${langName(langs.find(L => L.code === lang) || {code: lang, name: lang})}</span></summary><div class="sulangs">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}" aria-pressed="${L.code === lang}">${langName(L)}</button>`).join('')}</div></details>
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${isOn(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${isOn(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b> <small class="muted">${tr(p.desc)}</small>${SU_ADDS[k] ? ` <small class="suadds">${esc(tr('Adds: {0}', SU_ADDS[k]().join(', ')))}</small>` : ''}</button>`).join('')}</div>
