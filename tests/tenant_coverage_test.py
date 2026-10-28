@@ -944,7 +944,7 @@ ROUTES = {
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
-    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
