@@ -84,7 +84,7 @@ UMZ_TEXT_MAX = 1_000_000  # characters of one text value
 UMZ_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._\-/]{0,250}")
 UMZ_EID_RE = re.compile(r"[0-9a-f]{8,64}")
 # 2.278.0 C (#3091): the AAD a browser ciphertext of the old server carries (collab/e2e.py, notelock.js, e2e.js)
-UMZ_AAD_RE = re.compile(r"kalmido-(locknote|note|file):v1:[0-9]{1,19}:[0-9]{1,19}|kalmido-e2e:v1:[0-9]{1,19}")
+UMZ_AAD_RE = re.compile(r"kalmido-(locknote|file):v1:[0-9]{1,19}:[0-9]{1,19}|kalmido-e2e:v1:[0-9]{1,19}")
 
 
 def umz_legacy_aad(prefix, old, *ids):
@@ -109,7 +109,6 @@ UMZ_DROP = {
     "list_files": {"path"},
     "events": {"href"},
     "contacts": {"href"},
-    "notes": {"client_ref"},  # 2.362.0 (#3090, review): the offline outbox mark of the old server (unique per person)
     # 2.278.0 B (#3094): time_entries.billed_at is kept (umz_billed): a billed entry never comes open again (billed twice)
 }
 # 2.273.0 A (#3030): the parts of an account export the import reads (umz_write; people + list_members through the sharing
@@ -121,7 +120,6 @@ UMZ_READ = frozenset((
     "time_entries", "habits", "habit_logs", "filters", "templates", "address_books", "contacts", "event_calendars", "events",
     "event_attendees", "journal", "mailbox", "settings", "people", "server_links",
     "e2e_keys",  # 2.278.0: the browser keys
-    "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
@@ -383,7 +381,6 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
     ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
     ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),
-    ("bookings/", N_("Booking page")),  # 2.362.0 (#3096): in the archive, not taken over (a booking page is one person's)
 )
 
 
@@ -622,7 +619,7 @@ def umz_preview(c, uid, man, data, can_invite):
         "user": {"name": _txt(u.get("name"), 100), "email": _email(u.get("email"))},  # the own address (plain in the file)
         "counts": {k: tables.get(k, 0) for k in ("lists", "sections", "tasks", "comments", "attachments", "list_files", "habits",
                                                   "filters", "templates", "time_entries", "event_calendars", "events", "address_books",
-                                                  "contacts", "journal", "notes")},  # 2.362.0 (#3090): + project notes
+                                                  "contacts", "journal")},
         "lists": lists[:500], "people": people[:500], "can_invite": bool(can_invite),
         "people_salt": umz_salt(man) or "",  # 2.239.0 A (#2882): the client checks a typed address against the keyed hash
         "server_links": [_txt(x.get("name"), 100) or _txt(x.get("base_url"), 200) for x in data.get("server_links", [])][:20],
@@ -1020,21 +1017,6 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 "kalmido-locknote:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
             if d:
                 umz_insert(c, "task_note_locks", d, rid=False)
-    for r in data.get("task_enc_notes", []):  # 2.362.0 (#3090): browser-encrypted with my content key: only my own
-        tid = run.m("tasks", r.get("task_id"))
-        if tid and _oid(r.get("user_id")) == me_old:
-            d = umz_row(c, "task_enc_notes", r, {"task_id": tid, "user_id": uid, "legacy_aad": umz_legacy_aad(
-                "kalmido-note:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
-            if d and umz_insert(c, "task_enc_notes", d, rid=False):
-                run.count("task_enc_notes")
-    for r in data.get("notes", []):  # 2.362.0 (#3090): the project notes of my lists (the trash stays behind)
-        run.step()
-        lid = run.m("lists", r.get("list_id"))
-        if not lid or lid == inbox or r.get("deleted_at"):
-            continue
-        d = umz_row(c, "notes", r, {"list_id": lid, "created_by": uid, "updated_by": uid}, ts)
-        if d and umz_insert(c, "notes", d):
-            run.count("notes")
     keys = [r for r in data.get("e2e_keys", []) if _oid(r.get("user_id")) == me_old] if run.kind != "org" else []
     if keys:  # 2.278.0 C (#3091): my key bundle -- taken while I have none here, never replacing my own keys
         k = e2e_import_keys(c, uid, keys[0], me_old)

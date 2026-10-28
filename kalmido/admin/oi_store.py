@@ -19,11 +19,10 @@ import re
 import secrets
 
 from ..core.i18n import N_
-from .orgimport import OiT, _txt  # 2.362.0 (#3131): + _txt
+from .orgimport import OiT
 from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
-from ..core.db import iso, now_utc  # 2.362.0 (#3131)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -295,11 +294,8 @@ def _wiki_version(c, run, src, d, ctx):
 def _receipt(c, run, src, d, ctx):
     d["ws"] = _ws(ctx)
     if (src.get("billed_doc_id") or src.get("billed_at")) and not d.get("billed_doc_id"):  # 2.278.0 B (#3094): never silently open
-        # 2.362.0 (#3131): it stays billed ("billed, invoice missing": billed_at without a document, office/outlays.py au_billed),
-        # never open again (it would be billed twice); unbill frees it on purpose
-        d["billed_at"] = _txt(src.get("billed_at"), 40) or iso(now_utc())
-        d["billed_doc_id"], d["billed_item_id"] = None, None
-        run.warning(N_("Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed"))
+        d["billed_at"] = None
+        run.warning(N_("Billed receipts whose invoice did not come along are open again: check them before billing"))
     return d
 
 

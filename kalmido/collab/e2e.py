@@ -269,11 +269,10 @@ def e2e_note_get(tid):
     """{body: {v, iv, ct}, updated_at} -- my own encrypted note of the task (404: none)."""
     c = db()
     uid = _note_task(c, tid, False)
-    r = c.execute("SELECT body, updated_at, legacy_aad FROM task_enc_notes WHERE task_id=? AND user_id=?", (tid, uid)).fetchone()
+    r = c.execute("SELECT body, updated_at FROM task_enc_notes WHERE task_id=? AND user_id=?", (tid, uid)).fetchone()
     if not r:
         raise Denied(404)
-    # 2.362.0 (#3090): legacy_aad = the AAD of the old server after a move (sealed anew on the next save)
-    return jsonify(task_id=tid, body=json.loads(r["body"]), updated_at=r["updated_at"], legacy_aad=r["legacy_aad"])
+    return jsonify(task_id=tid, body=json.loads(r["body"]), updated_at=r["updated_at"])
 
 
 @app.put("/api/tasks/<int:tid>/enc-note")
@@ -289,7 +288,7 @@ def e2e_note_put(tid):
     ts = iso_ms(now_utc())
     new = c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? AND user_id=?", (tid, uid)).fetchone() is None
     c.execute("INSERT INTO task_enc_notes(task_id,user_id,body,updated_at) VALUES(?,?,?,?) ON CONFLICT(task_id,user_id) "
-              "DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at, legacy_aad=NULL", (tid, uid, enc, ts))  # 2.362.0 (#3090): sealed anew
+              "DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at", (tid, uid, enc, ts))
     if new:
         bump(c)  # the task's flag encrypted_note changes (nothing of the content goes anywhere else)
     c.commit()

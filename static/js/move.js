@@ -29,8 +29,7 @@ async function umzExpLoad(md) {
 const umzCount = (k, n) => ({lists: trn('{0} project', '{0} projects', n), tasks: trn('{0} task', '{0} tasks', n), comments: trn('{0} comment', '{0} comments', n),
   attachments: trn('{0} file', '{0} files', n), list_files: trn('{0} project file', '{0} project files', n), habits: trn('{0} habit', '{0} habits', n),
   events: trn('{0} event', '{0} events', n), contacts: trn('{0} contact', '{0} contacts', n), journal: trn('{0} journal entry', '{0} journal entries', n),
-  time_entries: trn('{0} time entry', '{0} time entries', n), templates: trn('{0} template', '{0} templates', n), filters: trn('{0} filter', '{0} filters', n),
-  notes: trn('{0} project note', '{0} project notes', n)})[k];  // 2.362.0 (#3090)
+  time_entries: trn('{0} time entry', '{0} time entries', n), templates: trn('{0} template', '{0} templates', n), filters: trn('{0} filter', '{0} filters', n)})[k];
 const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(k, n)).map(([k, n]) => esc(umzCount(k, n))).join(' · ');
 // 2.278.0 A (#3095): into an organisation an existing account is invited (joins once it accepts), with the role of the
 // file as a suggestion the admin confirms

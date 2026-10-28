@@ -44,8 +44,7 @@ async function bkBilledLoad(info) {  // 2.121.0 C (#2094)
   try { return (await api('GET', `/api/office/receipts/billed?ids=${ids.join(',')}`)).billed || {}; } catch { return {}; }
 }
 // 2.121.0 review N4: billed by another office before a move (no kind) -> the plain note
-// 2.362.0 (#3131): billed before an organisation import whose invoice did not come along
-const bkBilledTxt = b => !b ? '' : b.missing ? tr('Billed, the invoice did not come along with the import') : !b.kind ? tr('A receipt has already been billed') : tr('billed on {0} {1}', b.kind === 'invoice' ? tr('Invoice') : tr('Quotation'), b.number || tr('Draft'));
+const bkBilledTxt = b => !b ? '' : !b.kind ? tr('A receipt has already been billed') : tr('billed on {0} {1}', b.kind === 'invoice' ? tr('Invoice') : tr('Quotation'), b.number || tr('Draft'));
 async function bkLoadUstva() {
   const seq = ++BK.seq;
   try { const j = await api('GET', `/api/office/books/ustva?year=${BK.pyear}&period=${BK.period}`); if (seq === BK.seq) BK.ustva = j; }
