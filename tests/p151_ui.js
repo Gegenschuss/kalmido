@@ -45,7 +45,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
   check(!d.querySelector('#rail'), 'no rail any more');
   const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act).concat([...d.querySelectorAll('#srail .srb')].map(x => x.dataset.sbb || x.dataset.act));  // 2.152.2 (#2622): + the bar of the areas
-  const want = ['review', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];  // 2.152.2 (#2622): statistics = the area Review in the bar
+  const want = ['review', 'time', ...(w.eval('overviewOn()') ? ['overview'] : [])];  // 2.152.2 (#2622): statistics = the area Review in the bar  // 2.380.2 (#3400): Settings in the Kalmido menu (checked below)
   // 2.13.3: the search is the command-bar field at the top (no "Search" row)
   check(want.every(k => navK.filter(x => x === k).length === 1) && d.querySelectorAll('#kbar .kbsrch[data-act="palette"], #side .scmd[data-act="palette"]').length === 1 && !navK.includes('search'), 'sidebar: search (the field) / statistics / time / overview / settings, each once: ' + navK);  // 2.152.3 (#2619): the search field moved from the panel into the head bar
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
