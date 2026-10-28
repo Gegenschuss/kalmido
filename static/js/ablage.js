@@ -191,9 +191,9 @@ async function ab_upload(files, target) {
 async function ab_rename(n) {
   // 2.359.2 B (#3049): renamed before the dialog closes; on an error it stays open with the typed name (api() said why)
   let r = null;
-  const name = await askPrompt(tr('Rename'), n.name, {ok: tr('Save'), input: {max: 150},
+  await askPrompt(tr('Rename'), n.name, {ok: tr('Save'), input: {max: 150},
     submit: async v => { if (v && v.trim() && v !== n.name) r = await api('PATCH', `/api/files/nodes/${n.id}`, {name: v}); }});
-  if (!name || !r) return;
+  if (!r) return;  // (r alone: a dialog cancelled while the save ran has renamed all the same - review 2.359.2)
   ab_reload();
   const was = n.name;
   offerUndo(tr('Renamed to “{0}”', r.name), histAdd({label: tr('Rename “{0}”', was), undo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {name: was}), redo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {name: r.name})}));
