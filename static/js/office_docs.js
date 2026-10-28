@@ -746,7 +746,7 @@ async function ofdClick(e) {
   if (a === 'trash') { otb_open(); return; }  // 2.272.0 E2 (#3038)
   if (a === 'new') { await tri_new('offer'); return; }  // 2.380.0 B (#3418): created at once again (2.144.10 had a dialog with "Just to try")
   if (a === 'new-more') { menu(b, [{label: tr('Trial document (SAMPLE)'), icon: 'file', fn: () => tri_new('offer', true)}]); return; }
-  if (a === 'tri-x') { tri_markSeen(b.dataset.kind, b.dataset.office); $('.tri-hint', b.closest('.ofdeditor') || document)?.remove(); return; }
+  if (a === 'tri-x') { tri_markSeen(b.dataset.kind, b.dataset.office); b.closest('.tri-hint')?.remove(); return; }
   if (a === 'tri-del-all') { await tri_deleteAll(); return; }
   if (a === 'new-ls' || a === 'to-ls') return ls_click(a, d);  // 2.120.0 D (#2089)
   if (a === 'open') { if (typeof ms_lpRecent === 'function' && OFD.lp && ms_lpRecent(OFD.lp)) return; go(ofd_href(b.dataset.id)); return; }

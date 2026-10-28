@@ -59,7 +59,7 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     const tid = w.eval('S.route.id');
     const T = await call(ck, 'GET', '/api/office/docs/' + tid);
     check(T.trial === true && /^TEST-\d+/.test(T.number || ''), `${who}: a trial quotation with a TEST number ${T.trial} ${T.number}`);
-    let hint = await until(() => d.querySelector('.ofdeditor .tri-hint[data-trial-hint="offer"]'));
+    let hint = await until(() => d.querySelector('.ofdhead + .tri-hint[data-trial-hint="offer"]'));
     check(!!hint && /TEST number, watermark MUSTER, deletable any time/.test(hint.textContent) && /locked once finalised/.test(hint.textContent), `${who}: the one-time hint in the editor head`);
     hint?.querySelector('[data-ofd="tri-x"]')?.click();
     check(await until(() => !d.querySelector('.tri-hint')), `${who}: X removes the hint`);
@@ -111,7 +111,7 @@ const pick = (w, sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('chan
     check(await until(() => d.querySelector('.ofdeditor') && d.querySelector('.ofdhead .tri-tag') && w.eval('OFD.doc?.kind') === 'invoice'), `${who}: a trial invoice opens with the tag`);
     const iid = w.eval('S.route.id');
     check((await call(ck, 'GET', '/api/office/docs/' + iid)).trial === true, `${who}: the invoice is a trial one`);
-    hint = await until(() => d.querySelector('.ofdeditor .tri-hint[data-trial-hint="invoice"]'));
+    hint = await until(() => d.querySelector('.ofdhead + .tri-hint[data-trial-hint="invoice"]'));
     check(!!hint, `${who}: the invoice's own first-time hint`);
     hint?.querySelector('[data-ofd="tri-x"]')?.click();
     check(await until(async () => String((await call(ck, 'GET', '/api/state')).settings?.trial_hint_seen || '').includes(':invoice')), `${who}: X remembered the invoice hint`);
