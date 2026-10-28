@@ -256,7 +256,7 @@ function apvJump(mid) {
   const n = $('#apv-' + mid); if (!n) { toast(tr('The question is further up: answer it here.')); return; }
   n.scrollIntoView({block: 'center', behavior: 'smooth'}); n.querySelector('.cchb')?.focus({preventScroll: true});
 }
-const chatHM = iso => { try { return new Date(iso).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}); } catch { return ''; } };
+const chatHM = iso => { const d = new Date(iso); return isNaN(+d) ? '' : fmtTimeAt(d); };  // 2.368.0 B (#2982): one locale source
 function chatChoiceSt(m) {
   const ch = m.choices; if (!ch) return null;
   if (m.choice) return 'answered';
@@ -327,7 +327,8 @@ function chatChoiceEdit(mid, cid) {
 // job) and the time, the buttons (a tap sends like a press, the pen puts the text into the box) and X (dismiss, every device).
 // The chat settings per agent (chat-prefs, the header menu): suggestions latest | collect | keep, job results full | line,
 // approvals pinned on | off, notices full | line -- stored on the server per person and agent.
-const ACSET_DEF = {sugg: 'collect', jobs: 'full', pin: 'on', notices: 'full'}, ACSUG_MS = 24 * 3600e3, ACSUG_MAX = 10;
+// 2.331.0 (#3309): the default for suggestions is keep (at their message); stored choices stay.
+const ACSET_DEF = {sugg: 'keep', jobs: 'full', pin: 'on', notices: 'full'}, ACSUG_MS = 24 * 3600e3, ACSUG_MAX = 10;
 const acset_get = k => (S.chat.cp || ACSET_DEF)[k] || ACSET_DEF[k];
 const acsug_old = m => Date.parse(m.created_at) <= Date.now() - (S.chat.off || 0) - ACSUG_MS;
 function acsug_list() {
@@ -599,7 +600,7 @@ const QUOTA_KEYS = {seven_day: N_('Week'), five_hour: N_('5 hours'), spend_limit
 // 2.80.0 (#1841): a further weekly window at 0 % that resets with the week tells nothing new -- left out of the list
 const quotaIdle = (q, w, i) => i !== q.main && w.key?.startsWith('seven_day_') && !(+w.percent) && !!w.resets_at
   && q.windows.some(o => o.key === 'seven_day' && o.resets_at === w.resets_at);
-const quotaWhen = iso => { const d = new Date(iso); return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}); };
+const quotaWhen = iso => fmtStamp(new Date(iso));  // 2.368.0 B (#2982): one locale source
 const quotaPct = v => Math.round(+v || 0).toLocaleString(LOCALE()) + ' %';
 const quotaStale = q => q.stale || !q.at || Date.now() - new Date(q.at) > 864e5;
 function chatRingHtml(a) {
@@ -1178,9 +1179,10 @@ function agSetupHtml(guide, os) {
     : tr('A personal agent runs on your own computer and belongs to you: it sees only the projects you share with it, and only you can chat with it.');
   const steps = AG_GUIDES[g][o].map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
   return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an agent: you run the agent yourself.'))}</div>
-    ${g === 'own' ? `<div class="shint keep">${esc(tr('Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.'))}</div>` : ''}
+    <div class="shint keep">${esc(g === 'own' ? tr('Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.') : tr('Quickest: create the agent, then “Set up on a computer” installs it with one command.'))}</div>
+    <details class="agadv agbyhand"><summary>${tr('For advanced users')}</summary>${''/* 2.364.0 D (#3035): the way by hand (useradd …) folded; first the one-command setup in the agent's row */}
     <ol class="agsteps agb">${steps}</ol>
-    <div class="shint">${esc(tr('Recommended since 2.35: start the launcher with --events. It then runs the agent once per event (headless) and shows its steps, model, permission mode, plan usage and approval cards in the chat; the agent command needs no prompt.'))}</div>
+    <div class="shint">${esc(tr('Recommended since 2.35: start the launcher with --events. It then runs the agent once per event (headless) and shows its steps, model, permission mode, plan usage and approval cards in the chat; the agent command needs no prompt.'))}</div></details>
     ${agRulesHtml()}
     <div class="shint">${esc(tr('Every command, for all three systems:'))} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}#set-up-an-agent" target="_blank" rel="noopener noreferrer">${esc(tr('Set up an agent (docs/AGENTS.md)'))}</a></div>`;
 }
@@ -1268,10 +1270,10 @@ const audHtml = () => `<div class="shint">${tr('Every API request made with an a
     ${dateIn('aud-day', S.aud.day, {label: tr('Day'), empty: tr('All days'), max: today()})}</div>
   <div class="audtbl" id="s-aud" role="table" aria-label="${esc(tr('Activity log'))}"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 function audRow(r) {
-  const d = new Date(r.at), time = d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  const d = new Date(r.at), time = fmtTimeAt(d, true);
   const cls = r.denied ? 'den' : r.status >= 500 ? 'err' : r.status < 400 ? 'ok' : '';
   const ids = [r.task_id ? (r.task_title ? `#${r.task_id} ${r.task_title}` : tr('Task {0}', '#' + r.task_id)) : '', r.list_id ? (r.list_name ? tr('Project {0}', r.list_name) : tr('Project {0}', '#' + r.list_id)) : ''].filter(Boolean).join(' · ');
-  return `<div class="audr ${r.denied ? 'den' : ''}" role="row" data-audid="${r.id}"><span class="audt" role="cell" title="${esc(d.toLocaleString(LOCALE()))}">${esc(time)}${ds(d) === today() ? '' : `<small>${esc(shortDay(ds(d)))}</small>`}</span>
+  return `<div class="audr ${r.denied ? 'den' : ''}" role="row" data-audid="${r.id}"><span class="audt" role="cell" title="${esc(fmtStamp(d))}">${esc(time)}${ds(d) === today() ? '' : `<small>${esc(shortDay(ds(d)))}</small>`}</span>
     <span class="auda" role="cell">${esc(r.agent_name)}</span><span class="audrt" role="cell" title="${esc(r.method + ' ' + r.route)}"><b>${esc(r.method)}</b>${esc(r.route)}</span>
     <span class="auds" role="cell"><span class="audc ${cls}" ${r.denied ? `title="${esc(tr('Denied'))}"` : ''}>${r.status}</span></span><span class="audi" role="cell" ${ids ? `title="${esc(ids)}"` : ''}>${esc(ids || '–')}</span><span class="audd" role="cell">${esc(tr('{0} ms', r.ms))}</span></div>`;
 }
@@ -1401,16 +1403,19 @@ function agNewChooser(anchor, done) {
 }
 function agModal(a, done, o = {}) {
   const personal = a ? !!a.owner : o.kind === 'personal';
-  const ownerSel = (people) => `<div class="row"><label for="ag-owner">${tr('Belongs to')}</label><select id="ag-owner"><option value="" ${!personal ? 'selected' : ''}>${tr('Team agent')}</option>${people.map(u => `<option value="${u.id}" ${(a ? a.owner?.id : S.me?.id) === u.id ? 'selected' : ''}>${esc(tr('Personal agent of {0}', u.display_name))}</option>`).join('')}</select></div>
+  // 2.364.0 D (#3035): "New team agent" preselects "Team agent" (both options carried selected before, the person won)
+  const ownerSel = (people) => `<div class="row"><label for="ag-owner">${tr('Belongs to')}</label><select id="ag-owner"><option value="" ${!personal ? 'selected' : ''}>${tr('Team agent')}</option>${people.map(u => `<option value="${u.id}" ${personal && (a ? a.owner?.id : S.me?.id) === u.id ? 'selected' : ''}>${esc(tr('Personal agent of {0}', u.display_name))}</option>`).join('')}</select></div>
     <div class="shint" id="ag-ownhint">${personal ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for projects with several people; the owner of a project decides who may address it.')}</div>`;
+  const avRow = `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/a-robot.svg', !!a, a?.name || 'AI', AV_BOTS)}</div></div>`;
   const md = modal(`<h3>${a ? tr('Edit agent') : personal ? tr('New personal agent') : tr('New team agent')}</h3>
     <div id="ag-ownrow">${ownerSel(S.me ? [S.me] : [])}</div>${a ? '' : av_whichHtml()}
     ${wsOn() ? `<div class="row"><label for="ag-ws">${tr('Workspace')}</label>${wsSelectHtml('ag-ws', a ? a.org_id : (wsCur().startsWith('org:') ? +wsCur().slice(4) : (personal ? null : S.me?.workspaces?.[0]?.id)))}</div><div class="shint">${tr('An agent works in one workspace and joins only its projects; a private agent never sees an organisation’s projects.')}</div>` : ''}
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
+    ${a ? '' : `${avRow}<details class="agadv" id="ag-adv"><summary>${tr('Advanced')}</summary>`}${''/* 2.364.0 D (#3035): a new agent: name, kind, workspace, picture; the rest folded, sent as before */}
     <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"><span class="muted">${tr('for the login and @mentions')}</span></div>
     <div class="shint keep" id="ag-userhint" hidden></div>
     ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
-    <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/a-robot.svg', !!a, a?.name || 'AI', AV_BOTS)}</div></div>
+    ${a ? avRow : ''}
     ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47.1 (#1721): saved at once */}
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
@@ -1429,6 +1434,7 @@ function agModal(a, done, o = {}) {
     ${aiuLimFields(a)}
     ${agRtFields(a)}
     ${typeof agz_html === 'function' ? agz_html(a) : ''}${''/* 2.233.0 B (#3189): the interim summary, saved at once */}
+    ${a ? '' : '</details>'}
     <div class="foot stfoot"><div class="calerr" role="alert" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   if (a && typeof oa_switchLoad === 'function') oa_switchLoad(md);  // 2.51.0 A (#1348)
   if (a) agPuLoad(md, a);  // 2.312.0 D (#3266)
@@ -1478,14 +1484,15 @@ function agModal(a, done, o = {}) {
         await calReq('DELETE', `/api/admin/agents/${a.id}`);  // 2.7.2 (#420)
         md.remove(); done && done(); load().then(render).catch(() => {}); return;
       }
-      const rt = agRtBody(md); if (!rt) return;
+      const rt = agRtBody(md); if (!rt) { if ($('#ag-adv', md)) $('#ag-adv', md).open = true; return; }
       const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), provider: $('#ag-prov', md)?.value.trim() || '', proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
         ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim(), ...(a ? {list_ids: listCapVal(md, 'ag-lcap')} : {})};  // 2.15.0 (#479); 2.30.0 (#919): list_ids
       const ow = $('#ag-owner', md); if (ow && (!a || String(a.owner?.id || '') !== ow.value)) body.owner_id = ow.value ? +ow.value : null;  // 2.28.0 (#965)
       const wsel = $('#ag-ws', md); if (wsel && (!a || String(a.org_id || '') !== wsel.value)) body.org_id = wsel.value ? +wsel.value : null;  // 2.28.0 (#935)
       const un = $('#ag-user', md).value.trim().toLowerCase();
-      if (!un) { need($('#ag-user', md)); return; }
-      if (userNameBad(un)) { show(userNameBad(un)); need($('#ag-user', md)); return; }  // 2.28.0 (#926)
+      const adv = $('#ag-adv', md);  // 2.364.0 D (#3035): a problem in the folded part opens it
+      if (!un) { if (adv) adv.open = true; need($('#ag-user', md)); return; }
+      if (userNameBad(un)) { if (adv) adv.open = true; show(userNameBad(un)); need($('#ag-user', md)); return; }  // 2.28.0 (#926)
       if (!a || un !== a.username) body.username = un;
       const avk = avBox.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
       b.disabled = true; show('');
@@ -1495,7 +1502,7 @@ function agModal(a, done, o = {}) {
       else if (!a) secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + (r.webhook_secret ? ' ' + tr('Webhook signing secret: {0}', `<code class="topic">${esc(r.webhook_secret)}</code>`) : '') + ' ' + tr('Then share projects with the agent (project dialog > Sharing).'));
       else if (r.webhook_secret) secretModal(tr('Signing secret'), r.webhook_secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).'));
       else toast(tr('Saved'));
-    } catch (x) { show(x.message); } finally { b.disabled = false; }
+    } catch (x) { show(x.message); if (!a && $('#ag-adv', md)) $('#ag-adv', md).open = true; } finally { b.disabled = false; }
   });
   userNameFollow(md, 'ag-name', 'ag-user', 'ag-userhint');  // 2.28.0 (#926)
   setTimeout(() => $('#ag-name', md)?.focus(), 50);
@@ -1607,8 +1614,8 @@ function agRtFields(a) {
     <div class="row"><label for="ag-model">${tr('Model')}</label><input id="ag-model" list="ag-models" value="${esc(rt.model || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><datalist id="ag-models">${AG_MODELS.map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
-    <div class="row"><label for="ag-pm">${tr('Permissions')}</label><select id="ag-pm">${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
-    <div class="shint">${tr('Model: e.g. opus, sonnet or a full model id. Permissions: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
+    <div class="row"><label for="ag-pm">${tr('Approvals')}</label><select id="ag-pm">${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
+    <div class="shint">${tr('Model: e.g. opus, sonnet or a full model id. Approvals: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
     ${a ? `<div class="row"><label for="ag-pu">${tr('Permission questions go to')}</label><select id="ag-pu" disabled><option value="">${esc(tr('As set up on its computer'))}</option></select></div>
     <div class="shint" id="ag-puhint">${a.owner ? tr('A personal agent asks its owner.') : tr('Who answers when it asks for permission in the chat. Only people it reaches in a shared project; its computer takes the choice before its next run.')}</div>` : ''}
     ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button>${!a.owner || a.owner.id === S.me?.id ? `<button class="btn sm" type="button" data-m="aw">${ic('cog', 's')} ${tr('Work style and notifications')}</button>` : ''}</div>` : ''}`;  // 2.236.0 A (#2904-#2911): aw = the owner of a personal agent / any admin of a team agent

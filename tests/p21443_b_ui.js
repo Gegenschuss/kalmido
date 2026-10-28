@@ -53,14 +53,18 @@ const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.toISOStr
     await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     // 2.109.0 (#2054): the first click can land before the office view is wired up (race seen on the Mac runner) -> click again
+    // 2.380.0: #office/invoices already opens the invoice tab, so a click on it reloads the list and swaps the hint out under
+    // us -> click only when the tab is not selected, and wait for the list to be loaded before the hint counts
+    const listed = `typeof OFD !== 'undefined' && Array.isArray(OFD.list) && !OFD.loading`;
     let hint = false;
     for (let k = 0; k < 4 && !hint; k++) {
-      await ev(`(() => { document.querySelector('[data-ofd="kind"][data-kind="invoice"]')?.click(); return 1; })()`);
-      hint = await ready(ev, `/1 payment reminder suggested/.test(document.querySelector('.dun-hint.dun-go')?.textContent || '')`, 40);
+      await ev(`(() => { const t = document.querySelector('[data-ofd="kind"][data-kind="invoice"]'); if (t && t.getAttribute('aria-selected') !== 'true') t.click(); return 1; })()`);
+      hint = await ready(ev, `${listed} && /1 payment reminder suggested/.test(document.querySelector('.dun-hint.dun-go')?.textContent || '')`, 40);
     }
     check(hint, 'the invoice list: "1 payment reminder suggested"');
     await shot('p21443-b-hint.png');
-    await ev(`(() => { document.querySelector('.dun-hint.dun-go').click(); return 1; })()`);
+    await ready(ev, `${listed} && !!document.querySelector('.dun-hint.dun-go')`, 40);
+    await ev(`(() => { document.querySelector('.dun-hint.dun-go')?.click(); return 1; })()`);
     check(await ready(ev, `document.querySelector('[data-ofd="kind"][data-kind="reminder"]')?.getAttribute('aria-selected') === 'true' && document.querySelector('#ofd-status')?.value === 'draft'`, 60),
       'the jump: the reminder list with its drafts');
     check(await ready(ev, `document.querySelectorAll('.ofdlist .dun-tag').length === 1 && /nothing goes out automatically/.test(document.querySelector('p.dun-hint')?.textContent || '')`, 60),

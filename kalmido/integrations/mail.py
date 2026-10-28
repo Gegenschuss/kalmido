@@ -627,7 +627,7 @@ def mail_test():
         return err(tr("E-mail sending is not set up on this server"), 409)
     u = c.execute("SELECT email FROM users WHERE id=?", (me(),)).fetchone()
     if not u or not (u["email"] or "").strip():
-        return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Users)"), 409)
+        return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)"), 409)
     from ..admin.hosting import mail_budget
     if hit_limit(f"mailtest:{me()}", 5, 3600):  # 2.126.0 C (#1979 I6): a few tests an hour, counted in the daily e-mail limit
         return err(tr("Too many tests, please wait a few minutes"), 429)

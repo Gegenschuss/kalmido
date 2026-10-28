@@ -14,18 +14,17 @@ function av_personalHint(ps) {
     : tr('{0} is the personal agent of {1}: only {1} can address it. The switch is for team agents.', x.name, x.owner || tr('someone else'));
 }
 
-// ---- 2.46.6 (#1709): right after creating an agent: "Set up on a computer now?" -- Set up (the one-command setup, #1517) /
-// Later / the token for an own setup. The token comes back only this once: it lives in this dialog until it is closed,
-// nothing stores it. base = /api/my/agents/<id> (own agent) or /api/admin/agents/<id> (an admin's team agent).
+// ---- 2.46.6 (#1709): right after creating an agent: the setup on a computer and the token for an own setup. The token comes
+// back only this once: it lives in this dialog until it is closed, nothing stores it. base = /api/my/agents/<id> (own agent)
+// or /api/admin/agents/<id> (an admin's team agent).
+// 2.364.0 D (#3035): straight into the one-command setup (#1517); the token and the way by hand only under "For advanced users"
 function av_setupOffer(a, base, token) {
-  const md = modal(`<h3>${esc(tr('Agent created. Set it up on a computer now?'))}</h3>
-    <div class="shint keep">${esc(tr('One command installs {0} on your Mac, Windows PC or Linux computer and starts it at every login; the command fetches its own token.', a.name))}</div>
-    <div class="avtok" id="av-tok" hidden></div>
-    <div class="foot"><button type="button" class="linkbtn" data-m="av-tok">${tr('Show the token for an own setup')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Later')}</button><button class="btn pri" data-m="av-setup">${ic('download', 's')} ${tr('Set up')}</button></div>`);
+  const md = ains_setupModal(a, base);
+  $$('.foot', md).pop().insertAdjacentHTML('beforebegin', `<details class="agadv" id="av-adv"><summary>${tr('For advanced users')}</summary>
+    <div class="shint keep">${esc(tr('Set it up by hand instead: the step-by-step guide under Settings > Agents > Set up.'))}</div>
+    <button type="button" class="linkbtn" data-m="av-tok">${tr('Show the token for an own setup')}</button><div class="avtok" id="av-tok" hidden></div></details>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
-    if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m === 'av-setup') { md.remove(); ains_setupModal(a, base); return; }
     if (b.dataset.m === 'av-copy') { try { await navigator.clipboard.writeText(token); toast(tr('Copied')); } catch { $('#av-tokv', md)?.select(); } return; }
     if (b.dataset.m === 'av-tok') {
       b.hidden = true;
@@ -34,7 +33,6 @@ function av_setupOffer(a, base, token) {
         <div class="row icalrow"><input id="av-tokv" readonly value="${esc(token || '')}" aria-label="${esc(tr('API token of {0}', a.name))}" spellcheck="false"><button class="btn sm" data-m="av-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`;
     }
   });
-  setTimeout(() => $('[data-m="av-setup"]', md)?.focus(), 50);
   return md;
 }
 // the setup button of an agent's row: with its text while no computer ever connected (contact_age null), else the icon

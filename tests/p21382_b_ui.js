@@ -56,7 +56,8 @@ const EMOJI = /\p{Extended_Pictographic}/u;
   check(md?.querySelector('#og-flt')?.value === 'mem', '#2407: the filter starts on Members');
   const bobRow = md?.querySelector(`[data-ogrow="${BOB}"]`);
   check(bobRow && bobRow.classList.contains('mrow') && bobRow.querySelector('.avatar') && /Bob Builder/.test(bobRow.querySelector('.n')?.textContent || '') && /bob/.test(bobRow.querySelector('.n .muted')?.textContent || ''), '#2407: a row = avatar, name, user name (like Users)');
-  check(/Admin/.test(md?.querySelector(`[data-ogrow="${DAVE}"] .n .muted`)?.textContent || '') && !/Admin/.test(bobRow?.querySelector('.n .muted')?.textContent || ''), '#2407: a server admin is marked "Admin" in the row');
+  // 2.364.0 C (#3041): one role vocabulary: a server admin is "Manages the server" (Admin = the organisation's role)
+  check(/Manages the server/.test(md?.querySelector(`[data-ogrow="${DAVE}"] .n .muted`)?.textContent || '') && !/Manages the server/.test(bobRow?.querySelector('.n .muted')?.textContent || ''), '#2407: a server admin is marked "Manages the server" in the row');
   check(md?.querySelector('#og-cnt')?.textContent === '3 members · 1 admin', '#2407: counter ' + md?.querySelector('#og-cnt')?.textContent);
   // the boxes
   const mBox = id => md.querySelector(`[data-ogm="${id}"]`), aBox = id => md.querySelector(`[data-oga="${id}"]`);

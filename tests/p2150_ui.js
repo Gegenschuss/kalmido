@@ -221,7 +221,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await shot(`p2150-${tag}-perm.png`);
     // a tap / click toggles a permission
     const before = await ev(`document.querySelector('.modal:last-of-type [data-scope="export"]')?.checked ?? [...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`);
-    const q = await ev(center('.modal [data-scope="export"]'));
+    // 2.364.0 C: the permission of the dialog on top (the settings dialog behind can hold scope boxes too), scrolled into view
+    const q = await ev(`(() => { const e = [...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]'); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
     const q2 = await ev(`(() => { const m = [...document.querySelectorAll('.modal')].pop(), l = m.querySelector('[data-scope="export"]').closest('label'), r = l.getBoundingClientRect(); return {x: r.left + r.width * .7, y: r.top + r.height / 2}; })()`);
     if (touch) await tap(o, q2.x, q2.y); else await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(q2.x), y: Math.round(q2.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
     await until(async () => await ev(`[...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`) !== before);  // 2.308.0 (#3252): wait for the toggle instead of a fixed time

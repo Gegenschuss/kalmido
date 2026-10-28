@@ -63,7 +63,7 @@ function parseNum(v, frac) {
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
-const fmtDate = s => pd(s).toLocaleDateString(LOCALE());
+const fmtDate = s => fmtDateNum(pd(s));  // 2.368.0 B (#2982): the chosen order of numbers
 const RR_WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 function dayLabel(s, long) {
   const t = today();
@@ -76,7 +76,7 @@ function dayLabel(s, long) {
 }
 // 2.6.0 (K07): one way to write a task's date everywhere (rows, the date column, the task panel): "Mo, 5. Okt", a range
 // "So, 4. Okt – Mo, 5. Okt", a time after a comma ("Heute, 17:30")
-const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '');
+const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + fmtTimeLoc(t.due_time) : '');  // 2.368.0 B (#2982): fmtTimeLoc
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
 // 2.16.0 (#473, WCAG 1.4.1): the priority as a shape too (! / !! / !!!, like the quick add), named for screen readers
 const PRIO_NAME = {5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};
@@ -86,7 +86,10 @@ const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-la
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
 // a date without its weekday in the language's own short pattern ("4. Okt" / "Oct 4"), with the year if it is not this one
-const dayNoWd = (d, year) => fmtDay(year ? 'year' : 'short', d).replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '').replace(/^\s*[,.]\s*/, '');
+// 2.368.0 B (#2982): the leading weekday is cut by its name ("Mon 26 Oct" -> "26 Oct": the old pattern kept "Mon" when a
+// number followed it without a comma, as in English, Dutch); the old pattern stays for a language that writes it elsewhere
+const dayNoWd = (d, year) => { const s = fmtDay(year ? 'year' : 'short', d), w = WD[d.getDay()];
+  return (s.startsWith(w) ? s.slice(w.length) : s.replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '')).replace(/^\s*[,.]?\s*/, ''); };
 function weekTitle(first) {
   const a = pd(first), b = pd(addDays(first, 6)), y = new Date().getFullYear(), other = a.getFullYear() !== y || b.getFullYear() !== y;
   return `${dayNoWd(a, other && a.getFullYear() !== b.getFullYear())} – ${dayNoWd(b, other)} · ${tr('Week {0}', isoWeek(addDays(first, 3)))}`;
@@ -109,7 +112,7 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['budget', N_('Budget')],  // 2.72.0 (#1333): the household budget, off by default
   ['feeds', N_('Feeds')],  // 2.85.0 B (#1162): feeds, off by default
   // 2.23.0 (#463): package "Team, family, clients", each off by default
-  ['clients', N_('Clients')], ['workload', N_('Workload & absences')] /* 2.380.2 (#3407): the view's name (de: Einsatzplan) */, ['forms', N_('Forms')],
+  ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')],
   // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
@@ -130,10 +133,16 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
   sheets: N_('Simple tables with formulas like a spreadsheet; every cell can fetch figures from Kalmido (hours booked, budget, open tasks), for quotations, budgets and lists'),  // 2.89.0 (#1916)
   progress: N_('Progress bar in the project header and the project status (“Where is it stuck?”); with collaboration also a status per project')};
-const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
+// 2.364.0 B (#3018): a person without an organisation reads no "only within your organisation" (their clients are their own)
+const FEAT_DESC_SOLO = {clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month')};
+// 2.409.0 (#3490): + the areas switched off in the shown workspace (areas.js wsa_featOff; the module switch stays the main switch)
+const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f) && !(typeof wsa_featOff === 'function' && wsa_featOff(f));
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
 // sharing / assigning in the UI (data stays; with the server switch off the API refuses them too)
 const collab = () => feat('collab') && S.collabAll !== false;
+// 2.364.0 D (#3036): "has collaborators": a project of mine is shared with another person or an agent, or one of my
+// organisations has someone else. Without it the team entries (assign, waiting on someone, approval) stay out of the menus.
+const hasPeers = () => collab() && (!!S.orgPeers || (S.lists || []).some(l => l.shared));
 // 2.0.6 (#315): comments are a module of their own (personal notes); mentions, activity, reactions and the typing
 // indicator only where people work together: collaboration on and the task's list shared
 const cmtOn = () => feat('comments');
@@ -187,17 +196,19 @@ const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
-const overviewOn = () => progressOn() && (S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project' && inWs(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && l.kind === 'project' && inWs(l))));  // 2.380.2 (#3407): inWs
+// 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
+const isTracked = l => !!l && !l.is_inbox && !!l.status;
+const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l))));
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
 const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
-const isProject = lid => listById(lid)?.kind === 'project';
+const isProject = lid => { const l = listById(lid); return !!l && !l.is_inbox; };
 const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
 const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
-const progressFor = l => !!l && progressOn() && l.kind === 'project';
-const statusFor = l => !!l && statusOn() && l.kind === 'project';
+const progressFor = l => !!l && progressOn() && !l.is_inbox;
+const statusFor = l => !!l && statusOn() && !l.is_inbox;
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
 // 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
 const fieldsOf = lid => !fieldsOn() ? [] : td_rc('fo' + lid, () => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id));  // 2.40.0 (#1430): once per render
@@ -994,6 +1005,7 @@ function applyState(j) {
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
   S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || []; S.folderShares = j.folder_shares || {};  /* 2.41.0 (#1428) */  // 2.29.0 (#1030 / #929)
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
+  S.orgPeers = !!j.org_peers;  // 2.364.0 D (#3036): see hasPeers
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
   S.sample = j.sample || null;
@@ -1277,6 +1289,16 @@ function viewSafeRender() { if (lpHold() || (editing() && $('#view')?.contains(d
 // 1.8.1: the Inbox comes first (sidebar, tab choices, palette) and is the start view (START_KEY) until another view
 // was opened: the app reopens on the last task view of the device (LS 'lastKey')
 const START_KEY = 'inbox';
+// 2.364.0 B (#3031): the app opened without a page in its address shows the chosen start page (setting start_page): Start
+// (default), the basket, Today or 'last' = the last task view of this device (the way before); a link with a page keeps it
+const START_PAGES = [['home', N_('Start|home')], ['inbox', N_('Basket')], ['today', N_('Today')], ['last', N_('The last opened view')]];
+// A fresh account whose welcome tour is still to come opens in Projects as before: the tour starts only there (tourAuto,
+// #2821), so Start comes from the next opening on
+function st_landing() {
+  const p = S.settings?.start_page || 'home';
+  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !START_PAGES.some(x => x[0] === p) || S.settings?.tour === 'pending') return;
+  history.replaceState(history.state, '', location.pathname + location.search + '#' + p);
+}
 const SMART = {
   inbox: {name: N_('Basket'), icon: 'inbox'},
   today: {name: N_('Today'), icon: 'sun'},
@@ -1334,7 +1356,7 @@ function parseHash() {
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
-  if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null};  // 2.48.0 (#1111): documents (docs.js)
+  if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null, ...(b === 'review' ? {review: true} : {})};  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
   if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload', 'tags'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
   if (SMART[a]) return {mod: 'tasks', key: a};
@@ -1345,6 +1367,7 @@ async function route() {
   const r = parseHash();
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private
+  wsa_routeHint(r.mod);  // 2.409.0 (#3490): an area off in this workspace: a hint with the way to the workspace where it is on
   const mgAlt = !modOn(r.mod) && mg_alt(r.mod); if (mgAlt) { if (S.booted && r.mod === 'time') setTimeout(() => toast(tr('Time tracking is off (Settings > Modules)')), 0); r.mod = mgAlt; r.key = mgAlt; delete r.client; delete r.contact; } mg_seen(r.mod);  // 2.44.0 (#1187): a part that is off: its area's other tab
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;

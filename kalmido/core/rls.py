@@ -59,6 +59,7 @@ TABLES = (
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
     "fs_area_roots",  # 2.199.0 C (#2742): an area's root folder in a workspace (NULL = a person's own tree, the app checks owner_id)
+    "fs_locks",  # 2.353.0 A (#2758): locked folders of the file store (NULL = a person's own tree, the app checks the folder)
     "bg_jobs",  # 2.193.0 D (#2220): the queue of short background work (NULL = none / private; written and read as "system")
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "doc_fields", "doc_field_values",  # 2.153.0 (#2179): custom fields of documents (NULL = a person's own workspace)

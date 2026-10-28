@@ -126,7 +126,7 @@ def org_invite_new(oid):
         return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     name = re.sub(r"\s+", " ", str(b.get("name") or "")).strip()[:60]
     username = _username(c, email)
-    uid = create_user(c, username, name or username, None, onboard=True)
+    uid = create_user(c, username, name or username, None, onboard=True, ask_purpose=me())  # 2.364.0 A (#3032)
     c.execute("UPDATE users SET email=? WHERE id=?", (email, uid))
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))  # like a new account of the admins

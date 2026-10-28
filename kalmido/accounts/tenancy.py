@@ -259,6 +259,9 @@ CHECKS = {
     # 2.112.1 B (#2058): an external share link whose workspace is not its node's (the page refuses it: files/extlinks.py
     # xl_find; counted only) -- (link, creator)
     "file_ext_link": ("SELECT x.id, x.created_by FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),
+    # 2.353.0 F (#2758, review M5): the lock row of a folder whose workspace is not its folder's (row-level security would hide the
+    # lock from its people; counted only) -- (folder, its owner)
+    "file_lock": ("SELECT l.node_id, n.owner_id FROM fs_locks l JOIN fs_nodes n ON n.id=l.node_id WHERE l.org_id IS DISTINCT FROM n.org_id"),
     # 2.144.5 B (#2410): a workspace mailbox whose ws does not match its organisation / owner ('o<org>' | 'u<person>'; the
     # mailbox code reads by ws only; counted only) -- (mailbox, its owner or creator)
     "hub_mailbox": ("SELECT m.id, COALESCE(m.owner_id, m.created_by) FROM hub_mailboxes m WHERE m.ws IS DISTINCT FROM "
@@ -290,7 +293,7 @@ CHECKS = {
                    "WHERE om.org_id=i.org_id AND om.user_id=i.user_id) AND EXISTS (SELECT 1 FROM org_members o2 "
                    "WHERE o2.user_id=i.user_id AND o2.org_id<>i.org_id)"),  # 2.190.0 R (#2496): only an account of another organisation
 }
-TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
+TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Organisation > People")
 
 
 def boundary_check(c):
@@ -322,7 +325,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
           "tchat_person": ("tchat_members", "room_id")}  # 2.113.1 B (#2059)
-TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
+TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
 def boundary_repair(c):

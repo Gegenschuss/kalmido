@@ -1,0 +1,14 @@
+Mermaid, used by static/js/diagram.js for diagrams on knowledge pages (2.382.0, #3153).
+
+Package:  mermaid 12.2.0 (MIT, see LICENSE)
+Source:   https://registry.npmjs.org/mermaid/-/mermaid-12.2.0.tgz
+Tarball:  sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw==
+          (the npm registry's "integrity" value, checked on download)
+Files:    dist/mermaid.min.js (one file, sets the global "mermaid"), LICENSE -- unchanged copies. The bundle includes its
+          own dependencies (d3, dagre, DOMPurify and others, all MIT / ISC / Apache-2.0 / BSD; their notices are kept
+          inside the file).
+Loaded:   only when a page has a ```mermaid block; not in the service worker's precache. Runs with securityLevel
+          "strict", no HTML labels.
+Update:   download the new tarball, compare its sha512 with the registry's "integrity", copy the same files,
+          update this README and THIRD_PARTY_NOTICES.md.
+          sha256 a8a6a6f805b074a8261a2825c86f99c8054acb3b35f50bb7e24a4f9f2c3c3b9f  mermaid.min.js

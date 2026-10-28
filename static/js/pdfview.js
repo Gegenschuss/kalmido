@@ -155,10 +155,10 @@ async function pdfView(o) {
   if (o.aid) dpvSumMount(m, o);  // 2.92.0 C (#1926): "Summarise" by an agent (docpreview.js, same module)
   const my = gen;
   try {
-    if (!navigator.onLine) throw new TypeError('offline');
-    const r = await fetch(url, {credentials: 'same-origin'});
-    if (!r.ok) throw new Error(r.status === 404 || r.status === 410 ? tr('File damaged or missing') : tr('Could not load the file'));
-    const data = new Uint8Array(await r.arrayBuffer());
+    if (!navigator.onLine && !o.data) throw new TypeError('offline');
+    const r = o.data ? null : await fetch(url, {credentials: 'same-origin'});  // 2.353.0 A (#2758): o.data = bytes decrypted in the browser
+    if (r && !r.ok) throw new Error(r.status === 404 || r.status === 410 ? tr('File damaged or missing') : tr('Could not load the file'));
+    const data = o.data || new Uint8Array(await r.arrayBuffer());
     const lib = await pv_load();
     if (my !== gen || !m.isConnected) return;
     // isEvalSupported off: pdf.js never builds code from the file; no scripting, links stay inert (no annotation layer)

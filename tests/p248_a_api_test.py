@@ -148,7 +148,8 @@ cols = dbx("SELECT table_name, column_name, is_nullable, column_default FROM inf
 # 2.112.1 (#2058): + fs_ext_links (external share links, part B)
 # 2.122.0 (#2097): + fs_upload_requests (file request links)
 # 2.199.0 F (#2742): + fs_area_roots (the root folder of an area, files/fsroots.py, part C)
-check({r[0] for r in cols} - {"fs_upload_requests", "fs_area_roots"} == {"fs_nodes", "fs_versions", "fs_shares", "fs_log", "fs_ext_links"}, f"the file store's tables ({sorted({r[0] for r in cols})})")
+# 2.353.0 A (#2758): + fs_locks, fs_lock_keys (locked folders, files/fslock.py)
+check({r[0] for r in cols} - {"fs_upload_requests", "fs_area_roots", "fs_locks", "fs_lock_keys"} == {"fs_nodes", "fs_versions", "fs_shares", "fs_log", "fs_ext_links"}, f"the file store's tables ({sorted({r[0] for r in cols})})")
 rls = dbx("SELECT relrowsecurity FROM pg_class WHERE relname='fs_nodes'")
 check(rls and rls[0][0], "fs_nodes has row-level security")
 

@@ -117,7 +117,9 @@ def sh_folder_rename(c, uid, old, new):
 
 def _folder_arg(strict=True):
     from ..lists.lists import clean_folder
-    f = clean_folder((request.args.get("folder") if request.method == "GET" else (body().get("folder"))) or "", strict=strict)
+    from ..lists.lffolder import lf_path_arg
+    src = request.args if request.method == "GET" else body()
+    f = clean_folder(lf_path_arg(db(), src.get("folder"), src.get("node")) or "", strict=strict)  # 2.352.0 A (#2748): or node=
     if not f:
         raise _Bad(tr("Invalid value: {0}", "folder"))
     return f

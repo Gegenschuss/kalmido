@@ -117,22 +117,27 @@ with open(os.path.join(JS, "areas.js"), encoding="utf-8") as f:
     areas_js = f.read()
 m = re.search(r"OFM_ITEMS\s*=\s*\[(.*?)\];", areas_js, re.S)
 check(m is not None, "areas.js: OFM_ITEMS")
-items = re.findall(r"key:\s*'([^']+)',\s*go:\s*'([^']+)'", m.group(1) if m else "")
-check(len(items) >= 15, f"areas.js: menu points found {items}")
-for key, go in items:
+items = re.findall(r"\{key:\s*'([^']+)',\s*go:\s*'([^']+)'([^\n]*)", m.group(1) if m else "")
+check(len(items) >= 15, f"areas.js: menu points found {[i[:2] for i in items]}")
+for key, go, rest in items:
     if go.startswith("office/"):
-        check(key in AREA_KEYS, f"areas.js OFM_ITEMS: menu point {key} is no office area")
+        lvk = re.search(r"lvk:\s*'([^']+)'", rest)  # 2.380.0 B (#3409): invoices take the rights of the quotations' area
+        check((lvk.group(1) if lvk else key) in AREA_KEYS, f"areas.js OFM_ITEMS: menu point {key} is no office area")
 tabs = set()
+TAB_AREA = {}  # office.js ofr_area: tabs that use another area's rights (receipts -> books, invoices -> offers)
 for fn_ in sorted(glob.glob(os.path.join(JS, "office*.js"))):
     with open(fn_, encoding="utf-8") as f:
         src = f.read()
+    oa = re.search(r"const ofr_area = [^\n]*", src)
+    if oa:
+        TAB_AREA.update(re.findall(r"t === '([a-z_-]+)' \? '([a-z_-]+)'", oa.group(0)))
     d = re.search(r"const OFC_TABS\s*=\s*\[(.*?)\];", src, re.S)
     if d:
         tabs |= set(re.findall(r"\[\s*'([a-z_-]+)',\s*'", d.group(1)))
     tabs |= set(re.findall(r"OFC_TABS\.splice\([^\n]*?0,\s*(?:/\*\*[^*]*\*/\s*)?\(?\[\s*'([a-z_-]+)'", src))
 check({"offers", "settings", "travel", "books"} <= tabs, f"office*.js: OFC_TABS keys found {sorted(tabs)}")
 for t in sorted(tabs):
-    check(t in AREA_KEYS, f"OFC_TABS: tab {t} is no office area")
+    check(TAB_AREA.get(t, t) in AREA_KEYS, f"OFC_TABS: tab {t} is no office area")
 
 # ---- 4. the templates
 tpl = next((n for n in RTREE.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "TEMPLATES"), None)

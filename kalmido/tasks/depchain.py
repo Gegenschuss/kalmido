@@ -36,9 +36,9 @@ def dch_add(d, n):
 
 
 def dch_switch(c, tid):
-    """The list setting of the triggering task: on in a project list with dep_shift = 1."""
-    r = c.execute("SELECT l.kind, l.dep_shift FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    return bool(r) and r["kind"] == "project" and bool(r["dep_shift"])
+    """The list setting of the triggering task: on in a project list with dep_shift = 1 (2.352.0 B #2752: any but the inbox)."""
+    r = c.execute("SELECT l.is_inbox, l.dep_shift FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
+    return bool(r) and not r["is_inbox"] and bool(r["dep_shift"])
 
 
 def dch_skip(c, uid, w, reason):
@@ -53,13 +53,13 @@ def dch_plan(c, uid, roots, delta, seen, room=DCH_MAX):
     plan, skipped, todo = [], [], list(roots)
     while todo:
         bid = todo.pop(0)
-        for w in c.execute("""SELECT t.id, t.title, t.start, t.due, t.status, t.ms, t.deleted_at, t.list_id, l.kind
+        for w in c.execute("""SELECT t.id, t.title, t.start, t.due, t.status, t.ms, t.deleted_at, t.list_id, l.is_inbox
                               FROM task_deps d JOIN tasks t ON t.id=d.task_id JOIN lists l ON l.id=t.list_id
                               WHERE d.blocker_id=? ORDER BY t.id""", (bid,)).fetchall():
             if w["id"] in seen:
                 continue
             seen.add(w["id"])
-            if w["deleted_at"] or w["kind"] != "project":
+            if w["deleted_at"] or w["is_inbox"]:
                 continue
             reason = "done" if w["status"] != 0 else "milestone" if w["ms"] else "no_date" if not w["due"] else \
                 None if task_visible(c, w["id"], uid, write=True) else "no_access"
@@ -133,7 +133,7 @@ def dch_pull(tid):
     first = []
     for w in c.execute("""SELECT t.id, t.start, t.due FROM task_deps d JOIN tasks t ON t.id=d.task_id JOIN lists l ON l.id=t.list_id
                           WHERE d.blocker_id=? AND t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
-                          AND (t.ms IS NULL OR t.ms=0) AND l.kind='project' ORDER BY t.id""", (tid,)).fetchall():
+                          AND (t.ms IS NULL OR t.ms=0) AND l.is_inbox=0 ORDER BY t.id""", (tid,)).fetchall():
         if task_visible(c, w["id"], uid, write=True):
             first.append(dch_days(dch_add(t["due"], 1), w["start"] or w["due"]))
     gap = min(first) if first else 0

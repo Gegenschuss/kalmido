@@ -25,6 +25,8 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   check((await call('POST', '/api/deps', {task_id: shoot, blocker_id: plan})).status < 300, 'setup: Shoot day waits on Plan');
   check((await call('POST', '/api/deps', {task_id: o1, blocker_id: edit})).status < 300, 'setup: a task in "Outside" waits on Edit (other list)');
 
+  // 2.352.0 B (#2752): Priority is the default sort everywhere; these projects keep their own sort Flow
+  for (const id of [PRJ, FREE, OUT]) await call('PATCH', `/api/lists/${id}`, {sort_mode: 'flow'});
   // ---- #308 A: with dependencies in the view the badge shows, on the first ready task
   let w = await boot({user: 'alice', hash: 'l/' + PRJ}), d = w.document;
   check(w.eval('sortMode()') === 'flow', 'project list sorts by Flow');

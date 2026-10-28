@@ -135,7 +135,7 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
       return {w: a.width, h: a.height, sv: s.width, hdr: hd.scrollWidth <= hd.clientWidth + 1, page: document.documentElement.scrollWidth <= 390, badge: !!document.querySelector('.chath .chmode'), label: it?.label}; })()`);
     check(g && g.w >= 44 && g.h >= 44 && g.sv <= 20, `${tag}: #1090 the ring's tap box >= 44 px, the ring itself stays small ` + JSON.stringify(g));
     check(g && !g.badge && g.hdr && g.page, `${tag}: #1090 no badge in the header, it fits ` + JSON.stringify(g));
-    check(g && /^Rechte: Standard des Hosts \(Automatisch\)$/.test(g.label || ''), `${tag}: #1090 the full text is the menu entry ` + JSON.stringify(g?.label));
+    check(g && /^Rechte: Vorgabe des Servers \(Automatisch\)$/.test(g.label || ''), `${tag}: #1090 the full text is the menu entry ` + JSON.stringify(g?.label));  // 2.364.0 C (#3044): everyday words
     await shot('p2340d-390-chathead.png');
     // #1091: the search field hides the tab bar while it has the focus
     const t0 = await ev(`getComputedStyle(document.querySelector('#tabs')).display`);

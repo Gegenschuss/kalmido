@@ -52,6 +52,8 @@ const CONTRAST = `(() => {
   const DEV = await mkAgent('devbot', 'DevBot'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  // 2.352.0 B (#2752): kind is not read any more, a tracked project is one with a status (the sidebar's overview needs two)
+  for (const id of [L, W]) await call('POST', `/api/lists/${id}/status`, {status: 'on_track', note: ''});
   await call('PATCH', '/api/settings', {show_progress: String(L)});  // 2.40.0 (#1190): the progress bar of a project is off by default
   const PLAIN = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
   for (const u of [BOB, DEV.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: u, role: 'edit'});
@@ -80,7 +82,7 @@ const CONTRAST = `(() => {
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');
   for (const g of ['focus', 'views', 'lists', 'team']) check(d.querySelector(`#side .sg-${g} .sgh`), `sidebar group ${g}`);
   const reach = {cal: '#srail [data-sbb="cal"]', timeline: '#side [data-act="side-timeline"]', matrix: '#side [data-go="matrix"]', habits: '#srail [data-sbb="habits"]', pomo: '#srail [data-sbb="time"]',  // 2.44.0 (#1187): the areas Time + Review  // 2.152.2 (#2622): calendar, areas and Settings in the bar #srail
-    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#kbar .kbsrch[data-act="palette"]' /* 2.152.3 (#2619): the search moved into the head bar */, settings: '#kbar .kbsw[data-act="sbb-ws"]' /* 2.380.2 (#3400): Settings in the Kalmido menu */};  // 2.152.2 (#2622): full selectors (#side or #srail)
+    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#kbar .kbsrch[data-act="palette"]' /* 2.152.3 (#2619): the search moved into the head bar */, settings: '#srail .sset[data-act="settings"]'};  // 2.152.2 (#2622): full selectors (#side or #srail)
   for (const [k, sel] of Object.entries(reach)) check(d.querySelector(sel), `sidebar reaches ${k}`);  // 2.152.2 (#2622): the selector says where
   check(d.querySelector('#top .ttabs [data-act="view-kanban"]') && d.querySelector('#top .ttabs [data-act="view-timeline"]'), 'kanban + timeline as text tabs in the list header');
   check(/Kanban/.test(d.querySelector('#top .ttabs').textContent), 'the view tabs are text');
@@ -138,7 +140,7 @@ const CONTRAST = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   for (const k of ['cal', 'matrix', 'habits', 'pomo', 'stats', 'time']) check(!d.querySelector(reach[k]), `module off: ${k} not in the sidebar`);  // 2.152.2 (#2622): full selectors
   check(!d.querySelector('#side [data-act="side-timeline"]') && !d.querySelector('#srail [data-sbb="cal"]'), 'timeline / calendar off: gone');  // 2.152.2 (#2622): the calendar is an icon of the bar
-  check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#kbar .kbsw'), 'agents + settings (Kalmido menu) still there'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): agents and Settings in the bar
+  check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#srail .sset'), 'agents + settings still there');  // 2.152.2 (#2622): agents and Settings in the bar
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   // accent migration: mint (the old default) -> the default once (2.11.0: violet, 2.300.0: petrol); another colour stays

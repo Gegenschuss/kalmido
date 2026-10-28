@@ -202,7 +202,8 @@ def user_create():
     if isinstance(orgs, str):
         return err(orgs)
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
-                      bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True)
+                      bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True,
+                      ask_purpose=None if b.get("kid") is True else me() if orgs else 0)  # 2.364.0 A (#3032)
     email = str(b.get("email") or "").strip()[:200]
     if email and not EMAIL_RE.fullmatch(email):
         c.rollback()

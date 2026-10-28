@@ -176,6 +176,7 @@ async function wsh_read(id, md) {
     ${p.files?.length ? `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')} · ${p.files.length}</h4><ul>${p.files.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted">${p.role === 'edit' ? `<button type="button" class="btn sm" data-wsh-edit="${p.id}">${ic('edit', 's')} ${tr('Edit')}</button>` : ''}<span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>`;
   WSH.cur = p;
+  if (/<pre data-lang="(?:math|mermaid)"/.test(p.html || '')) loadModule('diagram').then(() => dg_draw(), () => {});  // 2.382.0 (#3153)
   if (md && md.isConnected) { md.querySelector('.card').innerHTML = inner; return; }
   const m = modal(inner);
   m.classList.add('wshread');

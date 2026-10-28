@@ -7,7 +7,7 @@ folders of the file store (fs_nodes / fs_shares), a folder share works like a fi
  4. the same in a private space -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
 An area is one entry of AREAS (functions, below); 2.199 B (office) / C (sheets) fill their sections, 2.200 (knowledge),
 2.201 (lists / projects), 2.202 (address books, contracts) add theirs. Invented names only.
-freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki  freelancer-matrix: pim
+freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki  freelancer-matrix: lists  freelancer-matrix: pim
 usage: folder_parity_test.py <datadir>"""
 import base64
 import os
@@ -279,6 +279,55 @@ check(r.ok, "setup: gina as guest " + r.text[:200])
 GINA, Gi = r.json().get("id"), sess("gina")
 AREAS["wiki"] = {"folder": _wk_folder, "item": _wk_item, "role": _wk_role, "agent_role": _wk_agent_role, "move_out": _wk_move,
                  "org_other": (Gi, GINA)}
+
+
+# --- area: lists / projects (2.352.0 A, #2748) ---
+# folder = a projects folder (POST /api/lists/folders below the workspace's root "Projects"), item = a list made in it (its
+# path = the folder's), role = the list's role in /api/state (admin / edit = edit, view / participant = view), agent_role =
+# GET /api/v1/lists/<id> "role", move_out = POST /api/lists/tree/move of the list's node. A folder's share gives the role at
+# runtime (list_members.frole), never a copy.
+LF_PATH = {}
+
+
+def _lf_root(s, ws):
+    org = int(ws.split(":")[1]) if ws.startswith("org:") else None
+    return next(x["root"] for x in s.get(B + "/api/lists/tree").json()["spaces"] if x["org_id"] == org)
+
+
+def _lf_folder(s, ws, name, parent=None):
+    pid = parent or _lf_root(s, ws)
+    r = s.post(B + "/api/lists/folders", json={"parent_id": pid, "name": name})
+    assert r.status_code == 201, (r.text, ws, pid, parent, s.get(B + "/api/lists/tree").json())
+    LF_PATH[r.json()["id"]] = r.json()["path"]
+    return r.json()["id"]
+
+
+def _lf_item(s, ws, folder):
+    org = int(ws.split(":")[1]) if ws.startswith("org:") else None
+    r = s.post(B + "/api/lists", json={"name": f"List in {LF_PATH[folder]}", "folder": LF_PATH[folder], "org_id": org})
+    assert r.ok, r.text
+    return r.json()["id"]
+
+
+def _lf_role(s, lid):
+    x = next((l for l in s.get(B + "/api/state").json()["lists"] if l["id"] == lid), None)
+    if not x:
+        return None
+    return {"owner": "edit", "admin": "edit", "edit": "edit", "view": "view", "participant": "view"}.get(x.get("role"), x.get("role"))
+
+
+def _lf_agent_role(h, lid):
+    r = requests.get(B + f"/api/v1/lists/{lid}", headers=h)
+    return {"admin": "edit", "edit": "edit", "view": "view", "participant": "view"}.get(r.json().get("role")) if r.ok else None
+
+
+def _lf_move(s, ws, lid, folder):
+    node = next(x["node_id"] for sp in s.get(B + "/api/lists/tree").json()["spaces"] for x in sp["lists"] if x["list_id"] == lid)
+    r = s.post(B + "/api/lists/tree/move", json={"node_id": node, "parent_id": folder})
+    assert r.ok, r.text
+
+
+AREAS["lists"] = {"folder": _lf_folder, "item": _lf_item, "role": _lf_role, "agent_role": _lf_agent_role, "move_out": _lf_move}
 
 
 # --- area: address book (2.351.0 B, #2749) ---

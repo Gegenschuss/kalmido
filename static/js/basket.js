@@ -69,8 +69,7 @@ const kbGroupResetItems = () => kbGroupView() && kbGroupPrefs()[S.route.key] ? [
 function kbCrumbHtml(g) {
   const l = g.lic; if (!l || !l.folder) return esc(g.name);
   const parts = [], f = l.folder;
-  if (fParent(f)) parts.push([fParent(f), fParent(f)]);
-  parts.push([f, fName(f)]);
+  f.split(FSEP).forEach((_, i, a) => { const p = a.slice(0, i + 1).join(FSEP); parts.push([p, fName(p)]); });  // 2.352.0 E (#2748): every folder above, any depth
   const shown = isMobile() ? parts.slice(-1) : parts;
   return `<span class="kbcrumb">${isMobile() && parts.length > 1 ? '<span class="kbcp" aria-hidden="true">…</span><span class="kbsep" aria-hidden="true">›</span>' : ''}${shown.map(([p, n]) => `<a class="kbcp" href="#${esc(keyToHash('folder:' + p))}" data-kbgo="${esc(keyToHash('folder:' + p))}">${esc(n)}</a><span class="kbsep" aria-hidden="true">›</span>`).join('')}<a class="kbcl" href="#${esc(keyToHash('l:' + l.id))}" data-kbgo="${esc(keyToHash('l:' + l.id))}">${esc(g.name)}</a></span>`;
 }
@@ -135,7 +134,7 @@ function kbSortBtn() {
 }
 const KB_ACTS = [['list', '1', 'list', N_('To a project')], ['me', '2', 'user', N_('Assign to me')], ['today', '3', 'sun', N_('Today')], ['tomorrow', '4', 'sunrise', N_('Tomorrow')],
   ['date', '5', 'cal', N_('Date…')], ['wait', '6', 'hourglass', N_('Waiting on someone')], ['del', '7', 'trash', N_('Delete')], ['skip', '0', 'right', N_('Skip')]];
-const kbActOn = a => a !== 'me' || (collab() && !!S.me);
+const kbActOn = a => (a !== 'me' && a !== 'wait') || (hasPeers() && !!S.me);  // 2.364.0 D (#3036): alone: no "Assign to me" / "Waiting on someone"
 function kbSortStart() {
   KB.ids = kbBasketOpen().map(t => t.id); KB.i = 0; KB.n = 0; KB.waitOpen = false;
   if (!KB.ids.length) { toast(tr('The basket is empty')); return; }

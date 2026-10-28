@@ -8,7 +8,7 @@ Kalmido never starts AI processes itself. You run this server (and your agent) o
 ## Before you start
 
 1. An admin creates the agent in **Settings > Agents > Status > Add agent**, or (2.7.2, when an admin allows it) you create your own personal agent in **Settings > Agents > Set up > Create agent**. Copy its API token (it is shown once). Step-by-step guides for Linux, macOS and Windows: **Settings > Agents > Set up** and [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
-2. Share the projects that the agent should work in with the agent (role Member, Participant or Viewer).
+2. Share the projects that the agent should work in with the agent (role Member, Participant or Read-only).
 
 ## Claude Code
 

@@ -5,7 +5,7 @@
 .wtime{position:absolute;right:.375rem;font-size:.625rem;color:var(--muted);transform:translateY(-.375rem)}
 .nowline{position:absolute;left:0;right:0;height:2px;background:var(--p5);z-index:2}
 .nowline::before{content:'';position:absolute;left:-.25rem;top:-.1875rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--p5)}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .wlbl{padding:.25rem 2px;font-size:.5625rem;line-height:1.1;overflow-wrap:anywhere}
 }
 .calsub{display:flex;align-items:center;gap:.5rem;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
@@ -22,7 +22,7 @@
 .cpal button.on{box-shadow:0 0 0 2px var(--bg2),0 0 0 .25rem var(--cc)}
 #ca-cals{margin:.25rem 0 .5rem}
 #ca-cals .shint{grid-column:1/-1}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .cpal.inline{grid-template-columns:repeat(5,1.5rem)}
 }
 .evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}
@@ -103,7 +103,7 @@ button.cyd:hover{background:var(--bg2)}
 .cyd.lv3{background:var(--accent);color:var(--accent-ink)}
 .cyd.today{box-shadow:inset 0 0 0 2px var(--accent);font-weight:700}
 .cyd.sel:not(.today){box-shadow:inset 0 0 0 1px var(--accent)}
-@media (max-width:899px){ .cyear{grid-template-columns:repeat(2,minmax(0,1fr));gap:.875rem} .cyd{font-size:var(--fs-xs)} }
+@media (max-width:767px){ .cyear{grid-template-columns:repeat(2,minmax(0,1fr));gap:.875rem} .cyd{font-size:var(--fs-xs)} }
 @media (max-width:23rem){ .cyear{grid-template-columns:minmax(0,1fr)} }
 /* 2.155.0 B (#2076): public holidays / absences in the month and week views: a quiet outlined chip (calendar.js abcX) */
 .cal .cev.cevx,.week .cev.cevx{background:transparent;border-style:dashed;color:var(--text2)}

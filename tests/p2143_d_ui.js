@@ -76,7 +76,7 @@ const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('c
   // ================= #2156: the activity table (Administration > Organisation)
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('users')`); await sleep(300);
-  w.eval(`admSubShow(document.querySelector('.smodal'), 'org')`);
+  w.eval(`admSubShow(document.querySelector('.smodal'), 'users')`);  // 2.364.0 C (#3041): Organisation > People
   await until(() => d.querySelector('#s-act .acttbl'), 60);
   const rows = [...d.querySelectorAll('#s-act .acttbl tbody tr')];
   check(rows.length >= 1 && /Without organisation/.test(rows[rows.length - 1].textContent), 'the table has the row "Without organisation": ' + rows.length);

@@ -113,7 +113,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
-ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
+ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Read-only")}  # 2.364.0 C (#3041): one role word
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
                "wont_do": N_("Mark {0} tasks as won’t do"), "delete": N_("Move {0} tasks to the trash"),
                "restore": N_("Restore {0} tasks from the trash")}
@@ -815,7 +815,8 @@ def v1_templates():
 @app.post("/api/v1/templates")
 @v1_view
 def v1_template_create():
-    """{task_id} (the task with its subtasks) | {list_id, relative?} (the list's sections + open tasks) | {kind, data};
+    """{task_id} (the task with its subtasks) | {list_id} (the list's sections + open tasks; 2.352.0 B #2752: dates always
+    relative to the project start, "relative" is accepted and ignored) | {kind, data};
     name optional."""
     v1_args(())
     b = _v1_body(("task_id", "list_id", "relative", "kind", "data", "name"))
@@ -990,14 +991,15 @@ def v1_list_delete(lid):
 
 def v1_members(c, lid):
     lst = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
-    rows = c.execute("SELECT user_id, role, own_role, grole FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall()
+    rows = c.execute("SELECT user_id, role, own_role, grole, frole FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall()
     ids = [lst["owner_id"], *[r["user_id"] for r in rows]]
     names = user_names(c, ids)
     kinds = {r[0]: r[1] for r in c.execute(f"SELECT id, COALESCE(kind,'user') FROM users WHERE id IN ({','.join('?' * len(ids))})", ids)}
     out = [{"user_id": lst["owner_id"], "name": names.get(lst["owner_id"], ""), "role": "owner", "agent": kinds.get(lst["owner_id"]) == "agent",
-            "via_group": False}]
+            "via_group": False, "via_folder": False}]
     out += [{"user_id": r["user_id"], "name": names.get(r["user_id"], ""), "role": r["role"], "agent": kinds.get(r["user_id"]) == "agent",
-             "via_group": bool(r["grole"]) and not r["own_role"]} for r in rows]
+             "via_group": bool(r["grole"]) and not r["own_role"],
+             "via_folder": bool(r["frole"]) and not r["own_role"] and not r["grole"]} for r in rows]  # 2.352.0 A (#2748)
     return out
 
 
@@ -1329,7 +1331,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "get": op("What the task waits on and what waits on it", T, ok(ref("Dependencies")) | errs("404"), [pid()]),
             "post": op("The task waits on another task", T, ok(ref("Dependencies"), "Created", "201") | errs("400", "403", "404", "409"), [pid()],
                        scope="tasks:write", body={"type": "object", "required": ["blocked_by"], "properties": {"blocked_by": {"type": "integer"}}},
-                       desc="Projects with progress and status (kind=project) only; no cycles.")},
+                       desc="Any project but the inbox (2.352.0); no cycles.")},
         "/tasks/{id}/dependencies/{blocker_id}": {"delete": op("Remove a dependency", T, ok(ref("Dependencies")) | errs("403", "404"),
                                                                [pid(), sub("blocker_id", "The task it waits on")], scope="tasks:write")},
         "/lists/{id}/fields": {
@@ -1361,7 +1363,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "get": op("Your templates", S, ok(ref("TemplatePage")) | errs()),
             "post": op("Create a template from a task, a project or data", S, ok(ref("Template"), "Created", "201") | errs("400", "403", "404"),
                        scope="structure", body={"type": "object", "properties": {
-                           "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "relative": {"type": "boolean"},
+                           "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "relative": {"type": "boolean", "description": "Ignored since 2.352.0: list templates always keep relative dates"},
                            "kind": {"type": "string", "enum": ["task", "list"]}, "data": obj, "name": {"type": "string"}}})},
         "/templates/{id}": {
             "patch": op("Rename a template or replace its data", S, ok(ref("Template")) | errs("400", "404"), [pid("id", "Template id")],
@@ -1468,7 +1470,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "delete": op("Delete your time entry", "Time tracking", nobody | errs("403", "404", "409"), [pid("id", "Entry id")], scope="time")},
         "/export": {"get": op("Export your lists, tasks, habits, time entries and settings as JSON, without webhook addresses and server-side settings "
                              "(the complete account export is in the app under Settings > Data; a personal token needs the scope account as well; 2.148.1, 2.239.0)", "Account", ok(obj) | errs("403"), scope="export")},
-        "/lists/{id}/status": {"put": op("Post a status update of a project with progress and status", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
+        "/lists/{id}/status": {"put": op("Post a status update of a project (a status = tracked; empty = not tracked)", L, ok(obj) | errs("400", "403", "404", "409"), [lp], scope="structure",
                                          body={"type": "object", "properties": {"status": {"type": "string", "enum": [*LIST_STATUSES, ""]},
                                                                                 "note": {"type": "string"}}},
                                          desc="Members are told (News / push). The history: GET /lists/{id}/overview.")},

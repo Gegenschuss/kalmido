@@ -716,22 +716,18 @@ def need_list(c, lid, write=True, owner=False, manage=False):
 
 
 # list types (package D2): time tracking, dependencies, custom fields and project status only in project lists
-PROJECT_ONLY = {"time": N_("Switch on progress and status in this project to track time"),
-                "deps": N_("Switch on progress and status in both projects to link their tasks"),
-                "fields": N_("Switch on progress and status in this project to use custom fields"),
-                "status": N_("Switch on progress and status in this project to set a status"),
-                "overview": N_("Switch on progress and status in this project to use its project page")}
-PROJ_SQL = "(SELECT id FROM lists WHERE kind='project')"
+# 2.352.0 B (#2752): every list is a project except the inbox; kind stays in the database but is not read any more
+PROJ_SQL = "(SELECT id FROM lists WHERE is_inbox=0)"
 
 
 def is_project(c, lid):
-    r = c.execute("SELECT kind FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
-    return bool(r) and r[0] == "project"
+    r = c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    return bool(r) and not r[0]
 
 
 def need_project(c, lid, what):
     if not is_project(c, lid):
-        raise Denied(409, tr(PROJECT_ONLY[what]))
+        raise Denied(409, tr("The basket has no project functions"))
 
 
 def need_task(c, tid, write=True, full=False):
@@ -764,8 +760,11 @@ def list_other_agent(c, lid, uid):
     """2.26.0: the id of another agent already in list lid (owner or member) when uid is an agent, else None."""
     if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
         return None
+    # 2.352.0 A (#2748): an agent only through a folder's share (frole, no own role) is one of the folder's agents, like in the
+    # file store -- not "the" agent of the list
     r = c.execute("""SELECT id FROM users WHERE kind='agent' AND id!=? AND (id=(SELECT owner_id FROM lists WHERE id=?)
-                     OR id IN (SELECT user_id FROM list_members WHERE list_id=?)) ORDER BY id LIMIT 1""", (uid, lid, lid)).fetchone()
+                     OR id IN (SELECT user_id FROM list_members WHERE list_id=? AND NOT (frole IS NOT NULL AND own_role IS NULL)))
+                     ORDER BY id LIMIT 1""", (uid, lid, lid)).fetchone()
     return r[0] if r else None
 
 

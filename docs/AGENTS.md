@@ -45,15 +45,17 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 
 ## Concept
 
-Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`); a project with
-*Progress and status* switched on has `kind=project`. The inbox is not a project.
+Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`). Since 2.352.0 every list
+except the inbox is a project with project page, progress, dependencies, sprints and status: `kind` is still returned
+and accepted but no longer evaluated. A project is **tracked** when it has a `status` (`PUT /lists/{id}/status`); an
+empty status = not tracked (start page card *Projects*, *Where is it stuck?*). The inbox is not a project (409).
 
 - **An agent is a user of type "agent".** An admin creates it in **Settings > Agents**, or turns an existing user into an agent. Each agent has:
   - an **API token**, shown once. This is how the agent authenticates.
   - an optional **webhook URL** and signing secret.
   - an **Enabled** switch.
   - a **note**, for example who runs the agent and where.
-- **Limited by design.** An agent is never an admin. It cannot sign in to the web app. It sees only the projects that are shared with it (plus projects it owns), with the role it was given (Member, Participant or Viewer; never project admin). An agent shares a project (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person)) and never becomes or hands over the owner of a project. A project an agent created is managed by an admin: *Settings > Administration > Projects owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the project as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
+- **Limited by design.** An agent is never an admin. It cannot sign in to the web app. It sees only the projects that are shared with it (plus projects it owns), with the role it was given (Member, Participant or Read-only; never project admin). An agent shares a project (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person)) and never becomes or hands over the owner of a project. A project an agent created is managed by an admin: *Settings > Organisation > People > Projects owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the project as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
 - **Team and personal agents (2.7.2).** Agents created by an admin are team agents. If an admin allows it, people can also create their own [personal agent](#personal-agents): it belongs to them, sees only what they share with it, and only they can chat with it.
 - **Kill switch.** Turning **Enabled** off stops the agent at once:
   - its token is refused (`403`).
@@ -133,7 +135,7 @@ responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalm
 a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a project, everyone
 in the project gets a News item naming the agent, who added it and where it runs.
 
-- **Admin policy**, *Administration > Agents* (server admins): *Users may create their own agents* (off by default: then
+- **Admin policy**, *Settings > Organisation > Agents* (server admins): *Users may create their own agents* (off by default: then
   each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
   new personal agent gets.
 
@@ -263,8 +265,10 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
   rules in its `CLAUDE.md`.
 
 The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
-team agent without a webhook) it offers *Set it up on a computer now?*: **Set up** opens the one-command setup, the API
-token of the new agent is shown only on request (*Show the token for an own setup*). Until a computer connected, the
+team agent without a webhook) the one-command setup opens right away; the API token of the new agent is shown only on
+request, under *For advanced users* (*Show the token for an own setup*). The dialog *New agent* shows only the display
+name, team or personal, the workspace and the picture; everything else sits under *Advanced* with the usual defaults
+(the runtime's permission mode is called *Approvals* there). Until a computer connected, the
 agent's row says **Set up**. The Agents view lists on every agent's card the projects it is in that you see (folder, who may
 address it there, *listens in* / *only via @*; a tap opens the project's settings); the row of a personal agent shows its
 workspace and changes it (`PATCH /api/my/agents/<id>` with `org_id`).
@@ -454,7 +458,7 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
 ### Guide B: a personal agent on your own computer (users)
 
 1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Workspaces*:
-   *Members may have their own agents*), or a server admin for everyone (*Administration > Agents*). If *Create agent* is
+   *Members may have their own agents*), or a server admin for everyone (*Settings > Organisation > Agents*). If *Create agent* is
    missing in *Settings > Agents > Set up*, personal agents are off on this server: ask a server admin.
 2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
    the token (shown once) into the env file (paths in the table above), readable only by you.
@@ -684,6 +688,12 @@ Three rules decide whether an action of someone reaches an agent as an event:
   project's agent in one step (the old one leaves, the new one joins) and answers `previous` for an undo. Projects that had
   several agents before the update keep them; no new ones are added. A folder can name several agents (2.41.0): its projects
   get the first one, the others only the projects that choose them, so an agent still sees only the projects shared with it.
+  **2.352.0:** the folders of the projects are folders of the file store (a tree below "Projects" in each workspace, any
+  depth). A share of such a folder (people, groups, agents, the file store's share dialog) reaches every project in it at
+  runtime, also later ones; revoking it, an expiry or moving the project out ends it. Several agents can reach a project
+  this way, like files in a shared folder; the project's own agent (`PUT /api/lists/{id}/agent`) stays one, and the rule
+  above still applies to sharing a project itself. A member who comes only through a folder carries `"via_folder": true` in
+  `GET /api/v1/lists/{id}/members`. An agent never gets a health, budget or read-later project through a folder.
 - **Projects with different people (2.30.0).** An agent that would sit in two projects whose people circles are neither equal
   nor nested (a *bridge*) is refused with `409` `agent_bridge` and `bridges: [{list_id, name}]`, unless a person who
   manages every project involved (or owns the personal agent) sends `bridge_ok: true`; the same for adding a person to a
@@ -779,13 +789,13 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle) of the projects shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a project](#playbook) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health projects never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
-| `deployed` | 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a project with progress and status shared with you; information only, no run. Set by a person, by the token API (`set_deployment`) or by the environment's deploy webhook | `list_id`, `environment` `{id, name}`, `version`, `milestone` `{id, title}` or `null`, `source` (`manual` \| `api` \| `hook`), `at`, `closed_task_ids` (tasks completed on arrival, if the environment does that) |
+| `deployed` | 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a project shared with you; information only, no run. Set by a person, by the token API (`set_deployment`) or by the environment's deploy webhook | `list_id`, `environment` `{id, name}`, `version`, `milestone` `{id, title}` or `null`, `source` (`manual` \| `api` \| `hook`), `at`, `closed_task_ids` (tasks completed on arrival, if the environment does that) |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a project's [Playbook](#playbook) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the project's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the project it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
 | `document_added` | 2.48.0 (#1356): a new document was recognised (once, after its first recognition) in a folder or file of the file store the agent sees (a share or its own result folder); read it with `get_document`, e.g. to [suggest project and category of a receipt](#receipts-suggest-project-and-category) | `document` `{id, name, state, date, url}` |
 | `offer_accepted` | 2.51.0 (#1348): a quotation of the agent's office area was accepted (by a person or the customer's approval); only agents with the switch *May draft office documents* (a personal agent in an organisation only while its owner works in the office), while the area lets agents read office data (see [Office](#office-drafts-only)); 2.223.7 (#2670): with office groups only agents whose groups give them *Offers*, and with a list restriction only for a quotation without a project or of a project within it; `list_id` is `null` when the project is not shared with the agent | `doc_id`, `number`, `title`, `client_id`, `list_id`, `net`, `gross`, `currency` |
 | `review_requested` | 2.60.0 (#1512): the agent is the reviewer of a task that went into the [review step](#review-step) (moved into the project's review section or *Send for review*); only when the agent has access to the project | `task`, `review` `{state: pending, reviewer_id, list_id, url, by}` |
-| `sprint_started` | 2.60.0 (#343): a sprint of a project with progress and status shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
+| `sprint_started` | 2.60.0 (#343): a sprint of a project shared with the agent started (switched on, started by hand, or the next one after closing) | `list_id`, `list`, `sprint` (id, num, title, start, end, goal, state, progress) |
 | `sprint_closed` | 2.60.0 (#343): a sprint was closed (by a person or after its last day); `sprint.review` holds the done / moved / added task ids, counts and points | `list_id`, `list`, `sprint` (with `review`), `next_sprint_id` |
 | `chat_pinned` | 2.62.0 (#1848): the person pinned or unpinned a message of the agent's chat (see [Pinned chat messages](#pinned-chat-messages)); information only, nothing to answer (the reference launcher starts no run) | `message` (the chat message, with `pinned_at` / `pinned_by`), `pinned` (true / false), `user` `{id, name}` |
 | `contract_notice` | 2.70.0 (#1359): the last day to cancel a contract (Home & life) in a project shared with the agent is near: from the contract's own lead (else 30 days) before it; once per contract, deadline and agent; never from a health project; only while the person has the module *Contracts* on. 2.92.0 (#1925): also a business contract of the office (Office > Contracts & insurance, its deadline task carries `fam.office_agreement`; `office` true; the person needs the office module instead). Answer with ONE `propose_contract_notice` (see [Contracts and notice deadlines](#contracts-and-notice-deadlines)) | `task_id`, `list_id`, `name`, `provider`, `cost`, `per`, `monthly`, `yearly`, `notice`, `notice_unit`, `due` (cancel by), `ends`, `renew_months`, `days`, `user` `{id, name}`, `lang`, `office` (2.92.0), `hint` |
@@ -929,7 +939,7 @@ A retry must not do the work twice. Two optional helpers (old agents keep workin
 
 *Since 2.67.0.*
 
-In a project with progress and status and *Move dependent tasks along* on (the default for such new projects), postponing a task's due
+In a project with *Move dependent tasks along* on (the default for new projects), postponing a task's due
 date (`PATCH /api/v1/tasks/{id}`, MCP `update_task`) moves every task waiting on it by the same number of days, down the
 whole chain (gaps stay, each task once, at most 500). Completed tasks, milestones, tasks without a date and tasks the
 agent may not change (projects not shared with it included) stay, and so does the chain behind them. The answer carries
@@ -1001,7 +1011,7 @@ lies idle.
 
 `GET /api/v1/time/gaps` (MCP `get_time_gaps`; `?days=` 1-31, default 14; `?user_id=`) returns the working days
 (Monday to Friday, before today) on which a person completed, commented or changed tasks of projects with time tracking
-(2.41.0: the project's switch `time_tracking`; before: projects with progress and status) but tracked no time there: `{user_id, from, to, days: [{date, count, tasks: [{id, title, list_id}]}]}` (at most five example
+(2.41.0: the project's switch `time_tracking`; before: projects) but tracked no time there: `{user_id, from, to, days: [{date, count, tasks: [{id, title, list_id}]}]}` (at most five example
 tasks per day). Without `user_id` it is the token user's own; an agent may pass the id of a person who may chat with
 it, and then only projects that the agent **and** that person see count (tasks and time entries). Pure data: suggest
 entries to the person (with `list_time_entries` for what is already there), never add time for them without asking.
@@ -1240,7 +1250,7 @@ undecided ones per agent and person and 50 per agent (`429`).
   `input.clients`, or `{name}`: a suggestion, used when a client of that exact name exists, else shown as *New client:
   create it in the office*), `sections`, `tasks` (as kind `project`, at least one), `shoot_days: [{title, date,
   end_date?, start_time?, end_time?, location?, notes?}]` and `offer?: {title?, intro?, items: [{service_id?, text, qty,
-  unit?, price?, discount?}]}`. Applying creates the project with progress and status (in the agent's organisation when the person is a
+  unit?, price?, discount?}]}`. Applying creates the project (in the agent's organisation when the person is a
   member there, otherwise private), its sections and tasks, every shoot day as an **event draft** (`status: tentative`,
   all-day without times) in the person's own calendar (the module *Events* is switched on when it was off), and the
   quotation as a **draft** through the office (prices and free items are marked as with every agent draft, see
@@ -1541,12 +1551,13 @@ ends every open button, a message of the agent only those of its own source -- t
 or the same job (`job_id`). A job's progress or result leaves the agent's open suggestion standing and the other way
 round; a job that offers buttons replaces only its own older ones. **Collected suggestions (2.233.0):** by default the
 person keeps older suggestions: buttons a newer message ended get `choice_state` `collected` (not `expired`), the app
-gathers them above the message box ("Earlier suggestions"), and a press there is accepted -- you get the usual
+leaves them answerable at their message (default since 2.331.0) or gathers them above the message box ("Earlier
+suggestions"), and a press there is accepted -- you get the usual
 `chat_choice` with `collected: true` (the person answers an older question; treat it like a normal message about that
 question, a host may hand it on as such). A collected suggestion stays answerable for 24 hours, at most the newest 10
 per conversation; afterwards, or when the person put it away (`choices.dismissed_at`), it is `expired` and a press
 answers `409` as before. Each person chooses per agent in the chat settings: only the newest (the 2.30.0 behaviour),
-collect (default) or keep them all at their message (answerable like collected ones). Permission questions and approval
+collect them above the message box, or keep them all at their message (answerable like collected ones; the default). Permission questions and approval
 requests keep their own rules. To take buttons back without a new message:
 
 ```
@@ -1809,6 +1820,11 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 agent's [office rights groups](#office-drafts-only) on top of the share (level *own*: only the receipts the agent
 added itself); a share alone is not enough. Without it the receipt is missing from listings, searches and ZIPs and reads
 answer `404`.
+**Locked folders (2.353.0):** a person may lock a folder: names and files below it are encrypted in the browser, the
+server keeps ciphertexts only. Agents and API tokens never reach a locked folder, not even through a share on a folder
+above it: it is missing from every listing, reads answer `404`, writes into it answer `409` (code `fs_locked`), and a
+locked folder cannot be shared with an agent (`409`, code `fs_locked_agent`). Nothing to do for an agent but to not
+expect files there.
 
 | What | Endpoint | MCP |
 |---|---|---|
@@ -1816,7 +1832,7 @@ answer `404`.
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
-| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
+| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 
@@ -2005,7 +2021,7 @@ hidden}` or null. Hints only, nothing is blocked; hiding them is for people in t
 
 *Since 2.48.0.*
 
-An incoming invoice or receipt can be assigned to a **project** (a project with progress and status, `kind=project`, of the document's workspace) and
+An incoming invoice or receipt can be assigned to a **project** (any project but the inbox of the document's workspace) and
 a **category** (short text such as *Travel*, *Material*, *Software*). Only people set it. An agent the document is shared
 with suggests, a person accepts (also with changed values) or rejects it in the document's sheet (2.187.1: once a file is
 an organisation's receipt, the agent also needs the office area *Receipts*, see [File store](#file-store)):
@@ -2180,7 +2196,7 @@ it never changes a view itself, and the routes people use to arrange views stay 
 `layouts` is off for new agents (and not part of the legacy `write`): an admin, or without an organisation the person
 itself, turns it on per agent. Whose views: a personal agent's owner, a team agent's person given as `user_id` (someone who
 may chat with it, in the agent's organisation); everyone else 404. The project page (view `list:<id>`) only for a project
-shared with the agent (within its project limit) that has *Progress and status* on and that the person sees.
+shared with the agent (within its project limit) that the person sees (2.352.0: every project but the inbox).
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|
@@ -2721,7 +2737,7 @@ by <agent>*), and it is one undo step.
 it proposes the whole project at once - the project, first tasks, the shoot days as event drafts in your calendar (shown as
 drafts until you confirm them) and, when the office switches allow it, a quotation draft. Or tap *Set up with your
 agent* (Settings > Modules, or the last card of the welcome tour), say what you use Kalmido for, and it proposes modules
-and projects, one of them with progress and status. Nothing is sent or booked; you tick what you want and apply it in one step. Details:
+and projects, one of them tracked with a status. Nothing is sent or booked; you tick what you want and apply it in one step. Details:
 [An inquiry becomes a project, the setup assistant](#an-inquiry-becomes-a-project-the-setup-assistant).
 
 **Flow.**
@@ -3010,7 +3026,7 @@ there is no write route in the API, and the app refuses agents.
 
 *Since 2.10.0.*
 
-Admins create groups of people (Settings > Administration > Groups; optionally their members follow a sign-in group of
+Admins create groups of people (Settings > Organisation > People > Groups; optionally their members follow a sign-in group of
 the OIDC provider). A project or a folder can be shared with a group; every member then is a member of the project with the
 group's role, which is the higher of their own role and the group's. Agents are never group members; share projects with an
 agent directly. A task can be assigned to a group (`assignee_group_id`); members see it in *Assigned to me* until one of
@@ -3175,7 +3191,7 @@ bodies), status code, the task / project id when the path or the body names one,
 too: 401 (expired token), 403 (paused, wrong scope, a project it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > Administration > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+- **Settings > Organisation > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
   class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
   20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
   line shows today's requests and denied calls. Rows name the task / project where you can see it. Denied calls are marked
@@ -3273,7 +3289,7 @@ A setup that works for several people and coding agents on one code base:
 
 ## Coding agent workflow
 
-From 2.2.0 a project with progress and status can be connected to a GitHub or Gitea / Forgejo repository (see *Git integration* in the
+From 2.2.0 a project can be connected to a GitHub or Gitea / Forgejo repository (see *Git integration* in the
 README). A **project agent** then takes tickets like a developer: someone assigns it a task, it works in its own checkout
 on a dev machine, opens a pull request and merges only after a person approved.
 
@@ -3420,7 +3436,7 @@ with the scope it needs). The tools:
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `related_tasks`, `remove_dependency`, `list_fields`, `create_field`,
-  `update_field`, `delete_field` (2.39.1, #1293: custom fields in every project, not only those with progress and status; creating a field or
+  `update_field`, `delete_field` (2.39.1, #1293: custom fields in every project; creating a field or
   showing it with `set_list_columns` switches the module *Custom fields* on for the project's owner, the answer's `modules_on` names it;
   2.43.0, #1328: type `formula` with `formula` = a calculation over number fields, computed by the server and read-only in
   tasks), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
@@ -3431,7 +3447,7 @@ with the scope it needs). The tools:
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `delete_chat_attachment`
-- projects with progress and status: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
+- projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
   (2.270.0: pass `expect_updated_at` = `description_at` from `get_project_overview` to `set_project_overview`; when someone saved
@@ -3664,7 +3680,7 @@ curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
 
 *Since 2.60.0.*
 
-A project with progress and status can plan its work in sprints (project dialog > *Sprints*, off by default): time boxes of one or two weeks (or a
+A project can plan its work in sprints (project dialog > *Sprints*, off by default): time boxes of one or two weeks (or a
 free length) with a goal, a burndown and a review at the end. A task belongs to at most one open sprint of its own project
 (`sprint_id`; none = the backlog); moving it to another project clears it. People switch sprints on, plan, start and close them;
 agents with access to the project can:

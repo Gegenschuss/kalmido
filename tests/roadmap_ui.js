@@ -65,8 +65,10 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const sum = lid => d.querySelector(`.rm-sum[data-lid="${lid}"]`);
   // 2.0.6 (#189): the "No date" rows (rm-nh / rm-u) are not groups
   const order = rows().filter(r => !r.classList.contains('rm-t') && !r.classList.contains('rm-u') && !r.classList.contains('rm-nh') && !r.classList.contains('rm-s') && !r.classList.contains('rm-a')).map(r => r.classList.contains('rm-f') ? 'F:' + r.textContent.trim().replace(/\d+$/, '') : +r.dataset.l);
-  check(JSON.stringify(order) === JSON.stringify([FILM, 'F:Clients', WEB, BRAND]), `groups: lists without folder, then the folder with its lists: ${JSON.stringify(order)}`);
-  check(d.querySelector('[data-act="rm-po"]').classList.contains('on') && !d.querySelector(`.rm-g[data-l="${SHOP}"]`), 'Projects only: on by default (a project exists), plain lists hidden');
+  // 2.352.0 B (#2752): Groceries (kind list) is a project too: after Film among the lists without folder
+  check(JSON.stringify(order) === JSON.stringify([FILM, SHOP, 'F:Clients', WEB, BRAND]), `groups: lists without folder, then the folder with its lists: ${JSON.stringify(order)}`);
+  // 2.352.0 B (#2752): kind is not read any more, every list but the inbox is a project (Groceries too)
+  check(d.querySelector('[data-act="rm-po"]').classList.contains('on') && d.querySelector(`.rm-g[data-l="${SHOP}"]`), 'Projects only: on by default (a project exists), Groceries is a project too');
   check(!d.querySelector('.rm-hint'), 'no hint while projects exist');
   check(d.querySelectorAll(`.rm-t[data-l="${WEB}"]`).length === 3, 'fewer than 5 projects: expanded, open dated tasks as rows (undated / done not)');
   // summary spans
@@ -98,17 +100,18 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(() => !d.querySelector('.rm-t')), 'Collapse all: one row per project');
   check(await until(async () => (await prefs()).def === 'c'), 'stored');
   d.querySelector('[data-act="rm-expand"]').click();
-  check(await until(() => d.querySelectorAll('.rm-t').length === 6), 'Expand all');
+  check(await until(() => d.querySelectorAll('.rm-t').length === 7), 'Expand all');  // 2.352.0 B (#2752): + Milk of Groceries
   // ---- filters
   d.querySelector('[data-act="rm-hd"]').click();
   check(await until(() => d.querySelector(`.tl-bar.done[data-id="${wD}"]`)), 'Hide done off: completed task shown, struck through');
   d.querySelector('[data-act="rm-hd"]').click();
   check(await until(() => !d.querySelector(`.tl-bar[data-id="${wD}"]`)), 'Hide done on again');
   d.querySelector('[data-act="rm-po"]').click();
-  check(await until(() => d.querySelector(`.rm-g[data-l="${SHOP}"]`)), 'Projects only off: plain lists with dated tasks appear');
-  check(!d.querySelector(`.rm-g[data-l="${SHOP}"] .rm-fill[style*="%"]`) || sum(SHOP).querySelector('.rm-fill').style.width === '0%', 'a plain list has no progress fill');
+  // 2.352.0 B (#2752): "Projects only" only leaves out the inbox; Groceries stays either way
+  check(await until(() => !d.querySelector('[data-act="rm-po"]').classList.contains('on') && d.querySelector(`.rm-g[data-l="${SHOP}"]`)), 'Projects only off: Groceries still there');
+  check(['', '0%', undefined].includes(sum(SHOP)?.querySelector('.rm-fill')?.style.width), 'Groceries: nothing done, no fill');
   d.querySelector('[data-act="rm-po"]').click();
-  await until(() => !d.querySelector(`.rm-g[data-l="${SHOP}"]`));
+  await until(() => d.querySelector('[data-act="rm-po"]').classList.contains('on'));
   d.querySelector('[data-act="rm-who"]').click(); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Everyone/.test(pop.textContent) && /Unassigned/.test(pop.textContent) && /Bob/.test(pop.textContent), 'assignee filter: everyone, me, unassigned, the people');
@@ -272,14 +275,14 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await call('PATCH', '/api/settings', {roadmap: JSON.stringify({v: 'timeline'})});
   for (const id of [WEB, BRAND, FILM]) await call('PATCH', `/api/lists/${id}`, {kind: 'list'});
   w = await boot({user: 'alice', hash: 'all'}); d = w.document;
-  // 2.152.2 (#2624): project instead of list
-  check(!d.querySelector('[data-act="rm-po"]').classList.contains('on') && /Switch on progress and status for a project to plan it here/.test(d.querySelector('.rm-hint')?.textContent || ''), 'no project: "Projects only" off, with the hint');
-  check(d.querySelector(`.rm-g[data-l="${SHOP}"]`) && d.querySelector(`.rm-g[data-l="${WEB}"]`), 'no project: every list with dates');
+  // 2.352.0 B (#2752): kind=list changes nothing any more: still projects, "Projects only" on, no hint to switch anything on
+  check(d.querySelector('[data-act="rm-po"]').classList.contains('on') && !d.querySelector('.rm-hint'), 'kind list: still projects, "Projects only" on, no hint');
+  check(d.querySelector(`.rm-g[data-l="${SHOP}"]`) && d.querySelector(`.rm-g[data-l="${WEB}"]`), 'every list with dates');
   w.close();
   for (const id of [WEB, BRAND, FILM]) await call('PATCH', `/api/lists/${id}`, {kind: 'project'});
   for (let i = 0; i < 3; i++) { const l = await L('Extra ' + i); await mk('T' + i, l, 1, 5 + i); }
   w = await boot({user: 'alice', hash: 'all'}); d = w.document;
-  check(d.querySelectorAll('.rm-g').length === 6 && !d.querySelector('.rm-t'), '6 projects: collapsed by default');
+  check(d.querySelectorAll('.rm-g').length === 7 && !d.querySelector('.rm-t'), '7 projects: collapsed by default');  // 2.352.0 B (#2752): + Groceries
   w.close();
   // 50 projects, 1000 tasks: straight into the test database would bypass the app; the API is fast enough
   const big = [];

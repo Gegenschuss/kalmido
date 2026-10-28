@@ -42,6 +42,7 @@ from ..accounts.login import auth_key, seal, unseal
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _now, _place
 from .fsroots import fs_area_folder_name  # 2.200.0 A (#2747, review 6)
+from .fslock import fsl_need_unlocked  # 2.353.0 A (#2758)
 
 FRQ_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 FRQ_TITLE_MAX, FRQ_NOTE_MAX, FRQ_NAME_MAX = 120, 2000, 120
@@ -261,6 +262,7 @@ def frq_create(nid):
     n = _folder(c, nid)
     if not public_links_on(c):
         return err(tr("Public links are turned off on this server"), 409)
+    fsl_need_unlocked(c, nid, "fs_locked_link")  # 2.353.0 A (#2758): an external person has no key
     f = frq_clean(body(), new=True)
     f.setdefault("max_mb", FRQ_MB_DEFAULT)
     f.setdefault("max_files", FRQ_FILES_DEFAULT)
@@ -571,6 +573,12 @@ def frq_send(token):
         frq_day_full(c, r["id"], len(data))  # counted only once the file is stored
         _log(c, nid, r["created_by"], "frq_upload", r["title"] + (f" · {name}" if name else ""))
         saved.append(nid)
+        from ..docs.recog import rc_after_add
+        try:
+            with c.savepoint():
+                rc_after_add(c, nid, r["created_by"])  # 2.353.0 D (#2759): into a recognising folder = a document (the queue's next tick)
+        except Exception as x:  # noqa: BLE001 -- the file is in; recognising it later is "Recognise" in its menu
+            print("filereq: recognition", type(x).__name__, flush=True)
         size += len(data)
     ts = _now()
     if saved:

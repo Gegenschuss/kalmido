@@ -202,19 +202,17 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const PL = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
   const pt = (await call('POST', '/api/tasks', {title: 'Milk', list_id: PL})).id;
   w = await boot({user: 'alice', hash: 'l/' + PL}); d = w.document;
-  check(!d.querySelector('#top .kbadge'), 'plain list: no Project badge');
+  check(!d.querySelector('#top .kbadge'), 'no type badge (2.352.0 B #2752: every list is a project)');
   w.eval(`openDetail(${pt})`); await sleep(300);
-  check(!d.querySelector('#d-time') && !d.querySelector('[data-act="timer-toggle"]') && !d.querySelector('#d-deps'), 'plain list: no timer, no time, no waiting on in the details');
+  // 2.352.0 B (#2752): kind=list is a project too: dependencies yes; the timer stays the list's own switch (off)
+  check(!d.querySelector('#d-time') && !d.querySelector('[data-act="timer-toggle"]') && d.querySelector('#d-deps'), 'kind list: no timer, no time, but waiting on in the details');
   w.eval(`openDetail(${E})`); await sleep(300);
   check(d.querySelector('#d-time') && d.querySelector('[data-act="timer-toggle"]') && d.querySelector('#d-deps'), 'project list: timer, time and dependencies in the details');
   w.eval('closeDetail()');
   w.eval('listModal()'); await sleep(200);
   md = lastModal(d);
-  check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#l-kindp') && !md.querySelector('#l-kindp').checked, 'new list dialog: the switch Project features, off (2.25.0)');
-  check(md.querySelector('.kproj').hidden, 'type List: project settings hidden');
-  { const kp = md.querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  // 2.41.0 (#1471): time tracking is no project feature any more (a switch of every list)
-  check(!md.querySelector('.kproj').hidden && /dependencies with the Gantt timeline, progress and status/.test(md.querySelector('#l-khint').textContent) && !/time tracking/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');  // 2.39.1 (#1217): custom fields are in every list, not a project feature
+  // 2.352.0 C (#2751): no switch "Progress and status" any more; the project features are a folding part, closed at first
+  check(md.querySelector('#l-kind').value === 'list' && !md.querySelector('#l-kindp') && md.querySelector('#lm-sec-proj:not([open]) .lptype'), 'new list dialog: no switch, the project features folded (2.352.0)');
   check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
@@ -223,9 +221,11 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   // 2.152.2 (#2624): project instead of list
   check(pop && !/As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit project…/.test(pop.textContent), 'sidebar context menu: no type entries (2.25.0, UX-52: Edit list > Project features)');
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Edit project…').click(); await sleep(300);  // 2.152.2 (#2624): project instead of list
-  { const kp = lastModal(d).querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  // 2.352.0 C (#2751): the dialog has no switch "Progress and status" any more: the kind is set through the API
+  check(lastModal(d)?.classList.contains('lmodal') && !lastModal(d).querySelector('#l-kindp'), 'context menu: the project dialog, without the switch');
+  lastModal(d).remove(); await call('PATCH', '/api/lists/' + PL, {kind: 'project'}); w.eval('load().then(render)');
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
-  check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');
+  check(!d.querySelector('#top .kbadge'), 'still no type badge in the header (2.352.0 B #2752)');
   w.eval(`openDetail(${pt})`); await sleep(300);
   // 2.41.0 (#1471): the type does not switch time tracking on; the list's own switch "Time tracking" does
   check(!d.querySelector('[data-act="timer-toggle"]'), 'after switching to Project: still no timer (time tracking is its own switch, off)');

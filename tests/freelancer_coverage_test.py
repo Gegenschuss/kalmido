@@ -33,7 +33,7 @@ KINDS = {
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
-    "files": ("matrix", SUITE + ", p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
+    "files": ("matrix", SUITE + ", p2353_a_lockfolder_test.py, p2353_a_scanlock_test.py (2.353.0: a locked private folder, scans refused there), p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
                          "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0); "
                          "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0)"),
@@ -49,8 +49,8 @@ KINDS = {
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
-    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
-                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail"),
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+                      "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail; 2.352.0 D: the shortened view of a private mail"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
@@ -93,6 +93,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
+    "GET /api/files/lock/{}": "files", "POST /api/files/lock/{}/start": "files", "GET /api/files/lock/{}/todo": "files", "GET /api/files/lock/{}/raw/{}": "files", "POST /api/files/lock/{}/convert/{}": "files", "POST /api/files/lock/{}/finish": "files", "POST /api/files/lock/{}/stop": "files", "POST /api/files/lock/{}/keys": "files", "POST /api/files/lock/upload": "files", "POST /api/files/lock/folder": "files", "POST /api/files/lock/rename/{}": "files", "POST /api/files/lock/version/{}": "files", "POST /api/files/lock/move/{}": "files",
     # ---- admin (54)
     "DELETE /api/admin/agents/{}": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "DELETE /api/admin/alerts": "admin", "DELETE /api/admin/backups/{}": "admin", "DELETE /api/admin/groups/{}": "admin",
@@ -259,6 +261,7 @@ ROUTES = {
     "POST /api/v1/documents": "files", "POST /api/docs/export.csv": "files",  # 2.122.0 (#2098)
     # 2.122.0 B (#2099 #2294)
     "GET /api/files/nodes/{}/tags": "files", "PUT /api/files/nodes/{}/tags": "files", "GET /api/files/tags": "files", "GET /api/files/tagged": "files",
+    "PUT /api/files/nodes/{}/recognition": "files",  # 2.353.0 D (#2759): p2353_d_ablagedocs_test.py (a, b) without an organisation
     "POST /api/docs/bulk": "files", "POST /api/docs/zip": "files", "GET /api/docs/zip/{}": "files",
     "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "GET /api/docs/{}/einvoice": "files",  # 2.146.0 A (#2451): the readable view of an e-invoice
@@ -384,6 +387,7 @@ ROUTES = {
     "POST /api/v1/lists/{}/shop-areas": "lists", "POST /api/v1/lists/{}/sprints/assign": "lists",
     "POST /api/v1/lists/{}/tags": "lists", "POST /api/v1/templates": "lists", "POST /api/v1/templates/{}/apply": "lists",
     "PUT /api/folder-heads": "lists", "PUT /api/folders/agents": "lists", "PUT /api/folders/groups/{}": "lists",
+    "GET /api/lists/tree": "lists", "POST /api/lists/folders": "lists", "POST /api/lists/tree/move": "lists",  # 2.352.0 A (#2748)
     "PUT /api/folders/notify-template": "lists", "PUT /api/folders/people": "lists", "PUT /api/folders/playbook": "lists",
     "PUT /api/folders/props": "lists", "PUT /api/folders/public-links": "lists", "PUT /api/lists/{}/agent": "lists",
     "PUT /api/lists/{}/bell": "lists", "PUT /api/lists/{}/favorite": "lists", "PUT /api/lists/{}/folder-repo": "lists",
@@ -752,6 +756,7 @@ ROUTES = {
     "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
+    "POST /api/lists/{}/move-space": "lists",  # 2.401.0 (#2924): p2401_a_api_test.py (409 without an organisation: no other workspace)
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
@@ -845,6 +850,7 @@ ROUTES = {
     "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private space's)
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.143.0 B (#2211): the trash of the private space (p2143_b_api_test.py)
     "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",

@@ -36,6 +36,9 @@ const V = B + 'api/v1';
   const AG = ag.id, AGH = {Authorization: 'Bearer ' + ag.token, 'Content-Type': 'application/json'};
   const L = (await call('POST', '/api/lists', {name: 'App dev', org_id: ORG})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: AG, role: 'edit'});
+  // 2.331.0 (#3309): the default is keep (suggestions at their message); this suite is about the shelf, so it chooses collect
+  check((await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.sugg === 'keep', '#3309: default keep');
+  await call('PUT', `/api/agents/${AG}/chat-prefs`, {sugg: 'collect'});
   const sayTo = async (uid, hd, body, extra = {}) => (await fetch(V + `/agent/chats/${uid}`, {method: 'POST', headers: hd, body: JSON.stringify({body, ...extra})})).json();
   const say = (body, extra) => sayTo(ME.id, AGH, body, extra);
   const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
@@ -113,6 +116,17 @@ const V = B + 'api/v1';
   const fa = await call('POST', '/api/my/agents', {username: 'fridabot', display_name: 'Frida bot', scopes: ['read', 'tasks:write', 'comments']}, FK);
   const ft = await call('POST', `/api/my/agents/${fa.id}/token`, {}, FK);
   const FH = {Authorization: 'Bearer ' + ft.token, 'Content-Type': 'application/json'};
+  // 2.331.0 (#3309): default keep - an ended suggestion stays answerable at its message, no shelf (then collect for the shelf below)
+  const f0 = await sayTo(FU.id, FH, 'Archive old mail?', {choices: ['Archive', 'Keep']});
+  await sayTo(FU.id, FH, 'Inbox checked.');
+  w = await boot({user: 'frida'}); d = w.document;
+  w.eval(`chatOpen(${fa.id})`); await until(() => cm(d, f0.id)?.querySelector('.cchoices .cchb:not([disabled])'));
+  check(cm(d, f0.id)?.querySelectorAll('.cchoices .cchb:not([disabled])').length === 2 && (!shelf(d) || shelf(d).hidden),
+    'freelancer #3309: by default the ended suggestion stays at its message, no shelf');
+  click(w, cm(d, f0.id).querySelector('.cchoices .cchb'));
+  await until(async () => (await call('GET', `/api/agents/${fa.id}/chat`, null, FK)).messages.find(m => m.id === f0.id)?.choice_state === 'answered');
+  w.close();
+  await call('PUT', `/api/agents/${fa.id}/chat-prefs`, {sugg: 'collect'}, FK);
   const f1 = await sayTo(FU.id, FH, 'Tidy the inbox?', {choices: ['Tidy', 'Later']});
   await sayTo(FU.id, FH, 'Done with the calendar.');
   w = await boot({user: 'frida'}); d = w.document;

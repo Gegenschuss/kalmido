@@ -260,7 +260,7 @@ def openapi_spec():
                                                       "next_due": nul("string", format="date")}},
         "List": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
-            "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
+            "folder": {"type": "string", "description": "Your folder path, at most 30 levels (2.352.0; before: 2): \"Clients/Company X\"; empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
             "ticket_key": nul("string", description="2.390.0: the project's ticket key (2-6 capitals / digits, a letter first, unique per workspace); "
                               "its tasks get keys like APP-12 (field key of a task); null = none"),
@@ -274,7 +274,7 @@ def openapi_spec():
                             "or select field of the project: one group per value, select fields in the order of their options, \"No value\" last; "
                             "sections stay and come back when it is off), \"\" = by sections"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "Project type (internally: list type); kind=project = the switch Progress and status: dependencies, progress and status (2.41.0: time tracking is the switch time_tracking of any project; 2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every project)"},
+            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "Stored list type, no longer evaluated (2.352.0): every list but the inbox is a project with project page, progress, dependencies and status; tracked = has a status (status not null). Still returned and accepted for compatibility"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
@@ -299,10 +299,10 @@ def openapi_spec():
             "favorite": {"type": "boolean", "description": "2.46.1 (#1361): a favourite of the person (an agent: of the person it belongs to; a team agent: always false)"}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
-            "folder": {"type": "string", "description": "Folder path, at most 2 levels (\"Clients/Company X\"); deeper: 400"},
+            "folder": {"type": "string", "description": "Folder path, at most 30 levels (\"Clients/Company X\", 2.352.0; before: 2); deeper: 400"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project (project = switch Progress and status on); \"checklist\" is a deprecated alias of list + done_at_bottom"},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project: stored only, no longer evaluated (2.352.0, every list but the inbox is a project); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
@@ -329,7 +329,7 @@ def openapi_spec():
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
             "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
-            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project (project = switch Progress and status on); \"checklist\" is a deprecated alias of list + done_at_bottom"},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project: stored only, no longer evaluated (2.352.0, every list but the inbox is a project); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
             "sort_mode": {"type": "string", "description": "2.144.0 (#2414): the project's sort for every member (owner / project admins); \"\" = default; " + SORT_MODE_DOC},
             "group_field": {"type": ["string", "integer", "null"], "description": "2.144.0 (#2414): group the list view by a custom field for every "
@@ -617,7 +617,7 @@ def openapi_spec():
         "/roadmap": {"get": op("All projects on one timeline: groups with summary spans, progress and dated tasks", "Roadmap",
                                ok(ref("Roadmap")) | errs("400"),
                                [q("from", "First day (default: 14 days ago)", date_s), q("to", f"Last day (default: from + 194 days, at most {ROADMAP_MAX_DAYS} days)", date_s),
-                                q("projects_only", "true = only projects with progress and status (kind=project)", {"type": "boolean"}),
+                                q("projects_only", "true = no inbox (2.352.0: every other list is a project)", {"type": "boolean"}),
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
         "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first (or by sort). 2.390.0: also "
                              "field_<id>=value, a custom field of a project you see (only its tasks): select = option id or name, "
@@ -825,7 +825,7 @@ def openapi_spec():
         "info": {"title": f"{APP_NAME} REST API", "version": API_VERSION,
                  "description": "Personal access tokens (Settings > Account > API tokens) as `Authorization: Bearer abk_...`. "
                                 "Every request acts as the token's user and sees exactly what that user sees. Dates are local dates "
-                                "of the server's time zone (YYYY-MM-DD), times HH:MM, timestamps ISO 8601 in UTC. Projects are called lists in the API (list_id, /lists, kind=list|project). Collections come in pages: "
+                                "of the server's time zone (YYYY-MM-DD), times HH:MM, timestamps ISO 8601 in UTC. Projects are called lists in the API (list_id, /lists; kind=list|project is stored but no longer evaluated, tracked projects have a status). Collections come in pages: "
                                 "{data, next_cursor}. Errors: {error: {code, message}}. See docs/API.md for examples and webhooks.",
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],

@@ -120,8 +120,8 @@ const V = B + 'api/v1';
   click(w, d.querySelector('.modal [data-rp="add"]'));
   const frow = await until(() => d.querySelector('.modal #l-repos .reporow'));
   check(frow && /acme\/app/.test(frow.textContent) && /Token set/.test(frow.textContent), '#934: connected to the folder: ' + (frow?.textContent.replace(/\s+/g, ' ') || ''));
-  // 2.152.2 (#2624): project instead of list
-  check(/Used by 2 of 2 projects with progress and status in this folder/.test(d.querySelector('.modal #l-repos').textContent), '#934: how many lists use it: ' + d.querySelector('.modal #l-repos .lhint[role="status"]')?.textContent);
+  // 2.152.2 (#2624): project instead of list; 2.352.0 B (#2752): "Notes" is a project too
+  check(/Used by 3 of 3 projects in this folder/.test(d.querySelector('.modal #l-repos').textContent), '#934: how many lists use it: ' + d.querySelector('.modal #l-repos .lhint[role="status"]')?.textContent);
   check(![...d.querySelectorAll('.modal')].some(m => m.innerHTML.includes(TOKEN)), '#934: no token in the page');
   click(w, rmd().querySelector('[data-m="close"]')); await sleep(100);
   // Back: the folder settings come back; close them too

@@ -14,7 +14,7 @@ function sup_accountRow() {
   return b ? `<div class="row suprow" id="a-sup"><label>${tr('Supporter')}</label><span class="supbadges">${b}</span></div>` : '';
 }
 function sup_licRow(l, kind, can) {
-  const date = l ? new Date(l.date + 'T12:00:00').toLocaleDateString(I18N.code || 'en') : '';
+  const date = l ? fmtDateNum(new Date(l.date + 'T12:00:00')) : '';
   return `<div class="row suplic"><label>${esc(tr(SUP_KIND_LABEL[kind]))}</label>${l
     ? `<span class="supbadges">${sup_badge(l)}<span class="muted">${esc(tr('since {0}', date))}${l.id ? ' · ' + esc(l.id) : ''}</span></span>${can ? `<button type="button" class="btn sm" data-sup="del" data-kind="${kind}">${esc(tr('Remove'))}</button>` : ''}`
     : `<span class="muted">${esc(kind === 'server' && !can ? tr('None yet (an admin enters it)') : tr('None yet'))}</span>`}</div>`;

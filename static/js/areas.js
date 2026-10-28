@@ -34,7 +34,7 @@ const mg_allOn = id => { const f = new Set(pma_full()), ks = mg_feats(id).filter
 function mg_target(id) {
   const ps = mg_partsShown(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];  // 2.173.0 A (#2680): an organisation's view: its parts only
   if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.161.2 (#2616)
-  return (ps.find(p => p[0] === last) || ps[0] || [id])[0];
+  return (ps.find(p => p[0] === last) || ps[0] || mg_parts(mg_area(id))[0] || [id])[0];  // 2.353.0 D (#2759): only a part without an entry on: that one
 }
 function mg_seen(mod) {
   const a = mg_areaOf(mod); if (!a) return;
@@ -245,7 +245,7 @@ function mg_sideRow(id, hid) {
   if (!mg_on(id) || (mg_sideHidden(id, hid) && !here) || o3a_hid(id)) return '';  // 2.83.0 (#1845)
   const rec = id === 'time' && (S.timer || S.pomo), req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0;
   const after = rec ? '<span class="c"><span class="recdot"></span></span>' : req ? `<span class="c nunread">${req}</span>` : '';
-  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(a[1])}<span class="n">${esc(tr(mg_nameKey(a)))}</span>${after}</button>`;
+  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(mg_icon(a))}<span class="n">${esc(tr(mg_nameKey(a)))}</span>${after}</button>`;
 }
 // [keys, name] for the sidebar editor (one check box per area, for all its parts)
 const mg_sideEntry = id => mg_on(id) ? [mg_sideKeys(id).join(','), mg_area(id)[2]] : null;
@@ -254,7 +254,7 @@ const MG_TAB_OLD = {'m:pomo': 'a:time', time: 'a:time', stats: 'a:review', 'm:fa
 const mg_tabIds = ids => ids ? [...new Set(ids.map(x => MG_TAB_OLD[x] || x))] : ids;
 function mg_tabItem(id) {
   const a = mg_area(id.slice(2)); if (!a || !mg_on(a[0])) return null;
-  return {id, go: mg_target(a[0]), icon: ic(a[1], 'l'), ico: a[1], label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
+  return {id, go: mg_target(a[0]), icon: ic(mg_icon(a), 'l'), ico: mg_icon(a), label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
 }
 const mg_tabOpts = opt => MG_IDS.filter(mg_on).map(id => opt('a:' + id, tr(mg_area(id)[2]))).join('');
 // ---- Settings > Modules: ONE switch per area; its parts below it (each can still be switched on its own)
@@ -270,7 +270,8 @@ function mg_modAreaHtml(id, partRow) {
   return `<div class="modrow mgarea ${on ? '' : 'off'} ${on && !all ? 'part' : ''}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${all ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small>${modPrivHtml(ks)}</span></label>
     <details class="mopt mgparts"><summary>${tr('Parts: {0}', a[3].map(p => tr(p[2])).join(', '))}</summary><div class="modlist">${ks.map(partRow).join('')}</div></details></div>`;
 }
-function mg_setSync(md) {
+function mg_setSync(md) { wsa_raw(() => mg_setSyncMain(md)); }  // 2.409.0 (#3490): the main switches
+function mg_setSyncMain(md) {
   for (const el of $$('[data-mgarea]', md)) if (el.matches('input')) { const id = el.dataset.mgarea; el.checked = mg_allOn(id); el.indeterminate = !el.checked && mg_on(id); }  // 2.171.0 (#2676)
   $$('[data-mgrow]', md).forEach(r => { const id = r.dataset.mgrow; r.classList.toggle('off', !mg_on(id)); r.classList.toggle('part', mg_on(id) && !mg_allOn(id)); });
 }
@@ -280,7 +281,7 @@ async function mg_areaSwitch(md, el) {
   const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
   for (const k of mg_feats(id)) on ? fs.add(k) : fs.delete(k);
   await setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n));
-  for (const x of $$('[data-feat]', md)) { x.checked = feat(x.dataset.feat); x.closest('[data-modrow]')?.classList.toggle('off', !x.checked); }
+  wsa_raw(() => { for (const x of $$('[data-feat]', md)) { x.checked = feat(x.dataset.feat); x.closest('[data-modrow]')?.classList.toggle('off', !x.checked); } });  // 2.409.0 (#3490)
   mg_setSync(md); modCountsSync(md);
   if (id === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }  // the time options
 }
@@ -300,9 +301,15 @@ const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' 
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
 // 2.173.0 A (#2680): the parts of an area shown in the current view (an organisation's: without the private ones) and the
 // name of Home there (only travel and staying in touch: not "Home")
-const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]));
+// 2.353.0 D (#2759): parts without an own entry in the navigation (tabs, panel, menus): Documents is a saved filter of the
+// file store now (abdocs.js); its route #docs, its switch and its old links stay
+const MG_NONAV = new Set(['docs']);
+const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]) && !MG_NONAV.has(p[0]));
 const O3A_LIFE_NAME = N_('Travel & contacts|area');
-const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : a?.[2];
+// 2.364.0 B (#3018): with Office & finance off the area is called and drawn like its first part on (Contacts, else Clients)
+const mg_ofOff = a => a?.[0] === 'office' && !officeOn() && mg_parts(a).length > 0;
+const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : mg_ofOff(a) ? mg_parts(a)[0][2] : a?.[2];
+const mg_icon = a => mg_ofOff(a) ? mg_parts(a)[0][1] : a?.[1];
 const mg_partName = (m, n) => m === 'life' && o3a_orgView() ? O3A_LIFE_NAME : n;
 const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();
 // a tab bar / "More" item ({mod}) or a sidebar row (its data-go route) hidden in an organisation's view
@@ -320,15 +327,16 @@ function o3a_toPrivate(mod) {
 // The panel always follows the page (the page's area), so both always match. Phones keep the drawer and the tab bar.
 // [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
 // 2.208.0 (#2771): the area 'tasks' is called Projects (its entries stay tasks), icon proj instead of the tick
-const SBB_RAIL = [['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
+// 2.364.0 B (#3031): Start (the overview, route home) is the first icon, on the computer's bar and in the phone's drawer
+const SBB_RAIL = [['home', 'start', N_('Start|home'), () => true, ['home']], ['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
-const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
+const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, mg_icon(a), mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
 // 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
 // Calendars window the head's button; Habits one entry; Time / Review two): on a computer no panel, the page takes the
 // width and an area's parts are the tabs on top (mg_tabsHtml). The phone's drawer keeps them (sbm_*)
-const SBB_NOPANEL = ['cal', 'habits', 'time', 'review'];
+const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home'];  // 2.364.0 B (#3031): Start has no panel either
 const sbb_noPan = (id = sbb_area()) => sbb_on() && SBB_NOPANEL.includes(id);
 // 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
 // mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)
@@ -382,10 +390,10 @@ const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_un
 function sbb_railHtml(hid) {
   const cur = sbb_area(), aw = sbb_aw();
   const btn = id => sbb_btnHtml(id, cur, hid, aw);
-  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml); with the panel hidden a small button on top
-  // of the bar brings it back
+  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
+  // hidden a small button on top of the bar brings it back
   const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
-  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu)
+  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}"${sbb_labelsOn() ? '' : ` aria-label="${esc(tr('Settings'))}"`}>${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {
@@ -438,7 +446,7 @@ function sbb_barHtml() {
   // P4: without an organisation the switch shows the private space (its menu: Private + "Add a company")
   const cur = wsOn() ? wsCur() : 'private', nm = wsName(cur);
   const acct = S.me ? `<button type="button" class="kbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
-  return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span>${updDot() ? `<span class="kbupd" title="${esc(tr('Update available'))}"></span>` : ''}</button>`
+  return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span></button>`
     + `<button type="button" class="kbsrch" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${esc(tr('Search'))}</span></button>`
     + `<span class="kbend">${bellBtn()}${netDotHtml()}${acct}</span>`;
 }
@@ -459,8 +467,7 @@ function sbb_wsMenu(anchor) {
   const opts = [...all.filter(w => w.startsWith('org:')), ...all.filter(w => !w.startsWith('org:'))];  // the companies first (sketch)
   const set = cur.startsWith('org:') && typeof lmOrgPaneOn === 'function' && lmOrgPaneOn();
   const p = menu(anchor, [{head: tr('Switch to')}, ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, cls: 'kbwsi', title: wsName(ws), fn: () => { if (ws !== wsCur()) wsSet(ws); }})),
-    '-', {label: tr('Settings'), icon: 'gear', cls: 'kbws-settings', keys: 'g s', sub: updDot() ? tr('Update available') : '', fn: () => settingsModal()},  // 2.380.2 (#3400)
-    {label: tr('Add an organisation'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
+    '-', {label: tr('Add an organisation'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
     ...(set ? [{label: tr('Company settings'), icon: 'building', cls: 'kbws-set', fn: () => settingsModal('org')}] : [])]);
   // each company's own sign in place of the icon: its picture or symbol, else its initial on a tile
   opts.forEach((ws, i) => {
@@ -620,12 +627,16 @@ function sbb_treeAnyOpen() {
 // 2.199.0 A (#2742): a node may also carry ns (the module's handlers, sbb_treeReg), id, par (its parent's key: siblings share
 // it), drag (dragged to move / sort), drop (takes nodes into it), menu (right-click / long press / the context key) and auto
 // (an automatic group: a filter view -- other look, never dragged, dropped on, sorted, shared or given a menu)
+// 2.352.0 E (#2748): + raw (a row the area draws itself: the projects' lists and folder bodies), cls / after (classes of the
+// row, what follows the name: count, share mark, menu button), ichtml (the icon's own markup) and fold ({open, attrs}: the
+// area keeps the open state itself)
 function sbb_treeHtml(nodes, lvl = 0) {
   return nodes.map(n => {
-    const open = !!n.kids && (n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
-    const arrow = n.kids ? `<button type="button" class="sbbtar" data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}" aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
+    if (n.raw != null) return n.raw;
+    const open = !!n.kids && (n.fold ? !!n.fold.open : n.open && !SBB_SHUT.has(n.k) || sbb_treeOpen(n.k)), sub = open ? n.sub() : [];
+    const arrow = n.kids ? `<button type="button" class="sbbtar" ${n.fold ? n.fold.attrs : `data-act="sbb-tree" data-k="${esc(n.k)}" data-open="${open ? 1 : ''}"`} aria-expanded="${open}" aria-label="${esc(tr(open ? 'Collapse' : 'Expand') + ': ' + n.name)}">${ic('chev', 's fcar')}</button>` : '<span class="sbbtar" aria-hidden="true"></span>';
     const dn = n.ns && !n.auto ? ` data-sbbns="${esc(n.ns)}" data-sbbid="${esc(String(n.id))}" data-sbbpar="${esc(String(n.par ?? ''))}"${n.drop ? ' data-sbbdrop="1"' : ''}${n.menu ? ' data-sbbmenu="1" aria-haspopup="menu"' : ''}${n.drag && !isTouch() ? ' draggable="true"' : n.drag ? ' data-sbbdrag="1"' : ''}` : '';
-    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}${n.auto ? ' sbbauto' : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}${dn}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}${n.auto ? ` title="${esc(tr('Automatic group'))}"` : ''}>${ic(n.icon || (n.auto ? 'filter' : 'folder'), 's')}<span class="n">${esc(n.name)}</span></button></div>`
+    return `<div class="fhead sbbt ${open ? '' : 'closed'} ${n.on ? 'on' : ''}${n.auto ? ' sbbauto' : ''}${n.cls ? ' ' + n.cls : ''}" style="--sbbl:${Math.min(lvl, 8)}" ${n.attrs || ''}${dn}>${arrow}<button type="button" class="sbbtn" data-go="${esc(n.go)}"${n.on ? ' aria-current="page"' : ''} ${n.battrs || ''}${n.auto ? ` title="${esc(tr('Automatic group'))}"` : ''}>${n.ichtml ?? ic(n.icon || (n.auto ? 'filter' : 'folder'), 's')}<span class="n">${esc(n.name)}</span></button>${n.after || ''}</div>`
       + (!open ? '' : sub === null ? `<div class="sbbtl muted" style="--sbbl:${Math.min(lvl + 1, 8)}">${esc(tr('Loading…'))}</div>` : sbb_treeHtml(sub, lvl + 1));
   }).join('');
 }
@@ -758,4 +769,107 @@ function sbb_panelHtml(id) {
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
   return title + `<div class="sgroup sbbp">${sbb_row(sbb_target(id), d[1], tr(d[2]), true)}</div>`;
+}
+// ---- 2.409.0 (#3490): areas on / off per workspace. The module switches ("features") stay the main switch (off = off
+// everywhere); below it each person switches areas off per own workspace (setting ws_areas_off, json {ws: [area]}, Settings >
+// Modules "Areas per workspace") and an organisation's admins switch areas off for all its members (orgs.areas_off, Settings >
+// Workspaces; the server then refuses the area's routes there, accounts/wsareas.py). "All workspaces" shows an area that is
+// on in at least one workspace. Nothing is deleted. feat() (core.js) asks wsa_featOff; WSA.raw > 0 = the main switches only
+// (Settings > Modules shows and changes those)
+const WSA_AREAS = ['office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets'];
+const WSA_ORG = WSA_AREAS.filter(a => a !== 'review');  // review is private only (O3A_PRIV)
+const WSA = {raw: 0, cur: null, own: null, ws: null, off: new Set(), ownS: null, ownO: {}};
+function wsa_raw(fn) { WSA.raw++; try { return fn(); } finally { WSA.raw--; } }
+const wsa_feats = id => mg_area(id) ? mg_feats(id) : [id];  // wiki, sheets: the module itself
+const wsa_name = (id, ws) => id === 'life' && ws?.startsWith('org:') ? O3A_LIFE_NAME : mg_area(id)?.[2] || (id === 'wiki' ? N_('Knowledge|area') : N_('Tables'));
+const wsa_areaOfMod = mod => mod === 'wiki' || mod === 'sheets' ? mod : mg_areaOf(mod === 'bookmarks' ? 'reading' : mod)?.[0] || null;
+function wsa_own() {
+  const s = S.settings?.ws_areas_off || '{}';
+  if (s !== WSA.ownS) { WSA.ownS = s; try { const o = JSON.parse(s); WSA.ownO = o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { WSA.ownO = {}; } }
+  return WSA.ownO;
+}
+const wsa_adm = ws => ws?.startsWith('org:') ? wsOrg(ws.slice(4))?.areas_off || [] : [];
+const wsa_spaces = () => wsOn() ? wsOptions().filter(w => w !== 'all') : ['private'];
+// on in workspace ws (below the main switch); review only in Private
+const wsa_wsOn = (ws, id) => !(id === 'review' && ws !== 'private') && !wsa_adm(ws).includes(id) && !(wsa_own()[ws] || []).includes(id);
+const wsa_areaOn = (id, ws = wsCur()) => ws === 'all' ? wsa_spaces().some(w => wsa_wsOn(w, id)) : wsa_wsOn(ws, id);
+function wsa_featOff(f) {
+  if (WSA.raw || !S.settings) return false;
+  const cur = wsCur();
+  if (cur !== WSA.cur || S.settings.ws_areas_off !== WSA.own || S.me?.workspaces !== WSA.ws) {
+    WSA.cur = cur; WSA.own = S.settings.ws_areas_off; WSA.ws = S.me?.workspaces;
+    WSA.off = new Set(WSA_AREAS.filter(id => !(id === 'review' && cur !== 'private' && cur !== 'all') && !wsa_areaOn(id, cur)).flatMap(wsa_feats));
+  }
+  return WSA.off.has(f);
+}
+// an area of the main switch that is on (some part) -- what Settings > Modules offers per workspace
+const wsa_mainOn = id => wsa_raw(() => mg_area(id) ? mg_on(id) : modOn(id));
+// Settings > Modules: one group per workspace with a switch per area (only with organisations: alone, Private = the main switches)
+function wsa_modHtml() {
+  const sps = wsa_spaces(); if (sps.length < 2 || S.me?.kid) return '';
+  const ids = WSA_AREAS.filter(wsa_mainOn); if (!ids.length) return '';
+  const grp = ws => {
+    const rows = ids.filter(id => ws === 'private' || id !== 'review').map(id => {
+      const adm = wsa_adm(ws).includes(id), on = wsa_wsOn(ws, id);
+      return `<div class="modrow ${on ? '' : 'off'}" data-wsarow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-wsa="${id}" data-wsaws="${ws}" ${on ? 'checked' : ''} ${adm ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${esc(tr(wsa_name(id, ws)))}</b>${adm ? `<small class="muted">${esc(tr('Switched off by the admins of {0}', wsName(ws)))}</small>` : ''}</span></label></div>`;
+    });
+    const n = ids.filter(id => (ws === 'private' || id !== 'review') && wsa_wsOn(ws, id)).length, t = ids.filter(id => ws === 'private' || id !== 'review').length;
+    return `<details class="modgrp wsagrp" data-wsagrp="${ws}"><summary><span class="mgn">${wsIcon(ws)} ${esc(wsName(ws))}</span><span class="mgc muted">${esc(tr('{0} of {1} on', n, t))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${rows.join('')}</div></details>`;
+  };
+  return `<h4 id="s-wsa-h">${tr('Areas per workspace')}</h4><div class="shint">${tr('Switched off here, an area disappears only in that workspace; the switches above apply everywhere. Nothing is deleted.')}</div>${sps.map(grp).join('')}`;
+}
+document.addEventListener('change', async e => {
+  const el = e.target; if (!el?.dataset?.wsa || !el.dataset.wsaws) return;
+  e.stopPropagation();
+  const id = el.dataset.wsa, ws = el.dataset.wsaws, on = el.checked, o = JSON.parse(JSON.stringify(wsa_own())), xs = new Set(o[ws] || []);
+  on ? xs.delete(id) : xs.add(id);
+  if (xs.size) o[ws] = WSA_AREAS.filter(x => xs.has(x)); else delete o[ws];
+  const n = `${tr(wsa_name(id, ws))} · ${wsName(ws)}`;
+  el.closest('[data-wsarow]')?.classList.toggle('off', !on);
+  await setApply({ws_areas_off: JSON.stringify(o)}, on ? tr('{0} on', n) : tr('{0} off', n));
+  wsa_sync(); render();
+}, true);
+// the switches follow an undo / another device (settingsSync)
+function wsa_sync(md = $$('.smodal').pop()) {
+  if (!md) return;
+  for (const el of $$('input[data-wsa]', md)) { const on = wsa_wsOn(el.dataset.wsaws, el.dataset.wsa); el.checked = on; el.closest('[data-wsarow]')?.classList.toggle('off', !on); }
+  for (const d of $$('[data-wsagrp]', md)) { const ins = $$('input[data-wsa]', d), c = $('.mgc', d); if (c) c.textContent = tr('{0} of {1} on', ins.filter(x => x.checked).length, ins.length); }
+}
+// Settings > Workspaces: the areas an organisation's members see (its admins decide, every member sees it; box._j = GET /api/orgs)
+function wsa_orgPaneDraw(box) {
+  if (!box?.isConnected) return;
+  const orgs = (box._j || {}).orgs || [];
+  for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
+    const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.wsa-org') || !Array.isArray(o.areas_off)) continue;
+    const adm = o.role === 'admin', ws = 'org:' + o.id;
+    const sec = document.createElement('div');
+    sec.className = 'wsa-org';
+    sec.innerHTML = `<h4>${tr('Areas in this organisation')}</h4><div class="shint keep">${esc(tr('Switched off, an area disappears for every member in this organisation and cannot be opened there; nothing is deleted.') + (adm ? '' : ' ' + tr('Only an admin of the organisation can change this.')))}</div>`
+      + `<div class="wsa-orgrows">${WSA_ORG.map(id => `<label class="chkl"><input type="checkbox" data-wsaorg="${id}" ${o.areas_off.includes(id) ? '' : 'checked'} ${adm ? '' : 'disabled'}> ${esc(tr(wsa_name(id, ws)))}</label>`).join('')}</div>`;
+    det.appendChild(sec);
+    if (!adm) continue;
+    sec.addEventListener('change', async e => {
+      const cb = e.target.closest('input[data-wsaorg]'); if (!cb) return;
+      e.stopPropagation();
+      const id = cb.dataset.wsaorg, on = cb.checked;
+      const put = v => async () => {
+        const off = new Set(o.areas_off); v ? off.delete(id) : off.add(id);
+        const j = await api('PATCH', `/api/orgs/${o.id}`, {areas_off: WSA_ORG.filter(x => off.has(x))});
+        o.areas_off = j?.areas_off || WSA_ORG.filter(x => off.has(x));
+        const w = wsOrg(o.id); if (w) { w.areas_off = o.areas_off; WSA.ws = null; }
+        const x = $(`input[data-wsaorg="${id}"]`, sec); if (x) x.checked = v;
+        render(); return {};
+      };
+      try { await put(on)(); } catch { cb.checked = !on; return; }
+      const label = `${tr(wsa_name(id, ws))} · ${o.name}`;
+      offerUndo(on ? tr('{0} on', label) : tr('{0} off', label), histAdd({label, undo: put(!on), redo: put(on)}));
+    });
+  }
+}
+// the router: an old link to an area that is off in the shown workspace (but on in another): a hint with a button to it
+function wsa_routeHint(mod) {
+  const id = wsa_areaOfMod(mod), cur = wsCur(); if (!id || cur === 'all' || S.me?.kid || modOn(mod) || !wsa_raw(() => modOn(mod))) return;
+  const to = wsa_spaces().find(w => w !== cur && wsa_wsOn(w, id)), h = location.hash.slice(1), n = tr(wsa_name(id, to || cur));
+  setTimeout(() => to ? toast(tr('{0} is off in this workspace. You find it in the workspace {1}.', n, wsName(to)), async () => { await wsSet(to); go(h); }, 10000, tr('Open'))
+    : toast(tr('{0} is off in this workspace.', n), null, 5000), 0);
 }

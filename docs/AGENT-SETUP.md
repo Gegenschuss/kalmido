@@ -11,7 +11,8 @@ another coding assistant, an n8n flow, a local model or a script) and run it on 
 subscription or API key. Kalmido provides:
 
 - an **agent account**: a user of type *Agent*, never an admin, sees only the projects shared with it
-  (the API calls projects lists: `list_id`, `/api/v1/lists`, `kind=list|project`),
+  (the API calls projects lists: `list_id`, `/api/v1/lists`, `kind=list|project`; since 2.352.0 `kind` is no longer
+  evaluated: every list but the inbox is a project, tracked = has a `status`),
 - an **API token** for it (shown once),
 - **events** (mentions, assignments, chat messages, reactions, jobs) by webhook or long polling,
 - the **MCP server** [`mcp/kalmido_mcp.py`](../mcp/kalmido_mcp.py), so the agent can use Kalmido as a tool,
@@ -146,7 +147,7 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    fields, emptying the trash, changing 10+ tasks at once, moving projects and sharing always wait for a person's approval.
 2. **Share projects** with it in the table *Projects*: one click on the agent's chip shares a project (role
    *Member*) or ends the sharing. Share only what the agent should work in. Use the project's Share dialog (*…* > *Share…* > *Agents*) for the
-   roles *Participant* (only tasks assigned to it) or *Viewer*.
+   roles *Participant* (only tasks assigned to it) or *Read-only* (called *Viewer* before 2.364).
 3. Optional, per agent above the table:
    - **Share all existing projects** shares every project you own with the agent (role *Member*), except your inbox and the
      projects you took out in the table before.
@@ -816,7 +817,7 @@ needs no entry in the agent's allow list.
 ### 11. Test checklist
 
 Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test project**
-with the agent; delete both afterwards. Watch the answers and *Settings > Administration > Agents* (the log).
+with the agent; delete both afterwards. Watch the answers and *Settings > Organisation > Agents* (the log).
 
 **Basics**
 

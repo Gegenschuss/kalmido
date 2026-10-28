@@ -433,6 +433,15 @@ Out of an organisation only an organisation admin moves something (2.148.1; befo
 a person without an organisation has no other workspace and does not see the action. Agents never move data between
 workspaces. Receipts the cash book or the equipment list points to stay in their workspace.
 
+**A project into the other workspace (2.401).** Changing *Workspace* in the project dialog checks first: when the move ends
+something, takes something along or leaves something behind, the same move dialog lists it before anything moves -- the
+client of the old workspace and "also in" links across the boundary end (Undo brings both back), the customer reports of
+its tasks go along (a report's client of the old workspace comes back with Undo), attached tables, video reviews, office
+documents, deals, approval links and receipts stay in the old workspace (each has its own *Move to another workspace…*).
+A member who does not fit the target, or a family / Home & life project, blocks the move there. Nothing to say: it moves at
+once, as before. Route: `POST /api/lists/{id}/move-space {to, dry: 1}` (only the check; the move is `PATCH /api/lists/{id}
+{org_id}`; agents 403).
+
 **Leaving an organisation is the admins' call (2.148.1).** Projects (also through a folder's workspace), copies of a project,
 files and folders, tables, contacts (single or several at once) and *Save as task* from a channel of the organisation
 leave it -- into the private space or another organisation -- only through an admin of that organisation; everybody else

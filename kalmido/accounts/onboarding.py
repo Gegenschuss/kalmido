@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings, write_lock
 from ..accounts.session import me
@@ -42,9 +42,9 @@ def onboarding_tasks(feats, touch, mac):
             ("collab", N_("Share this project with someone"), N_("Project menu (…) > Sharing. Tasks in shared projects can be assigned and commented.")),
             ("time", N_("Start a timer on a task"), N_("Task menu (…) > Start timer; reports under Time tracking.")),
             ("timeline+deps", N_("Plan a project in the timeline"),
-             N_("Edit project > Progress and status: on, View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
+             N_("Edit project > View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
              if not touch else
-             N_("Edit project > Progress and status: on, View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
+             N_("Edit project > View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
     for k, t, d in mods:
         if all(x in feats for x in k.split("+")):
             tt.append((t, d, 0, False, []))
@@ -52,16 +52,26 @@ def onboarding_tasks(feats, touch, mac):
     return tt
 
 
+def _org_member(c, uid):
+    """2.364.0 A (#3037): uid belongs to an organisation as a member (invited, placed in a team), not as its admin."""
+    with system_ctx(c):  # memberships are structure (as accounts/orgs.py user_orgs / org_role)
+        return bool(c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL "
+                              "AND COALESCE(m.role, 'member')<>'admin' LIMIT 1", (uid,)).fetchone())
+
+
 @app.post("/api/onboarding")
 def onboarding():
     b, c = body(), db()
     uid = me()
     write_lock(c, f"onboard:{uid}")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
-    if usettings(c, uid).get("onboard") != "pending":
+    again = b.get("again") is True and not g.user["kid"]  # 2.364.0 A (#3037): Settings > Help: the list on request, once more
+    if usettings(c, uid).get("onboard") != "pending" and not again:
         c.rollback()
         return jsonify(ok=True, created=False)
-    if g.user["kid"]:  # 2.49.0 (#1537): a kid gets no "Getting started" list (its view shows none), only done
+    if g.user["kid"] or (_org_member(c, uid) and not again):  # 2.49.0 (#1537): a kid gets no "Getting started" list (its view shows none), only done
         uset(c, uid, "onboard", "done")
+        if not g.user["kid"]:  # 2.364.0 A (#3037): an invited member neither (nor the sample project in the tour; Help still has both)
+            uset(c, uid, "sample_ask", "0")
         bump(c)
         c.commit()
         return jsonify(ok=True, created=False)

@@ -5,7 +5,7 @@
 // - the tiles: icon only, the name as title + aria-label, no numbers, in ONE order across kinds
 // - the tile menu: Move left / Move right / Remove; a second session of the same person gets the new order without reload
 // - "Only favourites" only for lists; a target the person cannot see any more is left out but stays stored
-// Firefox (1440, 904 mouse; 390 touch drawer): the head stays in place while the sidebar scrolls, tiles square, drag to reorder
+// Firefox (1440, 904 mouse; 390 touch drawer): the head stays in place while the sidebar scrolls (sidebar B: scrolls along, #3303), tiles square, drag to reorder
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -169,11 +169,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix'), t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
       return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, ft = document.elementFromPoint(r.left + r.width / 2, f.getBoundingClientRect().top + 8);
-        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix')}); })); })()`);
+        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: f.classList.contains('sbfix-flow')}); })); })()`);
     check(m, tag + ': head and tiles drawn');
     if (m) {
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
-      check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
+      if (m.flow) check(Math.abs(m.top1 - (m.top0 - m.scroll)) < 2, tag + ': sidebar B: the head scrolls along (#3303) ' + JSON.stringify(m));  // 2.331.0 A (#3303): in sidebar B the head is no longer fixed
+      else check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
       check(Math.abs(m.w - m.th) < 2 && m.w >= 2.75 * m.rem - 1, tag + ': tiles square, at least 2.75 rem ' + JSON.stringify(m));
       check(m.h < m.vh * 0.6, tag + ': the head stays below 60 % of the height ' + JSON.stringify(m));
     }

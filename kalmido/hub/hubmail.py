@@ -34,11 +34,12 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
+from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list, reading_sql
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
+from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
 from ..accounts.orgs import is_org_admin
 
 HBM_BODY_MAX = 200000   # characters of the plain text kept
@@ -49,11 +50,26 @@ HBM_KINDS = ("inbox", "client", "list")
 HBM_AUTHSERV = os.environ.get("KALMIDO_MAIL_AUTHSERV_ID", "").strip().lower()
 _AR_RE = re.compile(r"\s*(dkim|spf|dmarc)\s*=\s*([a-z]+)(.*)", re.I | re.S)
 _AR_PROP_RE = re.compile(r"([a-z][\w.-]*)\s*=\s*(\"[^\"]*\"|[^\s;()]+)", re.I)
-ROOT = "E-Mails"        # the folder at the root of the workspace's file tree
+ROOT = "E-Mails"        # the folder at the root of the workspace's file tree (its name before 2.368)
+ROOT_KEY = N_("Emails|folder")  # 2.368.0 (#2987): since then named in the person's language (hbm_root)
 ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+
+
+def hbm_root(c, uid, org, lg):
+    """2.368.0 (#2987): the name of the mail folder at the root of workspace org (None: uid's own space): the existing one in
+    any language (or "E-Mails" of before), else the name in lg -- an existing folder is never doubled by a language switch."""
+    from ..docs.store import folder_names, folder_in_sql
+    nm = folder_names(ROOT_KEY, ROOT)
+    if org:
+        r = c.execute("SELECT name FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND " + folder_in_sql("name", nm) +
+                      " AND deleted_at IS NULL ORDER BY id LIMIT 1", (int(org), *nm)).fetchone()
+    else:
+        r = c.execute("SELECT name FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' AND " +
+                      folder_in_sql("name", nm) + " AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid, *nm)).fetchone()
+    return r[0] if r else tr(ROOT_KEY, lg=lg)
 
 
 def hbm_on():
@@ -84,8 +100,14 @@ def _visible_client(c, uid, cid):
     return seen[uid].get(cid)
 
 
+# 2.352.0 G (#2752, review M5): lists without an e-mail address -- the inbox, a life area (health, budget, travel, read later ...),
+# a family list, an organisation's read-later project (before #2752: every list that was not kind project)
+_NO_MAIL = f"(l.is_inbox<>0 OR COALESCE(l.life, '')<>'' OR COALESCE(l.family, '')<>'' OR {reading_sql('l')})"
+
+
 def _list_row(c, lid):
-    return c.execute("SELECT id, name, org_id, kind, client_id, e2e FROM lists WHERE id=?", (lid,)).fetchone()
+    return c.execute(f"SELECT l.id, l.name, l.org_id, l.kind, l.is_inbox, l.client_id, l.e2e, {_NO_MAIL} AS no_mail FROM lists l WHERE l.id=?",
+                     (lid,)).fetchone()
 
 
 def hbm_can(c, uid, m, write=False):
@@ -107,9 +129,16 @@ def hbm_can(c, uid, m, write=False):
     return not m["org_id"] or int(m["org_id"]) in acx_of(c, uid).org_ids
 
 
+def _kid(c, uid):
+    u = c.execute("SELECT kid FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(u and u["kid"])
+
+
 def hbm_node_ok(c, uid, mail_id):
     """2.148.1 D (#2488): may uid read a file-store node filed with hub mail mail_id? Only who may read the mail (hbm_can,
     also an organisation admin only then); a mail that is gone or not readable = no."""
+    if _kid(c, uid):  # 2.352.0 G (#2752, review M5): like _gate -- a kid account never reads filed mails
+        return False
     m = c.execute("SELECT * FROM hub_mails WHERE id=?", (mail_id,)).fetchone()
     return bool(m) and hbm_can(c, uid, m)
 
@@ -118,6 +147,8 @@ def hbm_node_mail_ids(c, uid):
     """2.148.1 D (#2488): the ids of the hub mails with filed nodes that uid may read (files/store.py fs_visible_sql_c)."""
     from ..core.access import vis_sql
     from ..team.clients import client_rows
+    if _kid(c, uid):  # 2.352.0 G (#2752, review M5): see hbm_node_ok
+        return set()
     cids = [int(r["id"]) for r in client_rows(c, uid)]
     cl = f" OR (m.list_id IS NULL AND m.client_id IN ({','.join(map(str, cids))}))" if cids else ""
     # 2.148.1 G (#2488): only the columns hbm_can reads (no bodies on every file view)
@@ -172,7 +203,7 @@ def _target(c, b):
     if lid:
         need_list(c, lid)
         l = _list_row(c, lid)
-        if l["kind"] != "project":
+        if l["no_mail"]:  # 2.352.0 B (#2752): every list but the inbox is a project; G (review M5): no life area / family / read later
             raise Denied(409, tr("Only projects have an e-mail address"))
         if l["e2e"]:
             from ..collab.liste2eguard import le2b_off
@@ -344,6 +375,8 @@ def hbm_public(c, m, full=False):
     if full:
         from ..files.store import fs_role
         out["body"] = d["body"]
+        from ..integrations.mailtrim import md_trim_view  # 2.352.0 D (#2754): the shortened text (display only; "body" stays whole)
+        out["body_short"] = md_trim_view(d["body"] or "")
         out["to"] = d["to_addrs"]
         out["can_write"] = hbm_can(c, me(), m, write=True)
         out["folder_id"] = m["folder_id"] if m["folder_id"] and fs_role(c, m["folder_id"]) else None
@@ -419,7 +452,7 @@ def hbm_mails():
         l = _list_row(c, a["list_id"])
         rows = c.execute("SELECT * FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (l["id"], l["org_id"])).fetchall()
-        addr, can = _address_of(c, "list", uid, l["org_id"], None, l["id"]), role in WRITE_ROLES and l["kind"] == "project" and not l["e2e"]
+        addr, can = _address_of(c, "list", uid, l["org_id"], None, l["id"]), role in WRITE_ROLES and not l["no_mail"] and not l["e2e"]
     elif request.args.get("unassigned") in ("1", "true"):
         rows = c.execute("SELECT * FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
@@ -463,7 +496,8 @@ def hbm_mail_get(mid):
     _gate()
     m = _need_mail(c, mid)
     from .mailview import mh_info  # 2.141.0 B (#2140, #2139): the HTML part (+ its external pictures) and what was made from the mail
-    return jsonify({**hbm_public(c, m, full=True), **mh_info(c, m)})
+    out = hbm_public(c, m, full=True)  # 2.352.0 G (review N12): body_short comes from hbm_public (was computed twice)
+    return jsonify({**out, **mh_info(c, m)})
 
 
 @app.get("/api/hubmail/mails/<int:mid>/files/<int:nid>")
@@ -494,8 +528,8 @@ def hbm_targets():
     from ..team.clients import client_rows
     org = m["org_id"] or None
     cls = [{"id": r["id"], "name": r["name"]} for r in client_rows(c, uid, archived=False) if (r["org_id"] or None) == org]
-    lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE kind='project' AND archived=0 AND COALESCE(e2e,'')='' "
-                                    "AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name), id", (org,))]
+    lids = [r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE NOT {_NO_MAIL} AND l.archived=0 AND COALESCE(l.e2e,'')='' "
+                                    "AND l.org_id IS NOT DISTINCT FROM ? ORDER BY lower(l.name), l.id", (org,))]  # 2.352.0 G (review M5)
     pr = []
     for lid in lids:
         if list_role(c, lid, uid) in WRITE_ROLES:
@@ -515,8 +549,10 @@ def _move_folder(c, uid, m, cid, lid):
     cn, ln = _names(c, cid, lid)
     try:
         with c.savepoint():
-            parent = fs_folder(c, uid, m["org_id"], [ROOT, cn or ln or tr("Not assigned", lg=lang(c, uid))])
+            lg = lang(c, uid)
+            parent = fs_folder(c, uid, m["org_id"], [hbm_root(c, uid, m["org_id"], lg), cn or ln or tr("Not assigned", lg=lg)])
             if parent != n["parent_id"]:
+                fsl_need_plain(c, parent)  # 2.353.0 F (#2758, review M4): the mail (plain eml) never moves into a locked folder
                 c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?",
                           (parent, _free_name(c, parent, n["owner_id"], n["org_id"], n["name"], skip=n["id"]), _now(), n["id"]))
     except (Denied, ValueError) as e:
@@ -543,7 +579,7 @@ def hbm_mail_assign(mid):
         l = _list_row(c, lid)
         if (l["org_id"] or None) != org:
             return err(tr("The project belongs to another workspace"), 409)
-        if l["kind"] != "project" or l["e2e"]:
+        if l["no_mail"] or l["e2e"]:  # 2.352.0 G (#2752, review M5)
             return err(tr("Only projects take e-mails"), 409)
         cid = None
         if l["client_id"]:
@@ -690,8 +726,8 @@ def _holder_ok(c, kind, uid, org, cid, lid):
         org = cl["org_id"]
     elif kind == "list":
         l = _list_row(c, lid)
-        if not l or l["e2e"] or list_role(c, lid, uid) not in WRITE_ROLES:
-            return None  # gone, locked or no longer changeable
+        if not l or l["e2e"] or l["no_mail"] or list_role(c, lid, uid) not in WRITE_ROLES:
+            return None  # gone, locked, no address any more (2.352.0 G, review M5) or no longer changeable
         org = l["org_id"]
         cl = _visible_client(c, uid, l["client_id"]) if l["client_id"] else None
         cid = cl["id"] if cl and (cl["org_id"] or None) == (org or None) else None
@@ -810,7 +846,7 @@ def _import(c, r, msg, raw, mail_text):
         with c.savepoint():
             # 2.84.0: file store names are not sealed -- with the encryption on, no subject in the names
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (subj or tr("E-mail", lg=lg))
-            folder = fs_folder(c, uid, org, [ROOT, cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
+            folder = fs_folder(c, uid, org, [hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
     except (Denied, ValueError) as e:
         print("hubmail: no folder", type(e).__name__, flush=True)
         notes.append(tr("The original mail and its attachments could not be filed", lg=lg))  # 2.84.0 review

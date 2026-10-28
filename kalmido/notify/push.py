@@ -31,6 +31,7 @@ from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planne
 from ..personal.timetrack import _num, time_watchdog
 from ..core.env import env_bool
 from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lffolder import lf_expire_tick  # 2.352.0 A (#2748)
 
 
 # ---------------------------------------------------------------- watchdog / ntfy
@@ -621,6 +622,7 @@ def _watchdog_tick(c):
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
     from ..lists.listtrash import otr_prune
+    _wd_section(c, "list folder shares", lf_expire_tick)  # 2.352.0 A (#2748): an expired share of a projects folder ends its roles
     _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
     from ..tasks.tasktrash import ttp_tick
     _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)

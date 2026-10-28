@@ -379,16 +379,16 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   }, true);
   // a tablet (docked quick add at the bottom of the list): pinned above the keyboard, then let go
   await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = '820 tablet';
+    const {cmd, ev, ctx, shot} = o, tag = '744 tablet';  // 2.364.0 (#3040): 820 is the computer layout now; an iPad mini (744) keeps the dock
     check(await ffLogin(o, 'light') === 200, tag + ': login');
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 820, height: 1180}});
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 744, height: 1133}});
     await o.nav(B + '#l/' + L); await ready(ev);
     check(await ev(`!!document.querySelector('#view .qdock #qinput') && !!document.querySelector('#view .qdock').offsetParent`), `${tag}: the docked quick add`);
     let k = await ev(KB('#view .qdock #qinput', 420));
     check(inside(k) && k.pin && k.act, `${tag}: the docked quick add is pinned above the keyboard ` + JSON.stringify(k));
     k = await ev(KB('#view .qdock #qinput', 420, 150));
     check(inside(k), `${tag}: ... and follows a scrolled visual viewport ` + JSON.stringify(k));
-    await shot('p2260-light-820-quickadd-keyboard.png');
+    await shot('p2260-light-744-quickadd-keyboard.png');
     await ev(KBOFF); await sleep(500);
     check(await ev(`!document.querySelector('.vvpin, .vvph') && !!document.querySelector('#view .qdock #qinput')`), `${tag}: let go when the keyboard is gone`);
   }, true);

@@ -42,6 +42,6 @@
   .pbbtns .btn,.pbvb .btn,.pbprop .btn{min-height:2.75rem}
   .pbprev{max-height:12rem}
 }
-@media (max-width:899px), (pointer:coarse) {
+@media (max-width:767px), (pointer:coarse) {
   .pbhelp>summary{min-height:2.75rem;display:flex;align-items:center}
 }

@@ -251,7 +251,7 @@ function e2eCodeDlg(code) {
 function e2eCodePrint(code) {
   const p = document.createElement('div');
   p.className = 'e2eprint';
-  p.innerHTML = `<h1>${esc(tr('Kalmido recovery code'))}</h1><p>${esc(S.me?.display_name || '')} · ${esc(location.host)} · ${esc(new Date().toLocaleDateString())}</p>
+  p.innerHTML = `<h1>${esc(tr('Kalmido recovery code'))}</h1><p>${esc(S.me?.display_name || '')} · ${esc(location.host)} · ${esc(fmtDateNum(new Date()))}</p>
     <code>${esc(code)}</code><p>${esc(tr('With this code you can set a new passphrase if you forget it. Keep it in a safe place. Without passphrase and recovery code your locked notes, encrypted files and messages are lost; nobody can restore them, not even the operator.'))}</p>`;
   document.body.appendChild(p); document.body.classList.add('e2eprinting');
   const done = () => { p.remove(); document.body.classList.remove('e2eprinting'); window.removeEventListener('afterprint', done); };

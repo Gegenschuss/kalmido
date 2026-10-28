@@ -524,7 +524,7 @@ async function shvAttach(sh) {  // attach to a project / list of the same space 
   const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && shvListSpace(l) === sp && canEditList(l.id));
   if (!ls.length) { toast(tr('No project of this space to attach it to')); return; }
   const items = [...(sh.list_id ? [{label: tr('Detach from {0}', sh.list_title || ''), icon: 'x', fn: () => shvSetList(sh, null)}, '-'] : []),
-    ...ls.slice(0, 60).map(l => ({label: lname(l), icon: l.kind === 'project' ? 'rocket' : 'list', on: l.id === sh.list_id, fn: () => shvSetList(sh, l.id)}))];
+    ...ls.slice(0, 60).map(l => ({label: lname(l), icon: 'list', on: l.id === sh.list_id, fn: () => shvSetList(sh, l.id)}))];
   menu($('[data-shv="menu"]') || $('#view'), items, null, null, tr('Attach to a project'));
 }
 async function shvSetList(sh, lid) {

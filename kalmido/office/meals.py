@@ -19,6 +19,8 @@ host or participant, period, occasion), also as CSV and PDF.
 Every route: office_gate + office_org with the admin of the office area (like the travel expenses; members get 403, agents
 and kids 403); a meal of another office area is 404. A person without an organisation works in the personal office (its
 own admin). Texts and amounts encrypted at rest (orgcrypt FIELDS). Never reached by agents."""
+import base64
+import binascii
 import csv
 import hashlib
 import io
@@ -42,6 +44,7 @@ from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .calc import dec, dstr, money
 from .ledger import ofx_log
+from .letters import lt_profile  # 2.332.0 C (#3301): the one signature picture of a person
 from .rights import ofr_own_uid, NO_SPECIAL, ofr_allows
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
 
@@ -256,7 +259,7 @@ def bw_public(c, oid, r, logs=None, files=None, years=None):
     return {"id": d["id"], "date": d["date"], "place_name": d["place_name"], "place_address": d["place_address"], "occasion": d["occasion"],
             "host": host or None, "guests": guests, "amounts": lines, "tip": d["tip"] or "0.00", "currency": d["currency"], "note": d.get("note") or "",
             "status": d["status"], "locked": d["status"] == "approved", "approved_at": d.get("approved_at"), "approved_by": d.get("approved_by"),
-            "approved_name": d.get("approved_name") or "", "calc": bw_calc(lines, d["tip"]), "log": lg,
+            "approved_name": d.get("approved_name") or "", "sign_image": int(d.get("sign_image") or 0), "calc": bw_calc(lines, d["tip"]), "log": lg,
             "files": (files or {}).get(d["id"], []), "kept_until": bw_kept_from(d["date"], [x["at"] for x in lg if x["action"] == "approve"],
                                                                                     years if years is not None else bw_years(c, oid)),
             "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"]}
@@ -527,7 +530,7 @@ def bw_meals_get():
         c.commit()
         bw_rm(paths)
     return jsonify(meals=bw_rows(c, oid, year=y or None), people=bw_people(c, oid, uid), choices=bw_choices(c, oid),
-                   currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid))
+                   currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid), my_sig=1 if bw_sig_raw(c, oid, uid) else 0)
 
 
 @app.get("/api/office/meals/<int:mid>")
@@ -632,8 +635,9 @@ def bw_missing(m):
 
 @app.post("/api/office/meals/<int:mid>/approve")
 def bw_meal_approve(mid):
-    """Approves and locks a draft (the host's digital confirmation): 400 with the missing fields, 409 when approved already.
-    New places and people go into the choice lists; one office_meal_log row."""
+    """{sign_image?} approves and locks a draft (the host's digital confirmation): 400 with the missing fields, 409 when
+    approved already. New places and people go into the choice lists; one office_meal_log row. 2.332.0 C (#3301):
+    sign_image = put the approver's signature picture (letters profile) on the PDF; default on when the approver has one."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_meal_{int(mid)}")
     r = _meal(c, oid, mid, mode="approve")  # 2.187.1 B (#2735): level "own": only as the host
@@ -647,8 +651,11 @@ def bw_meal_approve(mid):
     ts = iso(now_utc())
     name = bw_user_name(c, uid)
     row = oc_enc_fields(c, oid, "office_meals", {"approved_name": name})
-    c.execute("UPDATE office_meals SET status='approved', approved_at=?, approved_by=?, approved_name=?, updated_at=? WHERE id=? AND org_id=?",
-              (ts, uid, row["approved_name"], ts, mid, oid))
+    b = body()
+    want = b.get("sign_image", True) if isinstance(b, dict) else True
+    sig = 1 if want not in (False, 0, "0", "false", None) and bw_sig_raw(c, oid, uid) else 0  # 2.332.0 C (#3301): only with a picture
+    c.execute("UPDATE office_meals SET status='approved', approved_at=?, approved_by=?, approved_name=?, sign_image=?, updated_at=? WHERE id=? AND org_id=?",
+              (ts, uid, row["approved_name"], sig, ts, mid, oid))
     bw_log(c, oid, mid, uid, name, "approve", "", ts)
     bw_adopt(c, oid, uid, m)
     ofx_log(c, oid, "approve", target="meals", detail={"id": mid})
@@ -670,13 +677,25 @@ def bw_meal_unlock(mid):
     b = body()
     reason = _text(b.get("reason") if isinstance(b, dict) else None, "reason", 500)
     ts = iso(now_utc())
-    c.execute("UPDATE office_meals SET status='draft', approved_at=NULL, approved_by=NULL, approved_name='', updated_at=? WHERE id=? AND org_id=?",
+    c.execute("UPDATE office_meals SET status='draft', approved_at=NULL, approved_by=NULL, approved_name='', sign_image=0, updated_at=? WHERE id=? AND org_id=?",
               (ts, mid, oid))
     bw_log(c, oid, mid, uid, bw_user_name(c, uid), "unlock", reason, ts)
     ofx_log(c, oid, "unlock", target="meals", detail={"id": mid})
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, mid))
+
+
+def bw_sig_raw(c, oid, uid):
+    """2.332.0 C (#3301): the signature picture (bytes) of person uid in area oid -- the one picture of the letters profile
+    (letters.lt_profile, encrypted) -- or None."""
+    p = lt_profile(c, oid, uid) if uid else None
+    if not p or not p.get("image"):
+        return None
+    try:
+        return base64.b64decode(p["image"])
+    except (binascii.Error, ValueError):
+        return None
 
 
 def bw_user_name(c, uid):

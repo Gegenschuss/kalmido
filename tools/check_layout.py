@@ -162,6 +162,7 @@ TENANT_EXEMPT = {
     "conn_requests": "2.49.0 (#1106): a request between two people (no workspace); only the two see it",
     "conn_links": "2.49.0 (#1106): an accepted connection between two people, like a private shared list (no workspace)",
     "wiki_keys": "2.64.3 (#1817): a wrapped key of a knowledge space -> its wiki_spaces row (org_id or owner_id); only the person it is wrapped for reads it",
+    "fs_lock_keys": "2.353.0 A (#2758): a wrapped key of a locked folder -> its fs_locks row (org_id or the folder's owner); only the person it is wrapped for reads it",
     "wiki_key_pending": "2.64.3 (#1817): an organisation member waiting for the key of a knowledge space -> its wiki_spaces row (org_id)",
     "msv_links": "2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py); only the person sees them",
     "ev_cal_feeds": _CAL + " (2.111.0 B #2056: a person's subscription link; every fetch checks that the person still sees the calendar)",

@@ -22,7 +22,7 @@ const pdEdit = () => !!(PD.data?.can_edit && !PD.view);
 /** @param {string} s */
 const pdText = s => esc(s || '').split(esc(PD.data?.gap_marker || '\u0000')).join(`<mark class="pd-gap">${esc(PD.data?.gap_marker || '')}</mark>`);
 /** @param {string} iso */
-const pdDay = iso => iso ? new Date(iso).toLocaleDateString() : '';
+const pdDay = iso => iso ? fmtDateNum(new Date(iso)) : '';  // 2.368.0 B (#2982): one locale source
 
 /** @param {any} f */
 function pdField(f) {

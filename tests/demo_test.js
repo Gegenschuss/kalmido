@@ -183,7 +183,8 @@ const srv = http.createServer((req, res) => {
     fields: [], deps: [], comments: [], activity: [], time: [], timer: null, habits: [], filters: [], status: [], chat: [], jobs: [], agent: {status: 'idle', status_text: '', status_task: null, step: 0}});
   store['tasks.lang'] = '"de"';
   w = await open('de-DE');
-  check(/Alte Liste/.test(w.document.querySelector('#side')?.textContent || '') && w.eval(`[...S.tasks.values()].some(t => t.title === 'Alte Aufgabe')`), 'old demo storage: data kept');
+  // 2.364.0 (#3031): a returning visitor (tour done) opens on Start, whose panel lists no projects: the list is checked in the state
+  check(w.eval(`(S.lists || []).some(l => l.name === 'Alte Liste')`) && w.eval(`[...S.tasks.values()].some(t => t.title === 'Alte Aufgabe')`), 'old demo storage: data kept');
   check(!w.document.querySelector('.tour') && !/Erste Schritte/.test(w.document.querySelector('#side')?.textContent || '') && JSON.parse(store['kalmido-demo.db']).ver === 2, 'old demo storage: migrated to version 2, no tour');
   check(!w.KDEMO.miss.length, 'every API call answered by the shim: ' + JSON.stringify(w.KDEMO.miss.slice(0, 5)));
   w.close();

@@ -93,7 +93,7 @@ function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold, floor
 // 2.26.x: the fixed line at the bottom of the task panel: "Created by <name> on <date>" (agents by their name; no known
 // creator: the date only), plus "Completed <date>" once done
 function createdLine(t) {
-  const f = v => new Date(v).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'});
+  const f = v => fmtMoment(new Date(v));  // 2.368.0 B (#2982): one locale source
   const who = t.created_by ? personNameAny(t.created_by) : '';
   const c = !t.created_at ? '' : who ? tr('Created by {0} on {1}', who, f(t.created_at)) : tr('Created {0}', f(t.created_at));
   const d = t.status === 2 && t.completed_at ? tr('Completed {0}', f(t.completed_at)) : '';
@@ -279,7 +279,7 @@ window.addEventListener('resize', () => { clearTimeout(qdT); qdT = setTimeout(()
 // 2.13.0 (#453 A15): folding / unfolding a Fold while typing switches between the phone and the tablet layout; the field
 // that had the focus gets it back (same id), with its text and caret
 try {
-  matchMedia('(max-width:899px)').addEventListener('change', () => {
+  matchMedia('(max-width:767px)').addEventListener('change', () => {  // 2.364.0 B (#3040): the phone layout ends at 767 px (was 899)
     const a = document.activeElement, id = a && a.id && editFocused() ? a.id : null, v = id ? a.value : null, sel = id ? [a.selectionStart, a.selectionEnd] : null;
     if (!S.booted) return;
     // 2.13.2 (#478 N3): a half-typed quick add moves along: the tablet's "Add task" box -> the phone's quick sheet (same
@@ -603,7 +603,7 @@ function renderDetail0() {
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic(t.pinned ? 'pinf' : 'pin')}<span class="dpw dpin">${esc(t.pinned ? tr('Pinned') : tr('Pin'))}</span></button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}<span class="dpw">${esc(t.priority ? prioWord(t.priority) : tr('Priority'))}</span></button>`}
-      ${ck || !(t.id > 0) ? '' : `<button class="iconbtn tlkb ${tlkL ? 'on' : ''}" data-act="tlk-toggle" data-id="${t.id}" title="${esc(tlkL ? tr('Locked: tap to unlock') : tr('Lock: title, description, date and more stay as they are'))}" aria-label="${esc(tr('Lock'))}" aria-pressed="${tlkL}">${ic('lock')}<span class="dpw">${esc(tlkL ? tr('Locked') : tr('Lock'))}</span></button>`}
+      ${''/* 2.364.0 D (#3036): Lock lives in "…"; here only a set lock (to unlock) - else "Time" when the module is on */}${ck || !(t.id > 0) ? '' : !tlkL ? (tFor(t) ? ((run) => `<button class="iconbtn dtime ${run ? 'on' : ''}" data-act="timer-toggle" data-id="${t.id}" title="${esc(run ? tr('Stop timer') : tr('Start time tracking'))}" aria-label="${esc(run ? tr('Stop timer') : tr('Start time tracking'))}" aria-pressed="${run}">${ic(run ? 'stop' : 'clock')}<span class="dpw">${esc(tr('Time|menu'))}</span></button>`)(!!S.timer && S.timer.task_id === t.id) : '') : `<button class="iconbtn tlkb ${tlkL ? 'on' : ''}" data-act="tlk-toggle" data-id="${t.id}" title="${esc(tlkL ? tr('Locked: tap to unlock') : tr('Lock: title, description, date and more stay as they are'))}" aria-label="${esc(tr('Lock'))}" aria-pressed="${tlkL}">${ic('lock')}<span class="dpw">${esc(tlkL ? tr('Locked') : tr('Lock'))}</span></button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
       ${asst_detailBtn(t, ck)}${''/* 2.75.0 (#1411): the assistant's menu */}${typeof tbl_btnHtml === 'function' ? tbl_btnHtml(t, ck) : ''}${''/* 2.53.0 C (#1424): the bell of this task (taskbell.js) */}
       ${typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? `<button class="iconbtn" data-mwtask="${t.id}" title="${esc(tr('Open in its own window'))}" aria-label="${esc(tr('Open in its own window'))}">${ic('panel')}</button>` : ''}
@@ -627,7 +627,7 @@ function renderDetail0() {
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
-      ${typeof ln_btnHtml === 'function' ? ln_btnHtml(t, ro || ck || tlkR) : ''}${typeof rf_btnHtml === 'function' ? rf_btnHtml('d', ro || tlkR || t.id < 0) : '' /* 2.53.0 (#1449): Insert reference (touch) */}`}
+      ${''/* 2.364.0 D (#3036): "Lock note" is in the "…" menu */}${typeof rf_btnHtml === 'function' ? rf_btnHtml('d', ro || tlkR || t.id < 0) : '' /* 2.53.0 (#1449): Insert reference (touch) */}`}
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
       ${ck || typeof hbm_taskLinkHtml !== 'function' ? '' : hbm_taskLinkHtml(t)}${''/* 2.141.0 B (#2139): the e-mail the task was made from (hubmail.js) */}

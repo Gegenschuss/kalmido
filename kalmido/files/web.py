@@ -38,9 +38,9 @@ def _names(c, ids):
     return {r[0]: r[1] for r in c.execute(f"SELECT id, display_name FROM users WHERE id IN ({q})", ids)}
 
 
-def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
+def fs_node_json(c, n, role=None, names=None, shared=None, up=None, lk=None):
     """The public form of a node row (role: the asker's; shared: has shares / organisation access; up: the marks of
-    files/upsafe.up_marks for a list, None = read for this node)."""
+    files/upsafe.up_marks for a list, None = read for this node; lk: fslock.fsl_map of a list, None = read for this node)."""
     names = names if names is not None else _names(c, [n["owner_id"], n["created_by"]])
     out = {"id": n["id"], "parent_id": n["parent_id"], "kind": n["kind"], "name": n["name"], "org_id": n["org_id"],
            "owner_id": n["owner_id"], "owner": names.get(n["owner_id"], ""), "created_by": n["created_by"],
@@ -48,6 +48,8 @@ def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
            "version": n["cur_version"], "created_at": n["created_at"], "updated_at": n["updated_at"],
            "deleted_at": n["deleted_at"], "org_access": n["org_access"] or "", "role": role,
            "sort_no": n["sort_no"] if "sort_no" in n.keys() else None}  # 2.199.0 A (#2742)
+    if n["kind"] in ("folder", "file") and "recog" in n.keys() and n["recog"]:
+        out["recog"] = n["recog"]  # 2.353.0 D (#2759): its own recognition switch (docs/recog.py; absent = as the folder above)
     if n["kind"] == "link":
         out["ref_kind"], out["ref_id"] = n["ref_kind"], n["ref_id"]
     elif n["kind"] == "ref":  # 2.199.0 A (#2742): an object of another area filed here (open = its route in the app)
@@ -60,6 +62,11 @@ def fs_node_json(c, n, role=None, names=None, shared=None, up=None):
             up = up_marks(c, "fs", [n["id"]])
         if up.get(n["id"]):
             out["up"] = up[n["id"]]
+    if lk is None:
+        from .fslock import fsl_map
+        lk = fsl_map(c, [n["id"]])
+    if n["id"] in lk:  # 2.353.0 A (#2758): a locked folder and everything in it (names / contents are ciphertexts but its own name)
+        out["locked"], out["lock_id"], out["lock_mode"] = True, lk[n["id"]][0], lk[n["id"]][1]
     return out
 
 
@@ -79,12 +86,16 @@ def _items(c, rows, parent_role=None):
     up = up_marks(c, "fs", [r["id"] for r in rows if r["kind"] == "file"])  # 2.61.0 (#1818)
     from .extlinks import xl_flags
     xl = xl_flags(c, [r["id"] for r in rows])  # 2.112.1 B (#2058): live external links (a badge for the owners)
+    from .fslock import fsl_map, fsl_person_ok
+    lk = fsl_map(c, [r["id"] for r in rows])  # 2.353.0 A (#2758)
+    if lk and not fsl_person_ok():
+        rows = [r for r in rows if r["id"] not in lk]  # agents and API tokens: no node of a locked folder in any listing
     out = []
     for r in rows:
         role = parent_role
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
-        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up)
+        x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up, lk)
         if r["id"] in xl and role == "owner":
             x["xl"] = True
         if r["kind"] == "link":
@@ -145,7 +156,10 @@ def files_list():
         fs_log_add(c, pid, "list")
         c.commit()
         chain = fs_chain(c, pid)
-        return jsonify(items=_items(c, rows, n["role"]), node=fs_node_json(c, n, n["role"]), crumbs=_crumbs(c, chain),
+        from ..docs.recog import rc_list_extra
+        items, node = _items(c, rows, n["role"]), fs_node_json(c, n, n["role"])
+        rc_list_extra(c, chain, node, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759): recognition + documents (cards)
+        return jsonify(items=items, node=node, crumbs=_crumbs(c, chain),
                        space=("org:%d" % n["org_id"]) if n["org_id"] else ("private" if n["owner_id"] == uid else "shared"))
     space, oid = _space_of(request.args.get("space"))
     ctx = acx_of(c, uid)
@@ -174,8 +188,10 @@ def files_list():
             rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id")
                     if r["owner_id"] != uid and (r["parent_id"] not in vis) and not (r["parent_id"] is None and r["org_id"])]
         role = None
-    return jsonify(items=_items(c, rows, role if role == "owner" else None), node=None, crumbs=[], space=request.args.get("space") or "private",
-                   role=role)
+    items = _items(c, rows, role if role == "owner" else None)
+    from ..docs.recog import rc_list_extra
+    rc_list_extra(c, None, None, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759)
+    return jsonify(items=items, node=None, crumbs=[], space=request.args.get("space") or "private", role=role)
 
 
 def _trash(c, uid):
@@ -254,7 +270,7 @@ def files_upload():
     uid = me()
     owner, org = _place(c, uid, pid, oid)
     replace = request.form.get("replace", "1") != "0"
-    out = []
+    out, added = [], 0
     try:
         for f in files:
             data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (_check_data refuses more)
@@ -268,11 +284,16 @@ def files_upload():
                 nid = fs_put(c, uid, pid, name, data, f.mimetype, org_id=org)
                 fs_log_add(c, nid, "upload")
                 out.append(nid)
+                from ..docs.recog import rc_after_add
+                added += rc_after_add(c, nid, uid)  # 2.353.0 D (#2759): into a recognising folder = a document
     except ValueError as e:
         c.rollback()
         return err(str(e))
     bump(c)
     c.commit()
+    if added:
+        from ..docs.ingest import docs_kick
+        docs_kick()
     rows = [c.execute("SELECT * FROM fs_nodes WHERE id=?", (i,)).fetchone() for i in out]
     return jsonify(items=_items(c, rows)), 201
 
@@ -293,7 +314,8 @@ def _shares(c, nid):
     if gq:
         gn = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM groups WHERE id IN ({','.join('?' * len(gq))})", gq)}
     return [{"id": r["id"], "user_id": r["user_id"], "group_id": r["group_id"], "agent_id": r["agent_id"], "role": r["role"],
-             "expires_at": r["expires_at"], "name": names.get(r["user_id"] or r["agent_id"]) or gn.get(r["group_id"], "")}
+             "expires_at": r["expires_at"], "name": names.get(r["user_id"] or r["agent_id"]) or gn.get(r["group_id"], ""),
+             **({"list_role": r["list_role"]} if r["list_role"] else {})}  # 2.352.0 A (#2748): a projects folder's list role
             for r in rows]
 
 
@@ -432,7 +454,11 @@ def files_version_restore(nid, no):
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
-    new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
+    from .fslock import fl_is_locked, fsl_restore_version
+    if fl_is_locked(c, nid):  # 2.353.0 A (#2758): the ciphertext as it is
+        new = fsl_restore_version(c, n, no)
+    else:
+        new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
     fs_log_add(c, nid, "restore_version", f"{no}->{new}")
     bump(c)
     c.commit()
@@ -455,6 +481,10 @@ def files_node_patch(nid):
         fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
     actx = fs_area_before(c, uid, n) if "name" in b or "parent_id" in b else None  # 2.200.0 A (#2747): e.g. the pages' paths
     if "name" in b:
+        from .fslock import fsl_of, fsl_denied
+        lk = fsl_of(c, nid)
+        if lk is not None and lk["node_id"] != nid:
+            raise fsl_denied("fs_locked")  # 2.353.0 A (#2758): names in a locked folder are ciphers (/api/files/lock/rename)
         nm = str(b.get("name") or "").strip()
         if not nm:
             return err(tr("Name missing"))
@@ -537,10 +567,15 @@ def files_node_order(nid):
     return jsonify(ok=True, order=[i for i in ids if i in vis])  # 2.199.0 F (#2742, review): only what the asker sees
 
 
-def _move(c, n, target, uid):
+def _move(c, n, target, uid, fsl_ok=False):
     tid = int(target) if target not in (None, "", 0) else None
     if tid == n["parent_id"]:
         return
+    if tid:
+        need_node(c, tid)  # 2.353.0 F (#2758, review N4): a folder the person does not see: 404 before its lock is checked
+    if not fsl_ok:
+        from .fslock import fsl_move_guard
+        fsl_move_guard(c, n, tid)  # 2.353.0 A (#2758): across a locked folder's border only re-encrypted (fslock.fsl_move)
     fs_area_need_fit(c, tid, n["kind"], n["ref_kind"], node=n)  # 2.200.0 A (#2747): nothing crosses a closed area's border
     fs_ref_need_move(c, uid, n)  # 2.199.0 A (#2742): moving a filed object changes who reaches it -- edit on the object too; F (review): every one in a folder too
     if tid:
@@ -560,6 +595,11 @@ def _move(c, n, target, uid):
     nm = _free_name(c, tid, n["owner_id"], n["org_id"], n["name"], skip=n["id"])
     c.execute("UPDATE fs_nodes SET parent_id=?, name=?, sort_no=NULL, updated_at=? WHERE id=?", (tid, nm, _now(), n["id"]))  # 2.199.0 A (#2742): by name at the end
     fs_log_add(c, n["id"], "move", str(tid or ""))
+    if tid:
+        from ..docs.recog import rc_after_add
+        if rc_after_add(c, n["id"], uid):  # 2.353.0 D (#2759): moved into a recognising folder = documents (the queue wakes)
+            from ..docs.ingest import docs_kick
+            docs_kick()
 
 
 @app.delete("/api/files/nodes/<int:nid>")
@@ -666,6 +706,9 @@ def _share_targets(c, n):
     groups = []
     if collab_all() and not wk:
         groups = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM groups ORDER BY name") if grp_visible(c, r)]
+    from .fslock import fl_is_locked
+    if fl_is_locked(c, n["id"]):
+        agents = []  # 2.353.0 A (#2758): a locked folder is never shared with agents
     return {"people": people, "groups": groups, "agents": agents}
 
 
@@ -709,10 +752,16 @@ def files_share_add(nid):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b.get("expires_at"), b.get("tz"))  # 2.58.0 (#1787): tz = the person's zone
     fs_ref_need_share(c, me(), n, role)  # 2.199.0 F (#2742, review): passing filed documents on needs that role on them
+    if fs_area_of(c, nid) == "lists":  # 2.352.0 F (#2748, review H1): a projects folder's share hands out list roles -- its owner / an admin of every list below
+        fs_ref_need_move(c, me(), n)
     t = _share_targets(c, n)
     key = next((k for k in ("user_id", "group_id", "agent_id") if b.get(k)), None)
     if not key:
         return err(tr("Expected {0}", "user_id | group_id | agent_id"))
+    if key == "agent_id":
+        from .fslock import fl_is_locked, fsl_denied
+        if fl_is_locked(c, nid):
+            raise fsl_denied("fs_locked_agent")  # 2.353.0 A (#2758)
     try:
         tid = int(b[key])
     except (TypeError, ValueError):
@@ -729,6 +778,13 @@ def files_share_add(nid):
             return err(tr("Too many shares"), 409)
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?)",
                         (nid, tid, role, exp, me(), _now()))
+    lr_ = b.get("list_role")  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
+    if lr_ is None and old and fs_area_of(c, nid) == "lists":
+        c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))
+    elif lr_ is not None and fs_area_of(c, nid) == "lists":
+        if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):
+            return err(tr("Invalid value: {0}", "list_role"))
+        c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?", (lr_, "edit" if lr_ in ("admin", "edit") else "view", sid))
     fs_log_add(c, nid, "share", f"{key[:-3]}:{tid}:{role}")
     if key == "agent_id" and not old:
         _agent_event(c, tid, n, role)
@@ -759,9 +815,20 @@ def files_share_patch(sid):
         return err(tr("Invalid value: {0}", "role"))
     exp = _expiry(b["expires_at"], b.get("tz")) if "expires_at" in b else s["expires_at"]
     longer = s["expires_at"] is not None and (exp is None or str(exp) > str(s["expires_at"]))
-    if role != s["role"] or longer:  # 2.238.0 A (#2863): extending a share passes the filed documents on as well
+    lists = fs_area_of(c, s["node_id"]) == "lists"
+    if role != s["role"] or longer or (lists and b.get("list_role")):  # 2.238.0 A (#2863): extending a share passes the filed documents on as well
         fs_ref_need_share(c, me(), need_node(c, s["node_id"]), role)  # 2.199.0 F (#2742, review)
+    if lists:  # 2.352.0 F (#2748, review H2): a list role set / changed without a role change was not checked at all
+        fs_ref_need_move(c, me(), need_node(c, s["node_id"]))
     c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, sid))
+    if "list_role" in b and lists:  # 2.352.0 A (#2748)
+        lr_ = b["list_role"]
+        if lr_ is not None and (lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and s["agent_id"])):
+            return err(tr("Invalid value: {0}", "list_role"))
+        c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?",
+                  (lr_, role if lr_ is None else ("edit" if lr_ in ("admin", "edit") else "view"), sid))
+    elif "role" in b and lists:
+        c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))  # a new view / edit replaces the list role
     fs_log_add(c, s["node_id"], "share_change", f"{sid}:{role}")
     bump(c)
     c.commit()

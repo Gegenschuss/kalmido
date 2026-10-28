@@ -186,6 +186,7 @@ j = r.json() if r.ok else {}
 check(r.ok and j.get("org_id") == ORG and any(x["user_id"] == CAROL for x in j["items"]), f"agent: Alpha's absences ({r.status_code} {r.text[:200]})")
 check(r.ok and all("kind" not in x and "note" not in x for x in j["items"]) and "sick" not in r.text and "flu" not in r.text, "agent: never the kind or the note")
 check(requests.get(B + "/api/v1/absences", params={"org": ORG2}, headers=AGH).status_code == 404, "agent: another organisation 404")
+check(Bo.delete(B + f"/api/lists/{_LS}/members/{AGT}").ok, "setup: the agent leaves the shared project")  # 2.361.4 (#2935): out of an organisation only without its projects
 check(A.patch(B + f"/api/admin/agents/{AGT}", json={"org_id": None}).ok, "setup: the agent becomes private")
 check(requests.get(B + "/api/v1/absences", headers=AGH).status_code == 404, "a private agent sees no team (404)")
 check(A.post(B + "/api/team/absences", json={"kind": "off", "start_date": D1}).status_code in (201, 404), "the instance admin outside Alpha enters into their own area")

@@ -60,7 +60,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
   // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)
-  check(!d.querySelector('#side .sfoot') && !d.querySelector('#srail .srfoot') && d.querySelector('#kbar .kbacct'), '#1502: nothing at the bottom of the bar, the account in the head bar'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
+  check(!d.querySelector('#side .sfoot') && [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings' && d.querySelector('#kbar .kbacct'), '#1502: Settings alone at the bottom of the bar, the account in the head bar');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
   check(more().querySelector(':scope > .srow[data-go="all"]') && more().querySelector(':scope > .srow[data-go="done"]') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('more'), '#1502: opened, remembered per device');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
@@ -81,7 +81,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   // the sidebar settings know the group (sort / hide)
   check(w.eval('sideGroupOrder().includes("more")') && w.eval('tr(SIDE_NAMES.more)') === 'More', '#1502: More in the sidebar settings');
   await call('PATCH', '/api/settings', {sidebar: JSON.stringify({order: ['views', 'areas', 'lists', 'focus'], hidden: ['g:more']})}); await w.eval('load().then(render)'); await sleep(400);
-  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#kbar .kbsw'), '#1503 #1502: an own order stays, More can be hidden'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): Settings in the bar
+  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#srail .sset'), '#1503 #1502: an own order stays, More can be hidden');  // 2.152.2 (#2622): Settings in the bar
   await call('PATCH', '/api/settings', {sidebar: ''});
   w.close();
   // a used device: More open, unless every group was folded; an open Tags group stays open
@@ -96,7 +96,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   await call('PATCH', '/api/settings', {side_people: String(BOB)});  // 2.99.0 (#2187): people only while pinned
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   const msg = await until(() => d.querySelector('#side .sg-team .sbmsg[data-go="team"]'));
-  check(msg && /Messages/.test(msg.textContent) && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Messages" with 2 unread ' + msg?.textContent);
+  check(msg && /Team chat/.test(msg.textContent) /* 2.364.0 (#3040): one name, was "Messages" */ && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Team chat" with 2 unread ' + msg?.textContent);
   check(d.querySelector('#side .sg-team').firstElementChild.nextElementSibling === msg, '#1509: on top of Conversations');
   const conv = await until(() => d.querySelectorAll('#side .sbconv').length === 2 && [...d.querySelectorAll('#side .sbconv')]);
   check(conv && conv.every(b => b.classList.contains('sbun')) && conv.some(b => b.dataset.go === `team/${DM}`) && conv.some(b => b.dataset.go === `team/${CH}`), '#1509: the 2 conversations, unread (bold)');
@@ -139,7 +139,8 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   check(await until(() => /harbour/.test(cards().find(a => a.getAttribute('href') === `#note/${N1}`)?.textContent || '')), '#1516: the first words of a note');
   // filter by list
   const sel = d.querySelector('#sbn-l');
-  check(sel && sel.querySelector('optgroup'), '#1516: a filter by project / list');
+  // 2.352.0 B (#2752): groups only split projects from the basket; without basket notes a flat list of projects
+  check(sel && sel.querySelector(`option[value="${GAR}"]`), '#1516: a filter by project / list');
   sel.value = String(GAR); sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(150);
   check(cards().length === 1 && cards()[0].getAttribute('href') === `#note/${N3}`, '#1516: filtered to Garden');
   sel.value = '0'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(150);

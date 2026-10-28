@@ -77,7 +77,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('.fxsum [data-fxsum]'); if (!b) return;
   const l = listById(+b.closest('.fxsum').dataset.lid), k = b.dataset.fxsum; if (!l) return;
   const cur = fxSumAgg(l, k), f = fieldById(+k.slice(2));
-  const kp = canManage(l) && !l.archived && l.kind === 'project' && f ? ['-', {label: tr('Key figure on the project page…'), icon: 'chart',
+  const kp = canManage(l) && !l.archived && !l.is_inbox && f ? ['-', {label: tr('Key figure on the project page…'), icon: 'chart',
     fn: () => fxKpiModal(l.id, {title: f.name, agg: cur === 'avg' ? 'avg' : cur === 'count' ? 'count' : 'sum', field: f.id, state: 'all'})}] : [];
   menu(b, [...FX_AGGS.map(([a, n]) => ({label: tr(n), on: a === cur, fn: () => fxSumSet(l.id, k, a)})), ...kp]);
 });

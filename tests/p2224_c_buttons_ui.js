@@ -42,8 +42,8 @@ const FEAT = 'cal,comments,office,clients,docs';
     check(await ready(ev, `document.querySelector('[data-cb="dir"][data-v="out"]').getAttribute('aria-pressed') === 'true' && document.querySelector('[data-cb="dir"][data-v="in"]').getAttribute('aria-pressed') === 'false'`), 'aria-pressed follows the click');
     await shot('p2224-c-cashbook.png');
     // the document-kind tabs
-    await nav(B + '#office/offers');
-    check(await ready(ev, `document.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 6`, 80), 'the six document kinds');
+    await nav(B + '#office/invoices');  // #3409: quotations and invoices are two areas; the invoices' area has five kinds
+    check(await ready(ev, `document.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 5`, 80), 'the five document kinds of the invoices');
     check(await ev(hgt('.ofdkinds button')) === segH, `the kind tabs have the standard switch height (${await ev(hgt('.ofdkinds button'))} / ${segH})`);
     check(await ev(`document.querySelector('.ofdkinds [aria-selected="true"]') && !!document.querySelector('.ofdkinds [role="tab"]')`), 'role=tab / aria-selected stay');
     await shot('p2224-c-offers.png');

@@ -8,8 +8,13 @@
 // conflict colour when a task starts before a task it waits on is due, a hatch on waiting bars, linking by dragging
 // the dot at a bar's end onto another bar (mouse / pen), long-press menu + "Connect to…" mode (touch), keyboard (focus
 // a bar: Enter opens, C connects, Shift+F10 / context menu key = menu, arrow keys move between bars).
-const tlDW = () => isRoadmap() ? rmDW() : Math.round((isMobile() ? 30 : 36) * uiZ());  // the roadmap (D3) has its own zoom
+const tlDW = () => isRoadmap() ? rmDW() : Math.max(1, Math.round(tlPx() * (isMobile() ? 30 / 36 : 1) * uiZ()));  // the roadmap (D3) has its own zoom
 const TL_DAYS = 70;
+// 2.331.0 E (#3311): two fingers / Ctrl + wheel set the day width without steps (px at 100 %, kept on the device); zoomed
+// out, the range grows so the timeline stays as wide as before
+const TL_PX = 36, TL_PXMIN = 16, TL_PXMAX = 96;
+const tlPx = () => { const v = S.tlLive || +LS.get('tlPx', TL_PX); return v > 0 ? Math.max(TL_PXMIN, Math.min(TL_PXMAX, v)) : TL_PX; };
+const tlDays = () => Math.max(TL_DAYS, Math.ceil(TL_DAYS * TL_PX / tlPx() / 7) * 7);
 const TL_MINW = 18;  // 1.5.3: a 1-day bar stays wide enough to tell move from resize at small zoom levels
 S.tlL = null;        // the drawn timeline: {bars: Map(id -> 1)}
 S.tlPick = null;     // "Connect to…" mode: {from}
@@ -36,7 +41,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   // range, and on the left it stops before the name column (max-width in px, the room there)
   // 2.13.0 (#453 P12): a title that would be cut inside its bar goes next to it too (not only bars under 110 px)
   const sh = w < 110 || String(t.title || '').length * 6.5 + 24 > w;
-  const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = sh && room < 120 && lroom > room;
+  const span = (diffDays(start, end) + 1) * DW, room = span - (x + w) - 24, lroom = x - 16, left = sh && room < 120 && lroom > room;
   const lmax = sh ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
   return `<div class="tl-bar p${t.priority} ${sh ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${mdTitleNL(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
     (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task this one blocks')}"></button>` : '');
@@ -45,7 +50,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
 // empty dashed track. Click a day = due that day, drag across days = start + due (touch: hold, then drag); the bar then
 // moves to its dated place. Header switch "No date" per device: on by default in project lists, off elsewhere.
 const tlNdKey = listId => listId ? 'l' + listId : 'all';
-function tlNdOn(listId) { const o = LS.get('tlnd', {}) || {}, k = tlNdKey(listId); return k in o ? !!o[k] : !!listId && listById(listId)?.kind === 'project'; }
+function tlNdOn(listId) { const o = LS.get('tlnd', {}) || {}, k = tlNdKey(listId); return k in o ? !!o[k] : !!listId && isProject(listId); }
 function tlNdRows(l, ts) {
   const ids = new Set(ts.map(t => t.id)), ord = [];
   const add = t => { ord.push(t); for (const k of ts.filter(x => x.parent_id === t.id).sort(bySort)) add(k); };  // subtasks under their parent
@@ -110,31 +115,31 @@ function tlNewHtml(key, geo) {
   const x = Math.max(0, diffDays(geo.s0, a)) * geo.dw, w = (diffDays(a < geo.s0 ? geo.s0 : a, b) + 1) * geo.dw;
   const when = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
   // 2.18.0 review (R4): narrow screens show the range in short form (5.10.–8.10.), the long one does not fit there
-  const sd = x => { try { return pd(x).toLocaleDateString(dpLocale(), {day: 'numeric', month: 'numeric'}); } catch { return x.slice(5); } };
+  const sd = x => { return fmtDateNum(pd(x), false); };
   const whenS = a < b ? `${sd(a)}–${sd(b)}` : sd(b);
   return `<div class="tl-ghost" style="left:${x + 2}px;width:${Math.max(TL_MINW, w - 4)}px" aria-hidden="true"></div>` +
     `<div class="tl-new" style="--x:${x}px"><label class="sr" for="tl-new-in">${esc(tr('New task, {0}', when))}</label><input id="tl-new-in" type="text" maxlength="500" autocomplete="off" enterkeyhint="done" value="${esc(N.v || '')}" placeholder="${esc(tr('Task name'))}"><span class="tl-nwhen" aria-hidden="true"><span class="tl-nwl">${esc(when)}</span><span class="tl-nws">${esc(whenS)}</span></span>` +
     `<button type="button" class="iconbtn" data-act="tl-new-ok" title="${esc(tr('Add'))}" aria-label="${esc(tr('Add'))}">${ic('check', 's')}</button><button type="button" class="iconbtn" data-act="tl-new-x" title="${esc(tr('Cancel'))}" aria-label="${esc(tr('Cancel'))}">${ic('x', 's')}</button></div>`;
 }
 function viewTimeline(listId, inCal) {
-  const DW = tlDW();
+  const DW = tlDW(), ND = tlDays();  // 2.331.0 E (#3311): ND days in the range
   if (!S.tlStart) S.tlStart = addDays(weekStartOf(today()), -7);
-  const start = S.tlStart, end = addDays(start, TL_DAYS - 1), t0 = today();
+  const start = S.tlStart, end = addDays(start, ND - 1), t0 = today();
   const all = openTasks().filter(t => (!listId || t.list_id === listId) && (!inCal || cvxTaskOn(t)));  // 2.36.1 (#1127): the calendar's task switches
   const dated = all.filter(t => t.due && t.due >= start && (t.start || t.due) <= end);
   const undated = all.filter(t => !t.due).length;
   const ndOn = tlNdOn(listId), und = ndOn ? all.filter(t => !t.due) : [];
   // 2.7.1 (#410): milestones of project lists as markers in the list's row (a list with only milestones in range shows too)
-  const msIn = l => l.kind === 'project' && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
+  const msIn = l => !l.is_inbox && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
   // 2.18.0 (#431): the list of a list timeline always has its group (an empty project can be planned right here)
   const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || listId === l.id).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
   let head = '', months = '', lastM = '';
-  for (let i = 0; i < TL_DAYS; i++) {
+  for (let i = 0; i < ND; i++) {
     const d = addDays(start, i), dd = pd(d), wk = dd.getDay() === 0 || dd.getDay() === 6;
     head += `<div class="tl-d ${d === t0 ? 'today' : ''} ${wk ? 'we' : ''}"><span>${WD[dd.getDay()].slice(0, 1)}</span>${dd.getDate()}</div>`;
     if (d.slice(0, 7) !== lastM) { months += `<div class="tl-m" style="left:${i * DW}px">${MON[dd.getMonth()]} ${dd.getFullYear()}</div>`; lastM = d.slice(0, 7); }
   }
-  months = tlStickyMonths(months, TL_DAYS * DW);
+  months = tlStickyMonths(months, ND * DW);
   const todayX = diffDays(start, t0) * DW;
   const deps = depsOn(), pick = S.tlPick && deps ? S.tlPick : null;
   const bars = new Map();
@@ -142,7 +147,7 @@ function viewTimeline(listId, inCal) {
   // 2.7.0 (K14): names cut with "…" (full name in the tooltip)
   // 2.18.0 (#462 / #431): a milestone task is a diamond in its own row, so the list row only marks the ones not drawn there
   const msMark = (l, ts) => msIn(l).filter(m => !tlMsDrawn(m, ts)).map(m => `<i class="tl-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${diffDays(start, m.day) * DW + DW / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
-  const geo = {s0: start, dw: DW, days: TL_DAYS};
+  const geo = {s0: start, dw: DW, days: ND};
   // 2.18.0 (#462): inside a list the tasks are grouped by section (the list's order, "Unassigned" first as in the list
   // view); every list / section row is a place to draw a new task into (#431), "+ Add task" ends every list group
   const rows = groups.map(g => {
@@ -166,7 +171,7 @@ function viewTimeline(listId, inCal) {
   const ndBtn = tlNdBtn(ndOn, undated);
   return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
     ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
-    <div class="tl${pick ? ' picking' : ''}" style="--dw:${DW}px;--days:${TL_DAYS}">
+    <div class="tl${pick ? ' picking' : ''}${DW < 22 ? ' tl-sm' : ''}" style="--dw:${DW}px;--days:${ND}">
     <div class="tl-scroll" id="tlscroll"><div class="tl-inner">
       <div class="tl-row tl-headrow" title="${esc(tr('Set a date range via “Start” in the date dialog.'))}"><div class="tl-name"></div><div class="tl-track tl-headtrack"><div class="tl-months">${months}</div><div class="tl-days">${head}</div></div></div>
       ${inCal ? tlCalRows(start, end, DW) : ''}
@@ -632,3 +637,39 @@ document.addEventListener('keydown', e => {
   else return;
   e.preventDefault(); e.stopPropagation();
 }, true);
+
+// ---- 2.331.0 E (#3311): two fingers / Ctrl + wheel / Safari's pinch on a timeline (list, calendar, roadmap) zoom only it:
+// the day width follows without steps (the roadmap changes week / month / quarter beyond a bound), the day under the
+// fingers stays under them; the page keeps its size. Kept on release: the roadmap in its prefs, the timeline on the device
+const tlz_s0 = d => d.rm ? S.rmStart : S.tlStart;
+pz_attach($('#view') || document, {
+  area: t => t?.closest('#view .tl') || null,
+  start(a, x) {
+    const sc = tlSc(); if (!sc) return null;
+    if (drg_cur) drg_cancel();  // a bar's drag / hold ends: two fingers zoom
+    const rm = isRoadmap() && !!S.rmV, dw = rm ? S.rmV.G.dw : tlDW(), s0 = rm ? S.rmV.G.start : S.tlStart;
+    const left = sc.getBoundingClientRect().left + tlNameW(), pos = Math.max(0, (x - left + sc.scrollLeft) / dw);
+    return {rm, left, px0: rm ? rmPx() : tlPx(), px: 0, at: addDays(s0, Math.floor(pos)), fr: pos - Math.floor(pos)};
+  },
+  move(d, k, x) {
+    const px = d.rm ? Math.max(RM_PXMIN, Math.min(RM_PXMAX, d.px0 * k)) : Math.max(TL_PXMIN, Math.min(TL_PXMAX, d.px0 * k));
+    if (Math.abs(px - (d.px || d.px0)) < .05) return;
+    d.px = px;
+    if (d.rm) {
+      const z = rmZFor(px);
+      if (S.rmStartZ !== z) { S.rmStart = addDays(weekStartOf(d.at), -RM_Z[z].lead); S.rmStartZ = z; }  // the day stays in the new zoom's range
+      S.rmLive = {z, px};
+    } else S.tlLive = px;
+    // the range starts early enough for the day under the fingers to stay where it is
+    const dw = tlDW(), off = x - d.left, lack = off / dw - (diffDays(tlz_s0(d), d.at) + d.fr);
+    if (lack > 0) { const s = addDays(tlz_s0(d), -7 * Math.ceil(lack / 7)); if (d.rm) S.rmStart = s; else S.tlStart = s; }
+    renderView();
+    const sc = tlSc(); if (sc) sc.scrollLeft = Math.max(0, (diffDays(tlz_s0(d), d.at) + d.fr) * dw - off);
+  },
+  end(d) {
+    if (d.rm) {
+      const L = S.rmLive; S.rmLive = null;
+      if (L) { const f = Math.round(L.px / RM_Z[L.z].px * 1000) / 1000; rmSet({z: L.z, zf: f === 1 ? undefined : f}, ''); }
+    } else if (S.tlLive) { LS.set('tlPx', Math.round(S.tlLive * 10) / 10); S.tlLive = null; }
+  },
+});

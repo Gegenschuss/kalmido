@@ -135,12 +135,6 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
 
 // ------------------------------------------------------------------ quick add wiring
 function currentQuickInput() { return $('#qinput'); }
-// 2.380.2 (#3403): a chip picked after the text names the same thing wins for this task (qovPick)
-function qovChipWins(type) {
-  const inp = $('#qinput'); if (!inp) return;
-  if (parseQuick(inp.value, S.quick.ignore).chips.some(c => c.type === type && !c.off)) S.qov.win = {...S.qov.win, [type]: 1};
-  updateChips(inp); inp.focus();
-}
 function updateChips(input) {
   if (input.id === 'qinput') qdockChips();
   input.closest('.qadd.dock')?.classList.toggle('has-text', !!input.value.trim());  // 2.24.0 (UX-30)
@@ -180,8 +174,7 @@ async function submitQuick(input, extra = {}) {
   if (!r.title && d.files?.length) r.title = d.files[0].name.replace(/\.[^.]+$/, '');  // shared file without a title
   if (!r.title) return;
   const o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};  // chips of the docked composer
-  const q = qovPick(o, r, d);  // 2.380.2 (#3403): the text wins over a chip
-  const body = {title: r.title, list_id: q.list_id, due: q.due, due_time: r.due_time || d.due_time, priority: q.priority,
+  const body = {title: r.title, list_id: o.list_id || r.list_id || d.list_id, due: 'due' in o ? o.due : r.due || d.due, due_time: r.due_time || d.due_time, priority: 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0,
     tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || '', section_id: d.section_id, content: d.content || ''};
   if (url) body.url = url;
   if (r.ttype) body.ttype = r.ttype;  // 2.4.0 (#340): !bug / !feature / !task
@@ -195,7 +188,7 @@ async function submitQuick(input, extra = {}) {
   if (d.who && d.noList && !body.list_id) { toast(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
-  input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input);  // 2.380.2 (#3403): the chips stay, their win over the text not
+  input.value = ''; S.quick.ignore = new Set(); updateChips(input);
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
@@ -216,7 +209,7 @@ async function submitQuick(input, extra = {}) {
     if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
     const tt = t.title || '', tq = tr('“{0}”|quoted', toastClip(tt));  // 2.25.0 (UX-31): which task, where it went
-    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
+    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
   if (d.files?.length && created?.id < 0 && await qfKeep(created.id, d.files)) { toast(tr('Offline: the files are uploaded once the task is synced')); return; }  // 2.359.0 A (#3023)
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
@@ -238,7 +231,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
   popOnClose = () => { an_remove(q); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
-  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
+  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + fmtTimeLoc(preset.due_time) : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
   const qh = $('.qhint', q); if (hint) qh.textContent = hint; else qh.innerHTML = qHelpChips('qsheet');
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
@@ -301,7 +294,7 @@ document.addEventListener('click', async e => {
   if (fm) {
     e.preventDefault(); e.stopPropagation();
     const f = fm.dataset.folder, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f), j = i + +fm.dataset.fmove;
-    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(sib) : sib.flatMap(t => [t, ...folderSubs(t)])); }
+    if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fOrderWith(fParent(f), sib)); }  // 2.352.0 E (#2748): any depth
     return;
   }
   // 2.25.0 (UX-02): the "…" of a list / folder in sort mode: up, down, folder
@@ -316,7 +309,7 @@ document.addEventListener('click', async e => {
   if (fs) {
     e.preventDefault(); e.stopPropagation();
     const f = fs.dataset.fsort, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f);
-    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(s2) : s2.flatMap(t => [t, ...folderSubs(t)])); };
+    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fOrderWith(fParent(f), s2)); };  // 2.352.0 E (#2748): any depth
     menu(fs, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: i <= 0, fn: mv(-1)}, {label: tr('Move down'), icon: 'chev', dis: i < 0 || i >= sib.length - 1, fn: mv(1)}]);
     return;
   }
@@ -491,7 +484,7 @@ document.addEventListener('click', async e => {
       // 2.31.0 (#378): the connection as the first line (online = "All saved" from 2.25), offline / waiting: try again now
       {label: n.k === 'on' ? tr('Online') + ' · ' + tr('All saved') : n.label, icon: n.k === 'on' ? 'check' : n.k === 'off' ? 'cloudoff' : 'sync', dis: true, cls: 'mnet n-' + n.k},
       ...(n.k !== 'on' ? [{label: tr('Try again'), icon: 'sync', fn: () => { if (OUT.q.length) flush(); refreshNow().then(staleDraw).catch(() => {}); }}] : []), '-',
-      {label: tr('Start|home'), icon: 'home', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
+      {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
@@ -506,7 +499,7 @@ document.addEventListener('click', async e => {
       if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq, .rxrow'); (q?.querySelector('.rxq') || q?.querySelector('.rx'))?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
-    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project with progress and status…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
+    case 'list-new': menu(a, [{label: tr('New project'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New project from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
     case 'status': statusModal(id); break;
@@ -620,7 +613,7 @@ document.addEventListener('click', async e => {
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;
-    case 'rm-zoom': if (a.dataset.k !== rmZoom()) { S.rmScrollReset = true; rmSet({z: a.dataset.k}); } break;
+    case 'rm-zoom': if (a.dataset.k !== rmZoom() || rmP().zf) { S.rmScrollReset = true; rmSet({z: a.dataset.k, zf: undefined}); } break;  // 2.331.0 E (#3311): the button = its own day width again
     case 'rm-prev': rmNav(-1); break;
     case 'rm-next': rmNav(1); break;
     case 'rm-today': rmNav(0); break;
@@ -666,13 +659,13 @@ document.addEventListener('click', async e => {
     case 'purge': if (await askConfirm(tr('Delete permanently?'), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) { await api('DELETE', `/api/tasks/${id}?hard=1`); await load(); render(); } break;
     case 'done-clean': doneCleanup(); break;
     case 'qd-date': {
-      const inp = $('#qinput'), cur = qovPick(S.qov || {}, parseQuick(inp?.value || '', S.quick.ignore), quickDefaults()).due || '';
-      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qovChipWins('date'); }});
+      const inp = $('#qinput'), cur = 'due' in (S.qov || {}) ? S.qov.due : parseQuick(inp?.value || '', S.quick.ignore).due || quickDefaults().due || '';
+      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qdockChips(); $('#qinput')?.focus(); }});
       break;
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
-    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
-    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
+    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qdockChips(); $('#qinput')?.focus(); }}))); break;
+    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qdockChips(); $('#qinput')?.focus(); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
     case 'mx-due': mxSet({due: a.dataset.k}); break;
@@ -916,7 +909,7 @@ S.qfiles = {};  // input id -> [File]
 function qTargetList(input) {
   const r = parseQuick(input.value, S.quick.ignore), o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};
   const d = input.id === 'qsheet' && S.quickPreset.capture ? {} : {...quickDefaults(), ...(input.id === 'qsheet' ? S.quickPreset : {})};
-  return listById(r.list_id || o.list_id || d.list_id || inbox()?.id);
+  return listById(o.list_id || r.list_id || d.list_id || inbox()?.id);
 }
 function qPeople(input) {
   const l = qTargetList(input);

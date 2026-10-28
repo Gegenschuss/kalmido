@@ -2559,6 +2559,14 @@ CREATE INDEX IF NOT EXISTS rate_hits_at ON rate_hits(at);  -- 2.306.0 Fix-1 (#28
 -- key + address, the Unix time; gone after KNOWN_DAYS. New table only: 2.311 ignores it (it remembers them in memory)
 CREATE TABLE IF NOT EXISTS rate_known (u TEXT NOT NULL, a TEXT NOT NULL, at DOUBLE PRECISION NOT NULL, PRIMARY KEY (u, a));
 CREATE INDEX IF NOT EXISTS rate_known_at ON rate_known(at);
+-- 2.352.0 A (#2748): a list's folder share (fs_shares on a folder of the projects area, lists/lffolder.py) does not reach this
+-- person on this list (removed from the list by hand, or the migration found the copy removed / set lower by hand). No org_id
+-- (like list_members: the list decides). New table only: 2.351 ignores it
+CREATE TABLE IF NOT EXISTS list_folder_skip (
+  list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+-- 2.352.0 (#2748): deleting a user (ON DELETE CASCADE) and the fkindex check need the user's side indexed
+CREATE INDEX IF NOT EXISTS list_folder_skip_user ON list_folder_skip(user_id);
 -- 2.361.2 (#2923): a member asks the admins of an organisation to give back what they brought in or made (kind list | sheet |
 -- file ..., accounts/orgout.py OO_KINDS; obj_id = its id; name = what the admins see): state open | approved | declined |
 -- used. An approved request lets that person move that one thing into their private space for a while (OO_GRANT_DAYS).
@@ -3698,6 +3706,19 @@ MIGRATIONS = [
     # Admins only; older versions ignore both
     ("orgs", "asst_comments", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS asst_comments BIGINT NOT NULL DEFAULT 0"),
     ("orgs", "chn_content", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS chn_content BIGINT NOT NULL DEFAULT 0"),
+    # 2.352.0 A (#2748): the role a list gets through the shares of its folders (lists/lffolder.py, computed by lists/groups.py
+    # grp_sync like grole; role = the highest of own_role, grole, frole), and the list role of a share of a projects folder
+    # (admin | edit | participant | view; NULL = its role view / edit). Older versions ignore both (a row with only frole
+    # reads as a personal share there)
+    ("list_members", "frole", "ALTER TABLE list_members ADD COLUMN IF NOT EXISTS frole TEXT"),
+    ("fs_shares", "list_role", "ALTER TABLE fs_shares ADD COLUMN IF NOT EXISTS list_role TEXT"),
+    # 2.353.0 D (#2759): recognition per folder / file of the file store ('' = as the folder above, 'on', 'off'; docs/recog.py).
+    # Older versions ignore it (their documents folder recognises as before)
+    ("fs_nodes", "recog", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS recog TEXT NOT NULL DEFAULT ''"),
+    # 2.353.0 A (#2758): a node below a locked folder (files/fslock.py): 0 = plain, n = its name (and a file's versions) are
+    # ciphertexts of the folder key of generation n. Older versions ignore it (they show the ciphertext name of a file of
+    # type application/octet-stream, nothing reads its content)
+    ("fs_nodes", "e2e_gen", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS e2e_gen BIGINT NOT NULL DEFAULT 0"),
     # 2.357.0 C (#3158): a document from a template signed with the own signature picture of this person (office/doctpl.py; set
     # only by that person, NULL = without). Older versions ignore it
     ("office_gen_docs", "sign_uid", "ALTER TABLE office_gen_docs ADD COLUMN IF NOT EXISTS sign_uid BIGINT REFERENCES users(id) ON DELETE SET NULL"),
@@ -3719,6 +3740,16 @@ MIGRATIONS = [
     # 2.361.4 (#2928): 1 = members of the organisation may keep their own (personal) agents in it; its admins decide
     # (agents/admin.py agent_ws_allowed). Older versions ignore it (there the server switch user_agents alone decides)
     ("orgs", "member_agents", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS member_agents BIGINT NOT NULL DEFAULT 0"),
+    # 2.332.0 C (#3301): the approver's signature picture on the receipt PDF (office/meals.py approve; 0 = the confirmation
+    # text only, as before). Older versions ignore it
+    ("office_meals", "sign_image", "ALTER TABLE office_meals ADD COLUMN IF NOT EXISTS sign_image BIGINT NOT NULL DEFAULT 0"),
+    # 2.409.0 (#3490): the areas the organisation's admins switched off for its members (csv of area ids, accounts/wsareas.py;
+    # '' = all on). Older versions ignore it (every area as the person's module switches say)
+    ("orgs", "areas_off", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS areas_off TEXT NOT NULL DEFAULT ''"),
+    # 2.371.3 (#3152): the default reading style of the organisation's / the person's private knowledge space (wiki/wkstyle.py
+    # WIKI_STYLES; '' = Clear). Older versions ignore it
+    ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
     # 2.390.0 (#3353): readable ticket keys APP-123. lists.ticket_key = the project's key (2-6 capitals / digits, a letter
     # first, unique per workspace; NULL = none, as before), tasks.ticket_no = the running number of the task in its project
     # (set by the trigger TICKET_NO_TRIGGER on insert / move), git_conns.hash_ids = a repository of a project with a key still
@@ -3976,6 +4007,22 @@ CREATE INDEX IF NOT EXISTS agent_decisions_list ON agent_decisions(list_id) WHER
 CREATE INDEX IF NOT EXISTS hub_mails_org ON hub_mails(org_id) WHERE org_id IS NOT NULL;
 -- 2.209.0 C (#2589): the documents whose split preview waits for the queue's page scan (the idle look stays an index read)
 CREATE INDEX IF NOT EXISTS doc_meta_split_wait ON doc_meta(node_id) WHERE split_scan ILIKE '%"state":"scan"%';
+-- 2.353.0 A (#2758): locked folders of the file store (files/fslock.py) -- one row per folder that was ever locked, e2e NULL
+-- (open) | encrypting | on | decrypting, e2e_gen = the generation of its key. The folder key of one generation is wrapped per
+-- person in fs_lock_keys (like wiki_keys), who has access but no copy waits (computed from the rights). Names and contents
+-- below such a folder are ciphertexts (fs_nodes.e2e_gen > 0). New tables only: older versions ignore them
+CREATE TABLE IF NOT EXISTS fs_locks (
+  node_id BIGINT PRIMARY KEY REFERENCES fs_nodes(id) ON DELETE CASCADE, org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,
+  e2e TEXT, e2e_gen BIGINT NOT NULL DEFAULT 0, e2e_by BIGINT REFERENCES users(id) ON DELETE SET NULL, e2e_at TEXT);
+CREATE INDEX IF NOT EXISTS fs_locks_org ON fs_locks(org_id) WHERE org_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS fs_locks_by ON fs_locks(e2e_by) WHERE e2e_by IS NOT NULL;
+CREATE TABLE IF NOT EXISTS fs_lock_keys (
+  node_id BIGINT NOT NULL REFERENCES fs_locks(node_id) ON DELETE CASCADE, gen BIGINT NOT NULL,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, wrapped TEXT NOT NULL,
+  wrapped_by BIGINT REFERENCES users(id) ON DELETE SET NULL, wrapper_pub TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (node_id, gen, user_id));
+CREATE INDEX IF NOT EXISTS fs_lock_keys_user ON fs_lock_keys(user_id);
+CREATE INDEX IF NOT EXISTS fs_lock_keys_by ON fs_lock_keys(wrapped_by) WHERE wrapped_by IS NOT NULL;
 -- 2.390.0 (#3353): ticket keys. A key is unique per workspace (organisation, else the owner's private one, a list in the
 -- trash keeps its key), checked where a key is set (tasks/ticketkey.py tk_set), not by the index: a project that moves to
 -- another workspace never fails on it (the lookup then takes the first one the reader sees). list_ticket_seq = the last number given per project (its own table, so a new task does not touch
@@ -4035,6 +4082,7 @@ USER_DEFAULTS = {
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
     "office_ws_hint": "0",      # 2.356.0 B (#2932): the office's "you are now working in the office of …" hint was shown
     "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
+    "ab_cards": "[]",           # 2.353.0 D (#2759): the file store's folders shown as cards (all devices): ["n:<id>", "s:<space>"]
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks
@@ -4109,6 +4157,7 @@ USER_DEFAULTS = {
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the figure celebrates an emptied Today / a completed list or project
     "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
+    "start_page": "home",       # 2.364.0 B (#3031): the page the app opens on: home (Start) | inbox | today | last (last task view)
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
     "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
@@ -4129,6 +4178,8 @@ USER_DEFAULTS = {
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
     "sample_ask": "1",          # 1.8.0: the welcome tour offers the sample project (0 = decided in the setup / created once)
+    "purpose_ask": "done",      # 2.364.0 A (#3032): "What do you use Kalmido for?" on the first start of an account an admin made
+                                # (user admin, organisation invitation, import): the preselected purpose = pending | done
     # 1.9.0: which events create a News item (groups, see NEWS_GROUPS). Default: everything but "completed by others"
     "news_kinds": "mention,assign,comment,unblock,share,status",
     # 2.1.0 (#317): the rest of the notification matrix, json {event: {news?, push?}} (see NOTIF_ROWS; '' = defaults)
@@ -4143,6 +4194,9 @@ USER_DEFAULTS = {
     # 2.57.0 B (#1807): my own colour per workspace, json {"private" | "org:<id>": tone key of LP_TONES | "none"};
     # a missing key = the default (an organisation: its admins' colour, Private: neutral). Only I see it.
     "ws_colors": "{}",
+    # 2.409.0 (#3490): the areas I switched off per workspace, json {"private" | "org:<id>": [area id]} (accounts/wsareas.py);
+    # below the module switches ("features" off = off everywhere) and the admins' choice of an organisation
+    "ws_areas_off": "{}",
     # 2.143.0 D (#2155): the appearance of all devices, json {LOOK_KEYS key: value}; '' = never saved (the first device uploads its own)
     "look": "",
     # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the
@@ -4169,6 +4223,10 @@ USER_DEFAULTS = {
     # 2.240.0 (#2886): '1' = load YouTube / Vimeo players in video reviews without asking each time (remembered per person)
     "chat_kbd_agent": "1", "chat_kbd_team": "1",  # 2.235.0 D (#2899): phones: the keyboard closes after sending
     "video_ext_ok": "0",
+    # 2.368.0 B (#2982): region / formats ('' = automatic, from the app language and the browser's region; static/js/popovers.js)
+    "week_start": "",           # '' | mon | sun: the first day of the week (calendar, date picker, dispatch, habits)
+    "time_format": "",          # '' | 24 | 12: how times show
+    "date_order": "",           # '' | dmy | mdy | ymd: the order of numeric dates (31.12.2026 / 12/31/2026 / 2026-12-31)
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

@@ -398,7 +398,8 @@ check(Bo.get(B + f"/api/lists/{P}/error-hook").json().get("may") is False, "a me
 check(Bo.patch(B + f"/api/lists/{P}/error-hook", json={"state": "on"}).status_code == 403, "a member cannot switch it on")
 check(Ca.patch(B + f"/api/lists/{P}/error-hook", json={"state": "on"}).status_code == 403, "a viewer cannot switch it on")
 check(ag.req("PATCH", f"/lists/{P}/error-hook", json={"state": "on"}).status_code == 403, "an agent cannot switch it on")
-check(A.patch(B + f"/api/lists/{PLAIN}/error-hook", json={"state": "on"}).status_code == 409, "project lists only")
+# 2.352.0 (#2752): every list but the inbox is a project
+check(A.patch(B + f"/api/lists/{next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])}/error-hook", json={"state": "on"}).status_code == 409, "not in the inbox")
 check(A.patch(B + f"/api/lists/{P}/error-hook", json={"state": "maybe"}).status_code == 400, "invalid state")
 check(A.patch(B + f"/api/lists/{P}/error-hook", json={"state": "on", "x": 1}).status_code == 400, "unknown field")
 r = Da.patch(B + f"/api/lists/{P}/error-hook", json={"state": "on"})

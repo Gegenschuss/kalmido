@@ -17,7 +17,7 @@
 .sthabits .n .sw{width:.5625rem;height:.5625rem;border-radius:50%;flex:none}
 .sthabits .rate{display:flex;align-items:center;gap:.5rem}
 .sthabits .rate b{font-variant-numeric:tabular-nums;font-weight:600}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .sthabits .shh,.sthabits .shr{grid-template-columns:minmax(0,1fr) 6rem 4rem 1.875rem;gap:.375rem}
   .sthabits .rate svg{width:2.5rem}
 }

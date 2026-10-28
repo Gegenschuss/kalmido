@@ -18,7 +18,7 @@ function pm_featsWith(all, p = S.settings.purpose || '') {
   for (const k of on) fs.add(k);
   return FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',');
 }
-const pm_switchHtml = (id, on, label, note) => `<label class="pmsw"><span class="swc"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${esc(label)}</b>${note ? `<small class="muted">${esc(note)}</small>` : ''}</span></label>`;
+const pm_switchHtml = (id, on, label, note) => `<label class="pmsw"><span class="swc"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${esc(label)}</b>${note ? ` <small class="muted">${esc(note)}</small>` : ''}</span></label>`;
 const pm_allHtml = (id, on) => pm_switchHtml(id, on, tr('Switch on all modules'), tr('Off: only projects and tasks, no calendar, appointments or contacts. Single modules stay switchable below.'));
 // Settings > Modules: the switch applies at once, ONE undo step (modules + the switch together)
 document.addEventListener('change', async e => {

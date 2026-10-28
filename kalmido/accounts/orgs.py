@@ -313,8 +313,22 @@ def workspaces_for(c, uid):
         return []
     q = ",".join("?" * len(oids))
     # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
-    return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member"}
-            for r in c.execute(f"SELECT id, name, icon, color FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+    # 2.409.0 (#3490): + areas_off (the areas its admins switched off for the members, accounts/wsareas.py)
+    return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member",
+             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x]}
+            for r in c.execute(f"SELECT id, name, icon, color, areas_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+
+
+def org_peers(c, uid):
+    """2.364.0 D (#3036): does uid work with someone in an organisation (another member or an agent of one of its
+    organisations)? Part of the app's mark "has collaborators" (with the shared projects, the client)."""
+    oids = user_orgs(c, uid)
+    if not oids:
+        return False
+    q = ",".join("?" * len(oids))
+    with system_ctx(c):  # memberships are structure (ids only), as user_orgs
+        return bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({q}) AND user_id<>? LIMIT 1", (*oids, uid)).fetchone()
+                    or c.execute(f"SELECT 1 FROM agents WHERE org_id IN ({q}) LIMIT 1", oids).fetchone())
 
 
 def list_org(c, lid):
@@ -473,11 +487,16 @@ def list_org_set(c, lid, v):
         return False
     from .orgout import org_out  # 2.148.1 B (#2483): out of an organisation only through its admin (logged, admins told)
     org_out(c, lr["org_id"], oid, "list", c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0], list_id=lid, obj=lid)  # 2.361.2 (#2923): obj
-    for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
+    # 2.352.0 F (#2748, review N4): a row only through the old workspace's folders ends with the move (grp_sync below)
+    for (uid,) in c.execute("""SELECT user_id FROM list_members WHERE list_id=? AND NOT (frole IS NOT NULL AND own_role IS NULL
+                               AND grole IS NULL) ORDER BY user_id""", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    from ..lists.groups import grp_sync
+    grp_sync(c, [lid])  # 2.352.0 A (#2748): its node into the new workspace's projects tree, the old folders' roles end
     # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
     from ..team.clients import _org_boundary
+    list_space_follow(c, lid, lr["org_id"], _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
     if _org_boundary(c):
         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
@@ -486,6 +505,25 @@ def list_org_set(c, lid, v):
     # (only this list's files, after the request)
     oc_settle_kick([lid])
     return True
+
+
+def list_space_follow(c, lid, old_org, boundary):
+    """2.401.0 (#2924): list lid just changed its workspace (from old_org): its tasks' customer reports and bells that lived in
+    the old space go along (lists/lmove.py); boundary = team/clients.py _org_boundary: a report's client of another workspace
+    is unbound then. Returns the number of reports moved. The caller commits."""
+    l = c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not l or (l["org_id"] or None) == (old_org or None):
+        return 0
+    oid, owner = l["org_id"] or None, None if l["org_id"] else l["owner_id"]
+    n = c.execute("""UPDATE portal_tickets SET org_id=?, owner_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND org_id IS NOT DISTINCT FROM ?""", (oid, owner, lid, old_org or None)).rowcount
+    if n and boundary:  # a client of another workspace is no client of the report there (tenancy portal_client)
+        c.execute("""UPDATE portal_tickets SET client_id=NULL WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND client_id IS NOT NULL AND client_id NOT IN (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)""",
+                  (lid, oid))
+    c.execute("""UPDATE task_bell SET org_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                 AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
+    return n
 
 
 def ws_default_org(c, uid, folder=""):
@@ -1017,6 +1055,7 @@ def org_mine_dict(c, r, uid):
             "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
             "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
+            "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],  # 2.409.0 (#3490): areas its admins switched off
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1072,6 +1111,9 @@ def org_mine_update(oid):
                 from ..assistant.web import asst_comments_notice
                 asst_comments_notice(c, oid, me())
             c.execute(f"UPDATE orgs SET {k}=? WHERE id=?", (int(b[k]), oid))
+    if "areas_off" in b:  # 2.409.0 (#3490): the areas switched off for every member (admins only); nothing is deleted
+        from .wsareas import wsa_clean_org
+        c.execute("UPDATE orgs SET areas_off=? WHERE id=?", (wsa_clean_org(b["areas_off"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()
@@ -1208,7 +1250,7 @@ def org_leave(c, oid, uid, heir):
     of the organisation (members and the agents it owns there stay with the lists), their personal agents of that workspace
     become private. The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
-    n = 0
+    n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if heir and heir != uid:
             owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
@@ -1220,6 +1262,7 @@ def org_leave(c, oid, uid, heir):
             continue
         else:
             c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
+            priv.append(lr["id"])
             c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lr["id"],))  # 2.172.1 (#2689)
             from ..admin.orgcrypt_cli import oc_settle_kick
             oc_settle_kick([lr["id"]])  # 2.64.0 (#1864): its files get the owner's account key
@@ -1227,6 +1270,9 @@ def org_leave(c, oid, uid, heir):
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+    if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
+        from ..lists.groups import grp_sync
+        grp_sync(c, priv)
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     from ..contacts.orgbooks import obk_leave
