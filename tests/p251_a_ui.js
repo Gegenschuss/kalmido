@@ -111,7 +111,7 @@ const today = TC.today();
     const pp = await agent(ag.token, 'POST', '/payment-suggestions', {invoice_id: inv.doc.id, amount: '200.00', date: today, reference: 'Musterfirma Abschlag', confidence: 'high'});
     check(pp.http === 201, '#1350: a payment suggestion ' + pp.http);
     await nav(B + 'static/icon.svg');
-    await nav(B + '#office/offers');
+    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('.ofdkinds [data-kind="invoice"]')`, 80);
     await ev(`(() => { document.querySelector('.ofdkinds [data-kind="invoice"]').click(); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.oa_pp li').length === 1 && /Musterfirma Abschlag/.test(document.querySelector('.oa_pp').textContent)`, 80), '#1350: "Suggested payments" above the invoices');

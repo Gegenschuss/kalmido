@@ -143,13 +143,13 @@ const PH = {mobile: true};  // a phone for jsdom
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('#side [data-ofm="offers"]'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row; 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the points sit in the panel #side
   const tab1 = d.querySelector('#side [data-go="office/offers"]');  // 2.152.2 (#2617): the office points sit in the panel #side
-  check(/^\s*Quotes & invoices\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotes & invoices": ' + (tab1?.textContent || ''));
+  check(/^\s*Quotations\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotations" (2.380.0 #3409: was "Quotes & invoices"): ' + (tab1?.textContent || ''));
   check(!d.querySelector('.office .ofchead h2'), '#1637: no second "Office & finance" heading above the tabs');
   await until(() => d.querySelector('.office .ofdbar'), 60);
   await sleep(300);
   check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty.eact [data-ofd="new"]'), '#1637: the empty list has exactly one "New quotation", the big one in the empty state');
-  check(!d.querySelector('.office .empty.eact [data-ofd="new"] ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text');
-  d.querySelector('.office .ofdkinds [data-kind="invoice"]').click(); await sleep(400);
+  check(!d.querySelector('.office .empty.eact .tri-split ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text (2.380.0 #3418: with its menu beside it)');
+  w.eval(`go('office/invoices')`); await until(() => d.querySelector('.office .ofdkinds [data-kind="invoice"]'), 60);  // 2.380.0 (#3409): the invoices' own area
   check(!!d.querySelector('.office .ofdbar'), '#1637: the other kinds keep their bar');
   w.close();
 

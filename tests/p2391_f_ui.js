@@ -73,7 +73,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntraile
   w.close();
 
   // ================= the documents tab: kind "Archive"
-  w = await boot({hash: 'office/offers'}); d = w.document;
+  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the archived invoice is in the invoices' area
   await until(() => d.querySelector('.ofdkinds [data-kind="archive"]'), 60);
   d.querySelector('.ofdkinds [data-kind="archive"]').click();
   await until(() => d.querySelector('.ofdlist a.ofdrow'), 60);
