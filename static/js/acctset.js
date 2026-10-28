@@ -860,22 +860,46 @@ async function odlDelete(o) {
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
     return false;
   }
+  // 2.361.0 (#2920): the members were told a day: the deletion waits until then (or is called off, they are told again)
+  if (j.notice && j.notice > day0) {
+    if (await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('The members were told that it is deleted on {0}. It can be deleted from that day on.', fmtDate(j.notice)), {ok: tr('Call off the deletion'), cancel: tr('Close')})) {
+      try { await api('DELETE', `/api/admin/orgs/${o.id}/delete-notice`); toast(tr('The deletion was called off. The members were told.')); } catch { /* api() showed it */ }
+    }
+    return false;
+  }
+  const mem = olvMemHtml(j);
   const retire = !!j.retain_until && !j.kept_until, content = [odlCounts(j.content), j.more_text].filter(Boolean).join(', ');  // 2.272.0 D (#3029): + the rest (catalogue)
   // 2.146.0 D (#2468): records to keep and nothing retires it (the hosted instance keeps nothing): the retention step first
   let rx = '';
   // 2.186.0 A (#2599): after the period of a retired organisation (state expired) it goes without the export step
   if (!retire) { const ri = await api('GET', `/api/retention/org/${o.id}`).catch(() => null); if (ri?.needed && !ri.state && !(rx = await rxAsk(ri, o.name))) return false; }
   const rxq = rx ? 'retention=' + rx : '';
-  if (!retire && !content) {
+  if (!retire && !content && !mem) {
     if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no projects. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) return false;
     try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
     toast(tr('Deleted')); return true;
   }
   const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it goes for good after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
-    + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + exp;
-  if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => oxDraw(md)})) return false;
+    + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + mem + exp;
+  if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => { oxDraw(md); olvNoticeWire(md, o); }})) return false;
   try { await api('DELETE', `/api/admin/orgs/${o.id}?confirm=1${rxq ? '&' + rxq : ''}`); } catch { return false; }
   toast(retire ? tr('Retired: kept until {0}', fmtDate(j.retain_until)) : tr('Deleted')); return true;
+}
+// 2.361.0 (#2920): whose content goes with the organisation (per member) and the offer to tell them first (News with the day)
+function olvMemHtml(j) {
+  const mem = (j.members || []).filter(x => x.id !== S.me?.id);
+  if (!mem.length) return '';
+  return `<div class="shint keep warn odlmembers">${ic('alert', 's')} ${esc(tr('Of its members, this goes along:'))}</div>`
+    + mem.map(x => `<div class="shint keep odlmember">${esc(x.name + ': ' + x.text)}</div>`).join('')
+    + (j.notice ? `<div class="shint">${esc(tr('The members were told that it is deleted on {0}.', fmtDate(j.notice)))}</div>`
+      : `<div class="shint">${esc(tr('Tell them first: each gets a News item with the day and what of theirs is in it, and the deletion waits {0} days.', 14))}</div>`
+      + `<div class="odlnotice"><button type="button" class="btn" data-odlnotice>${esc(tr('Tell the members'))}</button></div>`);
+}
+function olvNoticeWire(md, o) {
+  $('[data-odlnotice]', md)?.addEventListener('click', async () => {
+    try { const r = await api('POST', `/api/admin/orgs/${o.id}/delete-notice`, {days: 14}); toast(tr('The members were told: deleted on {0}.', fmtDate(r.notice))); } catch { return; }
+    md.remove();
+  });
 }
 // the account's delete dialog: its personal office (deleted with its files, or retired by law), agents, organisation
 // calendars, time entries and direct messages

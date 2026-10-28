@@ -54,7 +54,7 @@ def ws_param(c, raw, uid, manage=False):
     if manage:
         from ..accounts.orgs import is_org_admin
         if not is_org_admin(c, uid, oid):
-            raise Denied(403, tr("Only admins of the organisation can change this"))
+            raise Denied(403, tr("Only admins of this workspace can change this"))
     return oid, S.doc_ws(oid, uid)
 
 

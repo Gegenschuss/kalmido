@@ -49,7 +49,7 @@ function ab2_view() {
   // 2.96.0 D (#1941): the own personal area next to the organisations (the workspace switch on "Private" opens it)
   const areas = [...(d.personal ? [{id: d.personal, name: tr('Private|workspace')}] : []), ...d.orgs];
   return `<div class="dash wload ab2">${ab2_tabs('abs')}<div class="clhead"><h3 class="ab2mon">${esc(mon)}</h3><span class="spacer"></span>
-      ${areas.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Organisation'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+      ${areas.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Workspace'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="ab2-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="ab2-move" data-d="0">${tr('This month')}</button><button class="iconbtn" data-act="ab2-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <button class="btn sm pri" data-act="ab2-new">${ic('plus', 's')} ${tr('Enter an absence')}</button></div>
     <p class="muted">${tr('Only the person and the admins see the reason and the note.')}</p>
@@ -77,7 +77,7 @@ function ab2_sheet(it) {
     <div class="row ab2dates"><label>${tr('From')}${dateIn('ab2-from', st)}</label><label>${tr('To')}${dateIn('ab2-to', en)}</label></div>
     <div class="row" id="ab2-halfrow"><label for="ab2-half">${tr('Duration')}</label><select id="ab2-half"><option value="">${tr('Whole day')}</option><option value="am" ${it?.half_day === 'am' ? 'selected' : ''}>${tr('Half day (morning)')}</option><option value="pm" ${it?.half_day === 'pm' ? 'selected' : ''}>${tr('Half day (afternoon)')}</option></select></div>
     <div class="row"><label for="ab2-note">${tr('Note')}</label><input id="ab2-note" maxlength="500" value="${esc(it?.note || '')}" placeholder="${esc(tr('optional'))}"></div>
-    <div class="shint lhint keep">${tr('The team only sees that you are away. The kind and the note stay with you and the admins of the organisation.')}</div>
+    <div class="shint lhint keep">${tr('The team only sees that you are away. The kind and the note stay with you and the admins of the workspace.')}</div>
     ${lv_sheetHint()}
     <div class="foot">${it ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);
   md.classList.add('ab2md');

@@ -3731,6 +3731,12 @@ MIGRATIONS = [
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
     ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    # 2.361.0 (#2922): who moved a project from their private space into its organisation (accounts/orgs.py list_org_set);
+    # it goes back to that person's private space when they leave (org_leave). Older versions ignore it (the way back)
+    ("lists", "brought_by", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    # 2.361.0 (#2920): the day the members of an organisation were told it is deleted (accounts/orgleave.py; the deletion
+    # waits until then). Older versions ignore it (they delete at once, as before)
+    ("orgs", "delete_notice", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS delete_notice TEXT"),
     # 2.410.0 B (#3515): when a task came into its board column (section_at, set by the trigger kalmido_sec_at on every change of
     # section / list, lists/sections.py dw_setup; NULL = no known change: the board counts from created_at). The second step
     # takes the last section / list move of the history for the tasks from before. task_links.section_at = the same for a

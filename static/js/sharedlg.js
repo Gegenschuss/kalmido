@@ -39,7 +39,7 @@ function folderShareModal(f, opt = {}) {
     box.innerHTML = `<div class="mrow fshowner">${av(S.me?.id, S.me?.display_name || '')}<span class="n">${esc(S.me?.display_name || '')} ${tr('(me)')}</span><span class="muted">${tr('Owner')}</span></div>`
       + have.map(p => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, nm(p))}<span class="n"><span class="fpn">${esc(nm(p))}</span> <small class="muted">${tr('new projects too')}</small></span>${roleSel(`data-fprole="${p.user_id}"`, p.role, tr('Role of {0}', nm(p)))}<button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', nm(p)))}">${ic('x', 's')}</button></div>`).join('')
       + (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="fp-user" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, fws())}</select>${roleSel('id="fp-role"', 'edit')}<button class="btn sm" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`
-        : `<div class="muted mhint">${(users || []).filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`);
+        : `<div class="muted mhint">${(users || []).filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : noPeopleTxt()}</div>`);
   };
   const drawGroups = async () => {
     const box = $('#fsh-grp', md); if (!box) return;
@@ -154,7 +154,7 @@ function folderShareModal(f, opt = {}) {
     if (b.dataset.fshcopy) { try { await navigator.clipboard.writeText(b.dataset.fshcopy); toast(tr('Link copied')); } catch { toast(b.dataset.fshcopy); } return; }
     if (m === 'fsh-xfer') {
       const cand = (users || []).filter(u => !u.agent);
-      if (!cand.length) { toast(tr('No other users yet. An admin can add them in the settings.')); return; }
+      if (!cand.length) { toast(noPeopleTxt()); return; }
       menu(b, cand.map(u => ({label: u.display_name, icon: 'user', fn: async () => {
         if (!await askConfirm(tr('Transfer all your projects in “{0}” to {1}?', fDisp(f), u.display_name), tr('You stay in them as project admin. Each project can be handed back only by its new owner.'), {ok: tr('Transfer')})) return;
         try { const j = await api('POST', '/api/folders/owner', {folder: f, user_id: u.id}); await done(); drawOwn(); toast(j.skipped?.length ? `${trn('{0} project transferred', '{0} projects transferred', j.moved)} · ${j.skipped.map(x => `${x.name}: ${x.reason}`).join(' · ')}` : trn('{0} project transferred', '{0} projects transferred', j.moved)); } catch { /* said */ }

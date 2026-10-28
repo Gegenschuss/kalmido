@@ -49,7 +49,7 @@ KINDS = {
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
-    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
+    "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2361_a_texts_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail; 2.352.0 D: the shortened view of a private mail"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
@@ -505,6 +505,8 @@ ROUTES = {
     "GET /api/org-icon/{}/{}.png": "orgadmin", "POST /api/orgs/{}/icon": "orgadmin", "DELETE /api/orgs/{}/icon": "orgadmin",  # 2.87.9 (#1913)
     "DELETE /api/admin/orgs/{}": "orgadmin",
     "GET /api/admin/orgs/{}/delete-info": "orgadmin",  # 2.152.0 A (#2167)
+    "GET /api/orgs/{}/leave-info": "orgadmin", "POST /api/admin/orgs/{}/delete-notice": "orgadmin",  # 2.361.0 (#2920 / #2922)
+    "DELETE /api/admin/orgs/{}/delete-notice": "orgadmin",
     "DELETE /api/orgs/{}/export": "office",
     "DELETE /api/orgs/{}/lists/{}": "orgadmin", "DELETE /api/orgs/{}/lists/{}/icon": "orgadmin",
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
