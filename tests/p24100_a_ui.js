@@ -82,6 +82,8 @@ const OPTS = [{name: 'Planned'}, {name: 'Building'}, {name: 'Review'}, {name: 'P
     const wd = await ev(`(() => { const w = document.querySelector('#detail .cfstw'); const names = [...w.querySelectorAll('div[aria-hidden] > span')].map(s => s.textContent); return {stage: w.dataset.stage, names, cur: w.querySelectorAll('circle.c').length, done: w.querySelectorAll('circle.d').length, aria: w.getAttribute('aria-label'), wide: w.getBoundingClientRect().width > 200, sel: !!document.querySelector('#detail #cf-${FL.id}')}; })()`);
     check(wd && wd.stage === '3' && wd.names.join('|') === 'Planned|Building|Review|In main|Live' && wd.cur === 1 && wd.done === 2 && wd.wide && wd.sel,
       `#3514: the wide bar with a name under every stage, the select to change it stays ${JSON.stringify(wd)}`);
+    check(await ev(`(() => { const w = document.querySelector('#detail .cfstw'); return !w.closest('details:not([open])') && w.getClientRects().length > 0 && w.getBoundingClientRect().height > 20; })()`),
+      '#3514: the wide bar is seen at once (the fields stay outside "More details")');
     check(await ready(ev, `/^since /.test(document.querySelector('#detail .cfstw-m')?.textContent || '')`, 60), '#3514: "since …" from the last change of the field');
     if (SH) await shot('p24100a-detail-1280.png');
     // changing the value in the panel moves the bar
