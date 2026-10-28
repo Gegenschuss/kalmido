@@ -87,6 +87,10 @@ check(r.ok and r.json().get("id") == T[1], "#3353: GET /api/v1/tasks/APP-2 " + r
 check(key_get(FH, "app-2").json().get("id") == T[1], "#3353: a key in lower case finds it too")
 check(key_get(FH, "APP-99").status_code == 404 and key_get(FH, "APP-0x").status_code == 404, "#3353: an unknown key / no key: 404")
 check(key_get(GH_H, "APP-2").status_code == 404, "#3353: another person's token does not see it (404, no leak)")
+r = requests.get(V + "/tasks", headers=FH, params={"key": "APP-3"})
+check(r.ok and [x["id"] for x in r.json()["data"]] == [T[2]], "#3353: GET /api/v1/tasks?key=APP-3 " + r.text[:160])
+check(requests.get(V + "/tasks", headers=GH_H, params={"key": "APP-3"}).json().get("data") == [], "#3353: ?key= only lists tasks the token sees")
+check(requests.get(V + "/tasks", headers=FH, params={"key": "nokey"}).status_code == 400, "#3353: ?key= with no key: 400")
 r = requests.get(V + f"/lists/{P}", headers=FH)
 check(r.ok and r.json().get("ticket_key") == "APP", "#3353: API v1 list carries ticket_key")
 lt = requests.get(V + "/tasks", headers=FH, params={"list_id": P}).json()["data"]

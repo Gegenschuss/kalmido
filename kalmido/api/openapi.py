@@ -569,6 +569,7 @@ def openapi_spec():
                      q("created_by", "2.390.0: me or a user id"), q("reviewer", "2.390.0: me, none or a user id"),
                      q("review", "2.390.0: the review state", {"type": "string", "enum": ["pending", "approved", "changes", "none"]}),
                      q("q", "2.390.0: words in the title or notes (all of them, each as a word start)"),
+                     q("key", "2.390.0: the task with this ticket key (APP-12; a current or an old key)"),
                      q("sort", "2.390.0: priority, due, created, updated, title or manual; a leading - sorts descending (tasks "
                                "without a due date stay last). The cursor keeps the sort, pages stay stable with equal values",
                        {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)]}),

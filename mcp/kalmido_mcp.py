@@ -231,7 +231,7 @@ def t_list_tasks(api, a):
     if a.get("milestone_id"):
         q["milestone_id"] = a["milestone_id"]
     # 2.390.0 B (#3355): priority, column, sprint, creator, reviewer, review state, custom field values, text, sort
-    q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort")))
+    q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")))
     if a.get("priority"):
         q["priority"] = ",".join(a["priority"]) if isinstance(a["priority"], list) else a["priority"]
     for fid, v in (a.get("field_values") or {}).items():
@@ -545,6 +545,7 @@ TOOLS = [
                             "description": "2.390.0: {custom field id: value} of a project's fields (only its tasks): select = option "
                                            "id or name, text = contains, number, checkbox true / false"},
            "q": {"type": "string", "description": "2.390.0: words in the title or notes"},
+           "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}-[0-9]{1,9}$", "description": "2.390.0: the task with this ticket key (APP-12)"},
            "sort": {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)],
                     "description": "2.390.0: the order (default: oldest first); - = descending, no due date stays last"}}), t_list_tasks),
     ("get_milestone", "2.18.0: a milestone task (read-only): progress (done / total of its tasks), its tasks (open first), a burndown "

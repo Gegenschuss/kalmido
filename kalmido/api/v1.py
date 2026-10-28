@@ -925,7 +925,7 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
 
 
 # ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
-V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort")
+V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
 # sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
 V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
@@ -951,7 +951,7 @@ def v1_tasks_more(c, uid, a, where, args):
     sprint_id (id | current = the active sprint of the task's list | none = backlog), created_by (me | id), reviewer
     (me | none | id), review (pending | approved | changes | none), field_<id> (a custom field of a list you see: select =
     option id or name, text = contains, number, checkbox true / false, other types the stored value), q (words in title
-    or notes, the full-text index)."""
+    or notes, the full-text index), key (2.390.0: a ticket key APP-12, current or old)."""
     from ..tasks.ftsearch import fts_query, fts_terms
     if a.get("priority"):
         ps = _v1_multi(a, "priority")
@@ -975,6 +975,13 @@ def v1_tasks_more(c, uid, a, where, args):
             w, x = _v1_who(a, "sprint_id", None)
             where.append("sprint_id " + w)
             args += x
+    if a.get("key"):  # 2.390.0 (#3353): the task(s) with a ticket key "APP-12" (current or old); a bad key: 400
+        pair = tk_parse(a["key"])
+        if not pair:
+            raise BadInput(tr("Invalid value: {0}", "key"))
+        kids = tk_ids_ordered(c, pair)[:50] or [0]
+        where.append(f"id IN ({','.join('?' * len(kids))})")
+        args += kids
     if a.get("created_by"):
         w, x = _v1_who(a, "created_by", uid, none=False)
         where.append("created_by " + w)

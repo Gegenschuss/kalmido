@@ -333,8 +333,8 @@ had been made in the app. Webhooks fire too.
 (an id or `none`), `sprint_id` (an id, `current` = the active sprint of the task's project, `none` = backlog), `created_by`
 (`me` or a user id), `reviewer` (`me`, `none` or a user id), `review` (`pending`, `approved`, `changes`, `none`),
 `field_<id>=value` (a custom field of a project you see, only its tasks: `select` = option id or name, `text` = contains,
-`number`, `checkbox` `true` / `false`, other types the stored value), `q` (all words in title or notes, each as a word start)
-and `sort` (`priority`, `due`, `created`, `updated`, `title`, `manual`; a leading `-` = descending, tasks without a due date
+`number`, `checkbox` `true` / `false`, other types the stored value), `q` (all words in title or notes, each as a word start),
+`key` (a ticket key `APP-12`, current or old, see [Ticket keys](#ticket-keys)) and `sort` (`priority`, `due`, `created`, `updated`, `title`, `manual`; a leading `-` = descending, tasks without a due date
 stay last; ties by id). A `next_cursor` of a sorted page carries the sort value and the id, so pages stay stable with equal
 values; it only works with the same `sort`. Tasks carry `sprint_id`, `reviewer_id` and `review` (`null` = none);
 `POST` / `PATCH /tasks` take `sprint_id` (an open sprint of the same project) and `reviewer_id` (the checks of the review step,
