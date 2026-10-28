@@ -287,7 +287,7 @@ function palAll() {
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload & absences')], ['office', 'receipt', N_('Office & finance')]])
-    if (modOn(m) && !o3a_hid(m) && (m !== 'workload' || wlShown() /* 2.380.2 (#3407) */)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
+    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
   for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_icon(mg_area(id)), () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
@@ -352,7 +352,7 @@ function pg_dedupe(it) {
 // rights, country pack and switches are checked there), so a regrouped bar (package 2.276) needs no second list here
 function pg_officeItems(add) {
   if (S.me?.kid || !mg_on('office') || o3a_hid('office') || typeof ofm_items !== 'function') return;
-  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'invoices' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
+  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'offers' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
 }
 // 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
 function pg_actions(add) {
@@ -364,7 +364,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_newDialog('invoice')), {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)

@@ -67,8 +67,7 @@ const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
-  {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
-  {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
+  {key: 'offers', go: 'office/offers', icon: 'receipt', name: N_('Quotes & invoices'), group: 'sell', on: ofm_ofc},
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
   {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
   {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
@@ -142,7 +141,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
@@ -172,7 +171,7 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr(OFD.doc.kind === 'offer' ? 'Quotations' : 'Invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
+  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr('Quotes & invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }
@@ -386,10 +385,10 @@ const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_un
 function sbb_railHtml(hid) {
   const cur = sbb_area(), aw = sbb_aw();
   const btn = id => sbb_btnHtml(id, cur, hid, aw);
-  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml); with the panel hidden a small button on top
-  // of the bar brings it back
+  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml), at the bottom only Settings; with the panel
+  // hidden a small button on top of the bar brings it back
   const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
-  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu)
+  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div><div class="srfoot"><button type="button" class="srb sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}"${sbb_labelsOn() ? '' : ` aria-label="${esc(tr('Settings'))}"`}>${ic('gear')}<span class="srbn">${esc(tr('Settings'))}</span>${updDot() ? `<span class="srbd nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button></div>`;
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {
@@ -442,7 +441,7 @@ function sbb_barHtml() {
   // P4: without an organisation the switch shows the private space (its menu: Private + "Add a company")
   const cur = wsOn() ? wsCur() : 'private', nm = wsName(cur);
   const acct = S.me ? `<button type="button" class="kbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
-  return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span>${updDot() ? `<span class="kbupd" title="${esc(tr('Update available'))}"></span>` : ''}</button>`
+  return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span></button>`
     + `<button type="button" class="kbsrch" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${esc(tr('Search'))}</span></button>`
     + `<span class="kbend">${bellBtn()}${netDotHtml()}${acct}</span>`;
 }
@@ -463,8 +462,7 @@ function sbb_wsMenu(anchor) {
   const opts = [...all.filter(w => w.startsWith('org:')), ...all.filter(w => !w.startsWith('org:'))];  // the companies first (sketch)
   const set = cur.startsWith('org:') && typeof lmOrgPaneOn === 'function' && lmOrgPaneOn();
   const p = menu(anchor, [{head: tr('Switch to')}, ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, cls: 'kbwsi', title: wsName(ws), fn: () => { if (ws !== wsCur()) wsSet(ws); }})),
-    '-', {label: tr('Settings'), icon: 'gear', cls: 'kbws-settings', keys: 'g s', sub: updDot() ? tr('Update available') : '', fn: () => settingsModal()},  // 2.380.2 (#3400)
-    {label: tr('Add an organisation'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
+    '-', {label: tr('Add an organisation'), icon: 'plus', cls: 'kbws-add', fn: sbb_orgAdd},
     ...(set ? [{label: tr('Company settings'), icon: 'building', cls: 'kbws-set', fn: () => settingsModal('org')}] : [])]);
   // each company's own sign in place of the icon: its picture or symbol, else its initial on a tile
   opts.forEach((ws, i) => {

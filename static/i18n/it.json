@@ -14616,9 +14616,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nuova password revoca le tue password per app (CalDAV) e i tuoi token API; se servono, creane di nuovi in Impostazioni > Account (token API: Avanzate · per sviluppatori). Gli agenti mantengono i loro token.",
   "Please type your name without a link or web address.": "Inserisca il suo nome senza link né indirizzi web.",
   "Saved. {0} booking of someone else stays as it was": ["Salvato. {0} prenotazione di un'altra persona resta com'era", "Salvato. {0} prenotazioni di altre persone restano com'erano"],
-  "Trial document (SAMPLE)": "Documento di prova (MUSTER)",
-  "More ways to create": "Altri modi per creare",
-  "Archived quotations: {0}": "Preventivi archiviati: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Ancora nessun agente. Crea il tuo in Impostazioni > Agenti > Configura; poi comparirà qui.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "Nella tua area privata decidi tu. In un’organizzazione lo consentono i suoi admin (Impostazioni > Spazi di lavoro: «I membri possono avere agenti propri») o un admin del server per tutti (Admin > Agenti). Senza, manca «Crea agente» o l’agente non può passare a quell’organizzazione.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py come hook Stop e SubagentStop segnala token e costi, subagenti inclusi; i limiti per agente li impostano gli admin, per un agente personale anche il suo proprietario.",
@@ -14650,5 +14647,6 @@
   "{0} office document": ["{0} documento d'ufficio", "{0} documenti d'ufficio"],
   "{0} approval link": ["{0} link di approvazione", "{0} link di approvazione"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Resta nello spazio precedente e non è più collegato al progetto: {0}. Spostalo a parte se serve.",
-  "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"]
+  "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"],
+  "Quotations & invoices": "Preventivi e fatture"
 }

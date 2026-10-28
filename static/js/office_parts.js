@@ -188,7 +188,7 @@ function tpInvoiceDialog(d) {
       const mode = $('input[name="tp-mode"]:checked', md)?.value || cur;
       const j = await oil_post(d, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : ''});  // 2.269.0 D (#3046); 2.356.0 C (#3003): asks before a second invoice
       if (!j) return;
-      OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; TP.open = null; toast(tr('Invoice draft created')); go(`office/invoices/${j.id}`);
+      OFD.list = null; OFD.kind = 'invoice'; OFD.doc = j; TP.open = null; toast(tr('Invoice draft created')); go(`office/offers/${j.id}`);
     });
 }
 // the office settings: the preset for invoices from quotations with parts

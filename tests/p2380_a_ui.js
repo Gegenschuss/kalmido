@@ -47,12 +47,12 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= jsdom: the list with kind chips and state tags
   let w = await boot({hash: 'office/offers'}); let d = w.document;
-  await until(() => d.querySelector('.ofdkinds [data-kind="archive"]'), 60);
-  // 2.120.0 (#2089): + delivery notes; 2.380.0 (#3409): Quotations (+ Archive) and Invoices (+ credit notes, reminders, delivery notes, Archive) are two areas
-  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 2 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'quotations: two kind chips (quotations, archive), quotations first');
+  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
+  // 2.120.0 (#2089): + delivery notes -> six kinds
+  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 6 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'documents tab: six kind chips (2.39.1 #1182: + Archive, 2.120.0: + delivery notes), quotations first');
   check(d.querySelectorAll('.ofdlist .ofdrow').length === 1 && /Draft/.test(d.querySelector('.ofdlist .rotag')?.textContent || ''), 'quotation list as before');
-  w.eval(`go('office/invoices')`);  // 2.380.0 (#3409)
-  await until(() => d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 5 && d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
+  d.querySelector('.ofdkinds [data-kind="invoice"]').click();
+  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
   const rows = [...d.querySelectorAll('.ofdlist .ofdrow')];
   check(rows.length === 2 && d.querySelector('.ofdkinds [data-kind="invoice"]').getAttribute('aria-selected') === 'true', 'invoice chip lists the two invoices');
   const partial = rows.find(x => /RE-2026-001/.test(x.textContent));
