@@ -399,7 +399,7 @@ document.addEventListener('click', async e => {
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });
-document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; } });  // 2.12.2 (#453 B3): the draft survives any re-render
+document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; autosize(e.target); } });  // 2.380.2 (#3399): grows while typing  // 2.12.2 (#453 B3): the draft survives any re-render
 document.addEventListener('change', e => {
   if (e.target.id === 'pov-file') { const l = routeList(); if (l) povUpload(l, e.target.files); e.target.value = ''; }
 });

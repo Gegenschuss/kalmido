@@ -2937,6 +2937,10 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .povempty{font-size:var(--fs-m);padding:.25rem 0}
 .povmd{cursor:default;font-size:var(--fs-b)}
 #pov-desc-in{width:100%;min-height:10rem;font:inherit;font-size:var(--fs-b);line-height:1.5;resize:vertical}
+/* 2.380.2 (#3399): the description fills its widget (a taller widget = a taller field / text) and grows with its text */
+#pov-desc:not(.povs-empty){display:flex;flex-direction:column}
+#pov-desc > #pov-desc-in,#pov-desc > .povmd{flex:1 0 auto}
+#pov-desc > .povbar{flex:none}
 .povbar{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:var(--fs-s)}
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
