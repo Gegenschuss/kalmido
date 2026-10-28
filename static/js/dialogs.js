@@ -150,7 +150,7 @@ function modalSub(parent, open) {
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
 // 2.359.2 B (#3049): submit(value) = the write behind "OK": the dialog closes once it worked; false / an error keeps it open with its text
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after, submit}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after, submit = null}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
