@@ -16,6 +16,7 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_collab, collab_all, need_list
 from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lists import folder_under  # 2.411.0 (#3516)
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
@@ -280,7 +281,6 @@ def folder_ptype(c, owner, folder):
     eff = folder_effective(c, owner, folder)[0]
     if eff.get("ptype"):
         return eff["ptype"]
-    from ..lists.lists import folder_under
     from ..lists.templates import PTYPES
     ts = [r[1] or "" for r in c.execute("SELECT folder, ptype FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND family=''", (owner,))
           if folder_under(r[0] or "", folder)]
