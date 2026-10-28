@@ -174,6 +174,11 @@ check(r.ok and [(x["path"], x["text"]) for x in j["tasks"]] == [("Kunden/Nord/Pl
       "zeige: aufgaben = the open checkboxes (also in a quote; not done ones, not in code, none inside a line) " + r.text[:400])
 check(j["tasks"] and j["tasks"][0]["line"] == 7 and j["tasks"][0]["page_id"] == PA, "with their line and page " + str(j["tasks"][:1]))
 check(query(Fr, PQ, "show: tasks\nfolder: Notizen").json()["tasks"] == [], "no open checkbox: empty")
+PS = page(Fr, "private", "Notizen/Lang", "- [ ] a" + " " * 300_000 + "b\n- [ ]    \n- [ ] Ende   ")  # review: no slow regex on long blanks
+t0 = time.time()
+r = query(Fr, PQ, "show: tasks\nfolder: Notizen")
+check(r.ok and time.time() - t0 < 5 and [x["text"][:1] + str(len(x["text"])) for x in r.json()["tasks"]] == ["a300", "E4"],
+      f"a checkbox line with 300 000 blanks answers at once ({time.time() - t0:.1f} s), a blank one is none, trailing blanks cut " + r.text[:200])
 check(query(Fr, 0, "tag: projekt").status_code == 404 and query(Fr, 999999, "tag: projekt").status_code == 404, "no page / an unknown page: 404")
 
 # ================================================================ rights
@@ -195,7 +200,7 @@ r = query(Gi, P1, "tag: kunde")
 check(r.ok and len(r.json()["pages"]) == 1 and r.json()["pages"][0]["path"].endswith("Notes") and "Internal/" not in r.text and "Secret" not in r.text,
       "a guest through a folder share: only the shared pages, their paths from the share down " + r.text[:300])
 r = query(Gi, P1, "ordner: Internal")
-check(r.ok and "Secret plan" not in r.text, "and nothing outside the share by folder " + r.text[:300])
+check(r.ok and "Secret plan" not in r.text and r.json()["total"] == 0, "the folders above the share are not matched: ordner: Internal finds nothing (review) " + r.text[:300])
 
 # ================================================================ a space with the lock
 PL = page(Bo, SP, "Locked/Page", "#kunde")

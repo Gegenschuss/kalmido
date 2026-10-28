@@ -140,10 +140,10 @@ function wkq_sortKey(q, d) {
   return a == null || a === '' ? [1, ''] : [0, String(a).toLowerCase()];
 }
 const wkq_cmp = (x, y) => x < y ? -1 : x > y ? 1 : 0;
-const WKQ_TASK = /^[ \t]*(?:>[ \t]?)*[-*+][ \t]+\[ \][ \t]+(.+?)[ \t]*$/gm;
+const WKQ_TASK = /^[ \t]*(?:>[ \t]?)*[-*+][ \t]+\[ \][ \t]+(.+)$/gm;  // greedy + trimEnd (review: no lazy run before [ \t]*$)
 function wkq_tasks(text) {  // [[line, text]] of the open checkboxes, not in code blocks
   const t = String(text || '').replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm, m => '\n'.repeat((m.match(/\n/g) || []).length));
-  return [...t.matchAll(WKQ_TASK)].map(m => [t.slice(0, m.index).split('\n').length, m[1].slice(0, 300)]);
+  return [...t.matchAll(WKQ_TASK)].filter(m => m[1].trim()).map(m => [t.slice(0, m.index).split('\n').length, m[1].trimEnd().slice(0, 300)]);
 }
 // the query run here over pages with their texts ({id, path, attrs, body, updated_at, created_at}): the route's answer
 function wkq_run(q, pages, self) {

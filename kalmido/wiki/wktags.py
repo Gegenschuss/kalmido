@@ -51,7 +51,7 @@ _WKT_CUT = (re.compile(r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", re.S), 
             re.compile(r"\[\[[^\[\]\n]*\]\]"),                                                 # [[links]] (Page#Section)
             re.compile(r"\]\([^()\s]*\)"),                                                     # [label](address#anchor)
             re.compile(r"<[^<>\n]{1,500}>"))                                                   # html, <address>
-WKQ_TASK = re.compile(r"^[ \t]*(?:>[ \t]?)*[-*+][ \t]+\[ \][ \t]+(.+?)[ \t]*$", re.M)
+WKQ_TASK = re.compile(r"^[ \t]*(?:>[ \t]?)*[-*+][ \t]+\[ \][ \t]+(.+)$", re.M)  # 2.371 (review): greedy + rstrip, no lazy run before [ \t]*$
 _WKQ_FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?(?:^[ \t]*\1[ \t]*$|\Z)", re.S | re.M)
 WKQ_KEYS = {"tag": "tag", "tags": "tag", "ordner": "folder", "folder": "folder", "eigenschaft": "prop", "property": "prop",
             "zeige": "show", "show": "show", "sortiere": "sort", "sort": "sort", "grenze": "limit", "limit": "limit",
@@ -254,7 +254,7 @@ def wkq_sort_key(q, d):
 def wkq_tasks(text):
     """[(line number, text)] of the open checkboxes of a text (not in code blocks)."""
     t = _WKQ_FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), str(text or ""))
-    return [(t.count("\n", 0, m.start()) + 1, m.group(1)[:300]) for m in WKQ_TASK.finditer(t)]
+    return [(t.count("\n", 0, m.start()) + 1, m.group(1).rstrip()[:300]) for m in WKQ_TASK.finditer(t) if m.group(1).strip()]
 
 
 @app.get("/api/wiki/query")
@@ -284,13 +284,14 @@ def wkq_route():
                                      f"AND {wkf_visible_sql(c, uid)} ORDER BY lower(p.path) LIMIT {WIKI_INDEX_MAX}", a)
                 if not x["path"].lower().startswith(WIKI_TEMPLATES)]
         texts = {}
-    ds = [d for d in (wiki_dict(x, full=False) for x in rows if x["id"] != pid) if wkq_match(q, d["path"], d["attrs"])]
+    ds = [wiki_dict(x, full=False) for x in rows if x["id"] != pid]
     from .wkfolder import wkf_base, wkf_shared, wkf_shown_path
-    if wkf_base(c, uid, r) is None:  # read through a share: the paths from the share down (wiki_get)
-        info = wkf_shared(c, uid)
+    if wkf_base(c, uid, r) is None:  # read through a share: the paths from the share down (wiki_get), matched as shown (review:
+        info = wkf_shared(c, uid)    # "ordner:" must not tell the names of folders above the share)
         byid = {x["id"]: x for x in rows}
         for d in ds:
             d["path"] = wkf_shown_path(c, uid, byid[d["id"]], info)
+    ds = [d for d in ds if wkq_match(q, d["path"], d["attrs"])]
     ds.sort(key=lambda d: (wkq_sort_key(q, d), d["path"].lower()), reverse=q["desc"])
     if q["desc"]:  # pages without the sort key stay at the end
         ds.sort(key=lambda d: wkq_sort_key(q, d)[0])
