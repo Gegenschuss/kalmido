@@ -76,8 +76,8 @@ r = A.post(B + "/api/files/move-space", json={"ids": [FO], "to": "private", "dry
 j = r.json() if r.ok else {}
 notes = " | ".join(j.get("notes") or [])
 check(r.ok and j.get("links") == 1 and "external link ends" in notes, f"#2935: the dry run names the external link that ends {j}")
-check(j.get("requests") == 2 and "1 file request goes along" in notes and "1 file request of another person ends" in notes,
-      f"#2935: the dry run names the file requests (alice's goes along, bob's ends) {notes}")
+check(j.get("requests") == 2 and "1 file request goes along" in notes and "1 file request of another person keeps working only if" in notes,  # 2.361.4 review: honest wording (frq_alive decides)
+      f"#2935: the dry run names the file requests (alice's goes along, bob's only with edit rights there) {notes}")
 check(len(kt.dbx("SELECT 1 FROM fs_ext_links WHERE node_id=?", (FI,))) == 1, "#2935: the dry run changes nothing")
 
 r = A.post(B + "/api/files/move-space", json={"ids": [FO], "to": "private"})

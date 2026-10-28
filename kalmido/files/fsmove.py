@@ -273,14 +273,13 @@ def fsm_plan(c, uid, b, to, dry, office=False):
                              "{0} external links end (people outside Kalmido can no longer open them)", links))
         frq = [r[0] for r in c.execute(f"""SELECT created_by FROM fs_upload_requests WHERE node_id IN ({q})
                                           AND deleted_at IS NULL AND revoked_at IS NULL""", big)]
-        keep = sum(1 for w in frq if w == uid or (to and c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?",
-                                                                    (to, w)).fetchone()))
+        keep = sum(1 for w in frq if w == uid)  # review: another person's request lives on only with edit rights there (frq_alive)
         if keep:
             notes.append(trn("{0} file request goes along: its upload link keeps working",
                              "{0} file requests go along: their upload links keep working", keep))
         if len(frq) > keep:
-            notes.append(trn("{0} file request of another person ends (they have no access in the target)",
-                             "{0} file requests of other people end (they have no access in the target)", len(frq) - keep))
+            notes.append(trn("{0} file request of another person keeps working only if they can still edit the folder there",
+                             "{0} file requests of other people keep working only if they can still edit the folder there", len(frq) - keep))
         plan.update(links=links, requests=len(frq))
         notes.append(oo_into_note(c, src, to))  # 2.361.2 (#2923): the way back (empty unless a member moves it in)
         lost = sum(1 for r in c.execute(f"SELECT list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", big)

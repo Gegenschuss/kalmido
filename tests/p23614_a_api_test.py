@@ -101,5 +101,14 @@ check(news and news[0]["data"]["level"] == "hard", f"#2928: the owner hears that
 r = F.patch(B + f"/api/my/agents/{FA}", json={"limits": None})
 check(r.ok and not r.json().get("limits"), f"#2928: and removes it again {r.status_code} {r.text[:160]}")
 check(Bo.patch(B + f"/api/my/agents/{FA}", json={"limits": None}).status_code == 404, "#2928: nobody else sets them")
+# review 2.361.4: the owner's log names only her agent (never the other agents of the server)
+j = F.get(B + f"/api/my/agents/{FA}/audit").json()
+check([x["id"] for x in j.get("agents", [])] == [FA], f"#2928: the owner's log lists only her own agent {j.get('agents')}")
+# review 2.361.4: the server admin's limits for personal agents stay a ceiling for the owner
+A.put(B + "/api/admin/agent-policy", json={"limits": {"period": "month", "metric": "tokens", "hard": 5000}})
+check(F.patch(B + f"/api/my/agents/{FA}", json={"limits": None}).status_code == 400, "#2928: with a server limit the owner cannot remove hers")
+check(F.patch(B + f"/api/my/agents/{FA}", json={"limits": {"period": "month", "metric": "tokens", "hard": 9000}}).status_code == 400, "#2928: ... nor go above it")
+r = F.patch(B + f"/api/my/agents/{FA}", json={"limits": {"period": "month", "metric": "tokens", "hard": 4000}})
+check(r.ok and (r.json().get("limits") or {}).get("hard") == 4000, f"#2928: ... but set a lower one {r.status_code} {r.text[:160]}")
 
 sys.exit(done("p23614_a_api"))

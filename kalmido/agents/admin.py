@@ -618,6 +618,19 @@ def admin_agent_policy_put():
     return jsonify(agent_policy(c))
 
 
+def _own_limits_capped(cap, lim):
+    """2.361.4 (#2928, review): the server admin's limits for personal agents (user_agents_limits) stay a ceiling: the owner
+    may only set the same period and measure with values at or below them. BadInput otherwise."""
+    if not cap or not (cap.get("soft") is not None or cap.get("hard") is not None):
+        return
+    bad = BadInput(tr("The server sets a usage limit for personal agents: yours can only be lower (same period and measure)"))
+    if not lim or lim.get("period") != cap.get("period") or lim.get("metric") != cap.get("metric"):
+        raise bad
+    for k in ("soft", "hard"):
+        if cap.get(k) is not None and (lim.get(k) is None or lim[k] > cap[k]):
+            raise bad
+
+
 def need_own_agent(c, aid):
     """A personal agent of the current person (404 otherwise)."""
     a = agent_row(c, aid)
@@ -737,6 +750,7 @@ def my_agent_update(aid):
     if "limits" in b:
         try:
             lim = usage_limits_clean(b["limits"])
+            _own_limits_capped(agent_policy(c)["limits"], json.loads(lim) if lim else None)
         except BadInput:
             c.rollback()
             raise

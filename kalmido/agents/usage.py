@@ -600,11 +600,14 @@ def admin_agents_audit(aid=None):
     return _audit_answer(aid)
 
 
-def _audit_answer(aid):
+def _audit_answer(aid, own=False):
+    """own: the owner's view of one personal agent -- only that agent's name (review 2.361.4: never the server's agent list)."""
     c = db()
     csv_out = request.args.get("format") == "csv"
     rows, more = audit_query(c, request.args, aid, csv_out)
     names = audit_names(c)
+    if own:
+        names = {aid: names.get(aid, f"#{aid}")}
     if csv_out:
         return audit_csv(rows, names, aid or request.args.get("agent_id"))
     data = [audit_dict(r, names) for r in rows]
@@ -641,7 +644,7 @@ def _audit_answer(aid):
 def my_agent_audit(aid):
     """2.361.4 (#2928): the owner reads the log of their personal agent (the same filters and answer as the admins' route)."""
     need_own_agent(db(), aid)
-    return _audit_answer(aid)
+    return _audit_answer(aid, own=True)
 
 
 @app.get("/api/v1/admin/agents/<int:aid>/audit")
