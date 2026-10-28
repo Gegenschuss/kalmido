@@ -21,7 +21,7 @@ const until = async (fn, n = 140) => { for (let i = 0; i < n; i++) { const x = a
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Example Org', lang: 'en', collab_all: true, modules: ['agents', 'comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,kanban'});
   const ORG = (await call('GET', '/api/state')).me.workspaces[0]?.id;
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});
   AT = ag.token;
@@ -36,6 +36,7 @@ const until = async (fn, n = 140) => { for (let i = 0; i < n; i++) { const x = a
   const w = await boot({user: 'alice', hash: 'l/' + W}), d = w.document;
   const row = id => d.querySelector(`#view .trow[data-id="${id}"]`);
   await until(() => row(TL));
+  await until(() => w.eval('!!S.lpA && !S.lpUnk && S.lpPend.size === 0'));  // the first poll (it loads the whole state once) is over
   w.__noReload = 1;
   const n0 = w.eval('S.lpN.state');
 

@@ -60,10 +60,12 @@ OT, ot = agent("otto")      # only reads the list
 NO, no = agent("nora")      # not in the list at all
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"}).ok, "setup: claude edits the list")
-check(A.put(B + f"/api/lists/{W}/members", json={"user_id": OT, "role": "view"}).ok, "setup: otto only views the list")
+WR = A.post(B + "/api/lists", json={"name": "Read only", "org_id": ORG}).json()["id"]  # one agent per list: otto only views this one
+check(A.put(B + f"/api/lists/{WR}/members", json={"user_id": OT, "role": "view"}).ok, "setup: otto only views the list")
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob in the list")
 T = A.post(B + "/api/tasks", json={"title": "Board columns", "list_id": W}).json()["id"]
 T2 = A.post(B + "/api/tasks", json={"title": "Second task", "list_id": W}).json()["id"]
+TR = A.post(B + "/api/tasks", json={"title": "Read only task", "list_id": WR}).json()["id"]
 
 
 def state_task(s, tid):
@@ -122,7 +124,9 @@ check(cl.post(path(), json={"text": 5}).status_code == 400, "#3513: text must be
 check(cl.delete(path() + "?state=lost").status_code == 400, "#3513: DELETE with an unknown state: 400")
 
 # ================================================================== rights and the workspace boundary
-check(ot.post(path(), json={"text": "I only read"}).status_code == 403, "#3513: an agent that only reads the list: 403")
+check(ot.get(path(TR)).status_code == 200, "#3513: an agent that only reads the list sees the task (GET)")
+check(ot.post(path(TR), json={"text": "I only read"}).status_code == 403, "#3513: ... but cannot mark it: 403")
+check(not wk(A, TR), "#3513: ... nothing shows")
 check(no.post(path(), json={"text": "Not mine"}).status_code == 404, "#3513: an agent the list is not shared with: 404")
 check(no.get(path()).status_code == 404, "#3513: ... GET too")
 check(A.post(path(), json={"text": "a person"}).status_code in (401, 403), "#3513: a person's session is no agent")
@@ -164,6 +168,7 @@ check(cl.delete(path() + "?state=failed").ok and kt.dbx("SELECT state FROM agent
 ja = cl.post(V + "/agent/jobs", json={"title": "Part A", "task_id": T}).json()["id"]
 jb = cl.post(V + "/agent/jobs", json={"title": "Part B", "task_id": T}).json()["id"]
 check((wk(A, T) or {}).get("agent_id") == CL, "#3513: a plain running job with task_id shows the same way")
+kt.dbx("UPDATE agent_jobs SET updated_at=? WHERE id IN (?, ?)", ((datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(timespec="seconds"), ja, jb))
 r = cl.patch(path(), json={"text": "line of A", "job_id": ja})
 check(r.ok and r.json()["job"]["id"] == ja, f"#3513: job_id picks that job {r.status_code} {r.text[:160]}")
 logs = {x[0]: x[1] for x in kt.dbx("SELECT id, log FROM agent_jobs WHERE id IN (?, ?)", (ja, jb))}
