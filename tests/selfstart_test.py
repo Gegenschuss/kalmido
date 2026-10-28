@@ -70,7 +70,12 @@ class Scan:
         self.js = js
         self.start = JS_START2 if js else PY_START
         self.cut = (lambda x: x.split("//")[0].rstrip()) if js else (lambda x: x.split("#")[0].rstrip())
-        self.x = [self.cut(x) if not (x.strip().startswith(("//", "*", "/*")) and js) else "" for _, x in lines]
+        self.x, inside = [], False
+        for _, x in lines:
+            if js and (inside or x.strip().startswith("/*")):  # a block comment (a start.sh line in it is no call)
+                inside = "*/" not in x
+                x = ""
+            self.x.append(self.cut(x))
         self.defs, self.foreign, self.mods = {}, set(), set()
         for i, x in enumerate(self.x):
             m = (JS_DEF if js else PY_DEF).match(x)
