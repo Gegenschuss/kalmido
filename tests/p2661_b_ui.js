@@ -161,7 +161,9 @@ function scan() {
 
   const w = await boot({user: 'alice', hash: 'docs'}); const d = w.document;
   const view = () => d.querySelector('#view')?.textContent || '';
-  const sw = async ws => { w.eval(`wsSet(${JSON.stringify(ws)})`); await sleep(50); };
+  // 2.397.0 (#3404): a workspace now brings back the view it was left in; this suite checks the data of the SAME view after
+  // the switch, so each switch is a first visit (no kept view: the page stays and loads the new workspace's data)
+  const sw = async ws => { w.eval(`LS.del('wsView'); wsSet(${JSON.stringify(ws)})`); await sleep(50); };
   const has = (yes, no) => () => { const v = view(); return yes.every(x => v.includes(x)) && no.every(x => !v.includes(x)); };
 
   // ================= documents
