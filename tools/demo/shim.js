@@ -1333,7 +1333,7 @@
   on('PUT', '/api/team/leave/quota', (q, b) => { const year = +b.year, m = MD().quota = MD().quota || {};
     if (b.days === null || b.days === '' || b.days === undefined) delete m[year]; else m[year] = {days: +b.days || 0, carry: +b.carry || 0};
     return {org_id: null, user_id: 1, year, quota: m[year] || null}; });
-  on('PUT', '/api/team/leave/approval', () => bad(tx('Only admins of the organisation can change this')));
+  on('PUT', '/api/team/leave/approval', () => bad(tx('Only admins of this workspace can change this')));
   on('PUT', '/api/team/leave/worktime/(\\d+)', (q, b) => { if ('workdays' in b) MD().workdays = Array.isArray(b.workdays) ? b.workdays.join(',') : String(b.workdays || '');
     if ('hours' in b) MD().capacity_h = b.hours === null ? '' : String(b.hours); return {id: 1, workdays: wtDays(), capacity_h: capH(), capacity_set: !!MD().capacity_h}; });
   on('POST', '/api/team/absences/(\\d+)/decide', (q, b, id) => absOut(mfind('absences', id)));
@@ -1345,7 +1345,7 @@
   on('POST', '/api/time/sheets', (q, b) => { const m = b.month, s = MD().sheets = MD().sheets || {};
     if (!/^\d{4}-\d\d$/.test(m || '')) bad(tx('Invalid value: {0}').replace('{0}', 'month'));
     if (b.action === 'close') s[m] = {state: 'closed', closed_at: iso()}; else delete s[m]; return {ok: true, month: m, sheet: tslOut(m)}; });
-  on('POST', '/api/time/sheets/decide', () => bad(tx('Only admins of the organisation can change this')));
+  on('POST', '/api/time/sheets/decide', () => bad(tx('Only admins of this workspace can change this')));
   // disposition (kalmido/hub/dispo.py): the person, the contacts and the office's equipment as resources
   const dpRes = () => ({people: [{kind: 'user', id: 1, name: DB.me.display_name, avatar: ''}], contacts: liveCt().slice(0, 50).map(c => ({kind: 'contact', id: c.id, name: ctFn(c)})),
     equipment: mcol('of_equipment').filter(x => !x.deleted_at && !x.archived).map(x => ({kind: 'equipment', id: x.id, name: x.name, category: x.category || ''})),

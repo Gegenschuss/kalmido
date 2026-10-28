@@ -1534,7 +1534,7 @@ def inv_payment_delete(did, pid):
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if not _ofr_pay(c, uid, oid):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     b = body()
     note = b.get("note") if isinstance(b, dict) and isinstance(b.get("note"), str) else ""
     inv_pay_del(c, oid, did, pid, note=note, uid=uid)
@@ -1731,7 +1731,7 @@ def fd_fee_post(did):
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if not _ofr_pay(c, uid, oid):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:
         raise Denied(409, tr("Only the fee of a finalised reminder can be waived or marked as paid"))

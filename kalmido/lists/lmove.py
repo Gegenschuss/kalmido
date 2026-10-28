@@ -9,7 +9,7 @@ boundary, the opening to the organisation), what goes along (customer reports) a
 tables, video reviews, office documents and deals, approval links, receipts: each has its own move). The move itself stays
 PATCH /api/lists/<id> {org_id}.
 
-accounts/orgs.py list_space_follow runs inside every workspace change of a list (list_org_set, folder_apply): the customer
+accounts/orgs.py list_space_follow runs inside every workspace change of a list (list_org_set, folder_apply, ol_private): the customer
 reports (portal_tickets, pt_find reads them only in the space of their task's list) and the task bells (task_bell, ignored in
 another workspace) of its tasks go along; a report's client of another workspace is unbound (lmm keeps it for the way back).
 """

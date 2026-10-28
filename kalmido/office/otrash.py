@@ -134,7 +134,7 @@ def otb_tick(c, cut, purge):
 def _ctx_admin():
     c, uid, oid = office_ctx()
     if office_role(c, uid, oid) != "admin" and not ofr_admin_or(c, uid, oid, "offers", "manage"):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     return c, uid, oid
 
 
@@ -144,7 +144,7 @@ def _need_kind(c, uid, oid, tid):
     if not r:
         raise Denied(404)
     if r["kind"] != "doc" and office_role(c, uid, oid) != "admin":
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
 
 
 @app.get("/api/office/trash")

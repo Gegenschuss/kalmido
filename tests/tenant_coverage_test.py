@@ -699,6 +699,8 @@ ROUTES = {
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
     "GET /api/admin/orgs/{}/delete-info": "org",  # 2.152.0 A (#2167): numbers for the delete dialog (instance admin)
+    "GET /api/orgs/{}/leave-info": "org",  # 2.361.0 (#2922): the leave preview (the member / an admin of it)
+    "POST /api/admin/orgs/{}/delete-notice": "org", "DELETE /api/admin/orgs/{}/delete-notice": "org",  # 2.361.0 (#2920): instance admin
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
     # 2.115.0 B (#2062): an organisation's invitations by e-mail (p2115_b_api_test.py: other organisation 404, member 403)
     "GET /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites": "org", "POST /api/orgs/{}/invites/{}/resend": "org",

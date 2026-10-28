@@ -261,7 +261,7 @@ def lv_set_quota():
     b = body()
     oid = _area(c, uid, b.get("org"))
     if not abs_admin(c, uid, oid):
-        raise Denied(403, tr("Only admins of the organisation can change this"))
+        raise Denied(403, tr("Only admins of this workspace can change this"))
     try:
         who, year = int(b.get("user_id") or uid), int(b.get("year") or 0)
     except (TypeError, ValueError):
@@ -290,7 +290,7 @@ def lv_set_approval():
     oid = _area(c, uid, b.get("org"))
     from ..accounts.orgs import is_org_admin
     if not is_org_admin(c, uid, oid):
-        raise Denied(403, tr("Only admins of the organisation can change this"))
+        raise Denied(403, tr("Only admins of this workspace can change this"))
     on = 1 if b.get("on") else 0
     with system_ctx(c):  # the organisation's own row (orgs is structure); the admin right is checked above
         c.execute("UPDATE orgs SET hub_leave_approval=? WHERE id=? AND personal_of IS NULL", (on, oid))
@@ -308,7 +308,7 @@ def lv_set_worktime(who):
     oid = _area(c, uid, b.get("org"))
     if who != uid:
         if not abs_admin(c, uid, oid):
-            raise Denied(403, tr("Only admins of the organisation can change this"))
+            raise Denied(403, tr("Only admins of this workspace can change this"))
         _member(c, oid, who)
     from ..accounts.settings import clean_setting
     if "workdays" in b:
@@ -331,7 +331,7 @@ def lv_decide(aid):
     if r["deleted_at"]:
         raise Denied(404)
     if not abs_admin(c, uid, r["org_id"]):
-        raise Denied(403, tr("Only admins of the organisation can decide on vacation requests"))
+        raise Denied(403, tr("Only admins of this workspace can decide on vacation requests"))
     b = body()
     act = b.get("action")
     if act not in ("approve", "reject", "reopen"):

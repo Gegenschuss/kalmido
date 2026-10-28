@@ -3750,6 +3750,12 @@ MIGRATIONS = [
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
     ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    # 2.361.0 (#2922): who moved a project from their private space into its organisation (accounts/orgs.py list_org_set);
+    # it goes back to that person's private space when they leave (org_leave). Older versions ignore it (the way back)
+    ("lists", "brought_by", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    # 2.361.0 (#2920): the day the members of an organisation were told it is deleted (accounts/orgleave.py; the deletion
+    # waits until then). Older versions ignore it (they delete at once, as before)
+    ("orgs", "delete_notice", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS delete_notice TEXT"),
     # 2.390.0 (#3353): readable ticket keys APP-123. lists.ticket_key = the project's key (2-6 capitals / digits, a letter
     # first, unique per workspace; NULL = none, as before), tasks.ticket_no = the running number of the task in its project
     # (set by the trigger TICKET_NO_TRIGGER on insert / move), git_conns.hash_ids = a repository of a project with a key still

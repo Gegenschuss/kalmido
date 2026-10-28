@@ -52,7 +52,7 @@ function pdHtml() {
   const body = d.sections.map(s => `<section class="pd-sec" aria-labelledby="pd-s${esc(s.no)}"><h3 class="pd-st" id="pd-s${esc(s.no)}"><span class="pd-no">${esc(s.no)}</span>${esc(s.title)}</h3>${s.fields.map(pdField).join('')}</section>`).join('');
   const foot = pdEdit() ? `<div class="pd-foot"><button type="button" class="btn pri" data-pd="save"${PD.busy ? ' disabled' : ''}>${ic('check', 's')}<span>${tr('Save new version')}</span></button>
     <span class="muted ofchint">${tr('Every save keeps the previous versions readable.')}</span></div>`
-    : !PD.view && !d.can_edit ? `<p class="muted ofchint">${tr('Only an admin of this organisation can do this')}</p>` : '';
+    : !PD.view && !d.can_edit ? `<p class="muted ofchint">${tr('Only an admin of this workspace can do this')}</p>` : '';
   return head + body + foot;
 }
 

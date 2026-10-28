@@ -272,7 +272,7 @@ def tbill_release_post(did):
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     if not ofr_admin_or(c, uid, oid, "time", "edit"):  # 2.187.0 B (#2476): office groups: the times area (the path checked offers)
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     if r["kind"] != "invoice" or r["status"] != "cancelled":
         raise Denied(409, tr("Only the time of a cancelled invoice can be released"))
     b = body()
