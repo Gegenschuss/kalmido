@@ -356,6 +356,16 @@ def _p_opening(c, run, src, d, ctx):
     return False
 
 
+def _p_bka_file(c, run, src, d, ctx):
+    """2.414.0 (#3502): an original file / receipt image of the booking archive under a new name below the target's office folder."""
+    m = re.fullmatch(r"bka-[0-9a-f]{16}(\.[a-z]{3})", str(src.get("file") or ""))
+    new = _oi_put(ctx, src["file"], f"bka-{uuid.uuid4().hex[:16]}{m.group(1)}", mime=d.get("mime") or "") if m else None
+    if not new:
+        return None
+    d["file"] = new
+    return d
+
+
 def _p_datev_guid(c, run, src, d, ctx):
     """2.188.0 A (#2498): the kept GUID of a document that came along (receipt files: node_id late, _f_datev_guids)."""
     if src.get("doc_id") is not None and not d.get("doc_id"):
@@ -520,6 +530,13 @@ SPECS = [
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
     OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office",
         prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import
+    # 2.414.0 (#3502): the booking archive (rows of a run that did not come along stay out)
+    OiT("office/bookarch_files.json", "office_bookarch_files", refs={"run_id": "office_import_runs"}, need=("run_id",), people=_P,
+        private="office", prep=_p_bka_file),
+    OiT("office/bookarch.json", "office_bookarch", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office"),
+    OiT("office/bookarch_accts.json", "office_bookarch_accts", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office"),
+    OiT("office/bookarch_docs.json", "office_bookarch_docs", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office",
+        prep=_p_bka_file),
     OiT("office/datev_guids.json", "office_datev_guids", refs={"doc_id": "office_docs"}, late={"node_id": "fs_nodes"}, private="office",
         prep=_p_datev_guid),  # 2.188.0 A (#2498): the receipt images keep their GUID in DATEV (no double after a move)
     # 2.187.0 C (#2476): the office rights' own groups and their log come along (an organisation only: the private space has
@@ -600,6 +617,8 @@ def _f_runs(c, run, uid, data, who):
         for key, tbl in (("filled_clients", "clients"), ("filled_suppliers", "office_suppliers")):  # 2.148.0 D (#2458): DATEV runs
             if isinstance(det.get(key), dict):
                 det[key] = {str(n): v for n, v in ((run.m(tbl, k), v) for k, v in det[key].items()) if n}
+        if isinstance(det.get("master_runs"), list):  # 2.414.0 (#3502): the DATEV runs of a booking archive run
+            det["master_runs"] = [n for n in (run.m("office_import_runs", x) for x in det["master_runs"]) if n]
         if isinstance(det.get("replaced"), list):
             det["replaced"] = [dict(x, import_run_id=run.m("office_import_runs", x.get("import_run_id")) if x.get("import_run_id") else None)
                                for x in det["replaced"] if isinstance(x, dict)]

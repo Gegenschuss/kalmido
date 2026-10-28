@@ -280,6 +280,11 @@ OX_AREAS = (
     ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
+    # 2.414.0 (#3502): the booking archive (the files bka-* come with OFFICE_DIR)
+    ("office/bookarch_files.json", "office_bookarch_files", "org_id=?"),
+    ("office/bookarch.json", "office_bookarch", "org_id=?"),
+    ("office/bookarch_accts.json", "office_bookarch_accts", "org_id=?"),
+    ("office/bookarch_docs.json", "office_bookarch_docs", "org_id=?"),
     ("office/datev_guids.json", "office_datev_guids", "org_id=?"),  # 2.188.0 A (#2498): kept GUIDs of the DATEV receipt images
     ("office/rights_groups.json", "office_rgroups", "org_id=?"),  # 2.187.0 C (#2476): office rights: own groups, memberships, log
     ("office/rights_members.json", "office_rgroup_members", "org_id=?"),

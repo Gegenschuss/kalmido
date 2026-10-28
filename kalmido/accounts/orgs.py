@@ -983,7 +983,8 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "open_receipts": ("{0} receipt", "{0} receipts"), "einvoices": ("{0} invoice", "{0} invoices"),
              "payments": ("{0} payment", "{0} payments"), "signoffs": ("{0} confirmed sign-off", "{0} confirmed sign-offs"),
              "procdocs": ("{0} version of the procedure documentation", "{0} versions of the procedure documentation"),
-             "assets": ("{0} device", "{0} devices")}  # 2.355.0 B (#2845): the asset register
+             "assets": ("{0} device", "{0} devices"),  # 2.355.0 B (#2845): the asset register
+             "bookarch": ("{0} archived booking", "{0} archived bookings")}  # 2.414.0 (#3502): the booking archive
 
 
 def odl_text(counts):
