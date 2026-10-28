@@ -14612,7 +14612,6 @@
   "Offline: the files are uploaded once the task is synced": "Offline: de bestanden worden geüpload zodra de taak is gesynchroniseerd",
   "Not saved yet, trying again": "Nog niet opgeslagen, wordt opnieuw geprobeerd",
   "Write … ([[Page]], #123, / for commands)": "Schrijven … ([[Pagina]], #123, / voor opdrachten)",
-  "Live preview while writing": "Live voorbeeld tijdens het schrijven",
   "Numbered list": "Genummerde lijst",
   "Picture or file": "Afbeelding of bestand",
   "Embed a table": "Tabel insluiten",
@@ -14769,5 +14768,8 @@
   "Like the space ({0})": "Zoals de ruimte ({0})",
   "Clear|reading style": "Helder",
   "Book|reading style": "Boek",
-  "Default of the space": "Standaard van de ruimte"
+  "Default of the space": "Standaard van de ruimte",
+  "Diagram": "Diagram",
+  "The diagram could not be drawn": "Het diagram kon niet worden getekend",
+  "The formula could not be drawn": "De formule kon niet worden gezet"
 }

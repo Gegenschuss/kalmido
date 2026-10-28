@@ -14612,7 +14612,6 @@
   "Offline: the files are uploaded once the task is synced": "Sin conexión: los archivos se suben cuando la tarea esté sincronizada",
   "Not saved yet, trying again": "Aún no guardado, se intentará de nuevo",
   "Write … ([[Page]], #123, / for commands)": "Escribir … ([[Página]], #123, / para comandos)",
-  "Live preview while writing": "Vista previa en vivo al escribir",
   "Numbered list": "Lista numerada",
   "Picture or file": "Imagen o archivo",
   "Embed a table": "Insertar una tabla",
@@ -14769,5 +14768,8 @@
   "Like the space ({0})": "Como el espacio ({0})",
   "Clear|reading style": "Claro",
   "Book|reading style": "Libro",
-  "Default of the space": "Predeterminado del espacio"
+  "Default of the space": "Predeterminado del espacio",
+  "Diagram": "Diagrama",
+  "The diagram could not be drawn": "No se pudo dibujar el diagrama",
+  "The formula could not be drawn": "No se pudo componer la fórmula"
 }

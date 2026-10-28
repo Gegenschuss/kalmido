@@ -1,0 +1,13 @@
+KaTeX, used by static/js/diagram.js for formulas on knowledge pages (2.382.0, #3153).
+
+Package:  katex 0.19.1 (MIT, see LICENSE)
+Source:   https://registry.npmjs.org/katex/-/katex-0.19.1.tgz
+Tarball:  sha512-jG8uKntjSEcm2EpQOh0XturpPuuC9r3Sq5HLHdsFdWZT27E672SF19QEi+of0/YeOy15lDgRhKvr5614uRrEfA==
+          (the npm registry's "integrity" value, checked on download)
+Files:    dist/katex.min.js, dist/katex.min.css, dist/fonts/*.woff2, LICENSE -- unchanged copies. Only the woff2 fonts are
+          bundled (every browser Kalmido supports reads woff2; the css names woff / ttf only as fallbacks).
+Loaded:   only when a page has a formula (```math, $$ … $$, \( … \)); not in the service worker's precache.
+Update:   download the new tarball, compare its sha512 with the registry's "integrity", copy the same files,
+          update this README and THIRD_PARTY_NOTICES.md.
+          sha256 fa140498b8cfc8302cbe5e7cb1bdbc1f952bc38b3fa258ede09e73edbf9a74bc  katex.min.js
+          sha256 00e0b094171b07f58422075f469b4feac2b2f7bce1aeec943c08da4d697f4dcf  katex.min.css

@@ -483,13 +483,42 @@ function wk_pageHtml(p) {
 }
 const wk_unesc = h => { const d = document.createElement('textarea'); d.innerHTML = h; return d.value; };
 const wk_bodyStrip = b => String(b || '').replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '');
+// 2.382.0 (#3153): formulas and Mermaid diagrams (diagram.js draws them, loaded only when a page has one): outside code
+// blocks a "$$ … $$" line / a block between two "$$" lines becomes a ```math block; an inline \( … \) becomes a placeholder
+// (Markdown would take its backslash as an escape) and later a .wkimath span with its source. No single $ (amounts of money).
+const WK_DG_RE = /^\s*```\s*(?:math|mermaid)\s*$/m;
+function wk_dgCut(src, ims) {
+  if (!src.includes('$$') && !src.includes('\\(')) return src;
+  const ls = src.split('\n'), out = [];
+  let fence = false;
+  for (let i = 0; i < ls.length; i++) {
+    const l = ls[i];
+    if (fence) { if (/^\s*```\s*$/.test(l)) fence = false; out.push(l); continue; }  // like renderMd: any ``` opens, a bare ``` closes
+    if (/^\s*```/.test(l)) { fence = true; out.push(l); continue; }
+    let m;
+    if ((m = /^\s*\$\$(.+?)\$\$\s*$/.exec(l))) { out.push('```math', m[1].trim(), '```'); continue; }
+    if (/^\s*\$\$\s*$/.test(l)) {
+      const z = ls.findIndex((x, j) => j > i && /^\s*\$\$\s*$/.test(x));
+      if (z > i) { out.push('```math', ...ls.slice(i + 1, z), '```'); i = z; continue; }
+    }
+    out.push(l.includes('\\(') ? l.split(/(`[^`]*`)/).map((x, k) => k % 2 ? x : x.replace(/\\\((.+?)\\\)/g, (_, t) => { ims.push(t); return `\u2063IM${ims.length - 1}\u2063`; })).join('') : l);
+  }
+  return out.join('\n');
+}
+function wk_dgNeed(src, ims) {
+  if (!ims.length && !WK_DG_RE.test(src)) return;
+  if (typeof dg_draw === 'function') setTimeout(() => dg_draw(), 0);
+  else loadModule('diagram').then(() => dg_draw(), () => {});
+}
 // Markdown of the app + [[links]] + ```mindmap blocks (drawn by mindmap.js) + #123 (tasks I see)
 function wk_render(p) {
   if (typeof wem_cut !== 'function') { ld_later('wiki'); return `<p class="muted">${esc(tr('Loading…'))}</p>`; }  // 2.200.0 (#2747): the page can draw before wkembed.js arrived (tree / panel)
-  const mms = [], fls = [], ems = [], tcs = [];  // 2.123.0 C (#2103): ems = files of the file store (wkembed.js); 2.376 (#3294): tcs = ```seiten blocks
-  const src = wem_cut(wka_cut(wk_bodyStrip(p.body).replace(/^```mindmap[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm, (_, t) => { mms.push(t); return `\nMM${mms.length - 1}\n`; })
+  const mms = [], fls = [], ems = [], tcs = [], ims = [];  // 2.123.0 C (#2103): ems = files of the file store (wkembed.js); 2.376 (#3294): tcs = ```seiten blocks; 2.382.0 (#3153): ims = inline formulas
+  const src = wem_cut(wka_cut(wk_dgCut(wk_bodyStrip(p.body), ims).replace(/^```mindmap[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm, (_, t) => { mms.push(t); return `\nMM${mms.length - 1}\n`; })
     .replace(WKT_RE, (_, t) => { tcs.push(t); return `\n\n\u2063WKT${tcs.length - 1}\u2063\n\n`; }), fls), ems);
+  wk_dgNeed(src, ims);
   let h = mdTaskRefs(renderMd(src, true));
+  if (ims.length) h = h.replace(/\u2063IM(\d+)\u2063/g, (_, n) => { const t = ims[+n] ?? ''; return `<span class="wkimath" data-tex="${esc(t)}">\\(${esc(t)}\\)</span>`; });
   // [[links]] only in text: every tag is passed whole (no match inside an attribute), nothing inside code / pre / links
   let skip = 0;
   h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\[\[([^\[\]|#\n<>]{1,500})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, path, _a, label) => {

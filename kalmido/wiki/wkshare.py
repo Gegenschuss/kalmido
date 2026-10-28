@@ -698,16 +698,28 @@ def wsh_md(text, link, file, depth=0):
     while i < len(lines):
         ln = lines[i]
         st = ln.strip()
-        fence = re.match(r"^\s*(```|~~~)", ln)
+        fence = re.match(r"^\s*(```|~~~)\s*([\w-]*)", ln)
         if fence:
             flush()
             code, i = [], i + 1
             while i < len(lines) and not lines[i].strip().startswith(fence.group(1)):
                 code.append(lines[i])
                 i += 1
-            out.append(f'<pre><code>{e(chr(10).join(code))}</code></pre>')
+            # 2.382.0 (#3153): formulas / Mermaid diagrams are drawn in the app (static/js/diagram.js) by their language
+            lang = fence.group(2).lower()
+            at = f' data-lang="{lang}"' if lang in ("math", "mermaid") else ""
+            out.append(f'<pre{at}><code>{e(chr(10).join(code))}</code></pre>')
             i += 1
             continue
+        dm = re.match(r"^\s*\$\$(.*?)\$\$\s*$", ln)  # 2.382.0 (#3153): "$$ … $$" on its own line, or a block between two "$$" lines
+        if (dm and dm.group(1).strip()) or st == "$$":
+            z = next((j for j in range(i + 1, len(lines)) if lines[j].strip() == "$$"), -1) if st == "$$" else i
+            if z >= i:
+                flush()
+                tex = dm.group(1).strip() if z == i else chr(10).join(lines[i + 1:z])
+                out.append(f'<pre data-lang="math"><code>{e(tex)}</code></pre>')
+                i = z + 1
+                continue
         if not st:
             flush()
             i += 1
