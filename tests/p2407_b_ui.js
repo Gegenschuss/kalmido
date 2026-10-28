@@ -31,11 +31,11 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const me = (await call('GET', '/api/state')).me, ORG = me.workspaces[0].id;
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com', orgs: [ORG]})).id;
   const L = (await call('POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
-  await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
+  await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit', bridge_ok: true});
   const agent = async name => {
     const a = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write'], username: name, display_name: name});
     await call('PATCH', `/api/admin/agents/${a.id}`, {org_id: ORG});
-    await call('PUT', `/api/lists/${L}/members`, {user_id: a.id, role: 'edit'});
+    await call('PUT', `/api/lists/${L}/members`, {user_id: a.id, role: 'edit', bridge_ok: true});
     return a;
   };
   const plan = await agent('planbot'), api = await agent('apibot');

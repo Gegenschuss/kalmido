@@ -26,14 +26,14 @@ BOB = r.json()["id"]
 Bo = login(B, "bob")
 Bo.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 L = A.post(B + "/api/lists", json={"name": "Shared work"}).json()["id"]
-check(A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob shares the list")
+check(A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "admin"}).ok, "setup: bob shares the list (as its admin: agents are open to list admins)")
 
 
 def agent(name):
     r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write"], "username": name, "display_name": name.title()})
     assert r.ok, r.text
     aid = r.json()["id"]
-    check(A.put(B + f"/api/lists/{L}/members", json={"user_id": aid, "role": "edit"}).ok, f"setup: {name} on the shared list")
+    check(A.put(B + f"/api/lists/{L}/members", json={"user_id": aid, "role": "edit", "bridge_ok": True}).ok, f"setup: {name} on the shared list")
     return aid, {"Authorization": "Bearer " + r.json()["token"]}
 
 
