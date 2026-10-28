@@ -740,7 +740,7 @@ def clean_doc(c, oid, b, cur, admin):
         # 2.380.0 (#3420): a quotation made before a pack with "share by amount" was on switches it on like a new one
         pn = prd_new_doc(c, oid, office_settings(c, oid))
         if pn.get("producing_mode"):
-            f.update({k: pn[k] for k in ("producing_mode", "share_label", "producing_rate", "prod_quotient") if k not in f})
+            f.update({k: pn[k] for k in ("producing_mode", "share_label", "producing_rate", "prod_quotient")})  # the pack's factor, not one checked for the old mode
     f.update(prd_doc_clean(c, oid, b))  # 2.113.1 (#2252): handling costs / markup
     if "rights" in b and b.get("rights") is not None:
         f["rights"] = json.dumps(_rights_clean(c, oid, b["rights"], lang, _j(cur["rights"], {})), ensure_ascii=False)

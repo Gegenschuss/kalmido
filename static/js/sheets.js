@@ -456,7 +456,9 @@ async function shvPut(chg, label) {
   const undo0 = shvOptimistic(sh, chg);
   try { r = await shvSend(sid, chg.map((x, i) => ({...x, prev: old[i].raw}))); } catch (e) { undo0(); toast(e.message); shvPatchAll(); return null; }
   const cf = r?.conflicts || [];
-  if (cf.length) undo0(cf.map(x => x.row_id + ':' + x.col_id));
+  // 2.380.0 (#3423, review): a conflict cell the answer already set or emptied (shvMerge) shows the server's state; only the rest goes back
+  const srv = new Set((r?.cells || []).map(c => c.row_id + ':' + c.col_id));
+  if (cf.length) undo0(cf.filter(x => x.cell_id && !srv.has(x.row_id + ':' + x.col_id)).map(x => x.row_id + ':' + x.col_id));
   if (cf.length) toast(tr('Changed elsewhere in the meantime') + ': ' + cf.map(x => shvAddr(x.row_id, x.col_id)).join(', '));
   const keep = new Set(cf.map(x => x.row_id + ':' + x.col_id)), i0 = chg.map((x, i) => i).filter(i => !keep.has(chg[i].row_id + ':' + chg[i].col_id));
   if (!i0.length) return null;  // nothing written: no undo step

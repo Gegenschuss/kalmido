@@ -39,6 +39,7 @@ const line = (d, k) => (d.totals?.lines || []).find(x => x.kind === k);
   const qa = await call(CA, 'POST', '/api/office/docs', {project_title: 'Vor dem Paket'});
   check(qa.producing_on === 0 && qa.producing_mode == null, '#3420: a quotation without a pack has no producing');
   await call(CA, 'PUT', `/api/office/docs/${qa.id}/items`, {items: its});
+  const qb = await call(CA, 'POST', '/api/office/docs', {project_title: 'Vor dem Paket 2'});
   const qq = await call(CA, 'POST', '/api/office/docs', {project_title: 'Nach Mengen'});
   await call(CA, 'PATCH', `/api/office/docs/${qq.id}`, {producing_on: 1, prod_quotient: 3, producing_rate: 600});
   await call(CA, 'PUT', `/api/office/docs/${qq.id}/items`, {items: its});
@@ -49,6 +50,9 @@ const line = (d, k) => (d.totals?.lines || []).find(x => x.kind === k);
   const pl = line(ja, 'producing');
   check(ja.producing_mode === 'amount' && ja.share_label?.de === 'Producing' && pl && pl.total > 0 && ja.totals.net === 6000 + pl.total,
     '#3420: switched on in the older quotation: share by amount with the pack title, the line in the sums ' + JSON.stringify([ja.producing_mode, pl, ja.totals?.net]));
+  // review: a quotient sent along (valid for the old calculation, 3) does not become a share of 300 %
+  const jb = await call(CA, 'PATCH', `/api/office/docs/${qb.id}`, {producing_on: 1, prod_quotient: 3});
+  check(jb.producing_mode === 'amount' && jb.prod_quotient === film.calc.share.factor, '#3420: switched on with a quotient: the pack factor ' + JSON.stringify([jb.producing_mode, jb.prod_quotient]));
   const jq = await call(CA, 'PUT', `/api/office/docs/${qq.id}/items`, {items: its});
   check(jq.producing_mode == null && line(jq, 'producing')?.qty === 2, '#3420: a quotation computing by quantities keeps its calculation (6 / 3 = 2 days)');
 
