@@ -579,7 +579,21 @@ function ofdInput(e) {
   if (t.id === 'ofd-q') { OFD.q = t.value; const el = t.closest('.pboffers, .ofcbody'); if (el) keepFocus(el, () => fl_set(el, ofdListHtml())); }
 }
 function ofdKey(e) { if (e.key === 'Enter' && e.target.id === 'ofd-q') e.preventDefault(); }
+// 2.359.2 B (#3049): a field of the document whose save failed keeps what was typed (also through the redraw and later ones, closing
+// the page asks) and says so at the field, like ost_save in the office settings
 async function ofdChange(e) {
+  const t = e.target, form = t?.closest?.('.ofdeditor[data-fg]');
+  if (!form || !OFD.doc || !fgField(t)) return ofdChange0(e);
+  const fk = form.dataset.fg, k = fgKey(t), v = fgVal(t);
+  OFD.err = '';
+  await ofdChange0(e);
+  if (!OFD.err) return;
+  const n = fgFields(document).find(x => x.closest('[data-fg]')?.dataset.fg === fk && fgKey(x) === k); if (!n) return;
+  if (fgVal(n) !== v) { if (n.type === 'checkbox' || n.type === 'radio') n.checked = v; else n.value = v; }
+  (FG.d[fk] ||= {f: {}}).f[k] = v;
+  if (typeof ost_mark === 'function') ost_mark(n, 'err', OFD.err);
+}
+async function ofdChange0(e) {
   const t = e.target;
   if (t.id === 'ofd-trial') { OFD.trial = t.value; LS.set('ofdTrial', t.value); OFD.list = null; ofdLoadList(true); return; }  // 2.144.10 C (#2576)
   if (t.dataset.oflt && !S.route.id) { OFD.flt[t.dataset.oflt] = t.value; OFD.list = null; ofdLoadList(true); return; }  // 2.351.0 A (#3312)

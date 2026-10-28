@@ -244,10 +244,12 @@ function bg_catsModal() {
       try { gone = await api('DELETE', `/api/budget/cats/${c.id}`); } catch { return; }
       let cur = c;
       // 2.72.0 (#1333): undo re-creates the category and hangs its entries / recurring entries back on it
-      const rehang = async (j) => { cur = await api('POST', `/api/budget/${lid}/cats`, {name: c.name, kind: c.kind, limit: c.limit});
-        for (const id of j?.entry_ids || []) await api('PATCH', `/api/budget/entries/${id}`, {cat_id: cur.id}).catch(() => {});
-        for (const id of j?.recurring_ids || []) await api('PATCH', `/api/budget/recurring/${id}`, {cat_id: cur.id}).catch(() => {}); };
-      offerUndo(tr('Deleted: {0}', c.name), histAdd({label: tr('Category “{0}” deleted', c.name), undo: async () => { await rehang(gone); bg_after(); },
+      // 2.359.2 B (#3049): an entry that could not be hung back is counted: the undo names the category as not fully undone
+      const rehang = async (j) => { cur = await api('POST', `/api/budget/${lid}/cats`, {name: c.name, kind: c.kind, limit: c.limit}); let bad = 0;
+        for (const id of j?.entry_ids || []) await api('PATCH', `/api/budget/entries/${id}`, {cat_id: cur.id}).catch(() => { bad++; });
+        for (const id of j?.recurring_ids || []) await api('PATCH', `/api/budget/recurring/${id}`, {cat_id: cur.id}).catch(() => { bad++; });
+        return bad; };
+      offerUndo(tr('Deleted: {0}', c.name), histAdd({label: tr('Category “{0}” deleted', c.name), undo: async () => { const bad = await rehang(gone); bg_after(); return bad ? {skipped: [c.name]} : {}; },
         redo: async () => { gone = await api('DELETE', `/api/budget/cats/${cur.id}`); bg_after(); }}));
       redraw();
     } else if (add) {
