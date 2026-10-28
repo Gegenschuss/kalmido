@@ -52,6 +52,8 @@ const CONTRAST = `(() => {
   const DEV = await mkAgent('devbot', 'DevBot'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  // 2.352.0 B (#2752): kind is not read any more, a tracked project is one with a status (the sidebar's overview needs two)
+  for (const id of [L, W]) await call('POST', `/api/lists/${id}/status`, {status: 'on_track', note: ''});
   await call('PATCH', '/api/settings', {show_progress: String(L)});  // 2.40.0 (#1190): the progress bar of a project is off by default
   const PLAIN = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
   for (const u of [BOB, DEV.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: u, role: 'edit'});

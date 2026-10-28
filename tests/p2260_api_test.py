@@ -226,7 +226,9 @@ check(a.get("no_service") is True, "#933: API calls but no event poll for 10 min
 r = A.post(B + "/api/lists", json={"name": "Proj", "kind": "project", "family": "shopping"})
 check(r.status_code == 400, "family: a new project with a family kind is refused " + r.text[:80])
 PJ = A.post(B + "/api/lists", json={"name": "Proj", "kind": "project"}).json()["id"]
-check(A.patch(B + f"/api/lists/{PJ}", json={"family": "shopping"}).status_code == 400, "family: not for an existing project")
+check(A.patch(B + f"/api/lists/{PJ}", json={"kind": "project", "family": "shopping"}).status_code == 400, "family: not together with kind project")
+# 2.352.0 G (#2752, review N15): the stored kind is no longer read -- an old project may become a family list
+check(A.patch(B + f"/api/lists/{PJ}", json={"family": "shopping"}).ok, "family: an old project may become a family list (2.352.0)")
 check(A.patch(B + f"/api/lists/{PJ}", json={"kind": "list", "family": ""}).ok, "family: empty value is fine")
 
 print(f"p2260_api: {OKS[0]} ok, {len(FAILS)} failed")
