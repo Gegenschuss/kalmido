@@ -8951,7 +8951,6 @@
   "Recognise again": "Neu erkennen",
   "Recognised": "Erkannt",
   "Recognised text": "Erkannter Text",
-  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Dateien im Ordner „Dokumente/Eingang“ der Ablage erkennen",
   "Recognising…": "Wird erkannt…",
   "Recognition failed": "Erkennung fehlgeschlagen",
   "Reset filters": "Filter zurücksetzen",
@@ -14151,7 +14150,6 @@
   "Encrypted content from the export stays unreadable because you already have your own encryption keys here.": "Verschlüsselte Inhalte aus dem Export bleiben unlesbar, weil hier schon eigene Schlüssel bestehen.",
   "Encryption keys taken over: open locked notes and encrypted files with your passphrase from before.": "Verschlüsselungs-Schlüssel übernommen: gesperrte Notizen und verschlüsselte Dateien öffnest du mit deiner bisherigen Passphrase.",
   "The encryption keys in the export are broken: encrypted content stays unreadable.": "Die Verschlüsselungs-Schlüssel im Export sind beschädigt: verschlüsselte Inhalte bleiben unlesbar.",
-  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Der Beleg wird in der Ablage gespeichert (Ordner „Dokumente“) und unter Büro > Belege aufgeführt; Betrag und Datum werden erkannt.",
   "It goes to the trash and is removed from the phones that sync this address book.": "Er kommt in den Papierkorb und wird von den Handys entfernt, die dieses Adressbuch abgleichen.",
   "They go to the trash and are removed from the phones that sync these address books.": "Sie kommen in den Papierkorb und werden von den Handys entfernt, die diese Adressbücher abgleichen.",
   "Contacts in the trash are deleted for good after {0} day.": ["Kontakte im Papierkorb werden nach {0} Tag endgültig gelöscht.", "Kontakte im Papierkorb werden nach {0} Tagen endgültig gelöscht."],
@@ -14628,5 +14626,11 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Abgerechnete Belege, deren Rechnung nicht mitkam, bleiben abgerechnet (Rechnung fehlt): nur in der Buchhaltung freigeben, wenn sie nie abgerechnet wurden",
   "Billed, the invoice did not come along with the import": "Abgerechnet, die Rechnung kam beim Import nicht mit",
   "{0} project note": ["{0} Projekt-Notiz", "{0} Projekt-Notizen"],
-  "Differs from your app language: the client receives the document in this language.": "Weicht von deiner App-Sprache ab: der Kunde bekommt das Dokument in dieser Sprache."
+  "Differs from your app language: the client receives the document in this language.": "Weicht von deiner App-Sprache ab: der Kunde bekommt das Dokument in dieser Sprache.",
+  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "Der Beleg wird in der Ablage gespeichert (Ordner „{0}“) und unter Büro > Belege aufgeführt; Betrag und Datum werden erkannt.",
+  "Documents|folder": "Dokumente",
+  "Inbox|folder": "Eingang",
+  "Emails|folder": "E-Mails",
+  "Kalmido-files|zip": "Kalmido-Dateien",
+  "Recognise files put into the folder “{0}” of the file store": "Dateien im Ordner „{0}“ der Ablage erkennen"
 }

@@ -8973,7 +8973,6 @@
   "Recognise again": "Reconnaître à nouveau",
   "Recognised": "Reconnu",
   "Recognised text": "Texte reconnu",
-  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Reconnaître les fichiers déposés dans le dossier « Dokumente/Eingang » du classement",
   "Recognising…": "Reconnaissance…",
   "Recognition failed": "Échec de la reconnaissance",
   "Reset filters": "Réinitialiser les filtres",
@@ -14151,7 +14150,6 @@
   "Encrypted content from the export stays unreadable because you already have your own encryption keys here.": "Les contenus chiffrés de l’export restent illisibles, car vous avez déjà vos propres clés ici.",
   "Encryption keys taken over: open locked notes and encrypted files with your passphrase from before.": "Clés de chiffrement reprises : ouvrez les notes verrouillées et les fichiers chiffrés avec votre phrase secrète d’avant.",
   "The encryption keys in the export are broken: encrypted content stays unreadable.": "Les clés de chiffrement de l’export sont endommagées : les contenus chiffrés restent illisibles.",
-  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « Dokumente ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus.",
   "It goes to the trash and is removed from the phones that sync this address book.": "Il va dans la corbeille et est retiré des téléphones qui synchronisent ce carnet d’adresses.",
   "They go to the trash and are removed from the phones that sync these address books.": "Ils vont dans la corbeille et sont retirés des téléphones qui synchronisent ces carnets d’adresses.",
   "Contacts in the trash are deleted for good after {0} day.": ["Les contacts de la corbeille sont supprimés définitivement après {0} jour.", "Les contacts de la corbeille sont supprimés définitivement après {0} jours."],
@@ -14628,5 +14626,11 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Les justificatifs facturés dont la facture n’a pas été reprise restent facturés (facture manquante) : ne les libérez dans la comptabilité que s’ils n’ont jamais été facturés",
   "Billed, the invoice did not come along with the import": "Facturé, la facture n’a pas été reprise lors de l’import",
   "{0} project note": ["{0} note de projet", "{0} notes de projet"],
-  "Differs from your app language: the client receives the document in this language.": "Diffère de la langue de ton app : le client reçoit le document dans cette langue."
+  "Differs from your app language: the client receives the document in this language.": "Diffère de la langue de ton app : le client reçoit le document dans cette langue.",
+  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « {0} ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus.",
+  "Documents|folder": "Documents",
+  "Inbox|folder": "Arrivée",
+  "Emails|folder": "E-mails",
+  "Kalmido-files|zip": "Kalmido-fichiers",
+  "Recognise files put into the folder “{0}” of the file store": "Reconnaître les fichiers déposés dans le dossier « {0} » du classement"
 }

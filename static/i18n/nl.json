@@ -8973,7 +8973,6 @@
   "Recognise again": "Opnieuw herkennen",
   "Recognised": "Herkend",
   "Recognised text": "Herkende tekst",
-  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Bestanden in de map ‘Dokumente/Eingang’ van de opslag herkennen",
   "Recognising…": "Wordt herkend…",
   "Recognition failed": "Herkenning mislukt",
   "Reset filters": "Filters wissen",
@@ -14151,7 +14150,6 @@
   "Encrypted content from the export stays unreadable because you already have your own encryption keys here.": "Versleutelde inhoud uit de export blijft onleesbaar, omdat je hier al eigen sleutels hebt.",
   "Encryption keys taken over: open locked notes and encrypted files with your passphrase from before.": "Versleutelingssleutels overgenomen: open vergrendelde notities en versleutelde bestanden met je wachtwoordzin van voorheen.",
   "The encryption keys in the export are broken: encrypted content stays unreadable.": "De versleutelingssleutels in de export zijn beschadigd: versleutelde inhoud blijft onleesbaar.",
-  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "De bon wordt opgeslagen in de opslag (map ‘Dokumente’) en staat onder Kantoor > Bonnen; bedrag en datum worden herkend.",
   "It goes to the trash and is removed from the phones that sync this address book.": "Het gaat naar de prullenbak en wordt verwijderd van de telefoons die dit adresboek synchroniseren.",
   "They go to the trash and are removed from the phones that sync these address books.": "Ze gaan naar de prullenbak en worden verwijderd van de telefoons die deze adresboeken synchroniseren.",
   "Contacts in the trash are deleted for good after {0} day.": ["Contacten in de prullenbak worden na {0} dag definitief verwijderd.", "Contacten in de prullenbak worden na {0} dagen definitief verwijderd."],
@@ -14628,5 +14626,11 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Gefactureerde bonnen waarvan de factuur niet is meegekomen, blijven gefactureerd (factuur ontbreekt): geef ze in de boekhouding alleen vrij als ze nooit gefactureerd zijn",
   "Billed, the invoice did not come along with the import": "Gefactureerd, de factuur is bij de import niet meegekomen",
   "{0} project note": ["{0} projectnotitie", "{0} projectnotities"],
-  "Differs from your app language: the client receives the document in this language.": "Wijkt af van je app-taal: de klant krijgt het document in deze taal."
+  "Differs from your app language: the client receives the document in this language.": "Wijkt af van je app-taal: de klant krijgt het document in deze taal.",
+  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "De bon wordt opgeslagen in de opslag (map ‘{0}’) en staat onder Kantoor > Bonnen; bedrag en datum worden herkend.",
+  "Documents|folder": "Documenten",
+  "Inbox|folder": "Inbox",
+  "Emails|folder": "E-mails",
+  "Kalmido-files|zip": "Kalmido-bestanden",
+  "Recognise files put into the folder “{0}” of the file store": "Bestanden in de map ‘{0}’ van de opslag herkennen"
 }

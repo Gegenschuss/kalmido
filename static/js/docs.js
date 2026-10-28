@@ -371,7 +371,7 @@ function dc_sDraw(md) {
     <h4>${tr('Sorting automatically')}</h4>
     <p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
     ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-    <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${tr('Recognise files put into the folder “Dokumente/Eingang” of the file store')}</label>
+    <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${esc(tr('Recognise files put into the folder “{0}” of the file store', s.inbox_path || tr('Documents|folder') + '/' + tr('Inbox|folder')))}</label>
     <div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
     ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}
     <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
