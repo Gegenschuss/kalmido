@@ -71,7 +71,8 @@ const WS_VIEWS = {
   'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
   'static/js/dashboard.js': 'draw',           // 2.144.0 C (#2418): the start page names overdue tasks of other workspaces (wsCur / wsHidden while drawing)
   'static/js/collab.js': 'draw',              // 2.145.0 A (#2444): News names unread items of the other workspaces (wsCur while drawing)
-  'static/js/devlink.js': 'helper',           // 2.140.1 (#2136): "open the equipment" switches to the office's workspace first (no view)
+  'static/js/agentview.js': 'helper',         // 2.397.0 (#3404, from #2928): av_ownArea - which hint an empty agent list shows (no view)
+  'static/js/devlink.js': 'helper',          // 2.140.1 (#2136): "open the equipment" switches to the office's workspace first (no view)
   'kalmido/hub/absence.py': 'check:absences', // abs_org: the area of the saved setting; absences and disposition load again
                                               // with the state that follows the saved setting (core.js)
   'kalmido/office/model.py': 'check:office',  // office_org: the saved setting
