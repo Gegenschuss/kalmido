@@ -535,8 +535,8 @@ def lt_pdf(c, oid, d):
     for s in lt_addr_lines(d):  # 2.296.0 E (#3170): every wrapped part of every line (was the first part of the first 9 lines)
         page.text(PL, yy, s, body_sz)
         yy += lh
-    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
-    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
+    info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(d.get("letter_date") or local_now().date().isoformat(), _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
     if d.get("tracking_no") and d.get("channel") == "registered":

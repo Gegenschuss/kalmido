@@ -123,7 +123,7 @@ w = pdf.pdf_wrap("DE02120300000000202051", 9.6, 50)
 check(len(w) >= 2 and not any(x.endswith("-") for x in w) and "".join(w) == "DE02120300000000202051", f"#3180: digits are cut without a hyphen {w}")
 w = pdf.pdf_wrap("Kamera", 9.6, 1)
 check(w and "".join(x.rstrip("-") for x in w) == "Kamera", f"#3180: a very narrow column still keeps every letter {w}")
-LONGREF = "Bestellung 2026-10-4711 der Einkaufsabteilung Standort Nord, Kostenstelle 4711"  # beside the label: three lines
+LONGREF = "Bestellung 2026-10-4711 der Einkauf Nord, Kostenstelle 4711"  # 2.390.0 A (#3350): the info block is 65 mm wide now (was 72), a shorter text  # beside the label: three lines
 data = pdf.office_pdf(model(meta=[["Rechnung Nr.", "RE-2026-357"], ["Datum", "26.10.2026"], ["Ihre Referenz", LONGREF]]))
 p1 = pdfcheck.layout(data)[0]
 lab = next((t for t in p1["texts"] if t["s"] == "Ihre Referenz"), None)

@@ -539,8 +539,8 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     for ln in [w for x in addr[:8] for w in P.pdf_wrap(x, body_sz, P.PDF_ADDR_W)]:  # 2.217.0 B (#2800): wraps within the address field
         page.text(PL, yy, ln, body_sz)
         yy += lh
-    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
-    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
+    info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     when = (d.get("final_at") or d.get("updated_at") or iso(now_utc()))[:10]
     from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
