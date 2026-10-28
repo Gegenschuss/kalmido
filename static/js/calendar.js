@@ -21,7 +21,7 @@ function viewKanban() {
   return `${listHead(listById(lid))}${swlBar(lid)}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
       ${head(c)}
-      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
+      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true, dwell: lid})).join('')}</div>
       ${add(c)}
     </div>`).join('')}
     ${knew}</div>`;

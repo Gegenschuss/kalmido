@@ -19,6 +19,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
 )
 from ..core.schema import (
     GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, REVOKED_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    SEC_AT_TRIGGER,  # 2.410.0 B (#3515)
 )
 from ..core.i18n import LANGS, tr
 from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -759,6 +760,8 @@ def init_db(guard=True, load=None):
         acx_gen_setup(c)  # 2.149.0 C (#2508): membership changes renew the generation the access-context cache checks
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
+        # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
+        c.executescript(SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0)))
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";"):
             m = _IX_LINE.search(stmt + ";")

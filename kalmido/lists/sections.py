@@ -201,6 +201,25 @@ def wip_clean(v):
     return as_int(v, "wip_limit", 1, 999)
 
 
+DW_KEYS = ("dwell_warn_h", "dwell_alert_h")
+
+
+def dw_clean(v, what):
+    """2.410.0 B (#3515): a column's time limit (hours) from a client value: None / '' / 0 = none, else 1 h .. 1 year."""
+    if v in (None, "", 0, "0"):
+        return None
+    n = v if isinstance(v, int) and not isinstance(v, bool) else int(v) if isinstance(v, str) and v.strip().isdigit() else 0
+    if not 1 <= n <= 8760:
+        raise BadInput(tr("Invalid value: {0}", what))
+    return n
+
+
+def dw_check(warn, alert):
+    """2.410.0 B (#3515): red comes after yellow (both set)."""
+    if warn and alert and alert <= warn:
+        raise BadInput(tr("The red limit must be above the yellow one."))
+
+
 @app.post("/api/sections")
 def section_create():
     """{list_id, name, sort?, tasks?}. D4 (undo of a deleted section): sort = its old place, tasks = the tasks that were
@@ -223,7 +242,10 @@ def section_create():
     if not isinstance(tids, list) or len(tids) > 5000 or any(isinstance(i, bool) or not isinstance(i, int) for i in tids):
         return err(tr("Invalid value: {0}", "tasks"))
     wip = wip_clean(b.get("wip_limit"))  # 2.60.0 (#1510): also the undo of a deleted section brings its limit back
-    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit) VALUES(?,?,?,?)", (lid, name if le2e_is_cipher(name) else name[:200], srt, wip))
+    dw = [dw_clean(b.get(k), k) for k in DW_KEYS]  # 2.410.0 B (#3515): the same for its time limits
+    dw_check(*dw)
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit,dwell_warn_h,dwell_alert_h) VALUES(?,?,?,?,?,?)",
+                       (lid, name if le2e_is_cipher(name) else name[:200], srt, wip, *dw))
     sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -241,15 +263,16 @@ def section_create():
 
 @app.patch("/api/sections/<int:sid>")
 def section_update(sid):
-    """{name?, sort?, wip_limit?, _prev?: {name, wip_limit}}: with _prev (undo / redo) a name / limit changed elsewhere
-    meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit."""
+    """{name?, sort?, wip_limit?, dwell_warn_h?, dwell_alert_h?, _prev?: {name, wip_limit, dwell_*}}: with _prev (undo / redo)
+    a name / limit changed elsewhere meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit. 2.410.0 B
+    (#3515): dwell_warn_h / dwell_alert_h = hours in the column after which a card's time turns yellow / red (null / 0 = none)."""
     b = body()
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034): the _prev check and the write see no other edit in between
     need_section(c, sid)
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
-    cur = c.execute("SELECT name, wip_limit FROM sections WHERE id=?", (sid,)).fetchone()
+    cur = c.execute("SELECT name, wip_limit, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?", (sid,)).fetchone()
     if "name" in b:
         from ..collab.liste2e import le2a_clean_cipher, le2e_guard, le2e_is_cipher
         name = str(b["name"] or "").strip()
@@ -269,6 +292,13 @@ def section_update(sid):
             conflicts.append({"field": "wip_limit", "server": cur["wip_limit"], "mine": wip})
         else:
             c.execute("UPDATE sections SET wip_limit=? WHERE id=?", (wip, sid))
+    if any(k in b for k in DW_KEYS):  # 2.410.0 B (#3515): both limits as one value (red stays above yellow)
+        want = {k: dw_clean(b[k], k) if k in b else cur[k] for k in DW_KEYS}
+        dw_check(*want.values())
+        if any(k in prev for k in DW_KEYS) and any(cur[k] != dw_clean(prev.get(k), k) and cur[k] != want[k] for k in DW_KEYS):
+            conflicts.append({"field": "dwell", "server": {k: cur[k] for k in DW_KEYS}, "mine": want})
+        else:
+            c.execute("UPDATE sections SET dwell_warn_h=?, dwell_alert_h=? WHERE id=?", (*want.values(), sid))
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -305,7 +335,8 @@ def section_delete(sid):
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034)
     need_section(c, sid)
-    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit FROM sections WHERE id=?", (sid,)).fetchone())  # 2.60.0 (#1510): + limit
+    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?",
+                         (sid,)).fetchone())  # 2.60.0 (#1510): + limit; 2.410.0 B (#3515): + time limits
     tids = _sec_tasks(c, sid)
     prev = body().get("_prev")
     if isinstance(prev, dict):

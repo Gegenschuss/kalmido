@@ -14625,5 +14625,19 @@
   "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « Dokumente ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus.",
   "Billed receipts whose invoice did not come along are open again: check them before billing": "Les justificatifs facturés dont la facture n’a pas été reprise sont de nouveau ouverts : vérifiez-les avant de facturer",
   "Sum of the subtasks": "Somme des sous-tâches",
-  "own value {0}": "valeur propre {0}"
+  "own value {0}": "valeur propre {0}",
+  "{0} min|dwell": "{0} min",
+  "{0} h|dwell": "{0} h",
+  "{0} d|dwell": "{0} j",
+  "In this column for {0}": "Dans cette colonne depuis {0}",
+  "Over the red limit": "Au-delà de la limite rouge",
+  "Over the yellow limit": "Au-delà de la limite jaune",
+  "Time limits: {0}": "Limites de durée : {0}",
+  "Time limits…": "Limites de durée…",
+  "Time limits of {0}": "Limites de durée de {0}",
+  "Time limits of {0} saved": "Limites de durée de {0} enregistrées",
+  "Yellow after": "Jaune après",
+  "Red after": "Rouge après",
+  "The red limit must be above the yellow one.": "La limite rouge doit être supérieure à la jaune.",
+  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Chaque carte indique depuis combien de temps elle est dans cette colonne. Au-delà d'une limite, la durée passe au jaune ou au rouge. Vide = aucune limite."
 }

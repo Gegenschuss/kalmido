@@ -14625,5 +14625,19 @@
   "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Der Beleg wird in der Ablage gespeichert (Ordner „Dokumente“) und unter Büro > Belege aufgeführt; Betrag und Datum werden erkannt.",
   "Billed receipts whose invoice did not come along are open again: check them before billing": "Abgerechnete Belege, deren Rechnung nicht mitkam, sind wieder offen: vor dem Abrechnen prüfen",
   "Sum of the subtasks": "Summe der Unteraufgaben",
-  "own value {0}": "eigener Wert {0}"
+  "own value {0}": "eigener Wert {0}",
+  "{0} min|dwell": "{0} Min.",
+  "{0} h|dwell": "{0} h",
+  "{0} d|dwell": "{0} T",
+  "In this column for {0}": "Seit {0} in dieser Spalte",
+  "Over the red limit": "Über der roten Grenze",
+  "Over the yellow limit": "Über der gelben Grenze",
+  "Time limits: {0}": "Zeitgrenzen: {0}",
+  "Time limits…": "Zeitgrenzen…",
+  "Time limits of {0}": "Zeitgrenzen von {0}",
+  "Time limits of {0} saved": "Zeitgrenzen von {0} gespeichert",
+  "Yellow after": "Gelb nach",
+  "Red after": "Rot nach",
+  "The red limit must be above the yellow one.": "Die rote Grenze muss über der gelben liegen.",
+  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Jede Karte zeigt, wie lange sie schon in dieser Spalte steht. Über einer Grenze wird die Zeit gelb oder rot. Leer = keine Grenze."
 }
