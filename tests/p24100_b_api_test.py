@@ -9,6 +9,8 @@
  - the column limits sections.dwell_warn_h / dwell_alert_h (hours): set / clear (null, 0), bad values 400, red must stay
    above yellow (also when only one of them is sent), a stranger 404; the undo's _prev keeps limits changed meanwhile
    (conflict); a deleted section returns them and the undo's re-create takes them back
+ - task_field_values.set_at (for #3514's "since"): a new value sets it, the same value again or another field does not,
+   another value does; the task carries field_at {field id: ISO} with the known ones only, a cleared value drops it
  - freelancer-matrix: a person without an organisation: the same on a private project
 usage: p24100_b_api_test.py <datadir>"""
 import sys
@@ -26,9 +28,9 @@ Bo = sess("bob")
 FID, Fr = freelancer(B, A, "frida")
 OLD = "2026-01-02T03:04:05+00:00"
 
-for t, col in (("tasks", "section_at"), ("task_links", "section_at"), ("sections", "dwell_warn_h"), ("sections", "dwell_alert_h")):
+for t, col in (("tasks", "section_at"), ("task_links", "section_at"), ("task_field_values", "set_at"), ("sections", "dwell_warn_h"), ("sections", "dwell_alert_h")):
     check(kt.dbx("SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name=?", (t, col)), f"{t}.{col} exists")
-check(kt.dbx("SELECT 1 FROM pg_trigger WHERE tgname IN ('kalmido_sec_at', 'kalmido_sec_at_link')"), "the section_at triggers exist")
+check(kt.dbx("SELECT 1 FROM pg_trigger WHERE tgname IN ('kalmido_sec_at', 'kalmido_sec_at_link', 'kalmido_field_at') HAVING COUNT(*) = 3"), "the three triggers exist")
 
 
 def sec(s, lid, name):
@@ -74,8 +76,34 @@ def moves(s, who):
     return P, S2
 
 
+def field_since(s, who):
+    """A select field's value: field_at follows a change of the value and only that."""
+    L = s.post(B + "/api/lists", json={"name": f"Stages {who}"}).json()["id"]
+    r = s.post(B + f"/api/lists/{L}/fields", json={"name": "Stage", "type": "select", "options": {"options": [
+        {"id": "s1", "name": "Plan", "color": "blue"}, {"id": "s2", "name": "Build", "color": "green"}]}})
+    check(r.ok, f"{who}: select field created ({r.status_code} {r.text[:120]})")
+    F = str(r.json().get("id"))
+    N = str(s.post(B + f"/api/lists/{L}/fields", json={"name": "Notes", "type": "text"}).json().get("id"))
+    T = s.post(B + "/api/tasks", json={"title": f"Staged {who}", "list_id": L}).json()["id"]
+    check("field_at" not in task(s, T), f"{who}: no value, no field_at")
+    s.patch(B + f"/api/tasks/{T}", json={"fields": {F: "s1"}})
+    fa = task(s, T).get("field_at") or {}
+    sat = lambda: kt.dbx("SELECT set_at FROM task_field_values WHERE task_id=? AND field_id=?", (T, int(F)))[0][0]  # noqa: E731
+    check(fa.get(F) and fa.get(F) == sat() and list(fa) == [F], f"{who}: a new value sets field_at of that field only ({fa})")
+    kt.dbx("UPDATE task_field_values SET set_at=? WHERE task_id=? AND field_id=?", (OLD, T, int(F)))
+    s.patch(B + f"/api/tasks/{T}", json={"fields": {F: "s1", N: "a note"}})
+    fa = task(s, T).get("field_at") or {}
+    check(fa.get(F) == OLD and fa.get(N) and fa.get(N) != OLD, f"{who}: the same value again keeps it, the other field gets its own ({fa})")
+    s.patch(B + f"/api/tasks/{T}", json={"fields": {F: "s2"}})
+    check((task(s, T).get("field_at") or {}).get(F, OLD) != OLD, f"{who}: another value sets it again")
+    s.patch(B + f"/api/tasks/{T}", json={"fields": {F: None}})
+    check(F not in (task(s, T).get("field_at") or {}), f"{who}: a cleared value drops it")
+
+
 P, S2 = moves(A, "alice")
 FP, FS2 = moves(Fr, "frida")  # freelancer-matrix: section_at
+field_since(A, "alice")
+field_since(Fr, "frida")  # freelancer-matrix: field_at
 
 # ================================================================== a task's place in a further list
 L1 = A.post(B + "/api/lists", json={"name": "Origin"}).json()["id"]

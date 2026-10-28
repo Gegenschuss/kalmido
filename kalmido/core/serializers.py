@@ -139,12 +139,14 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
                 cms[r["task_id"]] = (r["n"], r["u"] or 0, r["a"] or 0)
     # custom field values (fields of the task's current list) and dependencies: blocked = open blockers
     # (also ones I cannot see), blockers = the open ones I can see, blocking = open tasks waiting on it
-    fvs, blk, bing = {}, {}, {}
+    fvs, blk, bing, fat = {}, {}, {}, {}
     if ids:
-        for r in c.execute("""SELECT v.task_id, v.field_id, v.value FROM task_field_values v JOIN list_fields f ON f.id=v.field_id
+        for r in c.execute("""SELECT v.task_id, v.field_id, v.value, v.set_at FROM task_field_values v JOIN list_fields f ON f.id=v.field_id
                               JOIN tasks t ON t.id=v.task_id WHERE f.list_id=t.list_id AND v.task_id = ANY(CAST(? AS BIGINT[]))""", (idl,)):
             if r["task_id"] in ids:
                 fvs.setdefault(r["task_id"], {})[str(r["field_id"])] = r["value"]
+                if r["set_at"]:  # 2.410.0 B (#3515): since when (only the known ones)
+                    fat.setdefault(r["task_id"], {})[str(r["field_id"])] = r["set_at"]
         from ..lists.formula import fx_fill
         fx_fill(c, fvs, {r["id"]: r["list_id"] for r in rows if r["list_id"]})  # 2.43.0 (#1328): formula fields, computed
         for r in c.execute(f"""SELECT d.task_id, d.blocker_id, b.list_id FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
@@ -199,6 +201,8 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         if apv:
             d["approvals_open"] = apv  # 2.41.0 (#1383)
         d["fields"] = fvs.get(r["id"], {})
+        if r["id"] in fat:  # 2.410.0 B (#3515): {field id: since when it has its value}, absent = none known
+            d["field_at"] = fat[r["id"]]
         d["blocked"] = len(blk.get(r["id"], []))
         d["blockers"] = [b for b, lid in blk.get(r["id"], []) if lid in vis and (lid not in pl or b in pv)]
         d["blocking"] = bing.get(r["id"], 0)

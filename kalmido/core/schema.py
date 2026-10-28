@@ -2596,7 +2596,8 @@ CREATE OR REPLACE TRIGGER time_title_e2e BEFORE INSERT OR UPDATE OF task_title O
   EXECUTE FUNCTION kalmido_time_title_e2e()"""  # 1.10.0: participants only while it is theirs
 # 2.410.0 B (#3515): when a task came into its board column (tasks.section_at). Every way a task changes its section or list
 # (the task dialog, dragging, batch moves, rules, imports, a deleted section's ON DELETE SET NULL ...) passes this trigger, so
-# no path can forget it; a task's place in a further list (task_links) the same. {off} = the seconds of a test server's test
+# no path can forget it; a task's place in a further list (task_links) the same, and since when a custom field has its value
+# (task_field_values.set_at, the detail's "since" of #3514). {off} = the seconds of a test server's test
 # clock (0 elsewhere). Re-created on every start (init_db), like the time trigger.
 SEC_AT_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_sec_at() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
@@ -2607,7 +2608,16 @@ BEGIN
 END $fn$;
 CREATE OR REPLACE TRIGGER kalmido_sec_at BEFORE UPDATE OF section_id, list_id ON tasks FOR EACH ROW EXECUTE FUNCTION kalmido_sec_at();
 CREATE OR REPLACE TRIGGER kalmido_sec_at_link BEFORE INSERT OR UPDATE OF section_id ON task_links FOR EACH ROW
-  EXECUTE FUNCTION kalmido_sec_at();"""
+  EXECUTE FUNCTION kalmido_sec_at();
+CREATE OR REPLACE FUNCTION kalmido_field_at() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.value IS DISTINCT FROM OLD.value THEN
+    NEW.set_at := to_char((now() + interval '{off} seconds') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"');
+  END IF;
+  RETURN NEW;
+END $fn$;
+CREATE OR REPLACE TRIGGER kalmido_field_at BEFORE INSERT OR UPDATE OF value ON task_field_values FOR EACH ROW
+  EXECUTE FUNCTION kalmido_field_at();"""
 # 2.64.1 (#1817): members of a list with the lock (lists.e2e not NULL). Every way a membership changes (share dialog, group
 # and folder shares, organisation exit, account deletion, cascades) passes here, also those without a browser:
 # - a new member without a key of the current generation lands on the waiting list (list_key_pending);
@@ -3701,6 +3711,13 @@ MIGRATIONS = [
     ("task_links", "section_at", "ALTER TABLE task_links ADD COLUMN IF NOT EXISTS section_at TEXT"),
     ("sections", "dwell_warn_h", "ALTER TABLE sections ADD COLUMN IF NOT EXISTS dwell_warn_h BIGINT"),
     ("sections", "dwell_alert_h", "ALTER TABLE sections ADD COLUMN IF NOT EXISTS dwell_alert_h BIGINT"),
+    # 2.410.0 B (#3515, for A #3514): since when a custom field has its value (set by the trigger kalmido_field_at on a new or
+    # changed value; NULL = not known). The second step takes the last change of that field from the history. Older versions
+    # ignore it
+    ("task_field_values", "set_at", "ALTER TABLE task_field_values ADD COLUMN IF NOT EXISTS set_at TEXT"),
+    ("task_field_values", "set_at", "UPDATE task_field_values v SET set_at=a.m FROM (SELECT task_id, data->>'id' AS fid, "
+     "MAX(created_at) AS m FROM activity WHERE kind='field' GROUP BY task_id, data->>'id') a "
+     "WHERE a.task_id=v.task_id AND a.fid=CAST(v.field_id AS TEXT) AND v.set_at IS NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
