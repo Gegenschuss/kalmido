@@ -14639,5 +14639,13 @@
   "Yellow after": "Gelb nach",
   "Red after": "Rot nach",
   "The red limit must be above the yellow one.": "Die rote Grenze muss über der gelben liegen.",
-  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Jede Karte zeigt, wie lange sie schon in dieser Spalte steht. Über einer Grenze wird die Zeit gelb oder rot. Leer = keine Grenze."
+  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Jede Karte zeigt, wie lange sie schon in dieser Spalte steht. Über einer Grenze wird die Zeit gelb oder rot. Leer = keine Grenze.",
+  "Special state red": "Sonderzustand rot",
+  "Special state orange": "Sonderzustand orange",
+  "Stage {0} of {1}: {2}": "Stufe {0} von {1}: {2}",
+  "Display": "Anzeige",
+  "Ordered (stages): show as a stage bar": "Geordnet (Stufen): als Stufenleiste zeigen",
+  "Kind of the option": "Art der Option",
+  "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Ein Sonderzustand (z. B. Geparkt) ist keine eigene Stufe: die Leiste zeigt ihn in seiner Farbe an der nächsten Stufe.",
+  "Unknown signal colour": "Unbekannte Signalfarbe"
 }

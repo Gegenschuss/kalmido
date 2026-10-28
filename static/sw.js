@@ -18,7 +18,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/sharedlg.js', '/static/js/drag.js', '/static/js/dnd.js', '/static/js/secdrag.js', '/static/js/dragmulti.js', '/static/js/palette.js',
   '/static/js/ftsearch.js', '/static/js/backclose.js', '/static/js/agents.js', '/static/js/cleanup.js', '/static/js/dayplan.js',
   '/static/js/choicecard.js', '/static/js/chatbase.js', '/static/js/jobchat.js', '/static/js/agentview.js', '/static/js/propkinds2.js',
-  '/static/js/listedit.js', '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js', '/static/js/tagsview.js', '/static/js/cfnew.js',
+  '/static/js/listedit.js', '/static/js/git.js', '/static/js/chat.js', '/static/js/refs.js', '/static/js/tagsview.js', '/static/js/cfnew.js', '/static/js/cfstage.js',
   '/static/js/richcopy.js', '/static/js/dashboard.js', '/static/js/widgets.js', '/static/js/pinboard.js', '/static/js/lysets.js',
   '/static/js/family.js', '/static/js/tapdone.js', '/static/js/listhead.js', '/static/js/purposemods.js', '/static/js/calevents.js',
   '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js', '/static/js/liveparts.js',

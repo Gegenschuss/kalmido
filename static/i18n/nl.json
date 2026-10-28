@@ -14639,5 +14639,13 @@
   "Yellow after": "Geel na",
   "Red after": "Rood na",
   "The red limit must be above the yellow one.": "De rode grens moet boven de gele liggen.",
-  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Elke kaart toont hoe lang ze al in deze kolom staat. Boven een grens wordt de tijd geel of rood. Leeg = geen grens."
+  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Elke kaart toont hoe lang ze al in deze kolom staat. Boven een grens wordt de tijd geel of rood. Leeg = geen grens.",
+  "Special state red": "Speciale status rood",
+  "Special state orange": "Speciale status oranje",
+  "Stage {0} of {1}: {2}": "Fase {0} van {1}: {2}",
+  "Display": "Weergave",
+  "Ordered (stages): show as a stage bar": "Geordend (fasen): als fasebalk tonen",
+  "Kind of the option": "Soort optie",
+  "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Een speciale status (bijv. Geparkeerd) is geen eigen fase: de balk toont hem in zijn kleur bij de volgende fase.",
+  "Unknown signal colour": "Onbekende signaalkleur"
 }

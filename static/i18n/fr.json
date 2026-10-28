@@ -14639,5 +14639,13 @@
   "Yellow after": "Jaune après",
   "Red after": "Rouge après",
   "The red limit must be above the yellow one.": "La limite rouge doit être supérieure à la jaune.",
-  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Chaque carte indique depuis combien de temps elle est dans cette colonne. Au-delà d'une limite, la durée passe au jaune ou au rouge. Vide = aucune limite."
+  "Each card shows how long it has been in this column. Above a limit the time turns yellow or red. Empty = no limit.": "Chaque carte indique depuis combien de temps elle est dans cette colonne. Au-delà d'une limite, la durée passe au jaune ou au rouge. Vide = aucune limite.",
+  "Special state red": "État spécial rouge",
+  "Special state orange": "État spécial orange",
+  "Stage {0} of {1}: {2}": "Étape {0} sur {1} : {2}",
+  "Display": "Affichage",
+  "Ordered (stages): show as a stage bar": "Ordonné (étapes) : afficher en barre d’étapes",
+  "Kind of the option": "Type de l’option",
+  "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un état spécial (p. ex. En attente) n’est pas une étape : la barre l’affiche dans sa couleur sur l’étape suivante.",
+  "Unknown signal colour": "Couleur de signal inconnue"
 }

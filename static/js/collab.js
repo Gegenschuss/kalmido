@@ -793,6 +793,7 @@ function drawTimeline() {
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
   if (typeof ptl_draw === 'function') ptl_draw();  // 2.63.0 B (#1513): the customer report's box + the switch
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
+  cfst_since();  // 2.410.0 A (#3514): "since …" under a stage bar
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
   const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || cmSocial(t) || tlForeign(t).length > 0);
