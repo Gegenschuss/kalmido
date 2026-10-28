@@ -546,7 +546,7 @@ async function rawFetch0(method, url, body, key) {
   const keepW = () => { if (key === undefined && method !== 'GET' && queueable(method, url) && !(body instanceof FormData)) outStash([{method, url, body: outPrev(method, url, body), uid: S.me?.id, k: outKey()}]); if (typeof savesStash === 'function') savesStash(false); };
   if (r.type === 'opaqueredirect' || ctype.includes('text/html')) {
     if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { keepW(); await authGone(); }  // 2.306.0 B (#2889); N25: not for any other page (captive portal, proxy error): only reload
-    location.reload();  // Authelia session expired -> login page
+    location.reload();  // login session expired -> login page
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
