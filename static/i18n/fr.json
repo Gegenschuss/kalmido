@@ -14944,5 +14944,7 @@
   "{0} account label": ["{0} libellé de compte", "{0} libellés de comptes"],
   "{0} booking taken over": ["{0} écriture reprise", "{0} écritures reprises"],
   "{0} receipt image": ["{0} image de justificatif", "{0} images de justificatifs"],
-  "{0} row": ["{0} ligne", "{0} lignes"]
+  "{0} row": ["{0} ligne", "{0} lignes"],
+  "lines: debit {0}, credit {1}": "lignes : débit {0}, crédit {1}",
+  "{0} receipt without image content left out": ["{0} justificatif sans contenu d’image ignoré", "{0} justificatifs sans contenu d’image ignorés"]
 }

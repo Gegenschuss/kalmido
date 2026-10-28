@@ -155,7 +155,8 @@ function bkaDialog() {
     const fd = new FormData(); for (const f of fs) fd.append('file', f);
     const j = await api('POST', `${BKA_URL}/import`, fd);
     BKA.year = Math.max(0, ...(j.years || []).map(y => y.year)); bkaReload();
-    toast(trn('{0} booking taken over', '{0} bookings taken over', j.counts?.bookings || 0), async () => { await api('POST', `${BKA_URL}/runs/${j.run_id}/undo`); bkaReload(); }, 12000);
+    const skip = j.counts?.docs_skipped ? ' · ' + trn('{0} receipt without image content left out', '{0} receipts without image content left out', j.counts.docs_skipped) : '';
+    toast(trn('{0} booking taken over', '{0} bookings taken over', j.counts?.bookings || 0) + skip, async () => { await api('POST', `${BKA_URL}/runs/${j.run_id}/undo`); bkaReload(); }, 12000);
   });
   md.classList.add('bka-imp');
   const ok = /** @type {any} */ ($('[data-m="ok"]', /** @type {any} */ (md))); if (ok) ok.disabled = true;
@@ -176,7 +177,8 @@ async function bkaCheck(input) {
 function bkaPreviewHtml(j) {
   const c = j.counts || {};
   const years = (j.years || []).map(y => `<li class="bka-pyear" data-year="${y.year}"><span class="ofcn"><b>${esc(String(y.year))} · ${esc(trn('{0} booking', '{0} bookings', y.bookings))}</b>
-    <small class="muted">${esc([tr('Debit {0} · Credit {1}', ofcMoney(y.debit), ofcMoney(y.credit)), y.no_counter ? tr('{0} without counter account', y.no_counter) : '',
+    <small class="muted">${esc([tr('Debit {0} · Credit {1}', ofcMoney(y.debit), ofcMoney(y.credit)),
+      y.lines_debit != null ? tr('lines: debit {0}, credit {1}', ofcMoney(y.lines_debit), ofcMoney(y.lines_credit)) : '', y.no_counter ? tr('{0} without counter account', y.no_counter) : '',
       y.bad ? tr('{0} lines not readable', y.bad) : ''].filter(Boolean).join(' · '))}</small></span>
     ${y.balanced ? `<span class="rotag bka-bal">${tr('Debit = Credit')}</span>` : `<span class="bk-warn bka-unbal">${esc(tr('Debit and credit differ: {0} / {1}', ofcMoney(y.debit), ofcMoney(y.credit)))}</span>`}</li>`).join('');
   const files = (j.files || []).map(f => `<li class="bka-pfile" data-kind="${esc(f.kind)}"><span class="ofcn"><b>${esc(f.name)}</b>

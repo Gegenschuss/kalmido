@@ -14944,5 +14944,7 @@
   "{0} account label": ["{0} Kontenbeschriftung", "{0} Kontenbeschriftungen"],
   "{0} booking taken over": ["{0} Buchung übernommen", "{0} Buchungen übernommen"],
   "{0} receipt image": ["{0} Belegbild", "{0} Belegbilder"],
-  "{0} row": ["{0} Zeile", "{0} Zeilen"]
+  "{0} row": ["{0} Zeile", "{0} Zeilen"],
+  "lines: debit {0}, credit {1}": "Zeilen: Soll {0}, Haben {1}",
+  "{0} receipt without image content left out": ["{0} Beleg ohne Bildinhalt ausgelassen", "{0} Belege ohne Bildinhalt ausgelassen"]
 }

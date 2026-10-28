@@ -14944,5 +14944,7 @@
   "{0} account label": ["{0} descripción de cuenta", "{0} descripciones de cuentas"],
   "{0} booking taken over": ["{0} asiento importado", "{0} asientos importados"],
   "{0} receipt image": ["{0} imagen de justificante", "{0} imágenes de justificantes"],
-  "{0} row": ["{0} fila", "{0} filas"]
+  "{0} row": ["{0} fila", "{0} filas"],
+  "lines: debit {0}, credit {1}": "líneas: debe {0}, haber {1}",
+  "{0} receipt without image content left out": ["{0} justificante sin contenido de imagen omitido", "{0} justificantes sin contenido de imagen omitidos"]
 }

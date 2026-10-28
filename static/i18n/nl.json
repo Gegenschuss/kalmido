@@ -14944,5 +14944,7 @@
   "{0} account label": ["{0} rekeningomschrijving", "{0} rekeningomschrijvingen"],
   "{0} booking taken over": ["{0} boeking overgenomen", "{0} boekingen overgenomen"],
   "{0} receipt image": ["{0} bonafbeelding", "{0} bonafbeeldingen"],
-  "{0} row": ["{0} rij", "{0} rijen"]
+  "{0} row": ["{0} rij", "{0} rijen"],
+  "lines: debit {0}, credit {1}": "regels: debet {0}, credit {1}",
+  "{0} receipt without image content left out": ["{0} bon zonder afbeeldingsinhoud overgeslagen", "{0} bonnen zonder afbeeldingsinhoud overgeslagen"]
 }
