@@ -131,7 +131,7 @@ def bw_lines_clean(v, date=None):
         kind = x.get("kind") or "food"
         if kind not in BW_KINDS:
             raise BadInput(tr("Invalid value: {0}", "amounts"))
-        rate = _amount(x.get("rate", bw_default_rate(kind, date)), "rate", 0, 100)
+        rate = _amount(x.get("rate") if x.get("rate") not in (None, "") else bw_default_rate(kind, date), "rate", 0, 100)
         gross = _amount(x.get("gross"), "amounts", 0, 10 ** 7, allow_none=True)
         if gross is None or gross == 0:
             continue
