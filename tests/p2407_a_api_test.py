@@ -165,7 +165,7 @@ check((wk(A, T) or {}).get("text") == "Back", "#3513: a new line brings the mark
 check(cl.delete(path() + "?state=failed").ok and kt.dbx("SELECT state FROM agent_jobs WHERE id=?", (J2,))[0][0] == "failed",
       "#3513: DELETE ?state=failed ends the job as failed")
 # two jobs of one agent on one task (a host with part jobs): job_id picks one
-ja = cl.post(V + "/agent/jobs", json={"title": "Part A", "task_id": T}).json()["id"]
+ja = cl.post(V + "/agent/jobs", json={"title": "Part A", "task_id": T, "user_id": ME["id"]}).json()["id"]  # 2.407.0 (review): a job for a person
 jb = cl.post(V + "/agent/jobs", json={"title": "Part B", "task_id": T}).json()["id"]
 check((wk(A, T) or {}).get("agent_id") == CL, "#3513: a plain running job with task_id shows the same way")
 kt.dbx("UPDATE agent_jobs SET updated_at=? WHERE id IN (?, ?)", ((datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(timespec="seconds"), ja, jb))
@@ -175,7 +175,18 @@ logs = {x[0]: x[1] for x in kt.dbx("SELECT id, log FROM agent_jobs WHERE id IN (
 check("line of A" in (logs.get(ja) or "") and "line of A" not in (logs.get(jb) or ""), f"#3513: ... the other job is untouched {logs}")
 check(cl.patch(path(T2), json={"text": "x", "job_id": ja}).status_code == 404, "#3513: a job of another task: 404")
 check((wk(A, T) or {}).get("text") == "line of A", "#3513: the newest update of the task shows")
-cl.patch(V + f"/agent/jobs/{ja}", json={"state": "done"})
+# 2.407.0 (#3513, review): the line through /working is a heading of the job's history too (the person's job chat), like append_log
+check(any(x[0] == "line of A" for x in kt.dbx("SELECT text FROM agent_steps WHERE job_id=?", (ja,))),
+      "#3513: a /working line of a job for a person lands in its history (agent_steps)")
+# 2.407.0 (#3513, review): a line through append_log is redacted before it shows at the mark
+cl.patch(V + f"/agent/jobs/{jb}", json={"append_log": "pushed with " + SECRET})
+check(SECRET not in (wk(A, T) or {}).get("text", "") and SECRET not in (kt.dbx("SELECT log FROM agent_jobs WHERE id=?", (jb,))[0][0] or ""),
+      f"#3513: append_log is redacted at the mark and in the log {wk(A, T)}")
+# 2.407.0 (#3513, review): DELETE ?job_id= ends only that job
+r = cl.delete(path() + f"?job_id={ja}")
+st = {x[0]: x[1] for x in kt.dbx("SELECT id, state FROM agent_jobs WHERE id IN (?, ?)", (ja, jb))}
+check(r.ok and r.json().get("ended") == 1 and st == {ja: "done", jb: "running"}, f"#3513: DELETE ?job_id= ends only that job {r.text[:120]} {st}")
+check(cl.delete(path() + f"?job_id={ja}").status_code == 404, "#3513: ... an ended job_id: 404")
 cl.patch(V + f"/agent/jobs/{jb}", json={"state": "done"})
 check(not wk(A, T), "#3513: ended plain jobs show nothing")
 kt.dbx("INSERT INTO agent_jobs(agent_id,task_id,title,state,log,created_at,updated_at,kind,prop_state) VALUES(?,?,?,?,?,?,?,?,?)",

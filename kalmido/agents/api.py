@@ -24,7 +24,7 @@ from ..agents.core import (
 )
 from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
-from ..agents.steps import step_clean  # 2.407.0 A (#3513)
+from ..agents.steps import redact, step_clean, steps_job_log  # 2.407.0 A (#3513)
 from ..core.serializers import wk_for  # 2.407.0 A (#3513)
 from ..agents.workstyle import ws_public
 from ..agents.control import ctl_public  # 2.235.0 A (#2891)
@@ -403,8 +403,9 @@ def v1_agent_job_update(jid):
     f = v1_job_in(c, aid, b, False)
     log = j["log"] or ""
     if "log" in b:
-        log = b["log"]
+        log = redact(b["log"])[0] if isinstance(b["log"], str) else b["log"]  # 2.407.0 (#3513): the last line shows on the task
     if b.get("append_log"):
+        b["append_log"] = redact(b["append_log"])[0] if isinstance(b["append_log"], str) else b["append_log"]
         log = (log + ("\n" if log else "") + b["append_log"])
     f["log"] = log[-JOB_LOG_MAX:]
     f["updated_at"] = iso(now_utc())
@@ -480,6 +481,8 @@ def wk_set(c, aid, tid, b, j):
     if j:
         log = (j["log"] or "") + ("\n" if j["log"] and text else "") + text
         c.execute("UPDATE agent_jobs SET log=?, updated_at=? WHERE id=?", (log[-JOB_LOG_MAX:], ts, j["id"]))
+        if text:  # 2.407.0 (#3513, review): like append_log, the line is a heading of the job's history (the person's job chat)
+            steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (j["id"],)).fetchone(), text)
         jid, code = j["id"], 200
     else:
         try:
@@ -531,15 +534,17 @@ def v1_task_working_update(tid):
 @app.delete("/api/v1/tasks/<int:tid>/working")
 @v1_view
 def v1_task_working_end(tid):
-    """?state=done|failed|stopped (default done) -- stop working on the task: the mark disappears at once."""
-    a = v1_args(("state",))
+    """?state=done|failed|stopped (default done), ?job_id= (only that job, else all of the agent on the task) -- stop working
+    on the task: the mark disappears at once."""
+    a = v1_args(("state", "job_id"))
     c = db()
     aid = wk_need(c, tid)
     st = a.get("state") or "done"
     if st not in ("done", "failed", "stopped"):
         raise BadInput(tr("Invalid value: {0}", "state"))
-    n = c.execute("""UPDATE agent_jobs SET state=?, updated_at=? WHERE agent_id=? AND task_id=? AND state='running' AND kind IS NULL
-                     AND COALESCE(approval, '')=''""", (st, iso(now_utc()), aid, tid)).rowcount
+    one = wk_pick(c, aid, tid, a) if a.get("job_id") not in (None, "") else None  # 2.407.0 (#3513, review): ?job_id= ends only that job
+    n = c.execute(f"""UPDATE agent_jobs SET state=?, updated_at=? WHERE agent_id=? AND task_id=? AND state='running' AND kind IS NULL
+                     AND COALESCE(approval, '')=''{' AND id=?' if one else ''}""", (st, iso(now_utc()), aid, tid, *((one["id"],) if one else ()))).rowcount
     if n:
         bump(c)
     c.commit()
