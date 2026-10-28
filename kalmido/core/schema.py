@@ -3693,6 +3693,9 @@ MIGRATIONS = [
     # 2.332.0 C (#3301): the approver's signature picture on the receipt PDF (office/meals.py approve; 0 = the confirmation
     # text only, as before). Older versions ignore it
     ("office_meals", "sign_image", "ALTER TABLE office_meals ADD COLUMN IF NOT EXISTS sign_image BIGINT NOT NULL DEFAULT 0"),
+    # 2.409.0 (#3490): the areas the organisation's admins switched off for its members (csv of area ids, accounts/wsareas.py;
+    # '' = all on). Older versions ignore it (every area as the person's module switches say)
+    ("orgs", "areas_off", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS areas_off TEXT NOT NULL DEFAULT ''"),
     # 2.371.3 (#3152): the default reading style of the organisation's / the person's private knowledge space (wiki/wkstyle.py
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
@@ -4102,6 +4105,9 @@ USER_DEFAULTS = {
     # 2.57.0 B (#1807): my own colour per workspace, json {"private" | "org:<id>": tone key of LP_TONES | "none"};
     # a missing key = the default (an organisation: its admins' colour, Private: neutral). Only I see it.
     "ws_colors": "{}",
+    # 2.409.0 (#3490): the areas I switched off per workspace, json {"private" | "org:<id>": [area id]} (accounts/wsareas.py);
+    # below the module switches ("features" off = off everywhere) and the admins' choice of an organisation
+    "ws_areas_off": "{}",
     # 2.143.0 D (#2155): the appearance of all devices, json {LOOK_KEYS key: value}; '' = never saved (the first device uploads its own)
     "look": "",
     # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the

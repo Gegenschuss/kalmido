@@ -270,7 +270,8 @@ function mg_modAreaHtml(id, partRow) {
   return `<div class="modrow mgarea ${on ? '' : 'off'} ${on && !all ? 'part' : ''}" data-mgrow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-mgarea="${id}" ${all ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(a[2])}</b><small class="muted">${tr(MG_DESC[id])}</small>${modPrivHtml(ks)}</span></label>
     <details class="mopt mgparts"><summary>${tr('Parts: {0}', a[3].map(p => tr(p[2])).join(', '))}</summary><div class="modlist">${ks.map(partRow).join('')}</div></details></div>`;
 }
-function mg_setSync(md) {
+function mg_setSync(md) { wsa_raw(() => mg_setSyncMain(md)); }  // 2.409.0 (#3490): the main switches
+function mg_setSyncMain(md) {
   for (const el of $$('[data-mgarea]', md)) if (el.matches('input')) { const id = el.dataset.mgarea; el.checked = mg_allOn(id); el.indeterminate = !el.checked && mg_on(id); }  // 2.171.0 (#2676)
   $$('[data-mgrow]', md).forEach(r => { const id = r.dataset.mgrow; r.classList.toggle('off', !mg_on(id)); r.classList.toggle('part', mg_on(id) && !mg_allOn(id)); });
 }
@@ -280,7 +281,7 @@ async function mg_areaSwitch(md, el) {
   const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
   for (const k of mg_feats(id)) on ? fs.add(k) : fs.delete(k);
   await setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, on ? tr('{0} on', n) : tr('{0} off', n));
-  for (const x of $$('[data-feat]', md)) { x.checked = feat(x.dataset.feat); x.closest('[data-modrow]')?.classList.toggle('off', !x.checked); }
+  wsa_raw(() => { for (const x of $$('[data-feat]', md)) { x.checked = feat(x.dataset.feat); x.closest('[data-modrow]')?.classList.toggle('off', !x.checked); } });  // 2.409.0 (#3490)
   mg_setSync(md); modCountsSync(md);
   if (id === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }  // the time options
 }
@@ -765,4 +766,107 @@ function sbb_panelHtml(id) {
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
   return title + `<div class="sgroup sbbp">${sbb_row(sbb_target(id), d[1], tr(d[2]), true)}</div>`;
+}
+// ---- 2.409.0 (#3490): areas on / off per workspace. The module switches ("features") stay the main switch (off = off
+// everywhere); below it each person switches areas off per own workspace (setting ws_areas_off, json {ws: [area]}, Settings >
+// Modules "Areas per workspace") and an organisation's admins switch areas off for all its members (orgs.areas_off, Settings >
+// Workspaces; the server then refuses the area's routes there, accounts/wsareas.py). "All workspaces" shows an area that is
+// on in at least one workspace. Nothing is deleted. feat() (core.js) asks wsa_featOff; WSA.raw > 0 = the main switches only
+// (Settings > Modules shows and changes those)
+const WSA_AREAS = ['office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets'];
+const WSA_ORG = WSA_AREAS.filter(a => a !== 'review');  // review is private only (O3A_PRIV)
+const WSA = {raw: 0, cur: null, own: null, ws: null, off: new Set(), ownS: null, ownO: {}};
+function wsa_raw(fn) { WSA.raw++; try { return fn(); } finally { WSA.raw--; } }
+const wsa_feats = id => mg_area(id) ? mg_feats(id) : [id];  // wiki, sheets: the module itself
+const wsa_name = (id, ws) => id === 'life' && ws?.startsWith('org:') ? O3A_LIFE_NAME : mg_area(id)?.[2] || (id === 'wiki' ? N_('Knowledge|area') : N_('Tables'));
+const wsa_areaOfMod = mod => mod === 'wiki' || mod === 'sheets' ? mod : mg_areaOf(mod === 'bookmarks' ? 'reading' : mod)?.[0] || null;
+function wsa_own() {
+  const s = S.settings?.ws_areas_off || '{}';
+  if (s !== WSA.ownS) { WSA.ownS = s; try { const o = JSON.parse(s); WSA.ownO = o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { WSA.ownO = {}; } }
+  return WSA.ownO;
+}
+const wsa_adm = ws => ws?.startsWith('org:') ? wsOrg(ws.slice(4))?.areas_off || [] : [];
+const wsa_spaces = () => wsOn() ? wsOptions().filter(w => w !== 'all') : ['private'];
+// on in workspace ws (below the main switch); review only in Private
+const wsa_wsOn = (ws, id) => !(id === 'review' && ws !== 'private') && !wsa_adm(ws).includes(id) && !(wsa_own()[ws] || []).includes(id);
+const wsa_areaOn = (id, ws = wsCur()) => ws === 'all' ? wsa_spaces().some(w => wsa_wsOn(w, id)) : wsa_wsOn(ws, id);
+function wsa_featOff(f) {
+  if (WSA.raw || !S.settings) return false;
+  const cur = wsCur();
+  if (cur !== WSA.cur || S.settings.ws_areas_off !== WSA.own || S.me?.workspaces !== WSA.ws) {
+    WSA.cur = cur; WSA.own = S.settings.ws_areas_off; WSA.ws = S.me?.workspaces;
+    WSA.off = new Set(WSA_AREAS.filter(id => !(id === 'review' && cur !== 'private' && cur !== 'all') && !wsa_areaOn(id, cur)).flatMap(wsa_feats));
+  }
+  return WSA.off.has(f);
+}
+// an area of the main switch that is on (some part) -- what Settings > Modules offers per workspace
+const wsa_mainOn = id => wsa_raw(() => mg_area(id) ? mg_on(id) : modOn(id));
+// Settings > Modules: one group per workspace with a switch per area (only with organisations: alone, Private = the main switches)
+function wsa_modHtml() {
+  const sps = wsa_spaces(); if (sps.length < 2 || S.me?.kid) return '';
+  const ids = WSA_AREAS.filter(wsa_mainOn); if (!ids.length) return '';
+  const grp = ws => {
+    const rows = ids.filter(id => ws === 'private' || id !== 'review').map(id => {
+      const adm = wsa_adm(ws).includes(id), on = wsa_wsOn(ws, id);
+      return `<div class="modrow ${on ? '' : 'off'}" data-wsarow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-wsa="${id}" data-wsaws="${ws}" ${on ? 'checked' : ''} ${adm ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${esc(tr(wsa_name(id, ws)))}</b>${adm ? `<small class="muted">${esc(tr('Switched off by the admins of {0}', wsName(ws)))}</small>` : ''}</span></label></div>`;
+    });
+    const n = ids.filter(id => (ws === 'private' || id !== 'review') && wsa_wsOn(ws, id)).length, t = ids.filter(id => ws === 'private' || id !== 'review').length;
+    return `<details class="modgrp wsagrp" data-wsagrp="${ws}"><summary><span class="mgn">${wsIcon(ws)} ${esc(wsName(ws))}</span><span class="mgc muted">${esc(tr('{0} of {1} on', n, t))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${rows.join('')}</div></details>`;
+  };
+  return `<h4 id="s-wsa-h">${tr('Areas per workspace')}</h4><div class="shint">${tr('Switched off here, an area disappears only in that workspace; the switches above apply everywhere. Nothing is deleted.')}</div>${sps.map(grp).join('')}`;
+}
+document.addEventListener('change', async e => {
+  const el = e.target; if (!el?.dataset?.wsa || !el.dataset.wsaws) return;
+  e.stopPropagation();
+  const id = el.dataset.wsa, ws = el.dataset.wsaws, on = el.checked, o = JSON.parse(JSON.stringify(wsa_own())), xs = new Set(o[ws] || []);
+  on ? xs.delete(id) : xs.add(id);
+  if (xs.size) o[ws] = WSA_AREAS.filter(x => xs.has(x)); else delete o[ws];
+  const n = `${tr(wsa_name(id, ws))} · ${wsName(ws)}`;
+  el.closest('[data-wsarow]')?.classList.toggle('off', !on);
+  await setApply({ws_areas_off: JSON.stringify(o)}, on ? tr('{0} on', n) : tr('{0} off', n));
+  wsa_sync(); render();
+}, true);
+// the switches follow an undo / another device (settingsSync)
+function wsa_sync(md = $$('.smodal').pop()) {
+  if (!md) return;
+  for (const el of $$('input[data-wsa]', md)) { const on = wsa_wsOn(el.dataset.wsaws, el.dataset.wsa); el.checked = on; el.closest('[data-wsarow]')?.classList.toggle('off', !on); }
+  for (const d of $$('[data-wsagrp]', md)) { const ins = $$('input[data-wsa]', d), c = $('.mgc', d); if (c) c.textContent = tr('{0} of {1} on', ins.filter(x => x.checked).length, ins.length); }
+}
+// Settings > Workspaces: the areas an organisation's members see (its admins decide, every member sees it; box._j = GET /api/orgs)
+function wsa_orgPaneDraw(box) {
+  if (!box?.isConnected) return;
+  const orgs = (box._j || {}).orgs || [];
+  for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
+    const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.wsa-org') || !Array.isArray(o.areas_off)) continue;
+    const adm = o.role === 'admin', ws = 'org:' + o.id;
+    const sec = document.createElement('div');
+    sec.className = 'wsa-org';
+    sec.innerHTML = `<h4>${tr('Areas in this organisation')}</h4><div class="shint keep">${esc(tr('Switched off, an area disappears for every member in this organisation and cannot be opened there; nothing is deleted.') + (adm ? '' : ' ' + tr('Only an admin of the organisation can change this.')))}</div>`
+      + `<div class="wsa-orgrows">${WSA_ORG.map(id => `<label class="chkl"><input type="checkbox" data-wsaorg="${id}" ${o.areas_off.includes(id) ? '' : 'checked'} ${adm ? '' : 'disabled'}> ${esc(tr(wsa_name(id, ws)))}</label>`).join('')}</div>`;
+    det.appendChild(sec);
+    if (!adm) continue;
+    sec.addEventListener('change', async e => {
+      const cb = e.target.closest('input[data-wsaorg]'); if (!cb) return;
+      e.stopPropagation();
+      const id = cb.dataset.wsaorg, on = cb.checked;
+      const put = v => async () => {
+        const off = new Set(o.areas_off); v ? off.delete(id) : off.add(id);
+        const j = await api('PATCH', `/api/orgs/${o.id}`, {areas_off: WSA_ORG.filter(x => off.has(x))});
+        o.areas_off = j?.areas_off || WSA_ORG.filter(x => off.has(x));
+        const w = wsOrg(o.id); if (w) { w.areas_off = o.areas_off; WSA.ws = null; }
+        const x = $(`input[data-wsaorg="${id}"]`, sec); if (x) x.checked = v;
+        render(); return {};
+      };
+      try { await put(on)(); } catch { cb.checked = !on; return; }
+      const label = `${tr(wsa_name(id, ws))} · ${o.name}`;
+      offerUndo(on ? tr('{0} on', label) : tr('{0} off', label), histAdd({label, undo: put(!on), redo: put(on)}));
+    });
+  }
+}
+// the router: an old link to an area that is off in the shown workspace (but on in another): a hint with a button to it
+function wsa_routeHint(mod) {
+  const id = wsa_areaOfMod(mod), cur = wsCur(); if (!id || cur === 'all' || S.me?.kid || modOn(mod) || !wsa_raw(() => modOn(mod))) return;
+  const to = wsa_spaces().find(w => w !== cur && wsa_wsOn(w, id)), h = location.hash.slice(1), n = tr(wsa_name(id, to || cur));
+  setTimeout(() => to ? toast(tr('{0} is off in this workspace. You find it in the workspace {1}.', n, wsName(to)), async () => { await wsSet(to); go(h); }, 10000, tr('Open'))
+    : toast(tr('{0} is off in this workspace.', n), null, 5000), 0);
 }

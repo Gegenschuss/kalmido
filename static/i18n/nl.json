@@ -14664,5 +14664,14 @@
   "Like the space ({0})": "Zoals de ruimte ({0})",
   "Clear|reading style": "Helder",
   "Book|reading style": "Boek",
-  "Default of the space": "Standaard van de ruimte"
+  "Default of the space": "Standaard van de ruimte",
+  "Areas per workspace": "Onderdelen per werkruimte",
+  "Switched off here, an area disappears only in that workspace; the switches above apply everywhere. Nothing is deleted.": "Hier uitgeschakeld verdwijnt een onderdeel alleen in die werkruimte; de schakelaars hierboven gelden overal. Er wordt niets verwijderd.",
+  "Switched off by the admins of {0}": "Uitgeschakeld door de beheerders van {0}",
+  "Areas in this organisation": "Onderdelen in deze organisatie",
+  "Switched off, an area disappears for every member in this organisation and cannot be opened there; nothing is deleted.": "Uitgeschakeld verdwijnt een onderdeel voor alle leden in deze organisatie en kan daar niet worden geopend; er wordt niets verwijderd.",
+  "Only an admin of the organisation can change this.": "Alleen een beheerder van de organisatie kan dit wijzigen.",
+  "{0} is off in this workspace. You find it in the workspace {1}.": "{0} staat uit in deze werkruimte. Je vindt het in de werkruimte {1}.",
+  "{0} is off in this workspace.": "{0} staat uit in deze werkruimte.",
+  "This area is switched off in this organisation by its admin.": "Dit onderdeel is in deze organisatie uitgeschakeld door de beheerder."
 }

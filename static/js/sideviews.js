@@ -159,8 +159,8 @@ function sv_entries() {
       folderNames().filter(f => !fParent(f)).forEach(f => fold(f, 0));
       return a;
     },
-    views: () => sideViewEntries().filter(x => !hid('e:' + x[0])).map(x => it('m:' + x[0], tr(x[1]))),
-    areas: () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? (mg_on(k) ? it('m:' + k, tr(/** @type {any} */ (mg_area(k))[2])) : null) : (x => x ? it('m:' + k, tr(x[1])) : null)(sideModEntries().find(x => x[0] === k))).filter(Boolean),
+    views: () => sideViewEntries().filter(x => !hid('e:' + x[0])).map(x => it('m:' + x[0], tr(/** @type {string} */ (x[1])))),  // 2.409.0: feat() is a boolean now, the entries [id, name, on]
+    areas: () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? (mg_on(k) ? it('m:' + k, tr(/** @type {any} */ (mg_area(k))[2])) : null) : (x => x ? it('m:' + k, tr(/** @type {string} */ (x[1]))) : null)(sideModEntries().find(x => x[0] === k))).filter(Boolean),
     filters: () => S.filters.map(f => it('f:' + f.id, f.name)),
     tags: () => Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, t)),
     team: () => [...(collab() ? (S.groups || []).filter(gr => myGroup(gr.id)).map(gr => it('g:' + gr.id, gr.name)) : []),

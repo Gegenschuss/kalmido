@@ -135,7 +135,8 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   progress: N_('Progress bar in the project header and the project status (“Where is it stuck?”); with collaboration also a status per project')};
 // 2.364.0 B (#3018): a person without an organisation reads no "only within your organisation" (their clients are their own)
 const FEAT_DESC_SOLO = {clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month')};
-const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
+// 2.409.0 (#3490): + the areas switched off in the shown workspace (areas.js wsa_featOff; the module switch stays the main switch)
+const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f) && !(typeof wsa_featOff === 'function' && wsa_featOff(f));
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
 // sharing / assigning in the UI (data stays; with the server switch off the API refuses them too)
 const collab = () => feat('collab') && S.collabAll !== false;
@@ -1366,6 +1367,7 @@ async function route() {
   const r = parseHash();
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private
+  wsa_routeHint(r.mod);  // 2.409.0 (#3490): an area off in this workspace: a hint with the way to the workspace where it is on
   const mgAlt = !modOn(r.mod) && mg_alt(r.mod); if (mgAlt) { if (S.booted && r.mod === 'time') setTimeout(() => toast(tr('Time tracking is off (Settings > Modules)')), 0); r.mod = mgAlt; r.key = mgAlt; delete r.client; delete r.contact; } mg_seen(r.mod);  // 2.44.0 (#1187): a part that is off: its area's other tab
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;

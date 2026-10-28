@@ -259,6 +259,9 @@ def clean_setting(k, v):
         return lp_clean_folder_colors(v)
     if k == "ws_colors":  # 2.57.0 B (#1807): my own colour per workspace
         return wsp_clean_ws_colors(v)
+    if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
+        from .wsareas import wsa_clean_own
+        return wsa_clean_own(v)
     if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
         return clean_look_pref(v)
     if k == "show_done_views":
