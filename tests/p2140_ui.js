@@ -298,7 +298,9 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     // phones and narrow list columns (an unfolded Fold with the sidebar): two cells, the rest in line 2, no title row
     // 2.40.0 (#1191): from 600 px on (tablets, the unfolded Fold at 880) the list has real columns with their titles; what
     // does not fit is hidden, nothing moves into line 2
-    if (vw >= 600 && vw < 900) check(x.head && x.align <= 2 && x.cells >= 3 && x.mlc === 0 && x.over <= 1, `${tag}: tablet columns with their titles, lined up ` + JSON.stringify(x));
+    // 2.364.0 (#3040): from 768 px on a tablet / an unfolded Fold has the computer navigation; with the panel the list is narrow
+    // there, so the computer rule of 2.290.0 C (#3163) applies: the cells under the title, no title row
+    if (vw >= 600 && vw < 900) check((x.head && x.align <= 2 && x.cells >= 3 && x.mlc === 0 && x.over <= 1) || (vw >= 768 && under && !x.head && x.mlc === x.all && x.over <= 1), `${tag}: tablet columns with their titles, lined up (or, with the computer navigation, under the title) ` + JSON.stringify(x));
     else if (phone || !x.head) check(x.cells <= 2 && x.shown + x.mlc === x.all && !x.head, `${tag}: at most two cells, the rest in line 2, no title row ` + JSON.stringify(x));
     else check(x.align <= 2 && x.cells >= 3 && x.shown + x.mlc === x.all, `${tag}: the title row lines up with the cells, the rest in line 2 ` + JSON.stringify(x));
     if (tag === '1920') check(x.shown === x.all && x.mlc === 0, '1920: every column has room, nothing doubled in line 2 ' + JSON.stringify(x));

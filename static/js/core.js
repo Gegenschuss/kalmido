@@ -1286,9 +1286,11 @@ const START_KEY = 'inbox';
 // 2.364.0 B (#3031): the app opened without a page in its address shows the chosen start page (setting start_page): Start
 // (default), the basket, Today or 'last' = the last task view of this device (the way before); a link with a page keeps it
 const START_PAGES = [['home', N_('Start|home')], ['inbox', N_('Basket')], ['today', N_('Today')], ['last', N_('The last opened view')]];
+// A fresh account whose welcome tour is still to come opens in Projects as before: the tour starts only there (tourAuto,
+// #2821), so Start comes from the next opening on
 function st_landing() {
   const p = S.settings?.start_page || 'home';
-  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !START_PAGES.some(x => x[0] === p)) return;
+  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !START_PAGES.some(x => x[0] === p) || S.settings?.tour === 'pending') return;
   history.replaceState(history.state, '', location.pathname + location.search + '#' + p);
 }
 const SMART = {
