@@ -4,6 +4,8 @@
 // - a task's detail drawn again while the tag field is typed in (the video section arrives late) keeps the text
 // - settings: a failed autosave leaves the typed value in its field (not reset to the saved one)
 // - a custom field of a task: a failed save leaves the typed value; leaving the field again saves it
+// - "Custom selection" of a project's bell, a dialog with a write behind OK (askDialog submit), renaming in Files: closed only
+//   once saved, on an error they stay open with what was ticked / typed
 // - the list dialog: "Close" with a failed save keeps the dialog and the typed name ("Discard changes?" first); Esc too
 // kalmido-suite: fresh
 const {boot, errs, B, login, until, sleep} = require('./boot');
@@ -159,6 +161,44 @@ const titles = async () => (await call('GET', '/api/state')).tasks.map(t => t.ti
   fake = null;
   cf = d.querySelector(`#detail [data-cf="${FB}"]`); cf.dispatchEvent(new w.FocusEvent('blur'));
   check(await until(async () => (await call('GET', '/api/tasks/' + T1)).fields?.[FB] === 'Bulb shop'), 'field: leaving it again saves it');
+
+  // ================= the bell's "Custom selection": closed once saved
+  w.__dialogs = 'manual';
+  w.eval(`bellCustomModal(${P})`);
+  check(await until(() => !!d.querySelector('.bcmodal [data-bc]')), 'bell: the custom selection is open');
+  const bmd = d.querySelector('.bcmodal');
+  fake = (m, p) => m === 'PUT' && p === `/api/lists/${P}/bell` ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
+  const bx = bmd.querySelector('[data-bc]'); const bwas = bx.checked; bx.checked = !bwas;
+  bmd.querySelector('[data-bcq="save"]').click();
+  check(await until(() => calls.some(c => c.p === `/api/lists/${P}/bell`) && !bmd.querySelector('[data-bcq="save"]').disabled), 'bell: the save was tried');
+  check(bmd.isConnected && bmd.querySelector('[data-bc]').checked === !bwas, 'bell 500: the dialog stays with the ticks');
+  fake = null;
+  bmd.querySelector('[data-bcq="save"]').click();
+  check(await until(() => !bmd.isConnected), 'bell: closed once saved');
+  check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === P)?.bell === 'custom'), 'bell: saved');
+
+  // ================= askDialog with a write behind OK
+  w.eval(`window.__sent = 0; window.__fail = true; window.__ask = askPrompt('Rename', 'Old name', {submit: async v => { window.__sent++; if (window.__fail) throw new Error('x'); }})`);
+  check(await until(() => !!d.querySelector('.modal.cdlg #cdlg-in')), 'ask: the dialog is open');
+  const amd = d.querySelector('.modal.cdlg'); amd.querySelector('#cdlg-in').value = 'New name';
+  amd.querySelector('[data-cd="yes"]').click();
+  check(await until(() => w.eval('window.__sent') === 1), 'ask: the write was tried');
+  await sleep(50);
+  check(amd.isConnected && amd.querySelector('#cdlg-in').value === 'New name', 'ask: an error keeps the dialog with the text');
+  w.eval('window.__fail = false'); amd.querySelector('[data-cd="yes"]').click();
+  check(await until(() => !amd.isConnected), 'ask: closed once it worked');
+  check(await w.eval('window.__ask') === 'New name', 'ask: the value comes back');
+
+  // ================= Files: rename
+  fake = (m, p) => m === 'PATCH' && p === '/api/files/nodes/987' ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
+  w.eval(`ab_rename({id: 987, name: 'notes.txt'})`);
+  check(await until(() => !!d.querySelector('.modal.cdlg #cdlg-in')), 'files: the rename dialog is open');
+  const rmd = d.querySelector('.modal.cdlg'); rmd.querySelector('#cdlg-in').value = 'garden notes.txt';
+  rmd.querySelector('[data-cd="yes"]').click();
+  check(await until(() => calls.some(c => c.p === '/api/files/nodes/987')), 'files: the rename was sent');
+  await sleep(100);
+  check(rmd.isConnected && rmd.querySelector('#cdlg-in').value === 'garden notes.txt', 'files 500: the dialog stays with the typed name');
+  rmd.querySelector('[data-cd="no"]').click(); fake = null;
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();

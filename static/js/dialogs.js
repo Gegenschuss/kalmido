@@ -149,7 +149,8 @@ function modalSub(parent, open) {
   };
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
+// 2.359.2 B (#3049): submit(value) = the write behind "OK": the dialog closes once it worked; false / an error keeps it open with its text
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after, submit}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
@@ -161,7 +162,15 @@ function askDialog({title, body = '', html = '', ok, danger = false, input = nul
     if (body || html) md.setAttribute('aria-describedby', 'cdlg-b');
     const prev = document.activeElement;
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); try { if (prev && prev.isConnected) prev.focus({preventScroll: true}); } catch { /* gone */ } };
-    md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); fin(input ? $('#cdlg-in', md).value : true); });
+    md.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault(); const v = input ? $('#cdlg-in', md).value : true;
+      if (submit) {
+        if (md._busy) return;
+        md._busy = 1; let r; try { r = await submit(v); } catch { r = false; } md._busy = 0;
+        if (r === false) return;
+      }
+      fin(v);
+    });
     md.addEventListener('click', e => { if (e.target.closest('[data-cd="no"]')) fin(input ? null : false); });
     md.addEventListener('keydown', e => {  // keep Tab inside the dialog
       if (e.key !== 'Tab') return;
@@ -490,11 +499,11 @@ function bellCustomOf(l) {
   for (const [r] of BELL_ROWS) out[r] = {news: 'news' in (c[r] || {}) ? !!c[r].news : !!m[r]?.news, push: 'push' in (c[r] || {}) ? !!c[r].push : !!m[r]?.push};
   return out;
 }
-async function bellSet(id, mode, custom) {
-  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return;
+async function bellSet(id, mode, custom) {  // 2.359.2 B (#3049): true = saved (or nothing to save)
+  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return true;
   const prev = l.bell || 'default', prevC = l.bell_custom || {};
   let j;
-  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return; }
+  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return false; }
   l.bell = mode; if (j?.custom) l.bell_custom = j.custom;
   renderSide(); render();
   const sel = $('#l-bell'); if (sel) { sel.value = mode; sel.dispatchEvent(new Event('bell-sync')); }
@@ -502,6 +511,7 @@ async function bellSet(id, mode, custom) {
     const r = await api('PUT', `/api/lists/${id}/bell`, prev === 'custom' || custom ? {mode: prev, custom: prevC} : {mode: prev});
     l.bell = prev; l.bell_custom = r?.custom || prevC; renderSide(); render(); const s2 = $('#l-bell'); if (s2) { s2.value = prev; s2.dispatchEvent(new Event('bell-sync')); }
   });
+  return true;
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
@@ -527,8 +537,11 @@ function bellCustomModal(id) {
     if (b.dataset.bcq === 'cancel') { md.remove(); return; }
     const custom = {};
     for (const x of $$('[data-bc]', md)) (custom[x.dataset.bc] ||= {})[x.dataset.ch] = x.checked ? 1 : 0;
-    md.remove();
-    await bellSet(id, 'custom', custom);
+    if (b.disabled) return;
+    b.disabled = true;  // 2.359.2 B (#3049): closed once saved; on an error the ticks stay (api() said why)
+    const ok = await bellSet(id, 'custom', custom);
+    b.disabled = false;
+    if (ok) md.remove();
   });
   setTimeout(() => $('[data-bc]', md)?.focus(), 30);
 }

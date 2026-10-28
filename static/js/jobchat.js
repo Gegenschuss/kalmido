@@ -131,7 +131,9 @@ const jc_cardBtn = j => !j.kind && j.can_stop && jc_live(j) ? `<button class="bt
 async function jc_msg(jid) {
   const j = (S.jobs?.items || []).find(x => x.id === jid) || S.jc.jobs[jid] || {id: jid};
   let ta = null;
-  const ok = await askDialog({title: tr('Message to {0}', jc_label(j)), ok: tr('Send'),
+  // 2.359.2 B (#3049): sent before the dialog closes; on an error it stays open with the text (api() said why)
+  const send = async () => { const text = ta?.value.trim(); if (!text) return false; await api('POST', `/api/agents/jobs/${jid}/action`, {action: 'message', text}); toast(tr('Sent to {0}', jc_label(j))); };
+  await askDialog({title: tr('Message to {0}', jc_label(j)), ok: tr('Send'), submit: send,
     html: `<textarea id="jc-text" class="jc-text" rows="4" maxlength="4000" aria-label="${esc(tr('Message to {0}', jc_label(j)))}"></textarea><p class="muted jc-hint">${esc(tr('The job reads it after its next step.'))}</p>`,
     after: md => {
       ta = $('#jc-text', md); const b = $('[data-cd="yes"]', md); b.disabled = true;
@@ -139,10 +141,6 @@ async function jc_msg(jid) {
       ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ta.value.trim()) { e.preventDefault(); b.click(); } });
       setTimeout(() => ta.focus(), 60);
     }});
-  const text = ok && ta ? ta.value.trim() : '';
-  if (!text) return;
-  try { await api('POST', `/api/agents/jobs/${jid}/action`, {action: 'message', text}); toast(tr('Sent to {0}', jc_label(j))); }
-  catch { /* api() shows the error */ }
 }
 
 // ---- #1793: running jobs with a name in the agent menu of the top bar (only the ones for me)
