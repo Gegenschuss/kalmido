@@ -920,6 +920,7 @@ ROUTES = {
     "PATCH /api/agents/{}/chat/{}": "agent",
     # 2.44.0 (#1517): one-command setup of an agent on a computer (one-time code, the computers = the agent's tokens)
     "POST /api/my/agents/{}/setup-code": "agent", "GET /api/my/agents/{}/machines": "agent",
+    "GET /api/my/agents/{}/audit": "agent",  # 2.361.4 (#2928): the owner's log of their personal agent
     "DELETE /api/my/agents/{}/machines/{}": "agent", "POST /api/admin/agents/{}/setup-code": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
