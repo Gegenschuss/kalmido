@@ -459,6 +459,15 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "tap_done"))
         c.execute("UPDATE lists SET tap_done=? WHERE id=?", (int(tv), lid))
         b = {k: v for k, v in b.items() if k != "tap_done"}
+    if "props" in b:  # 2.412.0 (#3552): the properties switched by hand against the project type (owner / project admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and project admins can change this setting"), 403)
+        from ..lists.templates import props_clean
+        try:
+            c.execute("UPDATE lists SET props=? WHERE id=?", (props_clean(b["props"]), lid))
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "props"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change the shown fields"), 403)
@@ -486,7 +495,7 @@ def list_update(lid):
     pt_out = {"modules_on": tb_col_on} if tb_col_on is not None else {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:
-            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids"}))
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids", "props"}))  # 2.412.0 (#3552): + props (set above, the undo)
             pt_out["modules_on"] = [*pt_out.get("modules_on", []), *[m for m in (tb_col_on or []) if m not in pt_out.get("modules_on", [])]]
         except BadInput as e:
             return err(str(e))

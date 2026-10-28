@@ -771,7 +771,7 @@ function taskMenu(anchor, id, o = {}) {
     }}] : []),
     // priority, assignee
     ...(inPanel ? [] : [PRIO_ROW(id)]),
-    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
     {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
@@ -803,14 +803,14 @@ function taskMenu(anchor, id, o = {}) {
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)
     {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }, ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
     ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
-    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
+    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
     ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
     ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
-    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
+    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
     '-',

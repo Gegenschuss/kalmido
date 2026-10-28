@@ -193,6 +193,7 @@ WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate
 WEB_LIST_EDIT |= {"group_field"}  # 2.144.0 C (#2414)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
 WEB_LIST_EDIT |= {"ticket_key"}  # 2.390.0 (#3353): the project's ticket key (owner / list admins)
+WEB_LIST_EDIT |= {"props"}  # 2.412.0 (#3552): properties against the project type (owner / project admins)
 WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "mentions"})  # 2.64.1 (#1817): mentions  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
 WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
 

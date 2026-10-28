@@ -14963,5 +14963,20 @@
   "Show administration again": "Beheer weer tonen",
   "You now see Kalmido like a member. Your rights stay the same.": "Je ziet Kalmido nu zoals een lid. Je rechten blijven gelijk.",
   "Administration is shown again": "Beheer wordt weer getoond",
-  "{0} table stays in the tables' trash": ["{0} tabel blijft in de prullenbak van de tabellen", "{0} tabellen blijven in de prullenbak van de tabellen"]
+  "{0} table stays in the tables' trash": ["{0} tabel blijft in de prullenbak van de tabellen", "{0} tabellen blijven in de prullenbak van de tabellen"],
+  "Repository and code": "Repository en code",
+  "Client and contacts": "Klant en contacten",
+  "Documents and invoices": "Documenten en facturen",
+  "As the project type": "Zoals het projecttype",
+  "Switch": "Wisselen",
+  "Properties": "Eigenschappen",
+  "Switch to {0}?": "Wisselen naar {0}?",
+  "Shown: {0}": "Getoond: {0}",
+  "Properties of {0}": "Eigenschappen van {0}",
+  "Properties as the project type": "Eigenschappen zoals het projecttype",
+  "What the tasks of this project show.": "Wat de taken van dit project tonen.",
+  "What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.": "Wat de taken van dit project tonen. {0} verbergt wat het niet nodig heeft; zet losse onderdelen hier weer aan.",
+  "Hidden is display only: nothing is deleted.": "Verbergen verandert alleen de weergave: er wordt niets verwijderd.",
+  "These properties are hidden then: {0}. Nothing is deleted; you can switch them back on under Properties.": "Deze eigenschappen worden dan verborgen: {0}. Er wordt niets verwijderd; onder Eigenschappen zet je ze weer aan.",
+  "{0} changed by hand": ["{0} met de hand gewijzigd", "{0} met de hand gewijzigd"]
 }

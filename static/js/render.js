@@ -1066,7 +1066,7 @@ function taskRow(t, opts = {}) {
   if (t.code?.build && !opts.trash && rs('code')) { const h = buildRowHint(t); if (h) meta.push(h); }  // 2.151.0 A (#2558): stale / only on a branch
   if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
-  const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)
+  const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id) && pz_on(t.list_id, 'who');  // 1.10.0: assignee column (own cell, click = assign); 2.412.0 (#3552): the property
   if (ac) who = whoCell(t);
   else if (lc) { /* 2.14.0: the assignee is a column or not shown */ }
   else if (t.assignee_group_id && collab()) {  // 2.10.0 (#441): assigned to a group
@@ -1101,7 +1101,7 @@ function taskRow(t, opts = {}) {
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
   // titles with and without a number start at the same x
-  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
+  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num') && pz_on(t.list_id, 'ticket')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
   if (gut) meta.unshift(`<span class="mid" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>`);
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
@@ -1372,19 +1372,21 @@ const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee
   ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')]];
 const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
-  const ok = k => k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
+  // 2.412.0 (#3552): a property the project switched off (props.js) is no column either
+  const ok = k => !pz_on(l, PZ_COL[k] || '') ? false : k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
   return [...COLS.filter(([k]) => ok(k)).map(([k, n]) => [k, tr(n)]), ...fieldsOf(l.id).map(f => ['f:' + f.id, f.name])];
 }
 const colCfg = lid => { const l = listById(lid); return l && Array.isArray(l.columns) ? l.columns : null; };
 function listCols(l) {  // the list's own columns that apply right now, or null (default layout)
   const c = l && colCfg(l.id); if (!c) return null;
-  const av = new Set(['id', ...colChoices(l).map(x => x[0])]);
+  const av = new Set([...(pz_on(l, 'ticket') ? ['id'] : []), ...colChoices(l).map(x => x[0])]);
   return c.filter(k => av.has(k));
 }
 function colDefault(l) {  // what the default layout shows: the starting point of "Columns…"
   const fs = fieldsOf(l.id), all = LS.get('fcols.' + l.id, false);
-  return [...(ticketsOn(l.id) || idsOn(l.id) ? ['id'] : []), 'due', ...(acolOn(l.id) ? ['who'] : []), ...(timeOn() && mtTime(l.id) ? ['time'] : []),  // 2.41.0 (#1471): mtTime
-    ...(all ? fs : fs.filter(f => f.pinned)).map(f => 'f:' + f.id), 'progress', ...(depsOn() && isProject(l.id) ? ['deps'] : []), 'tags'];
+  const on = new Set(colChoices(l).map(x => x[0]));  // 2.412.0 (#3552): only what the project's properties show
+  return [...((ticketsOn(l.id) || idsOn(l.id)) && pz_on(l, 'ticket') ? ['id'] : []), 'due', ...(acolOn(l.id) && on.has('who') ? ['who'] : []), ...(timeOn() && mtTime(l.id) && on.has('time') ? ['time'] : []),  // 2.41.0 (#1471): mtTime
+    ...(all ? fs : fs.filter(f => f.pinned)).map(f => 'f:' + f.id), 'progress', ...(depsOn() && isProject(l.id) && on.has('deps') ? ['deps'] : []), ...(on.has('tags') ? ['tags'] : [])];
 }
 const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + ((S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text') : k);
 const lcOvf = i => [2, 3, 5, 7, 10].filter(n => i >= n).map(n => 'o' + n).join(' ');

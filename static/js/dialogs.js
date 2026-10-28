@@ -274,7 +274,7 @@ async function setListPtype(id, pt, o = {}) {  // o.post: runs after an undo / r
   for (const k in prev) after[k] = lv(k, x[k]);  // 0 / 1 for the ticket types, as stored (the server's _prev check)
   // list admins: only the type itself (kind / ticket types / view are the owner's settings; they stay switched on)
   const go = (to, from) => async () => {
-    const own = isOwner(listById(id) || l), pick = o => own ? o : {ptype: o.ptype};
+    const own = isOwner(listById(id) || l), pick = o => own ? o : {ptype: o.ptype, ...('props' in o ? {props: o.props} : {})};  // 2.412.0 (#3552): props = owner + admins
     const res = await api('PATCH', '/api/lists/' + id, {...pick(to), _prev: pick(from)});
     return {skipped: (res.conflicts || []).length ? [`${qn(lname(listById(id)) || '')}: ${tr('Project type')}`] : []};
   };
@@ -833,7 +833,7 @@ function lmSec(k, title, inner, fown = [], open = false) {
 function lmSum(sec) {
   const out = [], lab = el => (el.closest('.row')?.querySelector(':scope > label')?.textContent || '').trim();
   for (const el of sec.querySelectorAll('.lmsecb input, .lmsecb select, .lmsecb .lmsum, .lmsecb #l-e2e-st')) {
-    if (el.closest('[hidden], .members, .emogrid, .pbarea')) continue;
+    if (el.closest('[hidden], .members, .emogrid, .pbarea, .pzlist')) continue;  // 2.412.0 (#3552): .pzlist says its state in .lmsum
     if (el.matches('.lmsum, #l-e2e-st')) { if (el.textContent.trim()) out.push(el.textContent.trim()); continue; }
     if (el.type === 'checkbox') { if (!el.checked) continue; const r = el.closest('.row'), n = r ? r.querySelectorAll('input[type="checkbox"]').length : 0; out.push(n === 1 && lab(el) ? lab(el) : (el.closest('label')?.textContent || '').trim()); continue; }
     if (el.tagName === 'SELECT') { const d = el.dataset.lmdef ?? el.options[0]?.value; if (el.value !== d && el.selectedOptions[0]) out.push(`${lab(el)}: ${el.selectedOptions[0].textContent.trim()}`); continue; }
@@ -965,6 +965,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
+    ${id && !l.is_inbox ? lmSec('props', tr('Properties'), pz_boxHtml(l), fown) : ''}${''/* 2.412.0 (#3552): the properties of the tasks (props.js) */}
     ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
     ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`);
   lmSecWire(md);
@@ -982,6 +983,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
+  if (id) pz_wire(md, id);  // 2.412.0 (#3552): properties
   if (id) rvw_wire(md, id);  // 2.60.0 C (#1512): review step
   if (id) o3c_wire(md, id);  // 2.83.0 C (#1427): header strip
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
@@ -1034,6 +1036,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
     tp_sync(md, x);  // 2.46.4 (#1751)
+    pz_sync(md, x);  // 2.412.0 (#3552)
     const keep = force ? [] : [['l-name', 'name'], ['l-folder', 'folder'], ['l-rate', 'rate'], ['l-dayh', 'day_hours']].filter(([e]) => document.activeElement === $('#' + e, md)).map(([, k]) => k);
     lbase = {...x, ...Object.fromEntries(keep.map(k => [k, lbase[k]]))};  // 2.270.0 A (#3019): a field being typed keeps its base
   };
@@ -1117,6 +1120,7 @@ function listModal(id, folder = '', o = {}) {
   const ptypeChange = v => (ptRun = ptRun.then(() => { const sel = $('#l-ptype', md); if (md.isConnected && sel && sel.value === v) return ptypeChange1(v); }).catch(() => {}));
   const ptypeChange1 = async v => {
     await autosave();
+    if (!await pz_askType(listById(id) || l, v)) { lsync(); return; }  // 2.412.0 (#3552): first what the new type hides
     const sel = $('#l-ptype', md), r = await setListPtype(id, v, {post: () => lsync()});
     if (!md.isConnected) return;
     if (!r) { lsync(); return; }

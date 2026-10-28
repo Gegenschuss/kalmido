@@ -205,8 +205,9 @@ const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
 const isProject = lid => { const l = listById(lid); return !!l && !l.is_inbox; };
-const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
-const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
+// 2.412.0 (#3552): + the project's properties (props.js); a task with tracked time / dependencies keeps showing them
+const tFor = t => !!t && timeOn() && mtTime(t.list_id) && pz_show(t, 'time', taskTime(t.id)[0]);    // time tracking for this task (2.41.0 #1471: the list's switch)
+const dFor = t => !!t && depsOn() && isProject(t.list_id) && pz_show(t, 'deps', (t.blockers || []).length);    // dependencies for this task
 const progressFor = l => !!l && progressOn() && !l.is_inbox;
 const statusFor = l => !!l && statusOn() && !l.is_inbox;
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);

@@ -14963,5 +14963,20 @@
   "Show administration again": "Mostrar de nuevo la administración",
   "You now see Kalmido like a member. Your rights stay the same.": "Ahora ves Kalmido como un miembro. Tus derechos siguen igual.",
   "Administration is shown again": "La administración se muestra de nuevo",
-  "{0} table stays in the tables' trash": ["{0} tabla se queda en la papelera de las tablas", "{0} tablas se quedan en la papelera de las tablas"]
+  "{0} table stays in the tables' trash": ["{0} tabla se queda en la papelera de las tablas", "{0} tablas se quedan en la papelera de las tablas"],
+  "Repository and code": "Repositorio y código",
+  "Client and contacts": "Cliente y contactos",
+  "Documents and invoices": "Documentos y facturas",
+  "As the project type": "Como el tipo de proyecto",
+  "Switch": "Cambiar",
+  "Properties": "Propiedades",
+  "Switch to {0}?": "¿Cambiar a {0}?",
+  "Shown: {0}": "Visible: {0}",
+  "Properties of {0}": "Propiedades de {0}",
+  "Properties as the project type": "Propiedades como el tipo de proyecto",
+  "What the tasks of this project show.": "Lo que muestran las tareas de este proyecto.",
+  "What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.": "Lo que muestran las tareas de este proyecto. {0} oculta lo que no necesita; aquí vuelves a activar lo que quieras.",
+  "Hidden is display only: nothing is deleted.": "Ocultar solo cambia la vista: no se borra nada.",
+  "These properties are hidden then: {0}. Nothing is deleted; you can switch them back on under Properties.": "Entonces se ocultan estas propiedades: {0}. No se borra nada; puedes volver a activarlas en Propiedades.",
+  "{0} changed by hand": ["{0} cambiada a mano", "{0} cambiadas a mano"]
 }

@@ -14963,5 +14963,20 @@
   "Show administration again": "Afficher à nouveau l’administration",
   "You now see Kalmido like a member. Your rights stay the same.": "Vous voyez maintenant Kalmido comme un membre. Vos droits restent les mêmes.",
   "Administration is shown again": "L’administration est à nouveau affichée",
-  "{0} table stays in the tables' trash": ["{0} tableau reste dans la corbeille des tableaux", "{0} tableaux restent dans la corbeille des tableaux"]
+  "{0} table stays in the tables' trash": ["{0} tableau reste dans la corbeille des tableaux", "{0} tableaux restent dans la corbeille des tableaux"],
+  "Repository and code": "Dépôt et code",
+  "Client and contacts": "Client et contacts",
+  "Documents and invoices": "Documents et factures",
+  "As the project type": "Comme le type de projet",
+  "Switch": "Changer",
+  "Properties": "Propriétés",
+  "Switch to {0}?": "Passer à {0} ?",
+  "Shown: {0}": "Affiché : {0}",
+  "Properties of {0}": "Propriétés de {0}",
+  "Properties as the project type": "Propriétés comme le type de projet",
+  "What the tasks of this project show.": "Ce que montrent les tâches de ce projet.",
+  "What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.": "Ce que montrent les tâches de ce projet. {0} masque ce dont il n’a pas besoin ; réactive ici ce que tu veux.",
+  "Hidden is display only: nothing is deleted.": "Masquer ne change que l’affichage : rien n’est supprimé.",
+  "These properties are hidden then: {0}. Nothing is deleted; you can switch them back on under Properties.": "Ces propriétés seront alors masquées : {0}. Rien n’est supprimé ; tu peux les réactiver sous Propriétés.",
+  "{0} changed by hand": ["{0} modifiée à la main", "{0} modifiées à la main"]
 }
