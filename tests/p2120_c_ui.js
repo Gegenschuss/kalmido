@@ -69,7 +69,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `/Invalid value/.test(document.querySelector('#dv-err')?.textContent || '')`), 'an invalid number shows the error at the section');
 
     // ---- the export dialog (invoice list)
-    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
+    await nav(B + '#office/offers');
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     await ev(clk('[data-ofd="kind"][data-kind="invoice"]'));
     check(await ready(ev, `!!document.querySelector('[data-dx="extf"]')`, 80), 'the DATEV export button');

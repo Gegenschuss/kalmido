@@ -75,7 +75,7 @@ const today = TC.today();
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await fresh(ev, nav, 'carol');
     await nav(B + '#office');
-    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotations/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotations (2.380.0 #3409: was Quotes & invoices) ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
+    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotes/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotes & invoices ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
     check(await ready(ev, `${money} === 'false'`, 40), '#3039: Money folded at first');
     check(await ev(`!document.querySelector('#side [data-ofm="receipts"]') && !!document.querySelector('#side [data-ofm="offers"]')`), '#3039: folded = no points of Money, Sell open');
     await shot('p2276a-desktop-start.png');

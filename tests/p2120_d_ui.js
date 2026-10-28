@@ -69,7 +69,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       check(await ev(noScroll), tag + 'editor: no horizontal scrolling');
       await shot(`p2120-d-editor-${u}-${w}.png`);
       // the list
-      await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
+      await nav(B + '#office/offers');
       check(await ready(ev, `!!document.querySelector('.ofdkinds [data-kind="delivery"]')`, 80), tag + 'the tab Delivery notes');
       await ev(`document.querySelector('.ofdkinds [data-kind="delivery"]').click()`);
       check(await ready(ev, `document.querySelectorAll('.ofdlist .ofdrow').length === 1 && !!document.querySelector('[data-ofd="new-ls"]')`, 80), tag + 'the list with its button');

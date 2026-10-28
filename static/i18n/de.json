@@ -14588,9 +14588,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Das neue Passwort widerruft deine App-Passwörter (CalDAV) und deine eigenen API-Tokens; lege danach bei Bedarf neue unter Einstellungen > Konto an (API-Tokens: Erweitert · für Entwickler). Agenten behalten ihre Tokens.",
   "Please type your name without a link or web address.": "Bitte geben Sie Ihren Namen ohne Link oder Web-Adresse ein.",
   "Saved. {0} booking of someone else stays as it was": ["Gespeichert. {0} Buchung einer anderen Person bleibt, wie sie war", "Gespeichert. {0} Buchungen anderer bleiben, wie sie waren"],
-  "Trial document (SAMPLE)": "Test-Dokument (MUSTER)",
-  "More ways to create": "Weitere Möglichkeiten zum Anlegen",
-  "Archived quotations: {0}": "Archivierte Angebote: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Noch keine Agenten. Leg deinen eigenen unter Einstellungen > Agenten > Einrichten an; dann erscheint er hier.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "In deinem privaten Bereich entscheidest du selbst. In einer Organisation erlauben es ihre Admins (Einstellungen > Arbeitsbereiche: „Mitglieder dürfen eigene Agenten haben“) oder ein Server-Admin für alle (Verwaltung > Agenten). Ohne das fehlt „Agent anlegen“ oder der Agent kann nicht in diese Organisation wechseln.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py als Stop- und SubagentStop-Hook meldet Tokens und Kosten, Subagenten eingeschlossen; Grenzen je Agent setzen Admins, bei einem persönlichen Agenten auch sein Besitzer.",
@@ -14638,5 +14635,6 @@
   "Time format": "Uhrzeitformat",
   "24 hours ({0})": "24 Stunden ({0})",
   "12 hours ({0})": "12 Stunden ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatisch richtet sich nach der Sprache und der Region dieses Browsers."
+  "Automatic follows the language and the region of this browser.": "Automatisch richtet sich nach der Sprache und der Region dieses Browsers.",
+  "Quotations & invoices": "Angebote & Rechnungen"
 }

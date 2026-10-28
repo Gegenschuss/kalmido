@@ -85,7 +85,7 @@ function kp_tile(card) {
 // overdue ones -- the figure "Open items" and the palette ("Open items", "OP")
 function kp_openItems(st = 'open') {
   if (typeof OFD === 'object') { OFD.kind = 'invoice'; OFD.status = st; OFD.list = null; OFD.doc = null; OFD.docId = null; }
-  go('office/invoices');  // 2.380.0 B (#3409)
+  go('office/offers');
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-kp]'); if (!b) return;

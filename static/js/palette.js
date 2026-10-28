@@ -352,7 +352,7 @@ function pg_dedupe(it) {
 // rights, country pack and switches are checked there), so a regrouped bar (package 2.276) needs no second list here
 function pg_officeItems(add) {
   if (S.me?.kid || !mg_on('office') || o3a_hid('office') || typeof ofm_items !== 'function') return;
-  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'invoices' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
+  for (const i of ofm_items()) add('v:o-' + i.key, 'view', tr(i.name), i.icon, () => go(i.go), {sub: tr('Office|area'), route: i.go, prio: 2, ...(i.key === 'offers' ? {kw: tr('open items unpaid invoices outstanding payments')} : {})});  // #2993: "Open items" is no page of its own
 }
 // 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
 function pg_actions(add) {
@@ -364,7 +364,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_newDialog('invoice')), {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)

@@ -6,7 +6,6 @@
   "part_kind": "shoot",
   "blocks": ["staff", "share", "km", "meals", "hotel", "set", "free"],
   "calc": {
-    "share": {"label": {"de": "Producing", "en": "Producing"}, "rate": 600, "factor": 0.2},
     "handling": {"label": {"de": "Handlungskosten", "en": "Handling costs"}, "pct": 4, "on": true},
     "markup": {"label": {"de": "Markup", "en": "Markup"}, "pct": 10, "on": false, "stacked": false}
   },

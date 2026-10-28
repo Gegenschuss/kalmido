@@ -14588,9 +14588,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Le nouveau mot de passe révoque tes mots de passe d'application (CalDAV) et tes propres tokens API ; crée-en de nouveaux ensuite si besoin sous Paramètres > Compte (tokens API : Avancé · pour les développeurs). Les agents gardent leurs tokens.",
   "Please type your name without a link or web address.": "Veuillez saisir votre nom sans lien ni adresse web.",
   "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"],
-  "Trial document (SAMPLE)": "Document d'essai (MUSTER)",
-  "More ways to create": "Autres façons de créer",
-  "Archived quotations: {0}": "Devis archivés : {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Pas encore d’agents. Crée le tien sous Paramètres > Agents > Configurer ; il apparaîtra alors ici.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "Dans ton espace privé, tu décides toi-même. Dans une organisation, ses admins l’autorisent (Paramètres > Espaces de travail : « Les membres peuvent avoir leurs propres agents »), ou un admin du serveur pour tout le monde (Admin > Agents). Sans cela, « Créer l’agent » manque ou l’agent ne peut pas passer dans cette organisation.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py comme hook Stop et SubagentStop signale tokens et coûts, sous-agents compris ; les limites par agent sont fixées par les admins, pour un agent personnel aussi par son propriétaire.",
@@ -14638,5 +14635,6 @@
   "Time format": "Format de l’heure",
   "24 hours ({0})": "24 heures ({0})",
   "12 hours ({0})": "12 heures ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatique suit la langue et la région de ce navigateur."
+  "Automatic follows the language and the region of this browser.": "Automatique suit la langue et la région de ce navigateur.",
+  "Quotations & invoices": "Devis et factures"
 }

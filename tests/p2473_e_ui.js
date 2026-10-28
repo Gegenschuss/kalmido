@@ -136,7 +136,7 @@ const row = (d, id) => d.querySelector(`#side .srow[data-list="${id}"]`);
   await w.eval(`ofcSaveSettings(document.getElementById('ofc-set'))`);
   const s2 = (await call('GET', '/api/office/settings')).settings.datev_extf || {};
   check(s2.advisor_no === '1234567' && s2.client_no === '42' && s2.chart === 'SKR03', '#1460: the block is saved with the settings ' + JSON.stringify(s2));
-  w.eval(`go('office/invoices')`);  // 2.380.0 (#3409): the invoices' own area
+  w.eval(`go('office/offers')`);
   await until(() => d.querySelector('[data-ofd="kind"][data-kind="invoice"]'));
   d.querySelector('[data-ofd="kind"][data-kind="invoice"]')?.click();
   await until(() => d.querySelector('[data-dx="extf"]'));

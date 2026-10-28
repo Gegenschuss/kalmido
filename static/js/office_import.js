@@ -246,26 +246,13 @@ async function oimLoadList() {
   OIM.listLoading = false;
   if (typeof ofdDraw === 'function') ofdDraw();
 }
-// 2.380.0 B (#3409): each area shows its own archived documents (Quotations: the quotations, Invoices: the invoices) -- no
-// switch between the kinds any more; Invoices filters All / open / paid, the sum line follows the filters (client, search)
-const oim_secKind = () => typeof ofd_sec === 'function' && ofd_sec() === 'invoices' ? 'invoice' : 'offer';
-const oim_secItems = () => (OIM.list?.items || []).filter(r => (r.kind === 'offer' ? 'offer' : 'invoice') === oim_secKind());
-const OIM_PAID = [['', N_('All|status')], ['open', N_('open')], ['paid', N_('Paid')]];
-function oim_sumHtml(items) {
-  const own = items.filter(r => !r.copy && r.amount != null), ct = xs => xs.reduce((a, r) => a + Math.round(+r.amount * 100), 0) / 100;  // copies count in their office (2.97.0 C)
-  if (!own.length) return '';
-  return `<p class="muted oimsum">${esc(oim_secKind() === 'invoice' ? tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(ct(own)), ofcMoney(ct(own.filter(r => r.paid)))) : tr('Archived quotations: {0}', ofcMoney(ct(own))))}</p>`;
-}
 function oimArchiveListHtml(q) {
   if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const inv = oim_secKind() === 'invoice', paid = inv ? OIM.paid || '' : '';
-  const items = oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
-    && (!paid || (paid === 'paid') === !!r.paid));
-  const sum = oim_sumHtml(items);
+  const items = (OIM.list.items || []).filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl));
+  const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import/archive">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
-  const pf = inv && oim_secItems().length ? `<div class="seg oimpaid" role="group" aria-label="${esc(tr('Status'))}">${OIM_PAID.map(([v, n]) => `<button type="button" data-oim-paid="${v}" aria-pressed="${v === paid}" class="${v === paid ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>` : '';
-  const sum0 = r81b_clFilter(pf) + sum;  // 2.81.0 (#1834): the client filter above the list
-  if (!items.length) return (OIM.cl || paid ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl || paid ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
+  const sum0 = r81b_clFilter() + sum;  // 2.81.0 (#1834): the client filter above the list
+  if (!items.length) return (OIM.cl ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
   return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
@@ -413,15 +400,14 @@ document.addEventListener('input', e => {
 // history (shown folded in the dialog, a member's change marked "by member").
 const R81B_TAX = [['19', '19 %'], ['7', '7 %'], ['0', '0 %'], ['rc', N_('Reverse charge')]];
 const R81B_PCT = {19: 19, 7: 7, 0: 0, rc: 0};
-function r81b_clFilter(more = '') {
+function r81b_clFilter() {
   const seen = new Map();
-  for (const r of oim_secItems()) if (r.client_id && !seen.has(r.client_id)) seen.set(r.client_id, r.client || r.client_name || '#' + r.client_id);  // 2.380.0 B (#3409): the clients of the area's documents
-  if (!seen.size && !OIM.cl) return more ? `<div class="ofcbar r81b-clf">${more}</div>` : '';
+  for (const r of OIM.list?.items || []) if (r.client_id && !seen.has(r.client_id)) seen.set(r.client_id, r.client || r.client_name || '#' + r.client_id);
+  if (!seen.size && !OIM.cl) return '';
   const opts = [...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
-  return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select>${more}</div>`;
+  return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select></div>`;
 }
 document.addEventListener('change', e => { if (e.target.id === 'oim-cl') { OIM.cl = e.target.value || ''; if (typeof ofdDraw === 'function') ofdDraw(); } });
-document.addEventListener('click', e => { const b = /** @type {any} */ (e.target).closest?.('[data-oim-paid]'); if (!b) return; OIM.paid = b.dataset.oimPaid || ''; if (typeof ofdDraw === 'function') ofdDraw(); });  // 2.380.0 B (#3409)
 // 2.355.0 B (#2843): like core/csvimport.amount_text (dec None): thousand separators only in groups of three, German first
 // ("1.500" = 1500), a single mark before three digits after at most three ("1,500") unreadable (NaN) -- was 1,5 / 1,23
 const r81b_num = v => {

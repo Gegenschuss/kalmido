@@ -14588,9 +14588,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Het nieuwe wachtwoord trekt je app-wachtwoorden (CalDAV) en je eigen API-tokens in; maak daarna zo nodig nieuwe aan onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars). Agents behouden hun tokens.",
   "Please type your name without a link or web address.": "Vul uw naam in zonder link of webadres.",
   "Saved. {0} booking of someone else stays as it was": ["Opgeslagen. {0} boeking van iemand anders blijft zoals hij was", "Opgeslagen. {0} boekingen van anderen blijven zoals ze waren"],
-  "Trial document (SAMPLE)": "Testdocument (MUSTER)",
-  "More ways to create": "Meer manieren om aan te maken",
-  "Archived quotations: {0}": "Gearchiveerde offertes: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Nog geen agents. Maak je eigen aan onder Instellingen > Agents > Instellen; dan verschijnt hij hier.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "In je privégedeelte beslis je zelf. In een organisatie staan haar admins het toe (Instellingen > Werkruimtes: „Leden mogen eigen agents hebben”), of een serverbeheerder voor iedereen (Admin > Agents). Zonder dat ontbreekt „Agent aanmaken” of kan de agent niet naar die organisatie.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py als Stop- en SubagentStop-hook meldt tokens en kosten, subagents inbegrepen; limieten per agent stellen admins in, bij een persoonlijke agent ook de eigenaar.",
@@ -14638,5 +14635,6 @@
   "Time format": "Tijdnotatie",
   "24 hours ({0})": "24 uur ({0})",
   "12 hours ({0})": "12 uur ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser."
+  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser.",
+  "Quotations & invoices": "Offertes en facturen"
 }

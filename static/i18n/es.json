@@ -14588,9 +14588,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nueva contraseña revoca tus contraseñas de aplicación (CalDAV) y tus propios tokens de API; si los necesitas, crea otros nuevos en Ajustes > Cuenta (tokens de API: Avanzado · para desarrolladores). Los agentes conservan sus tokens.",
   "Please type your name without a link or web address.": "Escriba su nombre sin enlaces ni direcciones web.",
   "Saved. {0} booking of someone else stays as it was": ["Guardado. {0} reserva de otra persona queda como estaba", "Guardado. {0} reservas de otras personas quedan como estaban"],
-  "Trial document (SAMPLE)": "Documento de prueba (MUSTER)",
-  "More ways to create": "Más formas de crear",
-  "Archived quotations: {0}": "Presupuestos archivados: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Aún no hay agentes. Crea el tuyo en Ajustes > Agentes > Configurar; entonces aparecerá aquí.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "En tu área privada decides tú. En una organización lo permiten sus admins (Ajustes > Espacios de trabajo: «Los miembros pueden tener sus propios agentes») o un admin del servidor para todos (Admin > Agentes). Sin eso falta «Crear agente» o el agente no puede pasar a esa organización.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py como hook Stop y SubagentStop informa de tokens y costes, subagentes incluidos; los límites por agente los fijan los admins, en un agente personal también su propietario.",
@@ -14638,5 +14635,6 @@
   "Time format": "Formato de hora",
   "24 hours ({0})": "24 horas ({0})",
   "12 hours ({0})": "12 horas ({0})",
-  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador."
+  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador.",
+  "Quotations & invoices": "Presupuestos y facturas"
 }

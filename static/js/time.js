@@ -158,7 +158,7 @@ function teRow(e, {task = true, day = true} = {}) {
 // 2.144.6 A (#2053): "billed RE-…" (opens the invoice) or "not billable" in the row; nothing for open billable time
 function tbill_tag(e) {
   if (e.billed && !e.billed.id) return `<span class="tebill muted">${esc(tr('billed {0}', '').trim())}</span>`;  // someone else's entry: no invoice link
-  if (e.billed) return `<button class="tebill linkbtn" data-go="office/invoices/${+e.billed.id}" title="${esc(tr('On this invoice; duration and date are locked'))}">${esc(tr('billed {0}', e.billed.number || tr('Draft')))}</button>`;
+  if (e.billed) return `<button class="tebill linkbtn" data-go="office/offers/${+e.billed.id}" title="${esc(tr('On this invoice; duration and date are locked'))}">${esc(tr('billed {0}', e.billed.number || tr('Draft')))}</button>`;
   return e.billable === false ? `<span class="tebill">${esc(tr('not billable'))}</span>` : '';
 }
 const findEntry = id => [...(S.te.items || []), ...(S.tv.data?.entries || []), ...(S.timer ? [S.timer] : [])].find(e => e.id === id);
