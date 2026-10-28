@@ -1079,6 +1079,7 @@ async function load(auto) {
     flush(); return;
   }
   applyState(j);
+  if (S.qfWait && typeof qfSend === 'function') qfSend();  // 2.376.1 CI fix: files of a quick add whose new task was not loaded yet
   LS.set('cache', j); S.lpCache = j;  // 2.42.0 (#1376): the delta keeps the cache current (liveparts.js)
   if (S.extra) await loadExtra().catch(() => {});
   if (S.sel && (cmtOn() || collab()) && S.tl.id === S.sel && S.tl.v !== S.v) loadTimeline(S.sel);
