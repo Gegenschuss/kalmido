@@ -372,8 +372,8 @@ document.addEventListener('change', async e => {
 // ---- 2.95.0 A (#1932): the per diem (Verpflegungsmehraufwand) of a trip and its report (part A fills this block; server
 // kalmido/office/vma.py + vmareport.py). rk_vmaRepHtml: the per diem block at the top of the evaluation view.
 const RKV = {rates: {}, rep: null, src: null, open: new Set()};
-const rk_vmaEur = n => curMoney(+n, 'EUR');  // 2.368.0 C (#2983): the BMF rates are in euros; the sign where the locale puts it
-const rk_vmaN = n => +n % 1 ? rk_vmaEur(n) : rk_vmaEur(n).replace(/[.,]00(?!\d)/, '');  // 2.368.0 C (#2983): whole rates without cents ("€28")
+const rk_vmaEur = n => `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} €`;
+const rk_vmaN = n => `${fmtNum(+n, +n % 1 ? 2 : 0)} €`;
 const rk_vmaCty = code => !code || code === 'DE' ? (ctyNames().DE || 'DE') : ctyNames()[code] || code;
 function rk_vmaRates(year) {  // the countries / cities and rates of a year (cached; a year without a table: countries [])
   const y = String(year || '').slice(0, 4);

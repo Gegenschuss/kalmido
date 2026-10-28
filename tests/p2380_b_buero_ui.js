@@ -93,7 +93,7 @@ async function archive(ck, run, f) {
     check(await until(() => d.querySelector('.oimarch')), `${who}: the quotations' archive`);
     let arch = () => [...d.querySelectorAll('.oimarch .ofcn b')].map(b => b.textContent).join('|');
     check(/A-OLD-1/.test(arch()) && !/R-OLD/.test(arch()), `${who}: #3409 the quotations' archive shows quotations only: ${arch()}`);
-    check(!d.querySelector('[data-oim-paid]') && /Archived quotations: 500/.test(d.querySelector('.oimsum')?.textContent || ''), `${who}: #3409 no paid filter, the quotations' sum ${d.querySelector('.oimsum')?.textContent}`);
+    check(!d.querySelector('[data-oim-paid]') && /Archived quotations: €?500/.test(d.querySelector('.oimsum')?.textContent || ''), `${who}: #3409 no paid filter, the quotations' sum ${d.querySelector('.oimsum')?.textContent}`);
     w.close();
 
     // ================= Invoices: its tabs, the archive with the paid filter + sum, the client filter kept
@@ -111,17 +111,17 @@ async function archive(ck, run, f) {
     check(await until(() => w.location.hash === '#office/invoices/archive' && d.querySelector('.oimarch')), `${who}: #3409 the invoices' archive ${w.location.hash}`);
     check(/R-OLD-1/.test(arch()) && /R-OLD-2/.test(arch()) && !/A-OLD/.test(arch()), `${who}: #3409 the invoices' archive shows invoices only: ${arch()}`);
     const sum = () => (d.querySelector('.oimsum')?.textContent || '').replace(/\s+/g, ' ');
-    check(/Archived invoices: 1,428\.00.*paid: 1,190\.00/.test(sum()), `${who}: #3409 the sum of all invoices: ${sum()}`);
+    check(/Archived invoices: €?1,428\.00.*paid: €?1,190\.00/.test(sum()), `${who}: #3409 the sum of all invoices: ${sum()}`);
     d.querySelector('[data-oim-paid="open"]').click();
     check(await until(() => /R-OLD-2/.test(arch()) && !/R-OLD-1/.test(arch())), `${who}: #3409 filter open: ${arch()}`);
-    check(/Archived invoices: 238\.00.*paid: 0\.00/.test(sum()) && d.querySelector('[data-oim-paid="open"]')?.getAttribute('aria-pressed') === 'true', `${who}: #3409 the sum follows "open": ${sum()}`);
+    check(/Archived invoices: €?238\.00.*paid: €?0\.00/.test(sum()) && d.querySelector('[data-oim-paid="open"]')?.getAttribute('aria-pressed') === 'true', `${who}: #3409 the sum follows "open": ${sum()}`);
     d.querySelector('[data-oim-paid="paid"]').click();
-    check(await until(() => /R-OLD-1/.test(arch()) && !/R-OLD-2/.test(arch())) && /Archived invoices: 1,190\.00.*paid: 1,190\.00/.test(sum()), `${who}: #3409 filter paid + its sum: ${arch()} ${sum()}`);
+    check(await until(() => /R-OLD-1/.test(arch()) && !/R-OLD-2/.test(arch())) && /Archived invoices: €?1,190\.00.*paid: €?1,190\.00/.test(sum()), `${who}: #3409 filter paid + its sum: ${arch()} ${sum()}`);
     d.querySelector('[data-oim-paid=""]').click();
     const sel = await until(() => d.querySelector('#oim-cl'));
     check(!!sel && [...sel.options].some(o => o.value === String(cl2.id)), `${who}: the client filter stays`);
     sel.value = String(cl2.id); sel.dispatchEvent(new w.Event('change', {bubbles: true}));
-    check(await until(() => /R-OLD-2/.test(arch()) && !/R-OLD-1/.test(arch())) && /Archived invoices: 238\.00/.test(sum()), `${who}: #3409 the client filter and its sum: ${sum()}`);
+    check(await until(() => /R-OLD-2/.test(arch()) && !/R-OLD-1/.test(arch())) && /Archived invoices: €?238\.00/.test(sum()), `${who}: #3409 the client filter and its sum: ${sum()}`);
     d.querySelector('.ofdkinds [data-kind="invoice"]').click();
     await until(() => d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]'));
     d.querySelector('.ofdkinds [data-kind="archive"]').click();

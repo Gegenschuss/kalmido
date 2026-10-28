@@ -124,6 +124,7 @@ for _ in range(3):
     requests.get(B + f"/api/v1/tasks/{T}", headers=AGH)
 r = requests.get(B + f"/api/v1/tasks/{T}", headers=AGH)
 check(r.ok, f"the agent in the workspace reads the shared task {r.status_code} {r.text[:200]}")
+A.delete(B + f"/api/lists/{OL}/members/{AID}")  # 2.361.4 (#2935): out of an organisation only without its projects
 r = A.patch(B + f"/api/admin/agents/{AID}", json={"org_id": None})
 check(r.ok, f"the agent leaves the workspace {r.status_code} {r.text[:200]}")
 r = requests.get(B + f"/api/v1/tasks/{T}", headers=AGH)

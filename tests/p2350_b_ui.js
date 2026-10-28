@@ -84,7 +84,7 @@ const TAP_JS = `const tapBox = e => { const r = e.getBoundingClientRect(), a = g
   d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] [data-cid="no"]`).click();
   await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cpermst`));
   const st2 = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cpermst`)?.textContent || '';
-  check(/Rejected by Alice at \d{1,2}:\d\d(\s?[AP]M)?$/i.test(st2.trim()) && !d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cchb`), '#1103: afterwards the card says who and when, the buttons are gone ' + st2);  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
+  check(/Rejected by Alice at \d\d:\d\d$/.test(st2.trim()) && !d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cchb`), '#1103: afterwards the card says who and when, the buttons are gone ' + st2);
   check(!d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"]`).classList.contains('apvopen'), '#1103: the answered card loses the accent edge');
   d.querySelector(`#chat-apv [data-mid="${pq.id}"][data-cid="allow"]`)?.click();
   await until(() => d.querySelector('#chat-apv').hidden);

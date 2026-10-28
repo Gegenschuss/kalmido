@@ -63,7 +63,7 @@ function parseNum(v, frac) {
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
-const fmtDate = s => fmtDateNum(pd(s));  // 2.368.0 B (#2982): the chosen order of numbers
+const fmtDate = s => pd(s).toLocaleDateString(LOCALE());
 const RR_WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 function dayLabel(s, long) {
   const t = today();
@@ -76,7 +76,7 @@ function dayLabel(s, long) {
 }
 // 2.6.0 (K07): one way to write a task's date everywhere (rows, the date column, the task panel): "Mo, 5. Okt", a range
 // "So, 4. Okt – Mo, 5. Okt", a time after a comma ("Heute, 17:30")
-const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + fmtTimeLoc(t.due_time) : '');  // 2.368.0 B (#2982): fmtTimeLoc
+const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '');
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
 // 2.16.0 (#473, WCAG 1.4.1): the priority as a shape too (! / !! / !!!, like the quick add), named for screen readers
 const PRIO_NAME = {5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};
@@ -86,10 +86,7 @@ const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-la
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
 // a date without its weekday in the language's own short pattern ("4. Okt" / "Oct 4"), with the year if it is not this one
-// 2.368.0 B (#2982): the leading weekday is cut by its name ("Mon 26 Oct" -> "26 Oct": the old pattern kept "Mon" when a
-// number followed it without a comma, as in English, Dutch); the old pattern stays for a language that writes it elsewhere
-const dayNoWd = (d, year) => { const s = fmtDay(year ? 'year' : 'short', d), w = WD[d.getDay()];
-  return (s.startsWith(w) ? s.slice(w.length) : s.replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '')).replace(/^\s*[,.]?\s*/, ''); };
+const dayNoWd = (d, year) => fmtDay(year ? 'year' : 'short', d).replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '').replace(/^\s*[,.]\s*/, '');
 function weekTitle(first) {
   const a = pd(first), b = pd(addDays(first, 6)), y = new Date().getFullYear(), other = a.getFullYear() !== y || b.getFullYear() !== y;
   return `${dayNoWd(a, other && a.getFullYear() !== b.getFullYear())} – ${dayNoWd(b, other)} · ${tr('Week {0}', isoWeek(addDays(first, 3)))}`;
@@ -112,7 +109,7 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['budget', N_('Budget')],  // 2.72.0 (#1333): the household budget, off by default
   ['feeds', N_('Feeds')],  // 2.85.0 B (#1162): feeds, off by default
   // 2.23.0 (#463): package "Team, family, clients", each off by default
-  ['clients', N_('Clients')], ['workload', N_('Workload & absences')] /* 2.380.2 (#3407): the view's name (de: Einsatzplan) */, ['forms', N_('Forms')],
+  ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')],
   // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
@@ -190,7 +187,7 @@ const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
-const overviewOn = () => progressOn() && (S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project' && inWs(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && l.kind === 'project' && inWs(l))));  // 2.380.2 (#3407): inWs
+const overviewOn = () => progressOn() && (S.lists.filter(l => !l.is_inbox && !l.archived && l.kind === 'project').length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && l.kind === 'project')));
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
 const fieldsOn = () => feat('fields');

@@ -16,8 +16,7 @@ test files and the changed files, nothing is started; Python standard library on
     --security       list the always-run suites (security / rights / tenant / org / freelancer) and exit
     --touched        2.181.0 (#2696): only the suites of the changed files plus the suites before them in their group that
                      write a state file they read (*ids.json) and
-                     the route guards for a new route and (2.381.0, #2853) the static guards ALWAYS_SUITES (never "full":
-                     unmappable files go to stderr);
+                     the route guards for a new route (no always-run suites, never "full": unmappable files go to stderr);
                      prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
                      GITHUB_EVENT_NAME, CI_BEFORE, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
@@ -395,21 +394,12 @@ TOUCHED_BROAD = 60  # --touched: a file that maps to more suites than this is re
 STATE_RE = re.compile(r"\b[a-z_]*ids\.json\b")  # the files suites of one group hand data over with
 NEEDS_RE = re.compile(r"stages-needs:[ \t]*([\w \t]+)")  # 2.300.0 (#3198): a suite that needs data of earlier suites without a state file (accounts)
 ROUTE_DEF_RE = re.compile(r"\.(?:route|get|post|put|patch|delete)\(\s*[rf]?['\"]/")
-# 2.381.0 (#2853): the static guards and the suites of the CI's script steps ("MCP server + usage hook", "New agents") - they
-# were red only in the CI (Audit F 23.10.2026: 5 of 12 red runs), because --touched took them only for a file they map to.
-# Every --touched selection with a changed file takes them along now (seconds, no own container; tests/p2381_a_guards_test.py)
-ALWAYS_SUITES = ("parity", "pg_dialect", "rls_static", "tenant_coverage", "freelancer_coverage", "p2125_d_demo",
-                 "launcher_parity", "agent_docs_coverage", "mcp", "usage_hook")
-# the WS_VIEWS guard (p2661_b_ui) needs a container: along when a server / client file changed (the files it scans)
-APP_GUARD_SUITES = ("p2661_b_ui",)
-APP_PREFIXES = ("kalmido/", "static/")
 
 
 def touched(repo, files, base=None, head=None):
     """--touched (2.181.0, #2696, the Mac runner's small runs): only the suites of the changed files, each with the suites
     before it in its group that write a state file it reads (calendars_ui after calendars), plus the route guards when a
-    server file gains a route, plus (2.381.0, #2853) the guards ALWAYS_SUITES (APP_GUARD_SUITES for a server / client file).
-    A file that would need the full run is listed, not run (the CI does that).
+    server file gains a route; no always-run suites. A file that would need the full run is listed, not run (the CI does that).
     -> (suites in run order, {suite: why}, [unmapped files])"""
     why, unmapped = {}, []
     for f in files:
@@ -432,9 +422,6 @@ def touched(repo, files, base=None, head=None):
                 for s in COVERAGE_SUITES:
                     if s in repo.group_of:
                         why.setdefault(s, f"{f}: route added")
-    for s in ALWAYS_SUITES + (APP_GUARD_SUITES if any(f.startswith(APP_PREFIXES) for f in files) else ()):
-        if files and s in repo.group_of:  # an unknown name: p2381_a_guards fails
-            why.setdefault(s, "guard, always (#2853)")
     # a chosen suite that reads a state file of its group (ids.json, cal_ids.json ...) needs the suites before it that
     # write it (calendars_ui after calendars, news_ui after news); the other suites set up their own data (ONLY runs them alone)
     for g, s, f in reversed(repo.rows):

@@ -89,9 +89,8 @@ const ALL = 'cal,events,comments';
     let p = await at(e, W2, 16 * 60 + 7);
     await drag(p.x, p.y, 0, p.H);
     await sleep(300);
-    const nb = await e(`(() => { const b = document.querySelector('#view .wcol[data-day="${W2}"] .cgnew'); return b ? [document.activeElement === b.querySelector('.cgin'), b.textContent, !document.querySelector('.modal.evmodal'), fmtTimeLoc('16:00') + '–' + fmtTimeLoc('17:00')] : null; })()`);
-    check(nb && nb[0] && nb[1].includes(nb[3]) && nb[2],  // 2.368.0 (#2982): the times as the app shows them (12 h in an en-US browser)
-      'desktop: the drag leaves a block "New event" (16:00-17:00) with the title in focus, no editor ' + JSON.stringify(nb));
+    const nb = await e(`(() => { const b = document.querySelector('#view .wcol[data-day="${W2}"] .cgnew'); return b ? [document.activeElement === b.querySelector('.cgin'), b.textContent, !document.querySelector('.modal.evmodal')] : null; })()`);
+    check(nb && nb[0] && /16:00.17:00/.test(nb[1]) && nb[2], 'desktop: the drag leaves a block "New event" (16:00-17:00) with the title in focus, no editor ' + JSON.stringify(nb));
     await shot('p252a-1440-new.png');
     await typeKeys(cmd, ctx, 'Planning' + ENTER);
     const PL = await until(() => find('Planning'));
@@ -207,7 +206,7 @@ const ALL = 'cal,events,comments';
     // hold 0.4 s, then drag: the block
     p = await at(e, W3, 13 * 60 + 7);
     await touch(p.x, p.y, 600, p.H * 1.5); await sleep(400);
-    check(await e(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && b.textContent.includes(fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:30')); })()`), 'phone: hold and drag: a block "New event" 13:00-14:30');
+    check(await e(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && /13:00.14:30/.test(b.textContent); })()`), 'phone: hold and drag: a block "New event" 13:00-14:30');
     check(await e(`(() => { const b = document.querySelector('#view .cgnew'); if (!b) return false; const r = b.getBoundingClientRect(), d = b.querySelector('.cgdet').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + .5 && d.height >= 43.5; })()`), 'phone: the block fits, "Details" is a 44 px target');
     await shot('p252a-390-new.png');
     await e(`(() => { const i = document.querySelector('#view .cgnew .cgin'); i.value = 'Call'; i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); return 1; })()`);

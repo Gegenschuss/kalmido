@@ -64,7 +64,6 @@ SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo pla
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
-SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
 def clean_setting(k, v):
@@ -321,10 +320,6 @@ def clean_setting(k, v):
         return sv
     if k == "time_currency":
         return sv[:8]
-    if k in SETTINGS_FMT:  # 2.368.0 B (#2982): region / formats, '' = automatic
-        if sv not in SETTINGS_FMT[k]:
-            raise bad
-        return sv
     if k == "lang":
         return sv
     return sv[:200]
@@ -742,9 +737,6 @@ def umz_export_queries(uid):
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
-        # 2.362.0 (#3090): my encrypted task notes (ciphertext as stored, only the author's own) and the project notes of my lists
-        "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
-        "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),

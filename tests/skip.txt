@@ -18,3 +18,4 @@ p2146_d_api 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code);
 p2239_b_logs 2026-11-10 #3402 CI v2.351.5 red, CI v2.351.4 green (same app code); Mac green 20261027-084524 (same code)
 p2283_ui 2026-11-10 #3402 CI v2.351.7 red, CI v2.351.6 green; Mac green 20261027-111106, 20261027-111243, 20261027-111349 (same code)
 p2290_api 2026-11-10 #3421 Mac red vorpruef mac-116e0689ee08 (live train 27.10.), Mac green 20261027-142207 (same code)
+p2191_f2_i18nrobust_ui 2026-11-11 #3533 CI v2.401.0 red (run 40670711961); Mac green 20261028-123358 (same code)

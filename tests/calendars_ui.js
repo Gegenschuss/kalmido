@@ -25,7 +25,7 @@ const STUB = 'http://127.0.0.1:8095';
   // on some weekdays (Mondays: "Ancient weekly", "Weekly planning") today's cell is full ("+3"): then the agenda row of the day
   const inCell = chips.find(c => /Lunch with Sam/.test(c.textContent));
   const lunch = inCell || [...d.querySelectorAll('.agenda .cevrow')].find(c => /Lunch with Sam/.test(c.textContent));
-  check(lunch && (inCell ? inCell.closest('.cell')?.dataset.day === w.eval('today()') : /\+\d/.test(d.querySelector(`.cal .cell[data-day="${w.eval('today()')}"] .more`)?.textContent || '')) && lunch.textContent.includes(w.eval(`fmtTimeLoc('13:00')`)), 'month: event on its day with the time');  // 2.368.0 (#2982): as the app shows times
+  check(lunch && (inCell ? inCell.closest('.cell')?.dataset.day === w.eval('today()') : /\+\d/.test(d.querySelector(`.cal .cell[data-day="${w.eval('today()')}"] .more`)?.textContent || '')) && /13:00/.test(lunch.textContent), 'month: event on its day with the time');
   check(lunch && lunch.style.getPropertyValue('--cc') === '#2dd4bf', 'month: chip in the calendar colour');
   check(!d.querySelector('.cal .cev[draggable]') && !d.querySelector('.cal .cev.ev'), 'events are not task chips (no drag, no task class)');
   check(w.__xss === undefined && !d.querySelector('#view img') && [...d.querySelectorAll('.agenda .cevrow')].some(c => c.textContent.includes('<img src=x')),
@@ -35,7 +35,7 @@ const STUB = 'http://127.0.0.1:8095';
   click(w, lunch); await sleep(200);
   let pop = d.querySelector('#pop');
   check(!pop.classList.contains('hidden') && pop.querySelector('.cevpop'), 'popover opens');
-  check(/Cafe Central/.test(pop.textContent) && /Team/.test(pop.textContent) && pop.textContent.includes(w.eval(`fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:00')`)) && /read-only/.test(pop.textContent), 'popover: place, calendar, time');
+  check(/Cafe Central/.test(pop.textContent) && /Team/.test(pop.textContent) && /13:00–14:00/.test(pop.textContent) && /read-only/.test(pop.textContent), 'popover: place, calendar, time');
   const a = pop.querySelector('.cevdesc a');
   check(a && a.getAttribute('href') === 'https://example.org/agenda?x=1' && a.target === '_blank' && /noopener/.test(a.rel), 'popover: http(s) URL linked');
   check(!pop.querySelector('a[href^="javascript"]') && /javascript:alert\(1\)/.test(pop.textContent), 'popover: javascript: stays plain text');
@@ -79,7 +79,7 @@ const STUB = 'http://127.0.0.1:8095';
   await until(() => d.querySelector('.cevtoday'));
   const rows = [...d.querySelectorAll('.cevtoday .cevrow')];
   check(rows.length >= 4 && /Events today/.test(d.querySelector('.cevtoday .ghead').textContent), 'Today: "Events today" block ' + rows.length);
-  check(/all day/.test(rows[0].textContent) && rows.some(r => r.textContent.includes(w.eval(`fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:00')`)) && /Lunch with Sam.*Cafe Central/.test(r.textContent)), 'Today: all-day first, then by time, with place');
+  check(/all day/.test(rows[0].textContent) && rows.some(r => /13:00–14:00.*Lunch with Sam.*Cafe Central/.test(r.textContent)), 'Today: all-day first, then by time, with place');
   check(d.querySelector('.cevtoday').compareDocumentPosition(d.querySelector('#view .trow')) & 4, 'Today: the block sits above the tasks');
   click(w, d.querySelector('.cevtoday .ghead')); await sleep(100);
   check(!d.querySelector('.cevtoday .cevrow'), 'Today: block collapses');

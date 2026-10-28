@@ -251,9 +251,8 @@ def abs_offer_info(c, oid, offer):
                     "net_eur": dstr(pn), "gross": t.get("gross") or "0.00", "gross_text": fmt_money(t.get("gross") or 0, x["lang"], x["currency"]),
                     **inv_money_fields(x, pm)})
         out[-1]["open_text"] = fmt_money(out[-1]["open"], x["lang"], x["currency"])  # 2.123.0 (#2351): German number format
-    home = hc_home(s)  # 2.368.0 C (#2983): the net is in the rates' currency (the office's home one), not always EUR
-    return {"net": dstr(net), "net_text": fmt_money(net, offer["lang"], home), "progress": out, "billed": dstr(billed),
-            "remaining": dstr(net - billed), "remaining_text": fmt_money(net - billed, offer["lang"], home)}
+    return {"net": dstr(net), "net_text": fmt_money(net, offer["lang"], "EUR"), "progress": out, "billed": dstr(billed),
+            "remaining": dstr(net - billed), "remaining_text": fmt_money(net - billed, offer["lang"], "EUR")}
 
 
 def abs_final_done(c, oid, offer_id, but=None):

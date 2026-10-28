@@ -88,13 +88,12 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
-  's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
-const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -192,16 +191,6 @@ async function setLang(code) {
   const e = histAdd({label: tr('Changed setting: {0}', tr('Language')), sett: true, post: () => { const m = $('.smodal'); if (m) { m._noflush = true; m.remove(); settingsModal(LS.get('settingsSec', 'general')); } },
     undo: () => setStep({lang: from}, {lang: code}, tr('Language')), redo: () => setStep({lang: code}, {lang: from}, tr('Language'))});
   setSaved(e);
-}
-// 2.368.0 B (#2982): region and formats; "Automatic" = from the language and the browser's region (popovers.js fmtPref)
-function fmtSetHtml(s, hint) {
-  const sel = (id, k, opts) => `<select id="${id}">${opts.map(([v, n]) => `<option value="${v}" ${(s[k] || '') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
-  const auto = tr('Automatic');
-  return `<h4 id="s-fmt-h">${tr('Region and formats')}</h4>
-      <div class="row"><label for="s-wkst">${tr('First day of the week')}</label>${sel('s-wkst', 'week_start', [['', auto], ['mon', WDL[1]], ['sun', WDL[0]]])}</div>
-      <div class="row"><label for="s-tfmt">${tr('Time format')}</label>${sel('s-tfmt', 'time_format', [['', auto], ['24', tr('24 hours ({0})', '14:30')], ['12', tr('12 hours ({0})', '2:30 PM')]])}</div>
-      <div class="row"><label for="s-dord">${tr('Date format')}</label>${sel('s-dord', 'date_order', [['', auto], ['dmy', '31.12.2026'], ['mdy', '12/31/2026'], ['ymd', '2026-12-31']])}</div>
-      ${hint(tr('Automatic follows the language and the region of this browser.'))}`;
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
@@ -619,7 +608,6 @@ function settingsModal(focus) {
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Quick add understands English, German and the language chosen here.'))}
-      ${fmtSetHtml(s, hint) /* 2.368.0 B (#2982) */}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
       ${hint(tr('Undated basket tasks as their own section in Today, with buttons to sort them.'))}
@@ -889,7 +877,7 @@ function settingsModal(focus) {
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
     [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
-    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
+    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
   const sq = $('#s-search', md);
@@ -1243,7 +1231,7 @@ async function cer_setList(el) {
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".
 const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
-function aaWhen(x) { return x ? fmtStamp(new Date(x)) : ''; }  // 2.368.0 B (#2982): one locale source
+function aaWhen(x) { return x ? new Date(x).toLocaleString(I18N.code || 'en', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
 async function aaDraw(md, j) {
   const box = $('#s-aa', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/alerts'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
@@ -1334,7 +1322,7 @@ function ad_updHtml(hint) {
     h += `<div class="shint updline"><b>${tr('v{0} installed — v{1} available', esc(a.version), esc(a.latest))}</b>${a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">${tr('Release notes')}</a>` : ''}</div>
       <div class="shelp">${tr('To update, run <code>~/kalmido/update.sh</code> (installed with the installer; it backs up the database first), or in the folder with docker-compose.yml: <code>docker compose pull && docker compose up -d</code> (prebuilt image) or <code>git pull && docker compose up -d --build</code> (built from source).')}</div>`;
   } else if (a.update_env && a.update_check && a.checked_at) {
-    const when = fmtStamp(new Date(a.checked_at));  // 2.368.0 B (#2982): one locale source
+    const when = new Date(a.checked_at).toLocaleString(I18N.code || 'en');
     h += hint(a.error ? tr('The last update check failed ({0}); it tries again later.', esc(a.error)) : a.latest ? tr('Up to date (checked {0}).', esc(when)) : tr('Checked {0}.', esc(when)));
   }
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
@@ -1383,7 +1371,7 @@ async function icalDraw(md, j) {
   // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
   if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
   const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button>`;
-  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', fmtDateNum(at))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
+  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
   box.innerHTML = `<div class="row icalrow"><input id="s-icalurl" readonly value="${esc(j.url)}" aria-label="${tr('Subscription link')}"><button class="btn sm pri" data-m="ical-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>
     <div class="row"><a class="btn sm" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${tr('Open in calendar app')}</a>${btns}</div>`;

@@ -61,8 +61,8 @@ function oa_ppBox() {
   const conf = {high: N_('sure'), medium: N_('likely'), low: N_('unsure')};
   return `<section class="oa_pp" aria-label="${esc(tr('Suggested payments'))}"><h3>${ic('bot', 's')} ${tr('Suggested payments')}</h3><ul role="list">${OA.pp.items.map(p => `<li>
     <span class="oa_ppm"><b><a href="#office/offers/${+p.doc_id}">${esc(p.number || '#' + p.doc_id)}</a>${p.client_name ? ' · ' + esc(p.client_name) : ''}</b>
-    <small class="muted">${esc([p.date ? fmtDateNum(new Date(p.date + 'T12:00')) : '', p.reference, tr(conf[p.confidence] || p.confidence), p.agent_name].filter(Boolean).join(' · '))}</small></span>
-    <b class="oa_ppa">${esc(curMoney(+p.amount, p.currency || 'EUR'))}</b>
+    <small class="muted">${esc([p.date ? new Date(p.date + 'T12:00').toLocaleDateString(LOCALE()) : '', p.reference, tr(conf[p.confidence] || p.confidence), p.agent_name].filter(Boolean).join(' · '))}</small></span>
+    <b class="oa_ppa">${esc(fmtNum(+p.amount, 2))} ${esc(ofcSym(p.currency || 'EUR'))}</b>
     ${OA.pp.admin ? `<span class="oa_ppb"><button type="button" class="btn sm pri" data-oa="pp-ok" data-id="${p.id}">${ic('check', 's')} ${tr('Book')}</button><button type="button" class="btn sm" data-oa="pp-no" data-id="${p.id}">${tr('Reject')}</button></span>` : ''}</li>`).join('')}</ul>
     ${OA.pp.admin ? '' : `<p class="muted">${tr('An admin of the organisation books payments.')}</p>`}</section>`;
 }

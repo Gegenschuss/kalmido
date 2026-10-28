@@ -183,13 +183,13 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
     the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
     bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
-    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id, billed_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
+    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
     # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
     if old and old["vat_pct"] is not None and vat is None:
         olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
-    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"] or old["billed_at"])):  # 2.362.0 (#3131): + billed, invoice missing
+    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",

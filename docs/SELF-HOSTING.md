@@ -922,13 +922,7 @@ organisation.
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
   `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
   address; never the status link, a new server would send new links) and the members with their roles (name, user
-  name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
-  exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
-  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
-  contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
-  office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
-  import does not take them over, a booking page belongs to one person). An open channel stays open in the target
-  organisation: every member there can read its history.
+  name, e-mail address).
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
@@ -937,12 +931,6 @@ organisation.
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
   ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
-  Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
-  messages they belong to their people), closed channels the admin is not a member of, notification channels,
-  invitations and join requests, the pictures of the organisation and its projects, synchronisation data of calendar
-  and task apps, groups of people, and (not yet) bookmarks, feeds and scheduling polls of the organisation. Every other
-  table with an organisation or project column is either exported or listed with its reason in the code
-  (`kalmido/admin/orgexport.py` OX_LEFT; `tests/export_coverage_test.py` fails on a new table that is neither).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
@@ -1002,14 +990,11 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
-**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
-their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
-(2.362), time entries, habits, filters, templates,
+**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files), their tasks with
+subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
 work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
-encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. The import keeps
-the old server's binding of each note and file (`legacy_aad`), so they open again although their ids changed; a note is
-sealed anew the next time you save it. Into an account
+encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. Into an account
 that has no encryption keys yet, the bundle is taken over and that content opens with the same passphrase. Into an
 account that already has its own keys, those keys stay and the content from the file arrives unreadable (you may delete
 it). Projects encrypted in the browser are not taken over at all: switch their encryption off before the export or
@@ -1065,9 +1050,8 @@ playbooks, project notes and notepads, time entries, customer reports and browse
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
 invoice that comes along point at the new invoice; without it they stay billed but not billable, never open again (the same
-for an account import, which carries no invoices). Since 2.362 a billed receipt whose invoice did not come along stays
-billed as well ("billed, the invoice did not come along" in the bookkeeping): it cannot be billed a second time; free it
-there only if it was never billed. Rows that cannot be taken over are named in the report with their number per area.
+for an account import, which carries no invoices). Rows that cannot be taken over are named in the report with their number
+per area.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table

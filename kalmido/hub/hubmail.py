@@ -34,7 +34,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
@@ -50,26 +50,11 @@ HBM_KINDS = ("inbox", "client", "list")
 HBM_AUTHSERV = os.environ.get("KALMIDO_MAIL_AUTHSERV_ID", "").strip().lower()
 _AR_RE = re.compile(r"\s*(dkim|spf|dmarc)\s*=\s*([a-z]+)(.*)", re.I | re.S)
 _AR_PROP_RE = re.compile(r"([a-z][\w.-]*)\s*=\s*(\"[^\"]*\"|[^\s;()]+)", re.I)
-ROOT = "E-Mails"        # the folder at the root of the workspace's file tree (its name before 2.368)
-ROOT_KEY = N_("Emails|folder")  # 2.368.0 (#2987): since then named in the person's language (hbm_root)
+ROOT = "E-Mails"        # the folder at the root of the workspace's file tree
 ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
-
-
-def hbm_root(c, uid, org, lg):
-    """2.368.0 (#2987): the name of the mail folder at the root of workspace org (None: uid's own space): the existing one in
-    any language (or "E-Mails" of before), else the name in lg -- an existing folder is never doubled by a language switch."""
-    from ..docs.store import folder_names, folder_in_sql
-    nm = folder_names(ROOT_KEY, ROOT)
-    if org:
-        r = c.execute("SELECT name FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND " + folder_in_sql("name", nm) +
-                      " AND deleted_at IS NULL ORDER BY id LIMIT 1", (int(org), *nm)).fetchone()
-    else:
-        r = c.execute("SELECT name FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' AND " +
-                      folder_in_sql("name", nm) + " AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid, *nm)).fetchone()
-    return r[0] if r else tr(ROOT_KEY, lg=lg)
 
 
 def hbm_on():
@@ -531,8 +516,7 @@ def _move_folder(c, uid, m, cid, lid):
     cn, ln = _names(c, cid, lid)
     try:
         with c.savepoint():
-            lg = lang(c, uid)
-            parent = fs_folder(c, uid, m["org_id"], [hbm_root(c, uid, m["org_id"], lg), cn or ln or tr("Not assigned", lg=lg)])
+            parent = fs_folder(c, uid, m["org_id"], [ROOT, cn or ln or tr("Not assigned", lg=lang(c, uid))])
             if parent != n["parent_id"]:
                 fsl_need_plain(c, parent)  # 2.353.0 F (#2758, review M4): the mail (plain eml) never moves into a locked folder
                 c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?",
@@ -828,7 +812,7 @@ def _import(c, r, msg, raw, mail_text):
         with c.savepoint():
             # 2.84.0: file store names are not sealed -- with the encryption on, no subject in the names
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (subj or tr("E-mail", lg=lg))
-            folder = fs_folder(c, uid, org, [hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
+            folder = fs_folder(c, uid, org, [ROOT, cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
     except (Denied, ValueError) as e:
         print("hubmail: no folder", type(e).__name__, flush=True)
         notes.append(tr("The original mail and its attachments could not be filed", lg=lg))  # 2.84.0 review

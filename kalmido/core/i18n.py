@@ -142,5 +142,5 @@ def short_day(d, lg=None, year=False):
         return d.strftime("%d.%m.%Y" if year else "%d.%m.")
     mons = LANGS.get(lg, {}).get("_months_short")
     if b == "en" or not (isinstance(mons, list) and len(mons) == 12):
-        return f"{d.day} {d:%b}" + (f" {d.year}" if year else "")  # 2.368.0 B (#2982): "3 Oct" like the client (was "03 Oct")
+        return d.strftime("%d %b %Y" if year else "%d %b")
     return f"{d.day} {mons[d.month - 1]}" + (f" {d.year}" if year else "")

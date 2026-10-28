@@ -20,6 +20,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+**2.401.0** (2026-10-28):
+- **Office**: Quotations and Invoices as two areas (Invoices with credit notes, reminders, delivery notes and a paid filter in the archive).
+- **Agents**: personal agents are allowed per workspace (private area: the person; organisation: its admins; server switch: everyone).
+- **Moving**: the account export now includes project notes and encrypted task notes; the organisation export includes the team chat channels with their files.
+
 **2.376** (2026-10-28, seven packages in one train):
 - **Office**: hand in receipts to the bookkeeping, GoBD export, take your part of an organisation's office into your personal one; refunds on credit notes, reverse charge hints, progress and final invoices.
 - **Projects**: show a task in several projects (field "Projects" in the task panel, Alt-drag onto a project).

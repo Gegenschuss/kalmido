@@ -20,7 +20,7 @@ import re
 
 from ..core.config import SECRET_KEY, ATT_DIR
 from ..core.db import insert_id, iso, now_utc
-from ..core.i18n import LANGS, N_, lang, tr
+from ..core.i18n import N_
 from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key
 from . import classify as CL
 from . import extract as EX
@@ -35,26 +35,8 @@ from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#249
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
-ROOT = "Dokumente"          # the documents folder at the root of a workspace's file tree (its name before 2.368)
-INBOX = "Eingang"           # its inbox folder: files put there are recognised and sorted (its name before 2.368)
-# 2.368.0 (#2987): a new documents folder is named in its owner's language; every language's name (and the German one of
-# before) is still recognised, so existing folders keep working and no second one is made
-ROOT_KEY = N_("Documents|folder")
-INBOX_KEY = N_("Inbox|folder")
-
-
-def folder_names(key, old):
-    """Every name of a built-in folder, lower case: the German name of before 2.368 + the name in each app language."""
-    return sorted({old.lower(), tr(key, lg="en").lower(), *(tr(key, lg=lg).lower() for lg in LANGS)})
-
-
-def is_inbox(name):
-    return str(name or "").lower() in folder_names(INBOX_KEY, INBOX)
-
-
-def folder_in_sql(col, names):
-    """SQL "lower(col) IN (?, ...)" for folder_names() (the arguments are the names)."""
-    return f"lower({col}) IN ({', '.join('?' * len(names))})"
+ROOT = "Dokumente"          # the documents folder at the root of a workspace's file tree
+INBOX = "Eingang"           # its inbox folder: files put there are recognised and sorted
 PREFIXES = (4, 6, 8)        # prefix lengths kept in the word index
 WORDS_MAX = 4000            # distinct words of one document in the index
 NAME_MAX = 120
@@ -496,28 +478,14 @@ def root_id(c, ws):
 
 def _root_by_name(c, ws, org):
     nl = " AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)"  # 2.353.0 F (#2758, review M2): a locked folder renamed so is none
-    nm = folder_names(ROOT_KEY, ROOT)  # 2.368.0 (#2987): its name in any language
     if org:
-        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND " + folder_in_sql("name", nm) +
-                      " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1", (org, *nm)).fetchone()
+        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND lower(name)=lower(?) "
+                      "AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1", (org, ROOT)).fetchone()
     else:
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
-                      "AND " + folder_in_sql("name", nm) + " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1",
-                      (int(ws[1:]), *nm)).fetchone()
+                      "AND lower(name)=lower(?) AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1",
+                      (int(ws[1:]), ROOT)).fetchone()
     return r[0] if r else None
-
-
-def inbox_path(c, root, uid):
-    """2.368.0 (#2987): "<documents folder>/<inbox>" as the settings name it: the existing folders' names, else the names a new
-    one gets in uid's language."""
-    lg = lang(c, uid)
-    r = c.execute("SELECT name FROM fs_nodes WHERE id=?", (root,)).fetchone() if root else None
-    i = None
-    if root:
-        ni = folder_names(INBOX_KEY, INBOX)
-        i = c.execute("SELECT name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND " + folder_in_sql("name", ni) +
-                      " AND deleted_at IS NULL ORDER BY id LIMIT 1", (root, *ni)).fetchone()
-    return f"{r[0] if r else tr(ROOT_KEY, lg=lg)}/{i[0] if i else tr(INBOX_KEY, lg=lg)}"
 
 
 def root_mark(c, ws, nid):
@@ -547,7 +515,7 @@ def root_folder(c, uid, org_id):
         return rid
     ctx = acx_of(c, uid)
     if not org_id or ctx.role == "agent":
-        rid = fs_folder(c, uid, org_id, [tr(ROOT_KEY, lg=lang(c, uid))])  # 2.368.0 (#2987): in the owner's language
+        rid = fs_folder(c, uid, org_id, [ROOT])
     else:
         if int(org_id) not in ctx.org_ids:
             raise Denied(404)
@@ -560,7 +528,7 @@ def root_folder(c, uid, org_id):
         ts = _now()
         rid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
                               VALUES(NULL,'folder',?,?,?,?,?,?)""",
-                        (_free_name(c, None, owner, int(org_id), tr(ROOT_KEY, lg=lang(c, owner))), owner, int(org_id), uid, ts, ts))
+                        (_free_name(c, None, owner, int(org_id), ROOT), owner, int(org_id), uid, ts, ts))
     root_mark(c, doc_ws(org_id, uid), rid)
     return rid
 
@@ -616,7 +584,7 @@ def _in_docs_tree(c, root, fid):
     if root not in ids or ids[0] == root:
         return False
     below = chain[:ids.index(root)]  # the folders between root and fid (fid first)
-    if is_inbox(below[-1]["name"]):
+    if below[-1]["name"].lower() == INBOX.lower():
         return False
     return fsl_of_chain(c, chain) is None  # 2.353.0 F (#2758, review M2): no document (plain, recognised) into a locked folder
 
@@ -645,7 +613,7 @@ def folder_tree(c, root, vis=None):
 
     def walk(pid, path, depth):
         for r in sorted(kids.get(pid, []), key=lambda x: (x["sort_no"] is None, x["sort_no"] or 0, x["name"].lower())):
-            if (depth == 0 and is_inbox(r["name"])) or (vis is not None and r["id"] not in vis):
+            if (depth == 0 and r["name"].lower() == INBOX.lower()) or (vis is not None and r["id"] not in vis):
                 continue
             p = path + [r["name"]]
             out.append({"id": r["id"], "name": r["name"], "parent_id": r["parent_id"], "depth": depth, "path": " / ".join(p)})
@@ -692,7 +660,7 @@ def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
     root = docs_root(c, node)
     parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
     parts = [x for x in parts if x][:DEPTH_MAX - 2]
-    if not root or not parts or is_inbox(parts[0]):
+    if not root or not parts or parts[0].lower() == INBOX.lower():
         return None
     p = c.execute("SELECT owner_id, org_id FROM fs_nodes WHERE id=?", (root,)).fetchone()
     pid = root

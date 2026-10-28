@@ -12,7 +12,7 @@
 const CG = {st: null, nw: null, swallow: 0};
 const CG_HOLD = 400, CG_TOL = 8;
 const cg_hm = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
-const cg_lab = m => m >= 1440 ? (hour12() ? fmtTimeLoc('00:00') : '24:00') : fmtTimeLoc(cg_hm(m));  // 2.368.0 B (#2982): 12 / 24 h as chosen
+const cg_lab = m => m >= 1440 ? '24:00' : cg_hm(m);
 const cg_wall = (day, m) => m >= 1440 ? `${addDays(day, Math.floor(m / 1440))}T${cg_hm(m % 1440)}` : `${day}T${cg_hm(m)}`;
 const cg_snap = m => Math.round(m / 15) * 15;
 // wall-clock arithmetic on "YYYY-MM-DDTHH:MM" without the device's time zone (no daylight-saving jumps)

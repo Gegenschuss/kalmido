@@ -46,6 +46,8 @@ check(not ar.work_window_open(OFFICE, at(2026, 10, 25, 10, 0)), "Sunday 10:00: c
 NIGHT = {**OFFICE, "work_from": "22:00", "work_to": "06:00", "work_days": [1, 2, 3, 4, 5, 6, 7]}
 check(ar.work_window_open(NIGHT, at(2026, 10, 26, 23, 0)) and ar.work_window_open(NIGHT, at(2026, 10, 27, 5, 59))
       and not ar.work_window_open(NIGHT, at(2026, 10, 26, 12, 0)), "a window over midnight")
+# #1604: the runner checks below use the real clock (time.time()); pin "empty work_days = closed" at a fixed Monday 09:00 too
+check(not ar.work_window_open({**OFFICE, "work_days": []}, at(2026, 10, 26, 9, 0)), "no work days: closed, also Monday 09:00")
 check(not ar.work_window_open({**OFFICE, "state": {"timezone": "No/Such_Zone", "working": False}}),
       "an unknown time zone: the server's state (closed)")
 

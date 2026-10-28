@@ -440,16 +440,6 @@ def _p_letter(c, run, src, d, ctx):
     return d
 
 
-def _p_drive_closed(c, run, src, d, ctx):
-    """2.362.0 (#3096): a closed month of the logbook (a vehicle that did not come along: nothing to close)."""
-    if src.get("vehicle_id") and not d.get("vehicle_id"):
-        return False
-    if c.execute("SELECT 1 FROM office_drive_closed WHERE org_id=? AND COALESCE(vehicle_id, 0)=? AND month=?",
-                 (ctx.space, d.get("vehicle_id") or 0, d.get("month"))).fetchone():
-        return False
-    return d
-
-
 def _p_letter_profile(c, run, src, d, ctx):
     """2.184.0 A (#2579): the signature of a person in the target office stays theirs (one per person and office)."""
     if c.execute("SELECT 1 FROM office_letter_profiles WHERE org_id=? AND user_id=?", (ctx.space, d["user_id"])).fetchone():
@@ -514,9 +504,6 @@ SPECS = [
         people={**_P, "user_id": "null"}, private="office"),
     OiT("office/drive_log.json", "office_drive_log", refs={"drive_id": "office_drives"}, need=("drive_id",), people={"by_user": "null"},
         private="office"),
-    # 2.362.0 (#3096): the closed months of the logbook stay closed (one already closed in the target is left as it is)
-    OiT("office/drive_closed.json", "office_drive_closed", refs={"vehicle_id": "office_vehicles"}, people={"closed_by": "null"},
-        private="office", label=N_("Logbook"), prep=_p_drive_closed),
     OiT("office/cashbooks.json", "office_cashbooks", people=_P, private="office"),
     OiT("office/cash_entries.json", "office_cash_entries", refs={"book_id": "office_cashbooks", "invoice_id": "office_docs"}, need=("book_id",),
         late={"storno_of": "office_cash_entries", "node_id": "fs_nodes"}, people=_P, private="office"),
