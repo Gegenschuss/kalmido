@@ -14627,5 +14627,6 @@
   "{0} client of a customer report": ["{0} cliente de un aviso de cliente", "{0} clientes de avisos de clientes"],
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Los recibos facturados cuya factura no se importó siguen facturados (falta la factura): libéralos en Contabilidad solo si nunca se facturaron",
   "Billed, the invoice did not come along with the import": "Facturado, la factura no se importó",
-  "{0} project note": ["{0} nota de proyecto", "{0} notas de proyecto"]
+  "{0} project note": ["{0} nota de proyecto", "{0} notas de proyecto"],
+  "Differs from your app language: the client receives the document in this language.": "Distinto del idioma de tu app: el cliente recibe el documento en este idioma."
 }

@@ -14627,5 +14627,6 @@
   "{0} client of a customer report": ["{0} klant van een klantmelding", "{0} klanten van klantmeldingen"],
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Gefactureerde bonnen waarvan de factuur niet is meegekomen, blijven gefactureerd (factuur ontbreekt): geef ze in de boekhouding alleen vrij als ze nooit gefactureerd zijn",
   "Billed, the invoice did not come along with the import": "Gefactureerd, de factuur is bij de import niet meegekomen",
-  "{0} project note": ["{0} projectnotitie", "{0} projectnotities"]
+  "{0} project note": ["{0} projectnotitie", "{0} projectnotities"],
+  "Differs from your app language: the client receives the document in this language.": "Wijkt af van je app-taal: de klant krijgt het document in deze taal."
 }

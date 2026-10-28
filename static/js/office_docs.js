@@ -264,7 +264,9 @@ function ofdEditorHtml() {
     ${ofdF('reminder_deadline_days', tr('Payment deadline'), `<span class="lacts">${ofdIn('reminder_deadline_days', d.reminder_deadline_days ?? '', {num: true, max: 3})}<span class="muted">${tr('days')}</span></span>`)}` : '';
   // 2.356.0 C (#3005): the client comes first; language, currency, VAT and framework contract wait folded below ("More details",
   // the summary names their values) -- quotations and invoices alike
-  const moreF = `${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, (S.languages || []).map(L => [L.code, L.name])))}
+  // 2.368.0 (#2979): a note when the document is written in another language than the app shows
+  const langOther = d.lang && String(d.lang).slice(0, 2) !== String(I18N.code || 'en').slice(0, 2);
+  const moreF = `${ofdF('lang', tr('Document language'), ofdSel('lang', d.lang, (S.languages || []).map(L => [L.code, L.name])), langOther ? tr('Differs from your app language: the client receives the document in this language.') : '', {keep: true})}
     ${ofdF('currency', tr('Currency'), ofdBound(d, ofdSel('currency', d.currency, ofdCurOpts(d))))}
     ${d.currency !== ofcHome() ? ofdF('fx_rate', tr('Exchange rate'), ofdBound(d, ofdIn('fx_rate', ofdNumIn(d.fx_rate), {num: true, max: 12})), ofdFxHint(d)) : ''}
     ${kind !== 'reminder' && kind !== 'delivery' ? ofdF('vat_mode', tr('VAT'), ofdBound(d, ofdSel('vat_mode', d.vat_mode, [['vat', tr('with VAT')], ['novat', tr('without VAT (reverse charge / abroad)')]]))) : ''}
@@ -284,7 +286,7 @@ function ofdEditorHtml() {
     ${kind !== 'reminder' ? ofdF('service_from', tr('Service from'), dateIn('ofd-service_from', d.service_from || '', {label: tr('Service from'), attrs: 'data-f="service_from"'})) : ''}
     ${kind !== 'reminder' ? ofdF('service_to', tr('Service until'), dateIn('ofd-service_to', d.service_to || '', {label: tr('Service until'), attrs: 'data-f="service_to"', after: 'ofd-service_from'})) : ''}
     ${invFields}${remFields}
-    </div><details class="oil_more" ${OFD.open.more ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span> <span class="muted">${esc(moreSum)}</span></summary><div class="ofdgrid">${moreF}</div></details>${kind === 'credit' && d.cancels ? `<p class="muted ofchint">${esc(tr('Credit note for invoice {0}', d.cancels.number || '#' + d.cancels.id))} <a href="#office/offers/${d.cancels.id}">${tr('open')}</a></p>` : ''}`);
+    </div><details class="oil_more" ${OFD.open.more ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span> <span class="muted${langOther ? ' ofd_langother' : ''}">${esc(moreSum)}</span></summary><div class="ofdgrid">${moreF}</div></details>${kind === 'credit' && d.cancels ? `<p class="muted ofchint">${esc(tr('Credit note for invoice {0}', d.cancels.number || '#' + d.cancels.id))} <a href="#office/offers/${d.cancels.id}">${tr('open')}</a></p>` : ''}`);
   const items = kind === 'reminder' ? ofdRefsHtml(d, t) : ofdItemsHtml(d, adm);
   const auto = inv ? '' : ofdAutoHtml(d, t);
   const rights = d.rights || {};
