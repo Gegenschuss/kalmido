@@ -152,6 +152,15 @@ j = A.get(OFF).json()
 check(j.get("type") == "" and not j["webdav"]["url"] and not j["webdav"]["password_set"],
       f"the restore keeps the removed target removed (no old address, no old password) {j.get('type')} {j.get('webdav')}")
 check(dbx("SELECT COUNT(*) AS n FROM users WHERE username='bob'", data=DATA)[0]["n"] == 1, "the restore itself ran (the data is there)")
+# 2.359.2 (#2892): an instance that never had a target (no bko_ rows at all, a fresh test instance) gets none from the backup
+dbx("DELETE FROM settings WHERE key LIKE 'bko%'", data=DATA)
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": bk[0] if bk else ""})
+check(r.ok, f"restore on an instance without a target {r.status_code} {r.text[:200]}")
+A = sess("alice")
+j = A.get(OFF).json()
+check(j.get("type") == "" and not j["webdav"]["url"] and not j["webdav"]["password_set"],
+      f"#2892: no target and no credentials from the backup on an instance that had none {j.get('type')} {j.get('webdav')}")
+check(not dbx("SELECT key FROM settings WHERE key IN ('bko_conf', 'bko_sec')", data=DATA), "#2892: bko_conf / bko_sec not in the database")
 
 # ============================================================== hosted: only public https
 if not nostart("P22232C"):

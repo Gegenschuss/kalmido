@@ -1401,6 +1401,11 @@ def bk_restore(path, pw, admin, via):
                 with _pg.system_ctx(c):  # every session of every organisation ends
                     for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
                         gset(c, k, seal(c, _BK_RESEAL[k], plain[k]) if plain.get(k) else v)  # 2.359.0 (#2894)
+                    # 2.359.2 (#2892): what this instance did not have goes too - a production backup restored on a fresh test
+                    # instance brought its off-site target and credentials along (uploads + keep-N pruning at production's target)
+                    for r in c.execute("SELECT key FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'").fetchall():
+                        if r[0] not in keep:
+                            c.execute("DELETE FROM settings WHERE key=?", (r[0],))
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
