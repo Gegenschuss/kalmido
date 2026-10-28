@@ -14658,5 +14658,11 @@
   "Time format": "Tijdnotatie",
   "24 hours ({0})": "24 uur ({0})",
   "12 hours ({0})": "12 uur ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser."
+  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser.",
+  "Task (#)": "Taak (#)",
+  "Reading style…": "Leesstijl…",
+  "Like the space ({0})": "Zoals de ruimte ({0})",
+  "Clear|reading style": "Helder",
+  "Book|reading style": "Boek",
+  "Default of the space": "Standaard van de ruimte"
 }

@@ -14658,5 +14658,11 @@
   "Time format": "Formato ora",
   "24 hours ({0})": "24 ore ({0})",
   "12 hours ({0})": "12 ore ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatico segue la lingua e la regione di questo browser."
+  "Automatic follows the language and the region of this browser.": "Automatico segue la lingua e la regione di questo browser.",
+  "Task (#)": "Attività (#)",
+  "Reading style…": "Stile di lettura…",
+  "Like the space ({0})": "Come lo spazio ({0})",
+  "Clear|reading style": "Chiaro",
+  "Book|reading style": "Libro",
+  "Default of the space": "Predefinito dello spazio"
 }

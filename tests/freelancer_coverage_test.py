@@ -847,6 +847,7 @@ ROUTES = {
     "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private space's)
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.143.0 B (#2211): the trash of the private space (p2143_b_api_test.py)
     "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
