@@ -1155,6 +1155,7 @@ function fieldText(f, v, lid) {
 }
 function fieldChip(f, v, lid) {
   if (CFK_TYPES.includes(f.type)) return cfkChip(f, v);  // 2.156.0 B (#2069)
+  if (cfst_on(f)) return cfstChip(f, v, false);  // 2.410.0 A (#3514): a stage bar (cfstage.js)
   const txt = fieldText(f, v, lid); if (!txt) return '';
   const tip = esc(f.name + ': ' + (f.type === 'url' ? v : f.type === 'date' ? fmtDate(v) : txt));
   if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)} title="${tip}">${esc(o.name)}</span>`; }
@@ -1166,6 +1167,7 @@ function fieldChip(f, v, lid) {
 }
 function fieldCell(f, v, lid, t) {  // column view (desktop); 2.156.0 B (#2069): t = the task (stars to tap)
   if (CFK_TYPES.includes(f.type)) return cfkCell(f, v, t);
+  if (cfst_on(f)) return cfstChip(f, v, true);  // 2.410.0 A (#3514)
   if (v == null || v === '') return '';
   if (f.type === 'select') { const o = selOpt(f, v); return o ? `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)}>${esc(o.name)}</span>` : ''; }
   if (f.type === 'checkbox') return v === '1' ? ic('check', 's') : '';

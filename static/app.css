@@ -8440,3 +8440,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   .chath .avb::before{content:"";position:absolute;inset:calc(50% - 1.375rem)}
 }
 time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-family:inherit;font-variant-numeric:tabular-nums}
+/* 2.410.0 A (#3514): the stage bar of an ordered choice field (cfstage.js); a phone shows only the dots */
+.cfst{display:inline-flex;align-items:center;gap:.375rem;max-width:100%;vertical-align:middle;font-weight:500}
+.cfst svg{flex:none}
+.cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){.cfst-l{display:none}}

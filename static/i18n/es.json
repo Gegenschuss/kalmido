@@ -14623,5 +14623,13 @@
   "Quotations & invoices": "Presupuestos y facturas",
   "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Reconocer los archivos colocados en la carpeta «Dokumente/Eingang» del archivo",
   "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "El recibo se guarda en el archivo (carpeta «Dokumente») y aparece en Oficina > Recibos; se reconocen importe y fecha.",
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Los recibos facturados cuya factura no se importó vuelven a estar abiertos: revísalos antes de facturar"
+  "Billed receipts whose invoice did not come along are open again: check them before billing": "Los recibos facturados cuya factura no se importó vuelven a estar abiertos: revísalos antes de facturar",
+  "Special state red": "Estado especial rojo",
+  "Special state orange": "Estado especial naranja",
+  "Stage {0} of {1}: {2}": "Etapa {0} de {1}: {2}",
+  "Display": "Visualización",
+  "Ordered (stages): show as a stage bar": "Ordenado (etapas): mostrar como barra de etapas",
+  "Kind of the option": "Tipo de opción",
+  "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un estado especial (p. ej. Aparcado) no es una etapa propia: la barra lo muestra con su color en la etapa siguiente.",
+  "Unknown signal colour": "Color de señal desconocido"
 }

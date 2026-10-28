@@ -525,7 +525,7 @@ function fieldEditor(f, t, ro) {
     case 'url': c = `<span class="cfurl"><input id="${id}" type="url" inputmode="url" data-cf="${f.id}" value="${esc(v)}" placeholder="https://…" ${ro ? 'readonly' : ''}>${v ? flkLink(v, 'iconbtn', ic(flkIs(v) ? 'folder' : 'link', 's'), true) : ''}</span>`; break;
     default: c = `<input id="${id}" data-cf="${f.id}" value="${esc(v)}" maxlength="1000" ${ro ? 'readonly' : ''} placeholder="–">`;
   }
-  return `<label for="${id}" title="${esc(ftLabel(f.type))}">${esc(f.name)}</label>${c}`;
+  return `<label for="${id}" title="${esc(ftLabel(f.type))}">${esc(f.name)}</label>${c}` + (cfst_on(f) ? cfstWide(f, t) : '');  // 2.410.0 A (#3514)
 }
 // typed number -> "1234.5" (German "1.234,5" / "12,5", English "1,234.5"); 2.263.0 (#2976): through parseNum (core.js), the
 // decimal sign of every language (French "12,5" was 125); no number = the text as typed (the server says "number expected")
@@ -543,7 +543,7 @@ async function saveField(el) {
   try { await patchTask(t.id, {fields: {[fid]: v}}); } catch { renderDetail(); }
 }
 function fieldModal(lid, f, done) {
-  const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}]))};
+  const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}])), stages: !!f?.options?.stages};  // 2.410.0 A (#3514): + stages
   const md = modal(`<h3>${edit ? tr('Edit field') : tr('New field')}</h3>
     <div class="row"><label for="fd-name">${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}"></div>
     <div class="row"><label for="fd-type">${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -557,11 +557,15 @@ function fieldModal(lid, f, done) {
     if (['currency', 'rating', 'task'].includes(st.type)) { x.innerHTML = ''; cfkModalExtra(x, st.type, f); return; }  // 2.156.0 B (#2069): cfkinds.js, on demand
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
-    else if (st.type === 'select' || st.type === 'multiselect') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
+    else if (st.type === 'select' || st.type === 'multiselect') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}">${st.type === 'select' && st.stages ? cfst_optSel(o, i) : ''}<button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}${st.type === 'select' ? cfst_dlgRow(st) : ''}`;
     else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the project.')}</div>` : '';
   };
   extra();
-  md.addEventListener('change', e => { if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); } });
+  md.addEventListener('change', e => {
+    if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); }
+    if (e.target.id === 'fd-stages') { st.stages = e.target.checked; st.pal = null; extra(); $('#fd-stages', md)?.focus(); }  // 2.410.0 A (#3514)
+    if (e.target.dataset?.osp !== undefined) st.opts[+e.target.dataset.osp].special = e.target.value;
+  });
   md.addEventListener('input', e => { const i = e.target.dataset.oname; if (i !== undefined) st.opts[+i].name = e.target.value; });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -582,7 +586,7 @@ function fieldModal(lid, f, done) {
     }
     if (a === 'save') {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
-      const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' || st.type === 'multiselect' ? {options: st.opts.filter(o => o.name.trim())} : cfkModalOpts(md, st.type);  // 2.156.0 B (#2069)
+      const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' || st.type === 'multiselect' ? {options: st.opts.filter(o => o.name.trim()), ...(st.type === 'select' ? {stages: st.stages} : {})} : cfkModalOpts(md, st.type);  // 2.156.0 B (#2069)
       const body = {name, options, pinned: $('#fd-pin', md).checked};
       if (st.type === 'formula') Object.assign(body, fxModalBody(md));  // 2.43.0 (#1328): the server checks it (position / field name)
       try { await api(edit ? 'PATCH' : 'POST', edit ? '/api/fields/' + f.id : `/api/lists/${lid}/fields`, edit ? body : {...body, type: st.type}); } catch { return; }
