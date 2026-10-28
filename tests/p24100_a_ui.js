@@ -85,15 +85,16 @@ const OPTS = [{name: 'Planned'}, {name: 'Building'}, {name: 'Review'}, {name: 'P
     check(await ready(ev, `/^since /.test(document.querySelector('#detail .cfstw-m')?.textContent || '')`, 60), '#3514: "since …" from the last change of the field');
     if (SH) await shot('p24100a-detail-1280.png');
     // changing the value in the panel moves the bar
-    await ev(`(() => { const s = document.querySelector('#detail #cf-${FL.id}'); s.value = ${JSON.stringify(id(FL, 'Live'))}; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ev(`!!document.querySelector('#detail #cf-${FL.id}')`), '#3514: the select of the field in the panel');
+    await ev(`(() => { const s = document.querySelector('#detail #cf-${FL.id}'); if (!s) return 0; s.value = ${JSON.stringify(id(FL, 'Live'))}; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `document.querySelector('#detail .cfstw')?.dataset.stage === '5' && document.querySelector('#tc-${T1} .cfst')?.dataset.stage === '5'`), '#3514: a new value moves the bar in the panel and the row');
-    await ev(`(() => { closeDetail?.(); return 1; })()`).catch(() => 0);
 
     // the field dialog: the switch and the kind per option
     await ev(`(() => { fieldModal(${L}, fieldById(${FL.id}), () => {}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #fd-stages')?.checked && document.querySelectorAll('.modal [data-osp]').length === 6 && document.querySelector('.modal [data-osp="3"]').value === 'red'`),
       '#3514: the field dialog has "Ordered (stages)" on and the kind per option (Parked = red)');
-    await ev(`(() => { const s = document.querySelector('.modal [data-osp="1"]'); s.value = 'orange'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
+    const osp = await ev(`(() => { const s = document.querySelector('.modal [data-osp="1"]'); if (!s) return [...document.querySelectorAll('.modal')].map(m => m.className + ':' + m.querySelectorAll('[data-osp]').length).join(','); s.value = 'orange'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
+    check(osp === 1, `#3514: the kind of option 2 changed in the dialog ${osp}`);
     check(await ready(ev, `fieldById(${FL.id})?.options.options[1].special === 'orange' && !document.querySelector('.modal #fd-stages')`), '#3514: the dialog saves a special state');
     await ev(`(() => { fieldModal(${L}, null, () => {}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #fd-type')`), 'the new field dialog');

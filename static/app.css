@@ -8444,4 +8444,4 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .cfst{display:inline-flex;align-items:center;gap:.375rem;max-width:100%;vertical-align:middle;font-weight:500}
 .cfst svg{flex:none}
 .cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:899px){.cfst-l{display:none}}
+@media (max-width:899px){.cfst .cfst-l{display:none}}
