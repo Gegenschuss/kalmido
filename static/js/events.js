@@ -10,9 +10,12 @@ function toastPlace(el) {
   // 2.46.4 (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
   // coordinates); the message sits above the lowest input field there (the comment field), else right above the keyboard
   const vv = window.visualViewport, kb = typeof kbReal === 'function' && kbReal();
-  const vis = kb ? Math.round(vv.offsetTop + vv.height) : innerHeight;
+  // 2.365.0 (#2824): measured against the layout viewport (position:fixed counts from its bottom), not innerHeight, which
+  // follows the visible area on some phones while the keyboard is up (the message then sat in the middle of the list)
+  const lay = document.documentElement.clientHeight || innerHeight;
+  const vis = kb ? Math.round(vv.offsetTop + vv.height) : lay;
   let top = vis;
-  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)']) {
+  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)', '#detail .dthumb']) {  // 2.365.0 (#2824): + the phone's task bar
     const e = $(s); if (!e || !e.offsetWidth) continue;
     const r = e.getBoundingClientRect(); if (r.top > vis * .5 && r.top < top && r.bottom > vis - 160) top = r.top;
   }
@@ -32,8 +35,8 @@ function toastPlace(el) {
   // 2.46.4 (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
   const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
   el.classList.remove('totop');
-  if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
-  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  if (sr && sr.top >= lay * .3) top = Math.min(top, sr.top);
+  el.style.bottom = top < lay ? Math.round(lay - top + 12) + 'px' : '';
   // 2.92.0 D (#2009): on the phone the message never covers the quotation editor's "In the cash flow" choice: it goes to the top
   const cf = $('.cf8sec .seg');
   if (cf && cf.offsetWidth && (isMobile() || isTouch())) {
@@ -41,6 +44,8 @@ function toastPlace(el) {
     if (a.bottom > b.top && a.top < b.bottom) { el.classList.add('totop'); el.style.bottom = ''; }
   }
 }
+// 2.365.0 (#2824): a message already shown follows the keyboard (it opens, closes, the visible area scrolls): right above it
+if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => { const el = $('#toast'); if (el && !el.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(el)); });
 // 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
 // text is set a moment after clearing it, so the same message twice is read twice
 let announceT;

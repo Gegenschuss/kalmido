@@ -778,7 +778,7 @@ function taskMenu(anchor, id, o = {}) {
   const l = listById(t.list_id), open = t.status === 0;
   // 2.31.0 (#1056): groups with small headings (Plan, Organize, Time, Structure); won't do + delete last, set apart. In the task
   // panel date and priority are not repeated: the panel's header has both (the date chip, Today / Tomorrow, the flag)
-  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail .dtop [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');
+  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail :is(.dtop, .dthumb) [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');  // 2.365.0 (#2824): the phone's date sits in the bottom bar
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),

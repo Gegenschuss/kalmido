@@ -46,10 +46,11 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   // ================= jsdom: the task header on a phone
   let w = await boot({user: 'alice', mobile: true, hash: 'l/' + L}), d = w.document;
   w.eval(`openDetail(${T})`); await sleep(400);
-  let dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
+  // 2.365.0 (#2824): on a phone the date, Today / Tomorrow and Complete sit in the bottom bar (.dthumb) above the comment field
+  let dq = [...d.querySelectorAll('#detail .dthumb [data-act="due-q"]')];
   check(dq.length === 3 && dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Today,+1 day,-1 day' /* 2.354.0 C (#3326): the task is due later */, '#636: Today / Tomorrow in the header with their words ' + dq.map(b => b.textContent.trim()));
-  check(/^\+1 day: Set to /.test(dq[1].getAttribute('aria-label'))  /* 2.354.0 C (#3326): names the target day */ && d.querySelector('#detail .dtop .dbr[aria-hidden="true"]'), '#636: aria-label kept, the row break is hidden from screen readers');
-  check(d.querySelector('#detail .dtop [data-act="pin"]') && d.querySelector('#detail .dtop .dchip .dct'), 'the header still has Pin (CSS decides) and the date');
+  check(/^\+1 day: Set to /.test(dq[1].getAttribute('aria-label'))  /* 2.354.0 C (#3326): names the target day */ && !d.querySelector('#detail .dtop .dbr'), '#636: aria-label kept; 2.365.0 (#2824): no row break in the phone header any more');
+  check(d.querySelector('#detail .dtop [data-act="pin"]') && d.querySelector('#detail .dthumb .dchip .dct') && !d.querySelector('#detail .dtop .dchip'), 'the header still has Pin (CSS decides); 2.365.0 (#2824): the date is in the bottom bar');
   click(w, dq[1]);
   check(await until(async () => (await task(T)).due === day(10)), '#636: a tap on Tomorrow moves one more day');  // 2.199.0 M (#2768): was day(1)
   check((await task(T)).due_time === '14:30', 'the time stays');
@@ -116,7 +117,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   const DT = (await call('POST', '/api/tasks', {title: 'Steuer', due: day(3)}, await login('dora'))).id;
   await w.eval('load().then(render)'); await sleep(300);
   w.eval(`openDetail(${DT})`); await sleep(400);
-  dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
+  dq = [...d.querySelectorAll('#detail .dthumb [data-act="due-q"]')];  // 2.365.0 (#2824): the phone's bottom bar
   check(dq.map(b => b.querySelector('.dql')?.textContent).join() === 'Heute,+1 Tag,-1 Tag' && dq[0].getAttribute('aria-label') === 'Fällig: Heute', 'German: Heute / Morgen');  // 2.354.0 C (#3326): due in 3 days: +1 Tag, -1 Tag
   w.eval('closeDetail()');
   w.eval(`tokModal(null, [])`); await sleep(300);
@@ -149,18 +150,22 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   };
   const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight - (document.querySelector('#tabs')?.offsetHeight || 0)) { e.scrollIntoView({block: 'center'}); } const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
   // the task header: rows, sizes, the date in full, nothing outside
+  // 2.365.0 (#2824): on a phone (touch below 900 px) the date, Today / Tomorrow and Complete sit in the bottom bar .dthumb: they
+  // are measured there (b = the bar when it is there, else the header), Pin and "…" stay in the header
   const HEAD = `(() => { const d = document.querySelector('#detail .dtop'); if (!d) return null; const R = d.getBoundingClientRect(), vis = e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
-    const r = s => { const e = d.querySelector(s); if (!vis(e)) return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height)}; };
-    const dct = d.querySelector('.dchip .dct'), dql = d.querySelector('[data-act="due-q"] .dql');
-    return {h: Math.round(R.height), over: document.documentElement.scrollWidth - innerWidth, sw: d.scrollWidth - d.clientWidth,
-      out: [...d.children].filter(vis).filter(e => { const b = e.getBoundingClientRect(); return b.right > R.right + .5 || b.left < R.left - .5; }).length,
+    const bar = document.querySelector('#detail .dthumb'), B2 = bar ? bar.getBoundingClientRect() : null;
+    const r = s => { const e = (bar && !/pin|task-menu/.test(s) ? bar : d).querySelector(bar && s === '.chk' ? '.dtdone' : s); if (!vis(e)) return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height)}; };
+    const dct = (bar || d).querySelector('.dchip .dct'), dql = (bar || d).querySelector('[data-act="due-q"] .dql');
+    return {h: Math.round(R.height), over: document.documentElement.scrollWidth - innerWidth, sw: d.scrollWidth - d.clientWidth + (bar ? Math.max(0, bar.scrollWidth - bar.clientWidth) : 0), bar: !!bar, barTop: B2 ? Math.round(B2.top) : null, hb: Math.round(R.bottom),
+      out: [...d.children, ...(bar ? bar.children : [])].filter(vis).filter(e => { const b = e.getBoundingClientRect(), P = bar && bar.contains(e) ? B2 : R; return b.right > P.right + .5 || b.left < P.left - .5; }).length,
       chk: r('.chk'), chip: r('.dchip'), today: r('[data-act="due-q"][data-d="0"]'), tom: r('[data-act="due-q"][data-d="1"]'), pin: r('[data-act="pin"]'), more: r('[data-act="task-menu"]'),
       clipped: dct.scrollWidth > dct.clientWidth + 1, words: vis(dql), date: dct.textContent}; })()`;
   const headChecks = (tag, x, {rows, words, pin}) => {
     check(x && x.over <= 0 && x.sw <= 0 && x.out === 0, `${tag}: the header fits, nothing sideways ` + JSON.stringify(x));
     check(x.today && x.tom && x.today.h >= 44 && x.tom.h >= 44 && x.today.w >= 44 && x.tom.w >= 44, `${tag}: Today / Tomorrow shown, 44 px targets`);
     check(!x.clipped, `${tag}: the whole date (${x.date}), not cut short ` + JSON.stringify({chip: x.chip, today: x.today, tom: x.tom, pin: x.pin, more: x.more, chk: x.chk}));
-    if (rows === 2) check(x.chip.t >= x.chk.b && x.today.t >= x.chk.b && Math.abs(x.today.t - x.chip.t) <= 2 && x.h < 125, `${tag}: date + Today / Tomorrow in a second row`);
+    if (rows === 'bar') check(x.bar && x.h < 70 && x.barTop > x.hb && Math.abs(x.today.t - x.chip.t) <= 2 && (x.chk.t >= x.chip.b - 1 || (Math.abs(x.chk.t - x.chip.t) <= 4 && x.chk.l > x.chip.r)), `${tag}: 2.365.0 (#2824) one header row; date + Today / Tomorrow, then project + Complete in the bottom bar ` + JSON.stringify(x));
+    else if (rows === 2) check(x.chip.t >= x.chk.b && x.today.t >= x.chk.b && Math.abs(x.today.t - x.chip.t) <= 2 && x.h < 125, `${tag}: date + Today / Tomorrow in a second row`);
     else check(x.h < 70 && Math.abs(x.chip.t - x.today.t) <= 2 && x.chip.l > x.chk.r, `${tag}: one row`);
     check(x.words === words, `${tag}: the words next to the icons ${words ? 'shown' : 'hidden'}`);
     check(!!x.pin === pin, `${tag}: Pin ${pin ? 'in the header' : 'in "…"'}`);
@@ -181,7 +186,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await openTask(o, T);
     const x = await ev(HEAD);
-    headChecks(tag, x, {rows: 2, words: vw >= 360, // 2.25.0 (UX-42): the words from 20rem (360 px phones too)
+    headChecks(tag, x, {rows: 'bar', words: false, // 2.365.0 (#2824): the bottom bar shows the icons (was: the words from 20rem)
                    pin: false});  // 2.218.0 (#2799): below 28rem Pin is in "…" (was: in the header)
     await shot(`p2151-${tag}-header.png`);
     if (vw !== 390) return;
@@ -264,7 +269,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await o.nav(B + '#today'); await ready(ev, o.idle);
     await ev(`(() => { openDetail(${DT}); return 1; })()`); await settle(ev, o.idle);
     const x = await ev(HEAD);
-    headChecks('de 390', x, {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
+    headChecks('de 390', x, {rows: 'bar', words: false, pin: false});  // 2.218.0 (#2799); 2.365.0 (#2824): the bottom bar
     await shot('p2151-de-390-header.png');
   }, true);
 
@@ -278,14 +283,14 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await shot('p2151-904-header.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await rsz(ev);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
-    headChecks('fold folded 412', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
+    headChecks('fold folded 412', await ev(HEAD), {rows: 'bar', words: false, pin: false});  // 2.218.0 (#2799); 2.365.0 (#2824): the bottom bar
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await rsz(ev);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
     headChecks('fold unfolded again', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
     // 2.364.0 (#3040): the widest phone layout is 767 px now (was 880)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 760, height: 904}}); await rsz(ev);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await settle(ev, o.idle);
-    headChecks('760 portrait', await ev(HEAD), {rows: 1, words: false, pin: true});
+    headChecks('760 portrait', await ev(HEAD), {rows: 'bar', words: true, pin: true});  // 2.365.0 (#2824): the phone layout (up to 767 px) has the bottom bar (wide: Today with its word)
     await shot('p2151-760-header.png');
     // the matrix keeps two columns on the unfolded Fold: no fold buttons
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
