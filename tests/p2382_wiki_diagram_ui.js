@@ -76,11 +76,11 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
       return {math: m.querySelectorAll('.wkdgmath .katex').length, inl: m.querySelectorAll('.wkimath .katex').length, svgs: m.querySelectorAll('.wkdgmm svg').length,
         label: svg.textContent.includes('Start') && svg.textContent.includes('End'), runs: !!svg.querySelector('script') || [svg, ...svg.querySelectorAll('*')].some(x => [...x.attributes].some(a => /^on/i.test(a.name))),
         err: m.querySelector('.wkdgerr').textContent, broken: [...m.querySelectorAll('pre[data-lang="mermaid"]')].map(p => p.textContent),
-        text: m.textContent.includes('it costs $5.'), code: m.querySelector('code')?.textContent}; })()`, 160);
+        text: m.textContent.includes('it costs $5.'), code: [...m.querySelectorAll('code')].find(c => !c.closest('pre'))?.textContent}; })()`, 160);
     check(d1 && d1.math === 2 && d1.inl === 1, `${tag}: "$$" lines and the \`\`\`math block are drawn as formulas, the inline \\( \\) too: ${JSON.stringify(d1)}`);
     check(d1 && d1.svgs === 1 && d1.label && !d1.runs, `${tag}: the Mermaid block is an SVG with its labels, nothing in it runs`);
     check(d1 && /could not be drawn/.test(d1.err) && d1.broken.length === 1 && d1.broken[0].includes('this is not a diagram'), `${tag}: a broken diagram keeps its source with a hint`);
-    check(d1 && d1.text && d1.code === '\\(code\\)', `${tag}: a single $ stays text, \\( \\) in a code span stays code`);
+    check(d1 && d1.text && d1.code === '\\(code\\)', `${tag}: a single $ stays text, \\( \\) in a code span stays code (${JSON.stringify(d1 && [d1.text, d1.code])})`);
     const l1 = await ev(loaded);
     check(l1 && ['js/diagram.js', 'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css', 'vendor/mermaid/mermaid.min.js'].every(f => l1.includes(f)), `${tag}: the libraries came from the server itself, only now (${JSON.stringify(l1)})`);
     if (vw > 1000) await shot(`p2382_${vw}_read.png`);
