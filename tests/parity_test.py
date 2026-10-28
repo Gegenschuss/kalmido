@@ -781,6 +781,8 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",
+    "GET /tasks/{}/working": "2.407.0 A (#3513): set_working answers the same (working + job); the job itself via get_job",
+    "PATCH /tasks/{}/working": "2.407.0 A (#3513): set_working (POST) adds the line as well while working; PATCH is for scripts that must not start one",
     "GET /documents/upload-target": "2.207.0 A (#2763): only for scan inbox keys (docs:upload, the folder watcher); never agents",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",

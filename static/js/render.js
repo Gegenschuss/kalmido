@@ -983,6 +983,26 @@ function renderView0() {
 }
 
 // ------------------------------------------------------------------ render: task rows
+// 2.407.0 A (#3513): an agent works on the task (its running job, t.working from the server): a pulsing dot with the name,
+// the time of its last update and its last progress line, in the row / board card and the detail. It fades ttl seconds
+// after that update here as on the server: agwArm redraws once the next one is due (no reload)
+let agwT = 0, agwAt = 0;
+function agwArm(end) {
+  if (agwT && agwAt <= end) return;
+  clearTimeout(agwT); agwAt = end;
+  agwT = setTimeout(() => { agwT = 0; viewSafeRender(); if (S.sel && !$('#detail')?.contains(document.activeElement)) renderDetail(); },
+    Math.min(Math.max(end - Date.now(), 0) + 1000, 2 ** 31 - 1));
+}
+function agwOf(t) {
+  const w = t?.working, at = w ? Date.parse(w.at) : NaN, end = at + (w?.ttl || 900) * 1000;
+  if (!w || !(end > Date.now())) return null;
+  agwArm(end);
+  return [w.name || w.agent || tr('Agent'), fmtTimeLoc(fmtHM(new Date(at))), w.text].filter(Boolean).join(' · ');
+}
+function agwChip(t) {
+  const line = agwOf(t);
+  return line ? `<span class="agw" title="${esc(line)}"><i class="agwd" aria-hidden="true"></i><span class="sr">${esc(tr('Agent working'))}: </span><span class="agwt">${esc(line)}</span></span>` : '';
+}
 function taskRow(t, opts = {}) {
   const kids = S.tasks.size ? children(t.id) : [];
   const openKids = kids.filter(k => k.status === 0).length;
@@ -1015,6 +1035,7 @@ function taskRow(t, opts = {}) {
   if (t.waiting_at && t.status === 0 && !opts.trash && rs('wait')) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
+  if (!opts.trash && t.working) { const w = agwChip(t); if (w) meta.push(w); }  // 2.407.0 A (#3513)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list') && !(rsyProjToday() && !opts.trash)) { /* 2.56.1 (#1799): the list is switched off */ }
@@ -1069,7 +1090,7 @@ function taskRow(t, opts = {}) {
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
-  const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
+  const work = t.status === 0 && t.id > 0 && ((S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id) || !!agwOf(t));  // 2.407.0 A (#3513): + a working job
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line

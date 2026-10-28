@@ -992,6 +992,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     schemas["Tag"]["properties"].update(kind={"type": "string", "enum": ["personal", "list"]}, list_id={"type": "integer"},
                                          id={"type": "integer"}, color={"type": "string"})
     AG, W = "Agents", "write"
+    wkr = {"type": "object", "properties": {  # 2.407.0 A (#3513)
+        "working": nul("object", description="{agent_id, agent, name, text, at, ttl}: what people see on the task (null = not shown)"),
+        "job": nul("object", description="Your running job of the task (the Job schema)")}}
     lp = pid("id", "List id")
     paths.update({
         "/agent": {"get": op("The agent itself: status, jobs, event cursor (agent tokens only)", AG, ok(ref("Agent")) | errs("403"))},
@@ -1055,6 +1058,28 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                              # 2.3.0: one job; a proposal job also with input (what the person sent), proposal and limits
                              "get": op("One job of the agent (proposal jobs: kind, input, proposal, limits)", AG, ok(ref("Job")) | errs("403", "404"),
                                        [pid("id", "Job id")])},
+        # 2.407.0 A (#3513): "agent is working" on a task (a pulsing dot with name, time and the last progress line)
+        "/tasks/{id}/working": {
+            "get": op("2.407.0 (#3513): whether you work on the task now (working = what people see, null = nothing; job = your running job)",
+                      AG, ok({"type": "object", "properties": {"working": nul("object"), "job": nul("object")}}) | errs("403", "404"), [pid()]),
+            "post": op("2.407.0 (#3513): you start working on the task -- people see a pulsing dot with your name, the time and your last "
+                       "progress line in the list, on the board card and in the detail. While you work, POST again (or PATCH) with the "
+                       "next short progress line (\"Column added\"); DELETE when you are done. Without an update for 15 minutes the "
+                       "mark fades on its own. Needs write access to the task's list. It is your running job of the task (GET /agent/jobs); "
+                       "prose only, no secrets (the server folds the text into one line and replaces recognisable secrets).", AG,
+                       ok(wkr, "Updated") | ok(wkr, "Started", "201")
+                       | errs("400", "403", "404"), [pid()], scope=W, body={
+                           "type": "object", "additionalProperties": False, "properties": {
+                               "text": {"type": "string", "description": "The progress line (one line, cut to 500 characters; shown up to 200)"},
+                               "title": {"type": "string", "description": "Title of the job when it starts (default: the task's title)"},
+                               "name": {"type": "string", "description": "Short name shown instead of yours (letters, up to 24), on start"},
+                               "job_id": {"type": "integer", "description": "That running job of yours on the task (several jobs on one task); else the newest"}}}),
+            "patch": op("2.407.0 (#3513): a new progress line while you work on the task (no text: only \"still working\"); 404 when you "
+                        "do not work on it", AG, ok(wkr) | errs("400", "403", "404"), [pid()], scope=W, body={
+                            "type": "object", "additionalProperties": False, "properties": {"text": {"type": "string"}, "job_id": {"type": "integer"}}}),
+            "delete": op("2.407.0 (#3513): you stop working on the task (the mark disappears at once; the job ends with state)", AG,
+                         ok({"type": "object", "properties": {"working": nul("object"), "ended": {"type": "integer"}}}) | errs("400", "403", "404"),
+                         [pid(), q("state", "done (default), failed or stopped")], scope=W)},
         # 2.26.0 (#949): a proposal to another topic (a list the agent cannot see)
         "/agent/proposals": {"post": op(
             "Propose tasks for a list you cannot see (another topic). Lands as a proposal with the list's owner (no event for the "

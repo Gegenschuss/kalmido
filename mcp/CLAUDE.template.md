@@ -168,6 +168,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short
   progress lines (`update_job` with `append_log`); set it to done / failed at the end, or waiting when you need a
   person. The last log line is the result in plain words.
+- **Working on a task** (2.407.0): when you start work on a task, mark it with `set_working` (`task_id`, a short first
+  line); people see a pulsing dot with your name, the time and that line at the task. Send the next short progress line
+  with `set_working` as you go (at least every 15 minutes, else the mark fades) and end it with `end_working` when you are
+  done or stop. Prose only, no secrets.
 - A chat answer should come within minutes. Longer work runs as a background job: answer at once with what you started;
   the result follows in the chat.
 - When work is superseded (a newer version, a changed request), stop your own jobs and sub-agents for it and set them

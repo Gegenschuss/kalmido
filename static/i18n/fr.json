@@ -14846,5 +14846,6 @@
   "Costs this month: {0}": "Coûts ce mois-ci : {0}",
   "Costs this month: {0} of {1}": "Coûts ce mois-ci : {0} sur {1}",
   "Share of its daily cost limit": "Part de sa limite de coûts quotidienne",
-  "Share of its monthly cost limit": "Part de sa limite de coûts mensuelle"
+  "Share of its monthly cost limit": "Part de sa limite de coûts mensuelle",
+  "Agent working": "Agent au travail"
 }

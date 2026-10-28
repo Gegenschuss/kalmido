@@ -1409,6 +1409,25 @@ characters, no digits or colons, no plain words such as `Release` or `Fix` (else
 2.306.0 (#2875): with `task_id`, `user_id` must be a person who sees the task and may address the agent in its list (else 400);
 `task_title` / `list_id` of a job are only filled for a viewer who sees the task.
 
+2.407.0 (#3513): **"Agent is working" at a task.** While you work on a task, people see a pulsing dot with your name (or
+the job's `name`), the time of your last update and your last progress line at the task: in the list row, on the board
+card and in the task detail (e.g. `Holston · 11:04 · Column added`), live in every open window.
+
+```
+POST   /api/v1/tasks/{id}/working   {"text": "Column added", "title": "…" (start only), "name": "Holston" (start only)}
+PATCH  /api/v1/tasks/{id}/working   {"text": "next line"}          -> 404 when you do not work on the task
+DELETE /api/v1/tasks/{id}/working?state=done | failed | stopped    -> the dot disappears at once
+GET    /api/v1/tasks/{id}/working                                 -> {working, job}
+```
+
+The first `POST` starts it (201), every further `POST` adds the next progress line (200); MCP `set_working` / `end_working`.
+It is your running job of that task (`GET /agent/jobs`): a job you already run with `task_id` (`POST /agent/jobs`) shows the
+same way. Without an update for 15 minutes the dot fades on its own (send a line at least that often, or `PATCH` without
+`text` to say "still working"). Needs the scope `tasks:write` and write access to the task's list (a task you cannot see:
+404, one you only read: 403). `text` is one line of prose: the server folds it and replaces recognisable secrets; the
+rows show up to 200 characters. `working` in the answer (and on the task in the app) is `{agent_id, agent, name, text, at,
+ttl}` or `null`.
+
 **Chat.** Every person has their own conversation with an agent, stored in Kalmido. Each message a person sends is a `chat` event.
 
 ```
@@ -3474,7 +3493,7 @@ with the scope it needs). The tools:
   `preview`
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `create_job`, `get_job`, `update_job`, `set_working` / `end_working` (2.407.0), `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
@@ -3498,7 +3517,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
@@ -3520,7 +3539,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
-`set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
+`set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
