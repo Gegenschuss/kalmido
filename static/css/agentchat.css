@@ -471,7 +471,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .chath.chh2 .chn::before{content:none}
 .chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:1.25}
 .chath.chh2 .chnm b{flex:0 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chath.chh2 .chl2{display:flex;min-width:0;font-size:var(--fs-xs);line-height:1.25}
+.chath.chh2 .chl2{display:flex;min-width:0;max-width:100%;font-size:var(--fs-xs);line-height:1.25}  /* 2.411.0 (#3529): never wider than the name column, the state ends in … */
 .chath.chh2 .chl2::before{content:none}
 .chath.chh2 .chst{min-width:0;font-size:var(--fs-xs)}
 .chath.chh2 .chqp{font-size:var(--fs-xs)}

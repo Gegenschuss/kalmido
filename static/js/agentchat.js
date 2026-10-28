@@ -563,7 +563,10 @@ function chatStHtml(a) {
     : tr('working on {0}', `<button class="linkbtn chtask" data-act="open-id" data-id="${a.status_task}" title="${esc(taskById(a.status_task)?.title || '')}">#${a.status_task}</button>`);
   const cls = !a.enabled ? 'paused' : off ? 'offline' : a.limit_reached ? 'limit' : esc(a.status || 'idle');
   // 2.13.0 (#453 P11): the typing dots only once, in the line under the messages (#chat-typing); the header keeps the state
-  return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx">${a.status === 'paused' && a.enabled ? esc(tr('does not answer right now: {0}', a.pause_reason || a.status_text || '')) : st + (a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? (a.status === 'working' ? ': ' : ' · ') + esc(a.status_text) : '')}</span></span>`;  // 2.26.0 (#949); 2.30.0 (#1039): a task's status text shows in that task
+  const pz = a.status === 'paused' && a.enabled, tail = a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? (a.status === 'working' ? ': ' : ' · ') + a.status_text : '';
+  // 2.411.0 (#3529): one line that ends in "…" before the header buttons; the full text in the hint
+  const full = pz ? tr('does not answer right now: {0}', a.pause_reason || a.status_text || '') : tail ? agentSt(a) + tail : '';
+  return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx"${full ? ` title="${esc(full)}"` : ''}>${pz ? esc(full) : st + esc(tail)}</span></span>`;  // 2.26.0 (#949); 2.30.0 (#1039): a task's status text shows in that task
 }
 // 2.29.0 (#1029): the permission mode badge (Auto / Ask) -- the owner (a team agent: an admin) switches it here; the agent's host
 // reads it before its next run (runtime.permission_mode). Nothing when it is the host's default and the viewer cannot change it.
