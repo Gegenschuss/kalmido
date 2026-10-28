@@ -26,6 +26,9 @@ WSA_KEY_RE = re.compile(r"private|org:[1-9][0-9]{0,11}")
 WSA_PATHS = (("/api/office/", "office"), ("/api/time", "time"), ("/api/pomo", "time"), ("/api/life", "life"),
              ("/api/reading", "reading"), ("/api/feeds", "reading"), ("/api/bookmarks", "reading"),
              ("/api/files", "ablage"), ("/api/docs", "ablage"), ("/api/wiki", "wiki"), ("/api/sheets", "sheets"))
+# the file store: only its own views are refused (the office, contact folders, letters and page / table attachments use the
+# file and document routes too and keep working while their own area is on)
+WSA_ABLAGE_VIEWS = ("/api/files", "/api/files/folders", "/api/files/search", "/api/files/tagged", "/api/docs")
 # an object of an organisation opened by its id (a link): its own organisation counts, whatever the workspace is
 WSA_OBJ = (("wiki", re.compile(r"/api/wiki/pages/(\d+)"), "wiki_pages"), ("sheets", re.compile(r"/api/sheets/(\d+)"), "sheets"),
            ("reading", re.compile(r"/api/bookmarks/(\d+)"), "bookmarks"), ("ablage", re.compile(r"/api/files/nodes/(\d+)"), "fs_nodes"))
@@ -89,13 +92,16 @@ def _in_req():
 def _req_org(c, uid, area):
     """The organisation a request works in: its explicit space ("org:<id>" / "private"; the knowledge pages also take the
     bare id) first, else the setting workspace; None = Private / All / not a member."""
-    sp = request.args.get("space")
+    key = "ws" if request.path.startswith("/api/docs") else "space"  # the documents name their workspace "ws" (docs/web.py)
+    sp = request.args.get(key)
     if sp is None and request.is_json:
         b = request.get_json(silent=True)
-        sp = b.get("space") if isinstance(b, dict) else None
+        sp = b.get(key) if isinstance(b, dict) else None
+    if sp is None and request.form:
+        sp = request.form.get(key)
     if isinstance(sp, int) and not isinstance(sp, bool):
         sp = str(sp)
-    if area == "wiki" and isinstance(sp, str) and sp.isdigit():
+    if area in ("wiki", "ablage") and isinstance(sp, str) and sp.isdigit():
         sp = "org:" + sp if sp != "0" else "private"
     ws = sp if isinstance(sp, str) and sp else str(usettings(c, uid).get("workspace") or "")
     m = re.fullmatch(r"org:(\d{1,12})", ws.strip())
@@ -133,8 +139,11 @@ def wsa_gate():
         if a == area and m:
             r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (int(m.group(1)),)).fetchone()  # noqa: S608 (fixed names)
             if r and r[0]:
-                wsa_org_check(c, r[0], area)
+                if area != "ablage" or "office" in wsa_org_off(c, r[0]):  # a file of the office stays reachable while the office is on
+                    wsa_org_check(c, r[0], area)
                 return None
+    if area == "ablage" and (request.method != "GET" or p.rstrip("/") not in WSA_ABLAGE_VIEWS):
+        return None
     oid = _req_org(c, u["id"], area)
     if oid:
         wsa_org_check(c, oid, area)
