@@ -14603,7 +14603,6 @@
   "{0} approval link": ["{0} Freigabe-Link", "{0} Freigabe-Links"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Bleibt im alten Bereich und hängt nicht mehr am Projekt: {0}. Bei Bedarf einzeln umziehen.",
   "{0} client of a customer report": ["{0} Kunde einer Kundenmeldung", "{0} Kunden von Kundenmeldungen"],
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Abgerechnete Belege, deren Rechnung nicht mitkam, sind wieder offen: vor dem Abrechnen prüfen",
   "Show all {0}": "Alle {0} anzeigen",
   "Search files": "Dateien suchen",
   "The picture is only printed in your own letters and on the entertainment receipts you approve.": "Das Bild erscheint nur in deinen eigenen Briefen und auf den Bewirtungsbelegen, die du freigibst.",
@@ -14976,5 +14975,8 @@
   "Git author for AI commits": "Git-Autor für KI-Commits",
   "empty = the agent’s": "leer = der des Agenten",
   "Git author for AI commits in this repository. Appears publicly in GitHub with every commit.": "Git-Autor für KI-Commits in diesem Repository. Erscheint öffentlich in GitHub bei jedem Commit.",
-  "It stops being a shopping list (Undo brings it back)": "Sie ist dann keine Einkaufsliste mehr (Rückgängig holt das zurück)"
+  "It stops being a shopping list (Undo brings it back)": "Sie ist dann keine Einkaufsliste mehr (Rückgängig holt das zurück)",
+  "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Abgerechnete Belege, deren Rechnung nicht mitkam, bleiben abgerechnet (Rechnung fehlt): nur in der Buchhaltung freigeben, wenn sie nie abgerechnet wurden",
+  "Billed, the invoice did not come along with the import": "Abgerechnet, die Rechnung kam beim Import nicht mit",
+  "{0} project note": ["{0} Projekt-Notiz", "{0} Projekt-Notizen"]
 }

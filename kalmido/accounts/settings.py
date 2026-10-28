@@ -763,6 +763,9 @@ def umz_export_queries(uid):
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
+        # 2.362.0 (#3090): my encrypted task notes (ciphertext as stored, only the author's own) and the project notes of my lists
+        "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
+        "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),

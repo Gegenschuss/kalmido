@@ -14603,7 +14603,6 @@
   "{0} approval link": ["{0} link di approvazione", "{0} link di approvazione"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Resta nello spazio precedente e non è più collegato al progetto: {0}. Spostalo a parte se serve.",
   "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"],
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Le ricevute fatturate la cui fattura non è stata importata sono di nuovo aperte: controllale prima di fatturare",
   "Show all {0}": "Mostra tutti i {0}",
   "Search files": "Cerca file",
   "The picture is only printed in your own letters and on the entertainment receipts you approve.": "L'immagine compare solo nelle tue lettere e sulle ricevute di rappresentanza che approvi tu.",
@@ -14976,5 +14975,8 @@
   "Git author for AI commits": "Autore Git per i commit dell’IA",
   "empty = the agent’s": "vuoto = quello dell’agente",
   "Git author for AI commits in this repository. Appears publicly in GitHub with every commit.": "Autore Git per i commit dell’IA in questo repository. Appare pubblicamente su GitHub in ogni commit.",
-  "It stops being a shopping list (Undo brings it back)": "Non è più una lista della spesa (Annulla lo ripristina)"
+  "It stops being a shopping list (Undo brings it back)": "Non è più una lista della spesa (Annulla lo ripristina)",
+  "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Le ricevute fatturate la cui fattura non è stata importata restano fatturate (fattura mancante): liberale nella contabilità solo se non sono mai state fatturate",
+  "Billed, the invoice did not come along with the import": "Fatturata, la fattura non è stata importata",
+  "{0} project note": ["{0} nota di progetto", "{0} note di progetto"]
 }

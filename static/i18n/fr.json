@@ -14603,7 +14603,6 @@
   "{0} approval link": ["{0} lien d'approbation", "{0} liens d'approbation"],
   "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Reste dans l'ancien espace et n'est plus lié au projet : {0}. Déplacez-le séparément si nécessaire.",
   "{0} client of a customer report": ["{0} client d'un signalement client", "{0} clients de signalements clients"],
-  "Billed receipts whose invoice did not come along are open again: check them before billing": "Les justificatifs facturés dont la facture n’a pas été reprise sont de nouveau ouverts : vérifiez-les avant de facturer",
   "Show all {0}": "Afficher les {0}",
   "Search files": "Rechercher des fichiers",
   "The picture is only printed in your own letters and on the entertainment receipts you approve.": "L'image n'apparaît que dans tes propres lettres et sur les justificatifs de frais de réception que tu valides.",
@@ -14976,5 +14975,8 @@
   "Git author for AI commits": "Auteur Git pour les commits de l’IA",
   "empty = the agent’s": "vide = celui de l’agent",
   "Git author for AI commits in this repository. Appears publicly in GitHub with every commit.": "Auteur Git pour les commits de l’IA dans ce dépôt. Apparaît publiquement dans GitHub à chaque commit.",
-  "It stops being a shopping list (Undo brings it back)": "Elle n'est plus une liste de courses (Annuler le rétablit)"
+  "It stops being a shopping list (Undo brings it back)": "Elle n'est plus une liste de courses (Annuler le rétablit)",
+  "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Les justificatifs facturés dont la facture n’a pas été reprise restent facturés (facture manquante) : ne les libérez dans la comptabilité que s’ils n’ont jamais été facturés",
+  "Billed, the invoice did not come along with the import": "Facturé, la facture n’a pas été reprise lors de l’import",
+  "{0} project note": ["{0} note de projet", "{0} notes de projet"]
 }
