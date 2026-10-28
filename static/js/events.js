@@ -135,10 +135,10 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
 
 // ------------------------------------------------------------------ quick add wiring
 function currentQuickInput() { return $('#qinput'); }
-// 2.380.2 (#3403): a chip picked after the text names the same thing wins: that word is then shown as not recognized
+// 2.380.2 (#3403): a chip picked after the text names the same thing wins for this task (qovPick)
 function qovChipWins(type) {
   const inp = $('#qinput'); if (!inp) return;
-  if (parseQuick(inp.value, S.quick.ignore).chips.some(c => c.type === type && !c.off)) S.quick.ignore.add(type);
+  if (parseQuick(inp.value, S.quick.ignore).chips.some(c => c.type === type && !c.off)) S.qov.win = {...S.qov.win, [type]: 1};
   updateChips(inp); inp.focus();
 }
 function updateChips(input) {
@@ -195,7 +195,7 @@ async function submitQuick(input, extra = {}) {
   if (d.who && d.noList && !body.list_id) { toast(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
-  input.value = ''; S.quick.ignore = new Set(); updateChips(input);
+  input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input);  // 2.380.2 (#3403): the chips stay, their win over the text not
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
