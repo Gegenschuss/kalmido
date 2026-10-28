@@ -155,7 +155,8 @@ dbx("UPDATE rc_receipts SET billed_doc_id=?, billed_at=? WHERE node_id=?", (FORE
 check(one("SELECT billed_doc_id FROM rc_receipts WHERE node_id=?", (RN,)) == FOREIGN, "setup: the receipt is billed")
 # a project with a task (contact on it, alice's encrypted note)
 LO = ok(A.post(B + "/api/lists", json={"name": "Umzug Projekt", "org_id": ORG}), "org list")["id"]
-ok(A.put(B + f"/api/lists/{LO}/members", json={"user_id": BOB, "role": "edit"}), "share the list")
+for u in (BOB, CARL):  # carl too: a group needs people who work with each other
+    ok(A.put(B + f"/api/lists/{LO}/members", json={"user_id": u, "role": "edit"}), "share the list")
 TK = ok(A.post(B + "/api/tasks", json={"title": "Drehplan", "list_id": LO}), "task")["id"]
 dbx("INSERT INTO task_enc_notes(task_id, user_id, body, updated_at) VALUES(?,?,?,?)", (TK, ALICE, NOTE, "2026-10-20T10:00:00Z"))
 BK = ok(A.post(B + "/api/books", json={"name": "Team Kontakte", "org_id": ORG}), "an address book of the organisation").get("id")
