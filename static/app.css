@@ -8349,6 +8349,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbfirm>svg.i{width:.75rem;height:.75rem;flex:none;opacity:.7}
 #kbar .kbsw:hover .kbfirm,#kbar .kbsw:focus-visible .kbfirm,#kbar .kbsw[aria-expanded="true"] .kbfirm{background:color-mix(in srgb,var(--accent) 15%,var(--kbbg,var(--bg2)));color:var(--text)}
 #kbar .kbsw:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:.5rem}  /* 2.165.8 (#2619): the ring on the switch itself (p2160_a11y) */
+#kbar .kbsw{position:relative}
+#kbar .kbupd{position:absolute;top:.125rem;left:1.375rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--kbbg,var(--bg2))}  /* 2.380.2 (#3400): an update, now that Settings sits in this menu */
 #kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s,.8125rem);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}
