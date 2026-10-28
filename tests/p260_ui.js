@@ -231,7 +231,8 @@ const TOUCH = `(() => {
   const rowT = d.querySelector(`#view .trow[data-id="${T}"]`), rowT2 = d.querySelector(`#view .trow[data-id="${T2}"]`);
   const cd = rowT.querySelector('.c-date');
   check(cd && cd.querySelector('.cdt') && cd.querySelector('.rngi') && / – /.test(cd.title) && !/ – /.test(cd.querySelector('.cdt').textContent), 'date column: own text span, a range icon, the whole range in the tooltip: ' + cd?.title);
-  check(/, 10:00$/.test(rowT2.querySelector('.c-date .cdt').textContent), 'a time after a comma, as in the panel: ' + rowT2.querySelector('.c-date .cdt').textContent);
+  check(rowT2.querySelector('.c-date .cdt').textContent.endsWith(', ' + w.eval(`fmtTimeLoc('10:00')`)),  // 2.368.0 (#2982): the time as the app shows times
+    'a time after a comma, as in the panel: ' + rowT2.querySelector('.c-date .cdt').textContent);
   w.eval(`openDetail(${T2})`); await idle(w);
   check(d.querySelector('#detail .dchip .dct').textContent === w.eval(`dueLabel(taskById(${T2}))`), 'the panel uses the same text');
   // ================= K11: the assignee circle only where it means something
