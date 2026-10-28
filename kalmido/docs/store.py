@@ -447,14 +447,6 @@ def index_text(c, m, name, text, cf=None):
     return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}"
 
 
-def doc_lock_gone(c, where, args):
-    """#3090: a deletion that takes documents along (an account, an organisation) locks their rows first thing in its
-    transaction, in one order: a recognition run of one of them (process: its first write is always the document's own row)
-    finishes first or waits for the deletion. Locked later, the two waited for each other (deadlock, 500 under load)."""
-    with system_ctx(c):  # the deletion's documents in every workspace (the caller checked who deletes)
-        c.execute(f"SELECT node_id FROM doc_meta WHERE {where} ORDER BY node_id FOR UPDATE", args).fetchall()
-
-
 def meta_row(c, nid):
     return c.execute("SELECT * FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
 
@@ -1069,7 +1061,7 @@ def process(c, nid):
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     # 2.273.0 C (#3047): the row locked from here on (a save waits); the values a person set by hand stay
     m2 = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
-    if not m2:  # #3090: deleted along while the run went (doc_lock_gone)
+    if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
         return None
     if asn_found and not m2["asn"]:
         asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write

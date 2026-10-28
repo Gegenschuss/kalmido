@@ -928,8 +928,8 @@ def org_delete(oid):
         n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
         if n and not info["kept_until"]:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
-        from ..docs.store import doc_lock_gone
-        doc_lock_gone(c, "org_id=?", (oid,))  # #3090: before the deletion's first write (no deadlock with a recognition run)
+        # #3090: its documents locked before the deletion's first write (no deadlock with a recognition run, users.user_delete)
+        c.execute("SELECT node_id FROM doc_meta WHERE org_id=? ORDER BY node_id FOR UPDATE", (oid,)).fetchall()
         from ..admin.retexport import rx_alert, rx_gate, rx_subject
         bad, retained = rx_gate(c, rx_subject(c, "org", oid))  # 2.146.0 D (#2468): the retention export (or its waiver) first
         if bad:
