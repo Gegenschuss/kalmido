@@ -1,6 +1,6 @@
 // 2.40.0 UI tests, part D: office documents (#1368 #1381 #1364 #1366), own container (start.sh). jsdom; invented data only.
 // - #1366: the PDF button opens /pdf?inline=1 in a new tab, the own "Download" button links the download
-// - #1364: the "More" menu has "Preview (PDF)" (no JSON print model)
+// - #1364: the "More" menu has no JSON print model (2.356.0 #3005: and no second "Preview (PDF)" beside the button)
 // - #1368 10: send dialog without mail: "To", a plain hint for people who are no admin (no KALMIDO_SMTP_HOST), the button
 //   downloads the PDF, the fields are locked
 // - #1368 7: reminder dialog: hints for a high fee and for an invoice not yet due (no block)
@@ -54,7 +54,8 @@ const TEST_IBAN = 'DE02120300000000202051';
   d.querySelector('[data-ofd="more"]').click();
   await until(() => d.querySelector('.menu-list'), 20);
   const mt = d.querySelector('.menu-list')?.textContent || '';
-  check(/Preview \(PDF\)/.test(mt) && !/print model/.test(mt), '#1364: menu entry "Preview (PDF)": ' + mt.slice(0, 120));
+  // 2.356.0 (#3005): the editor's menu has no second "Preview (PDF)" (the button above opens it); the list row menu keeps it (p287b_e_ui)
+  check(!/Preview \(PDF\)/.test(mt) && !/print model/.test(mt) && pdf, '#1364/#3005: no second preview in the editor menu, the button opens the PDF: ' + mt.slice(0, 120));
   d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   const ms = await call('GET', '/api/office/mail-status');
   w.eval('S.me.is_admin = false');
@@ -72,13 +73,13 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
-  w = await boot({hash: 'office/offers'}); d = w.document;
+  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelector('[data-ofd="remind"]'), 60);
-  // 2.357 (#3221): the server renders the stored files of finalised documents once after its start, the list can come late:
-  // wait for the row itself, not only for two rows
-  await until(() => [...d.querySelectorAll('.ofdlist .ofdrow')].some(x => x.dataset.id === String(inv.id) && /reminder fee open/.test(x.textContent)), 200);
+  // 2.357 (#3221) + 2.356.0 (#3004): the stored files render once after the start and the tab changes the address first:
+  // wait for the invoice tab and the row itself
+  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]') && [...d.querySelectorAll('.ofdlist .ofdrow')].some(x => x.dataset.id === String(inv.id) && /reminder fee open/.test(x.textContent)), 200);
   const rowPaid = [...d.querySelectorAll('.ofdlist .ofdrow')].find(x => x.dataset.id === String(inv.id));
   check(rowPaid && /reminder fee open: .*5,00/.test(rowPaid.textContent), '#1368 8: the paid invoice shows the open reminder fee: ' + (rowPaid?.textContent || '').replace(/\s+/g, ' ').slice(0, 160));
   d.querySelector('[data-ofd="remind"]').click();
@@ -98,7 +99,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 8 + 9: reminder list and editor
-  w = await boot({hash: 'office/offers'}); d = w.document;
+  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
   await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
   await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);

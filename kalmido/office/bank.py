@@ -55,6 +55,7 @@ BNK_EXTS = (".xml", ".csv", ".txt", ".sta", ".mt940", ".mt942", ".swi")  # 2.299
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
+from .invoices import _j as _inv_j, inv_refund_open  # noqa: E402  2.354.0 D (#2837)
 
 
 def _home(c, oid):
@@ -428,6 +429,21 @@ def bnk_open_invoices(c, oid):
     return out
 
 
+def bnk_open_refunds(c, oid):
+    """2.354.0 D (#2837): finalised credit notes of the area with money still to be paid back, like bnk_open_invoices
+    (open = the refund still open, invoices.inv_refund_open)."""
+    out = []
+    for r in c.execute("SELECT d.*, cl.name AS client_name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
+                       "WHERE d.org_id=? AND d.kind='credit' AND d.locked_at IS NOT NULL AND d.status NOT IN ('draft', 'cancelled', 'paid') "
+                       "AND d.trial=0", (oid,)).fetchall():
+        o = inv_refund_open(c, oid, r)
+        if o > 0:
+            out.append({"id": r["id"], "number": r["number"] or "", "client": r["client_name"] or "", "title": r["project_title"] or "",
+                        "currency": (r["currency"] or "EUR").upper(), "open": o,
+                        "gross": money(dec(_inv_j(r["totals"], {}).get("gross") or 0)), "date": r["date"] or "", "due": r["due_date"] or ""})
+    return out
+
+
 def _name_hit(a, b):
     """Some word (3+ letters) of name a appears in text b."""
     wb = set(_norm(b).split())
@@ -580,6 +596,11 @@ def bnk_candidates(tid):
                 continue
             out.append({"kind": "invoice", "id": i["id"], "label": lbl, "amount": dstr(i["open"]), "date": i["date"]})
     else:
+        for i in (bnk_open_refunds(c, oid) if ofr_allows(c, uid, oid, "offers", "view") else []):  # 2.354.0 D (#2837)
+            lbl = " · ".join(x for x in (i["number"], i["client"] or i["title"]) if x)
+            if i["currency"] != t["currency"] or (q and q not in _norm(f"{lbl} {i['title']} {dstr(i['open'])}")):
+                continue
+            out.append({"kind": "invoice", "id": i["id"], "label": lbl, "amount": dstr(-i["open"]), "date": i["date"], "refund": True})
         taken = {r[0] for r in c.execute("SELECT match_id FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt'", (oid,))}
         for r in _receipts(c, oid, _shift(t["day"], -60), _shift(t["day"], 60), uid):
             if r["node_id"] in taken or r.get("paid_at"):
@@ -641,22 +662,27 @@ def bnk_match(tid):
     if kind == "invoice":
         from .docs import doc_row
         ofr_need_area(c, uid, oid, "offers", "edit")  # 2.237.0 A (#2861): like the invoice's own payments (+ pay: the gate)
-        if not split:
-            doc_row(c, oid, mid)  # 404 outside the area (before the direction, as before)
-        if t["amount"] <= 0:
+        refund = False
+        if not split:  # 404 outside the area (before the direction, as before)
+            refund = doc_row(c, oid, mid)["kind"] == "credit"  # 2.354.0 D (#2837): money paid out on a credit note = the refund to the customer
+        if not refund and t["amount"] <= 0:
             raise Denied(409, tr("Only money received can pay an invoice"))
+        if refund and t["amount"] >= 0:
+            raise Denied(409, tr("Only money paid out can be a refund"))
         if t["day"] > local_now().date().isoformat():  # a booking marked in advance (value date tomorrow) cannot pay yet
             raise Denied(409, tr("The booking lies in the future, match it on its day"))
         live = bnk_split_live(c, oid, tid)
         if live:  # 2.355.0 B (#2843): parts of an earlier split are still booked; 2.355.0 E (#2843): the answer names the invoices
             nums = ", ".join(dict.fromkeys(doc_row(c, oid, p["doc_id"])["number"] or str(p["doc_id"]) for p in live))
             raise Denied(409, tr("Payments of this booking are still on invoices ({0}); take them back there first", nums))
-        parts = bnk_parts(b, t) if split else [(mid, t["amount"])]
+        parts = bnk_parts(b, t) if split else [(mid, abs(t["amount"]))]
         pids = []
         for did, a in parts:
             r = doc_row(c, oid, did)  # 404 outside the area
             if r["trial"]:  # 2.144.10 B (#2576)
                 raise Denied(409, tr("Trial documents do not go to the accounting"))
+            if split and r["kind"] == "credit":  # 2.354.0 D (#2837): a split is money received, a refund is one booking on one credit note
+                raise Denied(409, tr("Only money received can pay an invoice"))
             if (r["currency"] or "EUR").upper() != t["currency"]:
                 raise Denied(409, tr("The invoice has another currency"))
             pids.append(inv_pay_add(c, oid, uid, did, {"date": t["day"], "amount": dstr(a), "method": "transfer"}))

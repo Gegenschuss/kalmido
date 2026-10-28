@@ -145,7 +145,7 @@ function bw_fileHtml(m) {
     + (m?.locked || m?.own_ro ? '' : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${fs.length ? tr('Replace the bill') : tr('Attach the restaurant bill')}</span></button>`);
 }
 const bw_actLabel = e => e.action === 'approve' ? tr('Approved on {0} by {1}', bw_when(e.at), e.user || '–') : tr('Approval undone on {0} by {1}', bw_when(e.at), e.user || '–') + (e.reason ? ` – ${e.reason}` : '');
-const bw_when = ts => { const d = new Date(ts); return isNaN(+d) ? ts : d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}); };
+const bw_when = ts => { const d = new Date(ts); return isNaN(+d) ? ts : fmtMoment(d); };
 function bw_modal(m0) {
   let m = m0, pend = null;
   const ro = !!m?.locked || !!m?.own_ro, hostOk = !!m?.own_ro && !m.locked && !!m.own_host;  // 2.187.1 B (#2735): somebody else's: read, the host approves

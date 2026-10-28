@@ -36,7 +36,10 @@ const TEST_IBAN = 'DE02120300000000202051';
   check(offer.http === 201 && offer.number, 'a quotation ' + offer.http);
   const inv = await call('POST', `/api/office/docs/${offer.id}/invoice`);
   check(inv.http === 201 && inv.kind === 'invoice' && inv.number === '' && inv.order_ref === 'PO-77', 'an invoice draft from the quotation ' + inv.http);
-  const inv2 = await call('POST', `/api/office/docs/${offer.id}/invoice`);
+  // 2.356.0 (#3003): a second full invoice from the same quotation asks first (409 invoice_exists), then force
+  const ask2 = await call('POST', `/api/office/docs/${offer.id}/invoice`);
+  check(ask2.http === 409 && ask2.code === 'invoice_exists', 'a second invoice from the quotation asks first ' + ask2.http);
+  const inv2 = await call('POST', `/api/office/docs/${offer.id}/invoice`, {force: true});
   const fin = await call('POST', `/api/office/docs/${inv2.id}/finalize`);
   check(fin.http === 200 && fin.number === 'RE-2026-001' && fin.status === 'issued', 'second invoice finalised ' + fin.http + ' ' + JSON.stringify(fin.error || fin.number));
   const pay = await call('POST', `/api/office/docs/${inv2.id}/payments`, {date: '2026-10-01', amount: 1000, method: 'transfer'});
@@ -44,12 +47,12 @@ const TEST_IBAN = 'DE02120300000000202051';
 
   // ================= jsdom: the list with kind chips and state tags
   let w = await boot({hash: 'office/offers'}); let d = w.document;
-  await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
-  // 2.120.0 (#2089): + delivery notes -> six kinds
-  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 6 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'documents tab: six kind chips (2.39.1 #1182: + Archive, 2.120.0: + delivery notes), quotations first');
+  await until(() => d.querySelector('.ofdkinds [data-kind="archive"]'), 60);
+  // 2.120.0 (#2089): + delivery notes; 2.380.0 (#3409): Quotations (+ Archive) and Invoices (+ credit notes, reminders, delivery notes, Archive) are two areas
+  check(d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 2 && d.querySelector('.ofdkinds [data-kind="offer"]')?.getAttribute('aria-selected') === 'true', 'quotations: two kind chips (quotations, archive), quotations first');
   check(d.querySelectorAll('.ofdlist .ofdrow').length === 1 && /Draft/.test(d.querySelector('.ofdlist .rotag')?.textContent || ''), 'quotation list as before');
-  d.querySelector('.ofdkinds [data-kind="invoice"]').click();
-  await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
+  w.eval(`go('office/invoices')`);  // 2.380.0 (#3409)
+  await until(() => d.querySelectorAll('.ofdkinds [data-ofd="kind"]').length === 5 && d.querySelectorAll('.ofdlist .ofdrow').length === 2, 60);
   const rows = [...d.querySelectorAll('.ofdlist .ofdrow')];
   check(rows.length === 2 && d.querySelector('.ofdkinds [data-kind="invoice"]').getAttribute('aria-selected') === 'true', 'invoice chip lists the two invoices');
   const partial = rows.find(x => /RE-2026-001/.test(x.textContent));

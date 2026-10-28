@@ -174,7 +174,7 @@ name = items[0]["name"] if items else ""
 r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json().get("ok"), "backup: verifies " + r.text[:200])
 dbx("UPDATE tasks SET locked=0", write=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 check(wait_for(lambda: dbx("SELECT locked FROM tasks WHERE id=?", (T,))[0][0] == 1, 10), "backup: the lock is back after the restore")
 

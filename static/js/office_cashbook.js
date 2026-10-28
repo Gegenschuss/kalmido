@@ -32,7 +32,7 @@ async function cbLoad() {
 // ---- the view
 function cbHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
   if (!CB.base || (CB.view !== 'books' && (!CB.list || CB.q !== `${CB.bid}:${CB.year}`))) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);
@@ -178,7 +178,7 @@ async function cbLogModal(e) {
   let rows;
   try { rows = (await api('GET', `/api/office/cash-entries/${e.id}/log`)).log; } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('History')}</h3><p class="muted">${esc(tr('Cash entry no. {0}', e.no))} · ${esc(e.text)}</p>
-    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(CB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(new Date(r.at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))} · ${esc(r.by)}</span>
+    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(CB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
       ${r.action === 'cancel' && r.prev.by_no ? `<small>${esc(tr('Cancelled by no. {0}', r.prev.by_no))}</small>` : cbPrev(r.prev) ? `<small>${esc((r.action === 'create' ? '' : tr('Before') + ': ') + cbPrev(r.prev))}</small>` : ''}</li>`).join('')}</ol>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');

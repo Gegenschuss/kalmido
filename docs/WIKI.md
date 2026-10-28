@@ -25,7 +25,9 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line
   comparison to the current text; *Restore* makes its text the current one again (a new version, the name stays) and can
   be undone. Whoever may read the page reads its history, restoring needs the right to change it. The history goes with
-  the page (trash, moving to another workspace) and is deleted with it. Encrypted spaces (see below) keep no history.
+  the page (trash, moving into the private space) and is deleted with it. Moving pages into an organisation leaves their
+  earlier versions behind (2.360.0: its members would read the old states; the dry run names how many). Encrypted spaces
+  (see below) keep no history.
 - **Search (2.123.0).** *Find a page* filters the names at once; from two characters the pages whose text has the words
   follow under *Found in the text* (whole words and word beginnings, names first, then the newest), 30 at a time with
   *Show more*. The server searches a word index of keyed hashes, not the text itself.
@@ -181,7 +183,8 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   expired and turned-off links all answer "Link not available". The pages are `noindex`, never cached, rate limited like
   the public list links, and the server switch for public links (*Settings > Users > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
   turns these off too. Only the SHA-256 of a token is looked up; the token itself is kept sealed so you can copy it again.
-- Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back); moving pages
+- Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back), and a share
+  of a page belongs to exactly that page (2.360.0): a new page of the same name is not shared by it; moving pages
   to the other workspace ends their shares. A space encrypted in the browser cannot share (the server cannot read its text);
   links of a space that gets locked stop working. Shared pages carry a small people mark in the tree and in the title.
 - A public link of an organisation's page works only while the person who made it is an active member; once they leave

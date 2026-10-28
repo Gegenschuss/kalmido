@@ -83,7 +83,8 @@ const rects = w => {
   const end = te(w, col(), 'touchend', []);
   check(end.defaultPrevented, 'touch: no click / mouse events follow the drag');
   const blk = await until(() => d.querySelector('#view .wcol .cgnew'));
-  check(!!blk && /13:00.14:30/.test(blk.textContent), 'touch: hold and drag = a block 13:00-14:30 ' + (blk && blk.textContent));
+  check(!!blk && blk.textContent.includes(w.eval(`fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:30')`)),  // 2.368.0 (#2982): as the app shows times
+    'touch: hold and drag = a block 13:00-14:30 ' + (blk && blk.textContent));
   if (blk) { const i = blk.querySelector('.cgin'); i.value = 'Call'; i.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); }
   const CA = await until(() => find('Call'));
   let ca = CA && await get(CA.eid);

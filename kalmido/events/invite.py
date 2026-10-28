@@ -17,6 +17,7 @@ from flask import jsonify, request
 from ..core.config import app, APP_NAME
 from ..core.i18n import short_day, tr
 from ..core.db import db, iso, local_now, now_utc, usettings
+from ..core.env import env_int
 from ..accounts.session import me
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import Denied
@@ -24,6 +25,9 @@ from ..core.errors import BadInput
 from ..events.model import EV_ATT_MAX, need_event, wall
 
 EVI_DAY_MAX = 200  # invitation mails per person and day
+EVI_SERVER_DAY = env_int("KALMIDO_INVITE_MAIL_DAY", 2000, lo=0)  # 2.360.0 D (#2496): invitation mails of the whole server and day
+# (mail_counts key EVI_SERVER_KEY); 2.360.0 R (#2496, review): set by KALMIDO_INVITE_MAIL_DAY
+EVI_SERVER_KEY = "i:evinvite"
 # what makes an invitation outdated: the external attendees get the new version (a change of the notes alone does not)
 EVI_KEYS = ("title", "location", "all_day", "start", "end", "tz", "rrule", "exdates", "overrides", "status")
 
@@ -88,6 +92,8 @@ def evi_precheck(c, uid, n):
     """429 before anything changes when n more mails would pass the person's daily limit."""
     if n and _sent_today(c, uid) + n > EVI_DAY_MAX:
         raise Denied(429, tr("At most {0} invitation e-mails a day. Try again tomorrow.", EVI_DAY_MAX))
+    if n and _server_today(c) + n > EVI_SERVER_DAY:  # 2.360.0 D (#2496): the server's limit, then the same answer
+        raise Denied(429, tr("The server sends no more invitation e-mails today. Try again tomorrow."))
 
 
 def evi_estimate(c, b, eid=None):
@@ -110,11 +116,22 @@ def _sent_today(c, uid):
     return r[0] if r else 0
 
 
+def _server_today(c):
+    """2.360.0 D (#2496): the invitation mails of the whole server today (one mail_counts row). 2.360.0 R (#2496, review):
+    the same day as the person's counter (_today, local), not the UTC day."""
+    r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (EVI_SERVER_KEY,)).fetchone()
+    return r[0] if r and r[1] == _today() else 0
+
+
 def _count(c, uid, n):
-    """Books n mails on today's counter; returns how many may go (the rest is dropped at the limit)."""
+    """Books n mails on today's counters (the person's and the server's); returns how many may go (the rest is dropped at
+    the limit)."""
     have = _sent_today(c, uid)
-    n = max(0, min(n, EVI_DAY_MAX - have))
+    n = max(0, min(n, EVI_DAY_MAX - have, EVI_SERVER_DAY - _server_today(c)))
     if n:
+        c.execute("INSERT INTO mail_counts(k,day,n) VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET "
+                  "n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+excluded.n ELSE excluded.n END, day=excluded.day",
+                  (EVI_SERVER_KEY, _today(), n))
         c.execute("INSERT INTO ev_invite_day(user_id, day, n) VALUES(?,?,?) ON CONFLICT (user_id, day) DO UPDATE SET n=ev_invite_day.n+?",
                   (uid, _today(), n, n))
         c.execute("DELETE FROM ev_invite_day WHERE day<?", ((local_now().date() - timedelta(days=7)).isoformat(),))
@@ -123,12 +140,14 @@ def _count(c, uid, n):
 
 # ---- the mail
 def _sender(c, uid, r):
-    """(address, name) of the inviting person; an account without an address (an agent) invites with the calendar owner's."""
+    """(address, name) of the inviting person; an account without an address (an agent) invites with the calendar owner's --
+    2.360.0 D (#2496): only an agent of that owner (another one's answers would go to someone who did not send it: the
+    server's sender with the agent's name)."""
     u = c.execute("SELECT email, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     if u and (u["email"] or "").strip():
         return u["email"].strip(), (u["display_name"] or u["username"])
-    o = c.execute("SELECT u.email, u.display_name, u.username FROM ev_cals k JOIN users u ON u.id=k.owner_id WHERE k.id=?",
-                  (r["cal_id"],)).fetchone()
+    o = c.execute("SELECT u.email, u.display_name, u.username FROM ev_cals k JOIN users u ON u.id=k.owner_id WHERE k.id=? "
+                  "AND EXISTS (SELECT 1 FROM agents a WHERE a.user_id=? AND a.owner_id=k.owner_id)", (r["cal_id"], uid)).fetchone()
     from ..integrations.mail import SMTP
     if o and (o["email"] or "").strip():
         return o["email"].strip(), (o["display_name"] or o["username"])
@@ -252,7 +271,8 @@ def evi_after_save(c, uid, eid, snap, send, only_invited=False):
     if not req and not cancel:
         c.commit()
         return 0
-    mails = [evi_mail(c, uid, r, "REQUEST", a, ext, update=a["invited_seq"] is not None) for a in req]
+    # 2.360.0 D (#2496): the attached calendar names the recipient only -- the other guests' addresses stay with the organiser
+    mails = [evi_mail(c, uid, r, "REQUEST", a, [a], update=a["invited_seq"] is not None) for a in req]
     ts = iso(now_utc())
     sent = {a["email"].lower() for a in req}
     for a in ext:

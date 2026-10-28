@@ -176,7 +176,9 @@ def auth_signup():
         return answer
     uid = create_user(c, _username(c, email), name, pw if not mail else None, onboard=True)
     c.execute("UPDATE users SET email=?, disabled=1, signup=? WHERE id=?", (email, "confirm" if mail else "pending", uid))
-    oid = org_for_email(c, email)
+    # 2.360.0 A (#2496): without e-mail the address is never confirmed: no organisation by its domain (an admin adds the
+    # person after the approval)
+    oid = org_for_email(c, email) if mail else None
     if oid:
         from ..core.pg import system_ctx
         with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in

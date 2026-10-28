@@ -64,8 +64,8 @@ PDF_ADDR_H = 45 * MM     # ... and is 45 mm high; the body begins below it
 PDF_ADDR_W = 85 * MM
 PDF_FOOT_H = 20 * MM     # footer (four columns + page line) reserved at the bottom of every page
 PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
-PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
-PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the page breaks
+PDF_SUM_GAP = 18 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page; 2.380.0 A (#3415): was 11 mm
+PDF_SUM_GAP_MIN = 8 * MM   # ... reduced step by step down to this before the page breaks; 2.380.0 A (#3415): was 4 mm
 PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
 PDF_MARK_GREY = "0.85 0.86 0.88"  # 2.294.0 (#3155): the draft watermark (was 0.88 0.89 0.91, fill only)
 PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
@@ -714,13 +714,14 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
 
 
 # ---- number and date formats in the document language -------------------------------------------------------------
-def pdf_money(v, lang, currency, fmt=None):
+def pdf_money(v, lang, currency, fmt=None, places=2):
     """1234.5 -> "1.234,50 €" (de) / "€1,234.50" (en); fmt = the pack's formats (optional).
     2.185.0 C (#2520): without fmt nl / fr / es / it write the decimal comma like de. 2.296.0 B (#3175): the one format of
-    calc.fmt_money (language table, "$" like the model's texts); the pack's formats only for German documents."""
+    calc.fmt_money (language table, "$" like the model's texts); the pack's formats only for German documents.
+    2.354.0 A (#2831): places 3 / 4 for a unit price (pdf_rate_places)."""
     fmt = fmt or {}
     if str(lang or "de").split("-")[0] != "de" or not fmt:
-        return _pdf_fmt_money(v, lang, currency or "EUR")
+        return _pdf_fmt_money(v, lang, currency or "EUR", places)
     comma = str(lang or "").split("-")[0] in PDF_COMMA
     dec = fmt.get("decimal") or ("," if comma else ".")
     tho = fmt.get("thousands") or ("." if comma else ",")
@@ -729,13 +730,22 @@ def pdf_money(v, lang, currency, fmt=None):
     except (TypeError, ValueError):
         v = 0.0
     neg = v < 0
-    s = f"{abs(v):,.2f}".replace(",", "\x00").replace(".", dec).replace("\x00", tho)
+    s = f"{abs(v):,.{places}f}".replace(",", "\x00").replace(".", dec).replace("\x00", tho)
     sym = fmt.get("currency_symbol") or {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}.get(currency or "EUR", currency or "")
     s = f"{sym} {s}" if (fmt.get("currency_pos") == "before") else f"{s} {sym}"
     return ("-" if neg else "") + s
 
 
-def _pdf_fmt_money(v, lang, currency):
+def pdf_rate_places(v):
+    """2.354.0 A (#2831): the places of a unit price on paper: 2, or 3 / 4 when it has them (0.125 -> 3)."""
+    try:
+        s = f"{float(v or 0):.4f}".rstrip("0")
+    except (TypeError, ValueError):
+        return 2
+    return max(2, min(4, len(s.split(".")[1]) if "." in s else 0))
+
+
+def _pdf_fmt_money(v, lang, currency, places=2):
     """2.296.0 B (#3175): calc.fmt_money (the package's, or calc.py next to this file when loaded on its own)."""
     global _PDF_CALC
     if _PDF_CALC is None:  # loaded on its own (tests): calc.py next to this file
@@ -745,7 +755,7 @@ def _pdf_fmt_money(v, lang, currency):
         sp.loader.exec_module(_c)
         _PDF_CALC = _c
     try:
-        return _PDF_CALC.fmt_money(v if v not in (None, "") else 0, lang, currency)
+        return _PDF_CALC.fmt_money(v if v not in (None, "") else 0, lang, currency, places)
     except (TypeError, ValueError, ArithmeticError):
         return _PDF_CALC.fmt_money(0, lang, currency)
 
@@ -1332,7 +1342,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
-    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
+    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 56, 76  # 2.380.0 A (#3415): c_vat was 36 (the price and VAT columns almost touched)
     np_ = bool(m.get("noprice"))  # 2.120.0 D (#2089): delivery note / timesheet: no price, VAT or total columns
     if np_:
         c_pos, c_rate, c_vat, c_tot = int(m.get("pos_w") or 22), 0, 0, 0
@@ -1411,7 +1421,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 qty_s = " ".join(x for x in qty_two(ln) if x).strip()
                 # 2.296.0 E (#3170): too wide for the column: number and unit on two lines (each wrapped to the column)
                 q_lines = [qty_s] if pdf_text_width(qty_s, 8.8) <= c_qty - 6 else [w for x in qty_two(ln) if x for w in pdf_wrap(x, 8.8, c_qty - 6)]
-                rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (money(ln["rate"]) if ln.get("rate") not in (None, "") else "")
+                rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (pdf_money(ln["rate"], lang, cur, fmt, pdf_rate_places(ln["rate"])) if ln.get("rate") not in (None, "") else "")  # 2.354.0 A (#2831)
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") and c_vat else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
                 if np_:
@@ -1854,12 +1864,20 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             nd = need(i, j, first_on_page)
             sqa = room_sq(i, j)
             aira = room_air(i, j)
+            # 2.380.0 A (#3415): the totals' gap never goes below its minimum: if the closing is still too long with the air at its
+            # minimum (no top gap given up either), it breaks (the totals with the last position on the next page)
+            hold = any(blocks[k]["air_kind"] == "sum" for k in range(i, j + 1))
+            if hold:
+                aira = room_air(i, j, True)
+                sqa = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in range(i, j + 1) if not blocks[k]["air"])
             if y + nd > bot + 0.01 and sqa + aira > 0 and y + nd - sqa - aira <= bot + 0.01:
                 # 2.294.0 (#3154): first the air around the totals down to its minimum, then (2.138.0 E #2238) the group a little
                 # tighter (top gaps only, same font sizes), the air below its minimum last -- instead of breaking the page
                 over = cut_air(i, j, y + nd - bot, True)
                 for with_air in (False, True):  # the top gaps of the blocks with air (the totals' own) only with the air below its minimum
                     ks = [k for k in range(i, j + 1) if bool(blocks[k]["air"]) == with_air]
+                    if with_air and hold:
+                        break
                     if with_air and over > 0:
                         over = cut_air(i, j, over, False)
                     sqk = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in ks)
@@ -1920,8 +1938,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if any(b["air"] for b in blocks):
         base = lay(True, {})[0]
         res = [(t, lay(True, t)) for t in tries]
-        # all of them tight: the totals' air alone (presses the totals no more than the old layout did) or none
-        tries = [next((t for t, (n, tight) in res if n <= base and not tight), None) or next((t for t, (n, _) in res[-2:] if n <= base), {})]
+        # 2.380.0 A (#3415): the totals' air never goes below its minimum (a break instead); the first try without an extra page,
+        # else the one with the fewest pages (the full air, then less intro air)
+        ns = [(t, lay(True, t)[0]) for t in tries[:4]]
+        tries = [next((t for t, n in ns if n <= base), None) or min(ns, key=lambda x: x[1])[0]]
     lay(False, tries[0])
     total = len(pages)
     for n, p in enumerate(pages, 1):

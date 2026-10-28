@@ -246,7 +246,7 @@ A.patch(B + "/api/admin/settings", json={"public_links": False})
 r = page(NP)
 check(r.status_code == 404 and r.text == gone, "admin switch off: 404")
 check(A.put(B + f"/api/lists/{L}/public-link", json={}).status_code == 409 and A.get(B + "/api/state").json()["public_links"] is False, "switch off: no new links")
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 check(page(NP).status_code == 200, "switch on again: the link works again (kept)")
 # 2.152.2 (#2624): project instead of list; 2.192.0 B (#2513): wait for the alert row instead of 1.5 s
 check(until(lambda: any("Public links to projects" in m for (m,) in dbx("SELECT message FROM admin_alerts WHERE kind='security'")), 15), "switch change: security alert")

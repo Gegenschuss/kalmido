@@ -244,8 +244,15 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
       for (const [vw, vh] of touch ? [[360, 780], [390, 844]] : [[1280, 800]]) {
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
         for (const theme of ['dark', 'light']) {
-          await nav(B + 'static/icon.svg');
-          await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+          // 2.376.1 CI fix: now and then the page is not the app's yet right after the navigate (a load that commits late) and
+          // localStorage throws "SecurityError: The operation is insecure" there: navigate once more instead of a failed suite
+          for (let k = 0; ; k++) {
+            await nav(B + 'static/icon.svg');
+            try { await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`); break; } catch (e) {
+              if (k >= 2 || !/SecurityError|insecure/.test(e.message)) throw e;
+              console.log(`p2100_ui: the theme could not be stored yet (${e.message}), once more`); await sleep(500);
+            }
+          }
           await nav(B + '?v=' + (++nr) + '#today/review');
           for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
           await sleep(1200);

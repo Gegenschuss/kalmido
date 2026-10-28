@@ -21,10 +21,10 @@ async function dp_load() {
   dp_redraw(seq);
 }
 function dp_redraw(seq) { if (S.route.mod === 'workload' && WLV.tab === 'dispo' && (seq === undefined || seq === DPV.seq)) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); } }
-const dp_monday = s => { const d = pd(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return ds(d); };
+const dp_monday = s => weekOf(s);  // 2.368.0 B (#2982): Monday unless the person chose a first day of the week
 const dp_time = s => s.includes('T') ? s.slice(11, 16) : '';
 function dp_when(b) {
-  const a = b.start.slice(0, 10), e = b.end.slice(0, 10), ta = dp_time(b.start), te = dp_time(b.end);
+  const a = b.start.slice(0, 10), e = b.end.slice(0, 10), ta = fmtTimeLoc(dp_time(b.start)), te = fmtTimeLoc(dp_time(b.end));  // 2.368.0 B (#2982): 12 / 24 h as chosen
   if (a === e) return fmtDayAbs(a) + (ta ? ` ${ta}${te ? '–' + te : ''}` : '');
   return `${fmtDayAbs(a)}${ta ? ' ' + ta : ''} – ${fmtDayAbs(e)}${te ? ' ' + te : ''}`;
 }
@@ -172,10 +172,11 @@ function dp_editSheet(b) {
     const before = {title: b.title, start: b.start, end: b.end, status: b.status, note: b.note || '', all: true};
     k.disabled = true;
     try {
-      await api('PATCH', `/api/team/dispo/bookings/${b.id}`, v);
+      const r = await api('PATCH', `/api/team/dispo/bookings/${b.id}`, v);
       const put = x => async () => { await api('PATCH', `/api/team/dispo/bookings/${b.id}`, x); dp_reload(); };
       histAdd({label: tr('Booking changed'), undo: put(before), redo: put(v)});
-      md.remove(); dp_reload(); toast(tr('Saved'));
+      // 2.360.0 R (#2496): bookings of colleagues in the job stay as they were (only their author or an admin changes them)
+      md.remove(); dp_reload(); toast(r?.skipped ? trn('Saved. {0} booking of someone else stays as it was', 'Saved. {0} bookings of others stay as they were', r.skipped) : tr('Saved'));
     } catch { k.disabled = false; /* api() said it */ }
   });
 }

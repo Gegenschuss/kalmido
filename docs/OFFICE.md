@@ -25,7 +25,11 @@ Which office you work in follows the workspace switch at the top of the sidebar:
 shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
 mode `shared`) there is no switch: the office is simply your personal one. With the switch on "All workspaces", a person
 in exactly one organisation works in that organisation's office (as before 2.47.3); with several organisations the
-office asks to choose one.
+office asks to choose one. Since 2.356.0 a person who already has data in the personal office (documents, master data,
+receipts, bank, cash book or private clients) and joins an organisation while the switch is on "All workspaces" keeps
+working in the personal office (the switch is set to **Private**; the organisation is one switch away). The office header
+always names the workspace of the shown office and, with organisations, is the workspace switch itself; the first change
+of the office's workspace shows one short hint.
 
 ## Personal office
 
@@ -77,8 +81,23 @@ dialog names what moves and what stays before anything changes:
 Rights: the right to work in both offices (travel expenses, templates and framework contracts: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|office, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
+
+Further areas (2.356.0): fixed costs, vehicles (with their logbook: drives, change log and closed months - a month closed
+for every vehicle stays closed for the moved one; no move into or out of a locked month), text blocks, services and
+equipment move from their dialog (*Move to another workspace…*, the office admin of both sides). One that something in the
+old office still uses (an issued invoice's position, a set, a framework contract) stays there archived and is created anew
+in the target; a fixed cost or vehicle that is used there stays. Links into the old office end (a drive's client / trip,
+a device's receipt / contract, a service's role) and come back with the undo.
+
+**Your own part of an organisation's office into your personal office** (2.356.0, e.g. when you leave an office community):
+Settings of the organisation's office, *Transfer into your personal office…* (its admins only), the same dialog with preview
+and undo (`what: office`, `ids: [org id]`, `to: "private"`). Only what you created there moves: your clients (with your
+drafts; a client the organisation still uses stays there active and is created anew for you), your drafts, the framework
+contracts of the clients that move, your trips, entertainment receipts and templates. Issued documents stay (retention,
+read-only copies on request), drafts are numbered anew; the drafts of the others, the cash book, books, bank and the other
+master data stay in the organisation.
 
 **The whole personal office into an organisation** (2.139.1): Settings of the office, *Transfer into an organisation*, offered
 when you are an admin of at least one organisation. The preview names what goes along (documents, payments, clients with
@@ -87,7 +106,8 @@ company and bank data, your number counters, the start and real balances of the 
 and who sees it afterwards (every member of the organisation with access to the office). Every entry keeps its id;
 finalised invoices stay finalised with their numbers, closed cash book days stay closed; the protected fields and the
 stored files are sealed anew with the organisation's key. A number the organisation already uses refuses the transfer
-(the preview lists them; numbers are never rewritten). One way, no undo. Only the person in the app, never an agent or an
+(the preview lists them; numbers are never rewritten). The receipts the cash book and the equipment list point at (your
+own files in Documents) move into the organisation's documents, so its bookkeeping can open them (2.356.0). One way, no undo. Only the person in the app, never an agent or an
 access token. `GET /api/office/move/check?org=<id>` -> `{org, ok, moves, keeps, notes, conflicts, numbers, who}`;
 `POST /api/office/move/org` `{org, confirm: true}` -> `{ok, org_id, name, clients, files, rows}` (404 not a member, 403 not
 its admin, 409 conflicts / not a personal office / nothing to move).
@@ -103,7 +123,7 @@ with this exemption reason.
 
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotes & invoices, Clients, Contacts, Documents, Framework contracts
+- **Sell** - Pipeline, Quotations, Invoices (2.380.0, before one point *Quotes & invoices*), Clients, Contacts, Documents, Framework contracts
 - **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
 - **Administration** - Equipment, Contracts & insurance, Settings
 
@@ -133,6 +153,17 @@ only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Rece
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
+has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
+notes, Reminders, Delivery notes and Archive (archived invoices only, filter All / open / paid; the sum line follows the
+filters and the client filter). A document opens in its own area (`#office/invoices/<id>`); an old link
+`#office/offers/<id>` of an invoice, credit note, reminder or delivery note (or `#office/offers/invoice`) moves on by
+itself, so links from mails, agents and bookmarks keep working. Both areas use the rights of the office area
+*Quotes & invoices* (no new right). In the sidebar each area is its own tree with its own root folder (`GET
+/api/office/docs/tree` = quotations, `?sec=invoices` = the invoice kinds; folders are made the same way). *New quotation*
+and *Empty invoice* create the draft at once; *Trial document (SAMPLE)* sits in the menu next to *New quotation* and in
+*New invoice*, the one-time hint about trial documents shows in the head of a trial document's editor.
 
 *Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
 sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20
@@ -1690,6 +1721,11 @@ lowers the invoice's open amount; over the full gross it sets the invoice to `ca
 number series and print "Credit note for invoice no. ...". Since 2.40.0 a credit note keeps the e-invoice format of its
 invoice (XRechnung for a client with a buyer reference), has its own closing (pack text `credit_closing`) and its XML
 carries no "payable on receipt" terms.
+2.354: a credit note always comes from its invoice: `POST /api/office/docs {kind: "credit"}` and copying a credit note
+answer 409 (credit notes made before stay readable). It keeps the invoice's currency, exchange rate, client, VAT mode and
+VAT note (a change in the draft: 409; the editor shows the fields locked) and the VAT rates frozen with the invoice
+(`tax_snapshot`), even after the country pack changed. Finalising checks the credit notes of an invoice per VAT rate:
+together never more than the invoice at that rate (409).
 
 **Changing the language of a draft** (2.40.0): `PATCH /api/office/docs/<id> {lang}` sets intro, closing (settings, pack or
 framework contract), the rights texts, the rights note and the titles of catalogue positions anew in the new language,
@@ -1712,6 +1748,12 @@ covers that day, on the day of the correction, the note names the payment's day;
 day either way), `reverses_id` = the payment; the list shows both
 (the payment marked `reversed`), the balance is right again, the books and the DATEV export see both lines. A reversal
 or a payment already reversed cannot be reversed (409).
+2.354: a **refund** is a payment on a finalised credit note (same routes, the bank reconciliation matches money paid out
+to it): at most `refund_open` of the credit note = what the customer paid beyond the invoice (payments plus credit notes
+over its gross, less the refunds booked), 409 above. Invoice and credit note answer `refund_open`; the invoice shows
+"Refund open" while money is still to be paid back. The books (VAT on payments received, income statement), the key
+figures, the cash flow and the DATEV export count a refund negative, so a paid invoice cancelled in full and refunded
+counts 0.
 
 ### Kept by law
 

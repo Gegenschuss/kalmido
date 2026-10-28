@@ -31,7 +31,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,fields,events,files,docs,time,office,wiki,clients"  # 2.152.0 review A2: + docs (receipts)
 O = "/api/office"
 KEYENV = " -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="
@@ -311,7 +311,7 @@ for _ in range(480):
     if A.get(B + f"/api/orgs/{GAM}/export").json().get("state") != "running":
         break
     time.sleep(0.25)
-r = A.get(B + f"/api/orgs/{GAM}/export/file")
+r = su_get(A, B + f"/api/orgs/{GAM}/export/file")  # 2.360.0 (#2496): the step-up
 check(r.ok and r.content[:8] == b"KALMIDO-", f"Gamma retired: the download works (logged in the office log) {r.status_code} {r.content[:80]}")
 if not r.ok:
     app_log()

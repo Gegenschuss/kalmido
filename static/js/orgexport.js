@@ -15,7 +15,7 @@ function oxStateHtml(j) {
   if (j.foreign) return `<div class="shint keep">${ic('lock', 's')} ${esc(j.hint || '')}</div>` + (j.may_replace && j.state === 'done' ? `<div class="row">${start(tr('Create export'))}</div>` : '');
   if (j.state === 'running') return botBusy(`<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>`);  // 2.161.2 (#2611)
   if (j.state === 'done') return `<div class="row oxdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
-    <div class="row"><a class="btn sm" href="/api/orgs/${j.oid}/export/file" download data-ox="dl"${+j.oid === 0 ? ' data-sudl' : ''}>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-ox="del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
+    <div class="row"><a class="btn sm" href="/api/orgs/${j.oid}/export/file" download data-ox="dl" data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-ox="del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
   return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Create export'))}</div>`;
 }
 async function oxLoad(box) {

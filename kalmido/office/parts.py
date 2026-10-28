@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .model import UNITS, office_role, office_settings
 from .packs import office_pack_for
@@ -209,26 +209,27 @@ def f8b_qty_bases(bases, qty):
     return pb
 
 
-def f8b_fix_cents(rows, want, lang="de"):
+def f8b_fix_cents(rows, want, lang="de", currency="EUR"):
     """2.58.0 (#1759): invoice positions made from a part (x a fractional qty) round every position on its own; per tax
     rate their sum must equal the part line's amount on the title page (want: {rate key: amount}). The rest cent goes
-    on the last position of that rate, which then becomes one flat amount (its qty x rate stays in the detail)."""
+    on the last position of that rate, which then becomes one flat amount (its qty x rate stays in the detail).
+    2.368.0 C (#2983): the detail's rate in the office's home currency (the rates' one), not always EUR."""
     have = {}
     for x in rows:
         if x.get("kind") not in ("service", "discount"):
             continue
         if x.get("unit") == "percent":
             return rows  # its amount depends on the whole invoice: leave as before
-        v = money(dec(x.get("qty"), "1") * money(dec(x.get("rate"))))
+        v = money(dec(x.get("qty"), "1") * dec(x.get("rate")))  # 2.354.0 A (#2831): like inv_calc, the exact rate
         have[x.get("tax")] = have.get(x.get("tax"), D0) + (-v if x["kind"] == "discount" else v)
     for k, w in (want or {}).items():
         diff = money(dec(w)) - have.get(k, D0)
         last = next((x for x in reversed(rows) if x.get("kind") == "service" and x.get("tax") == k), None)
         if not diff or last is None or abs(diff) > Decimal("0.05"):
             continue
-        q, rate = dec(last.get("qty"), "1"), money(dec(last.get("rate")))
+        q, rate = dec(last.get("qty"), "1"), dec(last.get("rate"))  # 2.354.0 A (#2831): the exact rate
         last.update(qty=_num(1), unit="flat", rate=_num(money(q * rate) + diff),
-                    detail=" · ".join(t for t in (f"{fmt_qty(q, lang)} × {fmt_money(rate, lang)}", last.get("detail") or "") if t))
+                    detail=" · ".join(t for t in (f"{fmt_qty(q, lang)} × {fmt_rate(rate, lang, currency)}", last.get("detail") or "") if t))
     return rows
 
 
@@ -576,7 +577,7 @@ def tp_render(c, oid, r, m, pack, lang, locked):
             if ln["kind"] in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
                 ln["total_text"] = fmt_money(ln["total"], lang, cur)
                 if ln.get("rate") is not None:
-                    ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
+                    ln["rate_text"] = fmt_rate(ln["rate"], lang, cur)  # 2.354.0 A (#2831): up to 4 places
             lines.append(ln)
         labels = pc.get("labels") or {}
         rows = [[L.get("net_total", labels.get("net") or label(pack, lang, "net")), fmt_money(pc.get("net") or 0, lang, cur)]]
@@ -641,7 +642,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         for n, k in enumerate(k for k in TAX_KEYS if k in bs):
             res.append(pos(ln["title"], qty, it.get("unit") or "piece", bs[k], k, detail=tax_word(k) if len(bs) > 1 else (it.get("detail") or ""),
                            cost=pc.get("costs") if n == 0 else 0))
-        return f8b_fix_cents(res, ln.get("taxes"), lang) or [pos(ln["title"], qty, it.get("unit") or "piece", 0, "standard")]
+        return f8b_fix_cents(res, ln.get("taxes"), lang, hc_home(s)) or [pos(ln["title"], qty, it.get("unit") or "piece", 0, "standard")]
 
     def auto(lines, factor=Decimal(1), with_disc=True):
         res = []
@@ -706,7 +707,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
             out += auto(raw_lines + [dl], qty)
         else:
             out += auto(pc["lines"], qty)
-        out[start:] = f8b_fix_cents(out[start:], ln.get("taxes"), lang)
+        out[start:] = f8b_fix_cents(out[start:], ln.get("taxes"), lang, hc_home(s))
     out += auto(t["lines"])
     return out
 

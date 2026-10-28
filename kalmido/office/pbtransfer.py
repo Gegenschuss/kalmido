@@ -23,6 +23,8 @@ the moved numbers) and a catalogue pack the target has installed itself.
 Files below OFFICE_DIR/<personal office> are written anew below OFFICE_DIR/<target> (same name, sealed with the target's
 key) before the commit; the old ones go only after it (on an error the personal office stays as it was). The settings'
 own files (logo, letterhead) stay; the frozen copies of finalised documents (logo-<hash>.png, lhs-<hash>.pdf) go along.
+2.356.0 A (#2926): the receipts the cash book / the equipment list point at (the person's own private files) move into the
+organisation's documents like POST /api/files/move-space (files/fsmove.py), so its accounting can open them.
 One entry "move" in the target's office log."""
 import os
 import re
@@ -40,6 +42,7 @@ from .ledger import ofx_log
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
+from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
 
 PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
@@ -195,8 +198,18 @@ def pbt_plan(c, uid, src, dst):
     if same:
         notes.append(trn("{0} client has the same name as one in the organisation: both stay, they are not merged",
                          "{0} clients have the same name as one in the organisation: both stay, they are not merged", same))
-    rec = c.execute("SELECT COUNT(*) FROM office_cash_entries WHERE org_id=? AND node_id IS NOT NULL", (src,)).fetchone()[0]
-    if rec:
+    rcs = pbt_receipts(c, uid, src)  # 2.356.0 A (#2926): the receipts of the cash book / equipment go into the organisation's documents
+    if rcs:
+        try:
+            fp = fsm_plan(c, uid, {"ids": rcs, "parent": "docs"}, dst, True, office=True)
+            if fp["block"]:
+                conflicts.append(tr("Receipts: {0}", fp["block"]))
+        except Denied as e:
+            conflicts.append(tr("Receipts: {0}", e.text()))
+        notes.append(trn("{0} receipt of the cash book moves into the organisation's documents: its accounting can open it",
+                         "{0} receipts of the cash book move into the organisation's documents: its accounting can open them", len(rcs)))
+    rec = c.execute("SELECT COUNT(DISTINCT node_id) FROM office_cash_entries WHERE org_id=? AND node_id IS NOT NULL", (src,)).fetchone()[0] - len(rcs)
+    if rec > 0:  # somebody else's file (shared with the person): it stays where it is
         notes.append(trn("{0} receipt stays in your private file store: only you can open it",
                          "{0} receipts stay in your private file store: only you can open them", rec))
     notes += pbt_dup_notes(c, src, dst)  # 2.188.0 A (#2498)
@@ -219,8 +232,17 @@ def pbt_plan(c, uid, src, dst):
     total = sum(v for t, v in counts.items() if t != "office_texts") + len(cl) + len(files)
     if not total:
         conflicts.append(tr("Your personal office is empty: there is nothing to move"))
-    return {"counts": counts, "clients": cl, "files": files, "moves": moves, "keeps": keeps, "notes": notes, "conflicts": conflicts,
+    return {"counts": counts, "clients": cl, "files": files, "receipts": rcs, "moves": moves, "keeps": keeps, "notes": notes, "conflicts": conflicts,
             "numbers": taken, "viewers": {"people": who["n"], "admins": who["a"]}, "total": total, "tables": tables}
+
+
+def pbt_receipts(c, uid, src):
+    """2.356.0 A (#2926): [node id] of the receipt files the cash book and the equipment list of personal office src point
+    at that are the person's own private files (they move along into the organisation's documents)."""
+    return [r[0] for r in c.execute(
+        "SELECT n.id FROM fs_nodes n WHERE n.kind='file' AND n.deleted_at IS NULL AND n.agent_id IS NULL AND n.org_id IS NULL "
+        "AND n.owner_id=? AND (n.id IN (SELECT node_id FROM office_cash_entries WHERE org_id=?) "
+        "OR n.id IN (SELECT receipt_node_id FROM office_equipment WHERE org_id=?)) ORDER BY n.id", (uid, src, src))]
 
 
 def pbt_dup_notes(c, src, dst):
@@ -363,7 +385,7 @@ def pbt_post():
     if p["conflicts"]:
         return jsonify(error=tr("The office cannot be moved: {0}", "; ".join(p["conflicts"][:5])), conflicts=p["conflicts"], numbers=p["numbers"][:50]), 409
     ddir = os.path.join(OFFICE_DIR, str(int(dst)))
-    made = []
+    made, old_rc = [], []
     try:
         for rel, path in p["files"]:  # written before the commit, removed again on an error
             to = os.path.join(ddir, rel)
@@ -379,6 +401,11 @@ def pbt_post():
             else:
                 oc_write_file(c, dst, to, oc_read_file(c, path), fresh=True)  # sealed with the target's key at rest
             os.chmod(to, 0o600)
+        if p["receipts"]:  # 2.356.0 A (#2926): into the organisation's documents (sealed anew), removed after the commit
+            fp = fsm_plan(c, uid, {"ids": p["receipts"], "parent": "docs"}, dst, False, office=True)
+            if fp["block"]:
+                raise Denied(fp["code"], fp["block"])
+            fsm_apply(c, uid, fp, dst, made, old_rc)
         own_default = c.execute("SELECT 1 FROM office_cashbooks WHERE org_id=? AND is_default=1", (dst,)).fetchone()
         moved_books = [r[0] for r in c.execute("SELECT id FROM office_cashbooks WHERE org_id=?", (src,))]
         unlinked = pb_letter_detach(c, src)
@@ -403,7 +430,7 @@ def pbt_post():
                 c.execute(f"UPDATE clients SET org_id=? WHERE org_id IS NULL AND id IN ({q})", (dst, *cl))
                 c.execute(f"UPDATE office_client_contacts SET org_id=? WHERE client_id IN ({q})", (dst, *cl))
                 c.execute(f"UPDATE office_client_contacts SET contact_id=NULL, trash_contact_id=NULL WHERE client_id IN ({q})", cl)  # own address books stay private
-        ofx_log(c, dst, "move", target="settings", detail={"from_personal": 1, "clients": len(cl), "files": len(p["files"]),
+        ofx_log(c, dst, "move", target="settings", detail={"from_personal": 1, "clients": len(cl), "files": len(p["files"]), "receipts": len(p["receipts"]),
                                                            "rows": {k: v for k, v in counts.items() if v},
                                                            "letter_links": unlinked})
         uset(c, uid, "workspace", f"org:{dst}")  # afterwards the app shows the organisation's office
@@ -419,7 +446,7 @@ def pbt_post():
         if isinstance(e, IntegrityError):  # the target took one of the numbers in the meantime
             return err(tr("The office cannot be moved: {0}", tr("Try again")), 409)
         raise
-    for _rel, path in p["files"]:  # the old copies go only after the commit
+    for path in [x for _rel, x in p["files"]] + old_rc:  # the old copies go only after the commit
         try:
             os.remove(path)
         except OSError:

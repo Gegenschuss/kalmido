@@ -430,7 +430,7 @@ function clearLocal() {
     ss.forEach(k => sessionStorage.removeItem(k));
   } catch { /* no storage */ }
   // 2.169.0 (#2671): the offline copy of the knowledge pages (wiki.js) goes too
-  const wk = (typeof wko_wipe === 'function' ? wko_wipe() : Promise.resolve()).then(() => { try { indexedDB.deleteDatabase('kalmido-wiki'); } catch { /* no IndexedDB */ } });
+  const wk = (typeof wko_wipe === 'function' ? wko_wipe() : Promise.resolve()).then(() => { try { indexedDB.deleteDatabase('kalmido-wiki'); indexedDB.deleteDatabase('kalmido-qfiles'); } catch { /* no IndexedDB */ } });  // 2.359.0 A (#3023): + the quick add's offline files
   return Promise.all([wk, typeof obxClear === 'function' ? obxClear() : Promise.resolve()]);  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)
 }
 // design per device: auto (follows the OS) | dark | light

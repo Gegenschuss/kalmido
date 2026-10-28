@@ -34,6 +34,11 @@ from ..tasks.validation import as_int, valid_date, valid_hm
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 APB_PREFIX = "/s/b/"
+# 2.360.0 D (#2496): the booking name goes into the confirmation mail to the typed address -- nothing that reads as a link or
+# an address (scheme, www., @, a dotted host name like example.com); "Dr. Example" stays fine (a space after the dot).
+# 2.360.0 R (#2496, review): a host name only with a known top-level domain at the end of a word ("Dr.med. Example",
+# "St.Pauli Film" are names)
+APB_NAME_BAD = re.compile(r"://|\bwww\.|@|[<>]|[^\W_][\w-]*\.(?:com|net|org|info|biz|de|at|ch|eu|uk|us|nl|fr|es|it|be|pl|ru|cn|io|co|me|ly|app|dev|xyz|top|site|online|shop|link|click|example|test|invalid|localhost)(?![\w-])", re.I)
 APB_HOLD_MIN = 30            # an unconfirmed booking holds its time this long
 APB_PURGE_DAYS = 7           # expired (never confirmed) bookings are deleted after this
 APB_CANCEL_DAYS = 30         # 2.148.1 C (#2493): cancelled, never confirmed bookings are deleted after this
@@ -478,7 +483,9 @@ def apb_busy(c, uid, p, lo, hi, skip=None):
     def day_span(d0, d1):  # local days [d0, d1) -> UTC
         return (apb_utc(datetime(d0.year, d0.month, d0.day, tzinfo=zone)), apb_utc(datetime(d1.year, d1.month, d1.day, tzinfo=zone)))
     from ..events.model import default_cal
-    cals = set(my_cal_ids(c, uid, hidden=False))
+    # 2.360.0 D (#2496): only calendars uid owns or edits -- a calendar someone else only shows uid (view) keeps its times off
+    # the public page (uid's own commitments there count as accepted invitations below)
+    cals = {k for k, role in my_cal_ids(c, uid, hidden=False).items() if role in ("owner", "edit")}
     # 2.94.0 (#1929 review): the calendar the bookings go into counts even when hidden in the view (apb_make's choice)
     tc = p["cal_id"] if p and p["cal_id"] and apb_cal_ok(c, uid, p["cal_id"]) else default_cal(c, uid, create=False)
     if tc:
@@ -830,8 +837,9 @@ def apb_pub_book(slug, tid, slot):
     vals["name"] = " ".join(vals["name"].split())
     if request.form.get("website"):  # the honeypot: a bot gets the same answer as a person, nothing is stored or sent
         return apb_msg(c, p, lg, tr("Almost done: please check your e-mail", lg=lg), [tr("We sent you a link. Your booking counts once you confirm it there (within 30 minutes).", lg=lg)])
-    if len(vals["name"]) < 2:
-        return apb_form(c, p, t, s, lg, vals, tr("Please type your name.", lg=lg), 400)
+    if len(vals["name"]) < 2 or APB_NAME_BAD.search(vals["name"]):  # 2.360.0 D (#2496): no link / address as the name (it is in the mail)
+        return apb_form(c, p, t, s, lg, vals, tr("Please type your name.", lg=lg) if len(vals["name"]) < 2
+                        else tr("Please type your name without a link or web address.", lg=lg), 400)
     if not EMAIL_RE.fullmatch(vals["email"]):
         return apb_form(c, p, t, s, lg, vals, tr("Please check the e-mail address.", lg=lg), 400)
     if vals["phone"] and not PHONE_RE.fullmatch(vals["phone"]):

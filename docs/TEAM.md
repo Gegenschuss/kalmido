@@ -406,6 +406,8 @@ project files, chat, documents, mail and sharing into Kalmido); profile pictures
   only the metadata blocks are cut out (JPEG keeps its colour profile; HEIC keeps its structure, its metadata blocks are
   emptied). A photo stored turned (the camera's orientation mark) is turned upright first and saved again, so it shows the
   right way round without the mark. Anything Kalmido cannot read is stored unchanged; the upload never fails because of it.
+- Videos (MP4, MOV, also from phones, 2.360.0): the recorded place is overwritten with zeros in the file itself; the video,
+  its size and everything else stay as they were.
 - The switch *Remove location data from photos* (on by default) also removes camera details and capture time. For your
   private files it sits in *Settings > Data > Photos*; files of an organisation follow the organisation's switch in
   *Settings > Workspaces*, which only its admins change. Off: photos are stored exactly as uploaded.
@@ -430,6 +432,15 @@ target), the archive number (when it is free there), the recognised text and a P
 Out of an organisation only an organisation admin moves something (2.148.1; before, the owner or who uploaded it could);
 a person without an organisation has no other workspace and does not see the action. Agents never move data between
 workspaces. Receipts the cash book or the equipment list points to stay in their workspace.
+
+**A project into the other workspace (2.401).** Changing *Workspace* in the project dialog checks first: when the move ends
+something, takes something along or leaves something behind, the same move dialog lists it before anything moves -- the
+client of the old workspace and "also in" links across the boundary end (Undo brings both back), the customer reports of
+its tasks go along (a report's client of the old workspace comes back with Undo), attached tables, video reviews, office
+documents, deals, approval links and receipts stay in the old workspace (each has its own *Move to another workspace…*).
+A member who does not fit the target, or a family / Home & life project, blocks the move there. Nothing to say: it moves at
+once, as before. Route: `POST /api/lists/{id}/move-space {to, dry: 1}` (only the check; the move is `PATCH /api/lists/{id}
+{org_id}`; agents 403).
 
 **Leaving an organisation is the admins' call (2.148.1).** Projects (also through a folder's workspace), copies of a project,
 files and folders, tables, contacts (single or several at once) and *Save as task* from a channel of the organisation
@@ -580,7 +591,9 @@ A form with **status link** turns every report sent without an account into a cu
 its status page (on the thank-you page and by mail). There they see the title, the state (received, in progress, done), the
 text they sent, the team's public answers and their own comments, and they can answer. **All my reports** sends a sign-in
 link (valid 30 minutes, once) to their address; it opens a page with all their reports in the same organisation (or the same
-private project owner) - never reports of another organisation, even with the same address. Nobody needs an account.
+private project owner) - never reports of another organisation, even with the same address. A report counts there once
+its address is confirmed: the link in a mail to that address was opened (someone typing another person's address into the
+form does not put reports into that person's list; 2.360). Nobody needs an account.
 
 - **Internal stays internal.** In the task panel, a customer report shows the box *Customer report* (who sent it; the
   address, *Copy the status link* and *Mails to the customer* only for people who may change the task). The comment box
@@ -621,11 +634,16 @@ of the same organisation (or the same personal office) whose e-mail or e-mail fo
 - **Show also in project…** in a task's menu (and in the task panel's project path) puts the task into a further list of the same
   workspace without copying it: it is one task, every change shows everywhere. *Remove from <project>* takes it out of that
   project again; the task stays. Both are one undo step, and the task's history notes them.
+- *Since 2.320:* the task panel shows the field **Projects**: the task's own project (fixed) and every further one; **+** adds
+  one, **x** removes it (phone and computer alike). On a computer, hold **Alt** (Option on a Mac) while dropping a task onto a
+  project in the sidebar: it is then shown there too instead of moved (the project says so while you drag). For several
+  selected tasks, **Show also in project…** sits in the selection panel (on a phone under More); subtasks and tasks that
+  cannot go there are skipped and counted. At most 10 further projects per task, main tasks only.
 - In the further list the row says **From <its project>**, in its own project **Also in <project>**. The further project has its own
   place and column for it: dragging it there (also on the board) moves only that place, never the task into another project.
 - **Who sees it** is decided by the task's own project only. Someone who sees only the further project does not see the task
   there (nor in search, the calendar feed, a public link or an export). Projects of another organisation, private projects of
-  an organisation's task (and the other way round), health projects and locked projects cannot be used.
+  an organisation's task (and the other way round), health, budget and locked projects cannot be used.
 - It counts once: in statistics, Today, the calendar, search and exports. The sidebar counts it in each project it is in.
 
 <a id="rules-in-lists-2710"></a>

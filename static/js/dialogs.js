@@ -833,6 +833,19 @@ function lwsBack(org, from) {
   if (!org || +org === +(from || 0) || (S.me?.workspaces || []).find(w => w.id === +org)?.role === 'admin') return '';
   return ' ' + tr('Back into your private space only after an admin of the organisation releases it (you ask for it).');
 }
+// 2.401.0 (#2924): the workspace field of an existing project runs the server's dry run first (POST …/move-space {dry: 1}):
+// what the move ends (Undo brings it back), takes along or leaves in the old workspace -- or what refuses it -- shows in the
+// move dialog before anything moves (true = move). Nothing to say = moved at once, as before.
+async function lwsDry(id, from, to) {
+  if ((from || null) === (to || null)) return true;
+  const check = async org => {
+    try { return await rawFetch('POST', `/api/lists/${id}/move-space`, {to: smv_ws(org), dry: 1}); }
+    catch (x) { return {block: x.message || tr('The check failed. Please try again.'), out_request: x?.data?.out_request}; }
+  };
+  const r = await check(to);
+  if (!r.block && !(r.notes || []).length) return true;
+  return !!await smv_open({what: qn(lname(listById(id)) || ''), from, only: [smv_ws(to)], check, run: async () => true});
+}
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
   const own = isOwner(l), dis = own ? '' : 'disabled';
@@ -948,6 +961,7 @@ function listModal(id, folder = '', o = {}) {
   // 2.270.0 A (#3019): the list as this dialog showed it (opened / last saved / synced): the autosave sends only what was
   // changed here, with these values as _prev (a value another device set meanwhile is not set back); lfail = last save failed
   let lbase = {...l}, lfail = false;
+  let wsHold = false;  // 2.401.0 (#2924): a workspace change waits for its dry run / the move dialog (no other save takes it along)
   const lsync = (force = false) => {  // after an undo / redo or a failed save: the dialog shows what is saved
     if (!md.isConnected) return;
     const x = listById(id); if (!x) return;
@@ -983,6 +997,7 @@ function listModal(id, folder = '', o = {}) {
       const cur = listById(id); if (!cur) return;
       const body = formBody(), diff = {}, prev = {};
       for (const k in body) if (lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }  // 2.270.0 A (#3019)
+      if (wsHold) { delete diff.org_id; delete prev.org_id; }  // 2.401.0 (#2924): e.g. the name's focusout while the move dialog opens
       if (!Object.keys(diff).length) { lfail = false; return; }
       if ('folder' in diff && own) {  // 2.39.1 (#1188): a folder with other workspace / agent defaults asks first
         const fa = await lmFolderAsk({[id]: diff.folder}); if (fa === null) { lsync(true); return; }
@@ -1022,7 +1037,16 @@ function listModal(id, folder = '', o = {}) {
       const org = !!e.target.value;
       if (org && $('#l-fam', md)?.value) { $('#l-fam', md).value = ''; }  // an organisation's list has no "Used for"
       const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
-      if (id) autosave(); return;
+      if (id) {  // 2.401.0 (#2924): the server's dry run first; cancelled = the field goes back
+        const sel = e.target, to = sel.value ? +sel.value : null, from = listById(id)?.org_id || null;
+        wsHold = true;
+        lwsDry(id, from, to).finally(() => { wsHold = false; }).then(go => {
+          if (go) { autosave(); return; }
+          if (!sel.isConnected) return;
+          sel.value = from ? String(from) : ''; sel.dispatchEvent(new Event('change', {bubbles: true}));
+        });
+      }
+      return;
     }
     if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
     if (!id && e.target.id === 'l-fam' && ['shopping', 'packing'].includes(e.target.value) && $('#l-dab', md)) $('#l-dab', md).checked = true;
@@ -1130,7 +1154,10 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'tpl') { await autosave(); md.remove(); saveTemplate({list_id: id, ...((listById(id) || l).kind === 'project' ? {relative: true} : {})}, lname(l)); return; }  // 2.4.0 (#328): projects keep their dates relative to the project start
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
-      if (!nm) return $('#l-name', md).focus();
+      if (!nm) {  // 2.354.0 C (#3013): say why nothing happens, mark the field
+        const ni = $('#l-name', md); ni.setAttribute('aria-invalid', 'true'); ni.addEventListener('input', () => ni.removeAttribute('aria-invalid'), {once: true});
+        toast(tr('Name missing')); return ni.focus();
+      }
       const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
@@ -1218,7 +1245,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels'];  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels', 'wkEd'];  // 2.350.0 B (#3147): the knowledge editor (live preview / plain text)  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 // 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
 // Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
 let lookTimer = 0, lookApplying = false;

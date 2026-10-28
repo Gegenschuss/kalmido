@@ -26,7 +26,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -188,7 +188,7 @@ while time.time() - t0 < 60:
     time.sleep(0.4)
 check(len(j.get("items", [])) > n0 and not j.get("last_error"), f"backup done: {j.get('last_error')}")
 if j.get("items"):
-    z = A.get(B + f"/api/admin/backups/{j['items'][0]['name']}/download")
+    z = su_get(A, B + f"/api/admin/backups/{j['items'][0]['name']}/download")  # 2.360.0 (#2496): the step-up
     try:
         names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
     except zipfile.BadZipFile:
@@ -215,7 +215,7 @@ check(not os.path.exists(p3), "... and its file")
 
 # a restore of that backup brings the photo back (the file too, not only the database row)
 BKN = j["items"][0]["name"] if j.get("items") else ""
-r = A.post(B + "/api/admin/backups/restore", json={"name": BKN, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": BKN, "confirm": "RESTORE"})
 check(r.ok and r.json().get("ok"), f"restored: {r.text[:200]}")
 time.sleep(1.0)
 A, Ca = sess("alice"), sess("carol")

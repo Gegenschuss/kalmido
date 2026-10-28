@@ -15,6 +15,7 @@ from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc
 from ..core.instance import LEGAL_ENV, legal_url_ok  # 2.306.0 B (#2887): the legal links live in core (layers)
 from ..accounts.session import me
 from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..api.scopes import need_scope  # 2.360.0 A (#2496)
 from ..core.env import env_bool
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
@@ -319,6 +320,7 @@ def v1_announce_put():
     v1_args(())
     if not g.user["is_admin"]:
         return v1_err(403, tr("Admins only"))
+    need_scope("admin-read")  # 2.360.0 A (#2496): as documented: admin-read + account (a banner and a push for everyone)
     c = db()
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("text", "level", "starts_at", "ends_at", "minutes", "push"))
@@ -513,8 +515,9 @@ def hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
 
 # ---- #896: agents are connected by people themselves (their own provider / key / computer). When one joins a list, every
 # person of the list learns it in their News: which agent, who added it and where it runs (agents.provider) -- the data of
-# the list then also reaches that provider. Who may connect agents at all: the organisation's setting user_agents (off by
-# default, Settings > Administration > Organisation: "Members may connect agents").
+# the list then also reaches that provider. Who may connect agents at all (2.361.4, #2928): the server switch user_agents
+# (Administration > Agents) lets everyone; off, each workspace decides -- an organisation's admins (orgs.member_agents,
+# Settings > Workspaces), the private area the person themselves (agents/admin.py agent_ws_allowed).
 def agent_joined_notice(c, lid, aid, actor):
     from ..collab.news import news_add
     a = c.execute("""SELECT u.display_name, u.username, COALESCE(g.provider,'') AS provider, g.owner_id FROM users u

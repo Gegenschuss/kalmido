@@ -20,7 +20,7 @@ import re
 
 from ..core.config import SECRET_KEY, ATT_DIR
 from ..core.db import insert_id, iso, now_utc
-from ..core.i18n import N_
+from ..core.i18n import LANGS, N_, lang, tr
 from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key
 from . import classify as CL
 from . import extract as EX
@@ -28,13 +28,33 @@ from . import rules as RU
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
+from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
-ROOT = "Dokumente"          # the documents folder at the root of a workspace's file tree
-INBOX = "Eingang"           # its inbox folder: files put there are recognised and sorted
+ROOT = "Dokumente"          # the documents folder at the root of a workspace's file tree (its name before 2.368)
+INBOX = "Eingang"           # its inbox folder: files put there are recognised and sorted (its name before 2.368)
+# 2.368.0 (#2987): a new documents folder is named in its owner's language; every language's name (and the German one of
+# before) is still recognised, so existing folders keep working and no second one is made
+ROOT_KEY = N_("Documents|folder")
+INBOX_KEY = N_("Inbox|folder")
+
+
+def folder_names(key, old):
+    """Every name of a built-in folder, lower case: the German name of before 2.368 + the name in each app language."""
+    return sorted({old.lower(), tr(key, lg="en").lower(), *(tr(key, lg=lg).lower() for lg in LANGS)})
+
+
+def is_inbox(name):
+    return str(name or "").lower() in folder_names(INBOX_KEY, INBOX)
+
+
+def folder_in_sql(col, names):
+    """SQL "lower(col) IN (?, ...)" for folder_names() (the arguments are the names)."""
+    return f"lower({col}) IN ({', '.join('?' * len(names))})"
 PREFIXES = (4, 6, 8)        # prefix lengths kept in the word index
 WORDS_MAX = 4000            # distinct words of one document in the index
 NAME_MAX = 120
@@ -216,6 +236,8 @@ def query_hashes(c, ws, word):
 
 def doc_index(c, nid, ws, text):
     c.execute("DELETE FROM doc_words WHERE node_id=?", (nid,))
+    if _sc_locked(c, "fs", nid):  # 2.360.0 B (#2496): a locked file stays out of the search
+        return
     hs = sorted(word_hashes(c, ws, index_words(text)))
     for i in range(0, len(hs), 500):
         part = hs[i:i + 500]
@@ -433,6 +455,12 @@ def meta_text(c, m):
     return doc_open(c, m["ws"], "doc_meta.text", m["text"]) or ""
 
 
+def meta_text_shown(c, m):
+    """2.360.0 B (#2496): the recognised text for people / agents / the search: none while the file is locked (malware
+    found later). meta_text stays the stored value (re-sealing, the models)."""
+    return "" if _sc_locked(c, "fs", m["node_id"]) else meta_text(c, m)
+
+
 def meta_json(c, m, col, default):
     if col == "auto":
         try:
@@ -468,14 +496,28 @@ def root_id(c, ws):
 
 def _root_by_name(c, ws, org):
     nl = " AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)"  # 2.353.0 F (#2758, review M2): a locked folder renamed so is none
+    nm = folder_names(ROOT_KEY, ROOT)  # 2.368.0 (#2987): its name in any language
     if org:
-        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND lower(name)=lower(?) "
-                      "AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1", (org, ROOT)).fetchone()
+        r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND " + folder_in_sql("name", nm) +
+                      " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1", (org, *nm)).fetchone()
     else:
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
-                      "AND lower(name)=lower(?) AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1",
-                      (int(ws[1:]), ROOT)).fetchone()
+                      "AND " + folder_in_sql("name", nm) + " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1",
+                      (int(ws[1:]), *nm)).fetchone()
     return r[0] if r else None
+
+
+def inbox_path(c, root, uid):
+    """2.368.0 (#2987): "<documents folder>/<inbox>" as the settings name it: the existing folders' names, else the names a new
+    one gets in uid's language."""
+    lg = lang(c, uid)
+    r = c.execute("SELECT name FROM fs_nodes WHERE id=?", (root,)).fetchone() if root else None
+    i = None
+    if root:
+        ni = folder_names(INBOX_KEY, INBOX)
+        i = c.execute("SELECT name FROM fs_nodes WHERE parent_id=? AND kind='folder' AND " + folder_in_sql("name", ni) +
+                      " AND deleted_at IS NULL ORDER BY id LIMIT 1", (root, *ni)).fetchone()
+    return f"{r[0] if r else tr(ROOT_KEY, lg=lg)}/{i[0] if i else tr(INBOX_KEY, lg=lg)}"
 
 
 def root_mark(c, ws, nid):
@@ -505,7 +547,7 @@ def root_folder(c, uid, org_id):
         return rid
     ctx = acx_of(c, uid)
     if not org_id or ctx.role == "agent":
-        rid = fs_folder(c, uid, org_id, [ROOT])
+        rid = fs_folder(c, uid, org_id, [tr(ROOT_KEY, lg=lang(c, uid))])  # 2.368.0 (#2987): in the owner's language
     else:
         if int(org_id) not in ctx.org_ids:
             raise Denied(404)
@@ -518,7 +560,7 @@ def root_folder(c, uid, org_id):
         ts = _now()
         rid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
                               VALUES(NULL,'folder',?,?,?,?,?,?)""",
-                        (_free_name(c, None, owner, int(org_id), ROOT), owner, int(org_id), uid, ts, ts))
+                        (_free_name(c, None, owner, int(org_id), tr(ROOT_KEY, lg=lang(c, owner))), owner, int(org_id), uid, ts, ts))
     root_mark(c, doc_ws(org_id, uid), rid)
     return rid
 
@@ -574,7 +616,7 @@ def _in_docs_tree(c, root, fid):
     if root not in ids or ids[0] == root:
         return False
     below = chain[:ids.index(root)]  # the folders between root and fid (fid first)
-    if below[-1]["name"].lower() == INBOX.lower():
+    if is_inbox(below[-1]["name"]):
         return False
     return fsl_of_chain(c, chain) is None  # 2.353.0 F (#2758, review M2): no document (plain, recognised) into a locked folder
 
@@ -603,7 +645,7 @@ def folder_tree(c, root, vis=None):
 
     def walk(pid, path, depth):
         for r in sorted(kids.get(pid, []), key=lambda x: (x["sort_no"] is None, x["sort_no"] or 0, x["name"].lower())):
-            if (depth == 0 and r["name"].lower() == INBOX.lower()) or (vis is not None and r["id"] not in vis):
+            if (depth == 0 and is_inbox(r["name"])) or (vis is not None and r["id"] not in vis):
                 continue
             p = path + [r["name"]]
             out.append({"id": r["id"], "name": r["name"], "parent_id": r["parent_id"], "depth": depth, "path": " / ".join(p)})
@@ -650,7 +692,7 @@ def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
     root = docs_root(c, node)
     parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
     parts = [x for x in parts if x][:DEPTH_MAX - 2]
-    if not root or not parts or parts[0].lower() == INBOX.lower():
+    if not root or not parts or is_inbox(parts[0]):
         return None
     p = c.execute("SELECT owner_id, org_id FROM fs_nodes WHERE id=?", (root,)).fetchone()
     pid = root
@@ -738,6 +780,21 @@ def untrain(c, nid):
         model_put(c, m["ws"], f, model)
 
 
+def _learn_seen(c, m, uid, f, lid):
+    """2.360.0 B (#2496): the models of an organisation's documents folder learn from every member's documents; for a
+    member who does not manage it a learned sender / type / tag counts only when it is on another document they see."""
+    oid = ws_org(m["ws"])
+    if not oid or not uid:
+        return True
+    with system_ctx(c):
+        r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+    if r and r[0] == "admin":
+        return True
+    q = ("SELECT 1 FROM doc_node_tags WHERE tag_id=? AND node_id<>?" if f == "tag" else
+         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>?")
+    return bool(c.execute(f"{q} AND node_id IN {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
+
+
 def classify(c, m, node, text, given=None):
     """(set, suggest, auto): what the levels of the workspace decide for one document.
     set = {feature: value} applied now, suggest = {feature: {value, conf, by}} offered for review, auto = {feature: how}.
@@ -772,7 +829,14 @@ def classify(c, m, node, text, given=None):
         if f == "folder":
             if not folder_ok(c, node, label):
                 continue
-        elif not label_ok(c, ws, f, label):
+            # 2.360.0 B (#2496): a learned folder only one the uploading person sees; files into it on its own only where
+            # they may edit (like a rule), else a suggestion
+            fr = _fs_role(c, int(label), uid)
+            if not fr:
+                continue
+            if fr not in ("owner", "edit"):
+                conf = min(conf, CL.MAYBE)
+        elif not label_ok(c, ws, f, label) or not _learn_seen(c, m, uid, f, label):
             continue
         val = label if f == "folder" else int(label)
         if conf >= CL.SURE:
@@ -789,7 +853,7 @@ def classify(c, m, node, text, given=None):
         if lv["tags"] == "learn":
             maybe = []
             for tid, conf in CL.predict_tags(model_get(c, ws, "tags"), toks):
-                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags:
+                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags or not _learn_seen(c, m, uid, "tag", tid):
                     continue
                 if conf >= CL.SURE:
                     tags.append(int(tid))

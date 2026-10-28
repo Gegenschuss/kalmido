@@ -249,8 +249,9 @@ check(A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True, "passwor
 check(Fr.patch(B + "/api/admin/settings", json={"oidc_autocreate": True, "password": "password123"}).status_code == 403,
       "freelancer (no instance admin): the switch 403 as before")
 assert A.put(B + "/api/admin/oidc", json={"admin_domains": "", "password": "password123"}).ok
-check(A.put(B + "/api/admin/oidc", json={"issuer": "https://idp2.example"}).ok and A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True}).ok
-      and A.patch(B + "/api/admin/settings", json={"oidc_autocreate": False}).ok, "without an admin rule: provider and auto-create need no password (as before)")
+check(A.put(B + "/api/admin/oidc", json={"issuer": "https://idp2.example"}).ok and A.patch(B + "/api/admin/settings", json={"password": "password123", "oidc_autocreate": True}).ok
+      and A.patch(B + "/api/admin/settings", json={"oidc_autocreate": False}).ok,
+      "without an admin rule: the provider needs no password; auto-create on asks for it (2.360.0 #2496: every opening switch)")
 assert A.put(B + "/api/admin/oidc", json={"issuer": "", "client_id": ""}).ok
 
 # ================================================================ 7. the context after a raw ROLLBACK TO SAVEPOINT

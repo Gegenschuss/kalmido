@@ -404,10 +404,11 @@ def agb_upload(lang):
         return err(tr("The file is too large (at most {0} MB)", AGB_MAX_MB), 413)
     if not raw.startswith(b"%PDF-"):
         return err(tr("Only PDF files"))
-    from ..files.scan import sc_scan  # 2.148.1 E (#2496): virus scan like every upload
+    from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.148.1 E (#2496): virus scan like every upload
     from ..files.upsafe import UploadRefused
     try:
-        sc_scan(f.filename or "terms.pdf", raw)
+        if sc_needs_retry(sc_scan(f.filename or "terms.pdf", raw), raw):  # 2.360.0 B (#2496): no later scan for this file, so checked now
+            return err(tr(SC_RETRY_TEXT), 503)
     except UploadRefused as e:
         return err(str(e))
     day = agb_valid_date(request.form.get("date"))

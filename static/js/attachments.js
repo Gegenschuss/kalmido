@@ -53,8 +53,52 @@ async function uploadFiles(taskId, files) {
     const t = await api('POST', `/api/tasks/${taskId}/attachments`, fd);
     putTask(t); render(); if (S.sel === taskId) renderDetail();
     toast(files.length === 1 ? tr('Attached') : tr('{0} files attached', files.length));
-  } catch (e) { /* api() already showed the error / offline notice */ }
+    return true;
+  } catch (e) { return false; /* api() already showed the error / offline notice */ }
   finally { upBusy.delete(taskId); }
+}
+// 2.359.0 A (#3023): files of a quick add made offline (the task has only its temporary id): kept in IndexedDB "kalmido-qfiles"
+// (key = the temporary id) and uploaded once its create went out (core.js outFlush / obxDrain call qfSend); a create the
+// server refused = the files' names wait in the conflicts dialog. Without IndexedDB (jsdom: __qfStore) false = as before.
+const QF = {st: null, busy: false};
+function qfStore() {
+  if (QF.st || globalThis.__qfStore) return QF.st ||= globalThis.__qfStore;
+  if (!globalThis.indexedDB) return null;
+  let dbp = null;
+  const db = () => dbp ||= new Promise((ok, no) => { const r = indexedDB.open('kalmido-qfiles', 1); r.onupgradeneeded = () => r.result.createObjectStore('f', {keyPath: 'tmp'}); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const run = async (mode, fn) => { const t = (await db()).transaction('f', mode), q = fn(t.objectStore('f')); return new Promise((ok, no) => { t.oncomplete = () => ok(q.result); t.onerror = t.onabort = () => no(t.error); }); };
+  return QF.st = {put: v => run('readwrite', o => o.put(v)), all: () => run('readonly', o => o.getAll()), del: k => run('readwrite', o => o.delete(k))};
+}
+async function qfKeep(tmp, files) {
+  const st = qfStore(); if (!st) return false;
+  try { await st.put({tmp, uid: S.me?.id, title: taskById(tmp)?.title || '', files: files.map((f, i) => ({name: f.name || `bild-${Date.now()}-${i}.png`, type: f.type, blob: f}))}); return true; } catch { return false; }
+}
+async function qfSend() {
+  const st = qfStore(); if (!st || QF.busy || !S.me) return;
+  QF.busy = true; S.qfWait = false;
+  try {
+    const idm = LS.get('idmap', {});
+    for (const r of await st.all()) {
+      if (r.uid !== S.me.id) continue;
+      const id = HIST.ids[r.tmp] || idm[r.tmp];
+      if (!id) {
+        if (OUT.q.some(x => x.tmp === r.tmp)) continue;  // its create still waits
+        S.conflicts.push({tid: 0, title: r.title, field: 'rejected', server: tr('The new task could not be created'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
+        LS.set('conflicts', S.conflicts); renderTop();
+      } else {
+        // 2.376.1 CI fix: the new task not in the local state yet (load() with changes still queued leaves the reload to the
+        // next flush): uploadFiles would refuse it as "view only" and the files were dropped unseen - they wait for that load
+        if (!taskById(id)) { S.qfWait = true; continue; }
+        const up = await uploadFiles(id, r.files.map(f => new File([f.blob], f.name, {type: f.type})));
+        if (up === false) continue;  // offline again: the next flush
+        if (!up) {  // refused here (too large, no right; an encrypted list answers with its file): named in the conflicts dialog, never lost unseen
+          S.conflicts.push({tid: id, title: r.title, field: 'rejected', server: tr('File upload'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
+          LS.set('conflicts', S.conflicts); renderTop();
+        }
+      }
+      await st.del(r.tmp);
+    }
+  } catch (e) { console.warn('qfiles', e); } finally { QF.busy = false; }
 }
 function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
   const t = taskById(S.sel), imgs = (list || (t?.attachments || []).filter(isImg)).filter(a => !upLocked(a));  // 2.61.0 (#1818): never a locked file
@@ -391,8 +435,42 @@ function queueSave(id, field, value, base0) {
   const base = old ? old.base : base0 !== undefined ? base0 : (t ? t[field] : undefined);  // value before this round of typing
   saveTimers[key] = {t: setTimeout(() => doSave(key), field === 'title' || field === 'content' ? TEXT_SAVE_MS : 600), id, field, value, base, sess: HIST.sess};
 }
-addEventListener('pagehide', () => { flushSaves(); });
+// 2.359.0 A (#3024): the page goes away (tab closed, reload, another address): savesStash (a normal fetch did not outlive it)
+addEventListener('pagehide', () => { savesStash(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSaves(); });
+// 2.359.0 A (#3024): typed text still waiting for its save goes into the offline queue at once (synchronously: it survives the
+// page) - when the page goes (send) also out by a fetch with keepalive under the same key (the server applies it once), and
+// before the reload of an ended session (core.js rawFetch0; sent after the next sign-in). A locked list's text keeps the
+// normal save (the queue holds ciphers only); formguard asks before such a page closes.
+function savesStash(send) {
+  const out = [];
+  for (const [key, s] of Object.entries(saveTimers)) {
+    const t = taskById(s.id);
+    if ((s.field === 'title' && !String(s.value).trim()) || (typeof le2eOn === 'function' && le2eOn(t?.list_id))) continue;
+    clearTimeout(s.t); delete saveTimers[key];
+    const id = s.id < 0 ? (HIST.ids[s.id] || LS.get('idmap', {})[s.id] || s.id) : s.id;
+    const body = {[s.field]: s.value}; if (s.base !== undefined && id > 0) body._prev = {[s.field]: s.base};
+    if (t) t[s.field] = s.value;
+    out.push({method: 'PATCH', url: '/api/tasks/' + id, body, uid: S.me?.id, k: outKey()});
+  }
+  outStash(out);
+  if (send) { for (const e of out) if (!/\/-\d+$/.test(e.url)) keepSend(e.method, e.url, e.body, e.k); flushSaves(); }
+  return out.length;
+}
+// after every script ran: in the one-file demo bundle formguard.js comes later, and typeof on its not yet initialised const throws
+document.addEventListener('DOMContentLoaded', () => { if (typeof fgWatch === 'function') fgWatch(() => Object.values(saveTimers).some(s => typeof le2eOn === 'function' && le2eOn(taskById(s.id)?.list_id))); });
+// 2.359.0 A (#3024): a save that failed: the field says "Not saved", the text is sent again (5 s, 15 s); after the third failure
+// it waits in the conflicts dialog and the local copy goes back to what the server has (no "saved" look, no false conflict)
+const SAVE_RETRY_MS = [5000, 15000];
+function unsavedMark(s, on) {
+  const el = S.sel === s.id && (s.field === 'title' || s.field === 'content') ? $(s.field === 'title' ? '#d-title' : '#d-content') : null;
+  if (!el) return;
+  el.classList.toggle('unsaved', on);
+  let m = el.nextElementSibling?.classList.contains('unsv') ? el.nextElementSibling : null;
+  if (!on) { m?.remove(); return; }
+  if (!m) { m = document.createElement('div'); m.className = 'unsv'; m.setAttribute('role', 'status'); el.after(m); }
+  m.textContent = tr('Not saved yet, trying again');
+}
 async function doSave(key, retry) {
   const s = saveTimers[key]; if (!s) return;
   delete saveTimers[key];
@@ -401,7 +479,19 @@ async function doSave(key, retry) {
   if (s.base !== undefined && s.id > 0) body._prev = {[s.field]: s.base};
   (S.sentVals[key] ||= []).push(s.value); if (S.sentVals[key].length > 30) S.sentVals[key].shift();
   const lt = S.tasks.get(s.id); if (lt) lt[s.field] = s.value;  // the next round of typing builds on what was just sent
-  const t = await api('PATCH', '/api/tasks/' + s.id, body);
+  let t;
+  try { t = await api('PATCH', '/api/tasks/' + s.id, body); }
+  catch (e) {
+    if (e.message === 'auth' || e.data?.code === 'tmp_id') return;  // kept in the queue before the reload / in the dialog (core.js)
+    const n = (s.tries || 0) + 1;
+    unsavedMark(s, n < 3);
+    if (saveTimers[key]) return;  // newer text waits already (it keeps this round's base)
+    if (n < 3) { saveTimers[key] = {...s, tries: n, t: setTimeout(() => doSave(key), SAVE_RETRY_MS[n - 1])}; return; }
+    if (lt && lt[s.field] === s.value && s.base !== undefined) lt[s.field] = s.base;
+    outReject({method: 'PATCH', url: '/api/tasks/' + s.id, body: {[s.field]: s.value}}, e); renderTop();
+    return;
+  }
+  unsavedMark(s, false);
   if (t.conflicts?.length) {
     const own = t.conflicts.filter(c => c.field === s.field && ownVal(key, c.server));
     if (own.length === t.conflicts.length && !retry) {  // only our own earlier text: send the newest on top of it

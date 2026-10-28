@@ -84,7 +84,7 @@ A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "collab"]})
 FEAT = "cal,comments,collab,files,docs"
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEAT})
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 BOB = A.post(B + "/api/users", json={"orgs": [ORG], "username": "bob", "display_name": "Bob", "password": "password123"}).json()["id"]
 CAROL = A.post(B + "/api/users", json={"username": "carol", "display_name": "Carol", "password": "password123"}).json()["id"]
@@ -248,7 +248,7 @@ check(qb["state"] == "inactive" and qb["manage"] is True and qb.get("url"), "the
 A.patch(B + "/api/admin/settings", json={"public_links": False})
 gone(T, "public links switched off")
 check(A.post(B + U, json={"title": "Off", "days": 3}).status_code == 409, "public links off: no new request (409)")
-A.patch(B + "/api/admin/settings", json={"public_links": True})
+A.patch(B + "/api/admin/settings", json={"password": "password123", "public_links": True})
 
 # ================================================================== the subfolder, the News item
 Q3 = A.post(B + U, json={"title": "Acme Example logos", "days": 3, "subfolder": True}).json()

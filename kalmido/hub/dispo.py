@@ -202,6 +202,12 @@ def _row(c, bid):
     return r
 
 
+def _may_change(c, uid, rows):
+    """2.360.0 C (#2496): other people's bookings only by an admin of the area (rls lets every member reach them)."""
+    if any(r["created_by"] != uid for r in rows) and not abs_admin(c, uid, rows[0]["org_id"]):
+        raise Denied(403, tr("Only who saved it or an admin of the organisation can change it"))
+
+
 def _notify(c, r):
     """A firm booking of a person with an account: a News entry for them (event "assigned to me", their own switch)."""
     if r["resource_kind"] != "user" or r["status"] != "firm" or r["resource_id"] == me():
@@ -405,6 +411,12 @@ def dsp_edit(bid):
     b = body()
     v = _clean(b, dict(r))
     targets = [x for x in c.execute("SELECT * FROM hub_bookings WHERE org_id=? AND job=? AND deleted_at IS NULL", (r["org_id"], r["job"]))] if b.get("all") else [r]
+    _may_change(c, uid, [r])
+    skipped = 0
+    if any(t["created_by"] != uid for t in targets) and not abs_admin(c, uid, r["org_id"]):
+        # 2.360.0 R (#2496, review): the whole job by a member: their own bookings change, other people's stay (counted)
+        own = [t for t in targets if t["created_by"] == uid]
+        skipped, targets = len(targets) - len(own), own
     if v:
         for t in targets:
             c.execute(f"UPDATE hub_bookings SET {', '.join(_q(k) + '=?' for k in v)}, updated_at=? WHERE id=?", (*v.values(), iso(now_utc()), t["id"]))
@@ -418,7 +430,7 @@ def dsp_edit(bid):
     first = min(date.fromisoformat(x["start"][:10]) for x in rows)
     last = max(date.fromisoformat(x["end"][:10]) for x in rows)
     conf = dsp_conflicts(c, r["org_id"], rows, first, last)
-    return jsonify(bookings=[dsp_public(x, conf.get(x["id"])) for x in rows])
+    return jsonify(bookings=[dsp_public(x, conf.get(x["id"])) for x in rows], skipped=skipped)
 
 
 def _q(k):
@@ -431,9 +443,11 @@ def dsp_delete(bid):
     c, uid = _gate()
     r = _row(c, bid)
     if request.args.get("all"):
-        ids = [x[0] for x in c.execute("SELECT id FROM hub_bookings WHERE org_id=? AND job=? AND deleted_at IS NULL", (r["org_id"], r["job"]))]
+        rows = list(c.execute("SELECT * FROM hub_bookings WHERE org_id=? AND job=? AND deleted_at IS NULL", (r["org_id"], r["job"])))
     else:
-        ids = [bid] if not r["deleted_at"] else []
+        rows = [r] if not r["deleted_at"] else []
+    _may_change(c, uid, rows or [r])
+    ids = [x["id"] for x in rows]
     now = iso(now_utc())
     for x in ids:
         c.execute("UPDATE hub_bookings SET deleted_at=? WHERE id=?", (now, x))
@@ -455,6 +469,7 @@ def dsp_restore():
             r = _row(c, int(x))
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid data")) from None
+        _may_change(c, uid, [r])
         n += c.execute("UPDATE hub_bookings SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (r["id"],)).rowcount
     bump(c)
     c.commit()

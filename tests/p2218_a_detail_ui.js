@@ -66,11 +66,11 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   check(item(its, /^Pinned$/)?.classList.contains('on'), '"…": Pinned with its check');
   w.eval('closePop()');
   w.eval(`openDetail(${T1})`); await sleep(400);
-  check(dq(d) === '0,1', 'due tomorrow: Today and Tomorrow (a further day, #2768): ' + dq(d));
+  check(dq(d) === '0,1,-1', 'due tomorrow: Today and Tomorrow (a further day, #2768): ' + dq(d));  // 2.354.0 C (#3326): + "-1 day"
   w.eval(`openDetail(${T9})`); await sleep(400);
-  check(dq(d) === '0,1', 'due in 9 days: Today and Tomorrow: ' + dq(d));
+  check(dq(d) === '0,1,-1', 'due in 9 days: Today and Tomorrow: ' + dq(d));
   d.querySelector('#detail .dtop [data-act="due-q"][data-d="1"]').click();
-  check(await until(() => dq(d) === '0,1'), 'a tap on Tomorrow (one more day, #2768): both stay');  // 2.218.0: merged with #2768, Tomorrow is never left out
+  check(await until(() => dq(d) === '0,1,-1'), 'a tap on Tomorrow (one more day, #2768): both stay');  // 2.218.0: merged with #2768, Tomorrow is never left out
   w.close();
 
   // ================= computer: no number in the path either

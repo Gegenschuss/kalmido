@@ -117,7 +117,8 @@ check(XI["einvoice_format"] == "xrechnung", "setup: invoice to a client with a b
 fin(XI["id"])
 cr = A.post(B + f"{D}/{XI['id']}/credit").json()
 check(cr["einvoice_format"] == "xrechnung", "#1368 5: the credit note keeps XRechnung: " + str(cr.get("einvoice_format")))
-check(A.post(B + D, json={"kind": "credit", "client_id": CLX}).json().get("einvoice_format") == "xrechnung", "#1368 5: an empty credit note to that client is XRechnung")
+# 2.354.0 (#2838): an empty credit note no longer exists (409); the credit note above already keeps XRechnung
+check(A.post(B + D, json={"kind": "credit", "client_id": CLX}).status_code == 409, "#2838: no empty credit note to that client (409)")
 
 # ---------------------------------------------------------------- #1368 4 + 6 + 8 + 9: reminders
 RI = inv(recipient={"name": "Mahn GmbH", "lines": ["Weg 2", "10115 Berlin"]})

@@ -158,8 +158,12 @@ FSM_RECEIPT_STAYS = N_("Receipts of the cash book or of the equipment list stay 
 FSM_BOOKED_STAYS = N_("A booked receipt stays in the books of its workspace: it is kept there by law until {0}.")
 
 
-def fsm_plan(c, uid, b, to, dry):
-    """Everything the move would do (no change): {roots: [(row, parent, owner, name)], moved, stay, notes, block, code}."""
+def fsm_plan(c, uid, b, to, dry, office=False):
+    """Everything the move would do (no change): {roots: [(row, parent, owner, name)], moved, stay, notes, block, code}.
+    office: 2.356.0 A (#2926) the receipts of a whole personal office that moves with its books (office/pbtransfer.py):
+    the books and the cash book go along, so the receipt rules below do not hold them back. The period locks do NOT go
+    along (pbtransfer PBT_KEEP): a receipt of a month locked in the personal office is open again in the organisation
+    (as the cash book rows were before) -- review N2 of 2.356, own task."""
     from ..accounts.orgs import is_org_admin
     from ..accounts.orgout import OO_ADMIN_ONLY, oo_denied, oo_into_note, org_out_ok
     items = fsm_items(b)
@@ -203,7 +207,7 @@ def fsm_plan(c, uid, b, to, dry):
     ids = [r["id"] for r, _ in plan["moved"]]
     from ..office.periodlock import pl_receipt_need_open
     for r, _ in plan["moved"][:SMV_MAX]:
-        if r["kind"] == "file":
+        if r["kind"] == "file" and not office:
             pl_receipt_need_open(c, r["id"])  # 2.148.0 A (#2471): a receipt of a locked month stays in its office's books
     for r, _ in plan["moved"]:
         if r["kind"] == "folder":
@@ -224,11 +228,11 @@ def fsm_plan(c, uid, b, to, dry):
             notes.append(trn("{0} folder with everything in it", "{0} folders with everything in them", folders))
     big = ids[:SMV_MAX]
     q = ",".join("?" * len(big))
-    if big and not plan["block"] and c.execute(f"""SELECT 1 FROM office_cash_entries WHERE node_id IN ({q}) UNION ALL
+    if big and not plan["block"] and not office and c.execute(f"""SELECT 1 FROM office_cash_entries WHERE node_id IN ({q}) UNION ALL
                             SELECT 1 FROM office_equipment WHERE receipt_node_id IN ({q}) LIMIT 1""", big + big).fetchone():
         # 2.148.1 B (#2483): receipts the cash book or the equipment list points to stay in their workspace
         plan["block"], plan["code"] = tr(FSM_RECEIPT_STAYS), 409
-    if big and not plan["block"]:
+    if big and not plan["block"] and not office:
         from ..receipts.suggest import olk_fs_locked
         for i in big:  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
             until = olk_fs_locked(c, i)
@@ -264,6 +268,21 @@ def fsm_plan(c, uid, b, to, dry):
                              "{0} shares end (people, groups or agents outside the target)", shares))
         if opened:
             notes.append(trn("{0} opening to the whole organisation ends", "{0} openings to the whole organisation end", opened))
+        # 2.361.4 B (#2935): external links end with the move (xl_space_moved), file requests go along (fsm_apply)
+        links = c.execute(f"SELECT COUNT(*) FROM fs_ext_links WHERE node_id IN ({q}) AND revoked_at IS NULL", big).fetchone()[0]
+        if links:
+            notes.append(trn("{0} external link ends (people outside Kalmido can no longer open it)",
+                             "{0} external links end (people outside Kalmido can no longer open them)", links))
+        frq = [r[0] for r in c.execute(f"""SELECT created_by FROM fs_upload_requests WHERE node_id IN ({q})
+                                          AND deleted_at IS NULL AND revoked_at IS NULL""", big)]
+        keep = sum(1 for w in frq if w == uid)  # review: another person's request lives on only with edit rights there (frq_alive)
+        if keep:
+            notes.append(trn("{0} file request goes along: its upload link keeps working",
+                             "{0} file requests go along: their upload links keep working", keep))
+        if len(frq) > keep:
+            notes.append(trn("{0} file request of another person keeps working only if they can still edit the folder there",
+                             "{0} file requests of other people keep working only if they can still edit the folder there", len(frq) - keep))
+        plan.update(links=links, requests=len(frq))
         notes.append(oo_into_note(c, src, to))  # 2.361.2 (#2923): the way back (empty unless a member moves it in)
         lost = sum(1 for r in c.execute(f"SELECT list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", big)
                    if not fsm_list_ok(c, r[0], to, uid))
@@ -506,6 +525,57 @@ def _rm(paths):
             pass
 
 
+def fsm_apply(c, uid, plan, to, new_paths, old_paths):
+    """2.356.0 A (#2926): the move of plan (fsm_plan) without the commit -> (moved, restored); the new sealed files are noted
+    in new_paths (removed on an error), the old ones in old_paths (removed after the commit). Shared with the office move."""
+    src, ts = plan["src"], _now()
+    out = []
+    from ..accounts.orgout import org_out  # 2.148.1 B (#2483): logged, the organisation's other admins told
+    org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]), obj=[n["id"] for n, _, _, _ in plan["roots"]])
+    ids = [r["id"] for r, _ in plan["moved"]]
+    for i in range(0, len(ids), 500):  # the recognition queues skip locked rows: none starts until the commit
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        if any(r[0] == "run" for r in c.execute(f"SELECT state FROM doc_meta WHERE node_id IN ({q}) FOR UPDATE", part).fetchall() +
+               c.execute(f"SELECT state FROM file_text WHERE kind='fs' AND node_id IN ({q}) FOR UPDATE", part).fetchall()):
+            raise Denied(409, tr("A file is being recognised right now. Please try again in a moment."))
+    back = fsm_memo_back(c, plan, to, uid)  # 2.273.0 B (#3042): a move back first takes the memo of the move out
+    fsm_memo(c, plan, to, uid)
+    for s in plan.get("ends") or []:
+        c.execute("DELETE FROM fs_shares WHERE id=?", (s,))
+    for r in plan["stay"]:  # up to the top of the source workspace (in the trash: restored there)
+        nm = r["name"] if r["deleted_at"] else _free_name(c, None, r["owner_id"], src, r["name"], skip=r["id"])
+        c.execute("UPDATE fs_nodes SET parent_id=NULL, name=? WHERE id=?", (nm, r["id"]))
+    names = {}
+    for n, pid, owner, name in plan["roots"]:
+        out.append({"id": n["id"], "parent_was": n["parent_id"], "org_was": src, "name_was": n["name"]})
+        names[n["id"]] = _free_name(c, pid, owner, to, name or n["name"], skip=n["id"])
+        c.execute("UPDATE fs_nodes SET parent_id=?, name=?, org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?",
+                  (pid, names[n["id"]], to, owner, ts, n["id"]))
+    for r, owner in plan["moved"]:
+        nm = names.get(r["id"], r["name"])
+        if r["id"] not in names:
+            c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?", (to, owner, ts, r["id"]))
+        dt_move(c, r["id"], f"o{to}" if to else f"u{owner}")  # 2.122.0 B (#2099): tags of files / folders go along by name
+        if r["kind"] == "file":
+            fsm_doc(c, r["id"], to, owner, uid, nm, new_paths, old_paths)
+            fsm_versions(c, r["id"], fs_space(to, owner), new_paths, old_paths)
+            fsm_text(c, r["id"], to, owner)
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
+        # 2.361.4 B (#2935): a folder's file requests follow it (frq_alive needs the folder's workspace), never die silently
+        c.execute(f"UPDATE fs_upload_requests SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
+        # 2.353.0 F (#2758, review M5): the row of an earlier (now open) lock goes along (a locked one never moves: fsl_space_guard)
+        c.execute(f"UPDATE fs_locks SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
+    for n, _, _, _ in plan["roots"]:
+        fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
+    from .extlinks import xl_space_moved
+    xl_space_moved(c, ids)  # 2.112.1 B (#2058): external links end with the move into another workspace
+    restored = fsm_memo_apply(c, back, to, uid)
+    return out, restored
+
+
 @app.post("/api/files/move-space")
 def files_move_space():
     """{ids, to: private | org:<id>, parent?: folder id | null (top level) | "docs", dry?} or {items: [{id, parent, name}], to}:
@@ -519,54 +589,14 @@ def files_move_space():
     plan = fsm_plan(c, uid, b, to, dry)
     if dry:
         return jsonify(smv_answer(plan["notes"], plan["block"], files=plan["files"], folders=plan["folders"], size=plan["size"],
-                                  shares=plan["shares"], **(plan.get("deny") or {})))
+                                  shares=plan["shares"], links=plan.get("links", 0), requests=plan.get("requests", 0),
+                                  **(plan.get("deny") or {})))
     if plan["block"]:
         c.rollback()  # a documents folder the plan made
         raise Denied(plan["code"], plan["block"], data=plan.get("deny"))
-    src, ts = plan["src"], _now()
-    new_paths, old_paths, out = [], [], []
+    new_paths, old_paths = [], []
     try:
-        from ..accounts.orgout import org_out  # 2.148.1 B (#2483): logged, the organisation's other admins told
-        org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]), obj=[n["id"] for n, _, _, _ in plan["roots"]])
-        ids = [r["id"] for r, _ in plan["moved"]]
-        for i in range(0, len(ids), 500):  # the recognition queues skip locked rows: none starts until the commit
-            part = ids[i:i + 500]
-            q = ",".join("?" * len(part))
-            if any(r[0] == "run" for r in c.execute(f"SELECT state FROM doc_meta WHERE node_id IN ({q}) FOR UPDATE", part).fetchall() +
-                   c.execute(f"SELECT state FROM file_text WHERE kind='fs' AND node_id IN ({q}) FOR UPDATE", part).fetchall()):
-                raise Denied(409, tr("A file is being recognised right now. Please try again in a moment."))
-        back = fsm_memo_back(c, plan, to, uid)  # 2.273.0 B (#3042): a move back first takes the memo of the move out
-        fsm_memo(c, plan, to, uid)
-        for s in plan.get("ends") or []:
-            c.execute("DELETE FROM fs_shares WHERE id=?", (s,))
-        for r in plan["stay"]:  # up to the top of the source workspace (in the trash: restored there)
-            nm = r["name"] if r["deleted_at"] else _free_name(c, None, r["owner_id"], src, r["name"], skip=r["id"])
-            c.execute("UPDATE fs_nodes SET parent_id=NULL, name=? WHERE id=?", (nm, r["id"]))
-        names = {}
-        for n, pid, owner, name in plan["roots"]:
-            out.append({"id": n["id"], "parent_was": n["parent_id"], "org_was": src, "name_was": n["name"]})
-            names[n["id"]] = _free_name(c, pid, owner, to, name or n["name"], skip=n["id"])
-            c.execute("UPDATE fs_nodes SET parent_id=?, name=?, org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?",
-                      (pid, names[n["id"]], to, owner, ts, n["id"]))
-        for r, owner in plan["moved"]:
-            nm = names.get(r["id"], r["name"])
-            if r["id"] not in names:
-                c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?", (to, owner, ts, r["id"]))
-            dt_move(c, r["id"], f"o{to}" if to else f"u{owner}")  # 2.122.0 B (#2099): tags of files / folders go along by name
-            if r["kind"] == "file":
-                fsm_doc(c, r["id"], to, owner, uid, nm, new_paths, old_paths)
-                fsm_versions(c, r["id"], fs_space(to, owner), new_paths, old_paths)
-                fsm_text(c, r["id"], to, owner)
-        for i in range(0, len(ids), 500):
-            part = ids[i:i + 500]
-            c.execute(f"UPDATE upload_scan SET org_id=? WHERE kind='fs' AND ref_id IN ({','.join('?' * len(part))})", [to, *part])
-            # 2.353.0 F (#2758, review M5): the row of an earlier (now open) lock goes along (a locked one never moves: fsl_space_guard)
-            c.execute(f"UPDATE fs_locks SET org_id=? WHERE node_id IN ({','.join('?' * len(part))})", [to, *part])
-        for n, _, _, _ in plan["roots"]:
-            fs_log_add(c, n["id"], "moved_space", f"{fsm_ws(src)}->{fsm_ws(to)}")
-        from .extlinks import xl_space_moved
-        xl_space_moved(c, ids)  # 2.112.1 B (#2058): external links end with the move into another workspace
-        restored = fsm_memo_apply(c, back, to, uid)
+        out, restored = fsm_apply(c, uid, plan, to, new_paths, old_paths)
         bump(c)
         c.commit()
     except BaseException:
@@ -574,7 +604,7 @@ def files_move_space():
         _rm(new_paths)
         raise
     _rm(old_paths)
-    return jsonify(moved=out, org_was=src, to=fsm_ws(to), count=len(plan["moved"]), shares=plan["shares"], restored=restored)
+    return jsonify(moved=out, org_was=plan["src"], to=fsm_ws(to), count=len(plan["moved"]), shares=plan["shares"], restored=restored)
 
 
 # 2.97.0 D (#2051): a move removes the old sealed versions only after its commit; a crash in between leaves files without a

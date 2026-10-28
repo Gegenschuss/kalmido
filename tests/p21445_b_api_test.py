@@ -34,7 +34,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = "cal,collab,comments,events,contacts,clients"
 PW_IMAP, PW_SMTP, PW_PRIV = "imap-pw-Zq71", "smtp-pw-Zq72", "priv-pw-Zq73"
 
@@ -114,7 +114,7 @@ def org_export(s, oid):
         if s.get(B + f"/api/orgs/{oid}/export").json().get("state") != "running":
             break
         time.sleep(0.25)
-    ox = s.get(B + f"/api/orgs/{oid}/export/file").content
+    ox = su_get(s, B + f"/api/orgs/{oid}/export/file").content  # 2.360.0 (#2496): the step-up
     rk = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     check(ox[:13] == b"KALMIDO-ORGX\n" and rk, f"organisation export {oid} + recovery key")
     return ox, rk
@@ -127,7 +127,7 @@ def acct_export(s, secs=120):
         if s.get(B + "/api/account/export").json().get("state") != "running":
             break
         time.sleep(0.25)
-    r = s.get(B + "/api/account/export/file")
+    r = su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     return r.content
 

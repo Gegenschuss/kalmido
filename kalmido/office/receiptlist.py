@@ -35,6 +35,7 @@ from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
 from .rights import ofr_own_only
+from .rcsubmit import rsb_who  # 2.356.0 D (#3129)
 
 RCL_PAGE = 200  # rows per page of the list
 RCL_PAGE_MAX = 500
@@ -93,7 +94,7 @@ def rcl_all(c, oid, f, uid, own=False):
     day = ("COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if f["by"] == "paid"
            else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))")
     rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, r.list_name, d.doc_date, d.due_date, d.amount, d.currency, "
-                     f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+                     f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, r.submitted_by, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
                      + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
                      + f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"]) + ((uid,) if own else ())).fetchall()
@@ -122,7 +123,8 @@ def rcl_all(c, oid, f, uid, own=False):
                     "supplier_id": r["sender_id"], "supplier": label_name(c, ws, "sender", r["sender_id"]) or "",
                     "vat_pct": vat_pct, "net": net, "vat": vat, "amount": gross, "currency": home,
                     "orig_amount": money(a) if cur != home else None, "orig_currency": cur if cur != home else None,
-                    "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(meta_json(c, r, "extracted", {}))})
+                    "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(meta_json(c, r, "extracted", {})),
+                    "submitted_by": _rcl_who(c, r["submitted_by"])})  # 2.356.0 D (#3129): handed in by a member
     from ..docs.dups import dup_seen
     dups = dup_seen(c, [x["node_id"] for x in out], uid)  # 2.185.0 A (#2583): a possible duplicate (marked, still counted)
     for x in out:
@@ -133,6 +135,12 @@ def rcl_all(c, oid, f, uid, own=False):
     for x in out:
         x["hints"] = seen.get(x["node_id"], 0) + (1 if x["dup"] else 0)
     return out
+
+
+def _rcl_who(c, uid):
+    """2.356.0 D (#3129): the name of the person who handed a receipt in (None: uploaded in the bookkeeping)."""
+    w = rsb_who(c, uid)
+    return w["name"] if w else None
 
 
 def _rcl_einv(ex):
@@ -190,7 +198,8 @@ def rcl_public(x):
             "supplier": x["supplier"] or None, "number": x["number"] or None, "einvoice": x["einvoice"], "vat_pct": x["vat_pct"],
             "net": dstr(x["net"]), "vat": dstr(x["vat"]), "amount": dstr(x["amount"]), "currency": x["currency"],
             "orig_amount": dstr(x["orig_amount"]) if x["orig_amount"] is not None else None, "orig_currency": x["orig_currency"],
-            "dup": bool(x.get("dup")), "hints": x.get("hints") or 0}  # 2.185.0 A (#2583); 2.299.0 D (#3193): + hints
+            "dup": bool(x.get("dup")), "hints": x.get("hints") or 0,  # 2.185.0 A (#2583); 2.299.0 D (#3193): + hints
+            "submitted_by": x.get("submitted_by")}  # 2.356.0 D (#3129)
 
 
 def _rcl_load(c, oid, uid, fill=False):

@@ -59,10 +59,12 @@ SETTINGS_FLAGS += ("time_split_midnight",)  # 2.125.0 B (#2120): entries over mi
 SETTINGS_FLAGS += ("chat_read_receipts",)  # 2.139.0 A (#2129): read receipts in the team chat (collab/teamchat.py)
 SETTINGS_FLAGS += ("cal_holidays", "cal_abs", "cal_abs_team")  # 2.155.0 B (#2076): holidays / absences in the calendar (hub/abscal.py)
 SETTINGS_FLAGS += ("chat_kbd_agent", "chat_kbd_team")  # 2.235.0 D (#2899): close the phone keyboard after sending (agent chat / team chat)
+SETTINGS_FLAGS += ("office_ws_hint",)  # 2.356.0 B (#2932): the hint "which office is this" was shown once (static/js/office.js)
 SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo players without asking (static/js/videorev.js)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
+SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
 def clean_setting(k, v):
@@ -319,6 +321,10 @@ def clean_setting(k, v):
         return sv
     if k == "time_currency":
         return sv[:8]
+    if k in SETTINGS_FMT:  # 2.368.0 B (#2982): region / formats, '' = automatic
+        if sv not in SETTINGS_FMT[k]:
+            raise bad
+        return sv
     if k == "lang":
         return sv
     return sv[:200]
@@ -477,7 +483,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels")  # 2.319.0 B (#3288)
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor
 
 
 def clean_look_pref(v):
@@ -736,6 +742,9 @@ def umz_export_queries(uid):
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
+        # 2.362.0 (#3090): my encrypted task notes (ciphertext as stored, only the author's own) and the project notes of my lists
+        "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
+        "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),

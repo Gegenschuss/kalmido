@@ -305,7 +305,8 @@ def _read_group(comps, raws, mi):
     if en is None and first.get("DURATION") is not None:
         d = _val(first.get("DURATION"))
         en = st + d if isinstance(d, timedelta) else None
-    v = {"uid": uid_, "title": (str(first.get("SUMMARY") or "").strip() or tr("(no title)"))[:EV_TITLE_MAX],
+    # 2.360.0 D (#2496): the title is one line (as in the app; a line break would break the subject of an invitation mail)
+    v = {"uid": uid_, "title": (one_line(first.get("SUMMARY") or "") or tr("(no title)"))[:EV_TITLE_MAX],
          "location": one_line(first.get("LOCATION") or "")[:EV_LOC_MAX],
          "description": str(first.get("DESCRIPTION") or "")[:EV_DESC_MAX], "all_day": 1 if all_day else 0, "tz": tzname if tz_ok(tzname) else ""}
     if v["tz"] == getattr(TZ, "key", ""):
@@ -437,7 +438,7 @@ def _read_group(comps, raws, mi):
         okeep = [x for x in r2["lines"] if _prop_name(x) not in EV_MAPPED]
         for b in r2["alarms"] + r2["blocks"]:
             okeep += b
-        ovs.append({"rid": rkey, "title": (str(comp.get("SUMMARY") or "").strip() or v["title"])[:EV_TITLE_MAX],
+        ovs.append({"rid": rkey, "title": (one_line(comp.get("SUMMARY") or "") or v["title"])[:EV_TITLE_MAX],
                     "location": one_line(comp.get("LOCATION") or "")[:EV_LOC_MAX],
                     "description": str(comp.get("DESCRIPTION") or "")[:EV_DESC_MAX], "all_day": oad, "start": okeys[0], "end": okeys[1],
                     "status": {"TENTATIVE": "tentative", "CANCELLED": "cancelled"}.get(ost_s, "confirmed"), "extra": _cap("\n".join(okeep))})

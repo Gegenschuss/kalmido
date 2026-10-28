@@ -39,4 +39,8 @@ RUN groupadd -g 1000 kalmido && useradd -u 1000 -g 1000 -M -d /tmp -s /usr/sbin/
     && mkdir -p /data /secret && chown 1000:1000 /data /secret
 USER 1000:1000
 EXPOSE 3040
+# 2.360.0 A (#2496): docker ps shows healthy / unhealthy also without the Compose file (python3 is in the image, no curl);
+# the same check as docker-compose.yml (which overrides it there)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD ["python3", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT', '3040'), timeout=5)"]
 CMD ["python", "app.py"]

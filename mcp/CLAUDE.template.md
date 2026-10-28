@@ -42,7 +42,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - Your token has fine permissions (scopes): `GET /api/v1/me` shows them in `token.effective_scopes`, and the MCP
   server lists only the tools you may use. A 403 with `required_scope` means: ask an owner to grant it in Kalmido; never
   work around it with other access. With a read-only token (2.190.0) chat messages, reactions, pins and proposals answer
-  403: report the result in your status or job log instead and ask for *Comments*.
+  403 (2.360.0: also a job for a person or a waiting one): report the result in your status or job log instead and ask
+  for *Comments*.
 - Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects and sharing, opening a
   public form and deleting an address book wait for a person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
@@ -315,7 +316,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
   area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,
   `list_office_documents`, `get_office_document`, `create_offer_draft` / `update_offer_draft` (your own drafts),
-  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`), `draft_reminder`, `suggest_payment` /
+  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`; 2.356.0: `409` `invoice_exists` = it has an invoice already, ask the person and send `force` only on their yes), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
   let you. Since 2.187.0 your office access comes from the office rights groups (Office > Settings > Rights): without a

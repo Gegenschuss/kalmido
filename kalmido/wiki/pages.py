@@ -833,9 +833,10 @@ def wiki_purge_many():
 def wiki_search():
     """?q=words -- pages of every space one may read whose name (or text) has all words; without their text. 2.123.0 A
     (#2106): over the word index (wksearch.py), ranked (words in the name, then in the text, then the newest); ?space=
-    only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}."""
+    only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}; 2.376 (#3292):
+    a hit with a query word in its text has snippet (plain text, "…" where cut) + marks ([[start, end], ...] in code points)."""
     from ..accounts.orgs import user_orgs
-    from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_search
+    from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_search, wks_snippets
     c = db()
     uid = me()
     q = (request.args.get("q") or "").strip()[:200]
@@ -850,7 +851,9 @@ def wiki_search():
         from ..accounts.orgroles import user_orgs_full
         spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]  # 2.143.0 A (#2151)
     rows, total = wks_search(c, uid, spaces, q, limit, offset)
-    return jsonify(pages=[wiki_dict(r, full=False) for r in rows], total=total, offset=offset, more=offset + len(rows) < total)
+    sn = wks_snippets(c, rows, q)  # 2.376 (#3292): the shown hits only, opened in memory (nothing stored or logged)
+    return jsonify(pages=[{**wiki_dict(r, full=False), **({"snippet": sn[r["id"]][0], "marks": sn[r["id"]][1]} if r["id"] in sn else {})}
+                          for r in rows], total=total, offset=offset, more=offset + len(rows) < total)
 
 
 @app.get("/api/wiki/mentions")

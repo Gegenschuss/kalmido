@@ -18,7 +18,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
-from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
+from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_rate, inv_calc, office_calc
 from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
 from .sheet import dk_pack, dk_packs_on
@@ -35,6 +35,7 @@ from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
                        inv_reminder_totals, inv_render, inv_scheme, inv_state)
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .invoices import inv_credit_pack, inv_refund_open  # 2.354.0 D (#2837, #2838)
 from .invoices import inv_number_year, inv_pay_add  # 2.355.0 A (#2839, #2847)
 
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
@@ -372,6 +373,8 @@ def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home curre
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
     pack = doc_pack(office_pack_for(s), doc_lg(r["lang"]))  # 2.185.0 C (#2520): the pack's words in the document's language
+    if r["kind"] == "credit":
+        pack = inv_credit_pack(c, oid, r, pack)  # 2.354.0 D (#2838): the rates frozen with its invoice
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
         return inv_reminder_totals(c, oid, r, pack)
     calc = inv_calc if r["kind"] in ("invoice", "credit", "delivery") else office_calc
@@ -407,6 +410,9 @@ def doc_public(c, oid, r, admin, items=True):
         d[k] = _j(d.get(k), dflt)
     d["recipient"] = dict(cdn_doc_recipient(c, oid, r, d["recipient"]))  # 2.97.0 B (#1951): a draft shows its client's address now
     d["recipient_missing"] = bool(d["recipient"].pop("missing", False))  # street, postcode or city missing at the client
+    if r["kind"] in ("invoice", "credit") and r["client_id"] and not ofx_locked(r):  # 2.354.0 A (#2834): the editor's reverse charge hint
+        cv = c.execute(f"SELECT vat_id FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone()
+        d["client_vat_id_missing"] = cv is not None and not str(cv["vat_id"] or "").strip()
     pm = inv_paid_map(c, oid, [r["id"]]) if r["kind"] in ("invoice", "credit") else {}
     d["state"] = inv_state(r, pm)  # 2.38.0: the derived state (partial / overdue) next to the stored status
     d["status_text"] = tr(STATUS_TXT.get(d["state"], d["state"]))
@@ -422,7 +428,9 @@ def doc_public(c, oid, r, admin, items=True):
         d.update(inv_money_fields(r, pm))
         d["open_text"] = fmt_money(d["open"], d["lang"], d["currency"])
         if items:
-            d["payments"] = inv_payments(c, oid, r["id"]) if r["kind"] == "invoice" else []
+            d["payments"] = inv_payments(c, oid, r["id"])  # 2.354.0 D (#2837): + the refunds on a credit note
+            if ofx_locked(r):  # 2.354.0 D (#2837): what is still to be paid back to the customer ("Refund open")
+                d["refund_open"] = str(inv_refund_open(c, oid, r))
             cr = c.execute("SELECT id, number, status, locked_at, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? ORDER BY id",
                            (oid, r["id"])).fetchall() if r["kind"] == "invoice" else []
             d["credits_of"] = [{"id": x["id"], "number": x["number"], "status": x["status"], "locked": bool(x["locked_at"]), "gross": _j(x["totals"], {}).get("gross")} for x in cr]
@@ -454,6 +462,8 @@ def doc_public(c, oid, r, admin, items=True):
             d["parts_shoot"] = tp_shoot_ok(c, oid)
         from .contacts_cl import fk_contacts
         d["client_contacts"] = fk_contacts(c, r["client_id"], oid) if r["client_id"] else []  # 2.40.0 (#1380); 2.148.1 B (#2484): same area only
+        from .offerlink import oil_doc_extra
+        oil_doc_extra(c, oid, r, d)  # 2.356.0 C (#3003): source_offer / offer_invoices
         d["contract"] = _contract(c, oid, d.get("contract_id"))
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
@@ -696,6 +706,9 @@ def clean_doc(c, oid, b, cur, admin):
         f["payment_days"] = None if v is None else int(v)
     if "vat_note" in b:
         f["vat_note"] = _choice(b.get("vat_note") or "", "vat_note", ("",) + INV_VAT_NOTES)
+    bound = cur["kind"] == "credit" and _cur_val(cur, "cancels_id")  # its own check below refuses a change (#2838)
+    if not bound and ((f.get("vat_note") and f.get("vat_mode", cur["vat_mode"]) != "novat") or f.get("vat_mode") == "vat"):
+        f["vat_note"] = ""  # 2.354.0 A (#2833): a VAT note only without VAT; switching to VAT clears it (no section 13b note next to VAT)
     if "einvoice_format" in b:
         f["einvoice_format"] = _choice(b.get("einvoice_format") or "", "einvoice_format", ("", "zugferd", "xrechnung"))
     if cur["kind"] == "delivery" and "delivery_title" in b:  # 2.120.0 D (#2089): "Lieferschein" or "Leistungsnachweis"
@@ -723,6 +736,11 @@ def clean_doc(c, oid, b, cur, admin):
         if k in b:
             v = _num(b.get(k), k, lo, hi)
             f[k] = dflt if v is None else v
+    if f.get("producing_on") == 1 and cur and cur["kind"] == "offer" and not dict(cur).get("producing_mode") and not ofx_locked(cur):
+        # 2.380.0 (#3420): a quotation made before a pack with "share by amount" was on switches it on like a new one
+        pn = prd_new_doc(c, oid, office_settings(c, oid))
+        if pn.get("producing_mode"):
+            f.update({k: pn[k] for k in ("producing_mode", "share_label", "producing_rate", "prod_quotient")})  # the pack's factor, not one checked for the old mode
     f.update(prd_doc_clean(c, oid, b))  # 2.113.1 (#2252): handling costs / markup
     if "rights" in b and b.get("rights") is not None:
         f["rights"] = json.dumps(_rights_clean(c, oid, b["rights"], lang, _j(cur["rights"], {})), ensure_ascii=False)
@@ -739,7 +757,22 @@ def clean_doc(c, oid, b, cur, admin):
             f["contract_id"] = ct["id"]
             if ct["id"] != cur["contract_id"] and b.get("apply_contract", True):
                 _apply_contract(c, oid, f, ct, lang, _j(f.get("rights") or cur["rights"], {}))
+    if cur["kind"] == "credit" and _cur_val(cur, "cancels_id"):  # 2.354.0 D (#2838): bound to its invoice, a change is refused
+        for k in CREDIT_BOUND:
+            if k in f and k in cur.keys() and not _same_val(k, f[k], cur[k]):
+                raise Denied(409, tr("A credit note keeps the currency, exchange rate, client and VAT of its invoice"))
+            f.pop(k, None)
     return f
+
+
+# 2.354.0 D (#2838): the head fields a credit note takes from its invoice (inv_credit_of) and keeps
+CREDIT_BOUND = ("currency", "fx_rate", "client_id", "vat_mode", "vat_note")
+
+
+def _same_val(k, a, b):
+    if k == "fx_rate":
+        return abs(float(a or 0) - float(b or 0)) < 1e-9
+    return (a or None) == (b or None)
 
 
 def clean_items(c, oid, r, items, admin, part=None):
@@ -828,6 +861,8 @@ def doc_create(c, oid, uid, b, admin, number=True):
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
     lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", DOC_LANGS)  # 2.185.0 C (#2520)
     today = local_now().date()
+    if kind == "credit":  # 2.354.0 D (#2838): a credit note only from a finalised invoice (POST /docs/<id>/credit)
+        raise Denied(409, tr("A credit note needs a finalised invoice"))
     if kind != "offer":  # 2.38.0 (#1021, F1): an empty invoice / credit note / reminder draft
         from .invoices import _insert_doc
         row = inv_new_row(c, oid, s, kind, lang)
@@ -1082,7 +1117,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         if ln["kind"] in ("item", "producing", "surcharge", "raw", "discount"):  # 2.113.1 (#2252): + surcharge
             ln["total_text"] = fmt_money(ln["total"], lang, cur)
             if ln.get("rate") is not None:
-                ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
+                ln["rate_text"] = fmt_rate(ln["rate"], lang, cur)  # 2.354.0 A (#2831): up to 4 places
     rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
     if not locked:
         rec = cdn_doc_recipient(c, oid, r, rec)  # 2.97.0 B (#1951): a draft prints its client's address as it is now
@@ -1222,20 +1257,25 @@ def odoc_list():
         args += [like, like, like, like]
     # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
     # missing behind the 500 newest); payments only of the rows shown; the language once
-    derived = st in ("partial", "overdue")
+    derived = st in ("partial", "overdue", "open")  # 2.356.0 D (#3007): open = the open items (open + overdue, as kpi.py kpi_open)
     if derived:
         sql += " AND kind='invoice' AND status NOT IN ('draft', 'paid', 'cancelled')"
+        if st == "open":
+            sql += " AND locked_at IS NOT NULL" + ("" if request.args.get("trial") in ("0", "1") else " AND trial=0")
         if st == "overdue":
             sql += " AND COALESCE(due_date, '') <> '' AND due_date < ?"
             args.append(local_now().date().isoformat())
-        else:
+        elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
     raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
     if derived:
-        raw = [r for r in raw if inv_state(r, pm) == st][:500]
+        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)][:500]
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
+    if kind == "offer":
+        from .offerlink import oil_list_marks
+        oil_list_marks(c, oid, rows)  # 2.356.0 C (#3005)
     role = office_role(c, uid, oid)
     if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
         for b, r in zip(rows, raw):
@@ -1477,6 +1517,8 @@ def odoc_duplicate(did):
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
+    if r["kind"] == "credit":  # 2.354.0 D (#2838): a copy would be a credit note bound to no invoice
+        raise Denied(409, tr("A credit note needs a finalised invoice"))
     ref, hit = ofi_ref_doc(c, oid, uid, body())  # 2.269.0 D (#3046): sent again = the copy made the first time
     if hit:
         return jsonify(doc_public(c, oid, doc_row(c, oid, hit), admin))

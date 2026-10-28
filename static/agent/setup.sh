@@ -2,16 +2,19 @@
 # agent-setup.sh -- set up a Kalmido project agent on macOS or Linux with one command (2.44.0, #1517 / #962).
 #
 # Kalmido shows the command in Settings > Agents > (agent) > "Set up on a computer", e.g.
-#   curl -fsSL https://tasks.example.com/agent-setup.sh | bash -s -- --url https://tasks.example.com --code ks_... --dir ~/projects/site
+#   curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... bash -s -- --url https://tasks.example.com --dir ~/projects/site
 # It trades the one-time setup code for the agent's token (stored in a file only you can read, never printed), fetches
 # the starter files (mcp/starter_files.txt), and starts the agent in event mode at every login and again after a crash:
 # a launchd LaunchAgent on macOS, a systemd --user service on Linux. One instance per project folder (several agents on one
 # computer = several folders). Needs: bash (3.2 is enough), curl, python3 3.9+, the agent command (default: claude).
 #
 # usage: agent-setup.sh --url URL --code CODE --dir FOLDER [--cmd COMMAND] [--from DIR] [--no-autostart] [--dry-run] [--lang de|en]
+#        [--allow-http]
 #        agent-setup.sh --uninstall --dir FOLDER [--dry-run]
 #   --url        your Kalmido address
-#   --code       the one-time setup code (15 minutes, works once; make a new one in Kalmido when it expired)
+#   --code       the one-time setup code (15 minutes, works once; make a new one in Kalmido when it expired); 2.360.0:
+#                better in the environment as KALMIDO_SETUP_CODE (not in the process list of the computer)
+#   --allow-http 2.360.0: an http:// address that is not this computer (localhost) -- only for a Kalmido without https
 #   --dir        the project folder the agent works in (created when missing)
 #   --cmd        the agent command (default claude); it gets --mcp-config with the Kalmido MCP server
 #   --from DIR   take the starter files from a local copy of mcp/ instead of downloading them
@@ -22,7 +25,7 @@
 # Files: ~/.kalmido/agents/<folder name>-<hash>/ (starter files, kalmido-agent.env with mode 600, mcp.json, agent.log).
 set -uo pipefail
 
-URL="" CODE="" DIR="" CMD=claude FROM="" DRY=0 UNINSTALL=0 NOAUTO=0 LANGC=en
+URL="" CODE=${KALMIDO_SETUP_CODE:-} DIR="" CMD=claude FROM="" DRY=0 UNINSTALL=0 NOAUTO=0 LANGC=en HTTPOK=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --url) URL=${2:-}; shift 2 ;;
@@ -32,9 +35,10 @@ while [ $# -gt 0 ]; do
     --from) FROM=${2:-}; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --no-autostart) NOAUTO=1; shift ;;
+    --allow-http) HTTPOK=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --lang) LANGC=${2:-en}; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0" 2>/dev/null || echo "see the comment at the top of agent-setup.sh"; exit 0 ;;
+    -h|--help) sed -n '2,25p' "$0" 2>/dev/null || echo "see the comment at the top of agent-setup.sh"; exit 0 ;;
     *) UNKNOWN=$1; break ;;
   esac
 done
@@ -85,6 +89,8 @@ msg_de() {
     s_starter) echo "Lade die Starter-Dateien" ;;
     dry_files) echo "  (Probelauf) die Dateien aus %s/starter_files.txt nach %s" ;;
     nobase) echo "Kalmido hat keine Adresse für die Starter-Dateien geschickt; nimm --from ORDNER" ;;
+    nohttp) echo "%s ist eine http://-Adresse: der Code und das Token gingen unverschlüsselt durchs Netz. Nimm die https://-Adresse (oder --allow-http, wenn dein Kalmido kein https hat)" ;;
+    basehttp) echo "Kalmido hat für die Starter-Dateien eine Adresse ohne https:// geschickt (%s); nimm --from ORDNER" ;;
     nolist) echo "keine starter_files.txt in %s" ;;
     nolistfetch) echo "die Liste der Starter-Dateien (%sstarter_files.txt) kann nicht geladen werden; diese Version ist vielleicht noch nicht veröffentlicht – versuche es später noch einmal oder nimm --from ORDNER" ;;
     skippath) echo "  %s übersprungen (keine Pfade erlaubt)" ;;
@@ -150,6 +156,8 @@ msg_en() {
     s_starter) echo "Fetching the starter files" ;;
     dry_files) echo "  (dry run) the files of %s/starter_files.txt into %s" ;;
     nobase) echo "Kalmido sent no address for the starter files; use --from DIR" ;;
+    nohttp) echo "%s is an http:// address: the code and the token would cross the network unencrypted. Use the https:// address (or --allow-http when your Kalmido has no https)" ;;
+    basehttp) echo "Kalmido sent an address without https:// for the starter files (%s); use --from DIR" ;;
     nolist) echo "no starter_files.txt in %s" ;;
     nolistfetch) echo "cannot fetch the starter file list (%sstarter_files.txt); this version may not be published yet - try again later or use --from DIR" ;;
     skippath) echo "  skipped %s (no paths allowed)" ;;
@@ -297,6 +305,11 @@ fi
 [ -n "$URL" ] || dief nourl
 [ -n "$CODE" ] || [ "$DRY" = 1 ] || dief nocode
 URL=${URL%/}
+# 2.360.0 C (#2496): https only, except this computer (localhost) or --allow-http for a Kalmido without https
+case "$URL" in
+  https://*|http://localhost|http://localhost[:/]*|http://127.0.0.1|http://127.0.0.1[:/]*|http://\[::1\]|http://\[::1\][:/]*) ;;
+  *) [ "$HTTPOK" = 1 ] || dief nohttp "$URL" ;;
+esac
 
 # kalmido-setup-step: redeem
 stepf s_connect
@@ -380,6 +393,8 @@ if [ "$DRY" = 1 ]; then
   sayf dry_files "${FROM:-starter}" "$INST"
 else
   [ -n "$FROM" ] || [ -n "$STARTER_BASE" ] || dief nobase
+  # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
+  case "$STARTER_BASE" in ""|https://*|"$URL"/*) ;; *) [ -n "$FROM" ] || dief basehttp "$STARTER_BASE" ;; esac
   if ! fetch starter_files.txt "$INST/starter_files.txt"; then
     [ -z "$FROM" ] || dief nolist "$FROM"
     # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version

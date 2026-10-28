@@ -4,7 +4,7 @@
 // (the client also keeps the active one in localStorage as a last offline fallback).
 // 2.191.0 A (#1410 #2518): the client loads the core texts (de.core.json is precached) and the texts of each module
 // (<code>.mod-<name>.json, fetched in the background by i18n.js i18nWarm, kept by swI18n); 2.191.0 F2: an update keeps them (swKeepI18n)
-const CACHE = 'tasks-shell-v394';  // app 2.361.3 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
+const CACHE = 'tasks-shell-v398';  // app 2.376.3 (2.126.0 D, #1992: count both up with every version, tools/check_layout.py)
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.core.json', '/static/icon-192.png',
   '/static/icon-512.png', '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2',
   '/static/quips.json', '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',
@@ -50,8 +50,8 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_letters.js', '/static/js/office_letterlinks.js', '/static/js/office_lettermail.js', '/static/js/office_rights.js',
   '/static/js/agentchat.js', '/static/js/agentsetup.js', '/static/js/agentrotate.js', '/static/js/agentwork.js', '/static/js/agentcontrol.js',
   '/static/js/agentlock.js', '/static/js/agentrules.js', '/static/js/pdfview.js', '/static/js/docpreview.js', '/static/js/mindmap.js',
-  '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wiki.js', '/static/js/wkimport.js', '/static/js/stats.js',
-  '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js',
+  '/static/js/wkshare.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wklive.js', '/static/js/wiki.js', '/static/js/wkimport.js',
+  '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js',
   '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js', '/static/js/docs.js', '/static/js/paperless.js',
   '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js', '/static/js/docscan.js',
   '/static/js/abdocs.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
@@ -399,10 +399,14 @@ async function swOutboxSend() {
           body.data = d;
         }
       }
+      // 2.359.0 A (#3023): a temporary id without its real one (its create failed or waits for the app): never sent as such
+      if (/\/-\d+(?=[/?]|$)/.test(url) || (body && [body.parent_id, body.task_id, ...(body.ids || []), ...(body.items || []).map(it => it && it.id)].some(v => typeof v === 'number' && v < 0))) break;
       const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
       if (e.k) opt.headers['Idempotency-Key'] = String(e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice
       if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
       const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
+      // 2.359.0 A (#3023): a server error / too many requests: the browser tries the sync again later (the entry stays first)
+      if (r.status >= 500 || r.status === 429 || r.status === 408) throw new Error('outbox: server error ' + r.status);
       if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) break;  // for the app (its own handling of errors)
       const j = await r.json().catch(() => ({}));
       if (j.conflicts && j.conflicts.length && url === '/api/tasks/batch' && body && body.action === 'complete') { j.conflicts = []; j.skipped = true; }  // 2.270.0 C (#3022): already ticked

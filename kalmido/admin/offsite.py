@@ -634,14 +634,17 @@ def bko_tick(c):
 
 
 # ---- 2.223.2 C (#2871): the step-up (also for the export downloads of retexport.py / orgexport.py)
-def stepup_need(c, b):
+def stepup_need(c, b, proxy_ok=False):
     """2.223.2 C (#2871): the step-up of orgcrypt.rck_stepup before the off-site target is changed / tested / used and before an
     export download; an error response or None. A login-provider account: its step-up sign-in there for the own office
     (oidc.py knows no other purpose yet); signed in by the login proxy without a password: refused. A confirmed step-up
     holds for this session RCK_FRESH_MIN minutes (sessions.stepup_for "su", never a recovery key's purpose), so filling in
-    the target field by field asks once."""
+    the target field by field asks once. 2.360.0 A (#2496): proxy_ok = an account of the login proxy relies on its session
+    (collab/e2e.py e2e_reauth) - the instance admin's backups, restore, switches and the own account export."""
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     step = rck_step(c, u)
+    if step == "proxy" and proxy_ok:
+        return None
     if step == "proxy":
         return jsonify(error=tr("You are signed in through the server’s login proxy. This step needs a sign-in with a password."),
                        need="proxy"), 403
@@ -663,11 +666,11 @@ def stepup_need(c, b):
     return e
 
 
-def stepup_download(c):
+def stepup_download(c, proxy_ok=False):
     """2.223.2 C (#2871): a download behind the step-up (the caller checked the right first): POST with the step-up ->
     {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this address) -> None = send the file; else the response."""
     if request.method == "POST":
-        e = stepup_need(c, body())
+        e = stepup_need(c, body(), proxy_ok)
         if e is not None:
             return e
         tok = secrets.token_urlsafe(32)

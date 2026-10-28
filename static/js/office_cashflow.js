@@ -23,7 +23,7 @@ const rk_cfQ = () => `from=${RKF.from}&months=${RKF.months}&basis=${RKF.basis}`;
 
 function rk_cashflowHtml() {
   if (RKF.oid !== OFC.info?.org_id) Object.assign(RKF, {oid: OFC.info?.org_id, data: null, fixed: null, open: null, err: null});  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (!RKF.from) RKF.from = rk_ym();
   if (RKF.err) return `<div class="empty">${esc(RKF.err)}</div>`;
   if (!RKF.data || RKF.q !== rk_cfQ()) { setTimeout(() => { if (RKF.q !== rk_cfQ() || !RKF.data) rk_cfLoad(); }, 0); if (!RKF.data) return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -56,7 +56,7 @@ const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th
 function rk_cfEntries(k) {
   const [mo, dir, st] = k.split('|');
   const es = (RKF.data.entries || []).filter(e => e.month === mo && e.dir === dir && e.state === st);
-  const go = e => e.doc_id ? `href="#office/offers/${e.doc_id}"` : e.series_id ? `href="#office/offers" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : e.node_id ? `href="#docs/${e.node_id}"` : '';  // 2.92.0 A (#1925); 2.114.1 B (#2018): a receipt opens the document
+  const go = e => e.doc_id ? `href="#office/invoices/${e.doc_id}"` : e.series_id ? `href="#office/invoices" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : e.node_id ? `href="#docs/${e.node_id}"` : '';  // 2.92.0 A (#1925); 2.114.1 B (#2018): a receipt opens the document
   // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
   return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
     <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
@@ -124,12 +124,13 @@ function rk_fixedModal(f) {
     <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || today(), {label: tr('First due date'), clear: false})}</div>
     <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'cf-start'})}</div>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}${f && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'fixed', ids: [f.id], from: ofm_officeFrom(), label: qn(f.label), after: async () => rk_cfReload()}); return; }  // 2.356.0 A (#2926)
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); rk_cfReload();

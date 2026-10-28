@@ -30,7 +30,7 @@ from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#30
 from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
-from ..core.access import Denied, my_inbox, need_list, wr_sql
+from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
 from ..files.fsref import fs_ref_rename
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
@@ -256,14 +256,24 @@ def bk_task_list(c, uid, lid, oid=None):
     if lid in (None, "", 0):
         return my_inbox(c, uid)
     lid = _int(lid, "list_id", 1, None)
-    need_list(c, lid)
+    role = need_list(c, lid)
     if oid is not None and c.execute("SELECT 1 FROM lists WHERE id=? AND org_id IS NOT NULL AND org_id<>?", (lid, oid)).fetchone():
+        raise BadInput(tr("Invalid value: {0}", "list_id"))
+    if not _private_ok(c, oid, lid, role):
         raise BadInput(tr("Invalid value: {0}", "list_id"))
     from ..collab.liste2e import le2a_gen_refuse
     le2a_gen_refuse(c, lid)
     if c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "list_id"))
     return lid
+
+
+def _private_ok(c, oid, lid, role):
+    """2.360.0 B (#2496): the deadline task of an organisation's contract goes into a private list only when it is the
+    person's own (never into another person's private list shared with them)."""
+    if role == "owner" or oid is None or pb_owner(c, oid) is not None:
+        return True
+    return not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id IS NULL", (lid,)).fetchone()
 
 
 def bk_task_sync(c, oid, uid, r, want=None, lid=None, revive=False, new_end=False):
@@ -317,7 +327,8 @@ def bk_public(c, oid, uid, row, today=None):
     t = bk_task_row(c, r["id"], r.get("task_id"))
     task = None
     if t and not t["deleted_at"]:
-        ln = c.execute("SELECT name FROM lists WHERE id=?", (t["list_id"],)).fetchone()
+        # 2.360.0 B (#2496): the list's name only for whoever sees the list
+        ln = c.execute("SELECT name FROM lists WHERE id=?", (t["list_id"],)).fetchone() if list_role(c, t["list_id"], uid) else None
         task = {"id": t["id"], "list_id": t["list_id"], "list": ln[0] if ln else "", "due": t["due"], "done": t["status"] != 0}
     out["task"] = task
     floor = t["due"] if task and not task["done"] else None
@@ -389,7 +400,9 @@ def _lists(c, uid, oid=None):
     inbox = my_inbox(c, uid)
     rows = c.execute(f"SELECT id, name FROM lists WHERE archived=0 AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
                      f"AND (org_id IS NULL OR org_id=?) AND id IN {wr_sql()} ORDER BY id<>?, lower(name), id", (oid or 0, uid, uid, inbox)).fetchall()
-    return [{"id": r["id"], "name": r["name"], "inbox": r["id"] == inbox} for r in rows]
+    roles = list_roles(c, uid, [r["id"] for r in rows])
+    return [{"id": r["id"], "name": r["name"], "inbox": r["id"] == inbox} for r in rows
+            if _private_ok(c, oid, r["id"], roles.get(r["id"]))]  # 2.360.0 B (#2496)
 
 
 @app.get("/api/office/agreements")

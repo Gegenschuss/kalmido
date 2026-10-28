@@ -43,7 +43,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import g, jsonify, request, send_file
+from flask import g, jsonify, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
@@ -72,7 +72,8 @@ OX_SECRET_COLS = frozenset((
     "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "p256dh",  # 2.138.0 C (#1907): the hashes too
     "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
     "etags", "api_key", "access_token", "refresh_token",
-    "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
+    "hint",  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
+    "confirm_hash", "cancel_hash"))  # 2.362.0 (#3096): the links of a booking (appt_bookings)
 
 _OX = {}  # org id -> the running thread
 _OX_LOCK = threading.Lock()
@@ -148,6 +149,8 @@ def _ox_dec_row(c, oid, table, row):
         if isinstance(v, str) and v.startswith("kenc1:"):
             row[k] = oc_dec(c, oid, f"{table}.{k}", v)
     row.pop("cost_enc", None)
+    if table == "appt_bookings":  # 2.362.0 (#3096): the booking customer's address on the network is no business record
+        row.pop("ip", None)
     if table == "portal_tickets":  # 2.81.0 (#1866): sealed with the server key -> plain inside the encrypted archive; the
         from ..accounts.login import unseal  # keyed hash only works on this server (token / token_hash: OX_SECRET_COLS)
         try:
@@ -188,6 +191,13 @@ def _rows(c, oid, table, where, args, paged=True):
 LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  # 2.223.3 B (#2879): not the task trash
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
+# 2.362.0 (#3092): the organisation's channels (kind 'channel') the exporting admin reads in the app: the open ones (ox_csq: + the
+# ones they are a member of); RSQ = every team chat room of the archive (+ the channels of the lists of LSQ)
+CSQ = "SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND is_open=1 AND archived_at IS NULL"
+RSQ = f"SELECT id FROM tchat_rooms WHERE (kind='list' AND list_id IN ({LSQ})) OR id IN ({CSQ})"
+# 2.362.0 (#3096): the booking pages billed by the organisation's office (a business record); ox_apq: + the exporting admin's
+# own page on a calendar of the organisation (another member's bookings only their owner reads in the app: calendars/apptbook.py)
+APQ = "SELECT user_id FROM appt_pages WHERE office_org_id=?"
 # (archive name, table, where; every "?" is the organisation id) -- the order of the archive
 OX_AREAS = (
     ("lists.json", "lists", f"id IN ({LSQ})"),  # 2.223.3 B (#2879, #2880): the lists of LSQ (ox_lsq), not the trash
@@ -207,6 +217,7 @@ OX_AREAS = (
     ("lists/form_entries.json", "form_entries", f"form_id IN (SELECT id FROM forms WHERE list_id IN ({LSQ}))"),  # 2.137.0 C (#2344): answers of form entries
     ("lists/playbooks.json", "playbooks", f"list_id IN ({LSQ})"),
     ("lists/sprints.json", "sprints", f"list_id IN ({LSQ})"),  # 2.137.0 C (#2344): sprints of the lists (tasks.sprint_id)
+    ("lists/section_templates.json", "section_templates", "org_id=?"),  # 2.362.0 (#3096): section templates shared with the organisation
     # 2.81.0 (#1866): customer reports of those lists (team/portal.py): the address in plain text, never the status link
     ("portal/tickets.json", "portal_tickets", f"list_id IN ({LSQ})"),
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
@@ -234,9 +245,12 @@ OX_AREAS = (
     ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
-    ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
-    ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
-    ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT m.id FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE r.kind='list' AND r.list_id IN ({LSQ}))"),  # 2.137.0 C (#2344)
+    # 2.362.0 (#3092): + the organisation's channels (CSQ), their members and the files of the messages (bytes under files/tchat/)
+    ("chat/channels.json", "tchat_rooms", f"id IN ({RSQ})"),
+    ("chat/members.json", "tchat_members", f"room_id IN ({CSQ})"),
+    ("chat/messages.json", "tchat_msgs", f"room_id IN ({RSQ})"),
+    ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}))"),  # 2.137.0 C (#2344)
+    ("chat/files.json", "tchat_files", f"room_id IN ({RSQ})"),
     ("calendars.json", "ev_cals", "org_id=?"),
     ("calendars/members.json", "ev_cal_members", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
     ("events.json", "events", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
@@ -244,11 +258,21 @@ OX_AREAS = (
     ("books.json", "books", "org_id=?"),
     ("books/members.json", "book_members", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
+    # 2.362.0 (#3096): contacts on tasks of the lists (waiting for / responsible / about)
+    ("books/contact_tasks.json", "contact_tasks", f"contact_id IN (SELECT id FROM contacts WHERE book_id IN (SELECT id FROM books WHERE org_id=?)) AND task_id IN ({TSQ})"),
+    # 2.362.0 (#3096): the booking pages on a calendar of the organisation (or billed by its office), their kinds of appointment
+    # and bookings (the customers' data; never the confirm / cancel links); the booked appointments are events of the calendar
+    ("bookings/pages.json", "appt_pages", f"user_id IN ({APQ})"),
+    ("bookings/types.json", "appt_types", f"user_id IN ({APQ})"),
+    ("bookings/bookings.json", "appt_bookings", f"user_id IN ({APQ})"),
     # 2.55.0 (#1455): the newsletter connection (its column "secret" never: see the list above), segments, members, log
     ("newsletter/connection.json", "nl_conns", "org_id=?"),
     ("newsletter/segments.json", "nl_segments", "org_id=?"),
     ("newsletter/members.json", "nl_members", "org_id=?"),
     ("newsletter/runs.json", "nl_runs", "org_id=?"),
+    # 2.362.0 (#3096): the suppression list and the consent log (hashes of the addresses): an unsubscription survives the move
+    ("newsletter/suppressed.json", "nl_suppress", "org_id=?"),
+    ("newsletter/consent_log.json", "nl_consent_log", "org_id=?"),
     ("clients.json", "clients", "org_id=?"),
     ("office/company.json", "office_company", "org_id=?"),
     ("office/settings.json", "office_settings", "org_id=?"),
@@ -310,6 +334,7 @@ OX_AREAS = (
     ("office/vehicles.json", "office_vehicles", "org_id=?"),
     ("office/drives.json", "office_drives", "org_id=?"),
     ("office/drive_log.json", "office_drive_log", "org_id=?"),
+    ("office/drive_closed.json", "office_drive_closed", "org_id=?"),  # 2.362.0 (#3096): the closed months of the logbook (GoBD)
     ("office/sub_reminders.json", "office_sub_reminders", "org_id=?"),  # 2.91.0 B (#1924): reminder tasks before a subscription renews
     ("office/dunning_marks.json", "office_dunning_marks", "org_id=?"),  # 2.147.1 B (#2054): invoices + levels with a suggested reminder
     ("office/peppol_sends.json", "office_peppol_sends", "org_id=?"),  # 2.154.0 B (#1960): sends over Peppol (the connection + key stay)
@@ -350,6 +375,7 @@ OX_AREAS = (
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
     ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
+    ("hub/mail_links.json", "hub_mail_links", "org_id=?"),  # 2.362.0 (#3096): the tasks / events made from a filed e-mail
     ("hub/mailbox.json", "hub_mailboxes", "org_id=?"),  # 2.144.5 B (#2410): the workspace mailbox (servers, user names, sender; never "secret")
 )
 OX_NOT_INCLUDED = (
@@ -360,10 +386,47 @@ OX_NOT_INCLUDED = (
     "passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets",
     "connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)",
     "personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats",
+    # 2.362.0 (#3092): group conversations belong to their people like direct messages; channels like in the app (teamchan.py tcx_room_ok)
+    "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)",
+    "channels of the organisation that are not open and that the exporting admin is not a member of",
+    # 2.362.0 (#3096): what else stays out on purpose (OX_LEFT names every table with an organisation column that does)
+    "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' "
+    "pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares",
+    "bookmarks, feeds and scheduling polls of the organisation (not yet in this export)",
+    "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels",
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
     "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
 )
 
+# 2.362.0 (#3096): every table with an organisation or a list column that is NOT in OX_AREAS, with the reason (the static guard
+# tests/export_coverage_test.py fails on a new such table until it is in OX_AREAS or here -- so nothing goes missing silently)
+_SECRET = "credentials or link secrets (not_included)"
+_PERSONAL = "a person's own data (their account export)"
+_DERIVED = "derived or working data, rebuilt on the target"
+_SERVER = "state of this server (keys, jobs, scanner, queues)"
+_AGENT = "agents and their logs (never in the organisation export)"
+_LATER = "not yet in the export (named in not_included, follow-up task #3469)"
+OX_LEFT = {
+    # organisation column
+    "agents": _AGENT, "bg_jobs": _SERVER, "bookmarks": _LATER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
+    "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted, 2.353.0 #2758)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
+    "merge_runs": _PERSONAL, "notify_channels": _SECRET, "office_peppol": _SECRET, "office_trash": "the trash (not_included)",
+    "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
+    "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
+    "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
+    "rc_suggest": _DERIVED, "reading_orgs": _LATER, "rss_feeds": _LATER, "sched_polls": _LATER, "task_bell": _PERSONAL,
+    "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
+    "wiki_spaces": "the lock of a space (client_encrypted names it)",
+    # list column
+    "agent_audit": _AGENT, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_usage": _AGENT,
+    "assistant_access": _PERSONAL, "assistant_log": _PERSONAL, "budget_cats": _PERSONAL, "budget_entries": _PERSONAL,
+    "budget_files": _PERSONAL, "budget_recurring": _PERSONAL, "contact_srcs": _SECRET, "ctr_notices": _PERSONAL, "dav_sync": _DERIVED,
+    "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET, "group_shares": "groups of people (not_included)",
+    "hook_in": _SECRET, "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
+    "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL, "list_notif": _PERSONAL,
+    "list_paperless": _SECRET, "mail_tokens": _SECRET, "notifications": _PERSONAL, "playbook_proposals": _AGENT, "public_links": _SECRET,
+    "shop_memory": _PERSONAL,
+}
 
 # 2.223.3 B (#2879): soft-deleted rows (the trash, undone entries) stay out of the organisation and the retention export, and
 # the rows of a deleted parent with them. office_drives keeps them: a removed drive stays for the change log (tax office).
@@ -371,6 +434,8 @@ OX_KEEP_DELETED = ("office_drives",)
 OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its parent row is deleted
     "comment_reactions": (("comments", "comment_id"),),
     "tchat_rx": (("tchat_msgs", "message_id"),),
+    "tchat_files": (("tchat_msgs", "message_id"),),  # 2.362.0 (#3092)
+    "hub_mail_links": (("hub_mails", "mail_id"),),  # 2.362.0 (#3096)
     "event_attendees": (("events", "event_id"),),
     "contacts": (("books", "book_id"),),
     "office_client_contacts": (("clients", "client_id"),),
@@ -428,6 +493,20 @@ def ox_lsq(by_id):
             "(l.org_visibility='org' AND COALESCE(l.life,'')='' AND COALESCE(l.family,'')='') "
             "OR EXISTS (SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND m.user_id!=l.owner_id "
             f"AND COALESCE(u.kind,'user')!='agent'){own})")
+
+
+def ox_apq(by_id):
+    """2.362.0 (#3096, review): APQ for the exporting admin (their own booking page on a calendar of the organisation too)."""
+    u = int(by_id or 0)
+    return APQ + (f" OR (user_id={u} AND cal_id IN (SELECT id FROM ev_cals WHERE org_id=?))" if u else "")
+
+
+def ox_csq(by_id):
+    """2.362.0 (#3092): CSQ for the exporting admin: the open channels of the organisation and the ones they are a member of
+    (the rule of collab/teamchan.py tcx_room_ok: an admin manages a closed channel but does not read it)."""
+    u = int(by_id or 0)
+    return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND ((is_open=1 AND archived_at IS NULL)"
+            + (f" OR id IN (SELECT room_id FROM tchat_members WHERE user_id={u})" if u else "") + ")")
 
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
@@ -547,8 +626,12 @@ def ox_build(c, oid, out, by=None):
             hnodes |= ox_dead_nodes(c, oid)  # 2.223.3 B (#2879): the trash of the file store and its rows
         lsq = ox_lsq((by or {}).get("id"))  # 2.223.3 B (#2880): only the lists the admin sees in the app
 
+        csq = ox_csq((by or {}).get("id"))  # 2.362.0 (#3092): the channels the admin reads in the app
+
+        apq = ox_apq((by or {}).get("id"))  # 2.362.0 (#3096, review): only booking pages the admin reads in the app
+
         def vis(where):
-            return where.replace(LSQ, lsq)
+            return where.replace(CSQ, csq).replace(APQ, apq).replace(LSQ, lsq)
         for name, table, where in OX_AREAS:
             if table not in have:
                 continue
@@ -556,6 +639,8 @@ def ox_build(c, oid, out, by=None):
             rows = _rows(c, oid, table, where, (oid,) * where.count("?"))
             if table == "hub_mails" and hidden:
                 rows = (r for r in rows if r.get("id") not in hidden)
+            elif table == "hub_mail_links" and hidden:  # 2.362.0 (#3096): a hidden mail's links stay out with it
+                rows = (r for r in rows if r.get("mail_id") not in hidden)
             elif hnodes and table == "fs_nodes":  # 2.190.0 R (#2561): the filed mail's folder, its files and their rows go too
                 rows = (r for r in rows if r.get("id") not in hnodes)
             elif hnodes and table in OX_NODE_TABLES:
@@ -594,6 +679,12 @@ def ox_build(c, oid, out, by=None):
                 full = _under(ATT_DIR, r.get("path"))
                 if full and not lk("sheet", r, r.get("name")):
                     _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+        if "tchat_files" in have:  # 2.362.0 (#3092): the files and voice messages of the team chat (decrypted like the attachments)
+            tw = ox_live(c, "tchat_files", vis(f"room_id IN ({RSQ})"))
+            for r in _rows(c, oid, "tchat_files", tw, (oid,) * tw.count("?")):
+                full = _under(ATT_DIR, r.get("path"))
+                if full and not lk("tchat", r, r.get("name")):
+                    _put_bytes(zf, man, f"files/tchat/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
         if os.path.isdir(odir):
@@ -612,7 +703,7 @@ def ox_build(c, oid, out, by=None):
                     _put_bytes(zf, man, "files/office/" + "/".join(_safe_part(p) for p in rel.split("/")), _read(c, full))
         if "enc" in _table_cols(c, "tchat_msgs"):  # 2.42.0 (#909, agent A): browser-encrypted chat messages stay ciphertext
             man.client_enc["chat_messages"] = c.execute(vis(f"""SELECT COUNT(*) FROM tchat_msgs WHERE COALESCE(enc,'')!='' AND room_id IN
-                (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"""), (oid,)).fetchone()[0]
+                ({RSQ})"""), (oid,) * RSQ.count("?")).fetchone()[0]  # 2.362.0 (#3092): + the channels
         if "tasks/encrypted_notes.json" in man.counts:
             man.client_enc["task_notes"] = man.counts["tasks/encrypted_notes.json"]
         if "tasks/locked_notes.json" in man.counts:
@@ -943,12 +1034,11 @@ def ox_download(oid):
     fx = ox_foreign(c, oid, own, {**(_state(oid) or {}), "state": "done"})
     if fx:  # 2.278.0 A (#3093): only the starter (the archive is filtered by their rights)
         raise Denied(403, _ox_foreign_msg(st, fx[0]))
-    if own:  # 2.223.2 C (#2871): the own office (0): POST with the step-up -> a ticket, GET with it -> the archive
-        e = stepup_download(c)
-        if e is not None:
-            return e
-    elif request.method == "POST":
-        raise Denied(404)
+    # 2.223.2 C (#2871): the own office (0): POST with the step-up -> a ticket, GET with it -> the archive. 2.360.0 A (#2496):
+    # an organisation's archive too (a login-proxy admin relies on the session there)
+    e = stepup_download(c, proxy_ok=not own)
+    if e is not None:
+        return e
     from ..office.ledger import ofx_log
     with system_ctx(c):  # 2.152.0 (#2167, review A4): an instance admin of a retired organisation is no member of it
         ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)

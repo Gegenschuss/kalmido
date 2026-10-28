@@ -202,6 +202,7 @@ function meHtml() {
       <div class="mefields">${fields}</div>
       ${meTagsHtml(ts)}
       ${dgMeHtml(ts)}
+      ${ml_meHtml(ts)}${''/* 2.320.0 (#3289): Show also in project… */}
       <div class="dsec melist"><h5>${tr('Selected tasks')}</h5><ul>${ts.map(t => `<li data-id="${t.id}"><button type="button" class="metl" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open only this task'))}">${t.status ? ic('check', 's') : ''}<span>${esc(t.title)}</span></button><button type="button" class="iconbtn" data-act="me-drop" data-id="${t.id}" title="${esc(tr('Remove from the selection'))}" aria-label="${esc(tr('Remove {0} from the selection', t.title))}">${ic('x', 's')}</button></li>`).join('')}</ul></div>
     </div>`;
 }

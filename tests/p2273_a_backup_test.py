@@ -136,7 +136,7 @@ check(q[0] == [[1]] and q[1] == [["keep me"]], f"#3050: the table the backup doe
 
 # ================================================================== #3051 p. 12 + 13: the restore names what it cannot bring back
 sql("INSERT INTO bg_jobs(kind, payload, state, run_after, created_at) VALUES ('p2273_test', '', 'wait', '2099-01-01T00:00:00Z', '2026-10-24T10:00:00Z')")
-r = A.post(B + "/api/admin/backups/restore", json={"name": BK1, "confirm": "RESTORE"})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": BK1, "confirm": "RESTORE"})
 j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
 check(r.ok, f"the restore went through {r.status_code} {r.text[:200]}")
 notes = " | ".join(j.get("notes") or [])

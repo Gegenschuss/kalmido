@@ -24,7 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer, login  # noqa: E402
-from kt import FAILS, OKS, check  # noqa: E402
+from kt import FAILS, OKS, check, su_get  # noqa: E402
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
@@ -48,7 +48,7 @@ def export_of(s, secs=120):
             break
         time.sleep(0.25)
     assert j.get("state") == "done", j
-    r = s.get(B + "/api/account/export/file")
+    r = su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     z = zipfile.ZipFile(io.BytesIO(r.content))
     return r.content, json.loads(z.read("manifest.json")), {n[5:-5]: json.loads(z.read(n)) for n in z.namelist() if n.startswith("data/")}

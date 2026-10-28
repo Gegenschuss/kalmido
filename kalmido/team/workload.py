@@ -7,6 +7,7 @@ from ..core.db import body, bump, db, err, local_now, usettings, uset
 from ..core.config import app
 from ..core.i18n import tr
 from ..accounts.session import me, user_public
+from ..accounts.orgs import is_org_admin, user_orgs
 from ..core.access import Denied, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
 
@@ -35,7 +36,7 @@ def capacity_h(c, uid):
 
 
 def wl_people(c, uid, org=None):
-    """[(id, row)] of the people of the workload view for uid: the organisation (org, else uid's first), visible to uid."""
+    """[(id, row)] of the people of the workload view for uid: the organisation (org, else the saved workspace's, else uid's first), visible to uid."""
     from ..accounts.orgs import user_orgs, visible_people
     u = g.user
     from ..accounts.orgroles import user_orgs_full
@@ -44,8 +45,10 @@ def wl_people(c, uid, org=None):
         if org not in mine and not u["is_admin"]:
             raise Denied(404)
         orgs = [org]
-    else:
-        orgs = mine[:1]
+    else:  # 2.380.2 (#3407): the saved workspace's organisation (the sidebar switch), else the first one
+        ws = str(usettings(c, uid).get("workspace") or "")
+        wo = int(ws[4:]) if ws.startswith("org:") and ws[4:].isdigit() else None
+        orgs = [wo] if wo in mine else mine[:1]
     vis = visible_people(c, uid)
     q = "SELECT * FROM users WHERE disabled=0 AND kid=0 AND COALESCE(kind,'user')!='agent'"
     if orgs:
@@ -145,9 +148,10 @@ def workload_get():
 
 @app.put("/api/workload/capacity/<int:uid>")
 def workload_capacity(uid):
-    """{hours: number | null}: hours per week of a person (oneself, or an admin for anyone; null = the default)."""
+    """{hours: number | null}: hours per week of a person (oneself, or an admin of an organisation the person is in; null =
+    the default). 2.360.0 D (#2496): the instance admin no longer for anyone (only as such an organisation admin)."""
     c = db()
-    if uid != me() and not g.user["is_admin"]:
+    if uid != me() and not any(is_org_admin(c, me(), o) for o in set(user_orgs(c, uid))):
         raise Denied(403, tr("Only admins can change the capacity of other people"))
     if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
         raise Denied(404)

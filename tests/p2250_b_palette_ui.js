@@ -50,7 +50,7 @@ const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input'
     check(await find('vacation', /^Enter an absence$/), tag + '"vacation" finds "Enter an absence"');
     check(await find('workload', /^Workload & absences$/), tag + 'the page is called "Workload & absences"');
     check(await find('invoice', /^Add invoice$/), tag + '"Add invoice" is offered (quotes & invoices are open to every member)');
-    check(await find('open items', /^Quotes & invoices$/), tag + '"open items" finds Quotes & invoices (no page of its own)');
+    check(await find('open items', /^Invoices$/), tag + '"open items" finds Invoices (no page of its own; 2.380.0 #3409: its own point)');
     check(await find('client', /^Add client$/), tag + '"Add client" is offered');
     input(w, inp, 'vacation'); await sleep(150);
     const at = [...d.querySelectorAll('.palette .pitem')].findIndex(b => b.querySelector('.plt')?.textContent === 'Enter an absence');

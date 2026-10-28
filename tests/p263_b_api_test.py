@@ -254,6 +254,7 @@ r = J.post(B + f"/portal/login/{lk}", allow_redirects=False)
 ck = r.headers.get("Set-Cookie", "")
 check(r.status_code == 303 and "kalmido_portal=" in ck and "HttpOnly" in ck and "Path=/portal" in ck and "SameSite=Lax" in ck, f"#1513: sign-in sets the portal cookie {ck}")
 check(requests.post(B + f"/portal/login/{lk}", allow_redirects=False).status_code == 404, "#1513: the link works once")
+dbq("UPDATE portal_tickets SET claimed=1 WHERE task_id IN (?,?)", (T1, T3))  # 2.360.0 (#2496): addresses confirmed by their mail link (p2360_a)
 pg = J.get(B + "/portal").text
 check("Export button does nothing" in pg and "Second report of Jane" in pg and "Beta ticket" not in pg, "#1513: the portal shows the same organisation's tickets only")
 check(f"/p/{TK1}" in pg and f"/p/{TK2}" not in pg, "#1513: links to the status pages")

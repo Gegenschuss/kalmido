@@ -101,7 +101,7 @@ function tcRoomHtml() {
     ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
-    ${room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() /* 2.266.0 (#2970) */ : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > cut ? name.slice(0, cut - 1).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
+    ${room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() /* 2.266.0 (#2970) */ : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(name.length > cut ? tr('Message to {0}', name.slice(0, cut - 1).trimEnd() + '…') : tr('Message to {0}…', name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tc-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}"${csdBusy('t:' + rid) ? ' disabled' : ''}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`}`;
 }
 // 2.139.0 A (#2127): list = the messages to draw; o.th = inside the thread view (o.root: its first message, o.older: the
@@ -844,15 +844,28 @@ function noteEditHtml(n) {
 }
 const noteCur = () => S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);
 function noteQueue() { S.nt.dirty = true; clearTimeout(S.nt.saveT); S.nt.saveT = setTimeout(noteFlush, 1200); }
-async function noteFlush() {
-  clearTimeout(S.nt.saveT);
-  const n = noteCur(); if (!n || !S.nt.dirty) return;
-  S.nt.dirty = false;
+function notePatch(n) {
   const t = $('#nt-title'), b = $('#nt-body'), g = $('#nt-tags');
   const patch = {expect_updated_at: n.updated_at};
   if (t && t.value.trim() && t.value.trim() !== n.title) patch.title = t.value.trim();
   if (b && b.value !== n.body) patch.body = b.value;
   if (g) { const tg = g.value.split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean); if (tg.join() !== n.tags.join()) patch.tags = tg; }
+  return patch;
+}
+// 2.359.0 A (#3024): the page goes away within the 1.2 s of typing: the change goes into the queue and out with keepalive
+// (core.js outKeep; the queued copy has the same key). A locked list's note keeps the normal way (the queue holds no plain text).
+window.addEventListener('pagehide', () => {
+  const n = S.nt.dirty && noteCur(); if (!n || ntLocked(n.list_id)) return;
+  const patch = notePatch(n); if (Object.keys(patch).length === 1) return;
+  clearTimeout(S.nt.saveT); S.nt.dirty = false;
+  if (n.id < 0) delete patch.expect_updated_at;
+  outKeep('PATCH', `/api/notes/${n.id}`, patch);
+});
+async function noteFlush() {
+  clearTimeout(S.nt.saveT);
+  const n = noteCur(); if (!n || !S.nt.dirty) return;
+  S.nt.dirty = false;
+  const patch = notePatch(n);
   if (Object.keys(patch).length === 1) return;
   try {
     const r = await ntWrite(n, patch);  // 2.143.0 C (#2153): offline into the outbox

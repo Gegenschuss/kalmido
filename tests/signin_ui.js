@@ -183,7 +183,7 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   d.querySelector('#totp-code').value = totp(gsec); submit(w, d.querySelector('#en-totp')); await sleep(700);
   check(d.querySelectorAll('.authscreen .rcodes code').length === 10 && w.__jar.has('kalmido_session'), 'enrolled: recovery codes + session');
   w.close();
-  await fetch(B + 'api/admin/settings', {method: 'PATCH', headers: {...H, Cookie: ac}, body: JSON.stringify({twofa_required: false})});
+  await fetch(B + 'api/admin/settings', {method: 'PATCH', headers: {...H, Cookie: ac}, body: JSON.stringify({twofa_required: false, password: 'password123'})});  // 2.360.0 (#2496): off asks for the password
 
   // ---- Settings > Users > Whole server: sign-in + backups
   w = await page({cookie: ac}); d = w.document;
@@ -193,7 +193,12 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   check(md.querySelector('#s-oidcredir')?.textContent === 'https://kalmido.example/api/auth/oidc/callback' && /id\.example/.test(md.querySelector('#sp-users').textContent), 'OIDC block: provider + redirect URI');
   const cb = md.querySelector('#s-2fareq'); cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
   check((await api(w, 'GET', '/api/about')).twofa_required === true, 'switch applied at once');
-  cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
+  // 2.360.0 (#2496): turning the policy off asks for the password
+  const cpp = await until(() => d.querySelector('.pwprompt #pp-pw'));
+  check(!!cpp && (await api(w, 'GET', '/api/about')).twofa_required === true, '2FA policy off: asks for the password first');
+  if (cpp) { cpp.value = 'password123'; submit(w, cpp.closest('form')); }
+  for (let i = 0; i < 50 && (await api(w, 'GET', '/api/about')).twofa_required !== false; i++) await sleep(100);
   check(md.querySelector('#s-bk-h')?.textContent === 'Backups' && md.querySelector('#bk-on').checked && md.querySelector('#bk-time').value === '03:30', 'backups section: on, 03:30');  // 2.45.0 (#1515): backups on for a new server
   check(/No backups yet/.test(md.querySelector('#s-bk').textContent), 'no backups yet');
   const bon = md.querySelector('#bk-on'); bon.checked = true; bon.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
@@ -214,7 +219,11 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   check(rm.querySelector('#bkr-go').disabled, 'wrong word keeps it disabled');
   input(w, rm.querySelector('#bkr-word'), 'RESTORE');
   check(!rm.querySelector('#bkr-go').disabled, 'RESTORE enables it');
-  submit(w, rm.querySelector('form')); await sleep(2500);
+  submit(w, rm.querySelector('form'));
+  const rpp = await until(() => d.querySelector('.pwprompt #pp-pw'));  // 2.360.0 (#2496): the restore asks for the password
+  check(!!rpp, 'restore: asks for the password');
+  if (rpp) { rpp.value = 'password123'; submit(w, rpp.closest('form')); }
+  await sleep(2500);
   // 2.140.1: a slow CI runner may still be restoring after 2.5 s - poll up to 20 s more
   let st = {};
   for (let i = 0; i < 40; i++) { try { st = await api(w, 'GET', '/api/state'); } catch (e) { st = {}; } if (st.tasks && !st.tasks.some(t => t.title === 'made after the backup')) break; await sleep(500); }

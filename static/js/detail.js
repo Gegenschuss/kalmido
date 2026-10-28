@@ -67,13 +67,17 @@ const SBB_FOUR_PX = 1200;
 //   3. still too narrow: the sidebar becomes the drawer (side-rail), first with the chat again, then without it.
 // The stored widths (LS pw.*) stay as they are; only the widths in use (--detW / --chatW) shrink and come back with room.
 // px in, px out: {yieldC, rail, det, chat, sq} (sq = shrunk); pure, so the tests can call it with any numbers
-function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold}) {
+function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold, floor = LIST_SQUEEZE_PX}) {
   let sq = false;
   const fit = (room, ps) => {  // the panels' widths for this room, null = even the minimums do not fit
     const want = ps.reduce((a, p) => a + p.w, 0) + LIST_MIN_PX;
     if (room >= want) return ps.map(p => p.w);
     sq = true;
-    const slack = ps.reduce((a, p) => a + Math.max(0, p.w - p.min), 0) + LIST_MIN_PX - LIST_SQUEEZE_PX, f = (want - room) / slack;
+    if (floor < LIST_SQUEEZE_PX) {  // 2.350.0 D (#2750): a wide chat / sidebar: the list gives way first, down to the floor, then the panels
+      const sum = want - LIST_MIN_PX, need = sum + floor - room, slack = ps.reduce((a, p) => a + Math.max(0, p.w - p.min), 0);
+      return need <= 0 ? ps.map(p => p.w) : need > slack ? null : ps.map(p => p.w - Math.max(0, p.w - p.min) * need / slack);
+    }
+    const slack = ps.reduce((a, p) => a + Math.max(0, p.w - p.min), 0) + LIST_MIN_PX - floor, f = (want - room) / slack;
     return f > 1 ? null : ps.map(p => p.w - Math.max(0, p.w - p.min) * f);
   };
   const both = chat > 0 && det > 0, tries = [];
@@ -89,7 +93,7 @@ function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold}) {
 // 2.26.x: the fixed line at the bottom of the task panel: "Created by <name> on <date>" (agents by their name; no known
 // creator: the date only), plus "Completed <date>" once done
 function createdLine(t) {
-  const f = v => new Date(v).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'});
+  const f = v => fmtMoment(new Date(v));  // 2.368.0 B (#2982): one locale source
   const who = t.created_by ? personNameAny(t.created_by) : '';
   const c = !t.created_at ? '' : who ? tr('Created by {0} on {1}', who, f(t.created_at)) : tr('Created {0}', f(t.created_at));
   const d = t.status === 2 && t.completed_at ? tr('Completed {0}', f(t.completed_at)) : '';
@@ -108,7 +112,7 @@ function layNow(o = {}) {
   // and opens the drawer (its panel button, the open area's icon). Before (#2622) the bar stepped aside below 1140 px.
   const four = !!sbb && det && innerWidth < SBB_FOUR_PX;
   const L = lay2209({W: innerWidth, bar: sbb, barRail: sbb, side: np ? 0 : panelRem('side') * rem,
-    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? Math.min((o.chat ?? panelRem('chat')) * rem, innerWidth * .4) : 0, chatMin: PW.chat[1] * rem, fold: (!!LS.get('sideFold', false) || four) && !np});
+    det: det ? (o.det ?? panelRem('det')) * rem : 0, detMin: PW.det[1] * rem, chat: chatOn ? (o.chat ?? panelRem('chat')) * rem : 0, chatMin: PW.chat[1] * rem, floor: listFloor(), fold: (!!LS.get('sideFold', false) || four) && !np});
   return {L, rem, det, chatOn};
 }
 function fitLayout(quiet) {
@@ -138,7 +142,11 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // Enter = the standard width. The list never gets narrower than LIST_MIN_PX; phones keep the full-screen panels.
 // 2.26.0 (#932): the sidebar too (grip on its right edge; ← → reversed there: → = wider). Only next to the list: the drawer
 // (side-rail) and phones keep their fixed widths.
-const PW = {det: [25.5, 20, 48], chat: [26, 20, 44], side: [15, 12, 26]};  // rem: standard, min, max
+// 2.350.0 D (#2750): chat and sidebar have no upper limit any more (1000 rem = never reached); the list keeps LIST_FLOOR_PX
+const PW = {det: [25.5, 20, 48], chat: [26, 20, 1000], side: [15, 12, 1000]};  // rem: standard, min, max
+const LIST_FLOOR_PX = 192, OLD_MAX = {chat: 44, side: 26};  // 12 rem; the former maximums
+// 2.350.0 D (#2750): a chat / sidebar wider than the former maximum may squeeze the list down to 12 rem (else 320 px as before)
+const listFloor = () => (document.body.classList.contains('chat-open') && panelRem('chat') > OLD_MAX.chat) || panelRem('side') > OLD_MAX.side ? LIST_FLOOR_PX : LIST_SQUEEZE_PX;
 // 2.319.0 B (#3288): the app bar's width in rem (app.css --srW: narrower without its labels)
 const srW = () => document.documentElement.classList.contains('rail-nolabel') ? 3.25 : 4.5;
 const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
@@ -150,11 +158,11 @@ function panelMax(k) {  // the widest the panel may get now, in rem (the list ke
   // widths in use of the other panels, and while fitLayout shrinks them the list keeps LIST_SQUEEZE_PX)
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
   const side = (k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem) + (app.classList.contains('sb-b') ? srW() * rem : 0);  // 2.152.2 (#2622): the bar of sidebar B comes on top of the panel
-  const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelEff('chat') * rem, innerWidth * .4) : 0;
+  const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? panelEff('chat') * rem : 0;
   const detW = app.classList.contains('detail-open') ? panelEff('det') * rem : 0;
   const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;
-  const room = (innerWidth - side - other - (PWE.sq ? LIST_SQUEEZE_PX : LIST_MIN_PX)) / rem;
-  return Math.max(PW[k][1], Math.min(PW[k][2], k === 'chat' ? Math.min(room, innerWidth * .4 / rem) : room));
+  const room = (innerWidth - side - other - (k === 'det' ? (PWE.sq ? LIST_SQUEEZE_PX : LIST_MIN_PX) : LIST_FLOOR_PX)) / rem;  // 2.350.0 D (#2750): chat + sidebar down to 12 rem
+  return Math.max(PW[k][1], Math.min(PW[k][2], room));
 }
 // 2.209.0 A (#2772): the stored width that shows v rem while fitLayout shrinks the panels (so a dragged edge stays where it
 // was let go); without shrinking it is v itself
@@ -227,7 +235,7 @@ function gripWire(g) {
     // the layout check and placing the grips happen on release
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelEff(k);  // 2.209.0 A (#2772): from the width in use
-    const cap = k === 'chat' ? innerWidth * .4 : Infinity, px = w => Math.min(w * rem, cap), px0 = px(w0);
+    const px = w => w * rem, px0 = px(w0);
     let w = w0; gripDrag = k;
     const mv = rafThrottle(x => {
       w = Math.round(Math.max(PW[k][1], Math.min(max, (k === 'side' ? x - left : right - x) / rem)) * 4) / 4;
@@ -589,7 +597,7 @@ function renderDetail0() {
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
       ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${rat_has(t) ? ' ' + ic('bell', 's') : ''}</button>`}
-      ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].filter(([n]) => n || t.due !== today()).map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(n ? tr('Tomorrow, each further click +1 day') : tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(n ? tr('Tomorrow, each further click +1 day') : tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
+      ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', qdLabel(t)], [-1, 'back', tr('-1 day')]].filter(([n]) => (n === -1 ? qdMinus(t) : n || t.due !== today())).map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) && n >= 0 ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(n === -1 ? tr('Set to {0}', dayLabel(addDays(t.due, -1))) : kt(n ? qdTitle(t) : tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(n === -1 ? lab + ': ' + tr('Set to {0}', dayLabel(addDays(t.due, -1))) : n ? (qdPlus(t) ? lab + ': ' : '') + qdTitle(t) : tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${''/* 2.218.0 A (#2799): "Today" is left out when the task is due today (the date chip says it); "Tomorrow" stays, a further click adds a day */}${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic(t.pinned ? 'pinf' : 'pin')}<span class="dpw dpin">${esc(t.pinned ? tr('Pinned') : tr('Pin'))}</span></button>
@@ -603,6 +611,7 @@ function renderDetail0() {
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''}">
       ${crumbsHtml(t, l, parent)}
+      ${ml_detailHtml(t)}${''/* 2.320.0 (#3289): the field Projects (multilist.js) */}
       ${le2uLk ? le2u_detailHtml(t) : ''}<div class="dtitle" ${le2uLk ? 'hidden' : ''}><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${tlkR ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
       ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}

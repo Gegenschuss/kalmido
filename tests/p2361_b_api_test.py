@@ -324,7 +324,7 @@ n_s, n_t = dbx("SELECT COUNT(*) FROM office_services")[0][0], dbx("SELECT COUNT(
 dbx("DELETE FROM office_services", write=True)
 dbx("DELETE FROM office_texts", write=True)
 dbx("DELETE FROM office_settings", write=True)
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 check(wait_for(lambda: dbx("SELECT COUNT(*) FROM office_services")[0][0] == n_s, 10) and dbx("SELECT COUNT(*) FROM office_texts")[0][0] == n_t and dbx("SELECT COUNT(*) FROM office_settings")[0][0] == 2, "backup: the office tables are back after the restore")
 A = sess("alice")

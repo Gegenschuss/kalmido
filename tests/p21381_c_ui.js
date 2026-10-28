@@ -42,14 +42,14 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(bar && bar === d.querySelector('#kbar button') && bar.dataset.act === 'sbb-ws' && /Private/.test(bar.querySelector('.wsn')?.textContent || '') && bar.querySelector('.wsp-dot') && bar.querySelector('svg.i:last-child'), '#2392: row 1 = the workspace switch: dot + name + arrow');
   check(d.querySelector('#side .sbhead .sbtools .sbbfa') && d.querySelector('#side .sbhead .sbtools .sbbhide') && d.querySelector('#side .sbhead h2.sbbpt'), '#2392: fold-all sits in the head\'s tools (hover / focus)');  // 2.152.3 (#2619): the panel head = area name + Fold all (.sbbfa) + Hide the panel
   const acct = d.querySelector('#kbar .kbend .kbacct');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
-  check(acct && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot') && !d.querySelector('#srail .sbacct') && [...d.querySelectorAll('#srail .srfoot > *')].every(x => x.classList.contains('sset')), '#2392: the avatar without dots in the head bar, only Settings at the bottom of the bar');  // 2.152.3 (#2619): the account in the head bar
+  check(acct && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot') && !d.querySelector('#srail .sbacct') && !d.querySelector('#srail .srfoot'), '#2392: the avatar without dots in the head bar, nothing at the bottom of the bar'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account in the head bar
   const nd = () => d.querySelector('#kbar .netdot');  // 2.152.3 (#2619): the dot moved from the panel head into the head bar
   check(nd()?.classList.contains('n-on') && nd().getAttribute('aria-label') === 'Online', '#2392: online: the dot is there for the state but n-on (hidden by CSS)');
   w.eval(`OUT.flushing = true; netDotDraw()`);
   check(nd()?.classList.contains('n-sync'), '#2392: syncing: the dot shows');
   w.eval(`OUT.flushing = false; netDotDraw()`);
   w.eval(`S.about = Object.assign(S.about || {}, {available: '99.0.0'}); renderSide()`);
-  check(d.querySelector('#srail .sset .nunread') && !d.querySelector('#kbar .kbacct .dot'), '#2392: the update dot only at Settings');  // 2.152.3 (#2619): the account in the head bar
+  check(d.querySelector('#kbar .kbsw .kbupd') && !d.querySelector('#kbar .kbacct .dot'), '#2392: the update dot only at the Kalmido menu (Settings)'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account in the head bar
   w.eval(`S.about.available = null; renderSide()`);
   click(w, d.querySelector('#kbar .kbacct')); await sleep(200);  // 2.152.3 (#2619): the account in the head bar
   const home = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
@@ -80,7 +80,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // the setting: "Workspace colour", Private's default = purple
   w.eval(`settingsModal(lmOrgPaneOn() ? 'org' : 'account')`);
   const pane = await until(() => d.querySelector('.wsp-pane'));
-  check(pane && pane.querySelector('h5')?.textContent === 'Workspace colour' && /stripe on top of the sidebar/.test(pane.querySelector('.shint')?.textContent || ''), '#2389: the setting is called "Workspace colour", the hint names the stripe');
+  check(pane && pane.querySelector('h5')?.textContent === 'My colour' && /stripe on top of the sidebar/.test(pane.querySelector('.shint')?.textContent || ''), '#2389: the setting is called "My colour" (#3013), the hint names the stripe');
   const pdef = pane?.querySelector('.wsp-row[data-wsp="private"] [data-wspc=""]');
   check(pdef && /accent/.test(pdef.getAttribute('style')) && pdef.getAttribute('aria-label') === 'Default (Kalmido purple)', '#2389: Private\'s default swatch is the accent');
   d.querySelectorAll('.modal').forEach(x => x.remove());

@@ -74,6 +74,8 @@ const F21 = [head(21, 'Buchungsstapel', 13), '"Umsatz (ohne Soll/Haben-Kz)";"Sol
     check(await ready(ev, sup('j.items.length === 0')), 'the preview wrote nothing');
     await shot('p2148-d-preview.png');
     await ev(`(() => { document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, sup(`j.items.length === 1 && j.items[0].account_no === '70020'`), 60), 'taken over: one supplier');
     check(await ready(ev, `!document.querySelector('.modal #dimp-file') && /Papier Muster KG/.test([...document.querySelectorAll('#dimp-sup input')].map(i => i.value).join('|'))`, 60),
       'the dialog closed, the suppliers list shows the creditor');

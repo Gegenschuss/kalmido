@@ -9,6 +9,8 @@ Key model:
   fields      = "kenc1:" + base64url(nonce | ciphertext), AES-256-GCM with the org key, AAD = "kenc1|<org id>|<table.column>"
   files       = b"KENC1\\n" + org id (8 bytes, big endian) + nonce + ciphertext, AAD = header + ctx (b"file"); the org id in the
                 header keeps a file readable after its list moved to another organisation
+Nonces: 12 random bytes per encryption, no counter (2.360.0 A, #2496): safe up to about 2^32 encryptions per key; a key
+in use for that long is renewed (orgcrypt_cli rotate, docs/SELF-HOSTING.md) -- no format change needed.
 Without a master key nothing is encrypted (everything plain as before); reading plain values / files always works (no
 prefix / magic = unchanged), so the start-up run (oc_migrate) and the way back (admin/orgcrypt_cli.py decrypt-all) can be
 repeated at any point. Deleting an organisation deletes its key row: what stays in

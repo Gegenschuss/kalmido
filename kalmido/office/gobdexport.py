@@ -6,7 +6,10 @@ their positions, payments, receipts, cash book, clients, opening balances, the o
 the office rights.
 
 CSV: UTF-8, ';', CRLF, text in double quotes, decimal comma, dates DD.MM.YYYY, no header line (the columns are in
-index.xml). Only finalised documents; drafts are no bookings. Admins (and the accounting role) of the office area."""
+index.xml). Only finalised documents; drafts are no bookings. Admins (and the accounting role) of the office area.
+2.356.0 (#3097): no trial invoices (as DATEV and the bookkeeping export); the formula guard of text columns (a leading
+' before = + - @, review of #2471) stays and index.xml says so; receipts left out (no date / no amount) are named in
+missing.txt and counted in index.xml."""
 import csv
 import io
 import json
@@ -21,6 +24,7 @@ from ..core.i18n import tr
 from ..core.db import db, local_now
 from ..core.orgcrypt import oc_dec_fields
 from ..personal.timetrack import BadInput
+from .books import bk_gaps_text
 from .calc import dec, money
 from .model import office_gate, office_org, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_log
@@ -68,7 +72,7 @@ class _Tbl:
                 out.append(_d(v))
             else:
                 v = str(v if v is not None else "").replace("\r", " ").replace("\n", " ").replace("\t", " ")
-                out.append("'" + v if v[:1] in ("=", "+", "-", "@") else v)  # no formula when a spreadsheet opens it
+                out.append("'" + v if v[:1] in ("=", "+", "-", "@") else v)  # no formula when a spreadsheet opens it (named in index.xml)
         self.w.writerow(out)
         self.n += 1
 
@@ -88,8 +92,8 @@ class _Tbl:
                 "        <TextEncapsulator>\"</TextEncapsulator>\n" + "\n".join(cols) + "\n      </VariableLength>\n    </Table>\n")
 
 
-def gx_tables(c, oid, frm, to):
-    """The tables of the export for [frm, to] (ISO days)."""
+def gx_tables(c, oid, frm, to, gaps=None):
+    """The tables of the export for [frm, to] (ISO days). gaps: see books.bk_receipts (2.356.0, #3097)."""
     from .datev import dx_rows
     from .books import bk_receipts
     s = office_settings(c, oid)
@@ -107,7 +111,7 @@ def gx_tables(c, oid, frm, to):
 
     docs = c.execute("SELECT d.*, cl.name AS cl_name, cl.customer_no AS cl_no FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
                      "WHERE d.org_id=? AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.date>=? AND d.date<=? "
-                     "ORDER BY d.date, d.number", (oid, frm, to)).fetchall()
+                     "AND d.trial=0 ORDER BY d.date, d.number", (oid, frm, to)).fetchall()
     t = _Tbl("invoices.csv", "Rechnungen", "Festgeschriebene Rechnungen und Gutschriften",
              [("ID", A), ("Art", A), ("Nummer", A), ("Datum", D), ("Kunde", A), ("Kundennummer", A), ("Netto", N), ("Steuer", N),
               ("Brutto", N), ("Waehrung", A), ("Status", A), ("Festgeschrieben", D), ("Storno_von", A)])
@@ -132,14 +136,14 @@ def gx_tables(c, oid, frm, to):
     t = _Tbl("payments.csv", "Zahlungen", "Zahlungseingaenge auf Rechnungen",
              [("ID", A), ("Rechnung_ID", A), ("Rechnungsnummer", A), ("Datum", D), ("Betrag", N), ("Zahlart", A)])
     for r in c.execute("SELECT p.*, d.number FROM office_payments p JOIN office_docs d ON d.id=p.doc_id WHERE p.org_id=? AND p.date>=? "
-                       "AND p.date<=? ORDER BY p.date, p.id", (oid, frm, to)).fetchall():
+                       "AND p.date<=? AND d.trial=0 ORDER BY p.date, p.id", (oid, frm, to)).fetchall():
         t.add(r["id"], r["doc_id"], r["number"], r["date"], r["amount"], r["method"])
     out.append(t)
 
     t = _Tbl("receipts.csv", "Belege", "Eingangsbelege (Belegfach) nach Belegdatum",
              [("Beleg_ID", A), ("Belegdatum", D), ("Bezahlt_am", D), ("Brutto", N), ("USt_Satz", A), ("Netto", N), ("USt", N),
               ("Kategorie", A), ("Datei", A)])
-    for r in bk_receipts(c, oid, frm, to, uid=0, by="doc"):
+    for r in bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps):
         t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", r["amount"], r["vat_pct"] or "", r["net"], r["vat"],
               r["category"], r["title"])
     out.append(t)
@@ -194,13 +198,16 @@ def _next_day(d):
 
 
 def gx_zip(c, oid, frm, to):
-    tables = gx_tables(c, oid, frm, to)
+    gaps = {}
+    tables = gx_tables(c, oid, frm, to, gaps)
+    left = len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ())
     co = ofx_company(c, oid) or {}
     name = (co.get("name") or "").strip() or "Kalmido"
     loc = " ".join(x for x in ((co.get("zip") or "").strip(), (co.get("city") or "").strip()) if x)
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE DataSet SYSTEM "' + GX_DTD_NAME + '">\n<DataSet>\n  <Version>1.0</Version>\n'
            f"  <DataSupplier><Name>{escape(name)}</Name><Location>{escape(loc)}</Location>"
-           f"<Comment>{escape(f'Kalmido, Zeitraum {_d(frm)} - {_d(to)}')}</Comment></DataSupplier>\n"
+           f"<Comment>{escape(f'Kalmido, Zeitraum {_d(frm)} - {_d(to)}. Textspalten, die mit = + - @ beginnen, tragen ein vorangestelltes Hochkomma (Formelschutz)'
+                                  + (f', {left} Belege ohne Datum oder Betrag nicht enthalten (missing.txt)' if left else ''))}</Comment></DataSupplier>\n"
            f"  <Media>\n    <Name>{escape(f'Kalmido {frm} {to}')}</Name>\n" + "".join(t.xml(frm, to) for t in tables) + "  </Media>\n</DataSet>\n")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -208,7 +215,9 @@ def gx_zip(c, oid, frm, to):
         z.writestr(GX_DTD_NAME, GX_DTD.encode("utf-8"))  # 2.188.0 A (#2498)
         for t in tables:
             z.writestr(t.url, t.buf.getvalue().encode("utf-8"))
-    return buf.getvalue(), {t.url: t.n for t in tables}
+        if left:
+            z.writestr("missing.txt", bk_gaps_text(gaps).encode("utf-8"))
+    return buf.getvalue(), dict({t.url: t.n for t in tables}, **({"missing.txt": left} if left else {}))
 
 
 def _span():
@@ -235,7 +244,9 @@ def gx_export_get():
     oid = office_org(c, uid, admin=True)
     frm, to = _span()
     if request.args.get("check") == "1":
-        return {"from": frm, "to": to, "counts": {t.url: t.n for t in gx_tables(c, oid, frm, to)}}
+        gaps = {}
+        counts = {t.url: t.n for t in gx_tables(c, oid, frm, to, gaps)}
+        return {"from": frm, "to": to, "counts": counts, "left_out": len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ())}
     data, counts = gx_zip(c, oid, frm, to)
     ofx_log(c, oid, "export", target="gobd", detail={"from": frm, "to": to, "counts": counts})
     c.commit()

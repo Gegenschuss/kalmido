@@ -307,7 +307,8 @@ check(all(r[0] for r in dbx("SELECT enabled FROM webhooks WHERE id=?", (wb["id"]
 wsl = mk(Bo, STUB + "/slow", ["task.created"], "slow")
 Bo.post(B + "/api/tasks", json={"title": "slow"})
 lg = wait_for(lambda: Bo.get(B + f"/api/me/webhooks/{wsl['id']}/log").json()["items"], 25)
-check(lg and lg[-1]["error"] == "timeout" and 9000 <= lg[-1]["ms"] <= 12500, "10 s timeout " + str(lg[-1:]))
+# 2.360.0 (#2496): a host of the allow-list answers one error for timeout / TLS / network (no port-scan hints)
+check(lg and lg[-1]["error"] == "network" and 9000 <= lg[-1]["ms"] <= 12500, "10 s timeout " + str(lg[-1:]))
 Bo.delete(B + f"/api/me/webhooks/{wsl['id']}")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")

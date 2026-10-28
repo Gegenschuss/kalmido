@@ -149,7 +149,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w.eval(`shareModal(${L.id})`); await sleep(300);
   check(d.querySelector('.modal.shmodal') && !d.querySelector('.modal #l-pub'), 'switched off: no public link section');
   d.querySelector('.modal').remove();
-  await call(ca, 'PATCH', '/api/admin/settings', {public_links: true});
+  await call(ca, 'PATCH', '/api/admin/settings', {public_links: true, password: 'password123'});  // 2.360.0 (#2496): on again asks for the password
   // "via API" in the history
   const ha = (await call(ca, 'GET', '/api/state')).tasks.find(t => t.title === 'From HA');
   w.close();

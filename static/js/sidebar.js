@@ -116,6 +116,7 @@ function multiMoreMenu(a) {
     ...tp_menuItems(one, a),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
     ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
     ...(ids.length && ids.some(i => canEdit(taskById(i))) ? dgMenuItems(ids) : []),  // 2.43.0 (#1003): Subtasks of… / Out of the parent task
+    ...ml_multiItems(ids, a),  // 2.320.0 (#3289): Show also in project…
     {label: tr('Select all'), icon: 'all', fn: () => { vl_ids().forEach(i => S.multi.add(i)); render(); }},  // 2.65.0 (#1825): also the rows a long list does not draw
     ...(clnSel() ? [{label: tr('Tidy up…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(clnSel().id, ids)}] : []),  // 2.39.0 (#1151)
     '-',

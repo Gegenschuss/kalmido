@@ -290,19 +290,20 @@ def fq_client(c, f, email, name, lg):
     """(client id or None, a note for the task) for a sent questionnaire with client_match on. Only the list's space: the
     client of the list itself, else the ONE client of the list's organisation (or the list owner's private clients) with
     this address (client e-mail, contact persons, linked address book contacts -- hub/hubmail.py hbm_match). Unknown:
-    a new client there when the form allows it (client_new), else a note."""
+    a new client there when the form allows it (client_new), else a note. 2.360.0 D (#2496): -> + typed: True when the
+    client comes only from the typed address (anyone can type it: the entry marks it unconfirmed, the note says so)."""
     from ..hub.hubmail import hbm_match
     lr = c.execute("SELECT client_id, org_id FROM lists WHERE id=?", (f["list_id"],)).fetchone()
     if lr and lr["client_id"]:
         cl = c.execute("SELECT id, name, org_id, created_by FROM clients WHERE id=?", (lr["client_id"],)).fetchone()
         if cl and cl["org_id"] == lr["org_id"] and (cl["org_id"] or cl["created_by"] == f["l_owner"]):
-            return cl["id"], tr("Client: {0}", cl["name"], lg=lg)
+            return cl["id"], tr("Client: {0}", cl["name"], lg=lg), False
     if not email:
-        return None, ""
+        return None, "", False
     cid = hbm_match(c, f["l_owner"], f["l_org"], [email.lower()])
     if cid:
         cl = c.execute("SELECT name FROM clients WHERE id=?", (cid,)).fetchone()
-        return cid, tr("Client: {0}", cl["name"] if cl else "", lg=lg)
+        return cid, tr("Client: {0}", cl["name"] if cl else "", lg=lg) + " " + tr("(by the typed e-mail address, not confirmed)", lg=lg), True
     from .clients import clients_on
     if f["client_new"] and clients_on(c, f["l_owner"]) and not hit_limit(f"fqnc:{f['id']}", FQ_NEW_CLIENTS_DAY, 86400):
         from ..core.pg import insert_id
@@ -310,8 +311,8 @@ def fq_client(c, f, email, name, lg):
         nm = (name or email)[:80]
         cid = insert_id(c, "INSERT INTO clients(org_id,name,email,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?)",
                         (f["l_org"], nm, email, f["l_owner"], ts, ts))
-        return cid, tr("New client created: {0} <{1}> (please check)", nm, email, lg=lg)
-    return None, tr("Client unknown: {0}", email, lg=lg)
+        return cid, tr("New client created: {0} <{1}> (please check)", nm, email, lg=lg), False
+    return None, tr("Client unknown: {0}", email, lg=lg), False
 
 
 # ---- 2.102.0 C (#2201): the client link -- the form's link with ?k=<client id>.<signature> (server key, form id, client id):
@@ -405,9 +406,9 @@ def fq_client_forms(cid):
     return jsonify(forms=out)
 
 
-def fq_entry_save(c, tid, f, cid, sender, email, ans):
-    c.execute("INSERT INTO form_entries(task_id,form_id,client_id,sender,email,answers,created_at) VALUES(?,?,?,?,?,?,?)",
-              (tid, f["id"], cid, sender[:120], email[:200], json.dumps(ans, ensure_ascii=False), iso(now_utc())))
+def fq_entry_save(c, tid, f, cid, sender, email, ans, typed=False):
+    c.execute("INSERT INTO form_entries(task_id,form_id,client_id,sender,email,answers,created_at,client_typed) VALUES(?,?,?,?,?,?,?,?)",
+              (tid, f["id"], cid, sender[:120], email[:200], json.dumps(ans, ensure_ascii=False), iso(now_utc()), 1 if typed and cid else 0))
 
 
 # ---- the evaluation (people who manage the form)
@@ -433,7 +434,8 @@ def fq_entries(c, f):
             ans = {}
         cl = {"id": r["client_id"], "name": r["cl_name"]} if r["client_id"] and r["cl_org"] == lorg else None
         out.append({"task_id": r["task_id"], "title": r["title"], "done": r["status"] != 0, "created_at": r["created_at"],
-                    "sender": r["sender"], "email": r["email"], "client": cl, "answers": ans if isinstance(ans, dict) else {}})
+                    "sender": r["sender"], "email": r["email"], "client": cl, "answers": ans if isinstance(ans, dict) else {},
+                    "client_typed": bool(cl and r["client_typed"])})  # 2.360.0 D (#2496): only by the typed address (unconfirmed)
     return out
 
 

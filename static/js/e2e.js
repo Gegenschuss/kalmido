@@ -251,7 +251,7 @@ function e2eCodeDlg(code) {
 function e2eCodePrint(code) {
   const p = document.createElement('div');
   p.className = 'e2eprint';
-  p.innerHTML = `<h1>${esc(tr('Kalmido recovery code'))}</h1><p>${esc(S.me?.display_name || '')} · ${esc(location.host)} · ${esc(new Date().toLocaleDateString())}</p>
+  p.innerHTML = `<h1>${esc(tr('Kalmido recovery code'))}</h1><p>${esc(S.me?.display_name || '')} · ${esc(location.host)} · ${esc(fmtDateNum(new Date()))}</p>
     <code>${esc(code)}</code><p>${esc(tr('With this code you can set a new passphrase if you forget it. Keep it in a safe place. Without passphrase and recovery code your locked notes, encrypted files and messages are lost; nobody can restore them, not even the operator.'))}</p>`;
   document.body.appendChild(p); document.body.classList.add('e2eprinting');
   const done = () => { p.remove(); document.body.classList.remove('e2eprinting'); window.removeEventListener('afterprint', done); };
@@ -381,7 +381,9 @@ async function e2eNoteLoad(tid) {
   let j;
   try { j = await rawFetch('GET', `/api/tasks/${tid}/enc-note`); }
   catch (x) { E2E.notes[tid] = {tid, text: '', open: true, err: x.status !== 404}; if (x.status === 404) E2E.notes[tid].err = false; if (S.sel === tid) renderDetail(); return; }
-  try { E2E.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpen(E2E.ckey, j.body, e2eNoteAad(tid))), open: true}; }
+  // 2.362.0 (#3090): after an account move the note may carry the old server's AAD (sealed anew on the next save)
+  const old = /^kalmido-note:v1:\d+:\d+$/.test(j.legacy_aad) ? j.legacy_aad : '';
+  try { E2E.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpenAny(E2E.ckey, j.body, [e2eNoteAad(tid), old])), open: true}; }
   catch { E2E.notes[tid] = {tid, text: '', open: true, err: true}; }
   if (S.sel === tid) renderDetail();
 }

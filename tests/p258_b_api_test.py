@@ -152,7 +152,7 @@ check(sum(money(v) for v in (ln.get("taxes") or {}).values()) == money(ln.get("t
 qb = {t["rate_key"]: money(t["base"]) for t in off["tax_lines"]}
 check(sum(qb.values()) == money(off["net"]) == Decimal("240.03"), f"#1759: the quotation's bases add up to its net {qb} {off['net']}")
 for mode in ("full", "title", "summary"):
-    r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode})
+    r = A.post(B + f"{D}/{DOC}/invoice", json={"parts_mode": mode, "force": True})  # 2.356.0 (#3003): a further full invoice from the same quotation only with force (else 409 invoice_exists)
     check(r.status_code == 201, f"#1759: invoice {mode} " + r.text[:200])
     t = r.json().get("totals", {})
     ib = {x["rate_key"]: money(x["base"]) for x in t.get("tax_lines", [])}

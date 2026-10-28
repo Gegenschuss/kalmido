@@ -96,7 +96,8 @@ def approval_apply(c, tid, b):
             assignment_events(c, tid, old, ap)
         return one_task(c, tid)
     if act == "cancel":
-        need_task(c, tid, write=False, full=True)  # 2.36.2 (#1142): former members cannot withdraw (404)
+        # 2.36.2 (#1142): former members cannot withdraw (404); 2.360.0 D (#2496): nor who only reads the project now (403)
+        need_task(c, tid, write=True, full=True)
         role = list_role(c, t["list_id"])
         if not t["approval"] or not (t["assigned_by"] == uid or t["created_by"] == uid or role in MANAGE_ROLES):
             raise Denied(403, tr("Only the person who asked or a project admin can withdraw the request"))

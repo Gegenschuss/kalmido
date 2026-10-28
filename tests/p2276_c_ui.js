@@ -24,10 +24,10 @@ const WANT = '## Intro\n[[Other]]\n![pic](/api/files/nodes/999/content)\n- Alpha
   await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call(CA, 'GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'notes'])].join(',');
-  await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
+  await call(CA, 'PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
   const fu = await call(CA, 'POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   const CF = await login('frida');
-  await call(CF, 'PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
+  await call(CF, 'PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
   check(fu.id && ((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'setup: frida has no organisation');
   const runs = [];
   for (const [who, ck] of [['alice', CA], ['frida', CF]]) {

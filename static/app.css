@@ -1827,6 +1827,7 @@ body.tdrag .sdrop{display:flex}
 .tpk .tpl{color:var(--muted);font-size:var(--fs-s)}
 .tpin{flex:1;font:var(--fs-l) var(--mono);font-variant-numeric:tabular-nums;padding:.375rem .5rem}
 .tpin.bad{border-color:var(--danger)}
+#l-name[aria-invalid="true"]{border-color:var(--danger)}  /* 2.354.0 C (#3013): New project without a name */
 .tpcols{display:grid;grid-template-columns:3fr 2fr;gap:.625rem}
 .tph,.tpm{display:grid;gap:2px;align-content:start}
 .tph{grid-template-columns:repeat(6,1fr)}
@@ -2208,6 +2209,21 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
   /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
+/* 2.350.0 A (#2793): the desktop composer: tools, box, Stop and Send on one line with one height (2.75rem, the touch size) and one rounding;
+   Send is an icon button (its word only in a wide chat); "Ctrl+Enter sends" is the Send button's title, no own line. The
+   narrow chat panel / window (#achat, agentchat.css) puts the tools behind the plus like the phone (#2788) */
+.chcomp > .chkh{display:none}
+@media (min-width:900px){
+  .chcomp{gap:.375rem;padding:.5rem .75rem;align-items:flex-end}
+  .chcomp textarea{min-height:2.75rem;padding:.6875rem .75rem;border-radius:var(--radius)}
+  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chstop,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
+}
+/* 2.350.0 A (#2790): the team chat on the phone: one header (the app header steps aside while a conversation is open, like
+   the agent chat), a long name stays on one line */
+.tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
@@ -2226,7 +2242,7 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
 /* 2.13.0: the app resizes beside the panel. 2.13.2 (#478 N1): the whole app (sidebar | list | task), not only the list
    area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
-@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(var(--chatW,26rem),40vw)} #achat{width:min(var(--chatW,26rem),40vw)}}
+@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:var(--chatW,26rem)} #achat{width:var(--chatW,26rem)}}
 body.chat-yield #achat{display:none}
 /* 2.29.0 (#363): the chat as a pop-up window (desktop) and its round button bottom right; neither takes room from the page */
 #achat.float{top:auto;left:auto;right:1.25rem;bottom:1.25rem;width:min(24rem,calc(100vw - 2rem));height:min(36rem,calc(100vh - 2.5rem));border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;z-index:62}
@@ -2650,6 +2666,8 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   @container dtop (min-width:23rem) and (max-width:27.99rem){
     .dtop .dq{padding:0 .625rem}
     .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+    .dtop .dq[data-d="-1"]{padding:0}  /* 2.354.0 C (#3326): "-1 day" stays a small arrow on a phone: the date keeps its room */
+    .dtop .dq[data-d="-1"] .dql{display:none}
   }
 }
 #detail{overflow-x:hidden}
@@ -2919,6 +2937,10 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .povempty{font-size:var(--fs-m);padding:.25rem 0}
 .povmd{cursor:default;font-size:var(--fs-b)}
 #pov-desc-in{width:100%;min-height:10rem;font:inherit;font-size:var(--fs-b);line-height:1.5;resize:vertical}
+/* 2.380.2 (#3399): the description fills its widget (a taller widget = a taller field / text) and grows with its text */
+#pov-desc:not(.povs-empty){display:flex;flex-direction:column}
+#pov-desc > #pov-desc-in,#pov-desc > .povmd{flex:1 0 auto}
+#pov-desc > .povbar{flex:none}
 .povbar{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:var(--fs-s)}
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
@@ -3074,6 +3096,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 #top .cmdbar{height:2.25rem;border-radius:1.125rem;padding:0 .5rem 0 .75rem;background:var(--bg2);flex:1 1 15rem;max-width:23.75rem;min-width:9rem;width:auto}
 #top .cmdbar>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #top:is(.tl1,.tl2,.tl3,.tl4) .cmdbar{flex:none;min-width:0;padding:0 .625rem}
+@media not all and (hover:hover) and (pointer:fine){ #top .cmdbar .kbs{display:none} }  /* 2.354.0 C (#3013): no "Ctrl K" hint where there is no keyboard to press it on */
 #top .tnew{height:2rem;border-radius:var(--radius);padding:0 .75rem;font-weight:600;font-size:var(--fs-m);flex:none}
 #top:is(.tl1,.tl2,.tl3,.tl4) .tnew>span{display:none}
 #top:is(.tl1,.tl2,.tl3,.tl4) .tnew{padding:0;width:2rem}
@@ -3440,6 +3463,9 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 /* a field changed elsewhere while it was edited: a calm bar under it, the draft stays */
 .cfbar{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin:.375rem 0;padding:.375rem .5rem;border-radius:var(--radius);background:var(--wait-soft);border:1px solid color-mix(in srgb,var(--st-wait) 45%,transparent);font-size:var(--fs-s);color:var(--text)}
 .cfbar span{flex:1 1 12rem}
+/* 2.359.0 A (#3024): a task text whose save failed (attachments.js unsavedMark): tried again, the field says so */
+.unsaved{box-shadow:inset .1875rem 0 0 var(--warn)}
+.unsv{margin:.25rem 0;font-size:var(--fs-s);color:var(--warn)}
 @media (pointer:coarse){ .cfbar .btn{min-height:2.75rem} }
 .att.broken .as{color:var(--danger)}
 .att.broken .as{color:var(--danger)}
@@ -4757,7 +4783,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .wlwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0}
 .wltable{border-collapse:collapse;width:100%;min-width:36rem}
 .wltable th,.wltable td{padding:.375rem .5rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-weight:400}
-.wltable thead th{font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.wltable thead th{font-size:var(--fs-s);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
 .wlp{display:flex;align-items:center;gap:.5rem;min-width:9rem}
 .wln{display:flex;flex-direction:column;min-width:0}
 .wlcap{font-size:var(--fs-xs);color:var(--muted);text-align:left;padding:0;min-height:1.5rem}
@@ -4768,7 +4794,9 @@ button.lkchip:hover{border-color:var(--accent)}
 .wlc.lv-warn .wlbar i,.wlk.lv-warn{background:var(--p3)}
 .wlc.lv-over .wlbar i,.wlk.lv-over{background:var(--danger)}
 .wlk.lv-ok{background:var(--ok)}
-.wlt{font:var(--fs-s)/1.2 var(--mono)}
+.wlt{font:var(--fs-s)/1.2 var(--sans);font-variant-numeric:tabular-nums}  /* 2.380.0 A (#3408): normal type, not the mono face */
+.wlt small{display:block}.wlun{font-size:var(--fs-xs);color:var(--muted)}
+.wltable thead th .wlw1,.wltable thead th .wlw2{display:block}.wltable thead th .wlw2{font-size:var(--fs-xs)}
 .wlc.lv-over .wlt b{color:var(--danger)}
 .wllegend{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;font-size:var(--fs-s)}
 .wlk{display:inline-block;width:.75rem;height:.375rem;border-radius:62.5rem;margin-left:.5rem}
@@ -4948,7 +4976,11 @@ button.lkchip:hover{border-color:var(--accent)}
   @container dtop (min-width:20rem) and (max-width:27.99rem){
     .dtop .dq{padding:0 .625rem}
     .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+    .dtop .dq[data-d="-1"]{padding:0}  /* 2.354.0 C (#3326): "-1 day" stays a small arrow on a phone: the date keeps its room */
+    .dtop .dq[data-d="-1"] .dql{display:none}
   }
+  /* 2.354.0 C (#3326): a 360 px phone with three quick buttons: only "Today" keeps its word, so the date stays whole */
+  @container dtop (max-width:21.99rem){ .dtop:has(.dq[data-d="-1"]) .dq:not([data-d="0"]){padding:0} .dtop:has(.dq[data-d="-1"]) .dq:not([data-d="0"]) .dql{display:none} }
 }
 /* UX-56: "Saved" in the task header for a moment after a change reached the server */
 .dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok-t);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
@@ -5970,6 +6002,10 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 [data-ly="today"] > .lyb > .lymore{background:none}
 [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:2.25rem}
 @media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] > .lymore{top:0} [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead{padding-right:3rem} }
+/* 2.354.0 C (#3009): the head of "Overdue" carries "All to today" / "Another day…": its right edge keeps clear of the block's "…"
+   (the button's width + its offset), so the two never overlap at any width */
+[data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:3.25rem}
+@media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:4rem} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */
 /* 2.46.2 (#1452): the evening review card (only after the end of the working hours) keeps its "Hide for today" x clear of the … button */
@@ -6012,6 +6048,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .fxsum .lc-f{justify-content:flex-end}
 .fxsb{display:inline-flex;align-items:baseline;gap:.25rem;max-width:100%;min-height:1.5rem;padding:0 .25rem;margin:0 -.25rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:600 var(--fs-s)/1.2 var(--sans);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fxsb i{font:500 var(--fs-xs)/1.2 var(--mono);font-style:normal;color:var(--muted)}
+.fxst{cursor:default}.fxst:hover{background:none}
 .fxsb:hover{background:var(--bg3)}.fxsb:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 @media (max-width:899px){ .fxsum{display:none} }
 @container lrows (max-width:48rem){ .fxsum{display:none} }
@@ -7362,7 +7399,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 @media (pointer:coarse){.ftxtbar input{min-height:2.75rem}}
 
 /* 2.62.0 C (#1485): the head of the list and folder settings (name, "Saved · Undo", close) stays on top while the dialog scrolls */
-.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:0;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
+.lmodal .card>.lhdr,.fsmodal .card>.lhdr{position:sticky;top:-1.25rem;z-index:3;background:var(--bg2);margin:-1.25rem -1.25rem .5rem;padding:1rem 1.25rem .5rem}
+/* 2.350.0 D (#2745): top:-1.25rem - the sticky edge lies inside the card's 1.25rem padding, top:0 pushed the head 20 px down over the first row */
 /* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
 .cmsg.csdpend .cbub{opacity:.6}
 .cmsg.csdpend .cmeta{opacity:.8}
@@ -7603,6 +7641,27 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .mlm svg.i{flex:0 0 auto;color:var(--accent)}
 @media (max-width:40rem){.meta .mlm{max-width:8rem}}
+/* 2.320.0 (#3289): the field Projects in the task panel; Alt onto a project in the sidebar (the hint while dragging) */
+#detail .dmlp{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.125rem 0 .5rem;font-size:var(--fs-s);color:var(--text2)}
+#detail .dmlpk{color:var(--muted);margin-right:.125rem}
+#detail .mlp{display:inline-flex;align-items:center;gap:.25rem;max-width:14rem;min-height:1.75rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:999rem;min-width:0}
+#detail .mlp.own{background:var(--bg3)}
+#detail .mlp>span,#detail .mlpn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#detail .mlp svg.i{flex:0 0 auto;color:var(--muted)}
+#detail .mlp:has(.mlpx){padding-right:0}
+#detail .mlpn{display:inline-flex;align-items:center;gap:.25rem;min-width:0;min-height:1.5rem;color:inherit}
+#detail .mlpn:hover{color:var(--text)}
+#detail .mlpx{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:1.5rem;min-height:1.5rem;border-radius:999rem;color:var(--muted)}
+#detail .mlpx:hover{background:var(--bg3);color:var(--text)}
+#detail .mlpadd{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem;min-width:1.75rem;justify-content:center;padding:0 .5rem;border:1px dashed var(--line2);border-radius:999rem;color:var(--accent)}
+#detail .mlpadd:hover{background:var(--accent-soft)}
+@media (pointer:coarse){ #detail .mlpadd{min-height:2.75rem;min-width:2.75rem} }  /* Sammelzug 2.376 (p260): a full touch target */
+.srow.mlalt,.srow.mlno,.srow.mlhint{position:relative}
+.srow.mlalt{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.srow.mlno{box-shadow:inset 0 0 0 2px var(--line2)}
+.srow.mlalt::after,.srow.mlno::after,.srow.mlhint::after{content:attr(data-ml);position:absolute;right:.375rem;top:50%;transform:translateY(-50%);z-index:2;pointer-events:none;
+  padding:.125rem .5rem;border-radius:999rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:600;white-space:nowrap;max-width:75%;overflow:hidden;text-overflow:ellipsis}
+.srow.mlno::after,.srow.mlhint::after{background:var(--bg4);color:var(--text2);font-weight:400}
 /* 2.71.0 A (#1457) rules of a list: rows in the list settings, the mark on rule comments, the proposal card */
 .rul-row{align-items:flex-start;gap:.5rem}
 .rul-row.off .rul-txt{opacity:.6}
@@ -8210,7 +8269,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #srail .srbs,#srail .srfoot{display:flex;flex-direction:column;gap:.125rem}
 #srail .srfoot{margin-top:auto;padding-top:.5rem;align-items:stretch}
 .srb{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1875rem;width:100%;padding:.4375rem .125rem .375rem;border-radius:var(--radius);color:var(--muted);font-size:.6875rem;line-height:1.15;text-align:center}
-.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;hyphens:auto;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names (Einstellungen, Gewohnheiten) wrap to a second line instead of being cut */
+.srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:break-word;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names (Einstellungen, Gewohnheiten) wrap to a second line instead of being cut */  /* 2.354.0 C (#3013): no hyphenation (it cut words with a hyphen sign) */
 /* 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar" off: icons only, a narrower bar (detail.js srW), the name as title */
 :root.rail-nolabel{--srW:3.25rem}
 :root.rail-nolabel .srb .srbn{display:none}
@@ -8301,6 +8360,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbfirm>svg.i{width:.75rem;height:.75rem;flex:none;opacity:.7}
 #kbar .kbsw:hover .kbfirm,#kbar .kbsw:focus-visible .kbfirm,#kbar .kbsw[aria-expanded="true"] .kbfirm{background:color-mix(in srgb,var(--accent) 15%,var(--kbbg,var(--bg2)));color:var(--text)}
 #kbar .kbsw:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:.5rem}  /* 2.165.8 (#2619): the ring on the switch itself (p2160_a11y) */
+#kbar .kbsw{position:relative}
+#kbar .kbupd{position:absolute;top:.125rem;left:1.375rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--kbbg,var(--bg2))}  /* 2.380.2 (#3400): an update, now that Settings sits in this menu */
 #kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s,.8125rem);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}

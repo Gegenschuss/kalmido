@@ -6,7 +6,7 @@
    tampered / broken / unknown signer / too long -> 400, nothing stored; the other kind -> 400; a member -> 403 for the
    server licence; DELETE + POST .../swap (undo / redo); the raw key never in /api/about, /api/supporter, /api/state,
    /api/export.json; agents 403
- - the yearly hint: admins only, not in the first 30 days, not with a licence, switchable off, "seen" = a year quiet
+ - the yearly hint: admins only, not in the first year (2.320, #3291), not with a licence, switchable off, "seen" = a year quiet
  - KALMIDO_SUPPORT_URL: only https
  - a hosted server: every route 404 and /api/about without the fields
 usage: p274_a_api_test.py <datadir>"""
@@ -95,7 +95,7 @@ Bo = sess("bob")
 j = A.get(B + "/api/about").json()
 check(j.get("supporter") is None and j.get("supporter_me") is None, "about: no licence yet")
 check(j.get("support_url") == "https://pay.example.com/kalmido", "about: the payment link")
-check(j.get("sup_nudge") is False, "a new server: no hint in the first 30 days")
+check(j.get("sup_nudge") is False, "a new server: no hint in the first year")
 jb = Bo.get(B + "/api/about").json()
 check("support_url" in jb and "sup_nudge" not in jb and "sup_nudge_on" not in jb, "a member: no hint fields at all")
 
@@ -155,7 +155,7 @@ check(ag.put(B + "/api/supporter/person", json={"key": PER}).status_code in (401
 
 # ---- the yearly hint (admins only)
 sql("UPDATE users SET created_at='2025-01-01T00:00:00Z'")
-check(A.get(B + "/api/about").json().get("sup_nudge") is True, "after 30 days without licence: the admin's hint is due")
+check(A.get(B + "/api/about").json().get("sup_nudge") is True, "after a year without licence: the admin's hint is due")
 check("sup_nudge" not in Bo.get(B + "/api/about").json(), "never for a member")
 check(Bo.patch(B + "/api/supporter/nudge", json={"seen": True}).status_code == 403, "a member cannot touch the hint")
 r = A.patch(B + "/api/supporter/nudge", json={"seen": True})

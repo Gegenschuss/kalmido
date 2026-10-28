@@ -129,6 +129,8 @@ OWN_ROUTES = {
     "POST /api/office/meals/<int:mid>/file/<int:fid>/restore", "GET /api/office/meals/<int:mid>/pdf",
     # 2.187.1 B (#2735): the person's own reports (filtered like the lists; the files for the tax adviser keep the special "export")
     "GET /api/office/trips/report", "GET /api/office/trips/vma", "GET /api/office/meals/report", "GET /api/office/logbook/report",
+    # 2.356.0 D (#3129): hand in a receipt and see the own ones handed in (office/rcsubmit.py filters by the person)
+    "POST /api/office/receipts/submit", "GET /api/office/receipts/mine",
 }
 
 TPL_LEGACY = "legacy"

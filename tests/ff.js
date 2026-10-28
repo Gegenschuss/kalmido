@@ -8,6 +8,7 @@ const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path'), net = require('net');
 const WS = globalThis.WebSocket || require('ws');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const {clockOffset, shiftedDate} = require('./boot');  // 2.381.0 (#2713)
 // 2.284.0 A (#3120): a port the system hands out free - a random one of 9300-9899 could be the port of another suite's Firefox
 // on the same machine (parallel places / shards): the connection went to that one ("session.new: Maximum number of active sessions")
 const freePort = () => new Promise(res => { const s = net.createServer(); s.on('error', () => res(9300 + Math.floor(Math.random() * 600)));
@@ -58,6 +59,10 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       ws.onmessage = onmsg;
       await cmd('session.new', {capabilities: {}});
     });
+    // 2.381.0 (#2713): the test clock in Firefox too - with KALMIDO_TEST_NOW (run_all.sh `now …`) every page gets the shifted
+    // Date of boot.js before its own scripts (only "now" moves; time zone, timers and dates with arguments stay; workers keep
+    // the real clock)
+    if (clockOffset) await cmd('script.addPreloadScript', {functionDeclaration: `() => { window.Date = (${shiftedDate})(window.Date, ${clockOffset}); }`});
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
     // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows

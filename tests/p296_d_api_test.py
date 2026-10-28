@@ -23,6 +23,7 @@ import time
 import requests
 
 import dbx as dbxm
+from kt import su_get  # 2.360.0 (#2496): the step-up before a download
 from freelancer_fixture import FEATURES, freelancer
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -146,7 +147,7 @@ for _ in range(480):
     if A.get(B + f"/api/orgs/{ORG}/export").json().get("state") != "running":
         break
     time.sleep(0.25)
-OX = A.get(B + f"/api/orgs/{ORG}/export/file").content
+OX = su_get(A, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): the step-up
 RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
 check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
 

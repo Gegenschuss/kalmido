@@ -155,6 +155,7 @@ document.addEventListener('click', async e => {
   const a = b.dataset.nwl, d = NWL.d;
   if (a === 'imp-cancel') { NWL.imp = null; nwl_draw(); return; }
   if (a === 'imp-go') {
+    if (!await importTargetConfirm({what: tr('the data of the file'), ws: NWL.ws, place: tr('Newsletter')})) return;  // 2.356.0 B (#2934): the target in words (#1940)
     b.disabled = true;
     try { const r = await nwl_impCall(true); NWL.imp = null; nwl_load(); toast(tr('{0} consents recorded', r.applied)); } catch { b.disabled = false; }
     return;

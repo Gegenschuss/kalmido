@@ -152,6 +152,7 @@ KINDS = {
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
                         "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
+    "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
@@ -197,7 +198,7 @@ ROUTES = {
     "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "GET /api/admin/storage-check": "admin",
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
-    "GET /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
+    "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
     "POST /api/admin/backups/restore": "admin",
     # 2.143.0 B (#2152): the off-site target of the backups (instance admins, p2143_b_api_test.py)
@@ -494,6 +495,7 @@ ROUTES = {
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
+    "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
     "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",
@@ -560,6 +562,7 @@ ROUTES = {
     # ---- dav (8)
     "DAV /": "dav", "DAV /.well-known/caldav": "dav", "DAV /.well-known/caldav/": "dav", "DAV /.well-known/carddav": "dav",
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
+    "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
     "GET /api/v1/events/{}": "event", "PATCH /api/v1/events/{}": "event", "DELETE /api/v1/events/{}": "event",
@@ -752,7 +755,7 @@ ROUTES = {
     # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
     # the import's target organisation needs its admin (p273_b_api_test.py)
     "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
-    "GET /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
+    "GET /api/account/export/file": "own", "POST /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
     # 2.96.0 D (#1941 / #1918): an organisation export into the private space (p296_d_api_test.py)
@@ -920,6 +923,7 @@ ROUTES = {
     "PATCH /api/agents/{}/chat/{}": "agent",
     # 2.44.0 (#1517): one-command setup of an agent on a computer (one-time code, the computers = the agent's tokens)
     "POST /api/my/agents/{}/setup-code": "agent", "GET /api/my/agents/{}/machines": "agent",
+    "GET /api/my/agents/{}/audit": "agent",  # 2.361.4 (#2928): the owner's log of their personal agent
     "DELETE /api/my/agents/{}/machines/{}": "agent", "POST /api/admin/agents/{}/setup-code": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth",
@@ -969,6 +973,8 @@ ROUTES = {
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
+    # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)
+    "POST /api/lists/{}/move-space": "list",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheet_share", "POST /api/sheets/{}/shares": "sheet_share",
     "PATCH /api/sheets/{}/shares/{}": "sheet_share", "DELETE /api/sheets/{}/shares/{}": "sheet_share",

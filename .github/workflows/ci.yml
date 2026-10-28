@@ -256,6 +256,7 @@ jobs:
           python tests/office_einvoice_test.py
           python tests/p2154_b_ubl_test.py  # 2.154.0 B (#1960): UBL (Peppol BIS 3.0, XRechnung UBL, EN 16931), after the CII files
           python tests/p2296_a_pdfa_test.py  # 2.296.0 A (#3178): logo, 16-bit logo, letterhead, draft mark + special characters, long footer
+          python tests/p2354_a_einvoice_test.py  # 2.354.0 A (#2831, #2833): exact unit prices, a taxed invoice with a stale reverse charge key
           python tests/p2357_l_einvoice_test.py  # 2.357.0 (#3217, #3218): zero rated Z, O with the tax number as seller id
           python tests/p2357_a_paper_pdf_test.py  # 2.357.0 A (#3156): US-Letter invoice with e-invoice, on a letterhead, draft
           python tests/p2355_c_einvoice_test.py  # 2.355.0 C (#2844): categories K (goods to the EU, deliver-to address) and G (export)

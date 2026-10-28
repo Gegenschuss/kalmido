@@ -138,7 +138,8 @@ before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
 and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
-by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains, and an
+by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
+with a confirmed address: without e-mail sending an admin adds the person after the approval), and an
 organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
 once there is one, people see the members of their organisations and the people they share something with; private projects
 reach anybody else by e-mail address.
@@ -511,6 +512,23 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.360: downloading a backup, a restore, downloading an account or organisation export and switching on what opens the
+  server (public links, a registration mode, accounts on the first single sign-on) or off the two-factor policy ask for
+  the account password (a download: `POST` with `{"password"}` gives a one-time ticket, `GET ?t=<ticket>` the file; signed
+  in through the login proxy without a password: the session is enough). A restore also keeps every API token and app
+  password revoked after the backup was written revoked (the server notes what was revoked; a restore onto a fresh server
+  or of the safety backup keeps every token the backup holds); the sessions end as before.
+
+- **The server key is part of every backup (2.359.0).** A backup holds the data, never the server key
+  (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
+  copy of the key apart from the backups (a password manager). To restore on another server (a move, a new disk, a lost
+  server), put the old key in place **before the new server's first start**: in `.env` as `KALMIDO_SECRET_KEY=…`, or as the
+  file `secret/kalmido.key`. Then start it and restore the backup. Restored with a different key, the database comes back but
+  attachments, private files, organisation files, office documents and fields and the wiki history cannot be decrypted
+  (the app answers with the code `orgcrypt`); with the old key back in place they are readable again. Account keys have
+  no recovery key: without the old server key private files are lost for good. The backup passphrase and the off-site
+  access data set on the restoring server stay usable after the restore (2.359.0; before, encrypted backups failed until
+  the passphrase was entered again).
 
 - **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
   archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
@@ -716,7 +734,10 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   organisation's key is renewed. After a `rewrap` with the earlier format the app can no longer show the current
   recovery key (its stored copy belonged to the old master key): the one you keep stays valid, *New recovery key*
   replaces it. Kalmido never replaces a recovery key on its own.
-- **Renewing an organisation's key** (2.138), e.g. after a recovery key got into the wrong hands:
+- **Renewing an organisation's key** (2.138), e.g. after a recovery key got into the wrong hands. Each value and file is
+  encrypted with a random 96-bit nonce (AES-256-GCM): renew the key long before about 2^32 (four billion) encryptions with
+  one key - far more than an organisation writes in normal use, but the reason to renew a key that has been in use for
+  many years on a very busy server (2.360):
 
   ```
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
@@ -901,7 +922,13 @@ organisation.
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
   `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
   address; never the status link, a new server would send new links) and the members with their roles (name, user
-  name, e-mail address).
+  name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
+  exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
+  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
+  contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
+  office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
+  import does not take them over, a booking page belongs to one person). An open channel stays open in the target
+  organisation: every member there can read its history.
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
@@ -910,6 +937,12 @@ organisation.
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
   ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
+  Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
+  messages they belong to their people), closed channels the admin is not a member of, notification channels,
+  invitations and join requests, the pictures of the organisation and its projects, synchronisation data of calendar
+  and task apps, groups of people, and (not yet) bookmarks, feeds and scheduling polls of the organisation. Every other
+  table with an organisation or project column is either exported or listed with its reason in the code
+  (`kalmido/admin/orgexport.py` OX_LEFT; `tests/export_coverage_test.py` fails on a new table that is neither).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
@@ -969,11 +1002,14 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
-**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files), their tasks with
-subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
+**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
+their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
+(2.362), time entries, habits, filters, templates,
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
 work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
-encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. Into an account
+encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. The import keeps
+the old server's binding of each note and file (`legacy_aad`), so they open again although their ids changed; a note is
+sealed anew the next time you save it. Into an account
 that has no encryption keys yet, the bundle is taken over and that content opens with the same passphrase. Into an
 account that already has its own keys, those keys stay and the content from the file arrives unreadable (you may delete
 it). Projects encrypted in the browser are not taken over at all: switch their encryption off before the export or
@@ -1029,8 +1065,9 @@ playbooks, project notes and notepads, time entries, customer reports and browse
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
 invoice that comes along point at the new invoice; without it they stay billed but not billable, never open again (the same
-for an account import, which carries no invoices). Rows that cannot be taken over are named in the report with their number
-per area.
+for an account import, which carries no invoices). Since 2.362 a billed receipt whose invoice did not come along stays
+billed as well ("billed, the invoice did not come along" in the bookkeeping): it cannot be billed a second time; free it
+there only if it was never billed. Rows that cannot be taken over are named in the report with their number per area.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
@@ -1196,8 +1233,9 @@ the browsers then send nothing.
   (never from the request's host). The page answers the same whether the account exists or not, at most one link per
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
   without a password (single sign-on only) get no link: their parents or an admin reset them. Two-factor sign-in stays
-  required: after the new password the second step follows, and all other sessions of the account end. App passwords
-  (CalDAV) and API tokens stay valid; the page for the new password says so and points to *Settings > Account* (2.58).
+  required: after the new password the second step follows, and all other sessions of the account end. The account's
+  app passwords (CalDAV) and its own API tokens are revoked as well (2.190, 2.360; an admin setting a new password does
+  the same); the tokens of agents stay. The page for the new password says so.
 
 ## The error-report webhook token
 
@@ -1229,6 +1267,9 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
   Once the scanner answers again, the server checks these files in the background
   (up to 20 per minute). Clean: the mark goes. A find: the file is **locked** - it stays stored, but nobody can download or
   preview it any more (403), and the person who uploaded it gets a News item. Deleting it is up to the people of the project.
+  2.360.0: a locked document also shows no recognised text and leaves the search. The office's letterhead and terms go
+  out with every document and have no later scan of their own: while the scanner cannot check them their upload is
+  refused (503, "try again in a few minutes").
   *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
 - Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
 - Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a
@@ -1707,9 +1748,13 @@ Notes:
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
 2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`):
-   without it, stored secrets (repository tokens, sign-on client secret) cannot be decrypted and must be
-   entered again.
+   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+   **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
+   with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
+   and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
+   have no recovery key, so private files cannot be brought back any other way, and the export of an office refuses
+   without the key. Put the key in place on the new server *before* its first start (see
+   [Backup and encryption](#backup-and-encryption)).
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,
    tasks; `GET /api/v1/admin/status` with an admin token) against the old server.
 4. **Switch DNS.** Old answers stay cached for a while: test the new server directly with

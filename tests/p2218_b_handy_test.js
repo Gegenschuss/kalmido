@@ -16,7 +16,7 @@ if (m) {
 check(/toastClip\(tt\)/.test(ev), '#2801: quick-add message cuts the title');
 check(/qn\(toastClip\(t\.title\)\)/.test(und), '#2801: swipe / tick message cuts the title, not the verb');
 check(/#toast\.one>span\{display:-webkit-box;[^}]*line-clamp:2/.test(app), '#2801: up to two lines');
-check(/addEventListener\('hashchange'[^]*?dataset\.page/.test(ev) && /dataset\.page = undo && !label \? toastPage\(\) : ''/.test(ev), '#2801: undo message ends with its page');
+check(/addEventListener\('hashchange'[^]*?dataset\.page/.test(ev) && /dataset\.page = undo && !label \? toastPage\(\) \|\| '#' : ''/.test(ev), '#2801: undo message ends with its page');  // 2.350.0 D (#3242): an empty hash is '#'
 check(/\^#t\\\//.test(ev.slice(ev.indexOf('function toastPage'))), '#2801: an open detail is not another page');
 // --- #2805
 const off = rd('static/css/office.css'), od = rd('static/js/office_docs.js'), pp = rd('static/js/popovers.js');

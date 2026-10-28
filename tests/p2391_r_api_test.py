@@ -188,7 +188,7 @@ r = A.post(B + "/api/admin/backups")
 check(r.status_code == 202, "backup: back up now " + r.text[:100])
 items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
 name = items[0]["name"] if items else ""
-r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 time.sleep(1)
 files = subprocess.run(["docker", "exec", CT, "sh", "-c", f"ls /data/office/{ORG}"], capture_output=True, text=True).stdout.split()

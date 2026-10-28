@@ -84,7 +84,7 @@ const TAP_JS = `const tapBox = e => { const r = e.getBoundingClientRect(), a = g
   d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] [data-cid="no"]`).click();
   await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cpermst`));
   const st2 = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cpermst`)?.textContent || '';
-  check(/Rejected by Alice at \d\d:\d\d$/.test(st2.trim()) && !d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cchb`), '#1103: afterwards the card says who and when, the buttons are gone ' + st2);
+  check(/Rejected by Alice at \d{1,2}:\d\d(\s?[AP]M)?$/i.test(st2.trim()) && !d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"] .cchb`), '#1103: afterwards the card says who and when, the buttons are gone ' + st2);  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
   check(!d.querySelector(`#chat-msgs .cmsg[data-mid="a:${a2.id}"]`).classList.contains('apvopen'), '#1103: the answered card loses the accent edge');
   d.querySelector(`#chat-apv [data-mid="${pq.id}"][data-cid="allow"]`)?.click();
   await until(() => d.querySelector('#chat-apv').hidden);
@@ -164,7 +164,7 @@ const TAP_JS = `const tapBox = e => { const r = e.getBoundingClientRect(), a = g
   // ================= Firefox 402 touch, German: #1107 the header's tap areas, #1099 on the phone
   await call('PATCH', '/api/settings', {lang: 'de'});
   const wk = Math.floor(Date.now() / 1000) + 3 * 86400, fh = Math.floor(Date.now() / 1000) + 3600;
-  await v1('PUT', '/agent/quota', {rate_limits: {five_hour: {used_percentage: 23.5, resets_at: fh}, seven_day: {used_percentage: 41, resets_at: wk}}});
+  await v1('PUT', '/agent/quota', {rate_limits: {five_hour: {used_percentage: 23.5, resets_at: fh}, seven_day: {used_percentage: 80, resets_at: wk}}});  // 2.350.0 (#3317): 80 %: the ring shows only near its limit
   await v1('PUT', '/agent/status', {status: 'idle', model: 'Opus 5.5', host_permission_mode: 'auto'});
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
@@ -184,7 +184,7 @@ const TAP_JS = `const tapBox = e => { const r = e.getBoundingClientRect(), a = g
       const ring = document.querySelector('.chnm .chring')?.getBoundingClientRect();
       return {over, small, n: bx.length, ring: ring ? [Math.round(ring.width), Math.round(ring.height)] : null, fits: hd.scrollWidth <= hd.clientWidth + 1,
         boxes: bx.map(b => b.n + ' ' + Math.round(b.l) + '-' + Math.round(b.r))}; })()`);
-    check(g && g.n >= 5 && !g.over.length, '402: #1107 no two tap areas of the chat header overlap ' + JSON.stringify(g));
+    check(g && g.n >= 4 && !g.over.length,  /* 2.350.0 (#3317): back, avatar, ring, ⋯ (badge and search are in the menu) */ '402: #1107 no two tap areas of the chat header overlap ' + JSON.stringify(g));
     check(g && !g.small.length && g.ring && g.ring[0] >= 44 && g.ring[1] >= 44 && g.fits, '402: #1107 every tap area >= 24 px, the ring 44 px, the header fits ' + JSON.stringify(g));
     await shot('p2350b-402-chathead.png');
     await steps(); await ev(`(() => { chatLoad(); return 1; })()`); await sleep(1500);

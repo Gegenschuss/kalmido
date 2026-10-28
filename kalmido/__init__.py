@@ -70,6 +70,7 @@ ORDER = (
     "lists.sections",
     "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
+    "lists.lmove",  # 2.401.0 (#2924): the dry run of a project's workspace change, what goes along
     "lists.foldershare",  # 2.41.0 (#1420)
     "lists.listhead",  # 2.83.0 C (#1427)
     "lists.listtrash",  # 2.102.0 A (#1988)
@@ -306,6 +307,7 @@ ORDER = (
     "office.peppol",  # 2.154.0 B (#1960): e-invoices over Peppol (own provider account): ids, connection, UBL, send + status
     "office.delivery",  # 2.120.0 D (#2089): delivery notes / proofs of service, the timesheet of an invoice
     "office.abschlag",  # 2.120.0 A (#2087): progress / final invoices, cash discount (Skonto)
+    "office.offerlink",  # 2.356.0 C (#3003): quotation <-> invoices made from it (links, asking before a second invoice)
     "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)
     "office.countries",  # 2.40.0 (#1372): the ISO 3166-1 alpha-2 list (no routes)
     "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
@@ -336,6 +338,7 @@ ORDER = (
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
     "office.receiptlist",  # 2.153.0 (#2055): receipts list over all months with filters + its CSV / ZIP for the tax adviser
+    "office.rcsubmit",  # 2.356.0 D (#3129): members hand in receipts to the bookkeeping
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task

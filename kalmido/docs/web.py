@@ -137,7 +137,7 @@ def doc_json(c, m, node, full=False, role=None):
     if role:
         d["role"] = role
     if full:
-        d["text"] = S.meta_text(c, m)
+        d["text"] = S.meta_text_shown(c, m)  # 2.360.0 B (#2496): no text of a file found infected later
         from ..receipts.extracted import rx_doc_view
         d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
         from ..receipts.rchecks import rck_view
@@ -526,6 +526,8 @@ def docs_accept(nid):
     sug.pop("_given", None)
     want = body().get("features") or list(sug)
     vals = {f: sug[f]["value"] for f in want if f in sug and f in FEATURE_NAMES}
+    if str(vals.get("folder") or "").isdigit():  # 2.360.0 B (#2496): a suggested folder is stored as its id text, not a name
+        vals["folder"] = int(vals["folder"])
     if "tags" in vals:
         vals["tags"] = sorted(set([t["id"] for t in S.node_tags(c, nid)] + list(vals["tags"])))
     e = doc_update(c, nid, vals, me()) if vals else None
@@ -707,7 +709,7 @@ def _settings_json(c, ws, uid):
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": folders,
-            "root_id": root, "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
+            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 

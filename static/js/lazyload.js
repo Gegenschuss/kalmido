@@ -28,7 +28,7 @@ const LD_MODS = {
   agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'],  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
-  wiki: ['wkshare', 'wkhist', 'wkembed', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
+  wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
@@ -262,12 +262,7 @@ const lifeOn = () => LIFE_MODS.some(m => feat(m));
 const MOD_PRIV = {health: N_('Health data is specially protected. Only you see it, unless you share a list.'),
   review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.')};
 const modPrivHtml = ks => ks.filter(k => MOD_PRIV[k]).map(k => `<small class="modpriv">${ic('info', 's')} ${tr(MOD_PRIV[k])}</small>`).join('');
-function fmtMoney(n) {
-  if (n == null) return '';
-  let s; try { s = new Intl.NumberFormat(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(n); } catch { s = n.toFixed(2); }
-  const cur = S.settings.time_currency ?? '€';
-  return cur ? s + ' ' + cur : s;
-}
+const fmtMoney = n => curMoney(n, S.settings.time_currency ?? '€');  // 2.368.0 C (#2983): one money format (i18n.js curMoney)
 window.lifeBar = l => { if (l?.life && !l.archived && (lifeOn() || (l.life === 'reading' && feat('reading')))) ld_later('life'); return ''; };  // 2.172.0 B (#2679): + a read-later project
 window.lifeDetailHtml = t => { if (t?.id > 0 && !t.context && ['contract', 'device', 'upkeep', 'health', 'bookmark'].includes(t.fam?.kind)) loadModule('life').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 window.lifeCareHtml = c => { if (c && feat('care')) ld_later('life'); return ''; };

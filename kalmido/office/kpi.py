@@ -103,7 +103,10 @@ def kpi_clients(c, uid, oid, home, docs, year):
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
     cls = [r for r in c.execute(f"SELECT id, name, budget_h, budget_amount, archived FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY lower(name), id")]
     inv, cost = {}, {}
+    gone = {r["id"] for r in docs if r["kind"] == "invoice" and r["status"] == "cancelled"}  # 2.354.0 B (#2842)
     for r in docs:
+        if r["kind"] == "credit" and r["cancels_id"] in gone:
+            continue  # 2.354.0 B (#2842): the credit note of a skipped (cancelled) invoice is skipped too, like books.py
         if r["kind"] in ("invoice", "credit") and r["locked_at"] and r["status"] != "cancelled" and r["client_id"] and y0 <= (r["date"] or "") <= y1:
             n = dec(_j(r["totals"]).get("net") or 0) / _fx(r, home)
             inv[r["client_id"]] = inv.get(r["client_id"], dec(0)) + (-n if r["kind"] == "credit" else n)

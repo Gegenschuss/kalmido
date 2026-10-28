@@ -9,6 +9,7 @@ from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
+from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
@@ -127,7 +128,7 @@ def om_setup_org(c, uid, name):
         if c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
             return None
         oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (nm, "", iso(now_utc())))
-        org_member_add(c, oid, uid, "admin")
+        org_member_add(c, oid, uid, "admin", keep_office=False)
     return oid
 
 
@@ -151,10 +152,33 @@ def user_orgs(c, uid):
                                         "AND o.retired_at IS NULL ORDER BY m.org_id", (uid,))]
 
 
-def org_member_add(c, oid, uid, role="member"):
-    """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts."""
-    c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role))
+def org_member_add(c, oid, uid, role="member", keep_office=True):
+    """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts.
+    keep_office=False (2.356.0, review N3): the person creates the organisation herself -- she goes on in it."""
+    n = c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role)).rowcount
     acx_drop()
+    if n == 1 and keep_office:  # 2.356.0 B (#2932): a person with an own office keeps working in it (every way of joining comes here)
+        _office_keep_on_join(c, uid)
+
+
+def _office_keep_on_join(c, uid):
+    """2.356.0 B (#2932): uid just joined an organisation. While the setting "workspace" is still unset ("all") and uid
+    has a personal office (office/model.py pb_personal) with data (documents, master data, receipts, bank, cash book or
+    private clients), it becomes "private": the office stays the person's own instead of switching silently to the
+    organisation's (office_where: "all" + one organisation = its office, its numbers). Without such data nothing changes."""
+    with system_ctx(c):  # the person's own setting and area (also when an admin adds the person)
+        if (usettings(c, uid).get("workspace") or "all").strip() not in ("", "all"):
+            return False
+        pid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+        if not pid:
+            return False
+        used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM office_purchases WHERE org_id=? UNION ALL SELECT 1 FROM office_bank_tx WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM office_cash_entries WHERE org_id=? "
+                         "UNION ALL SELECT 1 FROM clients WHERE org_id IS NULL AND created_by=? LIMIT 1", (pid[0],) * 5 + (uid,)).fetchone()
+        if used:
+            uset(c, uid, "workspace", "private")
+    return bool(used)
 
 
 def org_names(c, uid):
@@ -454,6 +478,7 @@ def list_org_set(c, lid, v):
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
     # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
     from ..team.clients import _org_boundary
+    list_space_follow(c, lid, lr["org_id"], _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
     if _org_boundary(c):
         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
@@ -462,6 +487,25 @@ def list_org_set(c, lid, v):
     # (only this list's files, after the request)
     oc_settle_kick([lid])
     return True
+
+
+def list_space_follow(c, lid, old_org, boundary):
+    """2.401.0 (#2924): list lid just changed its workspace (from old_org): its tasks' customer reports and bells that lived in
+    the old space go along (lists/lmove.py); boundary = team/clients.py _org_boundary: a report's client of another workspace
+    is unbound then. Returns the number of reports moved. The caller commits."""
+    l = c.execute("SELECT org_id, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not l or (l["org_id"] or None) == (old_org or None):
+        return 0
+    oid, owner = l["org_id"] or None, None if l["org_id"] else l["owner_id"]
+    n = c.execute("""UPDATE portal_tickets SET org_id=?, owner_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND org_id IS NOT DISTINCT FROM ?""", (oid, owner, lid, old_org or None)).rowcount
+    if n and boundary:  # a client of another workspace is no client of the report there (tenancy portal_client)
+        c.execute("""UPDATE portal_tickets SET client_id=NULL WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                     AND client_id IS NOT NULL AND client_id NOT IN (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)""",
+                  (lid, oid))
+    c.execute("""UPDATE task_bell SET org_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)
+                 AND org_id IS NOT DISTINCT FROM ?""", (oid, lid, old_org or None))
+    return n
 
 
 def ws_default_org(c, uid, folder=""):
@@ -758,7 +802,7 @@ def org_create():
         if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
             c.rollback()
             return err(tr("Invalid value: {0}", "admin_id"))
-        org_member_add(c, oid, adm, "admin")
+        org_member_add(c, oid, adm, "admin", keep_office=adm != me())
         bump(c)
         c.commit()
         print("organisation", oid, "created by", login_log_who(g.user), flush=True)
@@ -992,6 +1036,7 @@ def org_mine_dict(c, r, uid):
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
+            "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1039,7 +1084,7 @@ def org_mine_update(oid):
         if not isinstance(b["ext_links"], bool):
             return err(tr("Invalid value: {0}", "ext_links"))
         c.execute("UPDATE orgs SET ext_links=? WHERE id=?", (int(b["ext_links"]), oid))
-    for k in ("asst_comments", "chn_content"):  # 2.240.0 (#2884, #2867): privacy switches of the organisation (admins only)
+    for k in ("asst_comments", "chn_content", "member_agents"):  # 2.240.0 (#2884, #2867), 2.361.4 (#2928): switches of the organisation (admins only)
         if k in b:
             if not isinstance(b[k], bool):
                 return err(tr("Invalid value: {0}", k))

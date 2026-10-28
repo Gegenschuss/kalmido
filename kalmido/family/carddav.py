@@ -500,6 +500,8 @@ def contacts_sync(c, sid):
                 ln = c.execute("SELECT * FROM contact_links WHERE src_id=? AND uid=? AND kind=?", (sid, uid_, kind)).fetchone()
                 t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (ln["task_id"],)).fetchone() if ln and ln["task_id"] else None
                 n += 1
+                if t and list_role(c, t["list_id"], s["user_id"]) not in WRITE_ROLES:
+                    continue  # 2.360.0 D (#2496): its task went to a list the person may no longer change: left alone (not made again)
                 if t:
                     if ln["digest"] == dig:
                         if ln["want"] and s["writeback"]:  # 2.140.0 D (#2137): set in Kalmido, the card unchanged since

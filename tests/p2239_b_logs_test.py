@@ -84,7 +84,7 @@ check(ln and ln[-1].rstrip().endswith("from 2001:db8:1::/48") and "2001:db8:1:2:
       f"#2888: an IPv6 address is cut to its /48 {ln[-1:]}")
 
 # ================================================================== a registration and a sign-in link
-check(A.patch(B + "/api/admin/settings", json={"signup_mode": "approval"}).ok, "approval mode")
+check(A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "approval"}).ok, "approval mode")
 n0 = logs()
 r = anon().post(B + "/api/auth/signup", json={"name": "Ines Probe", "email": "ines2239@example.com", "password": "ines-secret-1"},
                 headers={"X-Forwarded-For": "198.51.100.23"})

@@ -73,6 +73,7 @@ KINDS = {
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, manifest, share target, QR code)"),
+    "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     # 2.102.0 (#1999)
     "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
                          "nobody into the one project list the server operator chose, nothing is read back or answered"),
@@ -100,7 +101,7 @@ ROUTES = {
     "DELETE /api/admin/groups/{}/avatar": "admin", "GET /api/admin/agent-policy": "admin", "GET /api/admin/agents": "admin",
     "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
-    "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
+    "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers
     "GET /api/admin/retention": "admin",  # 2.152.0 (#2165): the retention runs in numbers
     "GET /api/admin/lists/orphaned": "admin", "GET /api/admin/orgcrypt": "admin", "GET /api/admin/related": "admin",
@@ -181,7 +182,7 @@ ROUTES = {
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
-    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
+    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/audit": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
     "GET /api/proposals/{}": "agents", "GET /api/v1/agent": "agents", "GET /api/v1/agent/chats": "agents",
     "GET /api/v1/agent/events": "agents", "GET /api/v1/agent/jobs": "agents", "GET /api/v1/agent/jobs/{}": "agents",
     "GET /api/v1/agent/quota": "agents", "GET /api/v1/agent/schedules": "agents", "GET /api/v1/agent/usage": "agents",
@@ -529,7 +530,7 @@ ROUTES = {
     "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
     "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
     "DELETE /api/me/wait-suggestions": "own", "DELETE /api/me/webhooks/{}": "own", "DELETE /api/push/subs/{}": "own",
-    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own",
+    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own", "POST /api/account/export/file": "own",
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
     "GET /api/me/app-passwords": "own", "GET /api/me/mail": "own", "GET /api/me/share/httpshortcuts.zip": "own",
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",
@@ -605,6 +606,7 @@ ROUTES = {
     # ---- pim (88)
     "DAV /": "pim", "DAV /.well-known/caldav": "pim", "DAV /.well-known/caldav/": "pim", "DAV /.well-known/carddav": "pim",
     "DAV /.well-known/carddav/": "pim", "DAV /dav": "pim", "DAV /dav/": "pim", "DAV /dav/{}": "pim",
+    "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
     "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
     "DELETE /api/calendars/{}": "pim", "DELETE /api/calendars/{}/events": "pim", "DELETE /api/contacts/{}": "pim",
@@ -753,6 +755,7 @@ ROUTES = {
     "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
+    "POST /api/lists/{}/move-space": "lists",  # 2.401.0 (#2924): p2401_a_api_test.py (409 without an organisation: no other workspace)
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
@@ -873,6 +876,7 @@ ROUTES = {
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
+    "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
     "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",
     "GET /api/office/equipment/value.csv": "office", "GET /api/office/equipment/value.pdf": "office",

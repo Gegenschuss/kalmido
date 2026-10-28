@@ -75,7 +75,7 @@ const today = TC.today();
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await fresh(ev, nav, 'carol');
     await nav(B + '#office');
-    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotes/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotes & invoices ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
+    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotations/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotations (2.380.0 #3409: was Quotes & invoices) ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
     check(await ready(ev, `${money} === 'false'`, 40), '#3039: Money folded at first');
     check(await ev(`!document.querySelector('#side [data-ofm="receipts"]') && !!document.querySelector('#side [data-ofm="offers"]')`), '#3039: folded = no points of Money, Sell open');
     await shot('p2276a-desktop-start.png');
@@ -93,7 +93,7 @@ const today = TC.today();
     // ================= Receipts: upload + list
     await nav(B + '#office/receipts');
     check(await ready(ev, `!!document.querySelector('.office[data-ofctab="receipts"] .bk-photo #bk-file') && !!document.querySelector('#side [data-ofm="receipts"][aria-current="page"]')`, 80), '#3039: Office > Receipts with the upload');
-    check(await ev(`/Office > Receipts/.test(document.querySelector('.bk-photohint')?.textContent || '') && /Dokumente/.test(document.querySelector('.bk-photohint').textContent)`), '#3039: the hint says where the receipt goes');
+    check(await ev(`/Office > Receipts/.test(document.querySelector('.bk-photohint')?.textContent || '') && /Documents/.test(document.querySelector('.bk-photohint').textContent)`)  /* 2.368.0 (#2987): the folder in the app language */, '#3039: the hint says where the receipt goes');
     check(await ev(`!!document.querySelector('.rcp-kinds a[href="#office/meals"]') && !!document.querySelector('.rcp-kinds a[href="#office/travel"]') && !document.querySelector('.rcl-top')`), '#3039: entertainment / travel as kinds, no way back to the bookkeeping');
     check(await ready(ev, `!!document.querySelector('#rcl-h') && !document.querySelector('[data-rcl="rc"]')`, 60), 'the list, still empty');
     await shot('p2276a-receipts-empty.png');

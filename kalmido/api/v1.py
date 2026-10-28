@@ -1446,6 +1446,8 @@ def not_found(e):
                      f'<p>{html.escape(tr("This address does not exist.", lg=lg))}</p><p><a class="btn" href="/">'
                      f'{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p></div>', lg, 404, foot=False)
         return r
+    if request.path.startswith("/api/"):  # 2.359.0 A (#3023): JSON, never Flask's HTML page (the client took it for "session expired")
+        return err(tr("Not found"), 404)
     return e
 
 
@@ -1453,7 +1455,26 @@ def not_found(e):
 def not_allowed(e):
     if request.path.startswith(API_PREFIX):
         return v1_err(405, tr("Method not allowed"))
+    if request.path.startswith("/api/"):  # 2.359.0 A (#3023)
+        return err(tr("Method not allowed"), 405)
     return e
+
+
+@app.errorhandler(500)
+def server_error(e):
+    """2.359.0 A (#3023): an error nobody caught answers /api/* with JSON (the client keeps the change and sends it again
+    later); every other address keeps Flask's page. Flask has logged the exception already."""
+    if request.path.startswith(API_PREFIX):
+        return v1_err(500, tr("Server error, please try again later"))
+    if request.path.startswith("/api/"):
+        return err(tr("Server error, please try again later"), 500)
+    return e
+
+
+if os.environ.get("KALMIDO_TEST") == "1":  # test containers only (tests/start.sh): an uncaught error on purpose
+    @app.route("/api/test/boom", methods=["GET", "POST", "PATCH"])
+    def _test_boom():
+        raise RuntimeError("test: uncaught error on purpose")
 
 
 # ---- OpenAPI 3.1 description of /api/v1 (served at /api/v1/openapi.json; built once)

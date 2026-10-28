@@ -105,6 +105,8 @@ const day = n => TC.day(n);
       '#1930: the import preview with the duplicate marked');
     await shot('p294-a-import.png');
     await ev(`(() => { document.querySelector('.modal [data-li="go"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && ${leadCards}.some(c => /Beispiel Studio/.test(c.textContent))`, 60), '#1930: the imported lead in the column');
     check(await ready(ev, `/1 lead imported/.test(document.querySelector('#toast')?.textContent || '')`), '#1930: the import toast with undo');
     await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);

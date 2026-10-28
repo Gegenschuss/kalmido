@@ -44,19 +44,20 @@ async function bkBilledLoad(info) {  // 2.121.0 C (#2094)
   try { return (await api('GET', `/api/office/receipts/billed?ids=${ids.join(',')}`)).billed || {}; } catch { return {}; }
 }
 // 2.121.0 review N4: billed by another office before a move (no kind) -> the plain note
-const bkBilledTxt = b => !b ? '' : !b.kind ? tr('A receipt has already been billed') : tr('billed on {0} {1}', b.kind === 'invoice' ? tr('Invoice') : tr('Quotation'), b.number || tr('Draft'));
+// 2.362.0 (#3131): billed before an organisation import whose invoice did not come along
+const bkBilledTxt = b => !b ? '' : b.missing ? tr('Billed, the invoice did not come along with the import') : !b.kind ? tr('A receipt has already been billed') : tr('billed on {0} {1}', b.kind === 'invoice' ? tr('Invoice') : tr('Quotation'), b.number || tr('Draft'));
 async function bkLoadUstva() {
   const seq = ++BK.seq;
   try { const j = await api('GET', `/api/office/books/ustva?year=${BK.pyear}&period=${BK.period}`); if (seq === BK.seq) BK.ustva = j; }
   catch (x) { toast(x.message || tr('unknown')); }
   ofcDraw();
 }
-const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list  // 2.114.1 B (#2018): receipts count in the cash flow
+const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
 
 function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
-  if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
+  if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -75,13 +76,14 @@ function bkTabHtml() {
 // the upload of receipts (camera / files); 2.276.0 A (#3039): also on top of Office > Receipts (office_receipts.js rcp_tabHtml)
 const bkPhotoHtml = () => `<div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
     <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
-    ${(typeof BK !== 'undefined' && BK.info?.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.')}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
+    ${(typeof BK !== 'undefined' && BK.info?.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.', tr('Documents|folder'))}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
 // 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
 function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
   return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
-    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div></section>`;
+    <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
+    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${tr('{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
 }
 
 function bkRcRow(r) {
@@ -163,7 +165,7 @@ function bkItemRow(it) {
   const rc = it.kind === 'receipt';
   const t = rc ? (it.title || tr('Receipt')) : `${it.kind === 'credit' ? tr('Credit note') : tr('Invoice')} ${it.number || ''}`;
   const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : it.source === 'skonto' ? tr('Cash discount') /* 2.355.0 C (#2840) */ : ''].filter(Boolean).join(' · ');
-  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/offers/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
+  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/invoices/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
 }
 function bkSettingsHtml() {
   const s = OFC.info?.settings || {};

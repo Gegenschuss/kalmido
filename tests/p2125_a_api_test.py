@@ -247,7 +247,9 @@ check(pc["requested"] == 0 and pc["taken"] == 15.5, "#2117: a rejected request c
 r = Ca.patch(B + f"/api/team/absences/{REQ2}", json={"start_date": "2027-06-14", "end_date": "2027-06-14"})
 check(r.ok and r.json()["status"] == "pending", "#2117: carol changes the rejected request: asks again")
 r = Ca.patch(B + f"/api/team/absences/{REQ2}", json={"kind": "off"})
-check(r.ok and r.json()["status"] == "approved", "#2117: a day off needs no approval")
+# 2.360.0 (#2496): an open request does not become an approved day off by changing its kind
+check(r.status_code == 409, "#2117: an open vacation request keeps its kind " + r.text[:120])
+check(Ca.delete(B + f"/api/team/absences/{REQ2}").ok, "#2117: carol withdraws the request")
 r = Ca.patch(B + f"/api/team/absences/{REQ}", json={"note": "family visit"})
 check(r.ok and r.json()["status"] == "approved", "#2117: changing only the note keeps the approval")
 r = Ca.patch(B + f"/api/team/absences/{REQ}", json={"end_date": "2027-03-04"})

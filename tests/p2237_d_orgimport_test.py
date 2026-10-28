@@ -25,7 +25,7 @@ import requests
 
 import dbx as dbxm
 from freelancer_fixture import FEATURES, freelancer
-from kt import FAILS, OKS, check, sess
+from kt import FAILS, OKS, check, sess, su_get
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -103,7 +103,7 @@ def export(s, oid):
         if s.get(B + f"/api/orgs/{oid}/export").json().get("state") != "running":
             break
         time.sleep(0.25)
-    ox = s.get(B + f"/api/orgs/{oid}/export/file").content
+    ox = su_get(s, B + f"/api/orgs/{oid}/export/file").content  # 2.360.0 (#2496): the step-up
     rk = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
     check(ox[:13] == b"KALMIDO-ORGX\n" and rk, f"organisation export {oid} + recovery key")
     return ox, rk

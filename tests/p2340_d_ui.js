@@ -114,7 +114,7 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
   // ================= Firefox 390 touch, German
   await call('PATCH', '/api/settings', {lang: 'de'});
   const wk = Math.floor(Date.now() / 1000) + 3 * 86400, fh = Math.floor(Date.now() / 1000) + 3600;
-  await v1('PUT', '/agent/quota', {rate_limits: {five_hour: {used_percentage: 23.5, resets_at: fh}, seven_day: {used_percentage: 41, resets_at: wk}}});
+  await v1('PUT', '/agent/quota', {rate_limits: {five_hour: {used_percentage: 23.5, resets_at: fh}, seven_day: {used_percentage: 80, resets_at: wk}}});  // 2.350.0 (#3317): 80 % (yellow): the header shows the ring only near its limit
   await v1('PUT', '/agent/status', {status: 'idle', model: 'Opus 5.5', host_permission_mode: 'auto'});
   await v1('POST', `/agent/chats/${ME.id}`, {body: 'Moin, wie kann ich helfen? Ich lese gern das Briefing.'});
   const short = await v1('POST', `/agent/chats/${ME.id}`, {body: 'Ok'});
@@ -129,16 +129,13 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
     check(await ffLogin(o) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(1200);
-    // #1090: the ring's box, the badge
-    const g = await ev(`(() => { const r = document.querySelector('.chnm .chring'), m = document.querySelector('.chnm .chmode'), hd = document.querySelector('.chath'), sv = r?.querySelector('svg'); if (!r || !m) return {r: !!r, m: !!m};
-      const a = r.getBoundingClientRect(), s = sv.getBoundingClientRect(), mb = m.getBoundingClientRect(), bf = getComputedStyle(m, '::before').content;
-      return {w: a.width, h: a.height, sv: s.width, lineH: document.querySelector('.chnm').getBoundingClientRect().height, long: getComputedStyle(m.querySelector('.pmlong')).display,
-        before: bf, fits: m.scrollWidth <= m.clientWidth + 1, mw: mb.width, mright: mb.right, hdr: hd.scrollWidth <= hd.clientWidth + 1, page: document.documentElement.scrollWidth <= 390,
-        label: m.getAttribute('aria-label')}; })()`);
+    // #1090: the ring's box; 2.350.0 (#3317): the badge moved into the header's ⋯ menu ("Permissions: …")
+    const g = await ev(`(() => { const r = document.querySelector('.chnm .chring'), hd = document.querySelector('.chath'), sv = r?.querySelector('svg'); if (!r) return {r: !!r};
+      const a = r.getBoundingClientRect(), s = sv.getBoundingClientRect(), it = chatHeadInfo(document.querySelector('#jcd-fbtn')).find(x => /^Rechte/.test(x.label || ''));
+      return {w: a.width, h: a.height, sv: s.width, hdr: hd.scrollWidth <= hd.clientWidth + 1, page: document.documentElement.scrollWidth <= 390, badge: !!document.querySelector('.chath .chmode'), label: it?.label}; })()`);
     check(g && g.w >= 44 && g.h >= 44 && g.sv <= 20, `${tag}: #1090 the ring's tap box >= 44 px, the ring itself stays small ` + JSON.stringify(g));
-    check(g && g.long === 'none' && /Auto/.test(g.before || '') && g.fits && g.mright <= 390 && g.page, `${tag}: #1090 the badge shows "Auto" and fits ` + JSON.stringify(g));
-    // 2.152.4 (#2631): the label says "Automatisch" in full, the badge stays "Auto"
-    check(g && /Rechte: Standard des Hosts \(Automatisch\)/.test(g.label || ''), `${tag}: #1090 the full text stays in the label ` + JSON.stringify(g?.label));
+    check(g && !g.badge && g.hdr && g.page, `${tag}: #1090 no badge in the header, it fits ` + JSON.stringify(g));
+    check(g && /^Rechte: Standard des Hosts \(Automatisch\)$/.test(g.label || ''), `${tag}: #1090 the full text is the menu entry ` + JSON.stringify(g?.label));
     await shot('p2340d-390-chathead.png');
     // #1091: the search field hides the tab bar while it has the focus
     const t0 = await ev(`getComputedStyle(document.querySelector('#tabs')).display`);

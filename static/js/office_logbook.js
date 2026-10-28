@@ -84,12 +84,13 @@ function lbVehModal(v) {
     ${ofcRowF('lgb-vkind', tr('Kind'), ofcSel('lgb-vkind', v?.kind || 'private', [['private', tr('Private car used for business (mileage allowance)')], ['company', tr('Company car (costs through receipts)')]]))}
     ${ofcRowF('lgb-vodo', tr('Odometer at the start'), ofcIn('lgb-vodo', v?.odo_start != null ? lbKm(v.odo_start) : '', {num: true, ph: tr('optional')}))}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${v ? `<button class="btn" data-m="arch">${v.archived ? tr('Restore') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${v ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${v ? `<button class="btn" data-m="arch">${v.archived ? tr('Restore') : tr('Archive')}</button>` : ''}${v && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${v ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'vehicles', ids: [v.id], from: ofm_officeFrom(), label: qn(v.name), after: async () => { LB.vid = null; lbReload(true); }}); return; }  // 2.356.0 A (#2926): with its logbook
     try {
       if (b.dataset.m === 'arch') {
         const on = v.archived ? 0 : 1;
@@ -211,7 +212,7 @@ async function lbHistInto(md, d) {
   const ol = $('.lgb-hlist', md); if (!ol) return;
   let rows;
   try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { ol.innerHTML = `<li class="muted">${esc(x.message || '')}</li>`; return; }
-  ol.innerHTML = rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(new Date(r.at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))} · ${esc(r.by)}</span>
+  ol.innerHTML = rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
     ${Object.keys(r.prev || {}).length ? `<small>${esc((r.action === 'create' || r.action === 'corrected' ? '' : tr('Before') + ': ') + lbPrev(r.prev))}</small>` : ''}</li>`).join('');
 }
 async function lbCloseModal() {
@@ -240,7 +241,7 @@ async function lbLogModal(d) {
   let rows;
   try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('History')}</h3><p class="muted">${esc([fmtDateLoc(d.day), lbRoute(d)].filter(Boolean).join(' · '))}</p>
-    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(new Date(r.at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))} · ${esc(r.by)}</span>
+    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
       ${Object.keys(r.prev || {}).length ? `<small>${esc((r.action === 'create' ? '' : tr('Before') + ': ') + lbPrev(r.prev))}</small>` : ''}</li>`).join('')}</ol>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');

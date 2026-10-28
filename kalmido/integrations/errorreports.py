@@ -189,9 +189,10 @@ def errhook_in(lid, token):
     return err_take(c, lid, r, rep)
 
 
-def err_take(c, lid, r, rep):
+def err_take(c, lid, r, rep, new_ok=True):
     """A parsed report into list lid (r: its issue_hooks row + owner_id, tickets, archived): a new bug ticket, or a count on
-    the open ticket of the same error. 2.102.0 E (#1999): the browser's error reports (cer_report) take the same way."""
+    the open ticket of the same error. 2.102.0 E (#1999): the browser's error reports (cer_report) take the same way.
+    new_ok False = only counted when it would be a new ticket (2.360.0: the reporting person's budget is used up)."""
     now = iso(now_utc())
     c.execute("UPDATE issue_hooks SET last_at=?, received=received+1 WHERE list_id=?", (now, lid))
     old = c.execute("SELECT * FROM issue_reports WHERE list_id=? AND fp=?", (lid, rep["fp"])).fetchone()
@@ -213,12 +214,15 @@ def err_take(c, lid, r, rep):
         return jsonify(ok=True, task_id=t["id"], duplicate=True, count=n)
     hour = iso(now_utc() - timedelta(hours=1))
     # tickets made from reports in the last hour (a fingerprint can have made several, one after the other was closed)
+    # 2.360.0 C (#2496): the browser's reports (source client) and the other senders count apart, so the people of the
+    # instance cannot use up the hourly tickets of the error tracker
     made = c.execute("""SELECT COUNT(*) FROM tasks t WHERE t.list_id=? AND t.created_at>? AND t.created_by IS NULL AND EXISTS
-                        (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data::text ILIKE '%"report":%')""",
-                     (lid, hour)).fetchone()[0]
+                        (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data::text ILIKE '%"report":%'
+                         AND (COALESCE(a.data->>'report', '')='client')=?)""",
+                     (lid, hour, rep["source"] == "client")).fetchone()[0]
     from ..collab.liste2eguard import le2b_list_locked
     # 2.64.1 B (#1817): a list with the lock gets no plain-text tickets (only counted)
-    if made >= ERR_NEW_PER_HOUR or r["archived"] or le2b_list_locked(c, lid):  # only counted
+    if not new_ok or made >= ERR_NEW_PER_HOUR or r["archived"] or le2b_list_locked(c, lid):  # only counted
         c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,NULL,1,?,?)
                      ON CONFLICT(list_id,fp) DO UPDATE SET count=issue_reports.count+1, last_at=excluded.last_at""", (lid, rep["fp"], now, now))
         c.commit()
@@ -398,8 +402,10 @@ def v1_git_list(lid):
 # below /static/ with line:column, a stack of such places (2 KB), the client's version and the name of the open view.
 # At most CER_PER_MIN reports per person and minute and CER_PER_HOUR per hour (the client stops after 20 per page load).
 CER_PER_MIN, CER_PER_HOUR = 5, 60
+CER_NEW_PER_HOUR = 3  # 2.360.0 C (#2496): new tickets per person and hour; more of their reports are only counted
 CER_STACK_MAX = 2048
 _CER_RATE = {}
+_CER_NEW = {}
 
 
 def cer_list(c):
@@ -486,7 +492,15 @@ def cer_report():
     acx_anon_bind(c, r["org_id"])
     if not err_rate_ok(lid):
         return "", 204
-    err_take(c, lid, r, rep)
+    now = time.time()
+    with _ERR_LOCK:
+        mine = [t for t in _CER_NEW.get(u["id"], []) if t > now - 3600]
+    res = err_take(c, lid, r, rep, new_ok=len(mine) < CER_NEW_PER_HOUR)
+    if (res[1] if isinstance(res, tuple) else 200) == 201:
+        with _ERR_LOCK:
+            _CER_NEW[u["id"]] = mine + [now]
+            if len(_CER_NEW) > 5000:
+                _CER_NEW.clear()
     return "", 204
 
 

@@ -265,11 +265,23 @@ def mh_mail_html(mid):
     return resp
 
 
+_MH_INFO = {}  # 2.360.0 C (#2496): eml node id -> (html, external pictures); an .eml never changes, so no parse per detail call
+_MH_INFO_MAX = 2000
+
+
 def mh_info(c, m):
     """For the reading view (GET /api/hubmail/mails/<id>): {"html": bool, "html_ext": external pictures} + the links."""
-    got = mh_of(c, m)
-    ext = mh_clean(got[0], got[1], False)[1] if got else 0
-    return {"html": bool(got), "html_ext": ext, "made": mh_made(c, m["id"])}
+    hit = _MH_INFO.get(m["eml_id"]) if m["eml_id"] else None
+    if hit and not c.execute("SELECT 1 FROM fs_nodes WHERE id=? AND deleted_at IS NULL", (m["eml_id"],)).fetchone():
+        hit = (False, 0)  # the original went since (trash): the text view, as mh_of
+    if hit is None:
+        got = mh_of(c, m)
+        hit = (bool(got), mh_clean(got[0], got[1], False)[1] if got else 0)
+        if m["eml_id"]:
+            if len(_MH_INFO) >= _MH_INFO_MAX:
+                _MH_INFO.pop(next(iter(_MH_INFO)), None)
+            _MH_INFO[m["eml_id"]] = hit
+    return {"html": hit[0], "html_ext": hit[1], "made": mh_made(c, m["id"])}
 
 
 # ---- mail -> task / event ---------------------------------------------------------------------------------------------

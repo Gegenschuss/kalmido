@@ -21,7 +21,7 @@ from datetime import timedelta
 from flask import jsonify
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, OFFICE_DIR
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import db, gset, gsetting, iso, iso_ms, now_utc, bump
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
@@ -135,6 +135,16 @@ def _sc_down(e):
     _SC["down_until"] = time.time() + _env_int("KALMIDO_CLAMD_DOWN_S", SC_DOWN_S, 0, 3600)
     _SC["last_err"] = f"{iso(now_utc())} {type(e).__name__}: {e}"[:300]
     print("virus scanner not reachable:", _SC["last_err"], flush=True)
+
+
+def sc_needs_retry(st, data):
+    """2.360.0 B (#2496): True when an upload without a later scan of its own (the office's letterhead and terms, sent out
+    with every document) could not be checked because the scanner is down -- the caller refuses it (try again later). A file
+    larger than the scanner takes stays possible (it would never be checked)."""
+    return st == "unchecked" and len(data) <= sc_max_bytes()
+
+
+SC_RETRY_TEXT = N_("The virus scanner cannot check the file right now. Please try again in a few minutes.")
 
 
 def sc_ping():
@@ -606,6 +616,8 @@ def sc_tick(c, force=False):
                     _sc_tell(c, r["kind"], r["ref_id"], r["ver"], f[0], sig)
                     from .textscan import ts_forget  # the recognised text of a locked file is never searchable
                     ts_forget(c, r["kind"], r["ref_id"])
+                    if r["kind"] == "fs" and sc_locked(c, "fs", r["ref_id"]):  # 2.360.0 B (#2496): the current version: out of the document search
+                        c.execute("DELETE FROM doc_words WHERE node_id=?", (r["ref_id"],))
                     changed = True
                     print(f"virus scan: {sig} found in a stored file ({r['kind']} {r['ref_id']}), locked", flush=True)
                 else:  # clamd could not scan it: again later, waiting longer each time (at most a day)

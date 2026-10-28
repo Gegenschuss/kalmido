@@ -88,12 +88,13 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
+  's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
-const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden', 'side_people', 'side_agents'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -191,6 +192,16 @@ async function setLang(code) {
   const e = histAdd({label: tr('Changed setting: {0}', tr('Language')), sett: true, post: () => { const m = $('.smodal'); if (m) { m._noflush = true; m.remove(); settingsModal(LS.get('settingsSec', 'general')); } },
     undo: () => setStep({lang: from}, {lang: code}, tr('Language')), redo: () => setStep({lang: code}, {lang: from}, tr('Language'))});
   setSaved(e);
+}
+// 2.368.0 B (#2982): region and formats; "Automatic" = from the language and the browser's region (popovers.js fmtPref)
+function fmtSetHtml(s, hint) {
+  const sel = (id, k, opts) => `<select id="${id}">${opts.map(([v, n]) => `<option value="${v}" ${(s[k] || '') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  const auto = tr('Automatic');
+  return `<h4 id="s-fmt-h">${tr('Region and formats')}</h4>
+      <div class="row"><label for="s-wkst">${tr('First day of the week')}</label>${sel('s-wkst', 'week_start', [['', auto], ['mon', WDL[1]], ['sun', WDL[0]]])}</div>
+      <div class="row"><label for="s-tfmt">${tr('Time format')}</label>${sel('s-tfmt', 'time_format', [['', auto], ['24', tr('24 hours ({0})', '14:30')], ['12', tr('12 hours ({0})', '2:30 PM')]])}</div>
+      <div class="row"><label for="s-dord">${tr('Date format')}</label>${sel('s-dord', 'date_order', [['', auto], ['dmy', '31.12.2026'], ['mdy', '12/31/2026'], ['ymd', '2026-12-31']])}</div>
+      ${hint(tr('Automatic follows the language and the region of this browser.'))}`;
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
@@ -336,8 +347,13 @@ function agSetupPaneHtml(hint) {
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
 function agWhyHtml(g, adm) {
-  return g === 'team' ? esc(tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the projects shared with it, for the people those projects allow.')) + (adm ? '' : ' ' + esc(tr('Ask an admin to create it.')))
+  return g === 'team' ? esc(agTeamWhy(adm))
     : esc(tr('A personal agent is only yours: only you see it, chat with it and share your projects with it. You create it below and run it on your own computer.'));
+}
+// 2.361.4 (#2928): without an organisation (or in the private area) nobody else creates agents: the person's own instead
+function agTeamWhy(adm) {
+  return av_ownArea() && !adm ? tr('In your private area you are your own admin: create a personal agent below instead.')
+    : tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the projects shared with it, for the people those projects allow.') + (adm ? '' : ' ' + tr('Ask an admin to create it.'));
 }
 // 2.29.0 (#1024): the server-wide switches (admins), no longer mixed into "Set up"
 function agAdminPaneHtml(hint) {
@@ -345,7 +361,7 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
-    ${hint(tr('Off by default. You see every agent under Status and can pause or delete it.'))}
+    ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
@@ -359,12 +375,12 @@ async function agSetupDraw(md) {
   for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} project', '{0} projects', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
-    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
-  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
+  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Administration > Agents).')}</div>`)) + add;  // 2.361.4 (#2928)
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
 }
 // 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
@@ -402,6 +418,7 @@ function agSetupWire(md) {
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (k === 'work') { awOpen(a); return; }  // 2.236.0 A (#2904-#2911)
+      if (k === 'log') { av_logModal(a, () => agSetupDraw(md)); return; }  // 2.361.4 (#2928)
       if (k === 'ws') { av_wsMenu(b, a, () => agSetupDraw(md)); return; }  // 2.46.6 (#1708): its workspace
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
         const pmd = permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
@@ -489,7 +506,7 @@ function ad_agentsHtml(hint) {
 function orgAgentsHtml(hint) {
   if (!S.api?.enabled) return '';
   return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
-    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs. Off by default.')}</small></span></label></div>`;
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.')} ${tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.')}</small></span></label></div>`;
 }
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
 function hostHtml(hint) {
@@ -602,6 +619,7 @@ function settingsModal(focus) {
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Quick add understands English, German and the language chosen here.'))}
+      ${fmtSetHtml(s, hint) /* 2.368.0 B (#2982) */}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
       ${hint(tr('Undated basket tasks as their own section in Today, with buttons to sort them.'))}
@@ -848,7 +866,20 @@ function settingsModal(focus) {
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
-  onRemove(md, () => { if (!md._noflush) flush(); });
+  // 2.359.0 A (#3024): the page goes away within the 0.9 s of typing: the text fields waiting are sent with keepalive (core.js
+  // keepSend; settings have no queue: a later change elsewhere is not overwritten at the next start)
+  const leave = () => {
+    for (const id of [...pend.keys()]) {
+      clearTimeout(pend.get(id)); pend.delete(id);
+      const el = $('#' + id, md); if (!el) continue;
+      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) keepSend('PATCH', '/api/me', {display_name: v}); continue; }
+      const d = SETS[id], v = d && setVal(el, d[2]);
+      if (d && d[2] === 'time' && id === 's-allday' && !v) continue;  // 2.359.0 (review): the same guard as saveEl
+      if (v !== undefined && String(v) !== String(S.settings[d[0]] ?? '')) keepSend('PATCH', '/api/settings', {[d[0]]: v});
+    }
+  };
+  addEventListener('pagehide', leave);
+  onRemove(md, () => { removeEventListener('pagehide', leave); if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } } });
   md.addEventListener('click', e => { if (e.target.closest('[data-m="s-index"]')) { idx(true); $('.snav [data-sec]', md)?.focus(); } });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it
@@ -858,7 +889,7 @@ function settingsModal(focus) {
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
     [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
-    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
+    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
   const sq = $('#s-search', md);
@@ -1212,7 +1243,7 @@ async function cer_setList(el) {
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".
 const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
-function aaWhen(x) { return x ? new Date(x).toLocaleString(I18N.code || 'en', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
+function aaWhen(x) { return x ? fmtStamp(new Date(x)) : ''; }  // 2.368.0 B (#2982): one locale source
 async function aaDraw(md, j) {
   const box = $('#s-aa', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/alerts'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
@@ -1303,7 +1334,7 @@ function ad_updHtml(hint) {
     h += `<div class="shint updline"><b>${tr('v{0} installed — v{1} available', esc(a.version), esc(a.latest))}</b>${a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">${tr('Release notes')}</a>` : ''}</div>
       <div class="shelp">${tr('To update, run <code>~/kalmido/update.sh</code> (installed with the installer; it backs up the database first), or in the folder with docker-compose.yml: <code>docker compose pull && docker compose up -d</code> (prebuilt image) or <code>git pull && docker compose up -d --build</code> (built from source).')}</div>`;
   } else if (a.update_env && a.update_check && a.checked_at) {
-    const when = new Date(a.checked_at).toLocaleString(I18N.code || 'en');
+    const when = fmtStamp(new Date(a.checked_at));  // 2.368.0 B (#2982): one locale source
     h += hint(a.error ? tr('The last update check failed ({0}); it tries again later.', esc(a.error)) : a.latest ? tr('Up to date (checked {0}).', esc(when)) : tr('Checked {0}.', esc(when)));
   }
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
@@ -1320,8 +1351,9 @@ async function adminSwitch(md, el, fromHist) {
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   try {
-    // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password
-    const pw = key === 'oidc_autocreate' && on;
+    // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
+    // 2.360.0 A (#2496): every security switch (core/instance.py AUTH_SWITCHES) asks for it when it changes
+    const pw = ['twofa_required', 'passkey_login', 'oidc_autocreate', 'public_links'].includes(key);
     let j; try { j = await (pw ? rawFetch : api)('PATCH', '/api/admin/settings', {[key]: on}); } catch (x) {
       if (!pw || !x.data?.password_needed) { if (pw) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
@@ -1351,7 +1383,7 @@ async function icalDraw(md, j) {
   // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
   if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
   const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button>`;
-  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
+  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', fmtDateNum(at))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
   box.innerHTML = `<div class="row icalrow"><input id="s-icalurl" readonly value="${esc(j.url)}" aria-label="${tr('Subscription link')}"><button class="btn sm pri" data-m="ical-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>
     <div class="row"><a class="btn sm" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${tr('Open in calendar app')}</a>${btns}</div>`;

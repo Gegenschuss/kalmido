@@ -119,7 +119,7 @@ function fq_bind(ed, f) {
 async function fq_entriesOpen(f) {
   let j; try { j = await rawFetch('GET', `/api/forms/${f.id}/entries`); } catch (x) { toast(x.message || tr('Only available online.')); return; }
   const show = (q, v) => v == null || v === '' ? '—' : Array.isArray(v) ? v.join(', ') : q.kind === 'yesno' ? tr(v === 'yes' ? 'Yes' : 'No') : String(v);
-  const row = en => `<details class="fqen"><summary><span class="n"><b>${esc(en.title)}</b> <span class="muted">${esc(fmtWhen(en.created_at))}${en.sender || en.email ? ' · ' + esc([en.sender, en.email].filter(Boolean).join(' ')) : ''}${en.client ? ' · ' + esc(en.client.name) : ''}${en.done ? ' · ' + esc(tr('done')) : ''}</span></span></summary>
+  const row = en => `<details class="fqen"><summary><span class="n"><b>${esc(en.title)}</b> <span class="muted">${esc(fmtWhen(en.created_at))}${en.sender || en.email ? ' · ' + esc([en.sender, en.email].filter(Boolean).join(' ')) : ''}${en.client ? ' · ' + esc(en.client.name) + (en.client_typed ? ' (' + esc(tr('not confirmed')) + ')' : '') : ''}${en.done ? ' · ' + esc(tr('done')) : ''}</span></span></summary>
       <dl>${j.questions.map(q => `<dt>${esc(q.label)}</dt><dd>${esc(show(q, en.answers[q.id]))}</dd>`).join('')}</dl>
       <button type="button" class="btn sm" data-fq="task" data-tid="${en.task_id}">${ic('arrow', 's')} ${tr('Open task')}</button></details>`;
   const md = modal(`<div class="lhdr"><h3>${tr('Submissions')} · ${esc(f.title)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>

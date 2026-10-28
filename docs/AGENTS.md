@@ -96,7 +96,7 @@ admin (the agent's dialog), personal agents from their owner (the lock button in
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
 needs no permission; 2.190.0: a token that may only read (no permission beyond *Read*, *Read files*, *Read the file store*,
-*Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open). Agents created before 2.15.0 keep everything they could do (stored as `write`).
+*Read tables*, 2.200.0: *Read knowledge pages*) gets `403` for chat messages, reactions, pins and proposals there (status, progress, jobs, usage stay open; 2.360.0: a job for a person (`user_id`) or one that waits (`state: waiting`) and withdrawing answer buttons are refused too). Agents created before 2.15.0 keep everything they could do (stored as `write`).
 
 - `GET /api/v1/me` shows `token.effective_scopes`; the MCP server lists only the tools the token may use.
 - A request without its permission gets `403` with `error.required_scope`: ask a person to grant it, never work around it. A few checks depend on the request body (a batch that also deletes, `export_data`, `time/from-events`, preparing a task for an event, linking a contact, the proposals `time`, `shoot`, `layout`, `import` and `structure` replace): they answer a plain `403` (“This token lacks the permission …”) without `required_scope`; read the message, it names the permission.
@@ -121,17 +121,21 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 *Since 2.7.2.*
 
 Besides the **team agents** an admin creates, people can run their **own personal agent** (for example Claude Code on
-their laptop), if an admin allows it.
+their laptop). **Who allows it (2.361.4):** each workspace decides. In the private area the person is their own admin: a
+person without an organisation creates one without asking anybody. In an organisation its admins decide with the switch
+*Members may have their own agents* (*Settings > Workspaces*, the organisation's entry; `PATCH /api/orgs/{id}
+{"member_agents": true}`, off by default); its admins themselves always may. The server switch *Users may create their own
+agents* (below) allows it for everyone in every workspace. A server without organisations has only the server switch.
 
 **Who is responsible (2.24.0):** a personal agent is connected by the person themselves, with their own AI provider, key
 and computer. What it reads in the projects shared with it goes to that provider, and the person who connects it is
 responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalmido runs no third-party AI). Give the agent
 a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a project, everyone
-in the project gets a News item naming the agent, who added it and where it runs. The organisation's switch *Members may
-connect agents* (Settings > Administration > Organisation; the same policy as below) is off by default.
+in the project gets a News item naming the agent, who added it and where it runs.
 
-- **Admin policy**, *Settings > Agents > Set up* (admins): *Users may create their own agents* (off by default), the
-  limit per person (default 2, at most 20) and optional usage limits that every new personal agent gets.
+- **Admin policy**, *Administration > Agents* (server admins): *Users may create their own agents* (off by default: then
+  each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
+  new personal agent gets.
 
   ```
   GET /api/admin/agent-policy  -> {"user_agents": false, "max_per_user": 2, "limits": null}
@@ -144,17 +148,24 @@ connect agents* (Settings > Administration > Organisation; the same policy as be
 - **A person creates their agent** in *Settings > Agents > Set up > Your personal agents > Create agent*. The token is shown once.
 
   ```
-  GET    /api/my/agents              -> {"allowed": true, "max": 2, "agents": [ … ]}
-  POST   /api/my/agents              {"username": "alice-claude", "display_name": "Alice's Claude", "note": "laptop"}
-                                     -> 201 {…, "token": "abk_…"}   (403 when not allowed, 409 when the limit is reached)
-  PATCH  /api/my/agents/{id}         {"display_name"?, "note"?, "enabled"?}     (enabled false = pause)
+  GET    /api/my/agents              -> {"allowed": true, "server": false, "max": 2, "agents": [ … ]}
+  POST   /api/my/agents              {"username": "alice-claude", "display_name": "Alice's Claude", "note": "laptop", "org_id"?}
+                                     -> 201 {…, "token": "abk_…"}   (403 when not allowed, 409 when the limit is reached,
+                                        400 for an organisation that does not allow it; without org_id: the first
+                                        organisation that allows it, else the private area)
+  PATCH  /api/my/agents/{id}         {"display_name"?, "note"?, "enabled"?, "org_id"?, "limits"?}   (enabled false = pause;
+                                        limits as in Usage and limits, null = none)
+  GET    /api/my/agents/{id}/audit   the agent's audit log (filters and CSV as GET /api/admin/agents/{id}/audit)
   POST   /api/my/agents/{id}/token   -> {"token": "abk_…"}   a new token; every older one stops at once
   DELETE /api/my/agents/{id}         the agent is deleted; projects it created go to its owner
   ```
 - **Owned by its creator.** A personal agent (`owner` in the agent lists, `agents.owner_id`) sees only the projects its
   owner shares with it. Only the owner can share projects with it and chat with it; nobody else finds it in a share
   dialog. Like every agent it is never an admin and cannot sign in to the web app; the usage
-  limits and the audit log apply as for every agent.
+  limits and the audit log apply as for every agent. **The owner (2.361.4)** reads its log and sets its usage limits
+  (*Settings > Agents > Set up*, the chart button of the agent) and gets the News when it reaches one, as admins do.
+- **Changing its workspace** (`org_id`) works only when it is in no project, calendar or address book of another
+  workspace (400 with the number; 2.361.4: also from an organisation into the private area).
 - **Admins keep control.** *Settings > Agents* lists every agent with its owner. Admins pause one
   (`PATCH /api/admin/agents/{id} {"enabled": false}`), change its limits, or delete it: `DELETE /api/admin/agents/{id}` (projects the agent created go to its owner,
   for a team agent to the admin who deletes it).
@@ -176,15 +187,18 @@ Set up on a computer* (the download button in the agent's row; admins: in the ag
 and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token:
 
 ```sh
-curl -fsSL https://tasks.example.com/agent-setup.sh | bash -s -- --url https://tasks.example.com --code ks_... --dir ~/projects/site
+curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... bash -s -- --url https://tasks.example.com --dir ~/projects/site
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Code ks_... -Dir "$HOME\projects\site"
+$env:KALMIDO_SETUP_CODE='ks_...'; & ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Dir "$HOME\projects\site"
 ```
 
-The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). The script, served by your
-own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
+The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). 2.360.0: the code goes in the
+environment (`KALMIDO_SETUP_CODE`, on Windows too), so it is not in the computer's process list (`--code` / `-Code` still
+work). The scripts take an `http://` address only for this computer (`localhost`, `127.0.0.1`, `[::1]`) or with
+`--allow-http` / `-AllowHttp` (Kalmido adds it to the command when it runs without https), and fetch the starter files
+only over `https://` or from the Kalmido itself. The script, served by your own Kalmido (`/agent-setup.sh`, `/agent-setup.ps1`):
 
 1. checks what is needed (Python 3.9+, curl, the agent command, default `claude`) and names what is missing,
 2. trades the code for the agent's token (`POST /api/agent-setup/redeem`, no login, rate limited like logins) and keeps
@@ -439,8 +453,9 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
 
 ### Guide B: a personal agent on your own computer (users)
 
-1. **Allowed?** An admin has to switch on *Users may create their own agents* (*Settings > Agents > Set up*). If
-   *Create agent* is missing in *Settings > Agents > Set up*, ask an admin.
+1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Workspaces*:
+   *Members may have their own agents*), or a server admin for everyone (*Administration > Agents*). If *Create agent* is
+   missing in *Settings > Agents > Set up*, personal agents are off on this server: ask a server admin.
 2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
    the token (shown once) into the env file (paths in the table above), readable only by you.
 3. **Share only what it should see**: *Settings > Agents > Projects*, or a project's *Share* dialog. Nobody else can share
@@ -1317,7 +1332,7 @@ Where people see it (2.30.0, only where the agent really writes):
 
 - `working` **with** `task_id`: "Claude is working on it" (with the status text) in the comment area of exactly that task,
   and *working on #51* in the chat header -- not under the chat messages.
-- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working · text") and in the
+- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working: text", 2.350.0 the one state line) and in the
   header chip only (2.32.0: no longer repeated under the last chat message, there only the typing dots); never in a task
   and never in a project's agent band. The status text of such a
   status never appears where other people read along, but keep chat content out of it anyway.
@@ -1330,8 +1345,9 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
 `host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
-agent (`host` in the agent objects people get) and shows them in the chat header: the permission badge says
-"Host default (Auto)" instead of only "Host default", the model stands next to it, and a model set in the runtime settings
+agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
+"Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
+"Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
 that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"). Unknown fields stay as before.
 2.44.0 (#1517): `host` (max. 80 characters) names the computer; it is kept on the token the request came with, so
 *Set up on a computer* lists each computer by name (the reference launchers send it once at start, `KALMIDO_HOST` or the
@@ -2046,11 +2062,11 @@ it: an agent never gets more than that person. An agent never manages office rig
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
-| An invoice draft from an accepted quotation | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
+| An invoice draft from an accepted quotation (2.356: a quotation with a full invoice that is not cancelled answers `409` (`error.code` `invoice_exists`, `error.invoices` = those invoices); ask the person, `force: true` makes a second one) | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
 | A reminder draft over open invoices of one client (2.355: only invoices past their due date, else `409`; the totals carry `interest` / `flat_fee` when the office switched them on) | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
@@ -2068,7 +2084,9 @@ draft's `updated_at` you read: a person who saved in between answers `409` (`err
 current draft) - read it again and build on it, never resend the old list. Positions billed from receipts stay on the draft. A draft of an agent never gets a number; the document
 shows *Drafted by the agent ...*. 2.269.0: the three draft routes (quotation, invoice from a quotation, reminder) take an
 optional `client_ref` (your own id of the request, at most 64 characters): sent again with the same value (the answer got
-lost, a retry), Kalmido answers `200` with the draft made the first time instead of making a second one. `notify: true` posts a card in the person's chat with the sum and two link buttons,
+lost, a retry), Kalmido answers `200` with the draft made the first time instead of making a second one. 2.354.0: an invoice from a quotation that has finalised progress invoices
+(`inv_type: "progress"`) answers `409` without `inv_type` (it would bill them twice) - draft `inv_type: "final"`, which deducts
+each progress invoice less the credit notes on it. `notify: true` posts a card in the person's chat with the sum and two link buttons,
 *Open in the office* and *PDF preview* (link buttons are choices with `href`: only app targets `#...` and the PDF preview).
 
 Payments: Kalmido has no bank access. The agent reads an incoming payment from what a person gave it (e.g. a pasted bank
@@ -3050,6 +3068,8 @@ panel shows *Agent usage* on tasks with reports (only to people who see the task
   and `Retry-After` (seconds until the period ends), except `POST` / `GET /agent/usage`, `PUT /agent/status`,
   `/agent/quota` (2.33.0) and `GET /agent`. People see the agent as *limit reached*. It ends when the period rolls over or an admin raises the limit.
   `GET /agent` has `usage_limit` (the same object as `limit` above) so the agent can check where it stands.
+- 2.360.0: the limits count what the agent reports, so they are a cost brake for agents that behave, not a security
+  boundary: an agent that stops reporting is not stopped by them. To stop an agent, pause it or revoke its token.
 
 ### Claude Code: report usage automatically
 
@@ -3095,7 +3115,8 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
+yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 

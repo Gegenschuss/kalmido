@@ -20,7 +20,7 @@ const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };
 const dc_hashId = () => { try { const m = location.hash.match(/^#docs\/(\d+)/); return m ? +m[1] : null; } catch { return null; } };  // the sheet may close after its window is gone
-const dc_money = (a, cur) => a == null || a === '' ? '' : `${(+a).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${({EUR: '€', USD: '$', GBP: '£'})[cur] || cur || ''}`.trim();  // 2.189.0 (#2475): + £
+const dc_money = (a, cur) => curMoney(a, cur);  // 2.189.0 (#2475): + £; 2.368.0 C (#2983): one money format (i18n.js curMoney)
 const dc_day = d => d ? dayLabel(d, true) : '';
 const dc_isPdf = d => d && (d.mime === 'application/pdf' || /\.pdf$/i.test(d.name));
 const dc_fileUrl = (d, dl) => `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' : ''}`;
@@ -374,7 +374,7 @@ function dc_sDraw(md) {
     <h4>${tr('Sorting automatically')}</h4>
     <p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
     ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-    <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${tr('Recognise files put into the folder “Dokumente/Eingang” of the file store')}</label>
+    <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${esc(tr('Recognise files put into the folder “{0}” of the file store', s.inbox_path || tr('Documents|folder') + '/' + tr('Inbox|folder')))}</label>
     <div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
     ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}
     <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>

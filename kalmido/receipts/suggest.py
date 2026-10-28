@@ -36,7 +36,7 @@ _KEEP = object()
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
-from ..office.rights import NO_RIGHT, ofr_allows, ofr_rights  # 2.237.0
+from ..office.rights import NO_RIGHT, ofr_allows, ofr_groups_of, ofr_rights  # 2.237.0
 
 
 def _is_agent():
@@ -183,13 +183,13 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
     the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
     bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
-    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
+    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id, billed_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
     # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
     if old and old["vat_pct"] is not None and vat is None:
         olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
-    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
+    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"] or old["billed_at"])):  # 2.362.0 (#3131): + billed, invoice missing
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
@@ -400,6 +400,10 @@ def v1_rc_suggest(nid):
     c = db()
     aid = me()
     n, m = rc_doc(c, nid)
+    ws = m["ws"] or ""  # 2.360.0 C (#2496): an agent in the office groups needs the receipts area, like people; one without a
+    # group row as before (ofr_rights rules every agent, so without a row it would have no area at all)
+    if ws.startswith("o") and ws[1:].isdigit() and ofr_groups_of(c, int(ws[1:]), aid):
+        rc_office_need(c, m, aid, "view")
     lid, cat = rc_clean(b)
     amt = rc_amount_clean(b.get("amount"))  # 2.121.0 C (#2096): amount, currency and VAT rate may be suggested as well
     ccy = rc_currency_clean(b.get("currency"))

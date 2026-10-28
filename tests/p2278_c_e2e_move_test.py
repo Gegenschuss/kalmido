@@ -55,7 +55,7 @@ def export_of(s, secs=120):
             break
         time.sleep(0.25)
     assert j.get("state") == "done", j
-    r = s.get(B + "/api/account/export/file")
+    r = kt.su_get(s, B + "/api/account/export/file")  # 2.360.0 (#2496): the step-up
     assert r.ok, r.text[:200]
     return r.content
 

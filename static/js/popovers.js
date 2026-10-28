@@ -399,18 +399,37 @@ function dpLocale() {
 // 2.263.0 (#2977): a typed "3/10" is month / day where the region writes so (en-US: 10/23/2026), else day / month; without a
 // region (app language "en" on a browser of another language) day first. Quick add, the project table and the sheets use it.
 function mdFirst() {
+  const o = fmtPref('date_order'); if (o) return o === 'mdy';  // 2.368.0 B (#2982)
   const loc = dpLocale(); if (!loc.includes('-')) return false;
   try { const p = new Intl.DateTimeFormat(loc, {day: 'numeric', month: 'numeric'}).formatToParts(new Date(2000, 0, 2)).map(x => x.type); return p.indexOf('month') < p.indexOf('day'); } catch { return false; }
 }
+// 2.368.0 B (#2982): the person's choice in "Region and formats" (week_start, time_format, date_order); '' = automatic
+const fmtPref = k => (typeof S !== 'undefined' && S.settings && S.settings[k]) || '';
 function weekStart() {  // 0 = Sunday, 1 = Monday, 6 = Saturday
+  const p = fmtPref('week_start'); if (p) return p === 'sun' ? 0 : 1;
   try {
     const L = new Intl.Locale(dpLocale()), wi = typeof L.getWeekInfo === 'function' ? L.getWeekInfo() : L.weekInfo;
     if (wi && wi.firstDay) return wi.firstDay % 7;
     return DP_SUNDAY.has(L.maximize().region) ? 0 : 1;
   } catch { return 1; }
 }
-const hour12 = () => { try { return /h1[12]/.test(new Intl.DateTimeFormat(dpLocale(), {hour: 'numeric'}).resolvedOptions().hourCycle || ''); } catch { return false; } };
-const fmtTimeLoc = hm => { if (!/^\d\d:\d\d$/.test(hm || '')) return ''; const [h, m] = hm.split(':').map(Number); try { return new Date(2000, 0, 1, h, m).toLocaleTimeString(dpLocale(), {hour: hour12() ? 'numeric' : '2-digit', minute: '2-digit'}); } catch { return hm; } };
+const hour12 = () => { const p = fmtPref('time_format'); if (p) return p === '12'; try { return /h1[12]/.test(new Intl.DateTimeFormat(dpLocale(), {hour: 'numeric'}).resolvedOptions().hourCycle || ''); } catch { return false; } };
+// 2.368.0 B (#2982): every shown time goes through fmtTimeAt / fmtTimeLoc (12 / 24 h as chosen); input fields stay HH:MM
+const fmtTimeAt = (d, sec) => { const h = hour12(); try { return d.toLocaleTimeString(dpLocale(), {hour: h ? 'numeric' : '2-digit', minute: '2-digit', ...(sec ? {second: '2-digit'} : {}), hour12: h}); } catch { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; } };
+const fmtTimeLoc = hm => { if (!/^\d\d:\d\d$/.test(hm || '')) return ''; const [h, m] = hm.split(':').map(Number); return fmtTimeAt(new Date(2000, 0, 1, h, m)); };
+// a date in numbers: 03/10/2026, 03.10.2026 (app language) or the chosen order; year = false: day and month only
+function fmtDateNum(d, year = true) {
+  const o = fmtPref('date_order');
+  if (o) { const D = pad(d.getDate()), M = pad(d.getMonth() + 1), Y = d.getFullYear();
+    return o === 'ymd' ? (year ? `${Y}-${M}-${D}` : `${M}-${D}`) : o === 'mdy' ? `${M}/${D}${year ? '/' + Y : ''}` : `${D}.${M}.${year ? Y : ''}`; }
+  try { return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }
+}
+// a moment as numbers: date + time ("28/10/2026 14:05")
+const fmtStamp = (d, year = true) => `${fmtDateNum(d, year)} ${fmtTimeAt(d)}`;
+// a moment with the date in words: "28 Oct 2026, 14:05" (activity logs, versions)
+const fmtMoment = d => { try { return d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
+// weeks that keep Monday when automatic (dispatch, habit weeks), the chosen first day otherwise
+const weekOf = s => fmtPref('week_start') ? weekStartOf(s) : mondayOf(s);
 const fmtDateLoc = s => !/^\d{4}-\d\d-\d\d$/.test(s || '') ? '' : fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 const wdOrder = () => { const f = weekStart(); return [0, 1, 2, 3, 4, 5, 6].map(i => (i + f) % 7); };
 const weekStartOf = s => { const d = pd(s), k = (d.getDay() - weekStart() + 7) % 7; d.setDate(d.getDate() - k); return ds(d); };
@@ -513,7 +532,7 @@ function dpYears(y) {
 }
 function dpDrawTime() {
   const st = DP.st, el = DP.el, cur = st.sel || '', [ch, cm] = cur ? cur.split(':').map(Number) : [-1, -1], h12 = hour12();
-  const hl = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: h12 ? 'numeric' : '2-digit'}); } catch { return pad(h); } };
+  const hl = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: h12 ? 'numeric' : '2-digit', hour12: h12}); } catch { return pad(h); } };
   const hb = h => `<button type="button" role="option" class="${h === ch ? 'sel' : ''}" data-th="${h}" aria-selected="${h === ch}" aria-label="${esc(hl(h))}" tabindex="${h === (ch < 0 ? 9 : ch) ? 0 : -1}">${h12 ? (h % 12 || 12) : pad(h)}</button>`;
   const ap = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: 'numeric', hour12: true}).replace(/[\d\s\u202f]/g, '') || (h < 12 ? 'AM' : 'PM'); } catch { return h < 12 ? 'AM' : 'PM'; } };
   el.innerHTML = `<div class="tpk"><label class="tpl" for="dp-tin">${tr('Time')}</label><input id="dp-tin" class="tpin" value="${esc(fmtTimeLoc(cur) || '')}" inputmode="text" autocomplete="off" enterkeyhint="done" placeholder="${esc(fmtTimeLoc('09:30'))}"></div>
@@ -595,14 +614,22 @@ async function quickDue(id, days) {
   if (!canEdit(t)) { roToast(); return; }
   if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   // 2.199.0 M (#2768): "Tomorrow" on a task already due tomorrow or later moves it one more day from its own date
-  const d = days === 1 && t.due && t.due >= addDays(today(), 1) ? addDays(t.due, 1) : addDays(today(), days);
+  // 2.354.0 C (#3326): "-1 Tag" takes a day back, never before today
+  if (days === -1 && !(t.due && t.due > today())) return;
+  const d = days === -1 ? addDays(t.due, -1) : days === 1 && t.due && t.due >= addDays(today(), 1) ? addDays(t.due, 1) : addDays(today(), days);
   if (t.due === d) { toast(tr('Already due {0}', dayLabel(d))); return; }
   await patchUndoable(id, {due: d, ...(t.start && t.start >= d ? {start: null} : {})}, tr('Date: {0}', dayLabel(d)));
   if (S.sel === id) renderDetail();
 }
+// 2.354.0 C (#3326): on a task already due tomorrow or later the second button reads "+1 Tag" (tooltip: the target day); "-1 Tag" next to it only when due after today
+const qdPlus = t => !!(t?.due && t.due >= addDays(today(), 1));
+const qdLabel = t => qdPlus(t) ? tr('+1 day') : tr('Tomorrow');
+const qdTitle = t => qdPlus(t) ? tr('Set to {0}', dayLabel(addDays(t.due, 1))) : tr('Tomorrow, each further click +1 day');
+const qdMinus = t => !!(t?.due && t.due > today());
 const quickDueRow = id => { const t = taskById(id), d0 = today(), d1 = addDays(d0, 1);
   return {row: [{label: tr('Today'), icon: 'sun', title: isMobile() ? '' : `${tr('Due today')} (${keyName('t')})`, on: t?.due === d0, fn: () => quickDue(id, 0)},
-    {label: tr('Tomorrow'), icon: 'sunrise', title: isMobile() ? tr('Tomorrow, each further click +1 day') : `${tr('Tomorrow, each further click +1 day')} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)}]}; };
+    {label: qdLabel(t), icon: 'sunrise', title: isMobile() ? qdTitle(t) : `${qdTitle(t)} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)},
+    ...(qdMinus(t) ? [{label: tr('-1 day'), icon: 'back', title: tr('Set to {0}', dayLabel(addDays(t.due, -1) < d0 ? d0 : addDays(t.due, -1))), fn: () => quickDue(id, -1)}] : [])]}; };
 // ---- 2.1.0 (#335): "Waiting on external": who / what + a follow-up day (reminder + News on that day, agents get
 // followup_due). A chip on the row and a bar in the task panel; clearing it is one click.
 function waitLabel(t) {

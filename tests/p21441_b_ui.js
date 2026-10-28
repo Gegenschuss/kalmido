@@ -68,6 +68,8 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     check(await ev(noSide), '360 px: no sideways scrolling in the preview');
     await shot('p21441-b-preview.png');
     await ev(`(() => { document.querySelector('.modal.bnkdlg [data-bi="next"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal.bnkdlg') && !!document.querySelector('#toast button')`, 60), 'imported: the dialog closes, the toast offers the undo');
     const imps = await call(CF, 'GET', '/api/office/bank/imports');
     check((imps.items || []).length === 1 && imps.items[0].count === 3 && /2 files/.test(imps.items[0].filename), 'one import of two files ' + JSON.stringify(imps.items));
@@ -92,6 +94,8 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     await ev(give([['tag3.xml', C2]]));
     check(await ready(ev, `!!document.querySelector('.modal.bnkdlg [data-bi="next"]')`, 60), 'the preview from the cash flow');
     await ev(`(() => { document.querySelector('.modal.bnkdlg [data-bi="next"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), '2.356.0 B (#2934): the import names its target first');
+    await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal.bnkdlg') && /Account balance according to the bank/.test(document.querySelector('.cfb-box')?.textContent || '')`, 80), 'imported from the cash flow: it loads again with the bank balance');
     check(await ev(`!!document.querySelector('.cfb-box [data-cfb-imp]')`), 'the bank box keeps the import button');
   }, false);

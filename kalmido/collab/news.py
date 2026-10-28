@@ -108,12 +108,13 @@ def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
 
 
 def ws_budget_news_mine(c, uid, r):
-    """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent."""
+    """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent. 2.361.4 (#2928): its usage limits
+    too (the owner sets them)."""
     try:
         d = json.loads(r["data"] or "{}")
     except ValueError:
         return False
-    return bool(isinstance(d, dict) and d.get("budget") and c.execute(
+    return bool(isinstance(d, dict) and c.execute(
         "SELECT 1 FROM agents WHERE user_id=? AND owner_id=?", (r["actor_id"], uid)).fetchone())
 
 
@@ -508,8 +509,16 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..personal.timesheet import tsl_news_live
             if not tsl_news_live(c, uid, r["data"]):
                 continue
-        elif kind == "wiki_shared":  # 2.126.2 B (#2355): stays after a revoke (it opens "Shared with me"); only path + kind in data
-            pass
+        elif kind == "wiki_shared":  # 2.126.2 B (#2355): only path + kind in data; 2.360.0 D (#2496): while its share is live
+            try:  # (a person share of that path from the actor's private space to me; a revoke or the expiry ends the item)
+                d = json.loads(r["data"] or "{}")
+                p = str(d.get("path") or "")
+            except (ValueError, AttributeError):
+                continue
+            if not c.execute("SELECT 1 FROM wiki_shares WHERE kind='person' AND org_id IS NULL AND user_id=? AND owner_id=? AND lower(path)=lower(?) "
+                             "AND is_folder=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?) LIMIT 1",
+                             (uid, r["actor_id"], p, 1 if d.get("folder") else 0, iso(now_utc()))).fetchone():
+                continue
         elif kind == "signoff":  # 2.266.0 (#2965): a customer's decision, while I am still in that office (or see its list)
             from ..office.signoff import sig_news_live
             if not sig_news_live(c, uid, r["data"]):

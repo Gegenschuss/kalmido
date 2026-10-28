@@ -2004,7 +2004,8 @@ TOOLS += [
            "trial": {"type": "boolean", "description": "true = only trial documents, false = only real ones"}, **_RB}),
      lambda api, a: api.call("GET", "/office/docs", {**_pick(a, ("kind", "client_id", "status", "requested_by")), **({"open": "1"} if a.get("open") else {}),
                                                       **({"trial": "1" if a["trial"] else "0"} if a.get("trial") is not None else {})})),
-    ("get_office_document", "2.51.0: one document of the office with its positions, sums and state.",
+    ("get_office_document", "2.51.0: one document of the office with its positions, sums and state. 2.356.0: an invoice names its quotation "
+                            "(source_offer), a quotation lists the invoices made from it (offer_invoices).",
      _obj({"doc_id": S_ID, **_RB}, ["doc_id"]), lambda api, a: api.call("GET", f"/office/docs/{int(a['doc_id'])}", _pick(a, ("requested_by",)))),
     ("create_offer_draft", "2.51.0: a quotation DRAFT (no number, never sent): client, title, positions (service_id + qty takes title, unit and price "
                            "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "
@@ -2018,10 +2019,13 @@ TOOLS += [
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
                                  "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted. "
                                  "2.120.0: inv_type progress = a progress invoice of amount (net) or pct of the quotation's net; final = the whole "
-                                 "quotation less its finalised progress invoices.",
+                                 "quotation less its finalised progress invoices (less partial credit notes on them). 2.354.0: a quotation with finalised "
+                                 "progress invoices answers 409 without inv_type - use final. 2.356.0: a quotation that already has a full invoice (not cancelled) "
+                                 "answers 409 invoice_exists with those invoices: ask the person; force=true only when they want a second one.",
      _obj({"offer_id": S_ID, "parts_mode": {"type": "string", "enum": ["full", "title", "summary"]}, "notify": {"type": "boolean"},
-           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"}, **_RB, **_CREF}, ["offer_id"]),
-     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "requested_by", "client_ref")))),
+           "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"},
+           "force": {"type": "boolean"}, **_RB, **_CREF}, ["offer_id"]),
+     lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "force", "requested_by", "client_ref")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
                        "Never sent by you: a person checks and sends it. 2.355: only invoices past their due date (409 otherwise).",
      _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["invoice_ids"]),

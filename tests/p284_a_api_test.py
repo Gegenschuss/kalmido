@@ -25,7 +25,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA, su_get  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
            "-e", "KALMIDO_IMAP_SSL=0", "-e", "KALMIDO_IMAP_USER=kalmido", "-e", "KALMIDO_IMAP_PASSWORD=secret", "-e", "KALMIDO_IMAP_INTERVAL=600",
@@ -238,7 +238,8 @@ d = Bo.get(B + f"/api/hubmail/mails/{R['m1']['id']}").json()
 names = {a["name"] for a in d.get("attachments", [])}
 check("brief.txt" in names and any(n.endswith(".eml") for n in names), f"the .eml and the attachment ({names})")
 chain = dbx("SELECT f.name, p.name, r.name FROM fs_nodes f JOIN fs_nodes p ON p.id=f.parent_id JOIN fs_nodes r ON r.id=p.parent_id WHERE f.id=?", (R["m1"]["folder_id"],))
-check(chain and chain[0][1] == "Acme" and chain[0][2] == "E-Mails" and chain[0][0].startswith("2026-10-16 "), f"the folder E-Mails / Acme / <date> <subject> ({chain})")
+# 2.368.0 (#2987): the mail folder is named in the person's language (English here; "E-Mails" before)
+check(chain and chain[0][1] == "Acme" and chain[0][2] == "Emails" and chain[0][0].startswith("2026-10-16 "), f"the folder E-Mails / Acme / <date> <subject> ({chain})")
 check(d.get("folder_id") == R["m1"]["folder_id"], "bob sees the folder in the file store")
 att = next(a for a in d["attachments"] if a["name"] == "brief.txt")
 r = Ca.get(B + f"/api/hubmail/mails/{R['m1']['id']}/files/{att['id']}", params={"dl": 1})
@@ -297,7 +298,8 @@ check(m3 not in ids(Ca, client_id=ACME), "carol no longer sees it")
 check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"client_id": BETACO}).status_code == 404, "a client of another organisation: 404")
 check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"client_id": PRIVB}).status_code == 409, "a private client for an Alpha mail: 409")
 check(Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"list_id": PLAIN}).status_code == 409, "a plain list: 409")
-check(Ca.post(B + f"/api/hubmail/mails/{R['m1']['id']}/assign", json={"list_id": P}).status_code == 404, "a project carol does not see: 404")
+# 2.360.0 (#2496): carol may not move Acme's mail at all any more (403) - before that, the project she does not see (404)
+check(Ca.post(B + f"/api/hubmail/mails/{R['m1']['id']}/assign", json={"list_id": P}).status_code in (403, 404), "a project carol does not see: 404")
 r = Bo.post(B + f"/api/hubmail/mails/{m3}/assign", json={"list_id": P})
 check(r.ok and r.json()["mail"]["client_id"] == ACME, "a project brings its client")
 t = js(Bo.get(B + "/api/hubmail/targets", params={"mail": R["m1"]["id"]}))
@@ -305,9 +307,11 @@ check({x["id"] for x in t.get("clients", [])} == {ACME, OTHER} and [x["id"] for 
 check(Da.get(B + "/api/hubmail/targets", params={"mail": R["m1"]["id"]}).status_code == 404, "targets of a foreign mail: 404")
 m4 = R["m4"]["id"]
 check(Da.delete(B + f"/api/hubmail/mails/{m4}").status_code == 404, "dave cannot delete")
-check(Ca.delete(B + f"/api/hubmail/mails/{m4}").ok, "carol deletes a client mail")
-check(m4 not in ids(Bo, client_id=ACME), "deleted: gone for bob too")
-check(Ca.post(B + f"/api/hubmail/mails/{m4}/restore").ok and m4 in ids(Bo, client_id=ACME), "undo: restored")
+# 2.360.0 (#2496): a client's mail is moved / deleted by its recipient, who created the client or an organisation admin
+check(Ca.delete(B + f"/api/hubmail/mails/{m4}").status_code == 403, "carol (member, sees the client) cannot delete a client mail")
+check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok, "bob (admin) deletes a client mail")
+check(m4 not in ids(Ca, client_id=ACME), "deleted: gone for carol too")
+check(Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok and m4 in ids(Ca, client_id=ACME), "undo: restored")
 
 # ---- the boundary: a mail bound to a client of another workspace is shown nowhere and repaired
 dbx("UPDATE hub_mails SET client_id=? WHERE id=?", (BETACO, m4), write=True)
@@ -345,7 +349,7 @@ for _ in range(240):
     if st.get("state") != "running":
         break
     time.sleep(0.25)
-zf = zipfile.ZipFile(io.BytesIO(Er.get(B + "/api/account/export/file").content)) if st.get("state") == "done" else None
+zf = zipfile.ZipFile(io.BytesIO(su_get(Er, B + "/api/account/export/file").content)) if st.get("state") == "done" else None  # 2.360.0 (#2496): the step-up
 hm = json.loads(zf.read("data/hub_mails.json")) if zf and "data/hub_mails.json" in zf.namelist() else None
 hm = hm.get("rows", hm) if isinstance(hm, dict) else hm
 HX = {x.get("id") for x in hm} if isinstance(hm, list) else set()

@@ -65,7 +65,7 @@ function wsp_paneHtml() {
     return `<div class="row wsp-row" data-wsp="${esc(ws)}"><span class="wsp-nm">${wsIcon(ws)}<span>${esc(nm)}</span></span><div class="colors" role="group" aria-label="${esc(tr('Colour of {0}', nm))}">${org ? b('', def, tr('Default (colour of the organisation)')) + b('none', 'var(--bg4)', tr('No color')) : b('', 'var(--accent)', tr('Default (Kalmido purple)')) /* 2.138.2 C (#2389) */}${LP_TONES.map(t => b(t[0], t[2], tr(t[1]))).join('')}</div></div>`;
   };
   // 2.138.2 C (#2389): "Workspace colour" -- the stripe on top of the sidebar; Private's default is the accent (no "No color")
-  return `<div class="wsp-pane"><h5>${tr('Workspace colour')}</h5><div class="shint keep">${tr('Only you see it: a stripe on top of the sidebar and a dot in the workspace switch. Without a choice an organisation shows the colour its admins chose; Private shows Kalmido purple.')}</div>${(wsOn() ? wsOptions() : ['private']).filter(w => w !== 'all').map(row).join('')}</div>`;
+  return `<div class="wsp-pane"><h5>${tr('My colour')}</h5><div class="shint keep">${tr('Only you see it: a stripe on top of the sidebar and a dot in the workspace switch. Without a choice an organisation shows the colour its admins chose; Private shows Kalmido purple.')}</div>${(wsOn() ? wsOptions() : ['private']).filter(w => w !== 'all').map(row).join('')}</div>`;
 }
 // 2.138.2 C (#2389, P4): the swatches react (Settings > Workspaces, and the account page of a person without an organisation)
 function wsp_paneWire(box) {
@@ -129,10 +129,11 @@ function wsc_paneDraw(box) {
   const orgs = (box._j || {}).orgs || [];
   for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
     const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.wscpick')) continue;
-    const adm = o.role === 'admin', cur = WSC_TONES[wsc_ix(o.color, o.id)][0];
+    const adm = o.role === 'admin'; if (!adm) continue;  // 2.354.0 C (#3013): a member has no (locked) picker
+    const cur = WSC_TONES[wsc_ix(o.color, o.id)][0];
     const row = document.createElement('div');
     row.className = 'row wscpick';
-    row.innerHTML = `<label>${tr('Colour of the workspace')}</label><div class="colors" role="group" aria-label="${esc(tr('Colour of the workspace'))}">${WSC_TONES.map((t, i) => `<button type="button" style="background:${t[0]}" class="${cur === t[0] ? 'on' : ''}" aria-pressed="${cur === t[0]}" aria-label="${esc(tr('Color {0}', i + 1))}" data-wscp="${t[0]}" ${adm ? '' : 'disabled'}></button>`).join('')}</div>`;
+    row.innerHTML = `<label>${tr('Colour of the organisation')}</label><div class="colors" role="group" aria-label="${esc(tr('Colour of the workspace'))}">${WSC_TONES.map((t, i) => `<button type="button" style="background:${t[0]}" class="${cur === t[0] ? 'on' : ''}" aria-pressed="${cur === t[0]}" aria-label="${esc(tr('Color {0}', i + 1))}" data-wscp="${t[0]}" ${adm ? '' : 'disabled'}></button>`).join('')}</div>`;
     const hint = document.createElement('div');
     hint.className = 'shint keep';
     hint.textContent = adm ? tr('Every member sees it as a stripe on top of the sidebar and a dot in the workspace switch, unless they choose their own colour.') : tr('Only an admin of this organisation can change it.');  // 2.138.2 C (#2389): new hint

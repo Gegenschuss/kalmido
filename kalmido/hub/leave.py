@@ -98,15 +98,17 @@ def lv_status_new(c, uid, oid, who, kind):
 
 def lv_status_edit(c, uid, r, v):
     """{status: ...} for a change v (plain values, abs_clean) of absence r by uid: a member who changes the kind or the
-    period of their vacation (or changes a rejected request) asks again; a change to another kind needs no approval; an
-    admin's change keeps the status. {} = unchanged."""
+    period of their vacation (or changes a rejected request) asks again; an approved vacation may become another kind, an
+    open / rejected request may not (409); an admin's change keeps the status. {} = unchanged."""
     cur = r["status"] or "approved"
     if abs_admin(c, uid, r["org_id"]) or not lv_approval_on(c, r["org_id"]):
         return {}
     old = oc_dec_fields(c, r["org_id"], "hub_absences", r)["kind"]
     kind = v.get("kind", old)
     if kind != "vacation":
-        return {"status": "approved"} if cur != "approved" else {}
+        if cur != "approved":  # 2.360.0 C (#2496): an open / rejected request does not become approved by another kind
+            raise Denied(409, tr("A vacation request keeps its kind. Delete it and enter the absence anew."))
+        return {}
     moved = kind != old or any(k in v and v[k] != r[k] for k in ("start_date", "end_date", "half_day"))
     return {"status": "pending"} if moved or cur == "rejected" else {}
 
