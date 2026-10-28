@@ -21,7 +21,7 @@ function repoWire(md, lid, folder) {
     if (!md.isConnected) return;
     if (!j) { box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
     const rows = j.repos.map(r => `<div class="mrow reporow" data-rid="${r.id}">${ic('git', 's')}<span class="n"><a href="${esc(httpUrl(r.web_url))}" target="_blank" rel="noopener noreferrer">${esc(r.full_name)}</a>
-        <span class="muted rpm">${esc(GIT_PROV.find(x => x[0] === r.provider)?.[1] || r.provider)}${r.default_branch ? ' · ' + esc(r.default_branch) : ''}${j.may ? ' · ' + esc(r.token ? tr('Token set') : tr('No token')) + (r.hook ? ' · ' + esc(tr('Webhook on')) : '') : ''}</span>
+        <span class="muted rpm">${esc(GIT_PROV.find(x => x[0] === r.provider)?.[1] || r.provider)}${r.default_branch ? ' · ' + esc(r.default_branch) : ''}${j.may ? ' · ' + esc(r.token ? tr('Token set') : tr('No token')) + (r.hook ? ' · ' + esc(tr('Webhook on')) : '') : ''}${listById(lid)?.ticket_key ? ' · ' + esc(r.hash_ids ? tr('#number and {0}-123', listById(lid).ticket_key) : tr('only {0}-123', listById(lid).ticket_key)) : ''}</span>
         <span class="rst rst-${esc(r.status)}">${esc(r.status === 'error' ? r.error : r.status === 'new' ? tr('Waiting for the first check') : tr('Checked {0}', relTime(r.polled_at)))}</span></span>
         <button class="iconbtn" data-rp="refresh" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>
         ${j.may ? `<button class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
@@ -140,6 +140,9 @@ function repoWire(md, lid, folder) {
       menu(b, [{label: tr('Change access token'), icon: 'lock', fn: () => { edit = rid; secret = null; draw(); $('#rp-tok2', box)?.focus(); }},
         r.hook ? {label: tr('Turn the webhook off'), icon: 'x', fn: async () => { try { await api('PATCH', `/api/repos/${rid}`, {hook: 'off'}); } catch { return; } secret = null; await reload(); }}
           : {label: tr('Turn the webhook on (optional)'), icon: 'zap', title: tr('Only when the Git server can reach this server: it then triggers a check at once'), fn: async () => { let x; try { x = await api('PATCH', `/api/repos/${rid}`, {hook: 'on'}); } catch { return; } secret = {id: rid, s: x.hook_secret}; await reload(); }},
+        // 2.390.0 (#3353): with a project key, "#123" counts only while this is on (on for older connections, off for new ones)
+        {label: r.hash_ids ? tr('Stop reading #number (use the key)') : tr('Also read #number'), icon: 'git', title: tr('“#123” in commits and pull requests is the task id; it can clash with the issue numbers of the Git server. With a project key, APP-123 always works.'),
+          fn: async () => { try { await api('PATCH', `/api/repos/${rid}`, {hash_ids: !r.hash_ids}); } catch { return; } await reload(); }},
         '-', {label: tr('Remove the repository'), icon: 'trash', cls: 'flag-5', fn: async () => {
           if (!await askConfirm(tr('Remove {0}?', r.full_name), tr('The links to pull requests and commits disappear from the tasks. Completed tasks stay completed.'), {ok: tr('Remove'), danger: true})) return;
           try { await api('DELETE', `/api/repos/${rid}`); } catch { return; }

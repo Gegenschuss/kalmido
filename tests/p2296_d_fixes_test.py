@@ -37,7 +37,7 @@ for f in ("de.json", "xx.json"):
     check("überweisen" not in tx["delivery_closing"]["de"] and "transfer" not in tx["delivery_closing"]["en"], f"#3167: {f} delivery closing asks for no payment")
 for lg in ("de", "nl", "fr", "es", "it"):
     d = json.load(open(os.path.join(SRC, "static", "i18n", lg + ".json"), encoding="utf-8"))
-    check(all(k in d for k in ("Goods or services received in full and in good condition.|pack", "the following goods or services have been delivered:|pack",
+    check(all(k in d for k in ("Goods or services received in full and in good condition.|pack", "The following goods or services have been delivered:|pack",
                                "Delivery note closing (German)", "Delivery note closing (English)")), f"#3167: i18n {lg} has the delivery texts")
 import types  # noqa: E402
 

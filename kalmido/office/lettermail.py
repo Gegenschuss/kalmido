@@ -112,7 +112,7 @@ def ltm_default_text(c, oid, d, lg):
     if not who and u is not None and "display_name" in u.keys():
         who = u["display_name"] or ""
     subj = d.get("subject") or tr("Letter", lg=lg)
-    return tr("Hello,\n\nplease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}", subj, who, lg=lg).rstrip()
+    return tr("Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}", subj, who, lg=lg).rstrip()
 
 
 def ltm_lang(c, oid, d):

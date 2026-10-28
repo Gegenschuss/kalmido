@@ -194,6 +194,10 @@ TASK_FIELDS = {
     "locked": {"type": "boolean", "description": "2.36.0: locked in the app (title, notes, dates, priority, project, tags, repeat and "
                "assignee read-only there until a person unlocks it; comments, checkboxes, completing and subtasks stay free). "
                "Tasks you create start locked; send false for an open one. You can still change locked tasks through the API."},
+    # 2.390.0 B (#3355): the sprint and the reviewer
+    "sprint_id": {"type": ["integer", "null"], "description": "2.390.0: an open sprint of the same project (list_sprints); null = backlog"},
+    "reviewer_id": {"type": ["integer", "null"], "description": "2.390.0: who reviews it (a person / agent with access to the project); "
+                    "null = none. The decision itself: review_task"},
 }
 SUGGESTION = {"type": "object", "description": "structured tidy suggestion (projects with agent tidy 'suggest'/'auto'); "
               "a 👍 by someone who may change the task applies it",
@@ -226,6 +230,12 @@ def t_list_tasks(api, a):
         q["milestone"] = "true" if a["milestone"] else "false"
     if a.get("milestone_id"):
         q["milestone_id"] = a["milestone_id"]
+    # 2.390.0 B (#3355): priority, column, sprint, creator, reviewer, review state, custom field values, text, sort
+    q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")))
+    if a.get("priority"):
+        q["priority"] = ",".join(a["priority"]) if isinstance(a["priority"], list) else a["priority"]
+    for fid, v in (a.get("field_values") or {}).items():
+        q[f"field_{int(fid)}"] = ("true" if v else "false") if isinstance(v, bool) else v
     if a.get("compact") is True:
         q["fields"] = "compact"
     r = api.call("GET", "/tasks", q)
@@ -239,7 +249,15 @@ def t_list_tasks(api, a):
 
 
 def t_get_task(api, a):
-    tid = int(a["task_id"])
+    if a.get("key") and not a.get("task_id"):  # 2.390.0 (#3353): by its ticket key "APP-12"
+        key = str(a["key"]).strip()
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,5}-\d{1,9}", key):
+            raise ApiError(400, "key: a ticket key like APP-12")
+        tid = int(api.call("GET", f"/tasks/{key}")["id"])
+    elif a.get("task_id"):
+        tid = int(a["task_id"])
+    else:
+        raise ApiError(400, "task_id or key is required")
     task = api.call("GET", f"/tasks/{tid}")
     try:
         task["comments"] = api.call("GET", f"/tasks/{tid}/comments").get("data", [])
@@ -513,7 +531,23 @@ TOOLS = [
            "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
            "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"},
            "milestone": {"type": "boolean", "description": "2.18.0: true = only milestones, false = only the other tasks"},
-           "milestone_id": {**S_ID, "description": "2.18.0: only the tasks of this milestone"}}), t_list_tasks),
+           "milestone_id": {**S_ID, "description": "2.18.0: only the tasks of this milestone"},
+           # 2.390.0 B (#3355)
+           "priority": {"oneOf": [{"type": "string"}, {"type": "array", "items": PRIO}],
+                        "description": "2.390.0: none | low | medium | high, several as a list or comma separated"},
+           "priority_min": {**PRIO, "description": "2.390.0: at least this priority"},
+           "section_id": {"type": "string", "description": "2.390.0: a column (section) id, or none"},
+           "sprint_id": {"type": "string", "description": "2.390.0: a sprint id, current (the active sprint of the task's project) or none (backlog)"},
+           "created_by": {"type": "string", "description": "2.390.0: me or a user id"},
+           "reviewer": {"type": "string", "description": "2.390.0: me, none or a user id"},
+           "review": {"type": "string", "enum": ["pending", "approved", "changes", "none"], "description": "2.390.0: the review state"},
+           "field_values": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]},
+                            "description": "2.390.0: {custom field id: value} of a project's fields (only its tasks): select = option "
+                                           "id or name, text = contains, number, checkbox true / false"},
+           "q": {"type": "string", "description": "2.390.0: words in the title or notes"},
+           "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}-[0-9]{1,9}$", "description": "2.390.0: the task with this ticket key (APP-12)"},
+           "sort": {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)],
+                    "description": "2.390.0: the order (default: oldest first); - = descending, no due date stays last"}}), t_list_tasks),
     ("get_milestone", "2.18.0: a milestone task (read-only): progress (done / total of its tasks), its tasks (open first), a burndown "
                       "(open tasks per day + the ideal line to the due date) and release notes (Markdown of its completed tasks by "
                       "ticket type). Milestones are tasks with milestone: true (list_tasks milestone=true).",
@@ -577,8 +611,9 @@ TOOLS = [
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
                  "suggested branch name kalmido-<id>). 2.151.0: code.build / repo.build = its build state (state released | main | "
                  "branch | none, version, branches ahead of the default branch, package field vs. the version tags, stale = "
-                 "open although released; see list_build_status).",
-     _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
+                 "open although released; see list_build_status). 2.390.0: key = the ticket key \"APP-12\" instead of task_id "
+                 "(field key of a task; null when its project has no key).",
+     _obj({"task_id": S_ID, "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}-[0-9]{1,9}$"}}, []), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a project the agent may change. 2.270.0: client_ref = your own id "
                     "of the new task; calling again with the same client_ref (after a timeout) returns the task made the first time.",
      _obj({**TASK_FIELDS, "client_ref": {"type": "string", "maxLength": 64}}, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
@@ -1294,7 +1329,9 @@ TOOLS += [
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
            "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
            "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
-           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]}}, ["list_id"]),  # 2.144.0 (#2414)
+           "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]},  # 2.144.0 (#2414)
+           "ticket_key": {"type": ["string", "null"], "description": "2.390.0: the project's ticket key APP (2-6 capitals / digits, a letter "
+                          "first; owner / project admins; \"\" / null = none): its tasks get keys like APP-12"}}, ["list_id"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED project for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

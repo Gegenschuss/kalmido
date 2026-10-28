@@ -345,7 +345,8 @@ function crumbsHtml(t, l, parent) {
 }
 async function copyTaskLink(id) {
   const url = `${location.origin}/#t/${id}`;
-  try { if (isTouch() && navigator.share) { await navigator.share({url, title: '#' + id + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', '#' + id)); }
+  const k = tkOf(taskById(id)) || '#' + id;  // 2.390.0 (#3353): the key when the project has one
+  try { if (isTouch() && navigator.share) { await navigator.share({url, title: k + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', k)); }
   catch { toast(url, null, 6000); }
 }
 function crumbMenu(anchor, k, id) {  // 2.25.0 (UX-44)

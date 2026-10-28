@@ -431,8 +431,8 @@ function palItems() {
   }
   const boost = {action: 30, task: 40, view: 25, list: 20, note: 18, filter: 15, tag: 10, setting: 5, tasks: 0};
   // 2.13.0: "#447" or "447" jumps straight to that task (only one this person can see)
-  const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
-  const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `#${hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
+  const nm = q.match(/^#?(\d{1,9})$/), hit = (nm && taskById(+nm[1])) || tkFind(q);  // 2.390.0 (#3353): + "APP-12"
+  const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `${tkOf(hit) || '#' + hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
   const hits = jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0, x.kw ? fuzzy(q, x.kw) * 0.6 : 0)}))  // 2.250.0 B (#2993): kw = more words of the entry
     .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind] + lc_favBoost(x)})).sort((a, b) => b.score - a.score).slice(0, 60));
   // 2.16.0 (#644): what the field can do with the text itself: ask an agent (the text goes to its chat) and create a task

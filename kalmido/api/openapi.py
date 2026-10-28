@@ -104,6 +104,8 @@ def openapi_spec():
     prio = {"type": "string", "enum": list(PRIO_VALUES)}
     task_props = {
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "section_id": nul("integer"), "parent_id": nul("integer"),
+        "key": nul("string", description="2.390.0: the ticket key APP-12 (project key + running number); null = the project has no key. "
+                   "GET /tasks/APP-12 reads the task, commits / pull requests / branch names with it link to the task"),
         "title": {"type": "string"}, "notes": {"type": "string", "description": "Markdown"}, "priority": prio,
         "status": {"type": "string", "enum": list(STATUS_NAMES.values())}, "due": nul("string", format="date"),
         "due_time": nul("string", pattern="^[0-2][0-9]:[0-5][0-9]$", description="HH:MM, local time of the server; null = all day"),
@@ -170,6 +172,14 @@ def openapi_spec():
                                   description="2.111.0: a reminder at a fixed local date and time (server time zone, like due / "
                                   "due_time), with or without a due date; null = none. Fires once, like the reminders before the "
                                   "due time; on a recurring task it moves along with the due date")
+    # 2.390.0 B (#3355): the sprint, the reviewer and the review state
+    task_props["sprint_id"] = nul("integer", description="2.390.0: the sprint of the task's project it is planned in (null = "
+                                  "backlog). Writable: an open sprint of the same project (edit rights); a task moved to another "
+                                  "project leaves its sprint")
+    task_props["reviewer_id"] = nul("integer", description="2.390.0: who reviews the task (a person or agent with access to the "
+                                    "project; null = none). Writable, with the checks of POST /tasks/{id}/review action reviewer")
+    task_props["review"] = nul("string", enum=["pending", "approved", "changes", None], description="2.390.0: the review state "
+                               "(null = none; read only, changed with POST /tasks/{id}/review)")
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -252,6 +262,8 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 30 levels (2.352.0; before: 2): \"Clients/Company X\"; empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
+            "ticket_key": nul("string", description="2.390.0: the project's ticket key (2-6 capitals / digits, a letter first, unique per workspace); "
+                              "its tasks get keys like APP-12 (field key of a task); null = none"),
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
@@ -304,6 +316,8 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
             "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "ticket_key": nul("string", description="2.390.0: the project's ticket key APP (owner / project admins; null / \"\" = none). "
+                              "The tasks get running numbers (APP-1, APP-2, ... in the order they were made), old keys keep finding their tasks"),
             "org_id": nul("integer", description="2.28.0: the project's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life projects and the inbox)"),
             "client_id": nul("integer", description="2.23.0: the client of the project (owner / project admins; a client you see); null = none"),
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", "budget", None], description="2.22.0: what the project is for in "
@@ -547,6 +561,18 @@ def openapi_spec():
                      q("milestone", "2.18.0: true = only milestones, false = only the other tasks", {"type": "boolean"}),
                      q("milestone_id", "2.18.0: only the tasks of this milestone", {"type": "integer"}),
                      q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
+                     # 2.390.0 B (#3355): the further filters and the sort
+                     q("priority", "2.390.0: none, low, medium or high; several comma separated (or the parameter repeated)"),
+                     q("priority_min", "2.390.0: at least this priority", {"type": "string", "enum": ["none", "low", "medium", "high"]}),
+                     q("section_id", "2.390.0: a column (section) id, or none = no column"),
+                     q("sprint_id", "2.390.0: a sprint id, current = the active sprint of the task's project, none = backlog"),
+                     q("created_by", "2.390.0: me or a user id"), q("reviewer", "2.390.0: me, none or a user id"),
+                     q("review", "2.390.0: the review state", {"type": "string", "enum": ["pending", "approved", "changes", "none"]}),
+                     q("q", "2.390.0: words in the title or notes (all of them, each as a word start)"),
+                     q("key", "2.390.0: the task with this ticket key (APP-12; a current or an old key)"),
+                     q("sort", "2.390.0: priority, due, created, updated, title or manual; a leading - sorts descending (tasks "
+                               "without a due date stay last). The cursor keeps the sort, pages stay stable with equal values",
+                       {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)]}),
                      limit, cursor]
     paths = {
         "/me": {"get": op("The token's user, scopes and switched-on modules", "Account", ok(ref("Me")) | errs())},
@@ -593,10 +619,12 @@ def openapi_spec():
                                [q("from", "First day (default: 14 days ago)", date_s), q("to", f"Last day (default: from + 194 days, at most {ROADMAP_MAX_DAYS} days)", date_s),
                                 q("projects_only", "true = no inbox (2.352.0: every other list is a project)", {"type": "boolean"}),
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
-        "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
+        "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first (or by sort). 2.390.0: also "
+                             "field_<id>=value, a custom field of a project you see (only its tasks): select = option id or name, "
+                             "text = contains, number, checkbox true / false, other types the stored value", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
                    "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | ok(ref("Task"), "Already created with this client_ref") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
-        "/tasks/{id}": {"get": op("One task", T, ok(ref("Task")) | errs("404"), [pid()]),
+        "/tasks/{id}": {"get": op("One task (2.390.0: id may also be a ticket key like APP-12, a current or an old one)", T, ok(ref("Task")) | errs("404"), [pid()]),
                         "patch": op("Change a task (only the fields you send; send expect_updated_at)", T, ok(ref("TaskChanged")) | errs("400", "403", "404", "409"), [pid()],
                                     body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
