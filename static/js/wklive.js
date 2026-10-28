@@ -308,7 +308,7 @@ function wkst_items(p) {
   return [{label: tr('Reading style…'), icon: 'book', more: wkst_menu(p.space)}];
 }
 function wkst_menu(sp) {
-  const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '', name = k => tr(k ? WKST[k] : 'Clear|reading style');
+  const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '', clear = tr('Clear|reading style'), name = k => k ? tr(WKST[k]) : clear;
   const mine = (k, label) => ({label, on: own === k, fn: () => { if (k) LS.set('wkSt', k); else LS.del('wkSt'); renderView(); }});
   const items = [{head: tr('For me')}, mine('', tr('Like the space ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
   if (WK.idx[sp]?.may_style) {
