@@ -13,7 +13,7 @@ const hmm = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600
 const fmtDur = s => s > 0 && s < 60 ? tr('under 1 minute') : fmtH(Math.floor(Math.max(0, s) / 60));  // 2.354.0 C (#3013): not "0:00" for the first minute
 const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const hoursDec = s => (s / 3600).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2});
-const money = (v, cur) => v.toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (cur ? ' ' + cur : '');
+const money = (v, cur) => curMoney(v, cur);  // 2.368.0 C (#2983): "€1,234.50" in English, not "1,234.50 EUR"
 const timerElapsed = () => S.timer ? Math.max(0, (Date.now() - new Date(S.timer.start)) / 1000) : 0;
 const newCid = () => (window.crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 function taskTime(id) {  // [everyone I can see, mine] in seconds, incl. my running timer

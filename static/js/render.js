@@ -1182,7 +1182,7 @@ const cfk_opts = (f, v) => cfk_ids(v).map(id => selOpt(f, id)).filter(Boolean);
 const cfk_max = f => Math.min(10, Math.max(3, +(f.options?.max || 5)));
 function cfk_money(v, cur) {
   const x = +v; if (!Number.isFinite(x)) return String(v ?? '');
-  try { return x.toLocaleString(LOCALE(), {style: 'currency', currency: cur || 'EUR'}); } catch { return numFmt(v) + ' ' + (cur || 'EUR'); }
+  return curMoney(x, cur || 'EUR');  // 2.368.0 C (#2983): one money format (i18n.js curMoney: "$1,234.50", not "US$1,234.50")
 }
 // 2.156.0 B (#2070): the error values of a formula result
 const CFK_FX_ERR = {'#div0': N_('Division by 0'), '#type': N_('Not a number')};

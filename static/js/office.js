@@ -53,7 +53,7 @@ const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFea
 const ofcHome = () => OFC.info?.settings?.home_currency || 'EUR';
 const ofcSym = cur => ({EUR: '€', USD: '$', GBP: '£'})[cur || ofcHome()] || cur || '';
 const ofcCur = ofcHome;  // 2.189.0 (#2475): amounts of the office (rates, fees, books) are in the home currency
-const ofcMoney = n => n == null || n === '' ? '' : `${(+n).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${ofcSym(ofcHome())}`;
+const ofcMoney = n => curMoney(n, ofcHome());  // 2.368.0 C (#2983): the sign where the locale puts it ("€1,234.50" in English)
 // 2.50.1: thousands separators of the locale ("1.500,00", "1,500.00", "1.500") are read as such - a field filled with
 // fmtNum(1500, 2) = "1.500" came back as 1.5 on save; a single separator without three digits after it stays the decimal one
 // 2.263.0 (#2976): parseNum of core.js (a rate "0.856" was 856); frac = rate / factor with up to four decimals
