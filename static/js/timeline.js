@@ -110,7 +110,7 @@ function tlNewHtml(key, geo) {
   const x = Math.max(0, diffDays(geo.s0, a)) * geo.dw, w = (diffDays(a < geo.s0 ? geo.s0 : a, b) + 1) * geo.dw;
   const when = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
   // 2.18.0 review (R4): narrow screens show the range in short form (5.10.–8.10.), the long one does not fit there
-  const sd = x => { return fmtDateNum(pd(x), false); };
+  const sd = x => { try { return pd(x).toLocaleDateString(dpLocale(), {day: 'numeric', month: 'numeric'}); } catch { return x.slice(5); } };
   const whenS = a < b ? `${sd(a)}–${sd(b)}` : sd(b);
   return `<div class="tl-ghost" style="left:${x + 2}px;width:${Math.max(TL_MINW, w - 4)}px" aria-hidden="true"></div>` +
     `<div class="tl-new" style="--x:${x}px"><label class="sr" for="tl-new-in">${esc(tr('New task, {0}', when))}</label><input id="tl-new-in" type="text" maxlength="500" autocomplete="off" enterkeyhint="done" value="${esc(N.v || '')}" placeholder="${esc(tr('Task name'))}"><span class="tl-nwhen" aria-hidden="true"><span class="tl-nwl">${esc(when)}</span><span class="tl-nws">${esc(whenS)}</span></span>` +

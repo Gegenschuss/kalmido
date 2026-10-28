@@ -358,7 +358,7 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     await drag(r.x, r.y, 0, r.dy);
     await sleep(400);
     // 2.52.0 (#1016): the drag leaves a block "New event" in the grid; its "Details" opens the editor with that time
-    check(await ev(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && document.activeElement === b.querySelector('.cgin') && b.textContent.includes(fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:30')); })()`), `${tag}: the drag leaves a block "New event" with the title field`);
+    check(await ev(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && document.activeElement === b.querySelector('.cgin') && /13:00.14:30/.test(b.textContent); })()`), `${tag}: the drag leaves a block "New event" with the title field`);
     await ev(`(() => { document.querySelector('#view .cgnew .cgdet').click(); return 1; })()`);
     await sleep(600);
     const got = await ev(`(() => { const m = document.querySelector('.modal.evmodal'); return m ? [m.querySelector('#ev-sd').value, m.querySelector('#ev-stm').value, m.querySelector('#ev-etm').value] : null; })()`);

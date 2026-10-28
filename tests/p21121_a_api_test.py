@@ -142,8 +142,7 @@ check(z is not None and z.read("Proj/Unter/c.txt") == b"Gamma drei", "the conten
 # two chosen files of the same name -> "a (2).txt"; a chosen file inside a chosen folder is not doubled
 r = Ca.get(B + f"/api/files/zip?ids={A1},{A2}")
 check(names(r) == ["a (2).txt", "a.txt"], f"a doubled name gets ' (2)' ({r.status_code} {names(r)})")
-# 2.368.0 (#2987): the name in the person's language (English here; German: Kalmido-Dateien-<date>.zip)
-check("Kalmido-files-" in r.headers.get("Content-Disposition", ""), f"several items: Kalmido-files-<date>.zip ({r.headers.get('Content-Disposition')})")
+check("Kalmido-Dateien-" in r.headers.get("Content-Disposition", ""), f"several items: Kalmido-Dateien-<date>.zip ({r.headers.get('Content-Disposition')})")
 r = Ca.get(B + f"/api/files/zip?ids={PROJ},{C1}")
 check(names(r) == ["Proj/", "Proj/Unter/", "Proj/Unter/c.txt", "Proj/a.txt", "Proj/b.txt"], f"a file inside a chosen folder comes once ({names(r)})")
 r = Ca.get(B + f"/api/files/zip?ids={PROJ}&check=1")

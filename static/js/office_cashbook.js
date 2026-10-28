@@ -178,7 +178,7 @@ async function cbLogModal(e) {
   let rows;
   try { rows = (await api('GET', `/api/office/cash-entries/${e.id}/log`)).log; } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('History')}</h3><p class="muted">${esc(tr('Cash entry no. {0}', e.no))} · ${esc(e.text)}</p>
-    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(CB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
+    <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(CB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(new Date(r.at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))} · ${esc(r.by)}</span>
       ${r.action === 'cancel' && r.prev.by_no ? `<small>${esc(tr('Cancelled by no. {0}', r.prev.by_no))}</small>` : cbPrev(r.prev) ? `<small>${esc((r.action === 'create' ? '' : tr('Before') + ': ') + cbPrev(r.prev))}</small>` : ''}</li>`).join('')}</ol>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');

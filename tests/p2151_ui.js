@@ -219,7 +219,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     // the week view
     await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); location.hash = 'cal'; return 1; })()`); await sleep(1200);
     const wk = await ev(`(() => { const lb = document.querySelector('.wlbl').getBoundingClientRect(), row = document.querySelector('.wallday').getBoundingClientRect(), wb = document.querySelector('#wbody').getBoundingClientRect();
-      const t7 = [...document.querySelectorAll('.wtime')].find(e => e.textContent === fmtTimeLoc('07:00')).getBoundingClientRect();
+      const t7 = [...document.querySelectorAll('.wtime')].find(e => e.textContent === '07:00').getBoundingClientRect();
       const ev = [...document.querySelectorAll('.wad .ev')].find(e => /plumber/.test(e.textContent)), lh = parseFloat(getComputedStyle(ev).lineHeight);
       return {row: Math.round(row.height), lbl: Math.round(lb.height), t7top: Math.round(t7.top), wbTop: Math.round(wb.top), evLines: Math.round(ev.getBoundingClientRect().height / lh), over: document.documentElement.scrollWidth - innerWidth, page: document.documentElement.scrollHeight - innerHeight}; })()`);
     check(wk.evLines === 2, '390 week: an all-day task shows two lines of its title');

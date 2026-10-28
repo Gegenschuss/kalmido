@@ -33,7 +33,7 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   // 2.48.0 (#1111): "Dokumente/Eingang" is the fixed name of a folder in the file store (data, the same in every language), not the basket
   // 2.142.1 (#2150): "Share inbox (ntfy)" is the heading of the ntfy share inbox per person (the topic, not the basket)
   // 2.207.0 A (#2763): a "scan inbox" (Documents > Settings, upload-only key) is not the basket either (de: Scan-Eingang)
-  const allowed = k => /DATEV|document inbox|scan inbox|two inboxes|^Create inbox$|ntfy share inbox|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang|^Inbox\|folder$/.test(k);  // 2.368.0 (#2987): the documents' inbox folder  // it: "In arrivo" = coming up
+  const allowed = k => /DATEV|document inbox|scan inbox|two inboxes|^Create inbox$|ntfy share inbox|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang/.test(k);  // it: "In arrivo" = coming up
   for (const lg of Object.keys(NEW)) {
     const dict = JSON.parse(fs.readFileSync(path.join(I18N, lg + '.json'), 'utf8'));
     check(dict.Basket === NEW[lg], `#1219 ${lg}: Basket = ${NEW[lg]} (${dict.Basket})`);

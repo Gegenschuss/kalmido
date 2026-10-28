@@ -209,7 +209,7 @@ async function submitQuick(input, extra = {}) {
     if ($(`#view .trow[data-id="${created.id}"]`) || vl_ids().includes(created.id)) return;  // 2.65.0 (#1825): also a row a long list does not draw
     const t = taskById(created.id) || created, l = listById(t.list_id);
     const tt = t.title || '', tq = tr('“{0}”|quoted', toastClip(tt));  // 2.25.0 (UX-31): which task, where it went
-    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
+    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
   if (d.files?.length && created?.id < 0 && await qfKeep(created.id, d.files)) { toast(tr('Offline: the files are uploaded once the task is synced')); return; }  // 2.359.0 A (#3023)
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
@@ -231,7 +231,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
   popOnClose = () => { an_remove(q); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
-  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + fmtTimeLoc(preset.due_time) : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
+  const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
   const qh = $('.qhint', q); if (hint) qh.textContent = hint; else qh.innerHTML = qHelpChips('qsheet');
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);

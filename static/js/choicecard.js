@@ -48,7 +48,7 @@ function ccButtons(o) {
 
 // ---- comments: the card under an agent's comment
 S.ccPick = S.ccPick || {};
-const ccWhen = iso => { const d = new Date(iso); return isNaN(+d) ? '' : fmtStamp(d, false); };
+const ccWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}); } catch { return ''; } };
 function ccCmtState(c) {
   const ch = c.choices; if (!ch) return null;
   if (c.choice) return 'answered';

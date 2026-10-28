@@ -857,7 +857,7 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     try:
         with c.savepoint():
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (plain["subject"] or tr("E-mail", lg=lg))
-            folder = fs_folder(c, uid, org, [H.hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
+            folder = fs_folder(c, uid, org, [H.ROOT, cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
         name = ("mail" if sealed else re.sub(r"[\\/:*?\"<>|]+", "-", plain["subject"])[:60].strip() or "mail") + ".eml"
         with c.savepoint():
             eml_id = fs_put(c, uid, folder, name, raw, "message/rfc822", org)

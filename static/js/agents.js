@@ -949,7 +949,7 @@ function schedRhythm(s) {
 // 2.35.0 (#1107): plans show date + time in the date format of the language (de 10.10.2026 07:45, en-US 10/10/2026, 7:45 AM)
 function schedWhen(iso) {
   const d = new Date(iso); if (isNaN(d)) return '';
-  return fmtStamp(d);  // 2.368.0 B (#2982): one locale source
+  try { return d.toLocaleDateString(dpLocale(), {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + fmtTimeLoc(`${pad(d.getHours())}:${pad(d.getMinutes())}`); } catch { return fmtWhen(iso); }
 }
 const schedNext = s => s.next_at ? tr('next: {0}', schedWhen(s.next_at)) : tr('paused');
 // lists the agent may work in for me: shared with it, not the inbox (the server checks it again)

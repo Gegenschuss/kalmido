@@ -12,7 +12,7 @@ async function sesDraw(md) {
   const box = $('#s-ses', md); if (!box) return;
   let j; try { j = await api('GET', '/api/me/sessions'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
-  const day = x => x ? fmtDateNum(new Date(x)) : '';  // 2.368.0 B (#2982): one locale source
+  const day = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
   const others = j.sessions.filter(s => !s.current).length;
   box.innerHTML = (j.sessions.length ? `<div class="members seslist">${j.sessions.map(s => `<div class="mrow sesrow" data-sid="${esc(s.sid)}"><span class="avatar">${sesIcon(s)}</span>
       <span class="n"><b>${esc(sesName(s))}</b>${s.current ? ` <span class="tfastate on sescur">${tr('This device')}</span>` : ''}

@@ -21,10 +21,10 @@ async function dp_load() {
   dp_redraw(seq);
 }
 function dp_redraw(seq) { if (S.route.mod === 'workload' && WLV.tab === 'dispo' && (seq === undefined || seq === DPV.seq)) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); } }
-const dp_monday = s => weekOf(s);  // 2.368.0 B (#2982): Monday unless the person chose a first day of the week
+const dp_monday = s => { const d = pd(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return ds(d); };
 const dp_time = s => s.includes('T') ? s.slice(11, 16) : '';
 function dp_when(b) {
-  const a = b.start.slice(0, 10), e = b.end.slice(0, 10), ta = fmtTimeLoc(dp_time(b.start)), te = fmtTimeLoc(dp_time(b.end));  // 2.368.0 B (#2982): 12 / 24 h as chosen
+  const a = b.start.slice(0, 10), e = b.end.slice(0, 10), ta = dp_time(b.start), te = dp_time(b.end);
   if (a === e) return fmtDayAbs(a) + (ta ? ` ${ta}${te ? '–' + te : ''}` : '');
   return `${fmtDayAbs(a)}${ta ? ' ' + ta : ''} – ${fmtDayAbs(e)}${te ? ' ' + te : ''}`;
 }

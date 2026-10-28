@@ -14623,18 +14623,7 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Les justificatifs facturés dont la facture n’a pas été reprise restent facturés (facture manquante) : ne les libérez dans la comptabilité que s’ils n’ont jamais été facturés",
   "Billed, the invoice did not come along with the import": "Facturé, la facture n’a pas été reprise lors de l’import",
   "{0} project note": ["{0} note de projet", "{0} notes de projet"],
-  "Differs from your app language: the client receives the document in this language.": "Diffère de la langue de ton app : le client reçoit le document dans cette langue.",
-  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « {0} ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus.",
-  "Documents|folder": "Documents",
-  "Inbox|folder": "Arrivée",
-  "Emails|folder": "E-mails",
-  "Kalmido-files|zip": "Kalmido-fichiers",
-  "Recognise files put into the folder “{0}” of the file store": "Reconnaître les fichiers déposés dans le dossier « {0} » du classement",
-  "Region and formats": "Région et formats",
-  "First day of the week": "Premier jour de la semaine",
-  "Time format": "Format de l’heure",
-  "24 hours ({0})": "24 heures ({0})",
-  "12 hours ({0})": "12 heures ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatique suit la langue et la région de ce navigateur.",
-  "Quotations & invoices": "Devis et factures"
+  "Quotations & invoices": "Devis et factures",
+  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Reconnaître les fichiers déposés dans le dossier « Dokumente/Eingang » du classement",
+  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "Le justificatif est enregistré dans le classement (dossier « Dokumente ») et listé sous Bureau > Justificatifs ; montant et date sont reconnus."
 }

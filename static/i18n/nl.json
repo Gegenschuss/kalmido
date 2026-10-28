@@ -14623,18 +14623,7 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Gefactureerde bonnen waarvan de factuur niet is meegekomen, blijven gefactureerd (factuur ontbreekt): geef ze in de boekhouding alleen vrij als ze nooit gefactureerd zijn",
   "Billed, the invoice did not come along with the import": "Gefactureerd, de factuur is bij de import niet meegekomen",
   "{0} project note": ["{0} projectnotitie", "{0} projectnotities"],
-  "Differs from your app language: the client receives the document in this language.": "Wijkt af van je app-taal: de klant krijgt het document in deze taal.",
-  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "De bon wordt opgeslagen in de opslag (map ‘{0}’) en staat onder Kantoor > Bonnen; bedrag en datum worden herkend.",
-  "Documents|folder": "Documenten",
-  "Inbox|folder": "Inbox",
-  "Emails|folder": "E-mails",
-  "Kalmido-files|zip": "Kalmido-bestanden",
-  "Recognise files put into the folder “{0}” of the file store": "Bestanden in de map ‘{0}’ van de opslag herkennen",
-  "Region and formats": "Regio en notaties",
-  "First day of the week": "Eerste dag van de week",
-  "Time format": "Tijdnotatie",
-  "24 hours ({0})": "24 uur ({0})",
-  "12 hours ({0})": "12 uur ({0})",
-  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser.",
-  "Quotations & invoices": "Offertes en facturen"
+  "Quotations & invoices": "Offertes en facturen",
+  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Bestanden in de map ‘Dokumente/Eingang’ van de opslag herkennen",
+  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "De bon wordt opgeslagen in de opslag (map ‘Dokumente’) en staat onder Kantoor > Bonnen; bedrag en datum worden herkend."
 }

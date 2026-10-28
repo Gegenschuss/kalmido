@@ -65,7 +65,7 @@ TEXT_MAX = 8000
 
 # ---- settings (office_settings.data), defaults filled from the country pack
 SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact_lines": [], "register_lines": [], "bank_lines": []},
-                     "logo": "", "color": "", "lang": "de", "currency": "EUR", "fx_usd": 1.09, "offer_scheme": "",
+                     "logo": "", "color": "", "lang": "de", "currency": "EUR", "fx_usd": 1.09, "offer_scheme": "KVA-{yyyy}-{seq:03}",
                      "prod_quotient": 3, "raw_factor": 0.25, "producing_service_id": None, "producing_rate": 600,
                      "offer_valid_days": 30, "intro_text_id": {"de": None, "en": None}, "closing_text_id": {"de": None, "en": None},
                      "rights_default": {"time_id": None, "territory_id": None, "media_id": None},
@@ -138,9 +138,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "home_currency": "", "fx_rates": {},
                      # 2.147.0 (#2461): own VAT rates {standard, reduced} and the retention in years -- only used by a pack
                      # that allows it (tax.editable / retention.editable: the neutral base pack); None / {} = the pack's values
-                     "tax_rates": {}, "retention_years": None,
-                     # 2.368.0 (#2979): 1 once the admin chose the document language; until then a pack switch takes it along
-                     "lang_set": 0}
+                     "tax_rates": {}, "retention_years": None}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -332,10 +330,8 @@ def office_settings(c, oid):
     out["home_currency"] = hc_home_of(d if isinstance(d, dict) else {}, pack)  # 2.189.0 (#2475)
     if pack:
         out["currency"] = hc_code(out["currency"]) or out["home_currency"]
-        if not (isinstance(d, dict) and d.get("lang")):  # 2.368.0 (#2979): an unset document language follows the pack (en for International)
-            out["lang"] = pack.get("lang") if pack.get("lang") in LANGS else SETTINGS_DEFAULTS["lang"]
-        if not out.get("offer_scheme"):  # 2.368.0 (#2979): the default is empty, so QUO-… of the International pack applies
-            out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or "KVA-{yyyy}-{seq:03}"
+        if not out.get("offer_scheme"):
+            out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or SETTINGS_DEFAULTS["offer_scheme"]
         for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089)
             if not out.get(k + "_scheme"):
                 out[k + "_scheme"] = (pack.get("numbering") or {}).get(k) or dflt
@@ -398,20 +394,6 @@ def _id_or_none(c, v, table, oid, name):
     return i
 
 
-def _pack_switch(out, cur, b):
-    """2.368.0 (#2979): choosing another pack takes along the document language the admin never chose and the number schemes
-    that still hold the old pack's values; values set by hand -- or sent in the same body -- stay."""
-    old, new = office_pack(cur.get("pack")) or {}, office_pack(out["pack"]) or {}
-    if out["pack"] == cur.get("pack") or not new:
-        return
-    if "lang" not in b and not out.get("lang_set") and new.get("lang") in LANGS:
-        out["lang"] = new["lang"]
-    on = old.get("numbering") or {}
-    for k in SCHEME_KEYS:
-        if k not in b and out.get(k) and out[k] == on.get(k[:-len("_scheme")]):
-            out[k] = ""  # resolved from the new pack on reading (office_settings)
-
-
 def office_settings_clean(c, oid, b, cur):
     """Validates a PUT body (partial) against the current settings -> the new full dict."""
     out = json.loads(json.dumps(cur))
@@ -422,7 +404,6 @@ def office_settings_clean(c, oid, b, cur):
             if not isinstance(v, str) or v.strip().upper() not in office_pack_codes():
                 raise BadInput(tr("Invalid value: {0}", "pack"))
             out["pack"] = v.strip().upper()
-            _pack_switch(out, cur, b)
         elif k == "company":
             if not isinstance(v, dict):
                 raise BadInput(tr("Invalid value: {0}", "company"))
@@ -441,7 +422,6 @@ def office_settings_clean(c, oid, b, cur):
             if v not in LANGS:  # 2.185.0 C (#2520): every app language (was de / en)
                 raise BadInput(tr("Invalid value: {0}", "lang"))
             out["lang"] = v
-            out["lang_set"] = 1
         elif k in ("currency", "home_currency"):  # 2.189.0 (#2475): every currency of homecur.HC_CODES
             if not isinstance(v, str) or not hc_code(v) or hc_code(v) != v.strip().upper():
                 raise BadInput(tr("Invalid value: {0}", k))

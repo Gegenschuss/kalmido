@@ -14623,18 +14623,7 @@
   "Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed": "Los recibos facturados cuya factura no se importó siguen facturados (falta la factura): libéralos en Contabilidad solo si nunca se facturaron",
   "Billed, the invoice did not come along with the import": "Facturado, la factura no se importó",
   "{0} project note": ["{0} nota de proyecto", "{0} notas de proyecto"],
-  "Differs from your app language: the client receives the document in this language.": "Distinto del idioma de tu app: el cliente recibe el documento en este idioma.",
-  "The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.": "El recibo se guarda en el archivo (carpeta «{0}») y aparece en Oficina > Recibos; se reconocen importe y fecha.",
-  "Documents|folder": "Documentos",
-  "Inbox|folder": "Entrada",
-  "Emails|folder": "Correos",
-  "Kalmido-files|zip": "Kalmido-archivos",
-  "Recognise files put into the folder “{0}” of the file store": "Reconocer los archivos colocados en la carpeta «{0}» del archivo",
-  "Region and formats": "Región y formatos",
-  "First day of the week": "Primer día de la semana",
-  "Time format": "Formato de hora",
-  "24 hours ({0})": "24 horas ({0})",
-  "12 hours ({0})": "12 horas ({0})",
-  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador.",
-  "Quotations & invoices": "Presupuestos y facturas"
+  "Quotations & invoices": "Presupuestos y facturas",
+  "Recognise files put into the folder “Dokumente/Eingang” of the file store": "Reconocer los archivos colocados en la carpeta «Dokumente/Eingang» del archivo",
+  "The receipt is saved in the file store (folder “Dokumente”) and listed under Office > Receipts; amount and date are recognised.": "El recibo se guarda en el archivo (carpeta «Dokumente») y aparece en Oficina > Recibos; se reconocen importe y fecha."
 }
