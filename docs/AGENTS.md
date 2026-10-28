@@ -3127,8 +3127,9 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
-yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. 2.407.0 (#3493): the ring is always shown (2.350.0
+showed it only from yellow on); every window also sits in the chat header's "…" menu ("Usage: …"). Each person can hide the
+ring with *Show usage* (the "…" menu or *Chat settings*, for all their chats); the "…" menu keeps the numbers. Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 
@@ -3149,6 +3150,13 @@ read earlier, e.g. from a file a status line wrote: the ring greys out 24 h afte
 report replaces the previous one: send all windows each time. Report after
 every run or job (more often is fine; people's apps reload only when something visible changes). `GET /api/v1/agent`
 and the agents list carry the same object as `quota`. MCP: `report_plan_usage`, `get_plan_usage`, `clear_plan_usage`.
+
+**Agents with an API key instead of a plan (2.407.0, #3493).** An agent that reports no plan quota but costs
+(`cost_usd` in `POST /api/v1/agent/usage`) fills the ring with its costs against its own cost limit in Kalmido (the usage
+limits with metric `cost`, monthly or daily; the hard limit, else the soft one) -- same colours. Without a cost limit there
+is no ring; the "…" menu reads *Costs this month: $x* (and today). An agent that reports both: the plan quota fills the
+ring, the costs are added to its list. The agents list people get carries `cost`: `null`, or `{period, pct}` (`pct` null
+without a cost limit) and, for the owner of a personal agent and instance admins only, `today`, `month` and `limit` in USD.
 
 **Claude Code.** Its status line command gets the session data as JSON on stdin; for Pro / Max plans (and behind a
 gateway with spend limits) it contains `rate_limits` after the first answer of the session:
