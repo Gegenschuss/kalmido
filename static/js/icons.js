@@ -129,6 +129,8 @@ const P = {
   brief: icPath('M3 7H17V16H3ZM7 7V4H13V7') + icDot(10, 11.5, 1.6),
   code: icPath('M13 6L17 10L13 14M7 6L3 10L7 14'),
   home: icPath('M3 9L10 3L17 9M5 7.5V17H15V7.5') + icDot(10, 13, 1.8),
+  // 2.364.0 B (#3031): Start (the overview page, route home) -- a gauge, not the house (the house stays Private / Home & life)
+  start: icPath('M3 14.5A7 7 0 0 1 17 14.5M10 14.5L13.5 9.5M5.5 9.5L4.5 8.8M10 7.5V6.5M14.5 9.5L15.5 8.8') + icDot(10, 14.5, 1.8),
   // 2.19.0 (#653): the module Family
   family: icPath('M2.5 17V15.5A3.5 3.5 0 0 1 9.5 15.5V17M11 17V16.5A2.75 2.75 0 0 1 16.5 16.5V17M6 4.5A2.5 2.5 0 1 1 6 9.5A2.5 2.5 0 0 1 6 4.5') + icDot(13.75, 10.5, 1.9),
   cake: icPath('M4 17V11H16V17M2.5 17H17.5M4 13.5C6 15 8 12 10 13.5C12 15 14 12 16 13.5M10 11V8') + icDot(10, 5, 1.6),
@@ -277,7 +279,9 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 let TD_RC = null, TD_RCN = 0;
 const td_rc = (k, fn) => { if (!TD_RC) return fn(); if (TD_RC.has(k)) return TD_RC.get(k); const v = fn(); TD_RC.set(k, v); return v; };
 function td_rcRun(fn) { if (!TD_RCN++) TD_RC = new Map(); try { return fn(); } finally { if (!--TD_RCN) TD_RC = null; } }
-const isMobile = () => td_rc('mob', () => matchMedia('(max-width:899px)').matches);
+// 2.364.0 B (#3040): the computer layout (bar of the areas + one panel) from 768 px on (a tablet in portrait, an unfolded
+// foldable); was 900. app.css / css/*.css use the same edge (max-width:767px / min-width:768px)
+const isMobile = () => td_rc('mob', () => matchMedia('(max-width:767px)').matches);
 // ---- 2.7.0 (K13, #405): one layout for an unfolded foldable in both orientations. The phone / desktop switch is at
 // 900 px; a near-square touch screen (an unfolded Fold is ~880-910 px each way) sat right on it and flipped between the
 // tab bar and rail + sidebar when turned. Such a screen gets a layout width of at least 900 px in both orientations (the
@@ -291,6 +295,7 @@ const VP_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test
 const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // the layout width 900 keeps the iOS zoom stop of #453 too (iOS ignores interactive-widget, harmless)
 const VP_900 = 'width=900, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
+const VP_767 = 'width=767, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
 // query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
 // flipped it, the meta changed, the page re-laid out, the input lost its focus and the keyboard closed at once. And the meta
@@ -316,6 +321,8 @@ function vpWant() {
     const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b), mode = vpMode();
     const coarse = matchMedia('(pointer:coarse)').matches, square = coarse && lo >= 760 && hi >= 900 && hi / lo < 1.3;
     const land = screenLandscape(), w = land ? hi : lo;
+    // 2.364.0 B (#3040): "Phone" chosen on a touch screen of 768-899 px keeps the phone layout (laid out 767 px wide)
+    if (coarse && mode === 'phone' && w >= 768 && w < 900) return VP_767;
     if (!coarse || w >= 900 || mode === 'phone') return VIEWPORT;
     if (mode === 'desktop' || square) return VP_900;
     // 2.24.0 (#908): an unfolded foldable held sideways gets the desktop layout: the page is laid out 900 px wide and scaled

@@ -16,7 +16,7 @@ const SHORTCUTS_ALL = [
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a project')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
   [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
-  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g n', N_('Messages')], ['g s', N_('Settings')]]],  // 2.45.0 (#1509): g n = Messages
+  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g n', N_('Team chat')], ['g s', N_('Settings')]]],  /* 2.364.0 B (#3040): one name */  // 2.45.0 (#1509): g n = Messages
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
 const SC_MOD = {'g c': 'cal', 'g h': 'habits', 'g f': 'pomo'};
@@ -281,13 +281,13 @@ function palAll() {
   if (collab() && (hasSharing() || cn.byme)) add('v:byme', 'view', tr('Assigned by me'), 'send', () => go('byme'));  // 2.36.2 (#1138)
   // 2.25.0 (UX-47): "Message to …" for everyone one can write to (when typing)
   if (teamOn()) for (const p of teamPeople()) add('dm:' + p.id, 'action', tr('Message to {0}', p.name), 'comment', () => dmOpen(p.id, p.name), {qonly: true});
-  add('v:home', 'view', tr('Start|home'), 'home', () => go('home'));  // 2.17.0 (#475)
+  add('v:home', 'view', tr('Start|home'), 'start', () => go('home'));  // 2.17.0 (#475); 2.364.0 B (#3031): own icon
   if (teamOn()) add('v:team', 'view', tr('Team chat'), 'comment', () => go('team'));  // 2.17.0 (#419)
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload & absences')], ['office', 'receipt', N_('Office & finance')]])
     if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
-  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_area(id)[1], () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
+  for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_icon(mg_area(id)), () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
     if (!mg_on(aid) || o3a_hid(aid)) continue;
@@ -554,6 +554,11 @@ function unionRect(els) {
   const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top)), rr = Math.max(...rs.map(r => r.right)), b = Math.max(...rs.map(r => r.bottom));
   return {left: l, top: t, width: rr - l, height: b - t, right: rr, bottom: b};
 }
+// 2.364.0 A (#3016): the tour offers the sample project only while there are no projects yet (one's own "Getting started"
+// list aside): a list shared with the person, or a second own one
+// 2.364.0 A (#3037): an invited member of an organisation (not its admin): the tour shows where the organisation is
+const tourOrg = () => (S.me?.workspaces || []).find(w => w.role !== 'admin') || null;
+const tourHasProjects = () => { const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived); return ls.some(l => l.owner_id !== S.me?.id) || ls.length > 1; };
 function tourSteps() {
   if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
@@ -561,10 +566,14 @@ function tourSteps() {
   s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'), sel: '#top .menu', r: rect('#top .menu')}
     : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
+  const org = tourOrg(), wsEl = () => $$('[data-act="ws-menu"]').find(e => e.getBoundingClientRect().width) || null;
+  if (org) s.push({id: 'org', sel: '[data-act="ws-menu"]', t: N_('You are in {0}'), targs: [org.name], d: N_('Your projects and the team chat of {0} are in the menu. Here at the top you switch between {0} and your private space.'), args: [org.name], r: rect(wsEl)});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private”. Date, priority, tags and project are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for its details. Swipe right to complete, left to reschedule.') : N_('Click a task for its details. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
-  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), r: rect('#tabs')});
+  // 2.364.0 A (#3016): the bar's step names what the bar really holds (was "Tab bar" with "calendar, habits, focus")
+  const tabs = $$('#tabs > button').map(b => (b.querySelector('span:last-child')?.textContent || b.getAttribute('aria-label') || '').trim()).filter(Boolean);
+  if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('The bar at the bottom'), d: tabs.length ? N_('{0}. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), args: tabs.length ? [tabs.join(' · ')] : [], r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
   s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
@@ -600,7 +609,7 @@ function tourStart() {
   if (!S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
   TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid; TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -645,9 +654,9 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 ? tourHiFig() : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
-    ${last ? pk2_setupHtml() : ''}
+    ${last && (S.agents || []).length ? pk2_setupHtml() : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
   const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);

@@ -79,7 +79,7 @@ _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 MBX_ERR = {  # error code -> the text people see (never the server's own words: they may echo a user name)
     "auth": N_("The server refused the user name or the password"),
     "network": N_("The server cannot be reached (address or port wrong, or the server is down)"),
-    "blocked": N_("This server is in the local network: an admin has to allow it first (Settings > Administration > Advanced, allowed internal hosts)"),
+    "blocked": N_("This server is in the local network: an admin has to allow it first (Settings > Server > Server > Advanced, allowed internal hosts)"),
     "tls": N_("The encrypted connection failed (check SSL / TLS and the port)"),
     "folder": N_("The folder does not exist on the server"),
     "password": N_("The password is missing"),
@@ -857,7 +857,7 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     try:
         with c.savepoint():
             label = tr("E-mail", lg=lg) + f" {mid}" if sealed else (plain["subject"] or tr("E-mail", lg=lg))
-            folder = fs_folder(c, uid, org, [H.ROOT, cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
+            folder = fs_folder(c, uid, org, [H.hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{ts[:10]} {label}"[:120]])
         name = ("mail" if sealed else re.sub(r"[\\/:*?\"<>|]+", "-", plain["subject"])[:60].strip() or "mail") + ".eml"
         with c.savepoint():
             eml_id = fs_put(c, uid, folder, name, raw, "message/rfc822", org)

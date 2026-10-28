@@ -95,8 +95,23 @@ function viewContacts() {
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   const fbar = typeof ctf_barHtml === 'function' && !(mob && showCard) ? ctf_barHtml() : '';  // 2.351.0 B (#2749): the folder filter
-  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
+// 2.364.0 B (#3018): Office & finance off: a line above the contacts that turns it on right here (instead of Settings >
+// Modules > Areas > Parts); everyone but a child switches their own modules (without an organisation they are their own admin)
+const ct18_hintHtml = () => S.me?.kid || officeOn() || LS.get('ct18Hide') ? '' : `<div class="ct18" data-ct18>${ic('receipt', 's')}<span>${esc(tr('Quotations and invoices?'))}</span>
+  <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-ct18on><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Turn on Office & finance'))}</span></label>
+  <button type="button" class="iconbtn" data-ct18x aria-label="${esc(tr('Hide'))}" title="${esc(tr('Hide'))}">${ic('x', 's')}</button></div>`;
+document.addEventListener('change', async e => {
+  const el = e.target.closest?.('[data-ct18on]'); if (!el || !el.checked) return;
+  el.disabled = true;
+  await loadModule('settings');
+  const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean)); fs.add('office');
+  const ok = await setApply({features: FEATS.map(x => x[0]).filter(x => fs.has(x)).join(',')}, tr('{0} on', tr('Office & finance')));
+  if (ok === false) { el.checked = false; el.disabled = false; return; }
+  go('office');
+});
+document.addEventListener('click', e => { if (!e.target.closest?.('[data-ct18x]')) return; LS.set('ct18Hide', true); $('[data-ct18]')?.remove(); });
 // 2.272.0 E1 (#3038): the contacts' trash (More > Trash): the deleted contacts and address books, Restore, Delete for good
 // (asks with the number); after the trash period the server deletes them for good (trash_days)
 async function ctt_load() {

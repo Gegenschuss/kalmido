@@ -104,14 +104,15 @@ function wsMenu(anchor) {
   // phone closes; on a computer the sidebar folds away into the header's menu button, the same switch as side-fold)
   const brand = !!anchor?.closest?.('.sbbrand'), fold = !!LS.get('sideFold', false), drawer = isMobile() || !!$('#app')?.classList.contains('side-rail');
   const p = menu(anchor, [...(brand ? [{head: tr('Workspace')}] : []), ...opts.map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : ws === 'all' ? 'grid' : 'brief', on: ws === cur, fn: () => wsSet(ws)})),
-    ...(brand ? ['-', {label: tr('Start'), icon: 'home', cls: 'wsm-home', fn: () => { if (isMobile()) closeSide(); go('home'); }},
+    ...(brand ? ['-', {label: tr('Start'), icon: 'start', cls: 'wsm-home', fn: () => { if (isMobile()) closeSide(); go('home'); }},
       {label: !isMobile() && fold ? tr('Show the sidebar') : tr('Hide the sidebar'), icon: 'panel', cls: 'wsm-side', fn: () => isMobile() || (drawer && !fold) ? closeSide() : sideFold(!fold)}] : [])]);
   // 2.57.0 B (#1807): a colour dot in front of each workspace's name (my colour or its default; neutral = a ring)
   const off = brand ? 1 : 0;
   opts.forEach((ws, i) => { if (ws !== 'all') p?.querySelector(`[role="menuitem"][data-i="${i + off}"] .ml`)?.insertAdjacentHTML('beforebegin', wsp_dot(ws)); });
 }
 // the default workspace of a new list: the shown one; with "All" the one of the folder's lists, else the first organisation
-function wsDefaultOrg(folder = '') {
+// 2.364.0 D (#3033): proj = a new project: with "All" (and no folder rule) the workspace picked last for a new project, else Private
+function wsDefaultOrg(folder = '', proj = false) {
   const cur = wsCur();
   if (cur === 'private') return null;
   if (cur.startsWith('org:')) return +cur.slice(4);
@@ -119,8 +120,11 @@ function wsDefaultOrg(folder = '') {
   const fp = folderEff(folder); if ('org_id' in fp) return fp.org_id || null;  // 2.29.0 (#1030): the folder's workspace
   const ws = new Set(S.lists.filter(l => !l.is_inbox && folder && (l.folder === folder || String(l.folder || '').split('/')[0] === top)).map(l => l.org_id || null));
   if (ws.size === 1) return [...ws][0];
+  if (proj) { const last = String(LS.get('wsLastProj', '') || ''); return (S.me?.workspaces || []).some(o => 'org:' + o.id === last) ? +last.slice(4) : null; }
   return (S.me?.workspaces || [])[0]?.id || null;
 }
+// 2.364.0 D (#3033): under "All workspaces" a private project carries a small house in the sidebar
+const ws_prvMark = l => wsOn() && wsCur() === 'all' && !l.org_id && !l.is_inbox ? `<span class="shr wsprv" role="img" title="${esc(wsName('private'))}" aria-label="${esc(wsName('private'))}">${ic('home', 's')}</span>` : '';
 // the <select> of a list's workspace (list dialog); only when the person has an organisation
 function wsSelectHtml(id, cur, dis = '') {
   if (!wsOn()) return '';

@@ -119,7 +119,7 @@
   .shvrh button{min-height:2.75rem}
   .shvdd{opacity:1}
 }
-@media (max-width:899px){
+@media (max-width:767px){
   .shvbody{grid-template-columns:minmax(0,1fr)}
   .shvscroll{max-height:60dvh}
   .shvside{max-height:none;overflow:visible}
@@ -138,7 +138,7 @@
    empty columns / rows that fill it (display only), the table's own window (/?mini=1) and full screen */
 .shzbox{position:relative;max-width:100%;min-width:0}
 .shzbox[data-shzset] .shvscroll{height:100%;max-height:none}
-@media (min-width:900px){ .shzbox:not([data-shzset]) .shvscroll{min-height:min(22rem,calc(100dvh - 15rem))} }
+@media (min-width:768px){ .shzbox:not([data-shzset]) .shvscroll{min-height:min(22rem,calc(100dvh - 15rem))} }
 .shzgrip{position:absolute;right:.125rem;bottom:.125rem;z-index:5;width:1rem;height:1rem;padding:0;border:0;border-radius:var(--r-s);cursor:nwse-resize;opacity:.7;
   background:linear-gradient(135deg,transparent 45%,var(--faint) 45%,var(--faint) 55%,transparent 55%,transparent 70%,var(--faint) 70%,var(--faint) 80%,transparent 80%)}
 .shzgrip:hover,.shzgrip:focus-visible{opacity:1}
@@ -248,5 +248,5 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shbadd{flex:none}
 @media (pointer:coarse){.shbtab{min-height:2.75rem}}
 /* 2.138.4 A (#2372): on a phone the sheet bar stays above the bottom tab bar (a short sheet ended half under it) */
-@media (max-width:899px){.shbbar{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg)}}
+@media (max-width:767px){.shbbar{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg)}}
 .shvmen{padding:.25rem .5rem}  /* 2.126.2 A (#2357) */

@@ -40,6 +40,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const CAROL = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, CKB);
+  // 2.364.0 (#3031): Today's review shows from the account's second week on -> the accounts of this suite are older
+  { const [DBC, DBN] = require('fs').readFileSync(path.join(DATA, '.kalmido-db'), 'utf8').trim().split(/\s+/);
+    execFileSync('docker', ['exec', DBC, 'psql', '-U', 'kalmido', '-d', DBN, '-Atqc', "UPDATE users SET created_at='2025-01-01T00:00:00Z'"]); }
   const G1 = (await call('POST', '/api/admin/groups', {name: 'Office', members: [BOB]})).id;
   const L = (await call('POST', '/api/lists', {name: 'Office tasks'})).id;
   const FL = (await call('POST', '/api/lists', {name: 'Plans', folder: 'Team'})).id;
@@ -49,8 +52,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // ================= Settings > Administration > Groups
   let w = await boot({user: 'alice'}), d = w.document;
   w.settingsModal('groups'); await sleep(400);
-  const us = d.querySelector('[data-pane="users"]');
-  check(us && !us.classList.contains('hidden') && us.querySelector('#s-groups-h'), 'focus "groups" opens Administration at Groups');
+  const us = d.querySelector('[data-pane="org"]');  // 2.364.0 C (#3041): Organisation > People
+  check(us && !us.classList.contains('hidden') && us.querySelector('#s-groups-h'), 'focus "groups" opens Organisation at Groups');
   check(/Office/.test(us.querySelector('#a-groups')?.textContent || '') && /Bob/.test(us.querySelector('#a-groups').textContent), 'the group with its members');
   click(w, us.querySelector('[data-grp="new"]'));
   let md = await until(() => d.querySelector('.grpmodal'));

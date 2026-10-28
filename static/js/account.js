@@ -199,7 +199,7 @@ async function actDraw(md) {
   const box = $('#s-act', md); if (!box) return;
   let j; try { j = await api('GET', '/api/admin/orgs/activity'); } catch { box.innerHTML = ''; return; }
   const row = (n, o) => `<tr><th scope="row">${esc(n)}</th><td>${o.members}</td><td>${o.last_login ? esc(o.last_login) : '–'}</td><td>${esc(fmtBytes(o.storage_bytes))}</td><td>${o.lists}</td><td>${o.tasks}</td></tr>`;
-  box.className = 'actwrap';
+  box.className = 'actwrap'; box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-labelledby', 's-act-h');  // 2.364.0 C (#3041): now in view under People: the wide table scrolls by keyboard too
   box.innerHTML = `<table class="acttbl"><thead><tr><th>${tr('Organisation')}</th><th>${tr('Members')}</th><th>${tr('Last sign-in')}</th><th>${tr('Storage')}</th><th>${tr('Projects')}</th><th>${tr('Tasks')}</th></tr></thead><tbody>${
     j.orgs.map(o => row(o.name, o)).join('')}${row(tr('Without organisation'), j.private)}</tbody></table>`;
 }
@@ -211,27 +211,29 @@ async function wsPaneDraw(md) {
   let j; try { j = await api('GET', '/api/orgs'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   const mm = Object.keys(j.mismatches || {}).length;
+  // 2.364.0 C (#3041): with Organisation > Data in the dialog the data boxes of each organisation go there (one place)
+  const dbox = $('#s-wsdata', md), inl = !dbox, dataBoxes = o => ocBoxHtml(o) + oxBoxHtml(o) + (typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : '');
   const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${o.icon ? esc(o.icon) : ic('building')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.filter(m => !m.agent).length))} · ${esc(trn('{0} project', '{0} projects', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : o.role && o.role !== 'member' ? ' · ' + esc(tr('your role: {0}', oinvRoleSel.label(o.role))) : ''}</span></summary>
     ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
-    ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
+    ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite people')}</button></div>${''/* 2.364.0 C (#3041): one dialog (e-mail or link) instead of the field + Add */}
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com" data-wsf="domains"></div>` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button) */}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button></div>` : ''}
-    ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
-    ${o.role === 'admin' ? oxBoxHtml(o) : ''}
-    ${o.role === 'admin' && typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}${''/* 2.146.0 D (#2468): the retention export */}
+    ${o.role === 'admin' && inl ? dataBoxes(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key, export; 2.146.0 D (#2468): the retention export */}
     ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks; lazy-ok: 2.149.0 F (#2519): settings dialog only (LD_NEED loads integrations) */}
     ${o.role === 'admin' && typeof chn_orgBoxHtml === 'function' ? chn_orgBoxHtml(o) : ''}${''/* 2.142.0 A (#2145): its notification channels */}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} project of yours has an agent of another workspace (from before the workspaces). Open the project’s Share dialog to take it out or keep it.', '{0} projects of yours have an agent of another workspace (from before the workspaces). Open the projects’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
   // 2.186.0 A (#2599): retired organisations I was an admin of: no members any more, only their export until they go for good
-  if ((j.retired || []).length) box.insertAdjacentHTML('beforeend', j.retired.map(o => `<details class="sdet wsret"><summary><b>${esc(o.name)}</b> <span class="muted">${odlRetiredLabel(o)}</span></summary>
+  if (dbox) { dbox._j = j; dbox.innerHTML = j.orgs.filter(o => o.role === 'admin').map(o => `<div class="wsdorg" data-oid="${o.id}"><h5 class="wsdname">${esc(o.name)}</h5>${dataBoxes(o)}</div>`).join(''); }
+  if ((j.retired || []).length) (dbox || box).insertAdjacentHTML('beforeend', j.retired.map(o => `<details class="sdet wsret"><summary><b>${esc(o.name)}</b> <span class="muted">${odlRetiredLabel(o)}</span></summary>
     <div class="shint">${esc(tr('You were an admin of this organisation before it was retired: you can still export it until it is deleted for good.'))}</div>
     ${oxBoxHtml(o)}${typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}</details>`).join(''));
-  if (!S.me?.kid) box.insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
+  if (!S.me?.kid) (dbox || box).insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
+  if (dbox) { oxDraw(dbox); ocDraw(dbox); }  // 2.364.0 C (#3041)
   whoDraw(box);  // 2.115.0 A (#2061): their webhooks; lazy-ok: settings dialog only (LD_NEED settings -> integrations)
   if (typeof chn_orgDraw === 'function') chn_orgDraw(box);  // 2.142.0 A (#2145): their notification channels
   ocDraw(box);  // 2.42.0 (#828): their encryption sections
@@ -1093,13 +1095,23 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
 const SETUP_PRESETS = Object.fromEntries(PURPOSES.map(([k, i, n, d]) => [k, {name: n, icon: i, desc: d,
   off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => !mg_suIn(k, x))}]));
-// 2.25.0 (UX-19): the same count as Settings > Modules: what is picked here against every module (the ones not offered
-// here, such as Home & life or Clients, start off and are switched on later in Settings > Modules)
-function setupCount(picked) {
-  const here = SETUP_MAIN.length + SETUP_MODS.length, all = MOD_GROUPS.flatMap(([, ks]) => ks).length;
-  const on = picked.size;
-  return all > here ? tr('{0} of {1} modules on · {2} more in Settings > Modules', on, all, all - here) : tr('{0} of {1} modules on', on, all);
+// 2.25.0 (UX-19): the same count as Settings > Modules. 2.364.0 A (#3015): counted the same way, too: the single modules
+// the setup switches on (as the server's admin_setup: the modules sent, collaboration and time, the purpose's extras or
+// "all modules") against every single module there (an area by its parts, without what is switched off for everyone)
+const SU_LIFE = ['contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'];  // server: family._LIFE
+function setupCount(picked, mods, purpose, modsAll) {
+  const fk = new Set(FEATS.map(x => x[0]));
+  const units = [...new Set(MOD_GROUPS.flatMap(([, ks]) => ks).flatMap(k => k.startsWith('a:') ? mg_feats(k.slice(2)) : [k]))]
+    .filter(k => fk.has(k) && !(k === 'collab' && !picked.has('collab')) && !(k === 'time' && !picked.has('a:time')));
+  const on = new Set([...mods, 'collab', 'time']);
+  if (purpose && modsAll === true) units.forEach(k => on.add(k));
+  else if (purpose && modsAll !== false) [...(PURPOSE_MODS[purpose] || []).filter(k => SU_LIFE.includes(k)), ...(PURPOSE_EXTRA[purpose] || [])].forEach(k => on.add(k));
+  return tr('{0} of {1} modules on', units.filter(k => on.has(k)).length, units.length);
 }
+// 2.364.0 A (#3015): what a start adds on top of the modules ticked below (they differ only there: Team, Software projects
+// and Office & finance offer the same modules here)
+const SU_ADDS = {team: () => [tr('Agents')], software: () => [tr('a software project with a board')],
+  office: () => ['clients', 'workload', 'forms', 'office', 'agents'].map(k => tr(FEATS.find(x => x[0] === k)?.[1] || k))};
 async function setupChoices(el, logo) {
   let st = {};
   try { st = await (await fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
@@ -1121,7 +1133,8 @@ async function setupChoices(el, logo) {
   const fs0 = st.settings?.features;
   if (typeof fs0 === 'string' && !all.filter(x => x !== 'a:life' && x !== 'a:review').every(x => mg_suHas(new Set(fs0.split(',')), x))) {  // everything on = the untouched default (2.19.0: Family is off by default; 2.44.0: Home, and Review without the journal)
     const on = new Set(fs0.split(',')); picked = new Set(all.filter(x => mg_suHas(on, x) && (x !== 'collab' || st.collab_all !== false) && (x !== 'a:time' || st.time_all !== false)));
-    preset = Object.keys(SETUP_PRESETS).find(k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x))) || '';
+    const fits = k => !!SETUP_PRESETS[k] && all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
+    preset = fits(st.settings?.purpose || '-') ? st.settings.purpose : Object.keys(SETUP_PRESETS).find(fits) || '';  // 2.364.0 A (#3015): the chosen start, not the first fitting
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
   const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
@@ -1129,6 +1142,13 @@ async function setupChoices(el, logo) {
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   // 2.144.2 A (#2369): preset '' (modules fit no purpose) matches nothing, so "Start" switches nothing extra off
   const matches = k => !!SETUP_PRESETS[k] && all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
+  // 2.364.0 A (#3015): only the tile picked is marked (Team, Software projects and Office & finance hold the same modules
+  // here, so matching alone marked all three), and only while the ticks still fit it
+  const isOn = k => k === preset && matches(k);
+  const suMods = () => [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]);
+  const suPurpose = () => matches(preset) || (modsAll !== null && preset) ? preset : '';
+  const suCount = () => setupCount(picked, suMods(), suPurpose(), modsAll);
+  const suAllSync = () => { const a = $('#su-modsall', el); if (a) a.indeterminate = !a.checked && SETUP_MODS.some(([k]) => picked.has(k)); };  // 2.364.0 A (#3015): some on = half
   // 2.312.0 B (#3264): the note on health data (Art. 9 GDPR) while Home or Review (health, journal) is picked
   const suPriv = () => modPrivHtml(['a:life', 'a:review'].filter(x => picked.has(x)).flatMap(x => MG_SU_AREA[x]));
   const draw = () => {
@@ -1136,11 +1156,11 @@ async function setupChoices(el, logo) {
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
-      <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
+      <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${isOn(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${isOn(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b> <small class="muted">${tr(p.desc)}</small>${SU_ADDS[k] ? ` <small class="suadds">${esc(tr('Adds: {0}', SU_ADDS[k]().join(', ')))}</small>` : ''}</button>`).join('')}</div>
       <div class="supriv" id="su-priv">${suPriv()}</div>
       ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}
       ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations.')}</p>` : ''}
-      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
+      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(suCount())}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
@@ -1148,6 +1168,7 @@ async function setupChoices(el, logo) {
       <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
+    suAllSync();
   };
   draw();
   el.addEventListener('input', e => { if (e.target.id === 'su-org') orgName = e.target.value; });
@@ -1155,8 +1176,9 @@ async function setupChoices(el, logo) {
     if (e.target.id === 'su-modsall') { modsAll = e.target.checked; pm_su(); draw(); return; }
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
-    $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
-    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = setupCount(picked);
+    $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', isOn(b.dataset.suPreset)); b.setAttribute('aria-pressed', isOn(b.dataset.suPreset)); });
+    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = suCount();
+    const ma = $('#su-modsall', el); if (ma && modsAll === null) ma.checked = SETUP_MODS.every(([k]) => picked.has(k)); suAllSync();
     const sp = $('#su-priv', el); if (sp) sp.innerHTML = suPriv();  // 2.312.0 B (#3264)
   });
   el.addEventListener('click', async e => {
@@ -1171,7 +1193,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || httpErrText(r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(k => picked.has(k) && k !== 'collab').flatMap(k => MG_SU_AREA[k] ? MG_SU_AREA[k].filter(p => !matches(preset) || PURPOSE_MODS[preset].includes(p)) : [k]), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) || (modsAll !== null && preset) ? {purpose: preset} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: suMods(), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(suPurpose() ? {purpose: suPurpose()} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

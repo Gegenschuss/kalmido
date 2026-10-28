@@ -67,7 +67,7 @@ function viewAblage() {
   let body;
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
-  else if (!d.items.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span></div>`;
+  else if (!d.items.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span>${!r.nid && sp.startsWith('org:') && !ab_orgAdmin(sp) ? `<span class="muted abemptyhint">${tr('You see the organisation’s folders once an admin opens them to everyone or shares them with you.')}</span>` : ''}</div>`;
   else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}</div>`;
   if (d && typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) body = dt_abBody(sp || d.space);  // 2.122.0 B (#2099): the tag filter of the space
   const search = !trash && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text
@@ -162,12 +162,19 @@ function ab_openFile(n) {
 }
 
 // ---- actions (each one = ONE undo step)
+// 2.364.0 D (#3020): is the person an admin of the organisation space sp ('org:<id>')? Members see its folders only when opened / shared
+const ab_orgAdmin = sp => (S.me?.workspaces || []).some(o => 'org:' + o.id === sp && o.role === 'admin');
 async function ab_newFolder(parent) {  // 2.199.0 A (#2742): parent = a folder of the tree's menu (default: the open one)
-  const name = await askPrompt(tr('New folder'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 150}});
-  if (!name || !name.trim()) return;
   const pid = typeof parent === 'number' ? parent : S.route.nid;
+  // 2.364.0 D (#3020): an admin's new folder at the top of an organisation asks "Visible to all members?" (default off = as before)
+  const ask = !pid && ab_curSpace().startsWith('org:') && ab_orgAdmin(ab_curSpace());
+  let all = false;
+  const name = await askPrompt(tr('New folder'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 150},
+    ...(ask ? {html: `<label class="chkl"><input type="checkbox" id="ab-nfall"> ${tr('Visible to all members?')}</label>`, after: md => $('#ab-nfall', md).addEventListener('change', e => { all = e.target.checked; })} : {})});
+  if (!name || !name.trim()) return;
   const b = pid ? {parent_id: pid, name} : {space: ab_curSpace(), name};
   let n; try { n = await api('POST', '/api/files/folders', b); } catch { return; }
+  if (ask && all) { try { n = await api('PATCH', `/api/files/nodes/${n.id}`, {org_access: 'view'}); } catch { /* shown; the folder stays private to the admins */ } }
   ab_reload();
   offerUndo(tr('Folder “{0}” created', n.name), histAdd({label: tr('New folder “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
@@ -282,7 +289,7 @@ async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   $('.abdlg')?.remove();
   const vers = (n.versions || []).map(v => `<div class="abvrow"><span><b>v${v.no}</b> · ${esc(ab_when(v.created_at))} · ${fmtSize(v.size)}${v.by ? ' · ' + esc(v.by) : ''}</span><span class="spacer"></span><a class="iconbtn" href="${ab_url(n, true, v.no)}" download="${esc(n.name)}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download version {0}', v.no))}">${ic('download', 's')}</a>${ab_canWrite(n.role) && v.no !== n.version ? `<button type="button" class="btn sm" data-abv="${v.no}">${tr('Restore')}</button>` : ''}</div>`).join('');
-  const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(new Date(x.at).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}))}</small></div>`).join('');
+  const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(fmtTimeAt(new Date(x.at)))}</small></div>`).join('');
   const shares = n.role === 'owner' ? [...(n.shares || []), ...(n.inherited || [])] : [];
   const md = modal(`<div class="lhdr"><h3>${ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="muted abpath">${esc((n.crumbs || []).map(c => c.name).join(' / '))}</div>

@@ -219,7 +219,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     // the week view
     await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); location.hash = 'cal'; return 1; })()`); await sleep(1200);
     const wk = await ev(`(() => { const lb = document.querySelector('.wlbl').getBoundingClientRect(), row = document.querySelector('.wallday').getBoundingClientRect(), wb = document.querySelector('#wbody').getBoundingClientRect();
-      const t7 = [...document.querySelectorAll('.wtime')].find(e => e.textContent === '07:00').getBoundingClientRect();
+      const t7 = [...document.querySelectorAll('.wtime')].find(e => e.textContent === fmtTimeLoc('07:00')).getBoundingClientRect();
       const ev = [...document.querySelectorAll('.wad .ev')].find(e => /plumber/.test(e.textContent)), lh = parseFloat(getComputedStyle(ev).lineHeight);
       return {row: Math.round(row.height), lbl: Math.round(lb.height), t7top: Math.round(t7.top), wbTop: Math.round(wb.top), evLines: Math.round(ev.getBoundingClientRect().height / lh), over: document.documentElement.scrollWidth - innerWidth, page: document.documentElement.scrollHeight - innerHeight}; })()`);
     check(wk.evLines === 2, '390 week: an all-day task shows two lines of its title');
@@ -277,10 +277,11 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await sleep(900);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
     headChecks('fold unfolded again', await ev(HEAD), {rows: 2, words: true, pin: false});  // 2.218.0 (#2799)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await sleep(900);
+    // 2.364.0 (#3040): the widest phone layout is 767 px now (was 880)
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 760, height: 904}}); await sleep(900);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
-    headChecks('880 portrait', await ev(HEAD), {rows: 1, words: false, pin: true});
-    await shot('p2151-880-header.png');
+    headChecks('760 portrait', await ev(HEAD), {rows: 1, words: false, pin: true});
+    await shot('p2151-760-header.png');
     // the matrix keeps two columns on the unfolded Fold: no fold buttons
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
     await o.nav(B + '#matrix'); await ready(ev);

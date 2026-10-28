@@ -42,9 +42,9 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   let md = [...d.querySelectorAll('.modal')].at(-1);
   const sel = md.querySelector(`[data-mrole="${id.pete}"]`);
   check(sel && [...sel.options].map(o => o.value).join() === 'admin,edit,participant,view' && sel.value === 'participant', 'role picker: 4 roles, current selected');
-  check([...sel.options].map(o => o.textContent).join() === 'Admin,Member,Participant,Viewer' && sel.options[2].title === 'Sees only the tasks assigned to them', 'role names + one-line explanation');
+  check([...sel.options].map(o => o.textContent).join() === 'Admin,Member,Participant,Read-only' && sel.options[2].title === 'Sees only the tasks assigned to them', 'role names + one-line explanation');
   const help = md.querySelector('.rolehelp');
-  check(help && /Participant\s*Sees only the tasks assigned to them/.test(help.textContent) && /Viewer\s*Sees everything, changes nothing/.test(help.textContent), 'role legend under the members');
+  check(help && /Participant\s*Sees only the tasks assigned to them/.test(help.textContent) && /Read-only\s*Sees everything, changes nothing/.test(help.textContent), 'role legend under the members');  // 2.364.0 C (#3041): one role word
   check(!md.querySelector(`[data-mrole="${id.alice}"]`) && /Owner/.test(md.querySelector(`.mrow[data-uid="${id.alice}"]`).textContent), 'owner row: no picker');
   const addrole = md.querySelector('#l-addrole');
   check(!addrole || addrole.value === 'edit', 'add row defaults to Member');
@@ -146,7 +146,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`shareModal(${L})`); await sleep(900);
   md = [...d.querySelectorAll('.modal')].at(-1);
-  check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Betrachter', 'German role names');
+  check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Nur lesen', 'German role names');  // 2.364.0 C (#3041)
   check(/Sieht nur die eigenen, zugewiesenen Aufgaben/.test(md.querySelector('.rolehelp').textContent), 'German explanations');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Angezeigte Felder…'), 'German: Spalten… (2.14.0, was the assignee column toggle)');

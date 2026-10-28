@@ -49,8 +49,10 @@ function propDayplanHtml() {
 }
 // ---- the evening review: a card in Today after the end of the working hours (or opened from its push)
 S.review = {day: null, data: null, busy: false, hidden: null};
+// 2.364.0 B (#3031): the evening review from the account's second week (older than 7 days; its push link still opens it)
+const st_young = () => !!S.me?.since && (Date.parse(today()) - Date.parse(S.me.since)) / 864e5 <= 7;
 function reviewCard() {
-  if (S.route.key !== 'today' || !S.dayplan) return '';
+  if (S.route.key !== 'today' || !S.dayplan || (st_young() && !S.route.review)) return '';
   const now = new Date(), hm = dpHm(now.getHours() * 60 + now.getMinutes()), t0 = today();
   const want = S.route.review || hm >= (S.dayplan.work_end || '17:00');
   if (!want || LS.get('reviewHidden', '') === t0 && !S.route.review) return '';
@@ -105,8 +107,10 @@ function briefLiveNums(groups) {
   }
   return o;
 }
+// 2.364.0 B (#3031): Start shows the day's overview; Today drops its briefing card while Start is in the bar (not hidden there)
+const st_on = () => !S.me?.kid && !sideHidden('e:home');
 function briefCard(groups) {
-  if (S.route.key !== 'today') return '';
+  if (S.route.key !== 'today' || st_on()) return '';
   briefLoad();
   const d = S.brief.data; if (!d || d.date !== today()) return '';
   const n = groups ? {...d.counts, ...briefLiveNums(groups)} : d.counts; if (!(n.today || n.overdue || n.blocked || n.changed || n.stale)) return '';

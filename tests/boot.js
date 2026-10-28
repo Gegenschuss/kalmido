@@ -129,9 +129,12 @@ exports.dialogBridge = w => {
 };
 // 2.56.1 (#1799): legacy suites check every row symbol; the default level "Important" hides some, so every login of a
 // suite sets row_icons=all for that person (o.rowIcons: another level, null = leave the default; p2561_b_ui.js)
+// 2.364.0 B (#3031): the app opens on Start by default (setting start_page); the suites written before open on the device's
+// last task view (start_page 'last', the old way) -- pass startPage: null for the account's own (tests/p2364_b_nav_ui.js)
 const rowIconsSet = async (hd, o = {}) => {
-  if (o.rowIcons === null) return;
-  try { await fetch(B + 'api/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido', ...hd}, body: JSON.stringify({row_icons: o.rowIcons || 'all'})}); } catch { /* best effort */ }
+  const body = {...(o.rowIcons === null ? {} : {row_icons: o.rowIcons || 'all'}), ...(o.startPage === null ? {} : {start_page: o.startPage || 'last'})};
+  if (!Object.keys(body).length) return;
+  try { await fetch(B + 'api/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido', ...hd}, body: JSON.stringify(body)}); } catch { /* best effort */ }
 };
 exports.login = async (user, pw = 'password123', o = {}) => {
   const r = await fetch(B + 'api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: user, password: pw})});
@@ -143,9 +146,9 @@ exports.login = async (user, pw = 'password123', o = {}) => {
 // 2.53.0 (#1410): lazy = false (the default) loads the modules the app loads on demand (settings, contacts, office) right after
 // the start, so suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
 // 2.126.0 D (#1989): shared = {store: {}, wins: []}: windows of one browser -- one localStorage, a write fires "storage" in the others
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, shared = null} = {}) {
-  const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons});
-  if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons});  // 2.56.1 (#1799)
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, startPage, shared = null} = {}) {
+  const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons, startPage});
+  if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons, startPage});  // 2.56.1 (#1799)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
   // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device

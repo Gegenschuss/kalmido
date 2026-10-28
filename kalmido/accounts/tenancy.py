@@ -290,7 +290,7 @@ CHECKS = {
                    "WHERE om.org_id=i.org_id AND om.user_id=i.user_id) AND EXISTS (SELECT 1 FROM org_members o2 "
                    "WHERE o2.user_id=i.user_id AND o2.org_id<>i.org_id)"),  # 2.190.0 R (#2496): only an account of another organisation
 }
-TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Administration > Organisations")
+TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Organisation > People")
 
 
 def boundary_check(c):
@@ -322,7 +322,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
           "tchat_person": ("tchat_members", "room_id")}  # 2.113.1 B (#2059)
-TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
+TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
 def boundary_repair(c):

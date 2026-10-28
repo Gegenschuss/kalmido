@@ -82,7 +82,7 @@
 .peplist li{margin:.25rem 0}
 .pepset code,.ofddlg code{font-size:.875rem}
 @media (prefers-reduced-motion:no-preference) { .ostok{transition:opacity .2s} }
-@media (max-width:899px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
+@media (max-width:767px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
 @media (pointer:coarse) { .ofcset .ostsub button{min-height:2.75rem} }
 /* 2.113.0 (#2246): Switched on / Off with its switch on an industry pack's card */
 .pkc-on{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.375rem;font-size:var(--fs-m)}
@@ -116,6 +116,7 @@
 .oil_more{margin:.25rem 0 .5rem}  /* 2.356.0 C (#3005): language, currency, VAT, contract folded below the head */
 .oil_more>summary{display:flex;align-items:center;gap:.4rem;cursor:pointer;min-height:2.5rem;color:var(--muted);font-size:var(--fs-s);list-style:none}
 .oil_more>summary::-webkit-details-marker{display:none}
+.oil_more>summary .ofd_langother{color:var(--accent)}  /* 2.368.0 (#2979): the document language differs from the app language */
 .oil_more>summary .fcar{transform:rotate(-90deg)}
 .oil_more[open]>summary .fcar{transform:none}
 .oil_more>summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -191,7 +192,7 @@
   .ofdhead .btn{min-height:2.75rem}
 }
 #os-logo{max-width:100%;min-width:0}
-@media (max-width:899px), (pointer:coarse) {
+@media (max-width:767px), (pointer:coarse) {
   .ofdlocked .btn{min-height:2.75rem}
 }
 @media (max-width:599px) {
@@ -326,7 +327,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .oimfoot{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:2;margin:1rem -1.75rem 0;padding:.75rem 1.75rem calc(.75rem + var(--safe-b));background:var(--bg2);border-top:1px solid var(--line2);box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.5)}
 .oimfoot .aerr{flex:1 1 12rem;min-width:0}
 .oimfoot .spacer{flex:1 1 0}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .oimfoot{margin-inline:-.75rem;padding-inline:.75rem}
 }
 @media (prefers-color-scheme: light) {
@@ -414,7 +415,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnkimps{margin-bottom:.75rem}
 .bnkprev{max-height:50vh;overflow:auto}
 /* 2.218.0 B (#2805): the document kind tabs (Quotations / Invoices / Credit notes …) are at least 2.75rem high on phones */
-@media (hover:none),(max-width:899px){ .ofdkinds button{min-height:2.75rem} }
+@media (hover:none),(max-width:767px){ .ofdkinds button{min-height:2.75rem} }
 /* 2.299.0 B (#3191): bank rules */
 .bnkrsug{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.5rem .625rem;margin-bottom:.5rem;border-radius:var(--radius);border:1px solid var(--accent);background:var(--bg2)}
 .bnkrsn{display:flex;flex-direction:column;min-width:0}
@@ -488,7 +489,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .cfs-adj{margin-top:.25rem}
 .cfs-add{display:flex;justify-content:flex-end;margin-top:.25rem}
 .cfs-add .btn{min-height:2.75rem}
-@media (max-width:899px){.cfb-real{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg2)}}  /* 2.144.2 B (#2372): above the tab bar like the sheet bar */
+@media (max-width:767px){.cfb-real{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg2)}}  /* 2.144.2 B (#2372): above the tab bar like the sheet bar */
 /* 2.124.0 D (#2342): the balance according to the bank (cash flow, import preview) */
 .cfb-box{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;padding:.5rem .75rem;border:.0625rem solid var(--line2);border-radius:var(--radius)}
 .cfb-head{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
@@ -653,7 +654,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .dtp-sg{margin-top:1rem}
 .dtp-srow{cursor:default}
 .dtp-dlg .card{max-width:46rem}
-@media (max-width:899px) {
+@media (max-width:767px) {
   .dtp-edit{grid-template-columns:minmax(0,1fr)}
   .dtp-pv{position:static}
 }
@@ -712,7 +713,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .cb-qrow{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .cb-qrow>*{flex:1 1 8rem;min-width:0}
 .cb-go{height:1.75rem;justify-self:end}  /* 2.224.0 C (#2816): 28 px on a computer, 44 px only on touch */
-@media (pointer:coarse),(max-width:899px){ .cb-go{height:auto;min-height:2.75rem} .cb-dir button{min-height:2.75rem} }
+@media (pointer:coarse),(max-width:767px){ .cb-go{height:auto;min-height:2.75rem} .cb-dir button{min-height:2.75rem} }
 .cb-row{align-items:center}
 .cb-no{flex:none;min-width:2rem;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
 .cb-row .ofcn small{overflow-wrap:anywhere;white-space:normal}
@@ -747,7 +748,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .lead-pv li.lead-err .lead-why{color:var(--danger,#c0392b)}
 .lead-match{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem}
 .lead-mbtn{width:100%;justify-content:flex-start;min-height:2.75rem;text-align:left}
-@media (max-width:899px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb,.ofcbar [data-pp="new"]{min-height:2.75rem}}  /* 2.224.0 B (#2816): the one new button took the lead button's phone size */
+@media (max-width:767px){.pipcols{grid-template-columns:1fr}.ofcbar .lead-tb,.ofcbar [data-pp="new"]{min-height:2.75rem}}  /* 2.224.0 B (#2816): the one new button took the lead button's phone size */
 
 /* 2.95.0 A (#1932): the per diem of a trip, its report (rkv-) */
 .rkv-sec{border:1px solid var(--line2);border-radius:.75rem;padding:.5rem .75rem .25rem;margin:.5rem 0}

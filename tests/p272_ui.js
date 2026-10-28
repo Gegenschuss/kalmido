@@ -208,8 +208,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(!md.querySelector('#s-uag') && md.querySelector('#myag-user'), 'Bob: the create form, no admin switch');
   md.querySelector('#myag-user').value = 'bobs-claude'; md.querySelector('#myag-name').value = 'Bob\'s Claude';
   click(w, md.querySelector('[data-myag-act="new"]')); await sleep(900);
-  // 2.46.6 (#1709): "Set it up on a computer now?" first; the token only behind "Show the token for an own setup"
-  check(await until(() => d.querySelector('.modal:not(.smodal) [data-m="av-setup"]')), 'the setup is offered');
+  // 2.46.6 (#1709): the setup first; the token only behind "Show the token for an own setup"
+  // 2.364.0 (#3035): the one-command setup opens at once, the token under "For advanced users"
+  check(await until(() => d.querySelector('.modal:not(.smodal) #ains-dir')), 'the setup is offered');
   click(w, d.querySelector('.modal:not(.smodal) [data-m="av-tok"]')); await sleep(200);
   check(/^abk_/.test(d.querySelector('.modal:not(.smodal) #av-tokv')?.value || ''), 'the token is shown once');
   check(await until(() => md.querySelector('[data-myag]')), 'his agent in the list');

@@ -96,7 +96,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   await call('PATCH', '/api/settings', {side_people: String(BOB)});  // 2.99.0 (#2187): people only while pinned
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   const msg = await until(() => d.querySelector('#side .sg-team .sbmsg[data-go="team"]'));
-  check(msg && /Messages/.test(msg.textContent) && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Messages" with 2 unread ' + msg?.textContent);
+  check(msg && /Team chat/.test(msg.textContent) /* 2.364.0 (#3040): one name, was "Messages" */ && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Team chat" with 2 unread ' + msg?.textContent);
   check(d.querySelector('#side .sg-team').firstElementChild.nextElementSibling === msg, '#1509: on top of Conversations');
   const conv = await until(() => d.querySelectorAll('#side .sbconv').length === 2 && [...d.querySelectorAll('#side .sbconv')]);
   check(conv && conv.every(b => b.classList.contains('sbun')) && conv.some(b => b.dataset.go === `team/${DM}`) && conv.some(b => b.dataset.go === `team/${CH}`), '#1509: the 2 conversations, unread (bold)');

@@ -5,7 +5,7 @@
 .bmadd{display:flex;gap:.5rem;flex:1;min-width:0}
 .bmadd input{flex:1;min-width:0}
 .bmadd .btn{height:1.75rem;align-self:center}  /* 2.224.0 C (#2816): 28 px beside a field on a computer, 44 px only on touch */
-@media (pointer:coarse),(max-width:899px){ .bmadd input,.bmadd .btn{min-height:2.75rem} .bmadd .btn{align-self:stretch} }
+@media (pointer:coarse),(max-width:767px){ .bmadd input,.bmadd .btn{min-height:2.75rem} .bmadd .btn{align-self:stretch} }
 .bmmenu .bgmenul button{display:flex;align-items:center;gap:.625rem;padding:.625rem .75rem;border-radius:var(--r-s);min-height:2.75rem;width:100%;background:none;border:0;color:inherit;cursor:pointer;text-align:left;font:inherit}
 .bmmenu .bgmenul button:hover,.bmmenu .bgmenul button:focus-visible{background:var(--bg3)}
 .bmbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
@@ -56,7 +56,7 @@
 }
 /* 2.138.4 A (#2367): 44 px on a phone: iOS ignores min-height on a select (height instead, like .ofcset select); the tags get the height
    themselves (the pseudo box did not count the 1 px border: 42.5 px) */
-@media (pointer:coarse),(max-width:899px) {
+@media (pointer:coarse),(max-width:767px) {
   .bmdlg select,.bmbar select{height:2.75rem;line-height:1.25}
   .bmtag{min-height:2.75rem;box-sizing:border-box}
 }

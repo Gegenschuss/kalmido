@@ -245,7 +245,7 @@ function mg_sideRow(id, hid) {
   if (!mg_on(id) || (mg_sideHidden(id, hid) && !here) || o3a_hid(id)) return '';  // 2.83.0 (#1845)
   const rec = id === 'time' && (S.timer || S.pomo), req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0;
   const after = rec ? '<span class="c"><span class="recdot"></span></span>' : req ? `<span class="c nunread">${req}</span>` : '';
-  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(a[1])}<span class="n">${esc(tr(mg_nameKey(a)))}</span>${after}</button>`;
+  return `<button class="srow smod ${here ? 'on' : ''}" data-go="${mg_target(id)}" data-mgside="${id}">${ic(mg_icon(a))}<span class="n">${esc(tr(mg_nameKey(a)))}</span>${after}</button>`;
 }
 // [keys, name] for the sidebar editor (one check box per area, for all its parts)
 const mg_sideEntry = id => mg_on(id) ? [mg_sideKeys(id).join(','), mg_area(id)[2]] : null;
@@ -254,7 +254,7 @@ const MG_TAB_OLD = {'m:pomo': 'a:time', time: 'a:time', stats: 'a:review', 'm:fa
 const mg_tabIds = ids => ids ? [...new Set(ids.map(x => MG_TAB_OLD[x] || x))] : ids;
 function mg_tabItem(id) {
   const a = mg_area(id.slice(2)); if (!a || !mg_on(a[0])) return null;
-  return {id, go: mg_target(a[0]), icon: ic(a[1], 'l'), ico: a[1], label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
+  return {id, go: mg_target(a[0]), icon: ic(mg_icon(a), 'l'), ico: mg_icon(a), label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
 }
 const mg_tabOpts = opt => MG_IDS.filter(mg_on).map(id => opt('a:' + id, tr(mg_area(id)[2]))).join('');
 // ---- Settings > Modules: ONE switch per area; its parts below it (each can still be switched on its own)
@@ -302,7 +302,10 @@ const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org
 // name of Home there (only travel and staying in touch: not "Home")
 const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]));
 const O3A_LIFE_NAME = N_('Travel & contacts|area');
-const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : a?.[2];
+// 2.364.0 B (#3018): with Office & finance off the area is called and drawn like its first part on (Contacts, else Clients)
+const mg_ofOff = a => a?.[0] === 'office' && !officeOn() && mg_parts(a).length > 0;
+const mg_nameKey = a => a && a[0] === 'life' && o3a_orgView() ? O3A_LIFE_NAME : mg_ofOff(a) ? mg_parts(a)[0][2] : a?.[2];
+const mg_icon = a => mg_ofOff(a) ? mg_parts(a)[0][1] : a?.[1];
 const mg_partName = (m, n) => m === 'life' && o3a_orgView() ? O3A_LIFE_NAME : n;
 const o3a_hid = mod => !!mod && o3a_privOnly(mod) && o3a_orgView();
 // a tab bar / "More" item ({mod}) or a sidebar row (its data-go route) hidden in an organisation's view
@@ -320,15 +323,16 @@ function o3a_toPrivate(mod) {
 // The panel always follows the page (the page's area), so both always match. Phones keep the drawer and the tab bar.
 // [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
 // 2.208.0 (#2771): the area 'tasks' is called Projects (its entries stay tasks), icon proj instead of the tick
-const SBB_RAIL = [['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
+// 2.364.0 B (#3031): Start (the overview, route home) is the first icon, on the computer's bar and in the phone's drawer
+const SBB_RAIL = [['home', 'start', N_('Start|home'), () => true, ['home']], ['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
-const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, a[1], mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
+const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, mg_icon(a), mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
 // 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
 // Calendars window the head's button; Habits one entry; Time / Review two): on a computer no panel, the page takes the
 // width and an area's parts are the tabs on top (mg_tabsHtml). The phone's drawer keeps them (sbm_*)
-const SBB_NOPANEL = ['cal', 'habits', 'time', 'review'];
+const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home'];  // 2.364.0 B (#3031): Start has no panel either
 const sbb_noPan = (id = sbb_area()) => sbb_on() && SBB_NOPANEL.includes(id);
 // 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
 // mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)

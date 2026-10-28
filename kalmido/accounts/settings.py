@@ -24,7 +24,7 @@ from .layouts import LAYOUT_KEYS
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
@@ -64,6 +64,7 @@ SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo pla
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
+SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
 def clean_setting(k, v):
@@ -282,6 +283,10 @@ def clean_setting(k, v):
         return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
         return clean_cal_list(k, v)
+    if k == "start_page":  # 2.364.0 B (#3031)
+        if sv not in ("home", "inbox", "today", "last"):
+            raise bad
+        return sv
     if k == "side_icons":  # 2.36.0 (#1117)
         if sv not in ("line", "emoji", "dot"):
             raise bad
@@ -312,6 +317,10 @@ def clean_setting(k, v):
         return sv
     if k == "time_currency":
         return sv[:8]
+    if k in SETTINGS_FMT:  # 2.368.0 B (#2982): region / formats, '' = automatic
+        if sv not in SETTINGS_FMT[k]:
+            raise bad
+        return sv
     if k == "lang":
         return sv
     return sv[:200]

@@ -48,15 +48,16 @@ async function wpDraw(md) {
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 // 2.53.0 (#1410): SET_SECS lives in setcore.js (the command palette lists the sections)
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
-const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, projects of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
-  data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
+  data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
 const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
+  's-startpg': ['start_page', N_('Open the app on'), 'sel'],  // 2.364.0 B (#3031)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
   's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
@@ -88,12 +89,13 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-vext': ['video_ext_ok', N_('Load YouTube and Vimeo videos without asking'), 'chk'],  // 2.240.0 D (#2886)
   's-bl9ac': ['agent_comments', N_('Comments by agents'), 'sel'],  // 2.62.0 (#1854)
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
+  's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
-const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden', 'side_people', 'side_agents'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -192,6 +194,16 @@ async function setLang(code) {
     undo: () => setStep({lang: from}, {lang: code}, tr('Language')), redo: () => setStep({lang: code}, {lang: from}, tr('Language'))});
   setSaved(e);
 }
+// 2.368.0 B (#2982): region and formats; "Automatic" = from the language and the browser's region (popovers.js fmtPref)
+function fmtSetHtml(s, hint) {
+  const sel = (id, k, opts) => `<select id="${id}">${opts.map(([v, n]) => `<option value="${v}" ${(s[k] || '') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  const auto = tr('Automatic');
+  return `<h4 id="s-fmt-h">${tr('Region and formats')}</h4>
+      <div class="row"><label for="s-wkst">${tr('First day of the week')}</label>${sel('s-wkst', 'week_start', [['', auto], ['mon', WDL[1]], ['sun', WDL[0]]])}</div>
+      <div class="row"><label for="s-tfmt">${tr('Time format')}</label>${sel('s-tfmt', 'time_format', [['', auto], ['24', tr('24 hours ({0})', '14:30')], ['12', tr('12 hours ({0})', '2:30 PM')]])}</div>
+      <div class="row"><label for="s-dord">${tr('Date format')}</label>${sel('s-dord', 'date_order', [['', auto], ['dmy', '31.12.2026'], ['mdy', '12/31/2026'], ['ymd', '2026-12-31']])}</div>
+      ${hint(tr('Automatic follows the language and the region of this browser.'))}`;
+}
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
 // 2.53.0 (#1410): MOD_GROUPS lives in setcore.js (the first-start setup counts the modules)
@@ -259,6 +271,7 @@ const modCount = () => { const u = modUnits(modAll()); return tr('{0} of {1} mod
 function modCountsSync(md) {
   const t = $('#s-modtot', md); if (t) t.textContent = modCount();
   const pma = $('#s-modsall', md); if (pma) pma.checked = pm_allShown();  // 2.171.0 (#2676)
+  if (pma) pma.indeterminate = !pma.checked && pma_full().some(k => feat(k));  // 2.364.0 A (#3015): some modules on = the switch half
   for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
 }
 // 2.306.0 B (#2887): health and journal entries are special categories of personal data: a plain note in the module row
@@ -268,11 +281,11 @@ function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
   const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share projects, assign tasks, comment, or get News and collaboration notifications; shared projects are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
-  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${modPrivHtml([k])}${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
+  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr((!(S.me?.workspaces || []).length && FEAT_DESC_SOLO[k]) || MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${modPrivHtml([k])}${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
 // 2.46.6 (#1710): an admin switch that stays next to the own setting says so: "Admin · applies to everyone" + a jump to
 // the same switch under Administration (adSel = the id there)
-const ad_markHtml = adSel => `<span class="ad-mark"><span class="ad-tag">${tr('Admin · applies to everyone')}</span><button type="button" class="linkbtn ad-open" data-adopen="${adSel}">${tr('Open in Administration')}</button></span>`;
+const ad_markHtml = adSel => `<span class="ad-mark"><span class="ad-tag">${tr('Admin · applies to everyone')}</span><button type="button" class="linkbtn ad-open" data-adopen="${adSel}">${tr('Open under Server')}</button></span>`;  // 2.364.0 C (#3041): Administration is "Server"
 // 2.46.6 (#1710): Administration > Server > Whole server: collaboration and time tracking for everyone (the same switches
 // as in Modules, there with the mark above)
 function ad_allSwHtml() {
@@ -367,7 +380,7 @@ async function agSetupDraw(md) {
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
-  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Administration > Agents).')}</div>`)) + add;  // 2.361.4 (#2928)
+  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Settings > Organisation > Agents).')}</div>`)) + add;  // 2.361.4 (#2928); 2.364.0 C (#3041): the agents moved to Settings > Organisation
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
 }
 // 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
@@ -466,21 +479,31 @@ function aiSubShow(md, want, save) {
 // ---- 2.24.0 (#826): Settings > Administration in five sub-tabs (the pattern of Agents): People, Sign-in, Organisation,
 // Server, Log & errors. The last one is remembered per device; the settings search opens the sub-tab of its hit.
 // 2.46.6 (#1710): + Agents (the server-wide agent rules, the API log and the admins' usage alert, before in Settings > Agents)
-const ADM_SUBS = [['users', 'users', N_('People|admin')], ['signin', 'key', N_('Sign-in')], ['org', 'home', N_('Organisation')], ['agents', 'bot', N_('Agents')], ['server', 'grid', N_('Server')], ['log', 'alert', N_('Log & errors')]];
-const ad_admSubs = () => ADM_SUBS.filter(([k]) => k !== 'agents' || !!S.api?.enabled);  // agents need the API
-const ad_admFocus = f => ({users: 'users', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server'})[f];  // settingsModal(focus) -> sub-tab
-function admSubCur(want) { const k = want || LS.get('admSub', 'users'); return ad_admSubs().some(x => x[0] === k) ? k : 'users'; }
-function admSubsHtml(parts, want) {
-  const cur = admSubCur(want);
-  return `<div class="seg aisub admsub" role="tablist" aria-label="${esc(tr('Administration'))}">${ad_admSubs().map(([k, i, n]) => `<button type="button" role="tab" id="adms-${k}" data-admsub="${k}" aria-controls="admp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
-    ${ad_admSubs().map(([k]) => `<div class="aisp admp" data-admp="${k}" id="admp-${k}" role="tabpanel" aria-labelledby="adms-${k}" ${k === cur ? '' : 'hidden'}>${parts[k] || ''}</div>`).join('')}`;
+// 2.364.0 C (#3041): one place to manage: Settings > Organisation (People with invitations and roles, Agents, Data with
+// backups and exports) and Settings > Server (Sign-in, Server, Log) for the server's admins only. The sub-tab keys stay
+// (users / agents / signin / server / log; the old "Organisation" sub-tab is split into People, Agents and Data = odata);
+// the 4th field is the area. A jump to a sub-tab of the other area (settingsModal focus, data-admsub, data-adopen) opens it.
+const ADM_SUBS = [['users', 'users', N_('People|admin'), 'org'], ['agents', 'bot', N_('Agents'), 'org'], ['odata', 'download', N_('Data'), 'org'],
+  ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Log & errors'), 'users']];
+const ad_subSec = k => (ADM_SUBS.find(x => x[0] === k) || [])[3];
+const ad_admFocus = f => ({users: 'users', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
+const ad_subKey = sec => sec === 'org' ? 'orgSub' : 'admSub';  // remembered per device and area
+function admSubCur(sec, ks, want) { const k = (want && ad_subSec(want) === sec ? want : '') || LS.get(ad_subKey(sec), ks[0]); return ks.includes(k) ? k : ks[0]; }
+function admSubsHtml(sec, parts, want) {
+  const subs = ADM_SUBS.filter(([k, , , s]) => s === sec && parts[k]); if (!subs.length) return '';
+  const cur = admSubCur(sec, subs.map(x => x[0]), want);
+  return `${subs.length > 1 ? `<div class="seg aisub admsub" role="tablist" aria-label="${esc(tr(sec === 'org' ? 'Organisation' : 'Server'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="adms-${k}" data-admsub="${k}" aria-controls="admp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>` : ''}
+    ${subs.map(([k]) => `<div class="aisp admp" data-admp="${k}" id="admp-${k}" ${subs.length > 1 ? `role="tabpanel" aria-labelledby="adms-${k}"` : ''} ${k === cur ? '' : 'hidden'}>${parts[k]}</div>`).join('')}`;
 }
-function admSubShow(md, want, save) {
-  const k = admSubCur(want); if (save) LS.set('admSub', k);
-  $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
-  segReveal($(`[data-admsub="${k}"]`, md));
-  $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
-  if (k === 'org') actDraw(md);  // 2.143.0 D (#2156)
+function admSubShow(md, want, save, sec) {
+  sec = sec || ad_subSec(want); if (!sec) return;
+  const ks = $$('[data-admp]', md).map(p => p.dataset.admp).filter(k => ad_subSec(k) === sec); if (!ks.length) return;
+  if (want && ad_subSec(want) === sec && $('.snav [data-sec].on', md)?.dataset.sec !== sec && md._show) { md._show(sec); md._idx?.(false); }  // the other area
+  const k = admSubCur(sec, ks, want); if (save) LS.set(ad_subKey(sec), k);
+  $$('[data-admsub]', md).filter(b => ad_subSec(b.dataset.admsub) === sec).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  const sb = $(`[data-admsub="${k}"]`, md); if (sb) segReveal(sb);
+  $$('[data-admp]', md).filter(p => ad_subSec(p.dataset.admp) === sec).forEach(p => { p.hidden = p.dataset.admp !== k; });
+  if (k === 'users') actDraw(md);  // 2.143.0 D (#2156); 2.364.0 C (#3041): the activity per organisation is under People
   if (k === 'server' && typeof rt9_adminDraw === 'function') rt9_adminDraw(md);  // 2.59.0 B (#1375)
   if (k === 'agents') return Promise.all([ad_agPolicyDraw(md), audDraw(md)]);  // 2.46.6 (#1710): loaded when shown
 }
@@ -489,6 +512,14 @@ function ad_agentsHtml(hint) {
   if (!S.api?.enabled) return '';
   return `${agAdminPaneHtml(hint)}${notifMatrixHtml(S.settings, hint, true)}<h4 id="s-adlog-h">${tr('Log')}</h4>${audHtml()}`;
 }
+// 2.364.0 C (#3041): what the areas Organisation and Server load when shown (each draw skips what is not in the dialog)
+function ad_secDraw(md) {
+  if (!S.me?.is_admin) return;
+  aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md);  // 2.42.0 (#828): + ocAdminDraw
+}
+// 2.364.0 C (#3041): Organisation > Data: the encryption, export and retention export of the organisations I administer
+// (wsPaneDraw fills it; before inside each organisation under People)
+const wsDataHtml = hint => `<h4 id="s-wsdata-h">${tr('Organisation data')}</h4>${hint(tr('Encryption, recovery key and export of each organisation you manage.'))}<div id="s-wsdata" class="wsdata" aria-labelledby="s-wsdata-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 // Organisation: whether members may connect their own agents (#896, the policy user_agents of #420, off by default)
 function orgAgentsHtml(hint) {
   if (!S.api?.enabled) return '';
@@ -559,7 +590,7 @@ function hostWire(md) {
     try { await api('PUT', '/api/admin/announcement', body); } catch { return; }
     try { const j = await api('GET', '/api/about'); S.about = {...S.about, ...j}; } catch { /* keep */ }
     await load(); render(); toast(body.text ? tr('Notice published') : tr('Notice removed'));
-    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`) + bkHtml() + stoHtml(); bkDraw(md); }
+    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`); }  // 2.364.0 C (#3041): backups are under Organisation > Data
   });
 }
 function settingsModal(focus) {
@@ -572,7 +603,11 @@ function settingsModal(focus) {
       ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
   const pane = {
     account: S.me ? accountHtml() : '',
-    org: S.me && lmOrgPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : '',  // 2.39.1 (#1188): Settings > Organisation
+    // 2.39.1 (#1188): Settings > Organisation; 2.364.0 C (#3041): + the server admins' People, Agents and Data (was Administration)
+    org: S.me && (lmOrgPaneOn() || S.me.is_admin) ? admSubsHtml('org', {
+      users: (lmOrgPaneOn() ? wsPaneHtml(hint) : '') + (S.me.is_admin ? usersHtml() + grpHtml() + orphHtml() + orgsHtml() + actHtml() : ''),
+      agents: S.me.is_admin ? orgAgentsHtml(hint) + ad_agentsHtml(hint) : '',  // 2.46.6 (#1710)
+      odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) + bkHtml() + stoHtml() : '')}, ad_admFocus(focus)) : '',
     look: `<div id="s-lookin">${lookHtml()}</div>
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
       <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
@@ -606,6 +641,9 @@ function settingsModal(focus) {
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Quick add understands English, German and the language chosen here.'))}
+      <h4 id="s-startpg-h">${tr('Start page')}</h4>
+      <div class="row"><label for="s-startpg">${tr('Open the app on')}</label><select id="s-startpg">${START_PAGES.map(([v, n]) => `<option value="${v}" ${(s.start_page || 'home') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select></div>
+      ${fmtSetHtml(s, hint) /* 2.368.0 B (#2982) */}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
       ${hint(tr('Undated basket tasks as their own section in Today, with buttons to sort them.'))}
@@ -691,15 +729,13 @@ function settingsModal(focus) {
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
     assistant: asst_paneHtml(hint),  // 2.75.0 (#1411): only with a configured assistant
-    users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
-      users: usersHtml() + grpHtml() + orphHtml(),
+    users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
-      org: orgsHtml() + actHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
-      agents: ad_agentsHtml(hint),  // 2.46.6 (#1710)
-      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + bkHtml() + stoHtml() + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + asst_admHtml(),  // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
-      log: aaHtml()}, ad_admFocus(focus)) : '',  // 1.9.0: users first
+      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + asst_admHtml(),  // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
+      log: aaHtml()}, ad_admFocus(focus)) : '',
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
+      <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
       <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
@@ -725,14 +761,15 @@ function settingsModal(focus) {
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'users' : 'ai', agentpolicy: 'users', server: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
+    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
+  modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
   // 2.32.0 (#1060): a phone shows no area tabs inside an area, so the header names the area (the overview says "Settings")
   const head = () => { const h = $('.shdr h3', md); if (!h) return; const sec = isMobile() && !md.classList.contains('sidx') ? secs.find(x => x[0] === cur) : null; h.textContent = sec ? tr(sec[2]) : tr('Settings'); };
@@ -765,11 +802,11 @@ function settingsModal(focus) {
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
     if (k === 'integr') { icalDraw(md); calsDraw(md); }
-    if (k === 'access') acz_draw(md);  // 2.166.0 (#2633)
+    if (k === 'access') { acz_draw(md); const nb = $('.snav [data-sec="access"]', md); if (nb) nb.hidden = false; }  // 2.166.0 (#2633); 2.364.0 C (#3044): listed once opened
     if (k === 'notify') wpDraw(md);
-    if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }
+    if (k === 'users' || k === 'org') ad_secDraw(md);  // 2.364.0 C (#3041)
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
-    if (k === 'users') admSubShow(md);
+    if (k === 'users' || k === 'org') admSubShow(md, null, false, k);
     if (k === 'assistant' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411)
     if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
@@ -873,7 +910,7 @@ function settingsModal(focus) {
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
     [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
-    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
+    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
   const sq = $('#s-search', md);
@@ -912,14 +949,15 @@ function settingsModal(focus) {
   asst_setWire(md);  // 2.75.0 (#1411)
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
-  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus))).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
+  md._show = show;  // 2.364.0 C (#3041): a sub-tab of the other area opens that area (admSubShow)
+  if (cur === 'users' || cur === 'org') { ad_secDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus), false, cur)).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
     const b = e.target.closest('[data-adopen]'), el = b && $('#' + b.dataset.adopen, md); if (!el) return;
-    show('users'); idx(false); const ap = el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
+    const ap = el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true); else { show('users'); idx(false); }  // 2.364.0 C (#3041): its area
     const r = el.closest('label') || el;
     setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
   });
@@ -1031,6 +1069,10 @@ function settingsModal(focus) {
       return;
     }
     if (a === 'sample-add') { md.remove(); await sampleCreate(); return; }
+    if (a === 'practice-add') {  // 2.364.0 A (#3037): the "Getting started" list on request (invited members start without it)
+      md.remove(); let j; try { j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC, again: true}); } catch { return; }
+      await load(); if (j?.list_id) go('l/' + j.list_id); else render(); return;
+    }
     if (a === 'sample-rm') { b.disabled = true; try { await sampleRemove(); } finally { const r = $('#s-sample', md); if (r) r.innerHTML = sampleRowHtml(); } return; }
     if (a === 'test') { const j = await api('POST', '/api/ntfy/test'); toast(j.ok ? tr('Test sent') : tr('ntfy not reachable')); }
     if (a === 'ptest') { const j = await api('POST', '/api/push/test'); toast(j.ok ? tr('Test sent') : tr('Not delivered: no device accepted it and ntfy is not reachable')); }
@@ -1225,7 +1267,7 @@ async function cer_setList(el) {
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".
 const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
-function aaWhen(x) { return x ? new Date(x).toLocaleString(I18N.code || 'en', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
+function aaWhen(x) { return x ? fmtStamp(new Date(x)) : ''; }  // 2.368.0 B (#2982): one locale source
 async function aaDraw(md, j) {
   const box = $('#s-aa', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/alerts'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
@@ -1316,7 +1358,7 @@ function ad_updHtml(hint) {
     h += `<div class="shint updline"><b>${tr('v{0} installed — v{1} available', esc(a.version), esc(a.latest))}</b>${a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">${tr('Release notes')}</a>` : ''}</div>
       <div class="shelp">${tr('To update, run <code>~/kalmido/update.sh</code> (installed with the installer; it backs up the database first), or in the folder with docker-compose.yml: <code>docker compose pull && docker compose up -d</code> (prebuilt image) or <code>git pull && docker compose up -d --build</code> (built from source).')}</div>`;
   } else if (a.update_env && a.update_check && a.checked_at) {
-    const when = new Date(a.checked_at).toLocaleString(I18N.code || 'en');
+    const when = fmtStamp(new Date(a.checked_at));  // 2.368.0 B (#2982): one locale source
     h += hint(a.error ? tr('The last update check failed ({0}); it tries again later.', esc(a.error)) : a.latest ? tr('Up to date (checked {0}).', esc(when)) : tr('Checked {0}.', esc(when)));
   }
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
@@ -1365,7 +1407,7 @@ async function icalDraw(md, j) {
   // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
   if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
   const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button>`;
-  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', at.toLocaleDateString(LOCALE()))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
+  if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', fmtDateNum(at))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
   box.innerHTML = `<div class="row icalrow"><input id="s-icalurl" readonly value="${esc(j.url)}" aria-label="${tr('Subscription link')}"><button class="btn sm pri" data-m="ical-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>
     <div class="row"><a class="btn sm" href="${esc(j.url.replace(/^https?:/, 'webcal:'))}">${ic('cal', 's')} ${tr('Open in calendar app')}</a>${btns}</div>`;

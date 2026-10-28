@@ -116,7 +116,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
 
     // ================= #1060 Settings on the phone
     await ev(`(() => { settingsModal('ai'); return 1; })()`); await sleep(1500);
-    const st = await ev(`(() => { const m = document.querySelector('.smodal'), n = m.querySelector('.snav'), sub = m.querySelector('.aisub'), bs = [...sub.querySelectorAll('button')];
+    const st = await ev(`(() => { const m = document.querySelector('.smodal'), n = m.querySelector('.snav'), sub = m.querySelector('.aisub:not(.admsub)') /* 2.364.0 (#3041): the Organisation area has its own strip */, bs = [...sub.querySelectorAll('button')];
       const lbl = s => { const b = m.querySelector('#s-ags [data-ag="' + s + '"] .aglbl'); return b ? getComputedStyle(b).display !== 'none' && b.textContent : ''; };
       return {nav: getComputedStyle(n).display, back: getComputedStyle(m.querySelector('.sback')).display, h: m.querySelector('.shdr h3').textContent,
         flex: getComputedStyle(bs[0]).flexGrow, sc: sub.scrollWidth > sub.clientWidth, ox: getComputedStyle(sub).overflowX, test: lbl('test'), edit: lbl('edit'), over: document.documentElement.scrollWidth <= 390}; })()`);

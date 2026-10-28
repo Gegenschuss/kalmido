@@ -24,6 +24,10 @@
 .ctdate .chkl{min-width:0;color:var(--text);font-size:var(--fs-m);display:flex;align-items:center;gap:.375rem}
 .ctmulti .linkbtn{align-self:flex-start}
 .ctrow.ctro{opacity:.5}
+/* 2.364.0 B (#3018): "Quotations and invoices?" above the contacts while Office & finance is off */
+.ct18{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .75rem;padding:.5rem .75rem;margin:0 0 .5rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s);color:var(--muted)}
+.ct18>span{flex:1 1 auto}
+.ct18 .chkl{color:var(--text)}
 /* 2.351.0 B (#2749): the folder filter above the contacts list (ctfold.js) */
 .ctfbar{display:flex;align-items:center;gap:.5rem;padding:.375rem .75rem;margin:0 0 .5rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-m)}
 .ctfbar>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}

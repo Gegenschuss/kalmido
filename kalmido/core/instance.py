@@ -288,6 +288,8 @@ def admin_setup():
         sample_create(c, me())
     elif "sample" in b:
         uset(c, me(), "sample_ask", "0")  # decided here: the welcome tour does not ask again
+    if "sample" in b and b.get("sample") is not True and not pt:  # 2.364.0 A (#3016): "Empty" is empty: no "Getting started" list
+        uset(c, me(), "onboard", "done")
     gset(c, "setup_step2", "done")
     bump(c)
     c.commit()

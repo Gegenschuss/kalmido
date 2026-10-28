@@ -399,18 +399,37 @@ function dpLocale() {
 // 2.263.0 (#2977): a typed "3/10" is month / day where the region writes so (en-US: 10/23/2026), else day / month; without a
 // region (app language "en" on a browser of another language) day first. Quick add, the project table and the sheets use it.
 function mdFirst() {
+  const o = fmtPref('date_order'); if (o) return o === 'mdy';  // 2.368.0 B (#2982)
   const loc = dpLocale(); if (!loc.includes('-')) return false;
   try { const p = new Intl.DateTimeFormat(loc, {day: 'numeric', month: 'numeric'}).formatToParts(new Date(2000, 0, 2)).map(x => x.type); return p.indexOf('month') < p.indexOf('day'); } catch { return false; }
 }
+// 2.368.0 B (#2982): the person's choice in "Region and formats" (week_start, time_format, date_order); '' = automatic
+const fmtPref = k => (typeof S !== 'undefined' && S.settings && S.settings[k]) || '';
 function weekStart() {  // 0 = Sunday, 1 = Monday, 6 = Saturday
+  const p = fmtPref('week_start'); if (p) return p === 'sun' ? 0 : 1;
   try {
     const L = new Intl.Locale(dpLocale()), wi = typeof L.getWeekInfo === 'function' ? L.getWeekInfo() : L.weekInfo;
     if (wi && wi.firstDay) return wi.firstDay % 7;
     return DP_SUNDAY.has(L.maximize().region) ? 0 : 1;
   } catch { return 1; }
 }
-const hour12 = () => { try { return /h1[12]/.test(new Intl.DateTimeFormat(dpLocale(), {hour: 'numeric'}).resolvedOptions().hourCycle || ''); } catch { return false; } };
-const fmtTimeLoc = hm => { if (!/^\d\d:\d\d$/.test(hm || '')) return ''; const [h, m] = hm.split(':').map(Number); try { return new Date(2000, 0, 1, h, m).toLocaleTimeString(dpLocale(), {hour: hour12() ? 'numeric' : '2-digit', minute: '2-digit'}); } catch { return hm; } };
+const hour12 = () => { const p = fmtPref('time_format'); if (p) return p === '12'; try { return /h1[12]/.test(new Intl.DateTimeFormat(dpLocale(), {hour: 'numeric'}).resolvedOptions().hourCycle || ''); } catch { return false; } };
+// 2.368.0 B (#2982): every shown time goes through fmtTimeAt / fmtTimeLoc (12 / 24 h as chosen); input fields stay HH:MM
+const fmtTimeAt = (d, sec) => { const h = hour12(); try { return d.toLocaleTimeString(dpLocale(), {hour: h ? 'numeric' : '2-digit', minute: '2-digit', ...(sec ? {second: '2-digit'} : {}), hour12: h}); } catch { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; } };
+const fmtTimeLoc = hm => { if (!/^\d\d:\d\d$/.test(hm || '')) return ''; const [h, m] = hm.split(':').map(Number); return fmtTimeAt(new Date(2000, 0, 1, h, m)); };
+// a date in numbers: 03/10/2026, 03.10.2026 (app language) or the chosen order; year = false: day and month only
+function fmtDateNum(d, year = true) {
+  const o = fmtPref('date_order');
+  if (o) { const D = pad(d.getDate()), M = pad(d.getMonth() + 1), Y = d.getFullYear();
+    return o === 'ymd' ? (year ? `${Y}-${M}-${D}` : `${M}-${D}`) : o === 'mdy' ? `${M}/${D}${year ? '/' + Y : ''}` : `${D}.${M}.${year ? Y : ''}`; }
+  try { return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }
+}
+// a moment as numbers: date + time ("28/10/2026 14:05")
+const fmtStamp = (d, year = true) => `${fmtDateNum(d, year)} ${fmtTimeAt(d)}`;
+// a moment with the date in words: "28 Oct 2026, 14:05" (activity logs, versions)
+const fmtMoment = d => { try { return d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
+// weeks that keep Monday when automatic (dispatch, habit weeks), the chosen first day otherwise
+const weekOf = s => fmtPref('week_start') ? weekStartOf(s) : mondayOf(s);
 const fmtDateLoc = s => !/^\d{4}-\d\d-\d\d$/.test(s || '') ? '' : fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 const wdOrder = () => { const f = weekStart(); return [0, 1, 2, 3, 4, 5, 6].map(i => (i + f) % 7); };
 const weekStartOf = s => { const d = pd(s), k = (d.getDay() - weekStart() + 7) % 7; d.setDate(d.getDate() - k); return ds(d); };
@@ -481,7 +500,7 @@ function dpOpen(anchor, o) {
 }
 function dpPlace() {
   const el = DP.el; if (!el) return;
-  if (matchMedia('(max-width:899px)').matches) { el.classList.add('sheet'); return; }
+  if (matchMedia('(max-width:767px)').matches) { el.classList.add('sheet'); return; }  // 2.364.0 B (#3040): was 899 px
   const r = DP.anchor?.getBoundingClientRect?.() || {left: innerWidth / 2 - 150, bottom: innerHeight / 3, top: innerHeight / 3};
   const w = el.offsetWidth || 300, h = el.offsetHeight || 330;
   let x = Math.min(r.left, innerWidth - w - 12), y = r.bottom + 6;
@@ -513,7 +532,7 @@ function dpYears(y) {
 }
 function dpDrawTime() {
   const st = DP.st, el = DP.el, cur = st.sel || '', [ch, cm] = cur ? cur.split(':').map(Number) : [-1, -1], h12 = hour12();
-  const hl = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: h12 ? 'numeric' : '2-digit'}); } catch { return pad(h); } };
+  const hl = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: h12 ? 'numeric' : '2-digit', hour12: h12}); } catch { return pad(h); } };
   const hb = h => `<button type="button" role="option" class="${h === ch ? 'sel' : ''}" data-th="${h}" aria-selected="${h === ch}" aria-label="${esc(hl(h))}" tabindex="${h === (ch < 0 ? 9 : ch) ? 0 : -1}">${h12 ? (h % 12 || 12) : pad(h)}</button>`;
   const ap = h => { try { return new Date(2000, 0, 1, h).toLocaleTimeString(dpLocale(), {hour: 'numeric', hour12: true}).replace(/[\d\s\u202f]/g, '') || (h < 12 ? 'AM' : 'PM'); } catch { return h < 12 ? 'AM' : 'PM'; } };
   el.innerHTML = `<div class="tpk"><label class="tpl" for="dp-tin">${tr('Time')}</label><input id="dp-tin" class="tpin" value="${esc(fmtTimeLoc(cur) || '')}" inputmode="text" autocomplete="off" enterkeyhint="done" placeholder="${esc(fmtTimeLoc('09:30'))}"></div>
@@ -764,13 +783,14 @@ function taskMenu(anchor, id, o = {}) {
     // waiting
     ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
-      : {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
+      : hasPeers() ? {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)} : null].filter(Boolean) : []),  // 2.364.0 D (#3036): alone: no "Waiting on someone…" 
     // 2.23.0 (#463): an approval (a person of the shared list decides)
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
     // 2.218.0 A (#2799): with its state (a check when on); in a narrow task panel Pin and Lock are only here
     {label: t.pinned ? tr('Pinned') : tr('Pin'), icon: 'pin', on: !!t.pinned, fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
-    ...(inPanel && t.id > 0 && $('#detail .dtop .tlkb') ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),
+    ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
+    ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     {head: tr('Time|menu')},

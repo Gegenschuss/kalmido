@@ -199,7 +199,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   const row = d.querySelector(`#view .trow[data-id="${a2.id}"]`);
   row.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   await sleep(200);
-  check(/Waiting on someone…/.test(d.querySelector('#pop')?.textContent || ''), '#686: right-click on a row: the task menu with "Waiting on someone…"');
+  // 2.364.0 (#3036): alice shares no project yet (bob comes later): no "Waiting on someone…" while she works alone
+  check(/Pin/.test(d.querySelector('#pop')?.textContent || '') && !/Waiting on someone…/.test(d.querySelector('#pop')?.textContent || ''), '#686: right-click on a row: the task menu (alone: without "Waiting on someone…")');
   w.eval('closePop()');
   // quick add wartet:Kunde
   const qi = d.querySelector('#qinput');

@@ -25,6 +25,8 @@ const day = n => require('./testclock').day(n);  // the app's day (Berlin), cale
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, work_end: '23:59'});  // 2.122.4 (#1910): no evening review card, whatever the clock says
+  // 2.364.0 (#3031): Today shows the briefing only while Start is hidden in the bar (Start shows the day's overview)
+  await call('PATCH', '/api/settings', {sidebar: JSON.stringify({hidden: ['e:home']})});
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const BCK = await login('bob');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, BCK);

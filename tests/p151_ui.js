@@ -275,7 +275,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // 2.44.0 (#1187): the area tabs (Time: time tracking / focus timer) may stand above the page; the card is the first thing below them
   const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
   check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
-  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d\d:\d\d/.test(card().textContent), 'card: task, project, start time');
+  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d{1,2}:\d\d/.test(card().textContent), 'card: task, project, start time');  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
   w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await sleep(1300);
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);
   click(w, card().querySelector('.tvr-task')); await sleep(300);
@@ -288,7 +288,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => (await call('GET', '/api/state')).timer?.task_id === tt), 'one tap starts it again');
   await w.eval('timerStop()');
   const css2 = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
-  check(/@media \(max-width:899px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
+  check(/* 2.364.0 (#3040): the phone layout ends at 767 px */ /@media \(max-width:767px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
 
   // ================= (j) archived lists: one plain row "Archived" like Trash (1.6.1), a main view lists them
   w.eval(`go('today')`); await sleep(300);

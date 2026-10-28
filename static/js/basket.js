@@ -134,7 +134,7 @@ function kbSortBtn() {
 }
 const KB_ACTS = [['list', '1', 'list', N_('To a project')], ['me', '2', 'user', N_('Assign to me')], ['today', '3', 'sun', N_('Today')], ['tomorrow', '4', 'sunrise', N_('Tomorrow')],
   ['date', '5', 'cal', N_('Date…')], ['wait', '6', 'hourglass', N_('Waiting on someone')], ['del', '7', 'trash', N_('Delete')], ['skip', '0', 'right', N_('Skip')]];
-const kbActOn = a => a !== 'me' || (collab() && !!S.me);
+const kbActOn = a => (a !== 'me' && a !== 'wait') || (hasPeers() && !!S.me);  // 2.364.0 D (#3036): alone: no "Assign to me" / "Waiting on someone"
 function kbSortStart() {
   KB.ids = kbBasketOpen().map(t => t.id); KB.i = 0; KB.n = 0; KB.waitOpen = false;
   if (!KB.ids.length) { toast(tr('The basket is empty')); return; }
