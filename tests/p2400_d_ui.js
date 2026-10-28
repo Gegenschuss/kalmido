@@ -99,7 +99,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 8 + 9: reminder list and editor
-  w = await boot({hash: 'office/offers'}); d = w.document;
+  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
   await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
   await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);
