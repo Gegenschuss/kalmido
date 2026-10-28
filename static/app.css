@@ -2213,7 +2213,6 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp > .btn.pri{flex:none;width:2.75rem;height:2.75rem;min-width:0;padding:0;border-radius:50%}
   .chcomp > .btn.pri > span{display:none}
   .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
-  .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
   /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
 /* 2.350.0 A (#2793): the desktop composer: tools, box, Stop and Send on one line with one height (2.75rem, the touch size) and one rounding;
@@ -2223,7 +2222,7 @@ button.tvr-task:hover{color:var(--accent)}
 @media (min-width:900px){
   .chcomp{gap:.375rem;padding:.5rem .75rem;align-items:flex-end}
   .chcomp textarea{min-height:2.75rem;padding:.6875rem .75rem;border-radius:var(--radius)}
-  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chstop,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
   .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
   .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
 }

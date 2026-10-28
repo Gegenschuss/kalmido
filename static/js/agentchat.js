@@ -684,7 +684,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   // 2.152.2 C (#2627): filter, long messages and steps live in this menu (the header shows only search + menu)
   const filt = !S.chat.job && S.jcd.n;
-  menu(b, [...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
+  menu(b, [...chatStopItem(agentById(S.chat.aid)), ...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
     {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
     {label: tr('Chat settings'), icon: 'cog', fn: () => acset_open()},  // 2.233.0 A (#2848)
@@ -795,7 +795,7 @@ function chatInner(aid) {
     ${chatStepsLiveHtml()}
     <div class="mtgcards" id="chat-mtg">${mtg_cardsHtml(a.id)}</div>
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    <div class="acsug" id="chat-sug" hidden></div>${replyBarHtml('a:' + a.id)}<div class="chcomp${gcs}">${chatAbortHtml(a)/* 2.290.0 B (#3146): Stop at the left edge, away from Send */}${chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled || jc_ended()) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <div class="acsug" id="chat-sug" hidden></div>${replyBarHtml('a:' + a.id)}<div class="chcomp${gcs}">${chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled || jc_ended()) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
@@ -939,14 +939,20 @@ function chatBusy(a) {
 const chatAbortKey = () => `${S.chat.aid}:${S.chat.job?.id || ''}`;
 const chatAbortWaits = () => S.chat.abortAt?.k === chatAbortKey() && Date.now() - S.chat.abortAt.t < CHAT_ABORT_WAIT;
 const chatAbortTip = () => tr('Stop the answer ({0})', IS_MAC ? 'Esc · Ctrl+C · Cmd+.' : 'Esc · Ctrl+C');
-function chatAbortHtml(a) {
-  const on = chatBusy(a), wait = on && chatAbortWaits(), t = wait ? tr('Stopping…') : isTouch() ? tr('Stop the answer') : chatAbortTip();
-  return `<button type="button" class="iconbtn chstop" id="chat-stop" data-act="chat-abort" title="${esc(t)}" aria-label="${esc(t)}"${on ? '' : ' hidden'}${wait ? ' disabled' : ''}>${ic('stop', 's')}</button>`;
+// 2.411.0 (#3446): on every device Stop left the box: it is the first entry of the header's ⋯ menu (red, only
+// while the agent works for me, "Stopping…" while it waits); the ⋯ button carries a red dot meanwhile (jcd_fbtnHtml); the keys stay
+function chatStopItem(a) {
+  if (!chatBusy(a)) return [];
+  const wait = chatAbortWaits();
+  return [{label: wait ? tr('Stopping…') : tr('Stop the answer'), icon: 'stop', cls: 'chmi-stop', dis: wait, title: wait ? '' : chatAbortTip(),
+    keys: wait ? '' : 'Esc', fn: () => chatAbort()}, '-'];
 }
 function chatAbortSync() {
-  const b = $('#chat-stop'); if (!b) return;
+  if (!$('#jcd-fbtn')) return;
   const a = agentById(S.chat.aid); if (!chatBusy(a) && S.chat.abortAt?.k === chatAbortKey()) S.chat.abortAt = null;
-  const h = chatAbortHtml(a); if (!wk_sameEl(b, h)) b.outerHTML = h;
+  jcd_patch();
+  // an open ⋯ menu: its Stop entry goes with the run
+  const mi = $('#pop:not(.hidden) .chmi-stop'); if (mi && !chatBusy(a)) closePop();
 }
 async function chatAbort() {
   const a = agentById(S.chat.aid); if (!chatBusy(a) || chatAbortWaits()) return;

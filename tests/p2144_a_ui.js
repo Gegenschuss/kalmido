@@ -2,8 +2,8 @@
 // - #2419: no filter row above the messages, the filter icon in the chat header (also wide), its menu, the dot while not "All"
 // - #2416: "Only me and <agent>": my messages + the main agent's; a job's result WITH buttons is left out, an open approval of
 //   the job stays; "Jobs": the card, the job's result with buttons and its approval, not the plain answer
-// - #2412: while the agent works a Stop button next to Send (tooltip names the keys); a press / Esc sends the event abort
-//   (the agent sees it), the button waits; the agent's confirmation hides it; Ctrl+C with a selection stays Copy; an open
+// - #2412: while the agent works Stop (2.411.0 #3446: the first entry of the ⋯ menu, a red dot on ⋯; tooltip names the keys); a press / Esc sends the event abort
+//   (the agent sees it), the entry waits; the agent's confirmation removes it; Ctrl+C with a selection stays Copy; an open
 //   menu keeps its Esc; in a job's history Stop carries the job_id
 // - 2.144.0 A2 (#2412): Stop only for a run for me ("working" alone, with no typing to me and no message of mine waiting,
 //   is someone else's run: no button); Esc in the open message search closes the search, not the answer
@@ -129,50 +129,53 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(row(plain) && d.querySelector('.jcd') && !fbtn().querySelector('.jcdfdot') && !fbtn().classList.contains('jcdfon'), 'All: everything again, no dot');
 
   // ================= #2412 Stop
-  const stopB = () => d.querySelector('#chat-stop'), ci = () => d.querySelector('#chat-in');
-  check(stopB() && stopB().hidden, 'idle: the Stop button is hidden');
+  // 2.411.0 (#3446): Stop left the box: it is the first entry of the ⋯ menu (red), the ⋯ button has a red dot (chbusy) meanwhile
+  const ci = () => d.querySelector('#chat-in'), busy = () => !!fbtn()?.classList.contains('chbusy');
+  const stopIt = async () => { w.eval('closePop()'); click(w, fbtn()); await until(() => d.querySelector('#pop:not(.hidden) [role=menuitem]')); return d.querySelector('#pop:not(.hidden) .chmi-stop'); };
+  check(!d.querySelector('#chat-stop, .chcomp .chstop'), 'no Stop button in the box any more (#3446)');
+  check(!busy() && !(await stopIt()), 'idle: no dot, no Stop in the menu'); w.eval('closePop()');
   // 2.144.0 A2 (#2412): a run for me = "working" + its typing signal to me (what the launcher sends while it answers)
-  const working = async () => { await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); await v1('POST', '/agent/typing', {chat_user_id: me.id}); w.eval('agentPoll()'); await until(() => stopB() && !stopB().hidden, 40); };
+  const working = async () => { await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); await v1('POST', '/agent/typing', {chat_user_id: me.id}); w.eval('agentPoll()'); await until(() => busy(), 40); };
   const aborts = async () => ((await v1('GET', '/agent/events?since=0')).data || []).filter(e => e.event === 'abort');
   // "working" while a job of the agent runs is the job's: no Stop in the main chat
   await v1('PUT', '/agent/status', {status: 'working', text: 'Job: Knox'}); await w.eval('jc_sync(true)'); w.eval('agentPoll()'); await sleep(1500);
-  check(stopB() && stopB().hidden, 'a job runs: its "working" shows no Stop in the main chat');
+  check(!busy(), 'a job runs: its "working" shows no Stop in the main chat');
   await v1('PATCH', `/agent/jobs/${J}`, {state: 'done'}); await w.eval('jc_sync(true)');
   // 2.144.0 A2: "working" without typing to me and without a message of mine waiting = someone else's run: no Stop
   await v1('PUT', '/agent/status', {status: 'working', text: 'Answering in the chat'}); w.eval('agentPoll()'); await sleep(1500);
-  check(stopB() && stopB().hidden && w.eval(`chatBusy(agentById(${CL}))`) === false, 'working for someone else: no Stop for me (#2412 A2)');
+  check(!busy() && w.eval(`chatBusy(agentById(${CL}))`) === false, 'working for someone else: no Stop for me (#2412 A2)');
   await working();
-  check(stopB() && !stopB().hidden && !stopB().disabled, 'working: the Stop button shows');
-  // 2.290.0 B (#3146): Stop at the left edge of the box, before the textarea; Send stays last
-  check(stopB().parentElement === stopB().closest('.chcomp') && stopB().parentElement.firstElementChild === stopB()
-        && (stopB().compareDocumentPosition(ci()) & 4) && (ci().compareDocumentPosition(d.querySelector('[data-act="chat-send"]')) & 4), 'Stop: first in the box, before the text field and Send (#3146)');
-  check(stopB().closest('.chcomp') && /Esc/.test(stopB().title) && /Ctrl\+C/.test(stopB().title) && stopB().querySelector('svg, .i, i'), 'Stop: an icon, the tooltip names the keys');
-  click(w, stopB());
+  check(busy() && /Stop the answer/.test(fbtn().title), 'working: the ⋯ button has the dot and names Stop (#3446)');
+  let it = await stopIt();
+  const all = [...d.querySelectorAll('#pop:not(.hidden) [role=menuitem]')];
+  check(it && all[0] === it && !it.disabled && /Stop the answer/.test(it.textContent) && /Esc/.test(it.title) && /Ctrl\+C/.test(it.title), 'Stop: the first menu entry, the tooltip names the keys (#3446)');
+  click(w, it);
   await until(async () => (await aborts()).length === 1);
   let ab = await aborts();
   check(ab.length === 1 && ab[0].data.user.id === me.id && !ab[0].data.job_id, 'the press sends abort to the agent');
-  await until(() => stopB()?.disabled);
-  check(stopB().disabled && /Stopping/.test(stopB().title), 'the button waits: Stopping…');
+  it = await stopIt();
+  check(it && it.disabled && /Stopping/.test(it.textContent), 'the entry waits: Stopping…');
+  w.eval('closePop()');
   await v1('POST', '/agent/aborted', {seq: ab[0].seq});
   w.eval('agentPoll()');
-  await until(() => stopB()?.hidden);
-  check(stopB().hidden, 'confirmed by the agent: the button goes');
+  await until(() => !busy());
+  check(!busy(), 'confirmed by the agent: the dot goes');
   // Esc in the box sends it too
   await working();
   ci().focus(); key(w, ci(), 'Escape');
   await until(async () => (await aborts()).length === 2);
   check((await aborts()).length === 2 && d.querySelector('#chat-msgs'), 'Esc while working: abort, the chat stays open');
-  await v1('POST', '/agent/aborted', {}); w.eval('agentPoll()'); await until(() => stopB()?.hidden);
+  await v1('POST', '/agent/aborted', {}); w.eval('agentPoll()'); await until(() => !busy());
   // Ctrl+C with a selection stays Copy (Windows / Linux); an open menu keeps its Esc
   await working();
   ci().value = 'copy me'; ci().focus(); ci().setSelectionRange(0, 4);
   key(w, ci(), 'c', {ctrlKey: true}); await sleep(600);
-  check((await aborts()).length === 2 && !stopB().disabled, 'Ctrl+C with a selection: no abort');
+  check((await aborts()).length === 2 && !w.eval('chatAbortWaits()'), 'Ctrl+C with a selection: no abort');
   ci().setSelectionRange(7, 7);
   key(w, ci(), 'c', {ctrlKey: true});
   await until(async () => (await aborts()).length === 3);
   check((await aborts()).length === 3, 'Ctrl+C without a selection: abort');
-  await v1('POST', '/agent/aborted', {}); w.eval('agentPoll()'); await until(() => stopB()?.hidden);
+  await v1('POST', '/agent/aborted', {}); w.eval('agentPoll()'); await until(() => !busy());
   await working();
   click(w, fbtn()); await until(() => d.querySelector('[role=menuitem]'));
   key(w, d.querySelector('[role=menuitem]'), 'Escape'); await sleep(600);
@@ -187,9 +190,10 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await w.eval('jc_sync(true)');
   w.eval(`jc_enter(${CL}, {id: ${J2}})`);
   await until(() => d.querySelector('#jc-bar'));
-  await w.eval('jc_sync(true)'); w.eval('chatPatch({})'); await until(() => stopB() && !stopB().hidden, 40);
-  check(stopB() && !stopB().hidden, 'a running job\'s history: Stop shows');
-  click(w, stopB());
+  await w.eval('jc_sync(true)'); w.eval('chatPatch({})'); await until(() => busy(), 40);
+  it = await stopIt();
+  check(busy() && it, 'a running job\'s history: the dot and Stop in the menu');
+  if (it) click(w, it);
   await until(async () => (await aborts()).length === 4);
   ab = await aborts();
   check(ab.length === 4 && ab[3].data.job_id === J2, 'Stop in a job\'s history carries the job_id');
