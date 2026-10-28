@@ -53,6 +53,20 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wktoc ul{margin:.25rem 0;padding-left:1.25rem}
 .wktoc>ul{padding-left:1rem}
 .wktoc li{margin:.125rem 0}
+/* 2.371 (#3150): tags (links in the text, the phone's list, a tag's pages) and the ```abfrage block */
+.wktag{color:var(--accent);text-decoration:none;white-space:nowrap}
+.wktag:hover{text-decoration:underline}
+.wktags{border-top:1px solid var(--line);margin-top:.5rem;padding:.5rem .75rem}
+.wktags h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
+.wktags p{margin:0;display:flex;flex-wrap:wrap;gap:.25rem .75rem;line-height:2.25}
+.wktagh{display:flex;align-items:center;gap:.375rem}
+.wkq{margin:.5rem 0}
+.wkqlist,.wkqtasks{margin:.25rem 0;padding-left:1.25rem}
+.wkqtasks{list-style:none;padding-left:.25rem}
+.wkqlist li,.wkqtasks li{margin:.125rem 0}
+.wkqtasks input{margin:0 .25rem 0 0;vertical-align:middle}
+.wkqt{width:100%}
+.wkqerr,.wkqmore{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);margin:.25rem 0}
 .wksmore{margin:.375rem 0 0 .25rem}
 .wkfiles{border-top:1px solid var(--line);padding-top:.5rem}
 .wkfiles h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:var(--fs-s);color:var(--muted)}

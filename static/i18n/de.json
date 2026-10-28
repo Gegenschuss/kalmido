@@ -14883,5 +14883,10 @@
   "At most {0} portals": "Höchstens {0} Portale",
   "Report the portal first (PUT /fetcher/status)": "Melde das Portal zuerst (PUT /fetcher/status)",
   "The portal {0} is switched off in Kalmido": "Das Portal {0} ist in Kalmido ausgeschaltet",
-  "At most {0} receipt fetchers": "Höchstens {0} Beleg-Abholer"
+  "At most {0} receipt fetchers": "Höchstens {0} Beleg-Abholer",
+  "No page has this tag.": "Keine Seite hat diesen Tag.",
+  "Not understood: {0}": "Nicht verstanden: {0}",
+  "{0} of {1} shown": "{0} von {1} angezeigt",
+  "No open checkbox matches.": "Keine offene Checkbox passt.",
+  "No page matches this query.": "Keine Seite passt zu dieser Abfrage."
 }

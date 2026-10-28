@@ -213,6 +213,7 @@ ORDER = (
     "wiki.wikiatt",  # 2.99.0 A (#2182): files of knowledge pages (upload, ZIP import / export)
     "wiki.wkshare",  # 2.123.0 B (#2104): read-only shares of pages / folders (people, public link)
     "wiki.wkhist", "wiki.wksearch",  # 2.123.0 A (#2105, #2102, #2106): texts sealed at rest, page history, word index
+    "wiki.wktags",  # 2.371 (#3150): tags of pages (hashes in the word index) and the ```abfrage block
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.fsref",  # 2.199.0 A (#2742): reference nodes -- office documents / sheets filed in folders (no routes; the register)
     "files.fsroots",  # 2.199.0 C (#2742): an area's root folder in a workspace's tree (fs_area_roots; no routes)

@@ -14883,5 +14883,10 @@
   "At most {0} portals": "{0} portails au maximum",
   "Report the portal first (PUT /fetcher/status)": "Signalez d’abord le portail (PUT /fetcher/status)",
   "The portal {0} is switched off in Kalmido": "Le portail {0} est désactivé dans Kalmido",
-  "At most {0} receipt fetchers": "{0} récupérateurs de justificatifs au maximum"
+  "At most {0} receipt fetchers": "{0} récupérateurs de justificatifs au maximum",
+  "No page has this tag.": "Aucune page n’a ce tag.",
+  "Not understood: {0}": "Non compris : {0}",
+  "{0} of {1} shown": "{0} sur {1} affichés",
+  "No open checkbox matches.": "Aucune case ouverte ne correspond.",
+  "No page matches this query.": "Aucune page ne correspond à cette requête."
 }

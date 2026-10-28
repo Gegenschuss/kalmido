@@ -14883,5 +14883,10 @@
   "At most {0} portals": "Hoogstens {0} portalen",
   "Report the portal first (PUT /fetcher/status)": "Meld het portaal eerst (PUT /fetcher/status)",
   "The portal {0} is switched off in Kalmido": "Het portaal {0} staat uit in Kalmido",
-  "At most {0} receipt fetchers": "Hoogstens {0} bonnenophalers"
+  "At most {0} receipt fetchers": "Hoogstens {0} bonnenophalers",
+  "No page has this tag.": "Geen pagina heeft deze tag.",
+  "Not understood: {0}": "Niet begrepen: {0}",
+  "{0} of {1} shown": "{0} van {1} getoond",
+  "No open checkbox matches.": "Geen open selectievakje past.",
+  "No page matches this query.": "Geen pagina past bij deze zoekopdracht."
 }
