@@ -7,11 +7,16 @@ Both are plain invoices (kind invoice, the invoice number series) with office_do
   progress invoice and tax rate (finalised, not cancelled; office_docs.abs_refs = their ids). The deduction as negative
   lines keeps the tax per rate right in the e-invoice (BT-113 prepaid would deduct gross without tax); type 380.
   Finalising checks that the progress invoices are still the same (one cancelled or a new one = draft it anew).
+  2.408.0 (#3520, BMF letter of 15.10.2026 no. 3): the stored items and totals stay so (books, VAT return and open items
+  keep the remaining amount), but the print model (abs_render -> abs_prepaid_view) moves the deduction lines out of the
+  positions: the PDF shows the whole service, then each progress invoice below the total and the remaining amount; the
+  e-invoice carries the full sums, the progress invoices' gross as BT-113 (paid amount) and one line each in BT-22.
 - Skonto: office_docs.skonto_pct / skonto_days per invoice (default from the office settings, empty = none). The PDF
   prints the line under the payment terms, the e-invoice carries the XRechnung line #SKONTO#TAGE=n#PROZENT=p.pp# in BT-20.
   Payments dated within the period that reach gross - discount (with credit notes) make the invoice paid.
 Without inv_type / skonto (old documents) nothing changes."""
 import json
+import re
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -22,7 +27,7 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import write_lock  # 2.360.0 B (#2496)
 from ..core.errors import BadInput
-from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, inv_calc, money
+from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, fmt_qty, inv_calc, label, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
 from . import invoices as _inv  # 2.355.0 C (#2840); 2.354.0 B (#2836): the module, invoices imports abschlag too (cycle)
 from .pdf import pdf_date  # 2.296.0 B (#3175)
@@ -412,7 +417,70 @@ def abs_before_finalize(c, oid, r, items=None):
         raise BadInput(tr("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
 
 
-def abs_render(r, m, L, lang):
+def abs_prepaid_view(m, L, lang, pack=None):
+    """2.408.0 (#3520): the deduction lines of a final invoice (written by abs_deductions, known by their title) leave its
+    positions. m["abs_prepaid"] = [{title, detail, tax, pct, net, vat, gross}], m["abs_full"] = {net, tax, gross, tax_lines,
+    prepaid, note, tax_eur?}: the whole service (the remaining amount + the progress invoices) for the e-invoice, and the
+    totals rows: subtotal, VAT and total of the whole service, each progress invoice (gross) and the remaining amount. The
+    tax of a deduction is its net x rate (as on its progress invoice: one position per rate there). Nothing without them."""
+    lines = m.get("lines") or []
+    rx = re.compile("^" + re.escape(_t("deduct", lang, num="QQNUMQQ", date="QQDATEQQ")).replace("QQNUMQQ", ".+?").replace("QQDATEQQ", ".+?") + "$")
+    ded = [ln for ln in lines if isinstance(ln, dict) and ln.get("kind") == "discount" and rx.match(str(ln.get("title") or ""))]
+    if not ded:
+        return
+    head = _t("heading", lang)
+    m["lines"] = [ln for ln in lines if not any(ln is d for d in ded) and not (isinstance(ln, dict) and ln.get("kind") == "heading" and ln.get("title") == head)]
+    tot = m.get("totals") or {}
+    cur = tot.get("currency") or m.get("currency") or "EUR"
+    tls = {tl.get("rate_key"): dict(tl) for tl in tot.get("tax_lines") or [] if isinstance(tl, dict)}
+    novat = (tot.get("vat_mode") or m.get("vat_mode")) == "novat"
+    out, titles = [], [str(ln.get("title") or "") for ln in ded]
+    for ln in ded:
+        net = abs(money(dec(ln.get("net") if ln.get("net") not in (None, "") else ln.get("total") or 0)))
+        pct = Decimal(0) if novat else dec(ln.get("tax_pct") or 0)
+        vat = money(net * pct / 100)
+        k = ln.get("tax") if ln.get("tax") in TAX_KEYS else "standard"
+        title = str(ln.get("title") or "")
+        if titles.count(title) > 1:  # one progress invoice with several rates: the rate tells the rows apart
+            title += f" ({_pct_text(pct, lang)} %)"
+        out.append({"title": title, "detail": str(ln.get("detail") or ""), "tax": k, "pct": format(pct.normalize(), "f"),
+                    "net": dstr(net), "vat": dstr(vat), "gross": dstr(net + vat)})
+        if novat:
+            continue
+        tl = tls.get(k)
+        if tl is None:  # the rate is billed in full by progress invoices (no remaining amount at it)
+            tl = tls[k] = {"rate_key": k, "pct": format(pct.normalize(), "f"), "base": "0.00", "amount": "0.00",
+                           "label": label(pack, lang, "tax_" + k, pct=fmt_qty(pct, lang))}
+        tl["base"], tl["amount"] = dstr(dec(tl.get("base") or 0) + net), dstr(dec(tl.get("amount") or 0) + vat)
+        tl["base_text"], tl["amount_text"] = fmt_money(tl["base"], lang, cur), fmt_money(tl["amount"], lang, cur)
+    s_net, s_vat = sum((dec(x["net"]) for x in out), Decimal(0)), sum((dec(x["vat"]) for x in out), Decimal(0))
+    full = {"net": dstr(dec(tot.get("net") or 0) + s_net), "tax": dstr(dec(tot.get("tax") or 0) + s_vat),
+            "gross": dstr(dec(tot.get("gross") or 0) + s_net + s_vat), "prepaid": dstr(s_net + s_vat),
+            "tax_lines": [tls[k] for k in TAX_KEYS if k in tls],
+            "note": "\n".join([head] + [f"{x['title']}: {x['detail']}" if x["detail"] else x["title"] for x in out])}
+    if tot.get("tax_eur") not in (None, "") and dec(tot.get("fx_rate") or 0) > 0:  # 2.189.0 (#2475): the tax in the home currency too
+        full["tax_eur"] = dstr(dec(tot["tax_eur"]) + s_vat / dec(tot["fx_rate"]))
+    m["abs_prepaid"], m["abs_full"] = out, full
+    if not isinstance(tot.get("rows"), list):
+        return
+    lab = L.get("invoice_total", tr("Total|invoice", lg=lang))
+    rows = tot["rows"]
+    at = next((i for i, x in enumerate(rows) if x and x[0] == lab), None)
+    if at is None:
+        return
+    new = [[L.get("subtotal", tr("Subtotal|document", lg=lang)), fmt_money(full["net"], lang, cur)]]
+    for tl in full["tax_lines"]:
+        tlab = tl.get("label") or ""
+        if tlab:
+            tlab = tr(_inv.INV_TAX_ON, tlab, tl.get("base_text") or fmt_money(tl.get("base") or 0, lang, cur), lg=lang)
+        new.append([tlab, tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
+    new.append([lab, fmt_money(full["gross"], lang, cur), {"b": 1}])
+    new += [[x["title"], fmt_money(-dec(x["gross"]), lang, cur), {"detail": x["detail"]}] for x in out]
+    new.append([_t("rest", lang), rows[at][1]])
+    tot["rows"] = new + rows[at + 1:]  # the paid / outstanding rows stay below
+
+
+def abs_render(r, m, L, lang, pack=None):
     """The print model of invoices.inv_render: the title of a progress / final invoice, its type code, the remaining
     amount of a final invoice and the cash discount line under the payment terms."""
     typ = _col(r, "inv_type") or ""
@@ -421,7 +489,9 @@ def abs_render(r, m, L, lang):
     if m["inv_type"]:
         m["title"] = L.get(typ + "_invoice") or tr(ABS_TITLE[typ], lg=lang)
     tot = m.get("totals") or {}
-    if m["inv_type"] == "final" and isinstance(tot.get("rows"), list):
+    if m["inv_type"] == "final":
+        abs_prepaid_view(m, L, lang, pack)  # 2.408.0 (#3520): the progress invoices below the total (rows end with the remaining amount)
+    if m["inv_type"] == "final" and isinstance(tot.get("rows"), list) and not m.get("abs_prepaid"):
         lab = L.get("invoice_total", tr("Total|invoice", lg=lang))
         tot["rows"] = [[_t("rest", lang), x[1]] if x and x[0] == lab else x for x in tot["rows"]]
     m["skonto"] = None

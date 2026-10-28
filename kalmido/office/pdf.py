@@ -1546,11 +1546,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     raw_opt = next((x for x in lines if x.get("kind") == "raw" and x.get("optional")), None)
     raw_inc = next((x for x in lines if x.get("kind") == "raw" and not x.get("optional")), None)
     show_tax = tot.get("show_tax_lines")
+    p3o = {}
     if isinstance(tot.get("rows"), list) and tot["rows"]:  # the print model brings the rows ready-made (first = net total)
         given = [r for r in tot["rows"] if isinstance(r, (list, tuple)) and len(r) >= 2]
         # 2.38.0: an invoice's rows already end with the tax lines and the grand total (show_tax_lines true) -> last row bold
-        rows = [(str(r[0]), str(r[1]), i == 0 or ((bool(show_tax) or (m.get("kind") or "offer") != "offer") and len(given) > 1 and i == len(given) - 1))
+        rows = [(str(r[0]), str(r[1]), i == 0 or ((bool(show_tax) or (m.get("kind") or "offer") != "offer") and len(given) > 1 and i == len(given) - 1)
+                 or ("b" if len(r) > 2 and isinstance(r[2], dict) and r[2].get("b") else False))
                 for i, r in enumerate(given)]
+        # 2.408.0 (#3520): a row may bring {"b": 1} (bold, like a sum) and {"detail": text} (small below, like the option's detail)
+        p3o = {str(r[0]): str(r[2]["detail"]) for r in given if len(r) > 2 and isinstance(r[2], dict) and r[2].get("detail")}
         show_tax = False
     else:
         rows = [(L["net"], tot.get("net_text") or money(tot.get("net") or 0), True)]
@@ -1567,7 +1571,6 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if tot.get("gross") not in (None, ""):
             rows.append((L["gross"], money(tot.get("gross")), True))
     # 2.114.5 (#2300): the option as three rows of the totals (net, + option, net with option) instead of the dashed box
-    p3o = {}
     if raw_opt:
         inc_l = str(ml.get("incl_raw") or L["incl_raw"])
         inc_t = str(tot.get("net_incl_raw_text") or (money(tot["net_incl_raw"]) if tot.get("net_incl_raw") not in (None, "") else ""))
@@ -1582,7 +1585,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                               m.get("valid_note") if not m.get("valid_until") else None) if x and str(x).strip()]
     notes = list(dict.fromkeys(notes))
     note = "\n".join(notes)
-    tot_w = 230 if raw_opt else 190  # 2.114.5 (#2300): room for the option's name
+    tot_w = 230 if raw_opt or m.get("abs_prepaid") else 190  # 2.114.5 (#2300): room for the option's name; 2.408.0 (#3520): the progress invoices
     left_w = PDF_CW - tot_w - 20
     note_lines = pdf_wrap(note, 8.4, left_w) if note else []
     # 2.114.5 (#2300): a long label (the option's name) wraps beside its amount, the option's detail small below it

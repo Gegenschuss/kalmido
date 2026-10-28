@@ -263,6 +263,19 @@ def _party(parent, tag, name, fields, lang, home, contact=False, email=None, leg
     return p
 
 
+def _abs_full(m):
+    """2.408.0 (#3520, BMF letter of 15.10.2026 no. 3): (totals, prepaid, note) of a print model. A final invoice whose
+    deduction lines abschlag.abs_prepaid_view took out of the lines: the totals of the whole service (tax per rate, gross,
+    tax in the home currency), the progress invoices' gross as prepaid (BT-113, with the payments) and their details as
+    one note (BT-22). Else the totals as they are, 0, ''."""
+    tot = m.get("totals") or {}
+    full = m.get("abs_full")
+    if m.get("kind") != "invoice" or not isinstance(full, dict) or not m.get("abs_prepaid"):
+        return tot, Decimal("0"), ""
+    tot = {**tot, "tax_lines": full.get("tax_lines") or [], "gross": full.get("gross"), **({"tax_eur": full["tax_eur"]} if full.get("tax_eur") else {})}
+    return tot, _d(full.get("prepaid")).quantize(Q2, rounding=ROUND_HALF_UP), str(full.get("note") or "")
+
+
 def ein_build(model, fmt="zugferd"):
     """The CII XML (bytes, UTF-8) from the print model of an invoice / credit note (see the module text for the keys used:
     kind, number, date, lang, currency, order_ref, service_from/to, due_date, sender_fields, recipient, lines, totals,
@@ -274,7 +287,7 @@ def ein_build(model, fmt="zugferd"):
     kind = m.get("kind") or "invoice"
     sf = m.get("sender_fields") or {}
     rc = m.get("recipient") or {}
-    tot = m.get("totals") or {}
+    tot, prepaid, abs_note = _abs_full(m)  # 2.408.0 (#3520)
     pay = m.get("payment") or {}
     cur = str(m.get("currency") or "EUR").upper()
     hcur = str(tot.get("home") or "EUR").upper()  # 2.189.0 (#2475): the home currency (BT-6)
@@ -298,7 +311,7 @@ def ein_build(model, fmt="zugferd"):
              tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
     if novat and not m.get("vat_note_text"):
         notes.insert(0, _exempt(m, lang))
-    for n in notes[:4]:
+    for n in notes[:4] + ([abs_note] if abs_note else []):
         _e(_e(doc, "ram:IncludedNote"), "ram:Content", n)
 
     tx = _e(root, "rsm:SupplyChainTradeTransaction")
@@ -421,7 +434,7 @@ def ein_build(model, fmt="zugferd"):
         _e(pt, "ram:Description", tr(EIN_WORDS["now"], lg=lang))
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
-    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) if kind == "invoice" else Decimal("0")
+    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) + prepaid if kind == "invoice" else Decimal("0")
     ms = _e(se, "ram:SpecifiedTradeSettlementHeaderMonetarySummation")
     _e(ms, "ram:LineTotalAmount", _m(line_sum))
     _e(ms, "ram:TaxBasisTotalAmount", _m(line_sum))
@@ -561,7 +574,9 @@ def ein_check(xml_bytes):
         amount = _d(_text(t, "ram:CalculatedAmount"))
         seen.add((cat, pct))
         want = (base * pct / 100).quantize(Q2, rounding=ROUND_HALF_UP)
-        if amount != want:
+        # 2.408.0 (#3520): a final invoice adds the taxes its progress invoices rounded each (BT-113 > 0): a few cents apart are
+        # fine (the EN 16931 rule allows 1.00), else exact
+        if amount != want and not (bt113 > 0 and abs(amount - want) <= Decimal("0.05")):
             out.append(f"BR-CO-17: tax {amount} for {cat} {pct} % != {want}")
         if by_cat.get((cat, pct), Decimal("0")) != base:
             out.append(f"BR-S-08: basis {base} for {cat} {pct} % != sum of its lines {by_cat.get((cat, pct), Decimal('0'))}")
@@ -719,7 +734,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
     credit = kind == "credit"
     sf = m.get("sender_fields") or {}
     rc = m.get("recipient") or {}
-    tot = m.get("totals") or {}
+    tot, prepaid, abs_note = _abs_full(m)  # 2.408.0 (#3520)
     pay = m.get("payment") or {}
     cur = str(m.get("currency") or "EUR").upper()
     hcur = str(tot.get("home") or "EUR").upper()  # 2.189.0 (#2475): the home currency (BT-6)
@@ -747,8 +762,8 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
              tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
     if novat and not m.get("vat_note_text"):
         notes.insert(0, extext)
-    if notes:  # PEPPOL-EN16931-R002: one note on document level
-        _u(root, "cbc:Note", "\n".join(notes[:4]))
+    if notes or abs_note:  # PEPPOL-EN16931-R002: one note on document level
+        _u(root, "cbc:Note", "\n".join(notes[:4] + ([abs_note] if abs_note else [])))
     _u(root, "cbc:DocumentCurrencyCode", cur)
     if cur != hcur:
         _u(root, "cbc:TaxCurrencyCode", hcur)
@@ -849,7 +864,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(_u(root, "cac:TaxTotal"), "cbc:TaxAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID=hcur)
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
-    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) if kind == "invoice" else Decimal("0")
+    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) + prepaid if kind == "invoice" else Decimal("0")
     mt = _u(root, "cac:LegalMonetaryTotal")
     _u(mt, "cbc:LineExtensionAmount", _m(line_sum), currencyID=cur)
     _u(mt, "cbc:TaxExclusiveAmount", _m(line_sum), currencyID=cur)

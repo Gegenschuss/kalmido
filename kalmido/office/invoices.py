@@ -1071,7 +1071,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["valid_until"] = ""
     m["valid_until_text"] = ""
     from .abschlag import abs_render
-    abs_render(r, m, L, lang)  # 2.120.0 A (#2087): progress / final title, cash discount line
+    abs_render(r, m, L, lang, pack)  # 2.120.0 A (#2087): progress / final title, cash discount line
     return m
 
 
