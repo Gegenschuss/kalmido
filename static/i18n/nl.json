@@ -14829,5 +14829,6 @@
   "Section not found: {0}": "Sectie niet gevonden: {0}",
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
-  "Embed a page": "Pagina insluiten"
+  "Embed a page": "Pagina insluiten",
+  "{0} open · {1} done": "{0} open · {1} klaar"
 }

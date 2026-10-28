@@ -14829,5 +14829,6 @@
   "Section not found: {0}": "Sezione non trovata: {0}",
   "Daily note": "Nota del giorno",
   "Go to day": "Vai al giorno",
-  "Embed a page": "Incorpora una pagina"
+  "Embed a page": "Incorpora una pagina",
+  "{0} open · {1} done": "{0} aperte · {1} completate"
 }

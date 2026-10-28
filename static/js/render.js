@@ -313,12 +313,14 @@ function renderSide0() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const sbb = sbb_on(), sbm = !sbb && sbm_on(), sbbArea = sbb || sbm ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area; 2.196.0 A (#2737): sbm = the phone's drawer like it
   const row = (key, icon, name, n, extra = '', after = '') =>
-    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
+    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}"${n?.tip && rsy_sideCnt() ? ` title="${esc(n.tip)}" aria-label="${esc(n.tip)}"` : ''}>${(rsy_sideCnt() || (key === 'today' && c.over)) && (n?.v ?? n) || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  // 2.407.0 (#3518): a list / folder shows open/total (5/12) once something in it is done; the hint names both, the open number stays first
+  const sideOD = (open, done) => done ? {v: `${open || 0}/${(open || 0) + done}`, tip: tr('{0} open · {1} done', open || 0, done)} : open;
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
@@ -337,7 +339,7 @@ function renderSide0() {
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
     if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
-    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
+    return row('l:' + l.id, sw, nmOf(l), sideOD(c.lists[l.id], l.progress?.done), `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.352.0 E (#2748): a tree of any depth on the sidebar tree (areas.js sbb_treeHtml): a folder's head, then its body (its own
@@ -350,10 +352,11 @@ function renderSide0() {
   const fnode = f => {
     const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
+    const nd = fl.reduce((a, l) => a + (l.progress?.done || 0), 0);  // 2.407.0 (#3518): the folder sums its lists' done tasks too
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the arrow folds
     const mir = fl.some(l => l.mirrored);  // 2.27.0 (#988): the owner arranges a shared folder
-    const after = (S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>`)
+    const after = (S.listReorder ? '' : `<span class="c" ${nd && rsy_sideCnt() ? `title="${esc(tr('{0} open · {1} done', n, nd))}" aria-label="${esc(tr('{0} open · {1} done', n, nd))}"` : n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && (nd ? `${n}/${n + nd}` : n) || ''}</span>`)
       + (rsy_sideShr() ? folderShrHtml(f) : '')  // 2.41.0 (#1428); 2.56.1 (#1799): can be off
       + `<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>`
       + (S.listReorder ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
