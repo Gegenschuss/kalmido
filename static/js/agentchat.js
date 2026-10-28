@@ -986,7 +986,7 @@ async function aiTblDraw(md) {
   // 2.29.0 (#345): lists of others shared with me show up too -- read-only (owner named), changeable only where I am a list admin
   const ags = box._ags, lists = S.lists.filter(l => !l.archived && !l.is_inbox && (canManage(l) || l.owner_id !== S.me?.id)), ctl = $('#s-ai-tblctl', md);
   aiShareDraw(md, ags);
-  if (!ags.length) { box.innerHTML = `<div class="muted mhint">${tr('No agents yet. An admin adds them; then they show up here.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
+  if (!ags.length) { box.innerHTML = `<div class="muted mhint">${(av_ownArea() ? tr('No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.') : tr('No agents yet. An admin adds them; then they show up here.'))}</div>`; if (ctl) ctl.innerHTML = ''; return; }
   if (!lists.length) { box.innerHTML = `<div class="muted mhint">${tr('You do not manage any project yet.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
   const sees = l => { const people = listPeople(l); return ags.filter(a => people.some(p => p.user_id === a.id)); };
   // 2.27.0 (#964): grouped by folder (in the sidebar's order, lists without a folder first, each group folds), a search and a
@@ -1120,7 +1120,7 @@ const AG_S = {
   safe: [N_('Use it safely'), N_('One agent per context; only projects with the same people (connecting projects with different people needs your approval); limit it to selected projects in its permissions. All rules: Settings > Agents > Use safely.'), ''],
   rules: [N_('Rules and permissions'), N_('CLAUDE.md names who may instruct it; everything else is data. .claude/settings.json in one of two profiles. Hardened: defaultMode dontAsk, only the Kalmido tools allowed, no Edit or Write, the env file denied; the agent then has no notes, no working routine, no jobs, no files at its answers and asks no permission questions in the chat. Standard: mode default, plus narrow Edit/Write for WORKFLOW-KALMIDO.md and NOTIZEN.md and Bash for the job tool only. Both: the usage hook as Stop and SubagentStop hook.'), ''],
   test: [N_('Test'), N_('Mention it in a comment, write to it in the chat, pause it (it has to stop) and try the prompt-injection cases from the guide.'), ''],
-  ownAllowed: [N_('Allowed on this server?'), N_('An admin has to switch on “Users may create their own agents” (Settings > Agents > Set up). Without it, “Create agent” is missing: ask an admin.'), ''],
+  ownAllowed: [N_('Allowed on this server?'), N_('In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.'), ''],
   ownCreate: [N_('Create your agent'), N_('Settings > Agents > Set up > Your personal agents: a username, then “Create agent”. Copy the token: it is shown only once. The lock button sets what it may do. Only you can share projects with it and chat with it.'), ''],
   ownShare: [N_('Share only what it should see'), N_('Settings > Agents > Projects or a project’s Share dialog. It sees nothing else.'), ''],
   ownRules: [N_('Rules and permissions'), N_('CLAUDE.md: only you instruct it. .claude/settings.json in one of two profiles. Hardened: defaultMode dontAsk, only the Kalmido tools allowed, no Edit or Write, the env file denied; the agent then has no notes, no working routine, no jobs, no files at its answers and asks no permission questions in the chat. Standard: mode default, plus narrow Edit/Write for WORKFLOW-KALMIDO.md and NOTIZEN.md and Bash for the job tool only. Both: the usage hook as Stop and SubagentStop hook.'), ''],
@@ -1216,7 +1216,7 @@ const AG_STEPS = [
   [N_('Permissions in .claude/settings.json'), N_('An allowlist: only the Kalmido MCP tools and the event monitor; the env file is denied.'), ''],
   [N_('Event monitor with back-off'), N_('Long polling of the agent events; after an error it waits longer and longer (up to 5 minutes). It ends after about 9 minutes without an event (shell time limit of coding agents) and holds events back while the agent is paused.'), ''],
   [N_('Autostart'), N_('Required: a systemd user unit runs mcp/agent_launcher.sh (macOS: a LaunchAgent with agent_launcher.ps1). Without a service the agent falls asleep when the terminal is idle. It applies the runtime settings from Kalmido (model, auto-compact, nightly fresh restart, Reset now).'), 'loginctl enable-linger kalmido-agent\nsystemctl --user enable --now kalmido-agent.service'],
-  [N_('Usage reporting'), N_('mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins.'), ''],
+  [N_('Usage reporting'), N_('mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.'), ''],
   [N_('Test'), N_('Close every session with its token and wait 5 minutes: it must still show as connected (not “connected, but no service running”). Then mention it, write to it in the chat, pause it (it has to stop) and try the prompt-injection cases from the guide: it has to refuse every one.'), '']];
 function agGuideModal() {
   const d = {env: '~/kalmido-agent.env', user: 'kalmido-agent'};
@@ -1533,7 +1533,7 @@ async function aiuLoad() {
 // tasks, the lists and the models behind "Details" (closed unless opened in this session)
 function aiuHtml(j, w) {
   if (!j) return `<div class="muted mhint">${esc(S.aiu.err || tr('Loading…'))}</div>`;
-  if (!j.agents.length) return `<div class="muted mhint">${tr('No agent works in your projects yet. An admin adds agents; then share a project with one.')}</div>`;
+  if (!j.agents.length) return `<div class="muted mhint">${(av_ownArea() ? tr('No agent works in your projects yet. Create your own under Settings > Agents > Set up, then share a project with it.') : tr('No agent works in your projects yet. An admin adds agents; then share a project with one.'))}</div>`;
   const m = j.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens', v = x => aiuVal(x, m), num = x => m === 'cost' ? (+x.cost || 0) : x.tokens;
   const any = j.agents.some(a => a.totals.d30.calls);
   const seg = j.cost ? `<div class="aiuctl"><div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" class="${m === 'tokens' ? 'on' : ''}" data-aiu-m="tokens" aria-pressed="${m === 'tokens'}">${tr('Tokens')}</button><button type="button" class="${m === 'cost' ? 'on' : ''}" data-aiu-m="cost" aria-pressed="${m === 'cost'}">${tr('Cost')}</button></div></div>` : '';
@@ -1595,7 +1595,7 @@ function aiuLimFields(a) {
       <select id="ag-lmet" aria-label="${esc(tr('Measured in'))}"><option value="tokens" ${l.metric !== 'cost' ? 'selected' : ''}>${tr('Tokens')}</option><option value="cost" ${l.metric === 'cost' ? 'selected' : ''}>${tr('Cost (USD)')}</option></select></div>
     <div class="row"><label for="ag-lsoft">${tr('Soft limit')}</label><input id="ag-lsoft" type="number" min="0" step="any" inputmode="decimal" value="${esc(num(l.soft))}" placeholder="${esc(tr('none'))}"></div>
     <div class="row"><label for="ag-lhard">${tr('Hard limit')}</label><input id="ag-lhard" type="number" min="0" step="any" inputmode="decimal" value="${esc(num(l.hard))}" placeholder="${esc(tr('none'))}"></div>
-    <div class="shint">${tr('Soft: the admins are told at 80 % and 100 %. Hard: the agent’s API calls are refused too until the period rolls over; empty = no limit.')}${st ? `<br>${aiuLimLine(st)}${st.reached ? ` · <b class="aiulr">${tr('limit reached')}</b>` : ''}` : ''}</div>`;
+    <div class="shint">${tr('Soft: the admins and the owner of a personal agent are told at 80 % and 100 %. Hard: the agent’s API calls are refused too until the period rolls over; empty = no limit.')}${st ? `<br>${aiuLimLine(st)}${st.reached ? ` · <b class="aiulr">${tr('limit reached')}</b>` : ''}` : ''}</div>`;
 }
 // ---- 2.4.1 (#377) the agent dialog's "Runtime" section: Kalmido stores it, the agent's host applies it (GET /api/v1/agent
 // "runtime", event runtime_changed); "Reset now" sends the event reset (a fresh session). Kalmido never runs the agent.

@@ -3673,6 +3673,9 @@ MIGRATIONS = [
     # fq_client: a suggestion, the evaluation marks it unconfirmed); 0 = the list's client, the client link or a new client.
     # Older versions ignore it
     ("form_entries", "client_typed", "ALTER TABLE form_entries ADD COLUMN IF NOT EXISTS client_typed BIGINT NOT NULL DEFAULT 0"),
+    # 2.361.4 (#2928): 1 = members of the organisation may keep their own (personal) agents in it; its admins decide
+    # (agents/admin.py agent_ws_allowed). Older versions ignore it (there the server switch user_agents alone decides)
+    ("orgs", "member_agents", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS member_agents BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

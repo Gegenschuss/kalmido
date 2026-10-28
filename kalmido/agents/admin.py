@@ -447,6 +447,31 @@ def agent_policy(c):
             "scopes": [s for s in SCOPES if s != "admin-read"]}
 
 
+def agent_ws_allowed(c, uid, oid):
+    """2.361.4 (#2928): may uid keep a personal agent in workspace oid (None = private)? The server switch user_agents on =
+    everyone everywhere. Off: on a server with organisations each workspace decides -- the private area is the person's own
+    (always), an organisation its admins' (orgs.member_agents; its admins themselves always). Without organisations the
+    server switch alone (one shared team)."""
+    from ..accounts.orgs import has_workspaces, is_org_admin
+    if gsetting(c, "user_agents") == "1":
+        return True
+    if not has_workspaces(c):
+        return False
+    if not oid:
+        return True
+    if is_org_admin(c, uid, oid):
+        return True
+    with system_ctx(c):  # one switch of an organisation the person belongs to (checked by the callers)
+        r = c.execute("SELECT member_agents FROM orgs WHERE id=?", (oid,)).fetchone()
+    return bool(r and r[0])
+
+
+def agent_ws_allowed_any(c, uid):
+    """2.361.4 (#2928): uid may create a personal agent somewhere (the server switch, or a workspace that allows it)."""
+    from ..accounts.orgs import has_workspaces
+    return gsetting(c, "user_agents") == "1" or has_workspaces(c)
+
+
 def agent_owner(c, aid):
     r = c.execute("SELECT owner_id FROM agents WHERE user_id=?", (aid,)).fetchone() if aid else None
     return r["owner_id"] if r else None
@@ -484,13 +509,31 @@ def _agent_rgroups_drop(c, oid, aid):
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id=?", (oid, aid))
 
 
+def _agent_ws_check(c, aid, v):
+    """BadInput while agent aid is still in projects, calendars or address books of another workspace than v (None = private)."""
+    n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
+                     (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
+    if n:
+        raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
+    # 2.30.0 (#1036): calendars and address books follow the same rule
+    n = c.execute("""SELECT (SELECT COUNT(*) FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id WHERE m.user_id=? AND COALESCE(k.org_id,0)!=?)
+                          + (SELECT COUNT(*) FROM book_members m JOIN books b ON b.id=m.book_id WHERE m.user_id=? AND COALESCE(b.org_id,0)!=?)""",
+                  (aid, v or 0, aid, v or 0)).fetchone()[0]
+    if n:
+        raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
+
+
 def _agent_org_set(c, aid, v, main_org, user_orgs):
     a = agent_row(c, aid)
     if v == "auto":
         from ..accounts.orgroles import user_orgs_full
         oids = user_orgs_full(c, a["owner_id"], write=True) if a["owner_id"] else []  # 2.143.0 A (#2151)
+        if a["owner_id"]:  # 2.361.4 (#2928): the first organisation that lets it have an agent, else its private area
+            oids = [o for o in oids if agent_ws_allowed(c, a["owner_id"], o)]
         v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
     if v in (None, "", 0, "0", "private"):
+        if a["org_id"]:  # 2.361.4 (#2935): out of an organisation only when none of its projects / calendars / books holds it
+            _agent_ws_check(c, aid, None)
         c.execute("UPDATE agents SET org_id=NULL, office_drafts=CASE WHEN org_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
@@ -505,17 +548,10 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
     if a["owner_id"]:
         from ..accounts.orgroles import need_org_write
         need_org_write(c, a["owner_id"], v)  # 2.143.0 A (#2151): agents work only for members / admins of an organisation
+        if (a["org_id"] or None) != v and not agent_ws_allowed(c, a["owner_id"], v):  # 2.361.4 (#2928): its admins decide
+            raise BadInput(tr("This organisation does not let members have their own agents (its admins can allow it)"))
     if (a["org_id"] or None) != v:
-        n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
-                         (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
-        if n:
-            raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
-        # 2.30.0 (#1036): calendars and address books follow the same rule
-        n = c.execute("""SELECT (SELECT COUNT(*) FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id WHERE m.user_id=? AND COALESCE(k.org_id,0)!=?)
-                              + (SELECT COUNT(*) FROM book_members m JOIN books b ON b.id=m.book_id WHERE m.user_id=? AND COALESCE(b.org_id,0)!=?)""",
-                      (aid, v or 0, aid, v or 0)).fetchone()[0]
-        if n:
-            raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
+        _agent_ws_check(c, aid, v)
     # 2.51.0 A (#1348): another workspace = another office area: the office switch (its admin's decision) starts off again
     c.execute("UPDATE agents SET org_id=?, office_drafts=CASE WHEN org_id IS NOT DISTINCT FROM ? THEN office_drafts ELSE 0 END WHERE user_id=?", (v, v, aid))
     # 2.46.0 (#1592): an agent of an organisation is one of its members (seen and shared with there, as every agent of the
@@ -604,7 +640,8 @@ def my_agents_get():
         raise Denied(403, tr("Agents cannot use this endpoint"))
     pol = agent_policy(c)
     ags = my_agents(c, me())
-    return jsonify(allowed=pol["user_agents"] and API_ON, max=pol["max_per_user"], count=len(ags), agents=ags, api=API_ON,
+    return jsonify(allowed=agent_ws_allowed_any(c, me()) and API_ON, max=pol["max_per_user"], count=len(ags), agents=ags, api=API_ON,
+                   server=pol["user_agents"],  # 2.361.4 (#2928): on = everyone everywhere; off = each workspace decides
                    scopes=scopes_offer(c, g.user, agent=True), default_scopes=list(SCOPES_AGENT_DEFAULT))  # 2.15.0 (#479)
 
 
@@ -617,7 +654,7 @@ def my_agent_create():
         raise Denied(403, tr("Agents cannot use this endpoint"))
     need_api()
     pol = agent_policy(c)
-    if not pol["user_agents"]:
+    if not agent_ws_allowed_any(c, me()):  # 2.361.4 (#2928): with organisations the workspace decides (agent_org_set)
         raise Denied(403, tr("Personal agents are switched off on this server"))
     write_lock(c, f"agent_create:{me()}")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     n = c.execute("SELECT COUNT(*) FROM agents WHERE owner_id=?", (me(),)).fetchone()[0]
@@ -659,13 +696,15 @@ def my_agent_create():
 
 @app.patch("/api/my/agents/<int:aid>")
 def my_agent_update(aid):
-    """{display_name?, note?, enabled?} -- the owner renames / pauses / resumes a personal agent."""
+    """{display_name?, note?, enabled?} -- the owner renames / pauses / resumes a personal agent.
+    2.361.4 (#2928): {limits?} -- the owner sets its usage limits (as admins do for every agent; null = none)."""
+    from ..agents.usage import usage_limits_clean
     from ..api.scopes import agent_scopes_set
     c = db()
     a = need_own_agent(c, aid)
     b = body()
     unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id",
-                                               "runtime", "list_ids", "bridge_ok"))
+                                               "runtime", "list_ids", "bridge_ok", "limits"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
@@ -695,6 +734,14 @@ def my_agent_update(aid):
         except BadInput:
             c.rollback()
             raise
+    if "limits" in b:
+        try:
+            lim = usage_limits_clean(b["limits"])
+        except BadInput:
+            c.rollback()
+            raise
+        c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?", (lim, aid))
+        print("personal agent", aid, "usage limits", lim or "none", "by its owner", login_log_who(g.user), flush=True)
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", (_agent_name(b["display_name"]) or a["username"], aid))
     if "note" in b:

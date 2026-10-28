@@ -180,7 +180,7 @@ ROUTES = {
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",
-    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
+    "GET /api/my/agents": "agents", "GET /api/my/agents/{}/audit": "agents", "GET /api/my/agents/{}/machines": "agents", "GET /api/proposals/agents": "agents",
     "GET /api/proposals/{}": "agents", "GET /api/v1/agent": "agents", "GET /api/v1/agent/chats": "agents",
     "GET /api/v1/agent/events": "agents", "GET /api/v1/agent/jobs": "agents", "GET /api/v1/agent/jobs/{}": "agents",
     "GET /api/v1/agent/quota": "agents", "GET /api/v1/agent/schedules": "agents", "GET /api/v1/agent/usage": "agents",

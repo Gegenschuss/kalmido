@@ -90,3 +90,58 @@ const av_whichHtml = () => `<details class="avwhich"><summary>${ic('help', 's')}
   <li>${esc(tr('Team agent: colleagues give it orders themselves; it runs on a shared computer that is always on, with an account of the organisation. Its rules name who may give orders.'))}</li>
   <li>${esc(tr('Fewer people giving orders means less risk. A personal agent is gone while your computer is off.'))}</li>
   <li>${esc(tr('Switching later needs no new setup: an admin changes “Belongs to” to team or person. Projects and history stay; adjust the rules in its CLAUDE.md.'))}</li></ul></details>`;
+
+// ---- 2.361.4 (#2928): the private area is the person's own: nobody else creates agents there
+function av_ownArea() { return !(S.me?.workspaces || []).length || wsCur() === 'private'; }
+// the owner of a personal agent: its usage limit (as admins set it for every agent) and its log (the latest requests)
+function av_logModal(a, done) {
+  const md = modal(`<h3>${esc(tr('Log and usage limit of {0}', a.name))}</h3>${aiuLimFields(a)}
+    <div class="calerr" role="alert" id="avl-err" hidden></div>
+    <div class="row"><span class="spacer"></span><button class="btn sm pri" data-m="lim">${ic('check', 's')} ${tr('Save limit')}</button></div>
+    <h4 id="avl-h">${tr('Log')}</h4><div class="shint">${tr('Every API request made with its token, never what was sent or read. Denied calls are marked in red.')}</div>
+    <div class="audtbl" id="avl-aud" role="table" aria-labelledby="avl-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><a class="btn sm" href="/api/my/agents/${a.id}/audit?format=csv" download>${ic('download', 's')} CSV</a><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
+  const fill = async () => {
+    const box = $('#avl-aud', md);
+    let j; try { j = await api('GET', `/api/my/agents/${a.id}/audit?limit=30`); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Only available online.') : e.message)}</div>`; return; }
+    if (!md.isConnected) return;
+    box.innerHTML = j.data.length ? j.data.map(audRow).join('') : `<div class="muted mhint">${tr('It has not called the API yet.')}</div>`;
+  };
+  fill();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m !== 'lim') return;
+    b.disabled = true;
+    try { await calReq('PATCH', `/api/my/agents/${a.id}`, aiuLimBody(md)); toast(tr('Saved')); md.remove(); done?.(); }
+    catch (x) { const er = $('#avl-err', md); er.textContent = x.message; er.hidden = false; } finally { b.disabled = false; }
+  });
+}
+// Settings > Workspaces: whether the members of an organisation may keep their own agents in it (its admins decide, every
+// member sees it; only with the agent interface; box._j = GET /api/orgs)
+function oag_paneDraw(box) {
+  if (!box?.isConnected || !S.api?.enabled) return;
+  const orgs = (box._j || {}).orgs || [];
+  for (const det of box.querySelectorAll('details.wsorg[data-oid]')) {
+    const o = orgs.find(x => x.id === +det.dataset.oid); if (!o || det.querySelector('.oag-row') || o.member_agents === undefined) continue;
+    const adm = o.role === 'admin' && box._j.manage, id = `oag-o${o.id}`;
+    const row = document.createElement('div');
+    row.className = 'row oag-row';
+    row.innerHTML = `<label class="chkl"><input type="checkbox" id="${id}" ${o.member_agents ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${tr('Members may have their own agents')}</label>`;
+    const hint = document.createElement('div');
+    hint.className = 'shint keep';
+    hint.textContent = tr('Members can then connect their own AI agent (their own provider and computer) in this organisation and share its projects with it. Admins always may. Agents that are already in it stay.') + (adm ? '' : ' ' + tr('Only an admin of this organisation can change it.'));
+    (det.querySelector('summary')).after(row); row.after(hint);
+    if (!adm) continue;
+    const cb = $('#' + id, /** @type {any} */ (row));
+    cb.addEventListener('change', async () => {
+      const on = cb.checked, put = v => async () => {
+        await api('PATCH', `/api/orgs/${o.id}`, {member_agents: v});
+        o.member_agents = v; if (cb.isConnected) cb.checked = v; return {};
+      };
+      try { await put(on)(); } catch { cb.checked = !on; return; }
+      const label = tr('Own agents in {0}', qn(o.name));
+      offerUndo(label, histAdd({label, undo: put(!on), redo: put(on)}));
+    });
+  }
+}

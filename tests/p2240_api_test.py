@@ -216,7 +216,11 @@ check(r["agents"] and r["agents"][0]["provider"] == "Local model (own PC)", "#89
 r = Bo.patch(B + f"/api/my/agents/{r['agents'][0]['id']}", json={"provider": "Mistral (EU)"})
 check(r.ok and dbx("SELECT provider FROM agents WHERE owner_id=?", (ids["bob"],)) == [("Mistral (EU)",)], "#896: the owner changes it")
 A.put(B + "/api/admin/agent-policy", json={"user_agents": False})
-check(Ca.post(B + "/api/my/agents", json={"username": "carols-bot"}).status_code in (403, 409), "#896: switched off -> members cannot connect agents")
+# 2.361.4 (#2928): switched off, the organisation decides (its switch member_agents, off) and the private area is carol's own
+r = Ca.post(B + "/api/my/agents", json={"username": "carols-bot", "org_id": ORG})
+check(r.status_code == 400 and dbx("SELECT COUNT(*) FROM users WHERE username='carols-bot'") == [(0,)], f"#896/#2928: switched off -> not into the organisation {r.status_code} {r.text[:160]}")
+r = Ca.post(B + "/api/my/agents", json={"username": "carols-bot"})
+check(r.status_code == 201 and r.json().get("org_id") is None, f"#2928: ... but in her private area {r.status_code} {r.text[:160]}")
 
 # ================================================================== #905 a hosted server
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,

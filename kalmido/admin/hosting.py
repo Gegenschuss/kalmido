@@ -515,8 +515,9 @@ def hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
 
 # ---- #896: agents are connected by people themselves (their own provider / key / computer). When one joins a list, every
 # person of the list learns it in their News: which agent, who added it and where it runs (agents.provider) -- the data of
-# the list then also reaches that provider. Who may connect agents at all: the organisation's setting user_agents (off by
-# default, Settings > Administration > Organisation: "Members may connect agents").
+# the list then also reaches that provider. Who may connect agents at all (2.361.4, #2928): the server switch user_agents
+# (Administration > Agents) lets everyone; off, each workspace decides -- an organisation's admins (orgs.member_agents,
+# Settings > Workspaces), the private area the person themselves (agents/admin.py agent_ws_allowed).
 def agent_joined_notice(c, lid, aid, actor):
     from ..collab.news import news_add
     a = c.execute("""SELECT u.display_name, u.username, COALESCE(g.provider,'') AS provider, g.owner_id FROM users u

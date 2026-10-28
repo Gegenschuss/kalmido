@@ -1016,6 +1016,7 @@ def org_mine_dict(c, r, uid):
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
             "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
+            "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1063,7 +1064,7 @@ def org_mine_update(oid):
         if not isinstance(b["ext_links"], bool):
             return err(tr("Invalid value: {0}", "ext_links"))
         c.execute("UPDATE orgs SET ext_links=? WHERE id=?", (int(b["ext_links"]), oid))
-    for k in ("asst_comments", "chn_content"):  # 2.240.0 (#2884, #2867): privacy switches of the organisation (admins only)
+    for k in ("asst_comments", "chn_content", "member_agents"):  # 2.240.0 (#2884, #2867), 2.361.4 (#2928): switches of the organisation (admins only)
         if k in b:
             if not isinstance(b[k], bool):
                 return err(tr("Invalid value: {0}", k))
