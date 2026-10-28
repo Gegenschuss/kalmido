@@ -1504,12 +1504,14 @@ def bk_restore_packs(src):
         os.makedirs(dest, mode=0o755, exist_ok=True)
         for fn in names:
             d = os.path.join(dest, fn)
+            if os.path.lexists(d) and os.path.isfile(d) and not os.path.islink(d) and _sha256_file(d) == _sha256_file(os.path.join(src, fn)):
+                continue
+            tmp = os.path.join(dest, "." + fn + ".restore")  # first next to it: a failed copy never leaves the pack missing
+            shutil.copyfile(os.path.join(src, fn), tmp)
             if os.path.lexists(d):
-                if os.path.isfile(d) and not os.path.islink(d) and _sha256_file(d) == _sha256_file(os.path.join(src, fn)):
-                    continue
                 os.makedirs(old, mode=0o755, exist_ok=True)
-                shutil.move(d, os.path.join(old, fn))
-            shutil.move(os.path.join(src, fn), d)
+                shutil.copy2(d, os.path.join(old, fn), follow_symlinks=False)
+            os.replace(tmp, d)
             n += 1
     except OSError as e:
         print("restore: the industry packs could not all be written back:", aa_oserr(e), flush=True)
