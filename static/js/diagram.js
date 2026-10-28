@@ -64,6 +64,14 @@ async function dg_svg(src) {
     return h;
   } finally { document.getElementById(id)?.remove(); document.getElementById('d' + id)?.remove(); }
 }
+// Mermaid measured its texts outside the page; in the page the app's font can be wider: the view box follows the drawing
+function dg_fit(svg) {
+  let b; try { b = svg?.getBBox(); } catch { return; }
+  if (!b || !b.width || !b.height) return;  // not shown (yet): keep Mermaid's box
+  const p = 8, w = Math.ceil(b.width + 2 * p), h = Math.ceil(b.height + 2 * p);
+  svg.setAttribute('viewBox', `${Math.floor(b.x - p)} ${Math.floor(b.y - p)} ${w} ${h}`);
+  svg.style.maxWidth = w + 'px';
+}
 // a block that cannot be drawn keeps its source (code block) with a short hint above it
 function dg_fail(el, what, e) {
   const box = el.closest('.mdcode') || el;
@@ -86,7 +94,7 @@ async function dg_one(el) {
     if (mermaid) { d.className = 'wkdg wkdgmm'; d.innerHTML = await dg_svg(src); }
     else { d.className = 'wkdg wkdgmath'; d.setAttribute('role', 'math'); d.innerHTML = dg_tex(await dg_katex(), src, true); }
     d.dataset.src = src;
-    if (box.isConnected) box.replaceWith(d);
+    if (box.isConnected) { box.replaceWith(d); if (mermaid) dg_fit(d.querySelector('svg')); }
   } catch (e) { if (box.isConnected) dg_fail(el, mermaid ? tr('The diagram could not be drawn') : tr('The formula could not be drawn'), e); }
 }
 // every block not drawn yet, one after the other (Mermaid renders one at a time)
