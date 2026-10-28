@@ -14658,5 +14658,14 @@
   "Time format": "Formato de hora",
   "24 hours ({0})": "24 horas ({0})",
   "12 hours ({0})": "12 horas ({0})",
-  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador."
+  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador.",
+  "Areas per workspace": "Áreas por espacio de trabajo",
+  "Switched off here, an area disappears only in that workspace; the switches above apply everywhere. Nothing is deleted.": "Desactivada aquí, un área desaparece solo en ese espacio de trabajo; los interruptores de arriba valen en todas partes. No se borra nada.",
+  "Switched off by the admins of {0}": "Desactivada por los administradores de {0}",
+  "Areas in this organisation": "Áreas en esta organización",
+  "Switched off, an area disappears for every member in this organisation and cannot be opened there; nothing is deleted.": "Desactivada, un área desaparece para todos los miembros en esta organización y no se puede abrir allí; no se borra nada.",
+  "Only an admin of the organisation can change this.": "Solo un administrador de la organización puede cambiarlo.",
+  "{0} is off in this workspace. You find it in the workspace {1}.": "{0} está desactivado en este espacio de trabajo. Lo encuentras en el espacio de trabajo {1}.",
+  "{0} is off in this workspace.": "{0} está desactivado en este espacio de trabajo.",
+  "This area is switched off in this organisation by its admin.": "Esta área está desactivada en esta organización por su administrador."
 }
