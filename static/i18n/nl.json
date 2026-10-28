@@ -14609,5 +14609,6 @@
   "Despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack": "Ondanks onze betalingsherinnering en onze aanmaning zijn de volgende facturen nog steeds onbetaald:",
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Goedendag,\n\nIn de bijlage vindt u onze brief ‘{0}’ als pdf.\n\nMet vriendelijke groet\n{1}",
   "Please find attached our document “{0}”.": "In de bijlage vindt u ons document “{0}”.",
-  "Regarding the invoice referenced above we issue the following credit note:|pack": "Met betrekking tot de hierboven genoemde factuur verstrekken wij u de volgende creditnota:"
+  "Regarding the invoice referenced above we issue the following credit note:|pack": "Met betrekking tot de hierboven genoemde factuur verstrekken wij u de volgende creditnota:",
+  "Title or notes contain …": "Titel of notities bevatten …"
 }

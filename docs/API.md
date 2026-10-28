@@ -329,6 +329,16 @@ had been made in the app. Webhooks fire too.
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
 `tag` (one of your tags or a project tag, without `#`), `list_tag` (only project tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
 `parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `pinned=true|false` (2.16.0, the *Pinned* view), `limit`, `cursor`.
+2.390.0 (#3355): `priority` (`none`, `low`, `medium`, `high`; several comma separated or repeated), `priority_min`, `section_id`
+(an id or `none`), `sprint_id` (an id, `current` = the active sprint of the task's project, `none` = backlog), `created_by`
+(`me` or a user id), `reviewer` (`me`, `none` or a user id), `review` (`pending`, `approved`, `changes`, `none`),
+`field_<id>=value` (a custom field of a project you see, only its tasks: `select` = option id or name, `text` = contains,
+`number`, `checkbox` `true` / `false`, other types the stored value), `q` (all words in title or notes, each as a word start)
+and `sort` (`priority`, `due`, `created`, `updated`, `title`, `manual`; a leading `-` = descending, tasks without a due date
+stay last; ties by id). A `next_cursor` of a sorted page carries the sort value and the id, so pages stay stable with equal
+values; it only works with the same `sort`. Tasks carry `sprint_id`, `reviewer_id` and `review` (`null` = none);
+`POST` / `PATCH /tasks` take `sprint_id` (an open sprint of the same project) and `reviewer_id` (the checks of the review step,
+`400` when the person or agent has no access; not in `POST /tasks/batch`).
 
 **Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
 `status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large project

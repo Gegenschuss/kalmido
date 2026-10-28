@@ -473,6 +473,12 @@ when the project's rules or a person ask, never overwrite a person's estimate. A
 for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person.
 
+### Finding tasks (2.390.0)
+Ask `list_tasks` precisely instead of reading whole projects: `priority` / `priority_min`, `section_id`, `sprint_id`
+(`current` = the running sprint, `none` = backlog), `created_by`, `reviewer` + `review` (`reviewer: me, review: pending` = what
+waits for your review), `field_values` (custom fields), `q` (words in title or notes) and `sort` (`-priority`, `due`, ...).
+Tasks carry `sprint_id`, `reviewer_id` and `review`; `create_task` / `update_task` set `sprint_id` and `reviewer_id`.
+
 ### Reminders at a fixed time (2.138.1)
 "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in
 `create_task` / `update_task`; `reminders` stays the minutes before the due time. It fires once and moves along with a

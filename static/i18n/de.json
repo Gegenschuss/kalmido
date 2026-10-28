@@ -14609,5 +14609,6 @@
   "Despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack": "trotz unserer Zahlungserinnerung und Mahnung sind folgende Rechnungen weiterhin unbezahlt:",
   "Hello,\n\nPlease find attached our letter \"{0}\" as a PDF.\n\nKind regards\n{1}": "Guten Tag,\n\nanbei erhalten Sie unser Schreiben „{0}“ als PDF.\n\nMit freundlichen Grüßen\n{1}",
   "Please find attached our document “{0}”.": "anbei erhalten Sie unser Dokument „{0}“.",
-  "Regarding the invoice referenced above we issue the following credit note:|pack": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Gutschrift:"
+  "Regarding the invoice referenced above we issue the following credit note:|pack": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
+  "Title or notes contain …": "Titel oder Notiz enthält …"
 }

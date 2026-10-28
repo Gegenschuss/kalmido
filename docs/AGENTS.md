@@ -1287,7 +1287,8 @@ change its job (title, state, log: `409`). At most 20 requests wait per agent.
 #1512. A project can switch on a review step (project settings > *Review step*, or `set_list_review`): a default reviewer, the
 review section (default: the section named *Review*) and *Done only after approval*. Every task can have a reviewer
 (`reviewer_id`, a person or an agent with access to the project) and a review state (`review`: `pending`, `approved`,
-`changes`).
+`changes`). 2.390.0 (#3355): both stand on every task of the API (with `sprint_id`); `create_task` / `update_task` set
+`reviewer_id` with the same checks, `list_tasks` `reviewer: me, review: pending` lists what waits for your review.
 
 - Moving a task into the review section (board, detail, API) or `review_task` action `request` asks for the review: the
   default reviewer when the task has none, state `pending`. A person gets a News item + push (notification row *Reviews*,
@@ -3399,7 +3400,9 @@ with the scope it needs). The tools:
   `set_list_columns`, `list_members`, `share_list`, `unshare_list`, `list_groups`, `get_group`, `list_list_groups`,
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
-- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
+- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
+  filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
+  `q` and `sort`, see *Task filters* in docs/API.md),
   `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
