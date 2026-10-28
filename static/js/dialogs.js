@@ -974,9 +974,10 @@ function listModal(id, folder = '', o = {}) {
     const keep = force ? [] : [['l-name', 'name'], ['l-folder', 'folder'], ['l-rate', 'rate'], ['l-dayh', 'day_hours']].filter(([e]) => document.activeElement === $('#' + e, md)).map(([, k]) => k);
     lbase = {...x, ...Object.fromEntries(keep.map(k => [k, lbase[k]]))};  // 2.270.0 A (#3019): a field being typed keeps its base
   };
-  let saving = Promise.resolve();
+  let saving = Promise.resolve(), lbusy = 0;
   const autosave = () => {
     if (!id) return saving;
+    lbusy++;
     saving = saving.then(async () => {
       for (const t of pend.values()) clearTimeout(t);
       pend.clear();
@@ -991,19 +992,29 @@ function listModal(id, folder = '', o = {}) {
       if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
       let cfl = null;
       const e = await listPatch(id, {...diff, _prev: prev}, null, {post: lsync, conflicts: c => { cfl = c; }});
-      if (e === false) { lfail = true; lsync(); return; }
+      if (e === false) { lfail = true; return; }  // 2.359.2 B (#3049): the form keeps what was typed (the next save sends it again)
       lfail = false;
       for (const k in diff) lbase[k] = diff[k];
       if (cfl) { for (const c of cfl) lbase[c.field] = c.server; lsync(true); }  // the form shows what stayed
       lsaved(e);
-    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
+    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { lbusy--; if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
     return saving;
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
+  // 2.359.2 B (#3049): the save failed: the dialog stays unless the person discards what is not saved
+  const lDiscard = async () => {
+    toast(tr('Could not save'));
+    if (md._asking) return false;
+    md._asking = true;
+    const ok = await askConfirm(tr('Discard changes?'), tr('Your changes in this dialog are not saved yet.'), {ok: tr('Discard'), danger: true, cancel: tr('Keep editing')});
+    md._asking = false; return ok;
+  };
   if (id) {
     md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
     md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
     onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
+    // 2.359.2 B (#3049): Esc / the backdrop like "Close" when something is not saved yet (else at once, as before)
+    md._close = async () => { if (pend.size || lfail || lbusy) { await autosave(); if (lfail && !await lDiscard()) return; } md.remove(); };
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kindp') $('#l-kind', md).value = $('#l-kindp', md).checked ? 'project' : 'list';  // 2.25.0 (UX-52); 2.152.2 (#2624): the switch "Progress and status"
@@ -1122,8 +1133,9 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     const a = b.dataset.m;
-    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open once (the second tap closes it)
-      if (id) { await autosave(); if (lfail && !md._lkeep) { md._lkeep = 1; toast(tr('Could not save')); return; } }
+    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open
+      // 2.359.2 B (#3049): also on the next tap: closing without the save only after "Discard changes?"
+      if (id) { await autosave(); if (lfail && !await lDiscard()) return; }
       md.remove();
     }
     if (a === 'dup') { await autosave(); md.remove(); listDuplicate(id); return; }  // 2.78.0 (#1881)
@@ -1145,8 +1157,10 @@ function listModal(id, folder = '', o = {}) {
       } else {
         try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : b0); } catch { return; }
       }
-      if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
+      // 2.359.2 B (#3049): the rate / reminder sent after the create: a failure says so, with the list's dialog one tap away
+      const rnFail = (rate || nag) && await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).then(() => false, () => true);
       md.remove(); await load(); go('l/' + n.id);
+      if (rnFail) toast(tr('Could not save'), () => listModal(n.id), 10000, tr('Open'));
       modulesOnToast(n.modules_on);
       if (pt === 'software') projectNextSteps(n.id);
       return;
