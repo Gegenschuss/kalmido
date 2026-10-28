@@ -14617,5 +14617,13 @@
   "{0} external link ends (people outside Kalmido can no longer open it)": ["{0} link esterno termina (le persone esterne a Kalmido non possono più aprirlo)", "{0} link esterni terminano (le persone esterne a Kalmido non possono più aprirli)"],
   "{0} file request goes along: its upload link keeps working": ["{0} richiesta di file si sposta: il suo link di caricamento continua a funzionare", "{0} richieste di file si spostano: i loro link di caricamento continuano a funzionare"],
   "{0} file request of another person keeps working only if they can still edit the folder there": ["{0} richiesta di file di un’altra persona funziona ancora solo se può ancora modificare la cartella lì", "{0} richieste di file di altre persone funzionano ancora solo se possono ancora modificare la cartella lì"],
-  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "Il server imposta un limite di consumo per gli agenti personali: il tuo può essere solo più basso (stesso periodo e stessa misura)"
+  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "Il server imposta un limite di consumo per gli agenti personali: il tuo può essere solo più basso (stesso periodo e stessa misura)",
+  "The client of the project is taken off (Undo brings it back)": "Il cliente del progetto viene rimosso (Annulla lo ripristina)",
+  "{0} link to another project ends (Undo brings it back)": ["{0} collegamento a un altro progetto termina (Annulla lo ripristina)", "{0} collegamenti ad altri progetti terminano (Annulla li ripristina)"],
+  "It is no longer open to everyone in the organisation (Undo brings it back)": "Non è più aperto a tutti nell'organizzazione (Annulla lo ripristina)",
+  "{0} customer report moves along": ["{0} segnalazione del cliente si sposta insieme", "{0} segnalazioni dei clienti si spostano insieme"],
+  "{0} office document": ["{0} documento d'ufficio", "{0} documenti d'ufficio"],
+  "{0} approval link": ["{0} link di approvazione", "{0} link di approvazione"],
+  "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Resta nello spazio precedente e non è più collegato al progetto: {0}. Spostalo a parte se serve.",
+  "{0} client of a customer report": ["{0} cliente di una segnalazione", "{0} clienti di segnalazioni"]
 }

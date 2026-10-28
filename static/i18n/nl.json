@@ -14617,5 +14617,13 @@
   "{0} external link ends (people outside Kalmido can no longer open it)": ["{0} externe link vervalt (mensen buiten Kalmido kunnen hem niet meer openen)", "{0} externe links vervallen (mensen buiten Kalmido kunnen ze niet meer openen)"],
   "{0} file request goes along: its upload link keeps working": ["{0} bestandsverzoek verhuist mee: de uploadlink blijft werken", "{0} bestandsverzoeken verhuizen mee: de uploadlinks blijven werken"],
   "{0} file request of another person keeps working only if they can still edit the folder there": ["{0} bestandsverzoek van iemand anders werkt alleen nog als die de map daar nog mag bewerken", "{0} bestandsverzoeken van anderen werken alleen nog als zij de map daar nog mogen bewerken"],
-  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "De server stelt een verbruikslimiet voor persoonlijke agents in: die van jou kan alleen lager zijn (zelfde periode en maat)"
+  "The server sets a usage limit for personal agents: yours can only be lower (same period and measure)": "De server stelt een verbruikslimiet voor persoonlijke agents in: die van jou kan alleen lager zijn (zelfde periode en maat)",
+  "The client of the project is taken off (Undo brings it back)": "De klant van het project wordt verwijderd (Ongedaan maken zet hem terug)",
+  "{0} link to another project ends (Undo brings it back)": ["{0} koppeling met een ander project vervalt (Ongedaan maken zet hem terug)", "{0} koppelingen met andere projecten vervallen (Ongedaan maken zet ze terug)"],
+  "It is no longer open to everyone in the organisation (Undo brings it back)": "Het staat niet meer open voor iedereen in de organisatie (Ongedaan maken zet het terug)",
+  "{0} customer report moves along": ["{0} klantmelding verhuist mee", "{0} klantmeldingen verhuizen mee"],
+  "{0} office document": ["{0} kantoordocument", "{0} kantoordocumenten"],
+  "{0} approval link": ["{0} goedkeuringslink", "{0} goedkeuringslinks"],
+  "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Blijft in de oude werkruimte en hoort niet meer bij het project: {0}. Verplaats het zo nodig apart.",
+  "{0} client of a customer report": ["{0} klant van een klantmelding", "{0} klanten van klantmeldingen"]
 }

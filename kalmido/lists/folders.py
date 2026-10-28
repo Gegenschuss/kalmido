@@ -140,6 +140,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
                     org_out(c, cur, want, "list", lname, list_id=lid, obj=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
+                    from ..lists.lmove import lmv_follow
+                    lmv_follow(c, lid, cur)  # 2.401.0 (#2924): its customer reports and bells go along
                     from ..team.clients import _org_boundary
                     if _org_boundary(c):  # 2.173.1 (#2714): a client of another workspace does not travel along (as in list_org_set)
                         c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"

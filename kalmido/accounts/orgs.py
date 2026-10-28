@@ -476,6 +476,8 @@ def list_org_set(c, lid, v):
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    from ..lists.lmove import lmv_follow
+    lmv_follow(c, lid, lr["org_id"])  # 2.401.0 (#2924): its customer reports and bells go along
     # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
     from ..team.clients import _org_boundary
     if _org_boundary(c):
