@@ -1983,6 +1983,48 @@ Routes (admin, never agents): `POST /api/office/datev/import/check` and `POST /a
 removed for good after 30 days), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
 is in the office log (`import` / `undo`, target `datev_in`).
 
+### Booking archive: past DATEV years, read-only
+
+*Since 2.414.*
+
+Bookkeeping → **Booking archive** (admins; a personal office: its owner; never agents; needs the DATEV function of the country
+pack) keeps the complete DATEV data of past years in one place - to look things up, not to book. **Read DATEV data** takes
+what the tax advisor exports per year, as single files or one ZIP (also a ZIP inside it):
+
+- **Booking batch** (EXTF / DTVF category 21): **every** line, unchanged - account, counter account, debit / credit (a
+  negative amount is turned to the other side), amount, BU key, document date, receipt fields 1 and 2, booking text,
+  Beleglink and every other column of the line by its name (shown in the booking's details). The year is the fiscal year
+  of the batch header. Lines without a readable amount, debit / credit mark or account are named in the preview and stay
+  only in the original file.
+- **Account labels** (category 20) and **debtors / creditors** (category 16): the labels of the ledger accounts and the
+  names of the person accounts. The debtors / creditors also go through the DATEV import above (clients and suppliers get
+  only their empty fields filled) as a run of their own that the archive run undoes with it.
+- **Receipt images** in the format of the DATEV XML interface (`document.xml` + files): linked to the booking whose
+  Beleglink names their GUID (`BEDI "<GUID>"`); PDF, JPEG, PNG and TIFF.
+
+A preview comes first: per year the number of bookings, the debit and credit sums with the control *debit = credit* (a line
+without counter account makes them differ), what each file is, receipts linked / without booking / missing in the ZIP. The
+same file or the same batch content a second time (also re-exported with other bytes) is recognised and left out. **Take
+over** makes one run; **Undo** per run removes everything of it (the list on the archive page and on the import page).
+
+The archive is a world of its own: nothing flows into the income statement (EÜR), the VAT figures, the tax reserve or the
+cash flow, and nothing can be changed. The page shows per year the bookings (filters: account, counter account, either
+side, period, amount, receipt field, text; 200 per page; the debit / credit sums of the matches), the **sums per account**,
+a booking with all its columns and its receipt, the runs with the original files (download). The original files lie
+unchanged in the office's folder with their SHA-256; texts are encrypted at rest like the other office data. The GoBD
+export (*Datenträgerüberlassung*) takes the archive's lines of the chosen period along (`archive_bookings.csv`,
+`archive_accounts.csv`). Retention: 10 years after the end of the archived year (the receipt images too), then deleted
+for good with the retention switch (`KALMIDO_PURGE_TRASH` / `KALMIDO_RETENTION_PURGE`, run `bookarch`; counted while it is
+off). No tax advice: whether the archive replaces the DATEV data access for the retention, your tax advisor clarifies.
+
+Routes (admin, never agents): `GET /api/office/books/archive` (`{years, runs, note}`), `GET
+/api/office/books/archive/bookings?year=` (filters `account`, `counter`, `any`, `from`, `to`, `min`, `max`, `side`, `doc`,
+`q`; `offset`, `limit` up to 500), `GET /api/office/books/archive/bookings/<id>` (with `raw`), `GET
+/api/office/books/archive/accounts?year=`, `GET /api/office/books/archive/docs/<id>`, `GET /api/office/books/archive/files/<id>`,
+`POST /api/office/books/archive/check` and `POST /api/office/books/archive/import` (multipart `file`, several allowed),
+`POST /api/office/books/archive/runs/<run>/undo`. In the office log: `import` / `undo` (target `bookarch`), opening a receipt
+and downloading an original file.
+
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
