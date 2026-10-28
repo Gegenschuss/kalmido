@@ -925,9 +925,10 @@ organisation.
   name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
   exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
   (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
-  contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages on
-  the organisation's calendars with their kinds of appointment and bookings (in the archive; the import does not take
-  them over, a booking page belongs to one person).
+  contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
+  office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
+  import does not take them over, a booking page belongs to one person). An open channel stays open in the target
+  organisation: every member there can read its history.
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of

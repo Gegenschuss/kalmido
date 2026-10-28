@@ -109,6 +109,7 @@ UMZ_DROP = {
     "list_files": {"path"},
     "events": {"href"},
     "contacts": {"href"},
+    "notes": {"client_ref"},  # 2.362.0 (#3090, review): the offline outbox mark of the old server (unique per person)
     # 2.278.0 B (#3094): time_entries.billed_at is kept (umz_billed): a billed entry never comes open again (billed twice)
 }
 # 2.273.0 A (#3030): the parts of an account export the import reads (umz_write; people + list_members through the sharing

@@ -197,10 +197,11 @@ TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  #
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
 # 2.362.0 (#3092): the organisation's channels (kind 'channel') the exporting admin reads in the app: the open ones (ox_csq: + the
 # ones they are a member of); RSQ = every team chat room of the archive (+ the channels of the lists of LSQ)
-CSQ = "SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND is_open=1"
+CSQ = "SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND is_open=1 AND archived_at IS NULL"
 RSQ = f"SELECT id FROM tchat_rooms WHERE (kind='list' AND list_id IN ({LSQ})) OR id IN ({CSQ})"
-# 2.362.0 (#3096): the people whose booking page lies on a calendar of the organisation or is billed by its office
-APQ = "SELECT user_id FROM appt_pages WHERE cal_id IN (SELECT id FROM ev_cals WHERE org_id=?) OR office_org_id=?"
+# 2.362.0 (#3096): the booking pages billed by the organisation's office (a business record); ox_apq: + the exporting admin's
+# own page on a calendar of the organisation (another member's bookings only their owner reads in the app: calendars/apptbook.py)
+APQ = "SELECT user_id FROM appt_pages WHERE office_org_id=?"
 # (archive name, table, where; every "?" is the organisation id) -- the order of the archive
 OX_AREAS = (
     ("lists.json", "lists", f"id IN ({LSQ})"),  # 2.223.3 B (#2879, #2880): the lists of LSQ (ox_lsq), not the trash
@@ -394,6 +395,7 @@ OX_NOT_INCLUDED = (
     "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' "
     "pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares",
     "bookmarks, feeds and scheduling polls of the organisation (not yet in this export)",
+    "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels",
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
     "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
 )
@@ -495,11 +497,17 @@ def ox_lsq(by_id):
             f"AND COALESCE(u.kind,'user')!='agent'){own})")
 
 
+def ox_apq(by_id):
+    """2.362.0 (#3096, review): APQ for the exporting admin (their own booking page on a calendar of the organisation too)."""
+    u = int(by_id or 0)
+    return APQ + (f" OR (user_id={u} AND cal_id IN (SELECT id FROM ev_cals WHERE org_id=?))" if u else "")
+
+
 def ox_csq(by_id):
     """2.362.0 (#3092): CSQ for the exporting admin: the open channels of the organisation and the ones they are a member of
     (the rule of collab/teamchan.py tcx_room_ok: an admin manages a closed channel but does not read it)."""
     u = int(by_id or 0)
-    return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND (is_open=1"
+    return ("SELECT id FROM tchat_rooms WHERE kind='channel' AND org_id=? AND ((is_open=1 AND archived_at IS NULL)"
             + (f" OR id IN (SELECT room_id FROM tchat_members WHERE user_id={u})" if u else "") + ")")
 
 
@@ -621,8 +629,10 @@ def ox_build(c, oid, out, by=None):
 
         csq = ox_csq((by or {}).get("id"))  # 2.362.0 (#3092): the channels the admin reads in the app
 
+        apq = ox_apq((by or {}).get("id"))  # 2.362.0 (#3096, review): only booking pages the admin reads in the app
+
         def vis(where):
-            return where.replace(CSQ, csq).replace(LSQ, lsq)
+            return where.replace(CSQ, csq).replace(APQ, apq).replace(LSQ, lsq)
         for name, table, where in OX_AREAS:
             if table not in have:
                 continue
