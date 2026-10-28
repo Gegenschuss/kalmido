@@ -45,8 +45,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     w.eval(`listModal(0, 'Kalmido')`);
     await until(() => d.querySelector('.modal #l-name'));
     const md = () => [...d.querySelectorAll('.modal')].pop();
-    const st = w.eval(`(() => { const m = [...document.querySelectorAll('.modal')].pop(); return {kp: m.querySelector('#l-kindp')?.checked, kind: m.querySelector('#l-kind')?.value, card: m.querySelector('.ptcard.on')?.dataset.pt, secs: m.querySelector('#l-ptsecs')?.checked, shown: !m.querySelector('.lptype')?.hidden}; })()`);
-    check(st.kp && st.kind === 'project' && st.card === 'software' && st.secs && st.shown, `${u}: New project in the folder starts as Software with its sections ` + JSON.stringify(st));
+    const st = w.eval(`(() => { const m = [...document.querySelectorAll('.modal')].pop(); return {card: m.querySelector('.ptcard.on')?.dataset.pt, secs: m.querySelector('#l-ptsecs')?.checked, shown: !m.querySelector('.lptype')?.hidden}; })()`);
+    check(st.card === 'software' && st.secs && st.shown, `${u}: New project in the folder starts as Software with its sections ` + JSON.stringify(st));
     md().querySelector('#l-name').value = 'Fresh';
     click(w, md().querySelector('[data-m="save"]'));
     const x = await until(async () => ((await call(ck, 'GET', '/api/state')).lists || []).find(l => l.name === 'Fresh'));
@@ -63,8 +63,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     // a folder without a type: the dialog as before
     w.eval(`listModal(0, 'Plain')`);
     await until(() => [...d.querySelectorAll('.modal #l-name')].length);
-    const pl = w.eval(`(() => { const m = [...document.querySelectorAll('.modal')].pop(); return {kp: !!m.querySelector('#l-kindp')?.checked, card: m.querySelector('.ptcard.on')?.dataset.pt}; })()`);
-    check(!pl.kp && !pl.card, `${u}: a folder without a type keeps the simple list ` + JSON.stringify(pl));
+    const pl = w.eval(`(() => { const m = [...document.querySelectorAll('.modal')].pop(); return {card: m.querySelector('.ptcard.on')?.dataset.pt}; })()`);
+    check(!pl.card, `${u}: a folder without a type keeps the simple list ` + JSON.stringify(pl));
     w.close();
   }
 

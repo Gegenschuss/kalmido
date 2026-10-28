@@ -1259,7 +1259,6 @@ function lmFolderPtype(md, folder) {
   if (!md || $('.lhdr', md) || md._ptUser || !$('.ptcards', md)) return;
   const t = folderPtype(folder), card = $(`.ptcard[data-pt="${t}"]`, md);
   if (!card) return;
-  if (t && $('#l-kindp', md) && !$('#l-kindp', md).checked) { $('#l-kindp', md).checked = true; $('#l-kindp', md).dispatchEvent(new Event('change', {bubbles: true})); }
   $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === card); x.setAttribute('aria-checked', x === card); });
   $('.ptsecs', md).hidden = !PTYPE_SECS[t]; $('#l-ptsecsl', md).textContent = ptSecsLine(t);
   if ($('#l-ptsecs', md)) $('#l-ptsecs', md).checked = !!t;
