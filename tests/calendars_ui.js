@@ -5,13 +5,13 @@
 process.env.TZ = 'Europe/Berlin';
 const fs = require('fs');
 const path = require('path');
-const {boot, errs, sleep} = require('./boot');
+const {boot, errs, sleep, idle} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ids = JSON.parse(fs.readFileSync(path.join(__dirname, 'cal_ids.json'), 'utf8'));
 const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: b ? JSON.stringify(b) : undefined})).json();
-const until = async (fn, ms = 4000) => { for (let t = 0; t < ms; t += 100) { if (fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const STUB = 'http://127.0.0.1:8095';
 (async () => {
   let w = await boot({user: 'alice'}), d = w.document;
@@ -39,7 +39,7 @@ const STUB = 'http://127.0.0.1:8095';
   const a = pop.querySelector('.cevdesc a');
   check(a && a.getAttribute('href') === 'https://example.org/agenda?x=1' && a.target === '_blank' && /noopener/.test(a.rel), 'popover: http(s) URL linked');
   check(!pop.querySelector('a[href^="javascript"]') && /javascript:alert\(1\)/.test(pop.textContent), 'popover: javascript: stays plain text');
-  click(w, pop.querySelector('[data-cevtask]')); await sleep(1200);
+  click(w, pop.querySelector('[data-cevtask]')); await idle(w);
   let t = [...w.eval('S.tasks').values()].filter(x => x.title === 'Lunch with Sam').pop();
   check(t && t.due === w.eval('today()') && t.due_time === '13:00' && t.duration === 60 && t.list_id === w.eval('inbox().id'), 'task from event: title, date, time, duration, inbox ' + JSON.stringify(t && [t.due, t.due_time, t.duration]));
   check(t && /From calendar: Team/.test(t.content) && /Location: Cafe Central/.test(t.content), 'task from event: note with calendar + place');
@@ -86,17 +86,17 @@ const STUB = 'http://127.0.0.1:8095';
   click(w, d.querySelector('.cevtoday .ghead')); await sleep(100);
   // offline: the last copy of the range
   w.__offline = true;
-  w.eval(`calInvalidate(); S.cal.items = []; renderView()`); await sleep(500);
+  w.eval(`calInvalidate(); S.cal.items = []; renderView()`); await until(() => d.querySelectorAll('.cevtoday .cevrow').length === rows.length, 5000);
   check(d.querySelectorAll('.cevtoday .cevrow').length === rows.length, 'offline: events from the local copy');
   w.__offline = false; await sleep(100);
   await api(w, 'PATCH', '/api/settings', {cal_today: '0'});
   w.close();
-  w = await boot({user: 'alice', hash: 'today'}); d = w.document; await sleep(500);
+  w = await boot({user: 'alice', hash: 'today'}); d = w.document; await idle(w);
   check(!d.querySelector('.cevtoday'), 'Today: block off by the setting');
   await api(w, 'PATCH', '/api/settings', {cal_today: '1'});
   await w.eval('load()');
   // ---- settings
-  w.eval(`settingsModal('calendars')`); await sleep(900);
+  w.eval(`settingsModal('calendars')`); await idle(w);
   let md = d.querySelector('.smodal');
   check(!md.querySelector('#sp-integr').classList.contains('hidden') && md.querySelector('#s-cals-h')?.textContent === 'Calendars', 'settings: Integrations > Calendars');
   let subs = [...md.querySelectorAll('#s-cals .calsub')];
@@ -105,31 +105,31 @@ const STUB = 'http://127.0.0.1:8095';
   check(md.querySelector('#s-caltoday')?.checked === true, 'settings: Today switch');
   const dailyRow = () => md.querySelector(`#s-cals [data-cal="${ids.daily}"]`);
   check(dailyRow().classList.contains('off') && !dailyRow().querySelector('[data-calact="vis"]').checked, 'settings: hidden calendar greyed out');
-  const vis = dailyRow().querySelector('[data-calact="vis"]'); vis.checked = true; vis.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  const vis = dailyRow().querySelector('[data-calact="vis"]'); vis.checked = true; vis.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   let j = await api(w, 'GET', '/api/calendars');
   check(j.subs.find(x => x.id === ids.daily).visible === true && !dailyRow().classList.contains('off'), 'settings: show a calendar again');
   check(w.eval('S.calendars.subs') === 4, 'settings: visible count updated');
   click(w, dailyRow().querySelector('[data-calact="color"]')); await sleep(150);
-  click(w, d.querySelector('#pop .cpal [data-c="#c084fc"]')); await sleep(700);
+  click(w, d.querySelector('#pop .cpal [data-c="#c084fc"]')); await idle(w);
   j = await api(w, 'GET', '/api/calendars');
   check(j.subs.find(x => x.id === ids.daily).color === '#c084fc', 'settings: colour from the palette');
-  click(w, md.querySelector(`#s-cals [data-cal="${ids.good}"] [data-calact="refresh"]`)); await sleep(1200);
+  click(w, md.querySelector(`#s-cals [data-cal="${ids.good}"] [data-calact="refresh"]`)); await idle(w);
   check(/Calendar updated/.test(d.querySelector('#toast').textContent), 'settings: refresh now');
   click(w, md.querySelector(`#s-cals [data-cal="${ids.dav}"] [data-calact="edit"]`)); await sleep(200);
   let em = [...d.querySelectorAll('.modal')].pop();
   check(em.querySelector('#ce-pw') && em.querySelector('#ce-pw').value === '' && /saved/.test(em.querySelector('#ce-pw').placeholder), 'edit: password field empty, "saved"');
   em.querySelector('#ce-name').value = 'Work (DAV)';
-  click(w, em.querySelector('[data-m="save"]')); await sleep(900);
+  click(w, em.querySelector('[data-m="save"]')); await idle(w);
   j = await api(w, 'GET', '/api/calendars');
   check(j.subs.find(x => x.id === ids.dav).name === 'Work (DAV)' && j.subs.find(x => x.id === ids.dav).status === 'ok', 'edit: renamed, password kept');
   // add: blocked address -> error in the dialog
   click(w, md.querySelector('[data-m="cal-add"]')); await sleep(200);
   let am = [...d.querySelectorAll('.modal')].pop();
   am.querySelector('#ca-url').value = 'http://ten.test/private.ics';
-  click(w, am.querySelector('[data-m="ok"]')); await sleep(900);
+  click(w, am.querySelector('[data-m="ok"]')); await idle(w);
   check(d.body.contains(am) && !am.querySelector('#ca-err').hidden && /private network/.test(am.querySelector('#ca-err').textContent), 'add: private address refused in the dialog');
   am.querySelector('#ca-url').value = STUB + '/google.ics'; am.querySelector('#ca-name').value = 'Added in UI';
-  click(w, am.querySelector('[data-m="ok"]')); await sleep(1500);
+  click(w, am.querySelector('[data-m="ok"]')); await idle(w);
   check(!d.body.contains(am) && [...md.querySelectorAll('#s-cals .calsub')].some(r => /Added in UI/.test(r.textContent)), 'add: ICS link added, list redrawn');
   // add: CalDAV (find calendars, choose, add)
   click(w, md.querySelector('[data-m="cal-add"]')); await sleep(200);
@@ -137,28 +137,28 @@ const STUB = 'http://127.0.0.1:8095';
   click(w, am.querySelector('#ca-kind [data-k="caldav"]'));
   check(!am.querySelector('#ca-dav').hidden && am.querySelector('#ca-ics').hidden && am.querySelector('[data-m="ok"]').textContent === 'Find calendars', 'CalDAV form');
   am.querySelector('#ca-srv').value = STUB + '/'; am.querySelector('#ca-user').value = 'alice'; am.querySelector('#ca-pw').value = 'wrong';
-  click(w, am.querySelector('[data-m="ok"]')); await sleep(900);
+  click(w, am.querySelector('[data-m="ok"]')); await idle(w);
   check(/wrong username or password/.test(am.querySelector('#ca-err').textContent), 'CalDAV: wrong password shown');
   am.querySelector('#ca-pw').value = 'secret-pw'; am.querySelector('#ca-pw').dispatchEvent(new w.Event('input', {bubbles: true}));
-  click(w, am.querySelector('[data-m="ok"]')); await sleep(1000);
+  click(w, am.querySelector('[data-m="ok"]')); await idle(w);
   check(am.querySelectorAll('#ca-cals [data-ci]').length === 1 && /Work/.test(am.querySelector('#ca-cals').textContent) && am.querySelector('[data-m="ok"]').textContent === 'Add', 'CalDAV: calendars found');
-  click(w, am.querySelector('[data-m="ok"]')); await sleep(1500);
+  click(w, am.querySelector('[data-m="ok"]')); await idle(w);
   j = await api(w, 'GET', '/api/calendars');
   check(!d.body.contains(am) && j.subs.filter(x => x.kind === 'caldav').length === 2, 'CalDAV: added');
   // remove
   const added = j.subs.find(x => x.name === 'Added in UI');
-  click(w, md.querySelector(`#s-cals [data-cal="${added.id}"] [data-calact="del"]`)); await sleep(900);
+  click(w, md.querySelector(`#s-cals [data-cal="${added.id}"] [data-calact="del"]`)); await idle(w);
   j = await api(w, 'GET', '/api/calendars');
   check(!j.subs.some(x => x.id === added.id) && !md.querySelector(`#s-cals [data-cal="${added.id}"]`), 'remove');
   // admin allow-list
-  click(w, md.querySelector('[data-sec="users"]')); await sleep(600);
+  click(w, md.querySelector('[data-sec="users"]')); await idle(w);
   const ta = md.querySelector('#s-calhosts');
   check(ta && ta.value === 'evil.test:8095, other.lan' && /127\.0\.0\.1:8095/.test(md.querySelector('#sp-users').textContent), 'admin: allow-list with the env note');
   ta.value = 'evil.test:8095 other.lan nextcloud.home.arpa';
-  ta.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);  // 1.5: saved when leaving the field
+  ta.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);  // 1.5: saved when leaving the field
   check(ta.value === 'evil.test:8095, other.lan, nextcloud.home.arpa', 'admin: allow-list saved + normalized');
   ta.value = 'http://nope/';
-  ta.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
+  ta.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
   check(/Not a host name/.test(d.querySelector('#toast').textContent), 'admin: invalid entry refused');
   md.remove(); w.close();
   // ---- carol: no admin section; German labels
@@ -167,7 +167,7 @@ const STUB = 'http://127.0.0.1:8095';
   w = await boot({user: 'carol', hash: 'today'}); d = w.document;
   await until(() => d.querySelector('.cevtoday'));
   check(/Termine heute/.test(d.querySelector('.cevtoday .ghead')?.textContent || ''), 'German: "Termine heute"');
-  w.eval(`settingsModal('calendars')`); await sleep(900);
+  w.eval(`settingsModal('calendars')`); await idle(w);
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-cals-h')?.textContent === 'Kalender' && md.querySelectorAll('#s-cals .calsub').length === 20 && /Kalender hinzufügen/.test(md.textContent), 'German settings, carol\'s 20 calendars');
   check(!md.querySelector('#s-calhosts'), 'non-admin: no allow-list');

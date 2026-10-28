@@ -16,7 +16,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
 const SECRET = 'Moving plan: the spare key is with the neighbour';
 const FILETXT = 'Inventory list of the boxes';
 const PASS = 'correct horse battery staple';
-const until = async (fn, n = 400) => { for (let i = 0; i < n; i++) { const v = await fn(); if (v) return v; await sleep(250); } return null; };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 250 : 100000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await sleep(600);

@@ -81,17 +81,19 @@ function ofu_sync(inp, d) {
 const ofdSvcName = (s, d) => (ofdLang(d) === 'en' ? s.name_en || s.name_de : s.name_de || s.name_en) || '';
 
 // ---- loading
+// 2.358.0 B (#3302): a switch of kind / filter while a list loads is no longer dropped: the answer of the old one is thrown
+// away and the list loaded again (before: the offers stayed under "Invoices" after a quick click on the kind)
+const ofdListUrl = () => `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}${ofd_grpQs()}`;
 async function ofdLoadList(force) {
-  if (OFD.loading) return;
+  if (OFD.loading) { if (force) OFD.loadAgain = true; return; }
   if (OFD.list && !force) return;
   if (OFD.kind === 'archive') { if (typeof OIM !== 'undefined') OIM.list = null; OFD.list = []; ofdDraw(); return; }  // 2.39.1 (#1182): office_import.js loads it
-  OFD.loading = true;
-  const k0 = OFD.kind, st0 = OFD.status;  // 2.356.0 C (#3004): a tab changed while this list loaded -> load that one instead
-  try { const j = await api('GET', `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}${ofd_grpQs()}`);
-    if (OFD.kind !== k0 || OFD.status !== st0) { OFD.loading = false; return ofdLoadList(true); }
-    OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; tri_meta(j); }  // 2.147.1 B (#2054): dunning; 2.144.10 C (#2576): + trial filter / meta
-  catch (x) { OFD.list = []; OFD.err = x.message || tr('unknown'); }
+  OFD.loading = true; OFD.loadAgain = false;
+  const u = ofdListUrl();
+  try { const j = await api('GET', u); if (u === ofdListUrl()) { OFD.list = j.docs || []; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; tri_meta(j); } }  // 2.147.1 B (#2054): dunning; 2.144.10 C (#2576): + trial filter / meta
+  catch (x) { if (u === ofdListUrl()) { OFD.list = []; OFD.err = x.message || tr('unknown'); } }
   OFD.loading = false;
+  if (OFD.loadAgain || u !== ofdListUrl()) { ofdLoadList(true); return; }
   ofdDraw();
 }
 async function ofdLoadDoc(id, force) {

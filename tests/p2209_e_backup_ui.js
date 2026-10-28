@@ -15,7 +15,7 @@ const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 if (!process.env.P2209E_NOSTART && !process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(250); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 // the retry around pg_restore, with pg_restore itself stubbed (no database is restored)
 const RETRY = String.raw`

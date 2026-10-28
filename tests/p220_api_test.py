@@ -39,7 +39,7 @@ GH = "http://127.0.0.1:8090"      # fake GitHub Enterprise (API under /api/v3)
 GT = "http://127.0.0.1:8091"      # fake Gitea (API under /api/v1)
 TOKEN = "ghp_fake_read_only_token_7f3a9c"
 GTOKEN = "gitea-fake-token-51b2"
-from kt import FAILS, OKS, check, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 SEEN = []
 
 
@@ -48,14 +48,6 @@ class S(requests.Session):
         r = super().request(*a, **k)
         SEEN.append(r.text)
         return r
-
-
-def sess(user, pw="password123"):
-    s = S()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 class Api:
@@ -137,13 +129,13 @@ start()
 s0 = S()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice")
+A = sess("alice", session_cls=S)
 ids = {"alice": 1}
 for u in ("bob", "carol", "dave"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
-Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
+Bo, Ca, Da = sess("bob", session_cls=S), sess("carol", session_cls=S), sess("dave", session_cls=S)
 for x in (A, Bo, Ca, Da):
     x.patch(B + "/api/settings", json={"lang": "en"})
 r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
@@ -510,7 +502,7 @@ check(TOKEN not in _dbtext(), "no token in the database files")
 # ================================================================== without KALMIDO_SECRET_KEY
 start(with_key=False)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice")
+A = sess("alice", session_cls=S)
 P = A.post(B + "/api/lists", json={"name": "App", "kind": "project"}).json()["id"]
 r = A.post(B + f"/api/lists/{P}/repos", json=body)
 check(r.status_code == 409 and "KALMIDO_SECRET_KEY" in r.json().get("error", ""), f"no key: a token cannot be stored: {r.text[:120]}")

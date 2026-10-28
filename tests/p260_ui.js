@@ -13,11 +13,10 @@
 // (K18); the week title on one line on the Fold cover screen (K25); the date column never cut on the left (K07); text
 // contrast >= 4.5:1 (3:1 for large text) in the views the audit measured (K17); and at 390 px with touch every interactive
 // element of the main views >= 44 x 44 px, apart from the listed exceptions (K10) (screenshots with P260_SHOTS=<dir>).
-const {spawn, execFileSync} = require('child_process');
-const fs = require('fs'), os = require('os'), path = require('path');
+const {execFileSync} = require('child_process');
+const path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
 const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
-const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -27,7 +26,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -43,35 +42,9 @@ const TOUCH_OK = [
   [/^div\.ghead\[collapse\] in \.group .*x(3[6-9]|4[0-3])$/, 'section headers: full-width rows, 36-43 px high'],
 ];
 
-async function firefox(fn, touch) {
-  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('p260_ui: Firefox part skipped (no firefox on PATH)'); return; }
-  const PORT = 9300 + Math.floor(Math.random() * 600);
-  const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p260-'));
-  const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
-    ...(touch ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]] : [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]])];
-  fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
-  let ws, seq = 0; const pend = new Map();
-  try {
-    for (let i = 0; i < 90 && !ws; i++) {
-      try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
-    }
-    if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
-    ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
-    const cmd = (method, params = {}) => new Promise((res, rej) => { const id = ++seq; pend.set(id, {res, rej, method}); ws.send(JSON.stringify({id, method, params})); });
-    const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
-    await cmd('session.new', {capabilities: {}});
-    const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
-    const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
-    const nav = url => cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
-    const shot = async name => { const dir = process.env.P260_SHOTS; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
-    await fn({cmd, ev, nav, ctx, shot});
-  } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
-    try { ws && ws.close(); } catch { /* gone */ }
-    try { ff.kill(); } catch { /* gone */ }
-    await sleep(500); fs.rmSync(prof, {recursive: true, force: true});
-  }
-}
+// 2.358.0 C (#2782): the shared Firefox driver (tests/ff.js, with idle() / until()) instead of an own copy; lazy: the app loads
+// its modules itself, as before
+const firefox = require('./ff')({tag: 'p260_ui', check, shots: 'P260_SHOTS', lazy: true});
 
 // the header, measured in the page: title (all of it / at least 12 characters), "…", the bell, anything sticking out 2.152.3 (#2619): with sidebar B the bell sits in the head bar #kbar
 const HEAD = `(() => {
@@ -206,7 +179,8 @@ const TOUCH = `(() => {
   md = d.querySelector('.smodal');
   const off = md.querySelector('.aimodoff');
   check(off && !md.querySelector('[data-pane="ai"] [data-feat="agents"]') && /switched off for you/.test(off.textContent), 'module off: a hint instead of the switch');
-  click(w, off.querySelector('[data-m="go-modules"]')); await sleep(300);
+  click(w, off.querySelector('[data-m="go-modules"]'));
+  await until(() => md.querySelector('[data-pane="modules"] [data-feat="agents"]'));  // 2.358.0 C (#2782): the state, not 300 ms
   check(md.querySelector('.snav [data-sec="modules"]').classList.contains('on') || md.querySelector('.snav [data-sec="modules"]').getAttribute('aria-selected') === 'true', '"Open Modules" switches to Modules');
   check(md.querySelector('[data-pane="modules"] [data-feat="agents"]'), 'the switch is in Modules');
   md.remove(); w.close();
@@ -291,10 +265,11 @@ const TOUCH = `(() => {
   await until(() => /Helper now works in/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button'));  // CI of 2.307.7: the own toast before its button (an older toast and its Undo can still be there on a slow runner)
   let mm = await members();
   check(mm.some(p => p.user_id === ag2.id) && !mm.some(p => p.user_id === ag.id) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'switched to Helper in one step, with Undo');
-  d.querySelector('#toast button')?.click(); await sleep(1400);
-  mm = await members();
+  d.querySelector('#toast button')?.click();
+  await until(async () => { mm = await members(); return mm.some(p => p.user_id === ag.id) && !mm.some(p => p.user_id === ag2.id); }, 100);  // 2.358.0 C (#2782)
   check(mm.some(p => p.user_id === ag.id) && !mm.some(p => p.user_id === ag2.id), 'Undo: Claude is back');
-  agsel().value = ''; agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  agsel().value = ''; agsel().dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(async () => !(await members()).some(p => p.user_id === ag.id), 100);  // 2.358.0 C (#2782)
   check(!(await members()).some(p => p.user_id === ag.id), 'No agent: Claude no longer sees the list');
   click(w, md.querySelector('[data-m="list-edit"]')); await idle(w);
   check(d.querySelector('.modal.lmodal') && !d.querySelector('.modal.shmodal'), '"List settings…" goes back to the list dialog');
@@ -312,13 +287,16 @@ const TOUCH = `(() => {
   // ================= Firefox
   const W5 = [[360, 780, 1], [390, 844, 1], [904, 1080, 1], [1280, 800, 0], [1920, 1080, 0]];
   for (const touch of [1, 0]) {
-    await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: uf}) => {
       await nav(B + 'static/icon.svg');
       const lgi = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
       check(lgi === 200, 'Firefox: login');
       // a fresh document per view (a distinct URL: a hash-only change after the icon page did not always load the app)
       let nr = 0;
-      const open = async hash => { await nav(B + 'static/icon.svg'); await nav(B + '?v=' + (++nr) + '#' + hash); for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); };
+      // 2.358.0 C (#2782): then until the app's requests are done (idle) and two frames are drawn, instead of 1.5-2.2 s per view
+      const frames = () => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
+      const settle = async () => { await idle({quiet: 300}); await frames(); };
+      const open = async hash => { await nav(B + 'static/icon.svg'); await nav(B + '?v=' + (++nr) + '#' + hash); await uf(`!!document.querySelector('#top h1')`, {timeout: 20000}); await settle(); };
       for (const [Wd, Hh] of W5.filter(x => x[2] === touch)) {
         for (const theme of ['dark', 'light']) {
           await v1(ag.token, 'GET', '/agent/events');  // stays connected
@@ -327,10 +305,10 @@ const TOUCH = `(() => {
           await ev(`localStorage.setItem('tasks.theme', ${JSON.stringify(JSON.stringify(theme))}); 1`);
           // K01 / K02: the header on a long project name, Today and the calendar, with and without the task panel
           for (const [hash, name] of [['l/' + L, 'project'], ['today', 'today'], ['cal', 'calendar']]) {
-            await open(hash); await sleep(2200);
-            for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1 .ht')`)); i++) await sleep(300);
+            await open(hash);
+            await uf(`!!document.querySelector('#top h1 .ht')`); await frames();
             for (const panel of [0, 1]) {
-              if (panel) { if (name === 'calendar') continue; await ev(`openDetail(${T2})`); await sleep(700); }
+              if (panel) { if (name === 'calendar') continue; await ev(`openDetail(${T2})`); await settle(); }
               const h = await ev(HEAD);
               const tag = `${Wd}px ${theme} ${name}${panel ? ' + panel' : ''}`;
               if (h.none) { check(false, `${tag}: no header: ${h.none}`); continue; }
@@ -347,12 +325,12 @@ const TOUCH = `(() => {
               if (theme === 'dark') await shot(`p260-head-${name}${panel ? '-panel' : ''}-${Wd}.png`);
               // 2.26.1 (#953): closing the task on a touch screen goes back one history step; that traversal must be over before
               // the next navigation (otherwise Firefox's navigate never answers)
-              if (panel) { await ev(`typeof closeDetail === 'function' ? closeDetail() : null`).catch(() => {}); await sleep(800); }
+              if (panel) { await ev(`typeof closeDetail === 'function' ? closeDetail() : null`).catch(() => {}); await sleep(800); }  // on purpose: the history step has no state to wait for
             }
           }
           // K18: the toast above the composer, the tab bar and the + button
-          await open('l/' + L); await sleep(2000);
-          await ev(`toast('Done: Write the texts', () => {})`); await sleep(300);
+          await open('l/' + L);
+          await ev(`toast('Done: Write the texts', () => {})`); await uf(`!!document.querySelector('#toast:not(.hidden)')`); await frames();
           const ts = await ev(`(() => { const t = document.querySelector('#toast').getBoundingClientRect(), tops = ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)'].map(s => document.querySelector(s)).filter(e => e && e.offsetWidth).map(e => e.getBoundingClientRect()).filter(r => r.top > innerHeight / 2);
             return {bottom: t.bottom, top: t.top, hit: tops.filter(r => r.top < t.bottom - 0.5 && r.bottom > t.top && r.left < t.right && r.right > t.left).length, n: tops.length}; })()`);
           check(ts.hit === 0 && ts.top >= 0, `${Wd}px ${theme}: the toast covers neither the composer nor the tab bar ${JSON.stringify(ts)}`);
@@ -363,8 +341,8 @@ const TOUCH = `(() => {
             check(cut === 0, `${Wd}px ${theme}: no date cut on the left`);
           }
           // K25: the week title on one line
-          await open('cal'); await sleep(1500);
-          await ev(`S.calMode = 'week'; renderView(); 1`); await sleep(500);
+          await open('cal');
+          await ev(`S.calMode = 'week'; renderView(); 1`); await settle();
           const wt = await ev(`(() => { const h = document.querySelector('#view .calbar h2'); if (!h) return null; const s = getComputedStyle(h); return {txt: h.textContent, h: h.getBoundingClientRect().height, lh: parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.3}; })()`);
           check(wt && wt.h <= wt.lh * 1.5 + 1, `${Wd}px ${theme}: the week title on one line ${JSON.stringify(wt)}`);
           if (theme === 'dark' && Wd === 360) await shot(`p260-week-${Wd}.png`);
@@ -372,8 +350,8 @@ const TOUCH = `(() => {
           if (Wd === 1280) {
             for (const [hash, js, nm] of [['all', `document.querySelector('[data-act=rm-view][data-k=timeline]')?.click()`, 'roadmap'], ['today', `openPalette(); setTimeout(() => { const i = document.querySelector('.palette input'); i.value = 'Web'; i.dispatchEvent(new Event('input', {bubbles: true})); }, 200)`, 'palette'],
               ['agents/' + ag.id, '', 'chat'], ['today', `settingsModal('ai')`, 'settings agents'], ['l/' + L, `shareModal(${L})`, 'share dialog']]) {
-              await open(hash); await sleep(1800);
-              if (js) { await ev(`(() => { ${js}; return 1; })()`); await sleep(900); }
+              await open(hash);
+              if (js) { await ev(`(() => { ${js}; return 1; })()`); await settle(); }
               const bad = await ev(CONTRAST);
               check(!bad.length, `${theme} ${nm}: text contrast >= 4.5:1 ${JSON.stringify(bad.slice(0, 6))}`);
             }
@@ -385,8 +363,8 @@ const TOUCH = `(() => {
               ['today', `settingsModal('ai')`], ['today', `settingsModal('notify')`], ['today', `settingsModal('users')`], ['l/' + L, `shareModal(${L})`], ['l/' + L, `listModal(${L})`]];
             const all = {};
             for (const [hash, js] of views) {
-              await open(hash); await sleep(1800);
-              if (js) { await ev(`(() => { ${js}; return 1; })()`); await sleep(900); }
+              await open(hash);
+              if (js) { await ev(`(() => { ${js}; return 1; })()`); await settle(); }
               for (const x of await ev(TOUCH)) if (!TOUCH_OK.some(([re]) => re.test(x))) (all[x] = all[x] || []).push(hash + (js ? ' ' + js.slice(0, 24) : ''));
             }
             const keys = Object.keys(all);
@@ -394,7 +372,7 @@ const TOUCH = `(() => {
           }
         }
       }
-    }, touch);
+    }, !!touch);  // ff.js: true = touch, false = a mouse
   }
   await call('POST', '/api/time/stop', {});
 

@@ -11,7 +11,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const st = async (ck = CK) => call('GET', '/api/state', null, ck);
 const taskOf = async (id, ck = CK) => (await st(ck)).tasks.find(t => t.id === id);
 const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || '';

@@ -7,7 +7,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
-const until = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(80); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 80});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

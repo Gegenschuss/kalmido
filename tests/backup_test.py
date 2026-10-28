@@ -66,7 +66,10 @@ def dbx(sql, args=()):
 
 
 def state(s=None):
-    return (s or A).get(B + "/api/admin/backups").json()
+    r = (s or A).get(B + "/api/admin/backups")
+    # 2.358.0 A (#3279): CI v2.307.1 read an empty / HTML body here (a 500 of the listing): name status + text
+    assert r.ok and r.headers.get("Content-Type", "").startswith("application/json"), f"GET /api/admin/backups: {r.status_code} {r.text[:200]!r}"
+    return r.json()
 
 
 def wait_idle(n_before=None, t=30):
@@ -332,6 +335,40 @@ check(len([n for n in left if n.endswith("-safety.zip")]) == 3 and len([n for n 
 check(os.path.exists(os.path.join(BK, "notes.txt")), "unrelated files are never deleted")
 os.remove(os.path.join(BK, "notes.txt"))
 A.patch(B + "/api/admin/backups", json={"keep_daily": 14, "keep_weekly": 8})
+
+# 2.358.0 A (#3279): the retention of a running backup deletes files while the list is read (CI v2.307.1: a 500 of
+# GET /api/admin/backups in backup_now above). A file that is gone between the directory listing and its size / manifest
+# is left out, never an error.
+VANISH = r"""
+import json, os
+from kalmido.admin import backup as bk
+n = "kalmido-backup-20200101-030000-auto.zip"
+full, real, res = os.path.join(bk.BK_DIR, n), os.path.getsize, {}
+for when in ("before size", "after size"):
+    open(full, "wb").write(b"x")
+    def size(p, _w=when):
+        if os.path.basename(p) != n:
+            return real(p)
+        if _w == "before size":
+            os.remove(full)
+        v = real(p)
+        os.remove(full)
+        return v
+    os.path.getsize = size
+    try:
+        res[when] = n in [x["name"] for x in bk.bk_list()]
+    except Exception as e:
+        res[when] = repr(e)
+    os.path.getsize = real
+print(json.dumps(res))
+"""
+r = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", VANISH],
+                   capture_output=True, text=True)
+try:
+    res = json.loads(r.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    res = {"error": (r.stdout + r.stderr)[-400:]}
+check(res == {"before size": False, "after size": False}, f"a backup deleted while the list is read is left out: {res}")
 
 # ---- restore a listed backup
 # 2.190.0 R (#1991): push subscriptions of sessions go with the sessions, '' (no session) stays

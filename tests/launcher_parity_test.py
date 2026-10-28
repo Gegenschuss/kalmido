@@ -15,16 +15,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.join(HERE, "..", "mcp")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
+import kt  # noqa: E402
+from kt import check  # noqa: E402  2.358.0 D (#2783): shared helpers (tests/kt.py)
 
 
 def read(name):
@@ -340,5 +332,5 @@ check(aj.job_name("x", parent=5, jobs=JS) == "Alma B", "a part job: the leader's
 check(aj.job_name("x", jobs=JS) in aj.JOB_NAMES and aj.job_name("x", jobs=JS) != "Alma", "else a free name of the list")
 check(all(aj.NAME_RE.match(n + ": ") for n in aj.JOB_NAMES) and len(set(aj.JOB_NAMES)) == len(aj.JOB_NAMES), "every listed name is read back as a name")
 
-print(f"launcher_parity: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+print(f"launcher_parity: {kt.OKS[0]} ok, {len(kt.FAILS)} failed")
+sys.exit(1 if kt.FAILS else 0)
