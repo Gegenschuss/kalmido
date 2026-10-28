@@ -9,6 +9,12 @@
 // waits for one person's decision). Everything stays within the organisation; the server decides what each person sees.
 const clientsOn = () => feat('clients');
 const workloadOn = () => feat('workload') && collab();
+// 2.380.2 (#3407): the Einsatzplan follows the shown workspace: a company = that organisation (no picker), Private = not in
+// the menus (one person, nothing to plan; a link or a notification still opens it), All = the picker as before
+const wlWsOrg = () => { const ws = wsOn() ? wsCur() : 'all'; return ws.startsWith('org:') ? +ws.slice(4) : null; };
+const wlOrg = () => wlWsOrg() || WLV.org;
+const wlShown = () => workloadOn() && !(wsOn() && wsCur() === 'private');
+if (typeof p61b_wsOn === 'function') p61b_wsOn('workload', after => { if (!after) return; WLV.data = null; if (S.route?.mod === 'workload' && WLV.tab === 'wl') wlLoad(); });
 const formsOn = () => feat('forms');
 const CLV = {data: null, id: null, loading: false, seq: 0, month: null};
 const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl'};  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
@@ -321,7 +327,7 @@ document.addEventListener('change', async e => {
 async function wlLoad() {
   const seq = ++WLV.seq;
   WLV.loading = true;
-  const q = new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})});
+  const q = new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})});
   try { const j = await api('GET', '/api/workload?' + q); if (seq === WLV.seq) WLV.data = j; } catch { if (seq === WLV.seq) WLV.data = {error: true}; }
   WLV.loading = false;
   if (S.route.mod === 'workload' && seq === WLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); }
@@ -342,9 +348,9 @@ function viewWorkload() {
   };
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<span class="wln"><b>${esc(p.display_name)}</b><button type="button" class="linkbtn wlcap" data-act="wl-cap" data-uid="${p.id}" ${p.own || S.me?.is_admin ? '' : 'disabled'} title="${esc(tr('Hours per week'))}">${esc(tr('{0} h / week', fmtNum(p.capacity_h, 1)))}</button></span></span></th>${p.weeks.map((c, i) => cell(p, c, i)).join('')}<td class="wlc wlnd">${p.nodate.tasks ? `<button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="nd"><span class="wlt">${esc(trn('{0} task', '{0} tasks', p.nodate.tasks))}</span></button>` : ''}</td></tr>`).join('');
   return `<div class="dash wload">${ab2_tabs('wl')}<div class="clhead"><span class="spacer"></span>
-      ${d.orgs.length > 1 ? `<select id="wl-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+      ${d.orgs.length > 1 && !wlWsOrg() ? `<select id="wl-org" aria-label="${esc(tr('Organisation'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
-      <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
+      <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
     <div class="muted wlnote">${tr('Only what you can see.')}<div class="shint">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate.')}</div></div>
     <div class="wlwrap"><table class="wltable"><thead><tr><th scope="col">${tr('Person')}</th>${d.weeks.map(w => `<th scope="col">${esc(wk(w))}</th>`).join('')}<th scope="col">${tr('No date')}</th></tr></thead><tbody>${rows || `<tr><td colspan="${d.weeks.length + 2}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <p class="muted wllegend"><span class="wlk lv-ok"></span>${tr('below 80 %')} <span class="wlk lv-warn"></span>${tr('80–100 %')} <span class="wlk lv-over"></span>${tr('over capacity')}</p></div>`;

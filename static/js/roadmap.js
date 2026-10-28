@@ -32,7 +32,7 @@ function rmSet(patch, how = 'view') {
 }
 const rmZoom = () => RM_Z[rmP().z] ? rmP().z : 'month';
 const rmDW = () => RM_Z[rmZoom()].px * uiZ() * (isMobile() ? 5 / 6 : 1);
-const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && l.kind === 'project');
+const rmProjects = () => S.lists.filter(l => !l.archived && !l.is_inbox && l.kind === 'project' && inWs(l));  // 2.380.2 (#3407): only the shown workspace
 const rmPO = () => rmP().po ?? rmProjects().length > 0;   // "Projects only": default on as soon as one project exists
 const rmHD = () => rmP().hd !== false;                     // "Hide done": default on
 const rmNdOn = () => rmP().nd !== false;                   // 2.0.6 (#189) "No date" rows in open lists: default on
@@ -50,7 +50,7 @@ const rmCrGeo = G => ({s0: G.start, dw: G.dw, days: G.days});  // 2.18.0 (#431):
 // rows: f = folder, g = list (header row with the summary bar), t = task (only in an expanded list)
 function rmModel() {
   const P = rmP(), po = rmPO(), hd = rmHD(), who = rmWho(), sel = (P.ls || []).length ? new Set(P.ls) : null;
-  let lists = [inbox(), ...sideOrder()].filter(l => l && !l.archived && (!po || l.kind === 'project') && (!sel || sel.has(l.id)));
+  let lists = [inbox(), ...sideOrder()].filter(l => l && !l.archived && inWs(l) && (!po || l.kind === 'project') && (!sel || sel.has(l.id)));  // 2.380.2 (#3407): inWs
   const per = new Map(lists.map(l => [l.id, {open: [], shown: [], undated: 0, und: []}]));
   for (const t of S.tasks.values()) {
     const g = per.get(t.list_id); if (!g || t.deleted_at) continue;
@@ -191,7 +191,7 @@ function rmChips(M) {
 }
 function rmPeople() {
   const m = new Map();
-  for (const l of S.lists) if (l.shared && !l.archived) for (const p of listPeople(l)) if (p.user_id && !m.has(p.user_id)) m.set(p.user_id, p);
+  for (const l of S.lists) if (l.shared && !l.archived && inWs(l)) for (const p of listPeople(l)) if (p.user_id && !m.has(p.user_id)) m.set(p.user_id, p);
   return [...m.values()].filter(p => !S.me || p.user_id !== S.me.id).sort((a, b) => a.name.localeCompare(b.name));
 }
 function viewRoadmap() {
