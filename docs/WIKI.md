@@ -19,7 +19,17 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   Below each page, *Linked from* lists the pages that link to it. Renaming a page changes the links to it;
   *Rename folder…* in the menu of a page moves every page of its folder (the links follow as well).
 - **Frontmatter.** A leading block of `key: value` lines between `---` lines is shown as small fields above the text.
-- **Templates.** Pages under `Templates/` are offered as the start of a new page.
+- **Templates.** Pages under `Templates/` are offered as the start of a new page (and in the `/` menu while writing).
+  *2.371:* placeholders are filled in when a page starts from a template: `{{datum}}` (or `{{date}}`) today's date,
+  `{{titel}}` (`{{title}}`) the new page's name, `{{ich}}` (`{{me}}`) your name, `{{cursor}}` the place where writing starts.
+  Other `{{…}}` stay as they are. This happens in the browser, so it works the same in an encrypted space.
+- **Embedding a page (2.371).** `![[Page]]` shows another page of the same space inside this one, `![[Page#Heading]]`
+  only its part from that heading to the next heading of the same level. The embedded text is read only, framed, with its
+  name as a link. Only pages you may read are shown (otherwise *Page not available*); a page that would show itself,
+  embeds deeper than three levels and more than 20 embeds on one page stay a link. `/` > *Embed a page* while writing.
+- **Daily notes (2.371).** *Today* next to *New page* opens the page `journal/YYYY-MM-DD` of the space and creates it
+  when it is missing, from the template `Templates/Tagesnotiz` (or `Templates/Daily note`) when there is one. A daily
+  note shows arrows to the previous and next day that has a note and a date field to jump to any day.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **History (2.123.0).** *History* in the menu of a page lists its saved versions with date and person (saves of one
   person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line

@@ -14823,5 +14823,11 @@
   "Please find attached our document “{0}”.": "Le enviamos adjunto nuestro documento «{0}».",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "En relación con la factura indicada arriba, le emitimos la siguiente nota de abono:",
   "Title or notes contain …": "El título o las notas contienen …",
-  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "Los proyectos nuevos de la carpeta empiezan con este tipo y sus secciones. Los existentes conservan el suyo."
+  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "Los proyectos nuevos de la carpeta empiezan con este tipo y sus secciones. Los existentes conservan el suyo.",
+  "Page not available": "Página no disponible",
+  "This page is already shown here.": "Esta página ya se muestra aquí.",
+  "Section not found: {0}": "Sección no encontrada: {0}",
+  "Daily note": "Nota diaria",
+  "Go to day": "Ir al día",
+  "Embed a page": "Insertar una página"
 }

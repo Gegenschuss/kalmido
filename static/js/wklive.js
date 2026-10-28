@@ -212,6 +212,7 @@ const WKLV_CMDS = [
   ['file', 'picture', N_('Picture or file'), 'picture image bild file datei upload', null],
   ['emb', 'sheet', N_('Embed a table'), 'embed einbetten table tabelle', '[[tabelle:'],
   ['ln', 'link', N_('Link to a page'), 'link verweis page seite [[', '[['],
+  ['embp', 'note', N_('Embed a page'), 'embed einbetten page seite ![[', '![['],  // 2.371.2 (#3151)
   ['date', 'cal', N_('Date'), 'date datum today heute', null],
   ['task', 'check', N_('Task (#)'), 'task aufgabe # ticket', null],  // 2.371.3 (#3333): a search over the tasks the person sees
 ];
@@ -240,7 +241,7 @@ async function wklv_slashPick(ta, c) {
   const p = WK.pg, a = WK.ac.from, z = ta.selectionStart;
   WK.ac = null; $('#wk-ac')?.classList.add('hidden');
   const put = (txt, c0 = txt.length, c1 = c0) => wem_rep(ta, a, z, txt, a + c0, a + c1);
-  if (c.ins) { put(c.ins); if (c.ins.startsWith('[[')) wk_acUpdate(ta); return; }
+  if (c.ins) { put(c.ins); if (c.ins.includes('[[')) wk_acUpdate(ta); return; }
   if (c.k === 'tb') { const h = `| ${tr('Column')} 1 | ${tr('Column')} 2 |\n| --- | --- |\n|  |  |`; put(h, h.length - 5); return; }
   if (c.k === 'code') { put('```\n\n```', 4); return; }
   if (c.k === 'mm') { const t = tr('Topic'), h = `\`\`\`mindmap\n${t}\n  ${tr('Idea')}\n\`\`\``; put(h, 11, 11 + t.length); return; }
@@ -259,7 +260,8 @@ async function wklv_slashPick(ta, c) {
   if (c.k === 'tpl') {
     let t; try { t = await rawFetch('GET', '/api/wiki/pages/' + c.id); if (typeof wkePage === 'function') await wkePage(t); } catch (e) { toast(e.message); return; }
     if (!ta.isConnected) return;
-    put(wk_bodyStrip(t.body).replace(/\n+$/, ''));
+    const f = wk_tplFill(wk_bodyStrip(t.body).replace(/\n+$/, ''), p?.path || '');  // 2.371.2 (#3151): {{datum}}, {{cursor}} …
+    put(f.text, f.at >= 0 ? f.at : f.text.length);
   }
 }
 // ---- 2.371.3 (#3333): "/" -> "Task (#)" puts "#" and opens a search over the tasks the person sees: what follows the "#" is

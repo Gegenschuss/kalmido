@@ -14823,5 +14823,11 @@
   "Please find attached our document “{0}”.": "In de bijlage vindt u ons document “{0}”.",
   "Regarding the invoice referenced above we issue the following credit note:|pack": "Met betrekking tot de hierboven genoemde factuur verstrekken wij u de volgende creditnota:",
   "Title or notes contain …": "Titel of notities bevatten …",
-  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "Nieuwe projecten in de map starten met dit type en zijn secties. Bestaande projecten houden het hunne."
+  "New projects in the folder start with this type and its sections. Existing projects keep theirs.": "Nieuwe projecten in de map starten met dit type en zijn secties. Bestaande projecten houden het hunne.",
+  "Page not available": "Pagina niet beschikbaar",
+  "This page is already shown here.": "Deze pagina wordt hier al getoond.",
+  "Section not found: {0}": "Sectie niet gevonden: {0}",
+  "Daily note": "Dagnotitie",
+  "Go to day": "Naar dag gaan",
+  "Embed a page": "Pagina insluiten"
 }
