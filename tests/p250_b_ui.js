@@ -105,8 +105,8 @@ const today = TC.today();
     await shot('p250-b-kpi-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(`(() => { document.querySelector('[data-kp="go"][data-go="open"]').click(); return 1; })()`);
-    // 2.356.0 (#3004): the address names the kind tab (#office/offers/invoice); 2.380.0 (#3409): the invoices' own area office/invoices
-    check(await ready(ev, `/^#office\\/invoices(\\/invoice)?$/.test(location.hash) && document.querySelector('.ofdkinds [aria-selected="true"]')?.dataset.kind === 'invoice'`, 60), '#1197: a tap on open invoices opens the invoice list');
+    // 2.356.0 (#3004): the address names the kind tab (#office/offers/invoice)
+    check(await ready(ev, `location.hash === '#office/offers/invoice' && document.querySelector('.ofdkinds [aria-selected="true"]')?.dataset.kind === 'invoice'`, 60), '#1197: a tap on open invoices opens the invoice list');
     // the start page block "Figures" (admins of the office)
     await nav(B + '#home');
     check(await ready(ev, `!!document.querySelector('.dc-kpi a[href="#office/kpi"]')`, 60), '#1197: the start page shows the block "Figures" for the admin');

@@ -164,7 +164,7 @@ function bkItemRow(it) {
   const rc = it.kind === 'receipt';
   const t = rc ? (it.title || tr('Receipt')) : `${it.kind === 'credit' ? tr('Credit note') : tr('Invoice')} ${it.number || ''}`;
   const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : it.source === 'skonto' ? tr('Cash discount') /* 2.355.0 C (#2840) */ : ''].filter(Boolean).join(' · ');
-  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/invoices/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
+  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/offers/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
 }
 function bkSettingsHtml() {
   const s = OFC.info?.settings || {};

@@ -73,7 +73,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 7: the reminder dialog warns (high fee); 2.355.0 D (#2846): not yet due = not pickable
-  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
+  w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="invoice"]'), 60);
   d.querySelector('.ofdkinds [data-kind="invoice"]').click();
   await until(() => d.querySelector('[data-ofd="remind"]'), 60);
@@ -99,7 +99,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
 
   // ================= #1368 8 + 9: reminder list and editor
-  w = await boot({hash: 'office/invoices'}); d = w.document;  // 2.380.0 (#3409): the invoices' own area
+  w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('.ofdkinds [data-kind="reminder"]'), 60);
   d.querySelector('.ofdkinds [data-kind="reminder"]').click();
   await until(() => d.querySelectorAll('.ofdlist .ofdrow').length === 2 && !!d.querySelector('.ofdlist .ofdgrp'), 200);

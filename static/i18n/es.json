@@ -14586,9 +14586,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "La nueva contraseña revoca tus contraseñas de aplicación (CalDAV) y tus propios tokens de API; si los necesitas, crea otros nuevos en Ajustes > Cuenta (tokens de API: Avanzado · para desarrolladores). Los agentes conservan sus tokens.",
   "Please type your name without a link or web address.": "Escriba su nombre sin enlaces ni direcciones web.",
   "Saved. {0} booking of someone else stays as it was": ["Guardado. {0} reserva de otra persona queda como estaba", "Guardado. {0} reservas de otras personas quedan como estaban"],
-  "Trial document (SAMPLE)": "Documento de prueba (MUSTER)",
-  "More ways to create": "Más formas de crear",
-  "Archived quotations: {0}": "Presupuestos archivados: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Aún no hay agentes. Crea el tuyo en Ajustes > Agentes > Configurar; entonces aparecerá aquí.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "En tu área privada decides tú. En una organización lo permiten sus admins (Ajustes > Espacios de trabajo: «Los miembros pueden tener sus propios agentes») o un admin del servidor para todos (Admin > Agentes). Sin eso falta «Crear agente» o el agente no puede pasar a esa organización.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py como hook Stop y SubagentStop informa de tokens y costes, subagentes incluidos; los límites por agente los fijan los admins, en un agente personal también su propietario.",
@@ -14618,5 +14615,14 @@
   "The picture is only printed in your own letters and on the entertainment receipts you approve.": "La imagen solo aparece en tus propias cartas y en los comprobantes de atenciones que tú apruebas.",
   "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Una imagen de la firma no es una firma electrónica; aclara su aceptación por Hacienda con tu asesoría fiscal.",
   "Please draw your signature first.": "Dibuja primero tu firma.",
-  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Tu imagen de la firma aparece entonces en la línea de firma del PDF. Una imagen de la firma no es una firma electrónica; aclara su aceptación por Hacienda con tu asesoría fiscal."
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Tu imagen de la firma aparece entonces en la línea de firma del PDF. Una imagen de la firma no es una firma electrónica; aclara su aceptación por Hacienda con tu asesoría fiscal.",
+  "The client of the project is taken off (Undo brings it back)": "Se quita el cliente del proyecto (Deshacer lo recupera)",
+  "{0} link to another project ends (Undo brings it back)": ["{0} vínculo con otro proyecto termina (Deshacer lo recupera)", "{0} vínculos con otros proyectos terminan (Deshacer los recupera)"],
+  "It is no longer open to everyone in the organisation (Undo brings it back)": "Ya no está abierto a todos en la organización (Deshacer lo recupera)",
+  "{0} customer report moves along": ["{0} aviso de cliente se traslada también", "{0} avisos de clientes se trasladan también"],
+  "{0} office document": ["{0} documento de oficina", "{0} documentos de oficina"],
+  "{0} approval link": ["{0} enlace de aprobación", "{0} enlaces de aprobación"],
+  "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Se queda en el espacio anterior y ya no está vinculado al proyecto: {0}. Muévelo por separado si hace falta.",
+  "{0} client of a customer report": ["{0} cliente de un aviso de cliente", "{0} clientes de avisos de clientes"],
+  "Quotations & invoices": "Presupuestos y facturas"
 }

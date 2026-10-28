@@ -12,14 +12,13 @@
 
 const OFT = {d: {}, busy: {}};
 // area -> [route segment, icon of its documents]
-// 2.380.0 B (#3409): [2] = the query of the area (quotations / invoices share the documents' route)
-const OFT_AREAS = {offers: ['docs', 'file'], invoices: ['docs', 'receipt', '?sec=invoices'], gendocs: ['gen-docs', 'file'], letters: ['letters', 'mail'], receipts: ['receipts', 'ticket']};
+const OFT_AREAS = {offers: ['docs', 'receipt'], gendocs: ['gen-docs', 'file'], letters: ['letters', 'mail'], receipts: ['receipts', 'ticket']};
 const oft_key = () => `${S.me?.id || ''}:${typeof wsCur === 'function' ? wsCur() : 'all'}`;
 async function oft_load(area) {
   if (OFT.busy[area]) return;
   OFT.busy[area] = true;
   const key = oft_key();
-  try { OFT.d[area] = {...(await rawFetch('GET', `/api/office/${OFT_AREAS[area][0]}/tree${OFT_AREAS[area][2] || ''}`)), key, v: S.v, at: Date.now()}; }
+  try { OFT.d[area] = {...(await rawFetch('GET', `/api/office/${OFT_AREAS[area][0]}/tree`)), key, v: S.v, at: Date.now()}; }
   catch (e) { if (e.message === 'auth') { OFT.busy[area] = false; return; } OFT.d[area] = {key, v: S.v, at: Date.now(), folders: [], docs: [], err: e.message}; }
   OFT.busy[area] = false;
   if (typeof sbb_officeSync === 'function') sbb_officeSync();
@@ -72,14 +71,14 @@ function oft_sharedHtml(area) {
 function oft_after(area) {
   if (area) { if (OFT.d[area]) OFT.d[area].at = 0; OFT.d[area] && (OFT.d[area].v = -1); oft_load(area); }
   if (typeof ab_ptStale === 'function') ab_ptStale();
-  if (S.route.mod === 'office' && (area === 'offers' || area === 'invoices') && typeof OFD !== 'undefined') OFD.list = null;
+  if (S.route.mod === 'office' && area === 'offers' && typeof OFD !== 'undefined') OFD.list = null;
 }
 const oft_req = async (area, m, url, b) => { try { const r = await rawFetch(m, url, b); oft_after(area); return r || true; } catch (e) { toast(e.message); return null; } };
 const oft_open = (area, k) => { if (isMobile()) return; const x = new Set(LS.get('sbbOpen', []) || []); x.add(k); LS.set('sbbOpen', [...x].slice(-300)); };
 async function oft_newFolder(area, pid) {
   const v = await askDialog({title: tr('New folder'), input: {value: '', placeholder: tr('Folder name'), max: 120}, ok: tr('Create'), cancel: undefined, after: undefined});
   if (!v || !v.trim()) return;
-  const r = await oft_req(area, 'POST', `/api/office/${OFT_AREAS[area][0]}/tree/folders${OFT_AREAS[area][2] || ''}`, {name: v.trim(), ...(pid ? {parent_id: pid} : {})});
+  const r = await oft_req(area, 'POST', `/api/office/${OFT_AREAS[area][0]}/tree/folders`, {name: v.trim(), ...(pid ? {parent_id: pid} : {})});
   if (r?.folder) { oft_open(area, 'of:a:' + area); if (pid) oft_open(area, 'of:f:' + pid); }
 }
 async function oft_rename(area, f) {
@@ -163,7 +162,7 @@ sbb_treeReg('oft', {move: oft_move, order: oft_order, menu: id => oft_menuItems(
 let OFT_EXT = null;
 document.addEventListener('dragstart', e => {
   const li = /** @type {any} */ (e.target).closest?.('#view .ofdli[draggable="true"]'), r = li?.querySelector('.ofdrow[data-id]'); if (!r) return;
-  OFT_EXT = {area: typeof ofd_sec === 'function' ? ofd_sec() : 'offers', id: +r.dataset.id};  // 2.380.0 B (#3409): the list's area
+  OFT_EXT = {area: 'offers', id: +r.dataset.id};
   e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.querySelector('.ofcn b')?.textContent || '');
 });
 const oft_extTo = e => { const t = /** @type {any} */ (e.target).closest?.('#side .sbbt[data-sbbns="oft"][data-sbbdrop]'); return t && oft_id(t.dataset.sbbid).area === OFT_EXT?.area ? t : null; };

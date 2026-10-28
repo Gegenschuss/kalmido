@@ -72,7 +72,7 @@ const FEAT = 'clients,office,collab';
     const sec = await until(() => d.querySelector('#pov-officedocs'));
     check(!!sec, `${who}: the project page shows "Quotations & invoices"`);
     const txt = sec?.textContent.replace(/\s+/g, ' ') || '';
-    check(/Quotations/.test(txt) && txt.includes(Q1.number)  /* 2.380.0 (#3409): the group Quotations */ && /1,?428/.test(txt.replace(/\./g, ',')), `${who}: number and amount ` + txt.slice(0, 200));
+    check(/Quotations & invoices/.test(txt) && txt.includes(Q1.number) && /1,?428/.test(txt.replace(/\./g, ',')), `${who}: number and amount ` + txt.slice(0, 200));
     check(sec?.querySelector(`a[href="#office/offers/${Q1.id}"]`), `${who}: a row opens the quotation`);
     w.close();
   }

@@ -33,7 +33,7 @@ const ALL = 'office,cal,timeline,matrix,habits,pomo,collab,stats,time,progress,a
   check(grows('<h3>Note</h3><textarea></textarea><div class="foot"><button>OK</button></div>') === true, '#2615: a text field grows');
   // ---- #2616
   const order = w.eval(`OFR_ORDER.join()`);
-  check(/offers,invoices,gendocs,clients/.test(order), '#2616: Documents after Quotations and Invoices (2.380.0 #3409) ' + order);
+  check(/offers,gendocs,clients/.test(order), '#2616: Documents after Quotes & invoices ' + order);
   w.eval(`LS.set('ofmLast', null); ofm_adm = () => true`);
   // 2.276.0 (#3039): an admin without a kept point opens Quotes & invoices; the Pipeline only once the office has an inquiry
   check(w.eval('ofm_entry().key') === 'offers', '#3039: an admin without a kept point and without inquiries: Quotes & invoices ' + w.eval('ofm_entry().key'));

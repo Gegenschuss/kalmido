@@ -142,6 +142,7 @@ EMIL = db("SELECT id FROM users WHERE username='emil'")[0][0]
 Em = sess("emil")
 EL = Em.post(B + "/api/lists", json={"name": "Emil's org list"}).json()
 check(EL["org_id"] == ORG, "a member's list in the organisation")
+check(A.patch(B + f"/api/orgs/{ORG}", json={"member_agents": True}).ok, "setup: Alpha lets members keep own agents")  # 2.361.4 (#2928)
 r = A.post(B + "/api/admin/agents", json={"username": "emilbot", "display_name": "Emil bot", "owner_id": EMIL})
 EB = r.json()["id"]
 check(r.status_code == 201 and "emilbot" in members(ORG) and Em.put(B + f"/api/lists/{EL['id']}/members", json={"user_id": EB, "role": "edit"}).ok,

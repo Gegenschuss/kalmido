@@ -295,7 +295,8 @@ function tmm_msg(msg, r) {
   const p = [x.people && trn('{0} person coming along', '{0} people coming along', x.people), x.links && trn('{0} further project', '{0} further projects', x.links),
     x.subtasks && trn('{0} subtask stays in its project', '{0} subtasks stay in their projects', x.subtasks), x.assignee && tr('Assignee'), x.group && tr('Group'),
     x.milestone && tr('Milestone'), x.sprint && tr('Sprint'), x.ltags && trn('{0} project tag', '{0} project tags', x.ltags),
-    x.client && tr('Client'), x.visibility && tr('Everyone in the organisation'), x.assignees && trn('{0} assignment of a reader', '{0} assignments of readers', x.assignees)].filter(Boolean);  // a list's workspace (dialogs.js)
+    x.client && tr('Client'), x.visibility && tr('Everyone in the organisation'), x.assignees && trn('{0} assignment of a reader', '{0} assignments of readers', x.assignees),
+    x.tclients && trn('{0} client of a customer report', '{0} clients of customer reports', x.tclients)].filter(Boolean);  // a list's workspace (dialogs.js); 2.401.0 (#2924): + tclients
   return p.length ? `${msg || tr('Moved')} · ${tr('Not carried over: {0}. Undo brings it back.', p.join(', '))}` : msg;
 }
 // the few older callers: a toast with "Undo" for a step built above

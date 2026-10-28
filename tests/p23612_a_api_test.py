@@ -79,9 +79,9 @@ def decide(s, rid, d):
     return s.post(B + f"/api/orgs/{ORG}/out-requests/{rid}", json={"decision": d})
 
 
+ENV = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
 if not os.environ.get("P23612A_NOSTART"):
-    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_INSTANCE_MODE=workspaces")
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=ENV, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
 
 s0 = requests.Session()

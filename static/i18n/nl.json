@@ -14586,9 +14586,6 @@
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Het nieuwe wachtwoord trekt je app-wachtwoorden (CalDAV) en je eigen API-tokens in; maak daarna zo nodig nieuwe aan onder Instellingen > Account (API-tokens: Geavanceerd · voor ontwikkelaars). Agents behouden hun tokens.",
   "Please type your name without a link or web address.": "Vul uw naam in zonder link of webadres.",
   "Saved. {0} booking of someone else stays as it was": ["Opgeslagen. {0} boeking van iemand anders blijft zoals hij was", "Opgeslagen. {0} boekingen van anderen blijven zoals ze waren"],
-  "Trial document (SAMPLE)": "Testdocument (MUSTER)",
-  "More ways to create": "Meer manieren om aan te maken",
-  "Archived quotations: {0}": "Gearchiveerde offertes: {0}",
   "No agents yet. Create your own under Settings > Agents > Set up; then it shows up here.": "Nog geen agents. Maak je eigen aan onder Instellingen > Agents > Instellen; dan verschijnt hij hier.",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Workspaces: “Members may have their own agents”), or a server admin for everyone (Administration > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "In je privégedeelte beslis je zelf. In een organisatie staan haar admins het toe (Instellingen > Werkruimtes: „Leden mogen eigen agents hebben”), of een serverbeheerder voor iedereen (Admin > Agents). Zonder dat ontbreekt „Agent aanmaken” of kan de agent niet naar die organisatie.",
   "mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins, for a personal agent also by its owner.": "mcp/claude_usage_hook.py als Stop- en SubagentStop-hook meldt tokens en kosten, subagents inbegrepen; limieten per agent stellen admins in, bij een persoonlijke agent ook de eigenaar.",
@@ -14618,5 +14615,14 @@
   "The picture is only printed in your own letters and on the entertainment receipts you approve.": "De afbeelding verschijnt alleen in je eigen brieven en op de representatiebonnen die jij goedkeurt.",
   "A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert.",
   "Please draw your signature first.": "Teken eerst je handtekening.",
-  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Je handtekeningafbeelding staat dan op de handtekeningregel van de pdf. Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert."
+  "Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.": "Je handtekeningafbeelding staat dan op de handtekeningregel van de pdf. Een afbeelding van een handtekening is geen elektronische handtekening; bespreek met je belastingadviseur of de Belastingdienst die accepteert.",
+  "The client of the project is taken off (Undo brings it back)": "De klant van het project wordt verwijderd (Ongedaan maken zet hem terug)",
+  "{0} link to another project ends (Undo brings it back)": ["{0} koppeling met een ander project vervalt (Ongedaan maken zet hem terug)", "{0} koppelingen met andere projecten vervallen (Ongedaan maken zet ze terug)"],
+  "It is no longer open to everyone in the organisation (Undo brings it back)": "Het staat niet meer open voor iedereen in de organisatie (Ongedaan maken zet het terug)",
+  "{0} customer report moves along": ["{0} klantmelding verhuist mee", "{0} klantmeldingen verhuizen mee"],
+  "{0} office document": ["{0} kantoordocument", "{0} kantoordocumenten"],
+  "{0} approval link": ["{0} goedkeuringslink", "{0} goedkeuringslinks"],
+  "Stays in the old workspace and is no longer linked to the project: {0}. Move it on its own if needed.": "Blijft in de oude werkruimte en hoort niet meer bij het project: {0}. Verplaats het zo nodig apart.",
+  "{0} client of a customer report": ["{0} klant van een klantmelding", "{0} klanten van klantmeldingen"],
+  "Quotations & invoices": "Offertes en facturen"
 }

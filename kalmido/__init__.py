@@ -70,6 +70,7 @@ ORDER = (
     "lists.sections",
     "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
+    "lists.lmove",  # 2.401.0 (#2924): the dry run of a project's workspace change, what goes along
     "lists.foldershare",  # 2.41.0 (#1420)
     "lists.listhead",  # 2.83.0 C (#1427)
     "lists.listtrash",  # 2.102.0 A (#1988)

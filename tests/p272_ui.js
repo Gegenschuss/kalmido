@@ -172,8 +172,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const am = d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"]`);
   const up = am && am.querySelector('.rx.add[data-e="up"]');
   check(up && am.querySelectorAll('.rx.add').length === 3, 'quick 👍 👎 ❤️ on the agent\'s message');
-  click(w, up); await sleep(400);
-  check(d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`), 'my 👍 shows');
+  // #1604: the 👍 is drawn only after the reaction POST answers (CI shards slower than 400 ms): wait for it
+  click(w, up);
+  check(await until(() => d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`)), 'my 👍 shows');
   const evs = (await tcall('GET', `/agent/events?since=${cur}`, TOK)).data.filter(e => e.event === 'reaction');
   check(evs.length && evs[evs.length - 1].data.approval === 'approved' && evs[evs.length - 1].data.chat_message.id === ans.id, 'the agent got the approval');
   // offline (no event poll for 5 minutes): "answers later"
@@ -195,7 +196,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-agseg="os"] [data-agsv="win"]')); await sleep(100);
   check(/PowerShell|\.ps1|New-NetFirewallRule|Register-ScheduledTask/i.test(md.querySelector('#s-agguide').textContent), 'Windows: PowerShell steps');
   click(w, md.querySelector('[data-agseg="guide"] [data-agsv="own"]')); await sleep(100);
-  check(/admin has to switch on/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first');
+  check(/its admins allow it/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first (2.361.4, #2928: the organisation admins)');
   md.querySelector('#s-uag').checked = true; md.querySelector('#s-uag').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents);
   check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'admin switches it on');
