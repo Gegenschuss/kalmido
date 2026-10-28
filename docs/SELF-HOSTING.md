@@ -512,6 +512,14 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
+  the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
+  `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the
+  text cache of attachments (`textcache/`, built again), the organisation exports waiting for download (`exports/`) and
+  anything outside the data folder (`.env`, `docker-compose.yml`). A restore keeps the backup settings and the off-site
+  target of the restoring server as they are; a server that had none gets none from the backup (before 2.359.2 a
+  production backup restored on a fresh test server brought the production target and its access data along, and the
+  test server's uploads then thinned out production's copies there).
   2.360: downloading a backup, a restore, downloading an account or organisation export and switching on what opens the
   server (public links, a registration mode, accounts on the first single sign-on) or off the two-factor policy ask for
   the account password (a download: `POST` with `{"password"}` gives a one-time ticket, `GET ?t=<ticket>` the file; signed

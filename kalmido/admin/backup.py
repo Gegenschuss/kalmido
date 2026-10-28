@@ -110,6 +110,16 @@ BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
 BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
+# 2.359.2 (#2895): the own industry packs of the instance (office/sheet.py IND_DATA_DIR, /data/packs/industry): flat files
+BK_PACK_RE = re.compile(r"packs/industry/([A-Za-z0-9][A-Za-z0-9_.-]{0,250})")
+BK_PACK_PREFIX = "packs/industry/"
+
+
+def bk_pack_dir():
+    from ..office.sheet import IND_DATA_DIR
+    return IND_DATA_DIR
+
+
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
@@ -401,7 +411,8 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             raise BackupError("encrypt_required")
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
-        need = bk_db_bytes(c) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR) if os.path.isdir(d))
+        packs = bk_pack_dir()
+        need = bk_db_bytes(c) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR, packs) if os.path.isdir(d))
         free = shutil.disk_usage(BK_DIR).free
         if free < need * (2.2 if encrypt else 1.2) + 64 * 1024 * 1024:
             raise BackupError("disk")
@@ -418,7 +429,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             files.append([BK_DUMP, os.path.getsize(dbp), _sha256_file(dbp)])
             skipped = {}  # top folder -> files not matching BK_MEMBER_RE
             missing = []  # 2.273.0 A (#3050): (full path, archive name) of files gone between listing and reading
-            for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
+            for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/"), (packs, BK_PACK_PREFIX)):  # 2.359.2 (#2895)
                 if not os.path.isdir(base):
                     continue
                 for root, dirs, fns in os.walk(base):
@@ -429,7 +440,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                         rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
                         if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
                             continue
-                        if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
+                        if os.path.islink(full) or not os.path.isfile(full) or not (BK_PACK_RE if base is packs else BK_MEMBER_RE).fullmatch(rel):
                             if not os.path.islink(full) and os.path.isfile(full):  # 2.79.0 (#476 M8): never silently
                                 top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
                                 skipped[top] = skipped.get(top, 0) + 1
@@ -460,9 +471,12 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                 tops = sorted({"/".join(r.split("/")[:2]) if r.count("/") > 1 else r.split("/")[0] + "/." for r in gone})
                 print(f"backup: {len(gone)} file(s) vanished while the backup was written (deleted or moved after the database dump),",
                       "folders:", ", ".join(tops), flush=True)
+            npacks = sum(1 for f in files if f[0].startswith(BK_PACK_PREFIX))
             meta = {"format": "kalmido-backup", "format_version": 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
-                    "attachment_files": len(files) - 1, "attachment_bytes": att_bytes,
+                    "attachment_files": len(files) - 1 - npacks,
+                    "attachment_bytes": att_bytes - sum(f[1] for f in files if f[0].startswith(BK_PACK_PREFIX)),
+                    "pack_files": npacks,  # 2.359.2 (#2895)
                     "skipped_files": sum(skipped.values()),  # 2.79.0 (#476 M8)
                     "missing_files": len(gone), "missing_paths": gone[:BK_MISSING_SHOWN]}  # 2.273.0 A (#3050)
             if skipped:  # folder names only (never file names): a new kind of stored file the archive does not know yet
@@ -557,6 +571,7 @@ def bk_public(x):
     return {"name": x["name"], "kind": x["kind"], "encrypted": x["encrypted"], "size": x["size"], "created_at": iso(x["at"]),
             "app_version": m.get("app_version", ""), "schema_version": m.get("schema_version"), "counts": m.get("counts") or {},
             "attachment_files": m.get("attachment_files"), "attachment_bytes": m.get("attachment_bytes"),
+            "pack_files": m.get("pack_files") or 0,  # 2.359.2 (#2895)
             "unreadable": bool(m.get("unreadable")), "missing_files": m.get("missing_files") or 0,  # 2.273.0 A (#3050)
             # 2.37.0: a backup from before 2.37 (SQLite): listed and checked, restored only through 2.36 + the update
             "legacy": not m.get("unreadable") and m.get("format_version", 1) < 2}
@@ -746,7 +761,7 @@ def bk_check_zip(z):
     for i in infos:
         n = i.filename
         m = BK_MEMBER_RE.fullmatch(n)
-        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", ".."))
+        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", "..")) or bool(BK_PACK_RE.fullmatch(n))
         if not ok or n in seen or i.is_dir() or i.flag_bits & 0x1 or i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             raise BackupError("members")
         if (i.external_attr >> 16) & 0o170000 not in (0, 0o100000):  # symlinks / devices (unix mode bits)
@@ -1071,9 +1086,9 @@ def bk_scan_dump(dump):
     return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
 
 
-def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
+def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
     """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
-    office_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
+    office_dest, the own industry packs into pack_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
     2.37) is checked (members, checksums); for a restore its tasks.db is extracted (the returned path) for the move tool."""
     zp, _ = bk_open(path, pw, work)
     try:
@@ -1087,6 +1102,10 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
+                    pm = BK_PACK_RE.fullmatch(i.filename)
+                    if pm and pack_dest is not None:  # 2.359.2 (#2895): flat, the name checked by BK_PACK_RE (no / and no leading dot)
+                        bk_extract(z, i, os.path.join(pack_dest, pm.group(1)), man["_listed"])
+                        continue
                     if att_dest is None or m is None:  # verify only (or the tasks.db of an old archive): hash, write nothing
                         want, h, n = man["_listed"][i.filename], hashlib.sha256(), 0
                         with z.open(i) as src:
@@ -1352,7 +1371,9 @@ def bk_restore(path, pw, admin, via):
     try:
         os.makedirs(att_new, mode=0o755)
         os.makedirs(off_new, mode=0o700)  # 2.39.1 (#1210 N8)
-        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
+        pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
+        os.makedirs(pack_new, mode=0o755)
+        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
@@ -1444,6 +1465,7 @@ def bk_restore(path, pw, admin, via):
                 print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
             else:
                 shutil.rmtree(old, ignore_errors=True)
+        bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal)  # 2.152.0 B (#2172)
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
@@ -1466,6 +1488,34 @@ def bk_restore(path, pw, admin, via):
         shutil.rmtree(off_new, ignore_errors=True)
         _BK.update(running="", started=0.0)
         _BK_LOCK.release()
+
+
+def bk_restore_packs(src):
+    """2.359.2 (#2895): the own industry packs of the backup into the data folder (after the database is back). A pack added
+    since the backup stays; one the backup replaces with other content is kept in packs/industry.pre-restore-<hex>/ (never
+    deleted unseen). Never fails the restore (the log names a failure)."""
+    names = sorted(os.listdir(src)) if os.path.isdir(src) else []
+    if not names:
+        return 0
+    dest = bk_pack_dir()
+    old = dest.rstrip(os.sep) + ".pre-restore-" + secrets.token_hex(4)
+    n = 0
+    try:
+        os.makedirs(dest, mode=0o755, exist_ok=True)
+        for fn in names:
+            d = os.path.join(dest, fn)
+            if os.path.lexists(d):
+                if os.path.isfile(d) and not os.path.islink(d) and _sha256_file(d) == _sha256_file(os.path.join(src, fn)):
+                    continue
+                os.makedirs(old, mode=0o755, exist_ok=True)
+                shutil.move(d, os.path.join(old, fn))
+            shutil.move(os.path.join(src, fn), d)
+            n += 1
+    except OSError as e:
+        print("restore: the industry packs could not all be written back:", aa_oserr(e), flush=True)
+    if os.path.isdir(old):
+        print(f"restore: kept {os.path.basename(old)}: industry packs the backup replaced", flush=True)
+    return n
 
 
 def bkr_restore_journal(journal):
@@ -1653,6 +1703,7 @@ def backups_verify(name):
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
+                   pack_files=man.get("pack_files") or 0,  # 2.359.2 (#2895)
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
