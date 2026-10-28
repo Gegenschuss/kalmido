@@ -77,6 +77,8 @@ const WS_VIEWS = {
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
                                               // like office_where (no view keeping data; p2250_a_officesearch checks Private)
+  'kalmido/accounts/wsareas.py': 'helper',    // 2.409.0 (#3490): _req_org - which organisation an area lock applies to when a
+                                              // request names no space (the saved setting, per request; no view keeping data)
 };
 const ROOT = path.join(__dirname, '..');
 const CLIENT_RE = /\brd_space\(|\bwsCur\(|\bdc_ws\(|settings\.workspace|\bp61b_wsOn\(|\bwsObjIn\(|\binWs\(|\bwsHidden\(|\bwsAgentIn\(/;  // 2.172.0 B (#2679): + rd_space (the views of Reading)

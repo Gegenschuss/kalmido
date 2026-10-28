@@ -56,7 +56,7 @@ const ent = async (tid, id) => (await call('GET', `/api/time/entries?task_id=${t
   await w.eval(`go('l/${L}')`); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`openDetail(${T})`); await sleep(800);
   const row = [...d.querySelectorAll('#d-time .terow')].find(r => r.querySelector('.tebill[data-go]'));
-  check(row && row.querySelector('.tebill').dataset.go === `office/offers/${inv.id}` && /billed/.test(row.querySelector('.tebill').textContent), 'row: "billed" opens the invoice');
+  check(row && row.querySelector('.tebill').dataset.go === `office/invoices/${inv.id}` && /billed/.test(row.querySelector('.tebill').textContent), 'row: "billed" opens the invoice');
   check(row && !row.querySelector('[data-act="te-del"]') && row.querySelector('[data-act="te-edit"]'), 'billed row: edit, no delete');
   w.eval(`entryModal(findEntry(${E1.id}))`); await sleep(100);
   md = [...d.querySelectorAll('.modal')].pop();

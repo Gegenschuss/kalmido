@@ -242,6 +242,7 @@ async function wsPaneDraw(md) {
   if (typeof chn_contentPaneDraw === 'function') chn_contentPaneDraw(box);  // 2.240.0 B (#2867): content to personal forwardings
   if (typeof xl_paneDraw === 'function') xl_paneDraw(box);  // 2.112.1 B (#2058): external share links of its files allowed
   if (typeof oag_paneDraw === 'function') oag_paneDraw(box);  // 2.361.4 (#2928): members may keep their own agents in it
+  wsa_orgPaneDraw(box);  // 2.409.0 (#3490): the areas its members see (its admins decide)
   if (typeof asst_orgPaneDraw === 'function') asst_orgPaneDraw(box);  // 2.240.0 A (#2884): the assistant and other members' comments
   if (typeof oinvDraw === 'function') oinvDraw(box);  // 2.115.0 B (#2062): invite by e-mail + the open invitations
 }

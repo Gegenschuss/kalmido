@@ -164,11 +164,14 @@ function settingsSync() {
     if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' || k === 'side_count' || k === 'side_dots' || k === 'side_share' ? s[k] !== '0' : s[k] === '1';  // 2.56.1 (#1799): side_*
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
-  for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
+  wsa_raw(() => {  // 2.409.0 (#3490): the main switches
+    for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
+    $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
+  });
   for (const el of $$('[data-agvis]', md)) el.checked = !agentHidden().has(+el.dataset.agvis);
-  $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
   mg_setSync(md);  // 2.44.0 (#1187)
   modCountsSync(md);  // 2.25.0 (UX-19)
+  wsa_sync(md);  // 2.409.0 (#3490)
   const nm = $('#a-name', md); if (nm && nm !== document.activeElement && S.me) nm.value = S.me.display_name;
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
   ntfyShow(md);
@@ -238,7 +241,9 @@ function integrCardsHtml() {
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
 }
-function modulesHtml(hint) {
+// 2.409.0 (#3490): the page shows the main switches (wsa_raw), below them the areas per workspace (areas.js wsa_modHtml)
+const modulesHtml = hint => wsa_raw(() => modulesHtmlMain(hint)) + wsa_modHtml();
+function modulesHtmlMain(hint) {
   const s = S.settings;
   const opt = (k, body) => k === 'pomo' ? `<details class="mopt"><summary>${tr('Focus settings')}</summary>
       <div class="row"><label for="s-pf">${tr('Focus session')}</label><input type="number" id="s-pf" value="${esc(s.pomo_focus)}" min="1" inputmode="numeric" class="numin"><span class="muted">${tr('min')}</span></div>
@@ -270,7 +275,8 @@ const modUnits = r => { const f = new Set(pma_full()); return [...new Set(r.flat
 const modGroupCount = r => { const u = modUnits(r); return tr('{0} of {1} on', u.filter(k => feat(k)).length, u.length); };
 const modAll = () => MOD_GROUPS.flatMap(([, ks]) => modGroupKeys(ks));
 const modCount = () => { const u = modUnits(modAll()); return tr('{0} of {1} modules on', u.filter(k => feat(k)).length, u.length); };
-function modCountsSync(md) {
+function modCountsSync(md) { wsa_raw(() => modCountsSyncMain(md)); }  // 2.409.0 (#3490): the main switches
+function modCountsSyncMain(md) {
   const t = $('#s-modtot', md); if (t) t.textContent = modCount();
   const pma = $('#s-modsall', md); if (pma) pma.checked = pm_allShown();  // 2.171.0 (#2676)
   if (pma) pma.indeterminate = !pma.checked && pma_full().some(k => feat(k));  // 2.364.0 A (#3015): some modules on = the switch half
