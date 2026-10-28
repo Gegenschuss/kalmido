@@ -5,6 +5,21 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.376.3] - 2026-10-28
+
+### Fixed
+- CI of 2.376.2: p1_ui waits for the template list in Settings > Data (it comes from the server; a fixed 500 ms was too short on a loaded runner) and, before the "Ctrl+Z inside an input" step, for the reload after the previous undo (the next tick otherwise read the old local "completed" and reopened instead of completing). Test-only change, the app is unchanged.
+
+## [2.376.2] - 2026-10-28
+
+### Fixed
+- CI of 2.376.1: a picture added to a task typed offline is uploaded once the new task has loaded, instead of being dropped unseen when the reload after sending was still pending; a file refused on the device (too large, no right) is named in the conflicts dialog - p2359_a_outbox_ui (#1481). The real-layout part of p2100_ui navigates once more when the page is not the app's yet ("The operation is insecure").
+
+## [2.376.1] - 2026-10-28
+
+### Fixed
+- CI of 2.376.0: "Idle for N days" of a lying-idle task counts full days since its last change instead of calendar days, so the number no longer jumps by one when the view loads across midnight (UTC) - p2340_b_ui (#266).
+
 ## [2.376.0] - 2026-10-28
 
 Package 2.356 (Bündel Büro-Wege, Belege einreichen, GoBD-Export, Büro der Selbstständigen (2.252 + 2.276.1 + 2.261)).
@@ -8999,7 +9014,10 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.376.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.376.3...HEAD
+[2.376.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.3
+[2.376.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.2
+[2.376.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.1
 [2.376.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.376.0
 [2.361.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.3
 [2.361.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.361.2

@@ -79,7 +79,7 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     check(await ev(`!!document.querySelector('#kbar .bell') && !!document.querySelector('#kbar .kbacct[data-act="user-menu"] .avatar')`), 'bell and account in the head bar');
     check(await ev(`!document.querySelector('#top .bell') && !document.querySelector('#top .cmdbar') && !document.querySelector('#top .wschip')`), '#top keeps only the title and its own buttons');
     check(await ev(`!document.querySelector('#side .sbbrand') && !document.querySelector('#side .sbbtop') && !document.querySelector('#srail .sbacct')`), 'no brand in the panel, no search on it, no account at the bottom of the bar');
-    check(await ev(`[...document.querySelectorAll('#srail .srfoot .srb')].map(b => b.dataset.act).join() === 'settings'`), 'the bottom of the bar: only Settings');
+    check(await ev(`!document.querySelector('#srail .srfoot')`), 'the bottom of the bar: empty (Settings in the Kalmido menu)'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)
     check(await ev(`(() => { const b = document.querySelector('#srail .srb.on'); return !!b && getComputedStyle(b).backgroundColor !== 'rgba(0, 0, 0, 0)'; })()`), 'the open area tile is tinted');
     await shot('p21523a-head-light.png');
 

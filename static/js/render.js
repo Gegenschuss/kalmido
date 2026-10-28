@@ -216,7 +216,7 @@ const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload & absences'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
+  ['workload', N_('Workload & absences'), wlShown() /* 2.380.2 (#3407) */], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -390,7 +390,7 @@ function renderSide0() {
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
     lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
-    workloadOn() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)
+    wlShown() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)  // 2.380.2 (#3407): not in Private
     officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('wiki') ? mrow('wiki', 'book', tr('Knowledge pages')) : '',  // 2.49.0 (#1199)
     feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
@@ -1354,7 +1354,7 @@ function colDefault(l) {  // what the default layout shows: the starting point o
 const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + ((S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text') : k);
 const lcOvf = i => [2, 3, 5, 7, 10].filter(n => i >= n).map(n => 'o' + n).join(' ');
 const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x => x[0] === k) || [0, ''])[1];
-const colShort = (l, k) => k === 'time' ? tr('Time') : colName(l, k);  // the title row's label (narrow columns)
+const colShort = (l, k) => k === 'time' ? tr('Tracked') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
   switch (k) {
     case 'due': return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell
@@ -1651,18 +1651,25 @@ function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
 }
-// the chips of the docked composer: what the task will get (a chip set here wins over the text)
+// 2.380.2 (#3403): what the text says (!!!, morgen, ~project) wins over a chip picked before; no word in the text = the chip;
+// a chip picked while the text already named the same thing wins (o.win, until the task is added; the word still leaves the title)
+function qovPick(o, r, d) {
+  const w = o.win || {}, txt = (k, v) => v != null && v !== '' && !w[k];
+  return {due: txt('date', r.due) ? r.due : 'due' in o ? o.due : d.due, list_id: (txt('list', r.list_id) && r.list_id) || o.list_id || d.list_id,
+    priority: txt('prio', r.priority) ? r.priority : 'priority' in o ? o.priority : d.priority ?? 0};
+}
+// the chips of the docked composer: what the task will get
 function qdockChips() {
   const box = $('#qdchips'), inp = $('#qinput'); if (!box || !inp) return;
   if (S.qov?.key !== S.route.key) S.qov = {key: S.route.key};
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
-  const due = 'due' in o ? o.due : r.due || d.due, lid = o.list_id || r.list_id || d.list_id || inbox()?.id, pr = 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0;
+  const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
-  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
+  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
-    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+    `<button type="button" class="qdc set ${o.list_id && q.list_id === o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
+    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && q.priority === o.priority ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);
@@ -1775,7 +1782,8 @@ function viewListBody() {
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
-  const ls = S.lists.filter(l => l.archived).sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
+  const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
+    (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);

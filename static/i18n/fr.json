@@ -13903,7 +13903,6 @@
   "Create new project": "Créer un nouveau projet",
   "Project (not visible)": "Projet (non visible)",
   "Projects of the client": "Projets du client",
-  "Quotations & invoices": "Devis et factures",
   "Only quotations, invoices and credit notes belong to a project": "Seuls les devis, factures et avoirs appartiennent à un projet",
   "Offline · as of {0}": "Hors ligne · état du {0}",
   "Saved on this device, sent when online": "Enregistré sur cet appareil, envoyé dès que la connexion revient",
@@ -14597,5 +14596,8 @@
   "A vacation request keeps its kind. Delete it and enter the absence anew.": "Une demande de congés garde son type. Supprime-la et saisis l’absence à nouveau.",
   "The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.": "Le nouveau mot de passe révoque tes mots de passe d'application (CalDAV) et tes propres tokens API ; crée-en de nouveaux ensuite si besoin sous Paramètres > Compte (tokens API : Avancé · pour les développeurs). Les agents gardent leurs tokens.",
   "Please type your name without a link or web address.": "Veuillez saisir votre nom sans lien ni adresse web.",
-  "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"]
+  "Saved. {0} booking of someone else stays as it was": ["Enregistré. {0} réservation d'une autre personne reste inchangée", "Enregistré. {0} réservations d'autres personnes restent inchangées"],
+  "Trial document (SAMPLE)": "Document d'essai (MUSTER)",
+  "More ways to create": "Autres façons de créer",
+  "Archived quotations: {0}": "Devis archivés : {0}"
 }

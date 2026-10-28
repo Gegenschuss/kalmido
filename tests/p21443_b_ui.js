@@ -50,7 +50,7 @@ const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.toISOStr
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
     // ================= the invoice list: the hint with the jump
-    await nav(B + '#office/offers');
+    await nav(B + '#office/invoices');  // 2.380.0 (#3409): the invoices' own area
     await ready(ev, `!!document.querySelector('[data-ofd="kind"][data-kind="invoice"]')`, 80);
     // 2.109.0 (#2054): the first click can land before the office view is wired up (race seen on the Mac runner) -> click again
     let hint = false;

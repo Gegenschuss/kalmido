@@ -33,13 +33,14 @@ const near = (a, b) => Math.abs(+a - +b) < 0.005;
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'de', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
-  const st = await call(CF, 'PUT', '/api/office/settings', {industry_packs: ['film']});
-  check(st.http === 200, 'the pack Film & Video in the personal office ' + st.http);
   const cl = await call(CF, 'POST', '/api/clients', {name: 'Beispiel Medien GmbH'});
-  // 2.138.4 (#2252): since 2.113.1 the film pack switches handling costs (4 %) on for a new quotation - off here, the sums below are without them
+  // 2.380.0 (#3420): the film pack offers share by amount (and handling costs) for a new quotation - this quotation is made
+  // before the pack is on and keeps the calculation by quantities / quotient the sums below are made of
   const q = await call(CF, 'POST', '/api/office/docs', {project_title: 'Imagefilm', client_id: cl.id, handling_pct: null});
   const D = `/api/office/docs/${q.id}`;
   check((await call(CF, 'PATCH', D, {producing_on: 1, prod_quotient: 3, producing_rate: 500, raw_mode: 'none', discount_pct: 0})).http === 200, 'the calculation values of the document');
+  const st = await call(CF, 'PUT', '/api/office/settings', {industry_packs: ['film']});
+  check(st.http === 200, 'the pack Film & Video in the personal office ' + st.http);
   // part A: takes over the document (4.5 producing days / 3 = 1.5 days), part B: own setting, producing off
   const pa = (await call(CF, 'POST', D + '/parts', {kind: 'items', title: 'Modul Dreh'})).part;
   const pb = (await call(CF, 'POST', D + '/parts', {kind: 'items', title: 'Modul Schnitt'})).part;

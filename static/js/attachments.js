@@ -75,7 +75,7 @@ async function qfKeep(tmp, files) {
 }
 async function qfSend() {
   const st = qfStore(); if (!st || QF.busy || !S.me) return;
-  QF.busy = true;
+  QF.busy = true; S.qfWait = false;
   try {
     const idm = LS.get('idmap', {});
     for (const r of await st.all()) {
@@ -85,7 +85,17 @@ async function qfSend() {
         if (OUT.q.some(x => x.tmp === r.tmp)) continue;  // its create still waits
         S.conflicts.push({tid: 0, title: r.title, field: 'rejected', server: tr('The new task could not be created'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
         LS.set('conflicts', S.conflicts); renderTop();
-      } else if (await uploadFiles(id, r.files.map(f => new File([f.blob], f.name, {type: f.type}))) === false) continue;  // offline again: the next flush
+      } else {
+        // 2.376.1 CI fix: the new task not in the local state yet (load() with changes still queued leaves the reload to the
+        // next flush): uploadFiles would refuse it as "view only" and the files were dropped unseen - they wait for that load
+        if (!taskById(id)) { S.qfWait = true; continue; }
+        const up = await uploadFiles(id, r.files.map(f => new File([f.blob], f.name, {type: f.type})));
+        if (up === false) continue;  // offline again: the next flush
+        if (!up) {  // refused here (too large, no right; an encrypted list answers with its file): named in the conflicts dialog, never lost unseen
+          S.conflicts.push({tid: id, title: r.title, field: 'rejected', server: tr('File upload'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
+          LS.set('conflicts', S.conflicts); renderTop();
+        }
+      }
       await st.del(r.tmp);
     }
   } catch (e) { console.warn('qfiles', e); } finally { QF.busy = false; }
