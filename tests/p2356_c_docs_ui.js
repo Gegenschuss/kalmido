@@ -81,12 +81,13 @@ const FEAT = 'cal,comments,collab,office,clients';
 
   // ================= #3004: the kind tab in the address, Back returns
   d.querySelector('[data-ofd="back"]').click();
-  check(await until(() => /^#office\/offers\/invoice$/.test(w.location.hash) && d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]')),
+  // 2.380.0 (#3409): the invoices' own area office/invoices (credit notes are a tab of it)
+  check(await until(() => /^#office\/invoices\/invoice$/.test(w.location.hash) && d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]')),
     '#3004: back to the list: the address names the tab ' + w.location.hash);
-  d.querySelector('.ofdkinds [data-kind="offer"]').click();
-  check(await until(() => w.location.hash === '#office/offers/offer' && d.querySelector('.ofdkinds [data-kind="offer"][aria-selected="true"]')), '#3004: the quotation tab changes the address ' + w.location.hash);
+  d.querySelector('.ofdkinds [data-kind="credit"]').click();
+  check(await until(() => w.location.hash === '#office/invoices/credit' && d.querySelector('.ofdkinds [data-kind="credit"][aria-selected="true"]')), '#3004: the credit note tab changes the address ' + w.location.hash);
   w.history.back();
-  check(await until(() => w.location.hash === '#office/offers/invoice' && d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]')), '#3004: Back returns to the invoice tab ' + w.location.hash);
+  check(await until(() => w.location.hash === '#office/invoices/invoice' && d.querySelector('.ofdkinds [data-kind="invoice"][aria-selected="true"]')), '#3004: Back returns to the invoice tab ' + w.location.hash);
   // #3003: the list names the kind of amount
   check(await until(() => /gross/.test(d.querySelector('.ofdlist .oil_amt')?.textContent || '')), '#3003: the invoice list says gross');
 

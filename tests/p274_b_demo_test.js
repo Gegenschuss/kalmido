@@ -86,8 +86,7 @@ const srv = http.createServer((req, res) => {
   check(sv.id && svl.items.length === 1 && svl.items[0].daily_rate === 800, 'service with a day rate');
   // 3. a new quotation through the button, then client + positions
   w.eval(`ofdDraw()`); await sleep(300);
-  d.querySelector('[data-ofd="new"]')?.click(); await sleep(500);
-  d.querySelector('.modal.tri-dlg [data-m="ok"]')?.click(); await sleep(1200);  // 2.144.10 (#2576): the create dialog, confirmed (a real quotation)
+  d.querySelector('[data-ofd="new"]')?.click(); await sleep(1200);  // 2.380.0 (#3418): created at once again (no dialog)
   const oid = w.eval('S.route.id');
   const of0 = await J(w, `api('GET', '/api/office/docs/${oid}')`);
   check(of0.kind === 'offer' && of0.number === `KVA-${year}-001` && of0.status === 'draft' && of0.can_edit, 'button "Neues Angebot": draft with number ' + of0.number);

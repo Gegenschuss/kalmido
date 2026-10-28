@@ -56,7 +56,7 @@ function bnkRow(t) {
     // 2.355.0 B (#2843): a split names its invoices and the rest of the booking (an overpayment)
     const rest = t.match.rest && +t.match.rest > 0 ? ` · ${tr('overpaid {0}', ofcMoney(t.match.rest))}` : '';
     act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}${esc(rest)}</span>${typeof brl_byRule === 'function' ? brl_byRule(t.match) : ''}<span class="spacer"></span>
-      ${t.match.kind === 'invoice' ? `<a class="btn sm ghost" href="#office/offers/${t.match.id}">${tr('Open')}</a>` : ''}<button class="btn sm ghost" data-bnk="unmatch" data-id="${t.id}">${ic('undo', 's')}<span>${tr('Undo match')}</span></button></div>`;
+      ${t.match.kind === 'invoice' ? `<a class="btn sm ghost" href="#office/invoices/${t.match.id}">${tr('Open')}</a>` : ''}<button class="btn sm ghost" data-bnk="unmatch" data-id="${t.id}">${ic('undo', 's')}<span>${tr('Undo match')}</span></button></div>`;
   } else {
     const s = (t.suggestions || [])[0];
     const sug = s ? `<div class="bnksug"><span class="bnksn"><small class="muted">${tr('Suggestion')}</small><b>${esc(tr(BNK_KIND[s.kind]))} · ${esc(s.label)}</b><small class="muted">${esc(s.reason)}</small></span>

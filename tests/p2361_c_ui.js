@@ -43,9 +43,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   // 2.46.1 (#1637): an empty tab shows New once, as the big button in the empty state (not in the bar)
   check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty [data-ofd="new"]') && /No quotations yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'the tab shows the search bar, New and the empty hint');
   d.querySelector('.office [data-ofd="new"]').click();
-  // 2.144.10 (#2576): "New quotation" opens a small dialog ("Just to try" off, focus on Create) instead of creating at once
-  await until(() => d.querySelector('.modal.tri-dlg [data-m="ok"]'), 40);
-  d.querySelector('.modal.tri-dlg [data-m="ok"]').click();
+  // 2.380.0 (#3418): "New quotation" creates at once again (2.144.10 had a small dialog with "Just to try")
   await until(() => d.querySelector('.ofdeditor'), 60);
   let doc = (await call('GET', '/api/office/docs')).docs?.[0];
   check(!!doc && /office\/offers\/\d+/.test(w.location.hash) && /^KVA-\d{4}-001$/.test(doc.number), 'New creates a draft on the server and opens it: ' + w.location.hash + ' ' + doc?.number);

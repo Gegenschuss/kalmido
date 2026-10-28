@@ -178,7 +178,7 @@ check(j["producing_mode"] == "amount" and line(j, "producing")["total"] == 5000,
 check(new(A)["producing_mode"] is None, "#2251: a new quotation without the pack has no producing")
 
 # ---------------------------------------------------------------- film: handling costs + markup
-A.put(B + O + "/settings", json={"industry_packs": ["film"]})
+A.put(B + O + "/settings", json={"industry_packs": ["film"], "producing_on": 0})  # 2.380.0 (#3420): the film pack offers share by amount now - off here, the sums below are without it
 Q3 = new(A)
 check(Q3["handling_pct"] == 4 and Q3["markup_pct"] is None and Q3["markup_stacked"] == 0 and Q3["handling_label"]["de"] == "Handlungskosten",
       "#2252: film: handling costs 4 % on, markup off " + str({k: Q3.get(k) for k in ("handling_pct", "markup_pct", "markup_stacked")}))
