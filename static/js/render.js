@@ -32,7 +32,7 @@ function annSync() {
   const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
   if (!on) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
-  const until = a.ends_at ? tr('until {0}', new Date(a.ends_at).toLocaleString(I18N.code || 'en', {weekday: 'short', hour: '2-digit', minute: '2-digit'})) : '';
+  const until = a.ends_at ? tr('until {0}', ((d) => `${WD[d.getDay()]} ${fmtTimeAt(d)}`)(new Date(a.ends_at))) : '';
   const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
   bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
   if (bar.innerHTML !== html) bar.innerHTML = html;
@@ -1183,7 +1183,7 @@ const cfk_opts = (f, v) => cfk_ids(v).map(id => selOpt(f, id)).filter(Boolean);
 const cfk_max = f => Math.min(10, Math.max(3, +(f.options?.max || 5)));
 function cfk_money(v, cur) {
   const x = +v; if (!Number.isFinite(x)) return String(v ?? '');
-  try { return x.toLocaleString(LOCALE(), {style: 'currency', currency: cur || 'EUR'}); } catch { return numFmt(v) + ' ' + (cur || 'EUR'); }
+  return curMoney(x, cur || 'EUR');  // 2.368.0 C (#2983): one money format (i18n.js curMoney: "$1,234.50", not "US$1,234.50")
 }
 // 2.156.0 B (#2070): the error values of a formula result
 const CFK_FX_ERR = {'#div0': N_('Division by 0'), '#type': N_('Not a number')};

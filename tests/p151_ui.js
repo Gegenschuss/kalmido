@@ -275,7 +275,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // 2.44.0 (#1187): the area tabs (Time: time tracking / focus timer) may stand above the page; the card is the first thing below them
   const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
   check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
-  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d\d:\d\d/.test(card().textContent), 'card: task, project, start time');
+  check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d{1,2}:\d\d/.test(card().textContent), 'card: task, project, start time');  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
   w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await sleep(1300);
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);
   click(w, card().querySelector('.tvr-task')); await sleep(300);

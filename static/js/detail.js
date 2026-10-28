@@ -93,7 +93,7 @@ function lay2209({W, bar, barRail, side, det, detMin, chat, chatMin, fold, floor
 // 2.26.x: the fixed line at the bottom of the task panel: "Created by <name> on <date>" (agents by their name; no known
 // creator: the date only), plus "Completed <date>" once done
 function createdLine(t) {
-  const f = v => new Date(v).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'});
+  const f = v => fmtMoment(new Date(v));  // 2.368.0 B (#2982): one locale source
   const who = t.created_by ? personNameAny(t.created_by) : '';
   const c = !t.created_at ? '' : who ? tr('Created by {0} on {1}', who, f(t.created_at)) : tr('Created {0}', f(t.created_at));
   const d = t.status === 2 && t.completed_at ? tr('Completed {0}', f(t.completed_at)) : '';

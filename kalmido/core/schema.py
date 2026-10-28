@@ -4121,6 +4121,10 @@ USER_DEFAULTS = {
     # 2.240.0 (#2886): '1' = load YouTube / Vimeo players in video reviews without asking each time (remembered per person)
     "chat_kbd_agent": "1", "chat_kbd_team": "1",  # 2.235.0 D (#2899): phones: the keyboard closes after sending
     "video_ext_ok": "0",
+    # 2.368.0 B (#2982): region / formats ('' = automatic, from the app language and the browser's region; static/js/popovers.js)
+    "week_start": "",           # '' | mon | sun: the first day of the week (calendar, date picker, dispatch, habits)
+    "time_format": "",          # '' | 24 | 12: how times show
+    "date_order": "",           # '' | dmy | mdy | ymd: the order of numeric dates (31.12.2026 / 12/31/2026 / 2026-12-31)
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

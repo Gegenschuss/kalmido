@@ -116,6 +116,7 @@
 .oil_more{margin:.25rem 0 .5rem}  /* 2.356.0 C (#3005): language, currency, VAT, contract folded below the head */
 .oil_more>summary{display:flex;align-items:center;gap:.4rem;cursor:pointer;min-height:2.5rem;color:var(--muted);font-size:var(--fs-s);list-style:none}
 .oil_more>summary::-webkit-details-marker{display:none}
+.oil_more>summary .ofd_langother{color:var(--accent)}  /* 2.368.0 (#2979): the document language differs from the app language */
 .oil_more>summary .fcar{transform:rotate(-90deg)}
 .oil_more[open]>summary .fcar{transform:none}
 .oil_more>summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}

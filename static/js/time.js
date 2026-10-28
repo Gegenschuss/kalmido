@@ -11,9 +11,9 @@ const timeOn = () => feat('time') && S.timeAll !== false;  // own switch + the a
 const mtTime = lid => !!listById(lid)?.time_tracking;  // 2.41.0 (#1471): the list's own switch "Time tracking" (any type, default off)
 const hmm = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600)}:${pad(Math.floor(s % 3600 / 60))}`; };
 const fmtDur = s => s > 0 && s < 60 ? tr('under 1 minute') : fmtH(Math.floor(Math.max(0, s) / 60));  // 2.354.0 C (#3013): not "0:00" for the first minute
-const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;  // HH:MM for fields and comparisons; shown times use fmtTimeAt (2.368.0 B, #2982)
 const hoursDec = s => (s / 3600).toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2});
-const money = (v, cur) => v.toLocaleString(LOCALE(), {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (cur ? ' ' + cur : '');
+const money = (v, cur) => curMoney(v, cur);  // 2.368.0 C (#2983): "€1,234.50" in English, not "1,234.50 EUR"
 const timerElapsed = () => S.timer ? Math.max(0, (Date.now() - new Date(S.timer.start)) / 1000) : 0;
 const newCid = () => (window.crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 function taskTime(id) {  // [everyone I can see, mine] in seconds, incl. my running timer
@@ -153,7 +153,7 @@ function teRow(e, {task = true, day = true} = {}) {
   const title = task ? `<span class="tett" ${e.task_id ? `data-act="te-open" data-id="${e.task_id}"` : ''}>${esc((e.e2e && typeof le2eTitle === 'function' ? le2eTitle(e.task_id, e.title) : e.title) || tr('No task'))}</span>` : '';  // 2.64.1 (#1817): a locked list's title from this page
   const bill = tbill_tag(e);  // 2.144.6 A (#2053)
   const acts = e.locked ? tsl_lockMark() : e.mine ? `<span class="teacts">${!e.running && (e.task_id || e.list_id) ? `<button class="iconbtn" data-act="te-resume" data-eid="${e.id}" title="${tr('Continue (same task and note)')}">${ic('play', 's')}</button>` : ''}<button class="iconbtn" data-act="te-edit" data-eid="${e.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>${e.billed ? '' : `<button class="iconbtn danger" data-act="te-del" data-eid="${e.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>`}</span>` : '';  // 2.125.0 B (#2119): a closed month: a lock instead
-  return `<div class="terow ${e.running ? 'live' : ''}">${day ? `<span class="ted">${esc(dayLabel(ds(s)))}</span>` : ''}<span class="tet">${fmtClock(s)}–${en ? fmtClock(en) : tr('now')}</span>${title}<span class="ten">${esc(e.note)}</span>${bill}${src}${who}<b class="tedur" ${e.running ? 'data-timer-live' : ''}>${e.running ? fmtT(timerElapsed()) : hmm(e.seconds)}</b>${acts}</div>`;
+  return `<div class="terow ${e.running ? 'live' : ''}">${day ? `<span class="ted">${esc(dayLabel(ds(s)))}</span>` : ''}<span class="tet">${fmtTimeAt(s)}–${en ? fmtTimeAt(en) : tr('now')}</span>${title}<span class="ten">${esc(e.note)}</span>${bill}${src}${who}<b class="tedur" ${e.running ? 'data-timer-live' : ''}>${e.running ? fmtT(timerElapsed()) : hmm(e.seconds)}</b>${acts}</div>`;
 }
 // 2.144.6 A (#2053): "billed RE-…" (opens the invoice) or "not billable" in the row; nothing for open billable time
 function tbill_tag(e) {
@@ -309,7 +309,7 @@ function tvPomoCard() {
   return `<section class="tvrun tvpomo k-${k}${p.paused_at ? ' paused' : ''}" aria-label="${esc(tr(name))}">
     <div class="tvr-time">${ic(icn, 's rk')}<b data-pomo-mini>${pomoDisplay()}</b></div>
     <div class="tvr-info"><span class="tvr-kind">${tr(name)}${p.paused_at ? ` · ${tr('paused')}` : ''}</span>${t ? `<button class="tvr-task" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open task'))}">${esc(t.title)}</button>` : `<span class="tvr-task muted">${esc(k === 'break' ? tr('Break') : tr('No task'))}</span>`}
-      <span class="tvr-meta">${l ? `<span class="tvr-list"><span class="sw" style="${col ? 'background:' + col : ''}"></span>${esc(lname(l))}</span>` : ''}<span>${esc(tr('since {0}', fmtClock(new Date(p.start))))}</span>${k !== 'stopwatch' ? `<span>${esc(tr('{0} min planned', p.minutes))}</span>` : ''}</span></div>
+      <span class="tvr-meta">${l ? `<span class="tvr-list"><span class="sw" style="${col ? 'background:' + col : ''}"></span>${esc(lname(l))}</span>` : ''}<span>${esc(tr('since {0}', fmtTimeAt(new Date(p.start))))}</span>${k !== 'stopwatch' ? `<span>${esc(tr('{0} min planned', p.minutes))}</span>` : ''}</span></div>
     <div class="tvr-acts">${p.paused_at ? `<button class="btn pri" data-act="pomo-resume">${ic('play', 's')} ${tr('Resume')}</button>` : `<button class="btn" data-act="pomo-pause">${ic('pause', 's')} ${tr('Pause')}</button>`}<button class="btn" data-act="pomo-stop">${ic('stop', 's')} ${stop}</button><button class="btn" data-go="pomo">${ic('timer', 's')} ${tr('Focus')}</button></div>
   </section>`;
 }
@@ -324,7 +324,7 @@ function tvRunCard() {
   return `<section class="tvrun" aria-label="${esc(tr('Timer running'))}">
     <div class="tvr-time"><span class="rec"></span><b data-timer-live>${fmtT(timerElapsed())}</b></div>
     <div class="tvr-info">${t ? `<button class="tvr-task" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open task'))}">${esc(t.title)}</button>` : `<span class="tvr-task muted">${esc(r.title || tr('No task'))}</span>`}
-      <span class="tvr-meta">${l ? `<span class="tvr-list"><span class="sw" style="${col ? 'background:' + col : ''}"></span>${esc(lname(l))}</span>` : ''}<span>${esc(tr('since {0}', fmtClock(new Date(r.start))))}</span>${r.note ? `<span>${esc(r.note)}</span>` : ''}</span></div>
+      <span class="tvr-meta">${l ? `<span class="tvr-list"><span class="sw" style="${col ? 'background:' + col : ''}"></span>${esc(lname(l))}</span>` : ''}<span>${esc(tr('since {0}', fmtTimeAt(new Date(r.start))))}</span>${r.note ? `<span>${esc(r.note)}</span>` : ''}</span></div>
     <div class="tvr-acts"><button class="btn pri" data-act="tv-stop">${ic('stop', 's')} ${tr('Stop timer')}</button>${t ? `<button class="btn" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')} ${tr('Open task')}</button>` : ''}</div>
   </section>${pc}`;
 }
@@ -420,7 +420,7 @@ function timesheet() {
     <tr class="g"><td>${tr('Total')}</td><td class="muted">${esc(j.users.map(u => `${u.name} ${hmm(u.rounded)}`).join(', '))}</td><td class="n">${hmm(j.total.rounded)}</td><td class="n">${hoursDec(j.total.rounded)}</td>${hasAmt ? `<td></td><td class="n">${money(j.total.amount, cur)}</td>` : ''}</tr></tbody></table>
     <h2>${tr('Per day')}</h2><table class="tsdays"><thead><tr><th>${tr('Date')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th></tr></thead><tbody>${j.days.map(d => `<tr><td>${esc(fmtDay('year', pd(d.date)))}</td><td class="n">${hmm(d.rounded)}</td><td class="n">${hoursDec(d.rounded)}</td></tr>`).join('')}</tbody></table>
     <div class="tsentries">${Object.keys(byList).map(id => `<h2>${esc(lname2(+id))}</h2><table class="entries"><thead><tr><th>${tr('Date')}</th><th>${tr('Time|tracked')}</th><th>${tr('Task')}</th><th>${tr('Note')}</th>${all ? `<th>${tr('User')}</th>` : ''}<th class="n">h:mm</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}</tr></thead><tbody>
-      ${byList[id].map(e => { const s = new Date(e.start), en = e.end ? new Date(e.end) : null; return `<tr><td>${esc(fmtDate(ds(s)))}</td><td>${fmtClock(s)} – ${en ? fmtClock(en) : tr('running')}</td><td>${esc(e.title || tr('No task'))}</td><td class="note">${esc(e.note)}</td>${all ? `<td class="muted">${esc(e.user_name)}</td>` : ''}<td class="n">${hmm(e.seconds)}</td>${rm ? `<td class="n">${hmm(e.rounded)}</td>` : ''}</tr>`; }).join('')}</tbody></table>`).join('')}</div>`;
+      ${byList[id].map(e => { const s = new Date(e.start), en = e.end ? new Date(e.end) : null; return `<tr><td>${esc(fmtDate(ds(s)))}</td><td>${fmtTimeAt(s)} – ${en ? fmtTimeAt(en) : tr('running')}</td><td>${esc(e.title || tr('No task'))}</td><td class="note">${esc(e.note)}</td>${all ? `<td class="muted">${esc(e.user_name)}</td>` : ''}<td class="n">${hmm(e.seconds)}</td>${rm ? `<td class="n">${hmm(e.rounded)}</td>` : ''}</tr>`; }).join('')}</tbody></table>`).join('')}</div>`;
   $('.tsheet')?.remove();
   const el = document.createElement('div');
   el.className = 'tsheet';

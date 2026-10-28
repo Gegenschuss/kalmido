@@ -41,7 +41,7 @@ function lexHead(l, j) {
 function lexDoc(lid, done, notes, head) {
   const l = listById(lid), groups = lexRows(lid, done);
   const row = ({t, depth}) => {
-    const meta = [t.due ? fmtDateLoc(t.due) + (t.due_time ? ' ' + t.due_time : '') : '', t.priority ? tr(PRIO_NAMES[t.priority] || '') : '',
+    const meta = [t.due ? fmtDateLoc(t.due) + (t.due_time ? ' ' + fmtTimeLoc(t.due_time) : '') : '', t.priority ? tr(PRIO_NAMES[t.priority] || '') : '',
       (t.tags || []).map(g => '#' + g).join(' ')].filter(Boolean);
     return `<li class="lxr ${t.status ? 'done' : ''}" style="margin-left:${depth * 1.5}rem"><span class="lxbox" aria-hidden="true">${t.status === 2 ? '&#10003;' : ''}</span>
       <div class="lxt"><b>${esc(t.title)}</b>${meta.length ? `<span class="muted"> · ${esc(meta.join(' · '))}</span>` : ''}${notes && t.content ? `<div class="lxn">${esc(t.content)}</div>` : ''}</div></li>`;
