@@ -140,6 +140,8 @@ fetch_code() {
     cp -R "$tmp/src/." "$DIR/"
     REV="$VERSION (tarball)"
   fi
+  # 2.359.2 (#2897): the version of before, for the way back
+  if [ -f "$DIR/.kalmido-version" ]; then cp "$DIR/.kalmido-version" "$DIR/.kalmido-version.prev"; fi
   printf '%s\n' "$VERSION" > "$DIR/.kalmido-version"
 }
 
@@ -226,6 +228,7 @@ backup_db() {
       > "$DIR/data/backups/$name" && [ -s "$DIR/data/backups/$name" ] \
       || { rm -f "$DIR/data/backups/$name"; die "Could not back up the database. Nothing was changed."; }
     say "Saved data/backups/$name"
+    DBCOPY="data/backups/$name"
     # shellcheck disable=SC2012
     ls -1t "$DIR"/data/backups/kalmido-*.dump 2>/dev/null | tail -n +11 | while IFS= read -r old; do rm -f "$old"; done
     return 0
@@ -455,6 +458,7 @@ main() {
     say "Installs the latest release ($VERSION) from GitHub into $DIR"
   fi
   UPDATE=""
+  DBCOPY=""  # 2.359.2 (#2897): the database copy made before the update, named at the end
   if [ -f "$DIR/docker-compose.yml" ]; then
     UPDATE=1
     say "Existing installation found: updating (your .env and data/ are kept, the database is backed up first)."
@@ -492,6 +496,10 @@ main() {
   say "Backups:    daily into data/backups/ (Settings > Users > Whole server > Backups); copy them to another disk too"
   if [ -n "$IMAGE" ]; then say "Image:      $IMAGE (prebuilt)"; else say "Image:      kalmido:local (built on this computer)"; fi
   say "Update:     \"$DIR/update.sh\"  (backs up the database first; admins also see new versions in Settings > Help)"
+  prev=$(head -n 1 "$DIR/.kalmido-version.prev" 2>/dev/null || true)  # 2.359.2 (#2897)
+  if [ -n "$UPDATE" ] && [ -n "$prev" ] && [ "$prev" != "$VERSION" ]; then
+    say "Previous:   $prev  (back to it: KALMIDO_VERSION=$prev \"$DIR/update.sh\"${DBCOPY:+; the database of before: $DBCOPY})"
+  fi
   say "Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs/SELF-HOSTING.md"  # 2.61.0
   say "Stop:       cd \"$DIR\" && docker compose down"
   say "Uninstall:  cd \"$DIR\" && docker compose down && docker image rm ${IMAGE:-kalmido:local}"
