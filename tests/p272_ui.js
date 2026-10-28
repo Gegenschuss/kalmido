@@ -195,7 +195,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-agseg="os"] [data-agsv="win"]')); await sleep(100);
   check(/PowerShell|\.ps1|New-NetFirewallRule|Register-ScheduledTask/i.test(md.querySelector('#s-agguide').textContent), 'Windows: PowerShell steps');
   click(w, md.querySelector('[data-agseg="guide"] [data-agsv="own"]')); await sleep(100);
-  check(/admin has to switch on/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first');
+  // 2.361.4 (#2928): private area = the person decides, an organisation's admins or a server admin allow it
+  check(/its admins allow it/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says who allows it first');
   md.querySelector('#s-uag').checked = true; md.querySelector('#s-uag').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents);
   check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'admin switches it on');

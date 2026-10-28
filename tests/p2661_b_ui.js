@@ -47,6 +47,7 @@ const WS_VIEWS = {
   'static/js/readlater.js': 'draw',           // 2.172.0 B (#2679): read later of the shown workspace (rd_space), loads again when it changed (RDL.sp)
   'static/js/life.js': 'draw',                // 2.173.0 A (#2680): trips + staying in touch of the shown workspace (rd_space), loads again when it changed (LF.sp)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
+  'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea only picks the empty-state text (who creates agents)
   'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
