@@ -924,7 +924,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["service_period_text"] = (fmt_date(sf, pack) if sf == st or not st else (fmt_date(st, pack) if not sf else f"{fmt_date(sf, pack)} – {fmt_date(st, pack)}")) if (sf or st) else ""
     snd = _j(r["sender"], {}) if ofx_locked(r) else {}
     fields = snd.get("fields") if snd else ofx_company(c, oid)
-    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "address_extra", "zip", "city", "country", "email", "phone", "tax_number", "vat_id",
+    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "address_extra", "zip", "city", "country", "email", "website", "phone", "tax_number", "vat_id",
                                                                    "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}  # 2.99.0 D (#2188): + address_extra (BT-36)
     rec = _j(r["recipient_snapshot"], {}) if ofx_locked(r) and r["recipient_snapshot"] else {}
     if not rec and r["client_id"]:

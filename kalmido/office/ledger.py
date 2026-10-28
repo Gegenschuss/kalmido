@@ -49,9 +49,9 @@ OFX_LOCKED = N_("This document is finalised and cannot be changed. Duplicate it 
 OFX_DETAIL_MAX = 60000
 Q2 = Decimal("0.01")
 
-COMPANY_COLS = ("name", "street", "address_extra", "zip", "city", "country", "email", "phone", "tax_number", "vat_id", "iban", "bic", "bank_name",
+COMPANY_COLS = ("name", "street", "address_extra", "zip", "city", "country", "email", "website", "phone", "tax_number", "vat_id", "iban", "bic", "bank_name",
                 "register_court", "register_no", "managing_directors", "md_label")
-COMPANY_MAX = {"name": 200, "street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "phone": 60, "tax_number": 40,
+COMPANY_MAX = {"name": 200, "street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "website": 200, "phone": 60, "tax_number": 40,
                "vat_id": 20, "iban": 42, "bic": 11, "bank_name": 120, "register_court": 120, "register_no": 60, "managing_directors": 300, "md_label": 20}
 # 2.40.0 (#1377): the word before the names of the management in the printed footer (md_label; '' = "Geschäftsführung" as before)
 # 2.185.0 C (#2520): English keys through tr() in the document's language (was a de / en pair; the words stay the same)
@@ -261,6 +261,8 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     def cl(w):
         return w if w.endswith((".", ":")) or w in ("IBAN", "BIC") else w + ":"
     contact = [x for x in (f"{cl(W['phone'])} {pdf_phone(f['phone'])}" if f.get("phone") else "", f"{cl(W['email'])} {f['email']}" if f.get("email") else "") if x]  # 2.114.5 (#2300): "E-Mail:"
+    if ofx_web_print(f.get("website")):  # 2.408.0 (#3494): the website under the e-mail, without a label (as letterheads print it)
+        contact.append(ofx_web_print(f.get("website")))
     reg = []
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (cl(W["register"]) if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
@@ -281,6 +283,12 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     return {"name": ofx_name1(nm), "name_lines": ofx_name_lines(nm), "lines": addr or list(free.get("lines") or []),
             "contact_lines": contact or list(free.get("contact_lines") or []),
             "register_lines": (reg or list(free.get("register_lines") or [])) + tax, "bank_lines": bank or ([] if tax else list(free.get("bank_lines") or []))}
+
+
+def ofx_web_print(v):
+    """2.408.0 (#3494): a website as printed: without https:// (or http://) and without the slash at the end (www.example.com);
+    the stored value stays what was entered."""
+    return re.sub(r"^https?://", "", str(v or "").strip(), flags=re.I).rstrip("/")
 
 
 def ofx_sender_line(co):

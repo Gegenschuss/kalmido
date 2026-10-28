@@ -1086,7 +1086,9 @@ or the partners): documents print it as its own line under the name, the e-invoi
 (`recipient.name_extra`, older finalised documents without it stay as they are). The buyer e-mail (BT-49) is the client's
 `email_invoice`, else its `email`. Office settings: `company_fields.name` may have up to three lines (`\n`; more = `400`),
 the letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one
-line; `company_fields.address_extra` is the company's extra address line (BT-36). While street, postcode and city of the
+line; `company_fields.address_extra` is the company's extra address line (BT-36). `company_fields.website` (2.408, up to 200 characters, stored
+as entered) is printed in the contact block under the e-mail, without `https://` and the closing slash; finalised documents
+keep their sender snapshot. While street, postcode and city of the
 company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
 the answer; saving the settings keeps them, the free lines stay.
 A project's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its projects:
