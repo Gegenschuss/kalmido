@@ -64,12 +64,12 @@ for p in (DE, XX):
           f"#3183 {p['code']}: the credit note refers to the invoice above (its number stands in the head)")
 check(XX["texts"]["rights_media"][1]["de"] == "intern, Web, unbezahlte Medien", "#3183 xx: the German rights text is German")
 NEW = ("Description|pack", "Unit price|pack", "Net total|pack", "Gross total|pack", "Duration of licence|pack", "Territorial rights|pack",
-       "Rights by medium|pack", "Service date|pack", "Service date|document", "regarding the invoice referenced above we issue the following credit note:|pack")
+       "Rights by medium|pack", "Service date|pack", "Service date|document", "Regarding the invoice referenced above we issue the following credit note:|pack")
 for lg in ("de", "fr", "es", "it", "nl"):
     t = i18n(lg)
     check(all(isinstance(t.get(k), str) and t[k] for k in NEW), f"#3183 {lg}: every new pack word translated {[k for k in NEW if not t.get(k)]}")
 FR, ES = i18n("fr"), i18n("es")
-INTROS = [k for k in FR if k.endswith("|pack") and k.startswith(("regarding", "thank you for your enquiry", "the following goods", "it may have", "despite our"))]
+INTROS = [k for k in FR if k.endswith("|pack") and k.lower().startswith(("regarding", "thank you for your enquiry", "the following goods", "it may have", "despite our"))]  # 2.390.0 A (#3349): the keys are capitalised now
 check(len(INTROS) >= 8 and all(FR[k][:1].isupper() and ES[k][:1].isupper() for k in INTROS),
       f"#3183 fr / es: the sentence after the salutation starts with a capital {[k[:30] for k in INTROS if not (FR[k][:1].isupper() and ES[k][:1].isupper())]}")
 check(FR.get("Unit price|pack") == "Prix unitaire" and FR.get("Net total|pack") == "Total HT" and FR.get("Gross total|pack") == "Total TTC", "#3183 fr: Prix unitaire, Total HT / TTC")

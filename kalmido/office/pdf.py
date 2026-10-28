@@ -62,6 +62,7 @@ PDF_TOP = 10 * MM        # letterhead starts here
 PDF_ADDR_TOP = 45 * MM   # form B: the address field (sender line + recipient) begins 45 mm from the top
 PDF_ADDR_H = 45 * MM     # ... and is 45 mm high; the body begins below it
 PDF_ADDR_W = 85 * MM
+PDF_INFO_X = 125 * MM    # 2.390.0 A (#3350): the info block begins 125 mm from the sheet edge (DIN 5008 form B)
 PDF_FOOT_H = 20 * MM     # footer (four columns + page line) reserved at the bottom of every page
 PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
 PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
@@ -1271,8 +1272,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     for f in m.get("fields") or []:
         if isinstance(f, dict) and str(f.get("name") or "").strip():
             info.append((str(f["name"]), str(f.get("value") or "")))
-    info_x = PDF_L + PDF_ADDR_W + 8 * MM
-    info_w = PDF_CW - PDF_ADDR_W - 8 * MM
+    info_x = PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge (was 118 mm); runs to the right margin
+    info_w = PDF_L + PDF_CW - PDF_INFO_X
     info_lh = 8.6 * 1.45
     addr_lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip()]
     if rc.get("name") and (not addr_lines or addr_lines[0].strip() != str(rc["name"]).strip()):
