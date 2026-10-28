@@ -40,6 +40,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await call('PATCH', '/api/settings', {features: ALL, tour: 'done', lang: 'de'}, CC);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  await call('POST', `/api/lists/${L}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): tracked = has a status (the start page's projects card)
   const L2 = (await call('POST', '/api/lists', {name: 'Garden', kind: 'project'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L}/members`, {user_id: CAR, role: 'view'});

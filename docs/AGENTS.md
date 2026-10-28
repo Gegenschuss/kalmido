@@ -1819,6 +1819,11 @@ Scopes: `files:read` (list, read) and `files:write` (add files and folders, new 
 agent's [office rights groups](#office-drafts-only) on top of the share (level *own*: only the receipts the agent
 added itself); a share alone is not enough. Without it the receipt is missing from listings, searches and ZIPs and reads
 answer `404`.
+**Locked folders (2.353.0):** a person may lock a folder: names and files below it are encrypted in the browser, the
+server keeps ciphertexts only. Agents and API tokens never reach a locked folder, not even through a share on a folder
+above it: it is missing from every listing, reads answer `404`, writes into it answer `409` (code `fs_locked`), and a
+locked folder cannot be shared with an agent (`409`, code `fs_locked_agent`). Nothing to do for an agent but to not
+expect files there.
 
 | What | Endpoint | MCP |
 |---|---|---|
@@ -1826,7 +1831,7 @@ answer `404`.
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
-| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text`) | `GET /api/v1/files/search?q=` | `search_files` |
+| Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |
 | A new file / folder (`{parent_id?, name, content \| content_base64, mime?, kind?}`; without `parent_id`: your own folder) | `POST /api/v1/files` | `write_file`, `create_file_folder` |
 | A new version of a file (`{content \| content_base64}`, role edit; the older versions stay) | `POST /api/v1/files/{id}/versions` | `write_file` with `file_id` |
 

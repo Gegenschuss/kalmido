@@ -161,6 +161,7 @@ const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
 function sideToLists() {
   const sd = $('#side'), g = $('#side .sg-lists'); if (!sd || !g) return;
+  if (typeof sbm_on === 'function' && sbm_on()) { sd.scrollTop = 0; return; }  // 2.353.0 B (#2776): the phone's drawer has a fixed top: start at the head of the project list
   sd.scrollTop = Math.max(0, sd.scrollTop + g.getBoundingClientRect().top - sd.getBoundingClientRect().top - 8);
 }
 function tabsMore(anchor) {
@@ -315,7 +316,8 @@ function renderSide0() {
     `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
-  const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
+  // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
+  const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {

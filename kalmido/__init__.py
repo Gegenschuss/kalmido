@@ -99,6 +99,7 @@ ORDER = (
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
+    "accounts.wsareas",  # 2.409.0 (#3490): areas on / off per workspace (a before_request gate)
     "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)
@@ -219,8 +220,10 @@ ORDER = (
     "wiki.wkfolder",  # 2.200.0 A (#2747): knowledge pages in folders of the file store (the reference kind 'wiki', the tree)
     "wiki.wkv1",  # 2.200.0 C (#1781): knowledge pages for agents (API v1 + OpenAPI; only what is shared with them)
     "wiki.wkfshare",  # 2.200.0 B (#2747): pages reached through folder / page shares (Shared with me, new pages in a shared folder)
+    "wiki.wkstyle",  # 2.371.3 (#3152): the reading style of a knowledge space (PUT /api/wiki/style)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
+    "files.fslock",  # 2.353.0 A (#2758): locked folders (names and contents encrypted in the browser)
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.fstags",  # 2.122.0 B (#2099): tags of files and folders (the documents' tag set of the workspace)
     "files.bulk",  # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan -> one PDF
@@ -407,6 +410,7 @@ ORDER = (
     "docs.dups",  # 2.146.0 B (#2452): the same file / the same invoice twice (no routes; hooks into the recognition)
     "files.textscan",  # 2.61.0 C (#1820): text recognition of normal stored files (queue, search, Ablage search route)
     "docs.web",  # 2.48.0 (#1111): the routes of the documents area
+    "docs.recog",  # 2.353.0 D (#2759): recognition per folder / file of the file store (one route; after docs.web)
     "docs.dsearch",  # 2.122.0 B (#2294): filters + search syntax of the documents list (no routes)
     "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
     "docs.fields",  # 2.153.0 (#2179): custom fields of documents (definitions + routes; values via docs.web)

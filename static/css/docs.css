@@ -191,3 +191,12 @@
 .dsp-sum{margin:.25rem 0;font-weight:600}
 .dsp-pick #dsp-q{width:100%;margin-top:.5rem}
 @media (pointer:coarse){.dsp-cut{width:2.75rem;height:2.75rem;left:-1.6rem}.dsp-pg{padding-left:1rem}}
+/* 2.353.0 D (#2759): the file store's folders as cards (abdocs.js), the recognition line, the list / cards switch, the saved filters on phones */
+.abcards .dc-card{position:relative}
+.abcards .abcmenu{position:absolute;top:.25rem;right:.25rem;background:var(--bg2);border-radius:var(--radius)}
+.abcards .abcf .dc-ph svg{width:2rem;height:2rem}
+.abrecog{display:flex;align-items:center;gap:.4rem;margin:.25rem 0 .5rem;font-size:var(--fs-sm)}
+.abrecog .linkbtn{margin-left:.25rem}
+.abdoc.rev{color:var(--accent)}
+.abdnav{flex-direction:row;flex-wrap:wrap;position:static;margin-bottom:.5rem}
+@media (max-width:640px){.abviewseg span{display:none}}

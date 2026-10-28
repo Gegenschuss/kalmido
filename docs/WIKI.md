@@ -96,6 +96,15 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
     - Shoot
   ```
   ````
+- **Formulas and diagrams** (2.382.0). A block between two `$$` lines (or `$$ … $$` on one line) and a fenced block
+  with the language `math` are typeset as formulas (LaTeX syntax, KaTeX); `\( … \)` puts a small formula into the text.
+  A single `$` stays a dollar sign, so amounts of money are never read as formulas. A fenced block with the language
+  `mermaid` draws a diagram (flowchart, sequence, Gantt, … in Mermaid syntax). Both libraries ship with Kalmido and are
+  loaded only when a page has such a block; without a connection, or when a block has an error, its source stays visible
+  as a code block with a short hint. The editor's "/" commands *Formula* and *Diagram* insert an example. Pages shared
+  through a public link show the source as code.
+- **Source / Preview** (2.382.0). The formatting bar of the editor has a button that switches between the live preview
+  (the page drawn while writing) and the plain Markdown source; the page's "…" menu has the same entry.
 
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
 the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.

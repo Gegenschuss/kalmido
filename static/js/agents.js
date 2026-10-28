@@ -193,9 +193,10 @@ async function agentChipMenu(a) {
   const wait = wj.flatMap(j => [{label: `${tr('{0} waits for you', j.agent_name)}: ${j.title}`, dot: 'waiting', cls: 'minfo mwait', fn: () => go('agents')},
     j.kind ? {label: tr('Review the proposal'), icon: 'bot', fn: () => propOpen(j.id)}
       : {row: [{label: '\u{1F44D} ' + tr('Approve'), cls: 'pri', fn: () => jobDo(j.id, 'approve')}, {label: tr('Reject'), icon: 'x', fn: () => jobDo(j.id, 'reject')}]}, '-']);
-  menu(a, [...wait, ...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
-    '-', {label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')},
-    ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
+  // 2.353.0 B (#2786): "Agents and jobs" first, then a divider, the waiting blocks, the agents; chats and jobs below
+  menu(a, [{label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')}, '-', ...wait,
+    ...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
+    ...(list.length ? ['-'] : []), ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
     ...jc_menuItems(),  // 2.56.0 (#1793): running jobs ("Clara · Release …") open their own chat
     {label: tr('Choose the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
 }

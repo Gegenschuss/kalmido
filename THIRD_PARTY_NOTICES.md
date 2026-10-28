@@ -75,6 +75,17 @@ Unchanged copies of `legacy/build/pdf.min.mjs` and `legacy/build/pdf.worker.min.
 full license text (`LICENSE`) and a `README` with the source and checksums. They are served by Kalmido itself and only
 loaded when a PDF is opened; the browser never loads them from a third party.
 
+## KaTeX and Mermaid (formulas and diagrams in knowledge pages)
+
+Formulas in knowledge pages (2.382.0) are typeset by [KaTeX](https://katex.org/) (Copyright Khan Academy and other
+contributors, MIT License), from the [`katex`](https://www.npmjs.com/package/katex) package 0.19.1: unchanged copies of
+`dist/katex.min.js`, `dist/katex.min.css` and the `woff2` fonts ship in `static/vendor/katex/`.
+Diagrams are drawn by [Mermaid](https://mermaid.js.org/) (Copyright Knut Sveidqvist and contributors, MIT License), from the
+[`mermaid`](https://www.npmjs.com/package/mermaid) package 12.2.0: an unchanged copy of `dist/mermaid.min.js` (which bundles
+its own dependencies with their notices) ships in `static/vendor/mermaid/`.
+Both folders hold the full license text (`LICENSE`) and a `README` with the source and checksums. They are served by
+Kalmido itself and only loaded when a page has a formula or a diagram; the browser never loads them from a third party.
+
 ## Python packages (installed at build time, not bundled)
 
 - Flask (BSD-3-Clause)

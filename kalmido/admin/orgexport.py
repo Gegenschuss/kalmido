@@ -185,10 +185,6 @@ def _rows(c, oid, table, where, args, paged=True):
             yield _clean(c, oid, table, r)
 
 
-# 2.200.0 F (#2747, review 9): the nodes of an organisation's knowledge tree (the area root and everything below it)
-WKX = ("WITH RECURSIVE wkx(id) AS (SELECT node_id FROM fs_area_roots WHERE area='wiki' AND org_id=? AND node_id IS NOT NULL "
-       "UNION ALL SELECT n.id FROM fs_nodes n JOIN wkx ON n.parent_id=wkx.id) SELECT id FROM wkx")
-
 LSQ = "SELECT id FROM lists WHERE org_id=? AND is_inbox=0 AND deleted_at IS NULL"  # 2.102.0 A (#1988): not the list trash
 TSQ = f"SELECT id FROM tasks WHERE list_id IN ({LSQ}) AND deleted_at IS NULL"  # 2.223.3 B (#2879): not the task trash
 DSQ = "SELECT id FROM office_docs WHERE org_id=?"
@@ -230,12 +226,14 @@ OX_AREAS = (
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
     # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
-    # 2.200.0 F (#2747, review 9): without the knowledge tree (its root, folders, page nodes): it comes from the pages' paths
-    # (wiki/pages.json) in the target, an import gets no second root
-    ("store/nodes.json", "fs_nodes", f"org_id=? AND id NOT IN ({WKX})"),
+    # 2.353.0 C (#2829): with the knowledge tree (root, empty folders, order, folder shares, page nodes, files put there
+    # under 2.199) and the marks of the areas' roots (store/area_roots.json): the import puts a root into the target's own
+    # root of that area (admin/oi_store.py), never a second one; an older archive without them still rebuilds from the paths
+    ("store/nodes.json", "fs_nodes", "org_id=?"),
+    ("store/area_roots.json", "fs_area_roots", "org_id=? AND node_id IS NOT NULL"),
     ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
-    ("store/shares.json", "fs_shares", f"node_id IN (SELECT id FROM fs_nodes WHERE org_id=?) AND node_id NOT IN ({WKX})"),
-    ("store/history.json", "fs_log", f"node_id IN (SELECT id FROM fs_nodes WHERE org_id=?) AND node_id NOT IN ({WKX})"),
+    ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("chat/channels.json", "tchat_rooms", f"kind='list' AND list_id IN ({LSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN (SELECT id FROM tchat_rooms WHERE kind='list' AND list_id IN ({LSQ}))"),
     ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT m.id FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE r.kind='list' AND r.list_id IN ({LSQ}))"),  # 2.137.0 C (#2344)
@@ -433,7 +431,8 @@ def ox_lsq(by_id):
 
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
-OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts")
+OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts",
+                  "fs_area_roots")  # 2.353.0 C (#2829)
 
 
 def ox_hidden_nodes(c, oid, hidden):
@@ -630,6 +629,11 @@ def ox_build(c, oid, out, by=None):
                 man.client_enc["locked_list_note"] = ("Texts of lists encrypted in the browser (values starting with e2e1:) can only be "
                                                       "read in Kalmido with a member's own passphrase; no offline tool opens them.")
                 man.client_enc["locked_list_import"] = "The import does not take these lists over (no list keys move along)."  # 2.278.0 C (#3091)
+        if "fs_locks" in have and c.execute("SELECT 1 FROM fs_locks WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.353.0 A (#2758)
+            man.client_enc["locked_folders"] = c.execute("SELECT COUNT(*) FROM fs_locks WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone()[0]
+            man.client_enc["locked_folder_note"] = ("Names and files below a locked folder of the file store (names starting with e2e1:, "
+                                                    "files starting with KENC) are exported as stored, encrypted in the browser; only the "
+                                                    "people holding the folder key can read them, in Kalmido. No folder keys move along.")
         if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
             man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "

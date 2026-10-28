@@ -313,8 +313,10 @@ def workspaces_for(c, uid):
         return []
     q = ",".join("?" * len(oids))
     # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
-    return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member"}
-            for r in c.execute(f"SELECT id, name, icon, color FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+    # 2.409.0 (#3490): + areas_off (the areas its admins switched off for the members, accounts/wsareas.py)
+    return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member",
+             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x]}
+            for r in c.execute(f"SELECT id, name, icon, color, areas_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
 def org_peers(c, uid):
@@ -1053,6 +1055,7 @@ def org_mine_dict(c, r, uid):
             "asst_comments": bool(r["asst_comments"]),  # 2.240.0 (#2884): the assistant may read other members' comments
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
             "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
+            "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],  # 2.409.0 (#3490): areas its admins switched off
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1108,6 +1111,9 @@ def org_mine_update(oid):
                 from ..assistant.web import asst_comments_notice
                 asst_comments_notice(c, oid, me())
             c.execute(f"UPDATE orgs SET {k}=? WHERE id=?", (int(b[k]), oid))
+    if "areas_off" in b:  # 2.409.0 (#3490): the areas switched off for every member (admins only); nothing is deleted
+        from .wsareas import wsa_clean_org
+        c.execute("UPDATE orgs SET areas_off=? WHERE id=?", (wsa_clean_org(b["areas_off"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()

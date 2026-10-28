@@ -1509,6 +1509,13 @@ out). 2.122.0 (#2099): files and folders of the file store carry the tags of the
 /api/files/nodes/{id}/tags` (`{tags: [names | ids]}`, write access), `GET /api/files/tags?space=` (the tags used there, merged by
 name), `GET /api/files/tagged?space=&tag=1,7&tag=3&mode=all|any&not=4` (the matching files and folders of the space with their
 `path`); the lists and the details of the file store carry `tags`.
+2.353.0 (#2759): file store and documents are one area. `PUT /api/files/nodes/{id}/recognition` `{mode: on | off | inherit}`
+(write access, people only): a folder's own recognition switch (subfolders inherit it; without an own value anywhere up the
+path only the documents folder recognises) -- `on` makes its files documents at once (at most 500 per request) and every file
+uploaded or moved in later; `off` keeps the documents there. A file takes `on` only ("Recognise"). Answer `{recog: {on, own,
+from, root}, added}`; a locked folder: `409`. `GET /api/files?parent=` answers `node.recog_on` / `recog_from` / `recog_root`, each
+folder and file `recog_on` (own switch: `recog`), each document `doc: {state, review}` (`&docs=1`: the document as in `GET
+/api/docs`, for the cards). `GET /api/files/search` also finds documents by sender, type and tags (`hit: doc`).
 
 ## Scan inboxes: folder watcher
 
@@ -1931,7 +1938,7 @@ n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and t
 
 `PATCH /api/settings` takes the whole value of a setting as before. A list setting can also change by single entries:
 `{"set_delta": {"<key>": {"add": [...], "remove": [...]}}}` for `agents_hidden`, `features`, `fav_lists`, `hide_progress`,
-`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`
+`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`, `ab_cards` (2.353.0: the file store's folders shown as cards)
 (json lists). The server applies it to the stored value under the account's lock, so two devices that add or remove an
 entry at the same time both keep their change; the result is checked like a whole value (`400`, nothing stored). The
 notification matrix takes a partial `{"notify": {"<event>": {"news"?: 0|1, "push"?: 0|1}}}` the same way.

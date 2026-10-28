@@ -17,6 +17,7 @@ from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from ..docs import store as S
 from .store import fs_chain, fs_link_target, fs_log_add, fs_visible_sql, need_node
+from .fslock import fsl_need_unlocked  # 2.353.0 F (#2758)
 
 DT_MAX = 30       # tags per node (as a document)
 DT_HITS = 500     # nodes of one tag filter
@@ -142,6 +143,8 @@ def files_node_tags_put(nid):
     raw = body().get("tags")
     if not isinstance(raw, list):
         return err(tr("Invalid value: {0}", "tags"))
+    if raw:
+        fsl_need_unlocked(c, nid)  # 2.353.0 F (#2758, review N10): tags are plain -- none in a locked folder (taking them off stays possible)
     e = dt_set(c, n, raw, me())
     if e:
         return e

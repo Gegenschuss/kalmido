@@ -62,6 +62,7 @@ const WS_VIEWS = {
   // 2.87.9: files that read the shown workspace since 2.85 / 2.87.9
   'static/js/areas.js': 'draw',               // private-only modules hidden in an organisation's view, the office menu per workspace (#1917)
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
+  'static/js/docscan.js': 'draw',             // 2.207.0 A (#2763) / #2773: Settings > Integrations: the scans section loads the shown workspace's settings when drawn
   'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog)
   'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
   'static/js/dashboard.js': 'draw',           // 2.144.0 C (#2418): the start page names overdue tasks of other workspaces (wsCur / wsHidden while drawing)
@@ -77,6 +78,8 @@ const WS_VIEWS = {
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
                                               // like office_where (no view keeping data; p2250_a_officesearch checks Private)
+  'kalmido/accounts/wsareas.py': 'helper',    // 2.409.0 (#3490): _req_org - which organisation an area lock applies to when a
+                                              // request names no space (the saved setting, per request; no view keeping data)
 };
 const ROOT = path.join(__dirname, '..');
 const CLIENT_RE = /\brd_space\(|\bwsCur\(|\bdc_ws\(|settings\.workspace|\bp61b_wsOn\(|\bwsObjIn\(|\binWs\(|\bwsHidden\(|\bwsAgentIn\(/;  // 2.172.0 B (#2679): + rd_space (the views of Reading)

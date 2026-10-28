@@ -184,7 +184,7 @@ function rf_palItems(q) {
   for (const t of S.tasks.values()) if (t.id > 0 && !t.status && !archivedTask(t)) add('t:' + t.id, 'tasks', mdPlain(t.title), 'check', {sub: '#' + t.id + (t.list_id ? '  ·  ' + lname(listById(t.list_id)) : '')});
   for (const c of RF.ct || []) add('c:' + c.id, 'Contact', c.fn || c.org || '', 'user', {sub: c.org || ''});
   for (const e of RF.ev || []) add('e:' + e.id, 'Appointment', e.title || '', 'cal', {sub: e.start ? dayLabel(String(e.start).slice(0, 10)) : ''});
-  for (const n of (typeof AB !== 'undefined' && AB.data?.items) || []) if (n.kind !== 'link') add('f:' + n.id, 'Document', n.name, n.kind === 'folder' ? 'folder' : 'file');
+  for (const n of (typeof AB !== 'undefined' && AB.data?.items) || []) if (n.kind !== 'link' && !(n.locked && n.lock_id !== n.id)) add('f:' + n.id, 'Document', n.name, n.kind === 'folder' ? 'folder' : 'file');  // 2.353.0 F (#2758, review M7): no decrypted name of a locked folder into a text
   rf_palAsk(q);
   if (!q) return it.filter(x => x.kind === 'list').slice(0, 12).concat(it.filter(x => x.kind === 'tasks').slice(0, 8));
   const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);

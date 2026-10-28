@@ -215,7 +215,7 @@ async function wem_swap(p, pairs, fwd) {
 }
 // ---- the editor: insert a picture / file (upload or from the file store), paste / drop files
 function wem_bar(p) {
-  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
+  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button>${typeof wklv_srcBtn === 'function' ? wklv_srcBtn() : ''}<span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
 }
 // 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
 // a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,
@@ -402,6 +402,7 @@ document.addEventListener('click', e => {
   if (k === 'ins') wem_insMenu(a, p);
   else if (k === 'cb') { e.preventDefault(); wem_cbDlg(p, [+a.dataset.k]); }
   else if (k === 'cbs') wem_cbDlg(p, wem_cbLines(p.body).map((_, i) => i));
+  else if (k === 'src' && typeof wklv_toggle === 'function') wklv_toggle();  // 2.382.0 (#3128)
 });
 // 2.276.0 B (#3043): the bar keeps the field's focus and selection (no blur = no save, the phone's keyboard stays)
 document.addEventListener('mousedown', e => { if (/** @type {any} */ (e.target).closest?.('[data-wemf]')) e.preventDefault(); });

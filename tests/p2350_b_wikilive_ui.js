@@ -4,7 +4,7 @@
 // - typing saves the ONE Markdown string of the page (read back over the API), Ctrl+B, arrows move between blocks, Esc
 // - "/" at the start of a line opens the commands, typing filters, Enter on "Checkbox" writes "- [ ] "; Ctrl+K a link,
 //   Ctrl+Shift+7 a numbered list
-// - the page's "…" entry switches to the plain text field (#wk-body, an account setting: look.wkEd) and back; "/" works there too
+// - the page's "…" entry and (2.382.0 #3128) the bar's button "Source" / "Preview" switch to the plain text field (#wk-body, an account setting: look.wkEd) and back; "/" works there too
 // Invented texts only. Screenshots: P2350B_SHOTS.
 // kalmido-suite: fresh
 const path = require('path');
@@ -116,10 +116,12 @@ const K = {Enter: '', Escape: '', ArrowUp: '', ArrowDown: '', Contro
     const menuPick = async () => {
       await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
       await until(`!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`);
-      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Live preview while writing/.test(x.textContent)); if (!b) return null; const on = b.classList.contains('on'); b.click(); return {on}; })()`);
+      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /^\\s*(Source|Preview)\\s*$/.test(x.textContent)); if (!b) return null; const t = b.textContent.trim(); b.click(); return {t}; })()`);
     };
+    // 2.382.0 (#3128): the entry names what a click shows ("Source" / "Preview", like the bar's button) instead of a ticked "Live preview while writing"
+    check(await ev(`document.querySelector('.wembar [data-wem="src"]')?.textContent.trim()`) === 'Source', `${tag}: the formatting bar has the button "Source"`);
     const p1 = await menuPick();
-    check(p1 && p1.on, `${tag}: the page's "…" has "Live preview while writing", ticked`);
+    check(p1 && p1.t === 'Source', `${tag}: the page's "…" has "Source" (${JSON.stringify(p1)})`);
     check(await until(`document.querySelector('#wk-body')?.value === ${JSON.stringify(WANT)} && !document.querySelector('#wk-live')`), `${tag}: switched off: the plain text field with the whole page`);
     let look = '';
     for (let i = 0; i < 40 && !/"wkEd":"text"/.test(look); i++) { await sleep(250); look = (await call(run.ck, 'GET', '/api/state')).settings?.look || ''; }
@@ -130,8 +132,14 @@ const K = {Enter: '', Escape: '', ArrowUp: '', ArrowDown: '', Contro
     check(m2 === 'Heading', `${tag}: the plain text field has the commands too (${m2})`);
     await press('Enter'); await type('Next');
     check(await saved(WANT + '\n## Next') === WANT + '\n## Next', `${tag}: "/head" + Enter writes a heading, saved`);
-    const p2 = await menuPick();
-    check(p2 && !p2.on && await until(`!!document.querySelector('#wk-live .wklb h5')`), `${tag}: switched on again: drawn (the new heading too)`);
+    // 2.382.0 (#3128): back with the bar's button "Preview"
+    const p2 = await ev(`(() => { const b = document.querySelector('.wembar [data-wem="src"]'); if (!b) return null; const t = b.textContent.trim(); b.click(); return t; })()`);
+    check(p2 === 'Preview' && await until(`!!document.querySelector('#wk-live .wklb h5')`), `${tag}: the bar's "Preview" switches on again: drawn (the new heading too) (${p2})`);
+    check(await until(`document.querySelector('.wembar [data-wem="src"]')?.textContent.trim() === 'Source'`), `${tag}: the button names "Source" again`);
+    const p3 = await menuPick(); await until(`!!document.querySelector('#wk-body')`);
+    check(p3 && p3.t === 'Source', `${tag}: the "…" entry switches the same way`);
+    const p4 = await menuPick();
+    check(p4 && p4.t === 'Preview' && await until(`!!document.querySelector('#wk-live')`), `${tag}: and back with "Preview"`);
   });
   console.log(`p2350_b_wikilive_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

@@ -30,6 +30,7 @@ from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from fu
 from ..core.orgcrypt import oc_file_org, oc_open_k, oc_read_file, oc_seal_k, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
+from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
 
 STATES = ("wait", "run", "done", "failed")
@@ -494,13 +495,14 @@ def root_id(c, ws):
 
 
 def _root_by_name(c, ws, org):
+    nl = " AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)"  # 2.353.0 F (#2758, review M2): a locked folder renamed so is none
     nm = folder_names(ROOT_KEY, ROOT)  # 2.368.0 (#2987): its name in any language
     if org:
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND kind='folder' AND " + folder_in_sql("name", nm) +
-                      " AND deleted_at IS NULL AND agent_id IS NULL ORDER BY id LIMIT 1", (org, *nm)).fetchone()
+                      " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1", (org, *nm)).fetchone()
     else:
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id IS NULL AND org_id IS NULL AND owner_id=? AND kind='folder' "
-                      "AND " + folder_in_sql("name", nm) + " AND deleted_at IS NULL AND agent_id IS NULL ORDER BY id LIMIT 1",
+                      "AND " + folder_in_sql("name", nm) + " AND deleted_at IS NULL AND agent_id IS NULL" + nl + " ORDER BY id LIMIT 1",
                       (int(ws[1:]), *nm)).fetchone()
     return r[0] if r else None
 
@@ -614,7 +616,9 @@ def _in_docs_tree(c, root, fid):
     if root not in ids or ids[0] == root:
         return False
     below = chain[:ids.index(root)]  # the folders between root and fid (fid first)
-    return not is_inbox(below[-1]["name"])
+    if is_inbox(below[-1]["name"]):
+        return False
+    return fsl_of_chain(c, chain) is None  # 2.353.0 F (#2758, review M2): no document (plain, recognised) into a locked folder
 
 
 def folder_ok(c, node, fid):
@@ -698,6 +702,8 @@ def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
         if r:
             if check and not fs_role(c, r[0], uid):
                 return None
+            if fl_is_locked(c, r[0]):
+                return None  # 2.353.0 F (#2758, review M2): a locked folder takes no document (none is made next to it either)
             pid = r[0]
             continue
         if not create or (check and fs_role(c, pid, uid) not in ("owner", "edit")):

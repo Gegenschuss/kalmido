@@ -259,6 +259,9 @@ def clean_setting(k, v):
         return lp_clean_folder_colors(v)
     if k == "ws_colors":  # 2.57.0 B (#1807): my own colour per workspace
         return wsp_clean_ws_colors(v)
+    if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
+        from .wsareas import wsa_clean_own
+        return wsa_clean_own(v)
     if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
         return clean_look_pref(v)
     if k == "show_done_views":
@@ -277,6 +280,14 @@ def clean_setting(k, v):
         except ValueError:
             raise bad from None
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
+    if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
+        try:
+            o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 500 or not all(isinstance(x, str) and re.fullmatch(r"n:\d{1,12}|s:(private|shared|org:\d{1,12})", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)
@@ -481,7 +492,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd", "wkSt")  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor; 2.371.3 (#3152): wkSt = the own reading style
 
 
 def clean_look_pref(v):
@@ -500,6 +511,8 @@ def clean_look_pref(v):
     for k, x in o.items():
         if k not in LOOK_KEYS:
             continue
+        if k == "wkSt" and x not in ("clear", "book", "compact", "notepad"):  # 2.371.3 (#3152): a fixed choice only (a class)
+            continue
         if isinstance(x, bool) or (isinstance(x, str) and len(x) <= 40 and x.isprintable()):
             out[k] = x
         elif isinstance(x, (int, float)) and abs(x) < 10 ** 6:
@@ -511,7 +524,7 @@ def clean_look_pref(v):
 
 # 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
 SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
-SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen")
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards")  # 2.353.0 D (#2759): ab_cards
 
 
 def set_delta_apply(cur, d):

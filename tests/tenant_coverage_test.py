@@ -72,7 +72,8 @@ KINDS = {
     "file_request": ("matrix", "p2122_a_api_test.py: a file request of another organisation's folder (list, create, change, remove): 404; the link writes only into its own folder as its creator, the page shows nothing of the folder (2.122.0 A, #2097)"),
     "file": ("matrix", "p248_a_api_test.py: a node of another organisation / person: 404 (read, list, content, versions, share, move); shares only to people and agents of the node's workspace; "
                        "p2199_a_fsref_test.py (2.199.0): an object filed in a folder of another organisation: 404, never filed across workspaces (409); "
-                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space"),
+                       "p2122_b_api_test.py (2.122.0): tags of a node and the tag filter of a space; "
+                       "p2353_a_lockfolder_test.py (2.353.0): a locked folder of another person 404, agents / API tokens never reach it"),
     "paperless": ("matrix", "p248_d_paperless_api_test.py: the connection of another workspace: 404; organisation admins only change it; agents never"),
     # 2.55.0 (#1455): the newsletter connection of one workspace (segments, log, sync) + the consent of a contact
     "newsletter": ("matrix", "p255_e_api_test.py: the connection, segments, log and sync of another workspace: 404 / 403; organisation admins only; agents never; consent only on writable contacts; address books of other workspaces refused in a segment"),
@@ -191,6 +192,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
+    "GET /api/files/lock/{}": "file", "POST /api/files/lock/{}/start": "file", "GET /api/files/lock/{}/todo": "file", "GET /api/files/lock/{}/raw/{}": "file", "POST /api/files/lock/{}/convert/{}": "file", "POST /api/files/lock/{}/finish": "file", "POST /api/files/lock/{}/stop": "file", "POST /api/files/lock/{}/keys": "file", "POST /api/files/lock/upload": "file", "POST /api/files/lock/folder": "file", "POST /api/files/lock/rename/{}": "file", "POST /api/files/lock/version/{}": "file", "POST /api/files/lock/move/{}": "file",
     # ---- admin (40)
     "PUT /api/admin/oidc": "admin", "POST /api/admin/oidc/check": "admin", "PUT /api/admin/oidc/draft": "admin", "DELETE /api/admin/oidc/draft": "admin", "POST /api/admin/oidc/draft/apply": "admin",  # 2.166.0 (#2633)
     "GET /api/admin/storage-check": "admin",
@@ -939,6 +942,7 @@ ROUTES = {
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
@@ -1022,6 +1026,7 @@ ROUTES = {
     # organisation / person: nothing changed, nothing in the ZIP, 404 on the tags of a node, no hit in the tag filter)
     "POST /api/docs/bulk": "document", "POST /api/docs/zip": "document", "GET /api/docs/zip/{}": "document",
     "GET /api/files/nodes/{}/tags": "file", "PUT /api/files/nodes/{}/tags": "file", "GET /api/files/tags": "file", "GET /api/files/tagged": "file",
+    "PUT /api/files/nodes/{}/recognition": "file",  # 2.353.0 D (#2759): p2353_d_ablagedocs_test.py (c): another person 404, read-only 403
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
     "GET /api/docs/{}/receipt": "receipt", "POST /api/docs/{}/extracted": "document",  # 2.121.0 A (#2092)

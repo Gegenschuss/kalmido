@@ -28,12 +28,13 @@ const LD_MODS = {
   agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'],  // 2.236.0 A (#2904-#2911): agentwork.js = the dialog "Work style and notifications"
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
+  diagram: ['diagram'],  // 2.382.0 (#3153): formulas / Mermaid diagrams of knowledge pages, only when a page has one (wiki.js wk_dgNeed)
   wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
   calabs: ['calabs'],  // 2.155.0 B (#2076, #2077): holidays / absences in the "Calendars" window, the availability bar
-  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan'],  // 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
+  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'abdocs'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
   life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
    // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],
@@ -46,6 +47,7 @@ const LD_MODS = {
   sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
   asstprop: ['asstprop', 'sheetprop'],  // 2.126.1 A (#2123 #2124): texts worded by an agent (office, documents, status report, the proposal card); B (#2125): sheetprop.js (table rows as tasks)
   sheets: ['sheetfold', 'sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js; 2.199.0 C (#2742): sheetfold.js (folders; 2.200.0 F: first, the overview calls it when sheets.js is in)
+  fslock: ['fslock'],  // 2.353.0 A (#2758): locked folders of the file store (loaded by the file store's first view)
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
   filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
   fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)

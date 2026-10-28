@@ -20,6 +20,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+**2.412.0** (2026-10-28):
+- **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
+
 **2.401.0** (2026-10-28):
 - **Office**: Quotations and Invoices as two areas (Invoices with credit notes, reminders, delivery notes and a paid filter in the archive).
 - **Agents**: personal agents are allowed per workspace (private area: the person; organisation: its admins; server switch: everyone).

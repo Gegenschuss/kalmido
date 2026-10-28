@@ -5166,6 +5166,11 @@ body.msel #view .qdock{visibility:hidden}
 @media (max-width:599px){ .wschip span{display:none} .wschip{padding:.25rem .4375rem} }
 .wsorg summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;min-height:2.25rem}
 .wsorg .mrow select{max-width:7rem}
+/* 2.409.0 (#3490): the areas an organisation's members see (areas.js wsa_orgPaneDraw), the groups per workspace in Settings > Modules */
+.wsa-org h4{margin:.75rem 0 .25rem}
+.wsa-orgrows{display:flex;flex-wrap:wrap;gap:.25rem 1rem}
+.wsa-orgrows .chkl{min-height:2.75rem}
+.wsagrp .mgn{display:inline-flex;align-items:center;gap:.4rem}
 /* 2.147.2 B (#2501): role select: 44 px high, the longest role name fits */
 select.orgrolesel,.wsorg .mrow select.orgrolesel{min-height:2.75rem;min-width:8.5rem;max-width:100%}
 .wsadd{gap:.375rem}.wsadd input{flex:1;min-width:8rem}
@@ -6656,6 +6661,10 @@ button.lnph:hover{border-color:var(--accent)}
 .abempty{padding:2rem 1rem}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:.9em}
 .abhint{font-size:.85rem;margin-top:.75rem}
+/* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
+.fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:8px;font-size:.85rem;color:var(--muted)}
+.fslbar>span{flex:1 1 14rem}
+.fslbar .fslq{flex:0 1 14rem;min-width:8rem}
 .abpath{margin:-.25rem 0 .5rem;font-size:.85rem}
 .abfacts{display:flex;flex-wrap:wrap;gap:.25rem .75rem;margin-bottom:.75rem;color:var(--muted);font-size:.9rem}
 .abvers,.ablog{display:flex;flex-direction:column;gap:.125rem;max-height:16rem;overflow:auto}
