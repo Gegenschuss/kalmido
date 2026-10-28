@@ -13,8 +13,8 @@
 'use strict';
 
 /** @type {any} */
-const DG = {k: null, m: null, seen: new Map(), n: 0, q: Promise.resolve(), obs: null, light: null};
-const DG_SEL = '.wkmd pre[data-lang="math"]:not([data-dg]), .wkmd pre[data-lang="mermaid"]:not([data-dg]), .wkmd .wkimath:not([data-dg])';
+const DGM = {k: null, m: null, seen: new Map(), n: 0, q: Promise.resolve(), obs: null, light: null};
+const DGM_SEL = '.wkmd pre[data-lang="math"]:not([data-dg]), .wkmd pre[data-lang="mermaid"]:not([data-dg]), .wkmd .wkimath:not([data-dg])';
 function dg_script(src) {
   return new Promise((ok, no) => {
     const s = document.createElement('script'); s.src = src;
@@ -23,17 +23,17 @@ function dg_script(src) {
   });
 }
 function dg_katex() {
-  if (!DG.k) {
+  if (!DGM.k) {
     if (!document.querySelector('link[data-dgkatex]')) {
       const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/static/vendor/katex/katex.min.css'; l.dataset.dgkatex = '1'; document.head.appendChild(l);
     }
-    DG.k = dg_script('/static/vendor/katex/katex.min.js').then(() => /** @type {any} */ (window).katex).catch(e => { DG.k = null; throw e; });
+    DGM.k = dg_script('/static/vendor/katex/katex.min.js').then(() => /** @type {any} */ (window).katex).catch(e => { DGM.k = null; throw e; });
   }
-  return DG.k;
+  return DGM.k;
 }
 function dg_mermaid() {
-  if (!DG.m) DG.m = dg_script('/static/vendor/mermaid/mermaid.min.js').then(() => /** @type {any} */ (window).mermaid).catch(e => { DG.m = null; throw e; });
-  return DG.m;
+  if (!DGM.m) DGM.m = dg_script('/static/vendor/mermaid/mermaid.min.js').then(() => /** @type {any} */ (window).mermaid).catch(e => { DGM.m = null; throw e; });
+  return DGM.m;
 }
 const dg_light = () => { const t = document.documentElement.dataset.theme; return t === 'light' || (t !== 'dark' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches); };
 function dg_tex(k, tex, display) {
@@ -52,15 +52,15 @@ function dg_clean(svg) {
 }
 async function dg_svg(src) {
   const light = dg_light(), key = (light ? 'l' : 'd') + src;
-  if (DG.seen.has(key)) return DG.seen.get(key);
+  if (DGM.seen.has(key)) return DGM.seen.get(key);
   const mm = await dg_mermaid();
   mm.initialize({startOnLoad: false, securityLevel: 'strict', theme: light ? 'neutral' : 'dark', htmlLabels: false, flowchart: {htmlLabels: false}, fontFamily: 'inherit', suppressErrorRendering: true});
-  const id = 'dgmm' + (++DG.n);
+  const id = 'dgmm' + (++DGM.n);
   try {
     const {svg} = await mm.render(id, src);
     const h = dg_clean(svg);
     if (!h) throw new Error(tr('The diagram could not be drawn'));
-    DG.seen.set(key, h);
+    DGM.seen.set(key, h);
     return h;
   } finally { document.getElementById(id)?.remove(); document.getElementById('d' + id)?.remove(); }
 }
@@ -92,26 +92,26 @@ async function dg_one(el) {
 // every block not drawn yet, one after the other (Mermaid renders one at a time)
 function dg_draw(root) {
   dg_watch();
-  const els = [...(root || document).querySelectorAll(DG_SEL)];
-  for (const el of els) DG.q = DG.q.then(() => dg_one(el)).catch(() => {});
-  return DG.q;
+  const els = [...(root || document).querySelectorAll(DGM_SEL)];
+  for (const el of els) DGM.q = DGM.q.then(() => dg_one(el)).catch(() => {});
+  return DGM.q;
 }
 // later drawings (the live preview redraws its blocks from a cache, the share dialog, another page) are found as they come;
 // watched from the first page with a formula / diagram on (a module loaded by the test suites' ld_all watches nothing)
 function dg_watch() {
-  if (DG.obs || typeof MutationObserver !== 'function') return;
+  if (DGM.obs || typeof MutationObserver !== 'function') return;
   let t = 0;
   const later = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : f => setTimeout(f, 16);
-  DG.obs = new MutationObserver(() => { if (!t) t = later(() => { t = 0; dg_draw(); }); });
-  DG.obs.observe(document.body, {childList: true, subtree: true});
-  DG.light = dg_light();
+  DGM.obs = new MutationObserver(() => { if (!t) t = later(() => { t = 0; dg_draw(); }); });
+  DGM.obs.observe(document.body, {childList: true, subtree: true});
+  DGM.light = dg_light();
   try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => setTimeout(dg_retheme, 0)); } catch { /* old browser */ }
   new MutationObserver(() => dg_retheme()).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme']});
 }
 // the theme changed: the diagrams are drawn again in the other colours
 function dg_retheme() {
-  const l = dg_light(); if (l === DG.light) return;
-  DG.light = l;
+  const l = dg_light(); if (l === DGM.light) return;
+  DGM.light = l;
   document.querySelectorAll('.wkdgmm[data-src]').forEach(d => {
     const el = /** @type {HTMLElement} */ (d), pre = document.createElement('pre');
     pre.className = 'mdpre'; pre.dataset.lang = 'mermaid'; pre.textContent = el.dataset.src || ''; el.replaceWith(pre);

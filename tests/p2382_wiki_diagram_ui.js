@@ -20,7 +20,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const PLAIN = '# Plain\n\nCosts $5 and $10 today.\n\n```js\nconst a = "$$"\n```';
 const DIAG = '# Sums\n\n$$\n\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\n$$\n\nInline \\(a^2 + b^2\\) here, it costs $5.\n\n'
   + '```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n\n```mermaid\nthis is not a diagram ((\n```\n\n```math\nx^2\n```\n\n`\\(code\\)` stays';
-const K = {Enter: '', Escape: ''};
+const K = {Enter: '\uE007', Escape: '\uE00C'};
 
 (async () => {
   await sleep(600);
