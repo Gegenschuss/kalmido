@@ -446,7 +446,7 @@ function wk_panelAllHtml() {
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true} : {}),  // 2.200.0 A (#2747): dropped on = to the top
       sub: () => { if (!d || d.v === -1) wk_load(sp); return d?.pages ? wk_subNodes(sp, wk_treeOf(sp), node) : d?.err ? [] : null; }};
-    const h = sbb_treeHtml([root]), mark = ic('book', 's');
+    const h = sbb_treeHtml([root]), mark = ic('book');  // 2.406.0 A (#3492): the tree draws full-size symbols
     return lock ? h : h.replace(mark, () => wk_spIcon(sp));  // the space's own symbol (the shared tree takes icon names only)
   }).join('')}</div>`;
 }
