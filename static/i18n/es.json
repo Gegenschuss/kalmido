@@ -14830,5 +14830,21 @@
   "Daily note": "Nota diaria",
   "Go to day": "Ir al día",
   "Embed a page": "Insertar una página",
-  "{0} open · {1} done": "{0} abiertas · {1} hechas"
+  "{0} open · {1} done": "{0} abiertas · {1} hechas",
+  "Private agent": "Agente privado",
+  "Personal agent of {0} · {1}": "Agente personal de {0} · {1}",
+  "Personal agent · {0}": "Agente personal · {0}",
+  "Your personal agent · {0}": "Tu agente personal · {0}",
+  "Team agent · {0}": "Agente del equipo · {0}",
+  "Show usage": "Mostrar consumo",
+  "Chat header": "Cabecera del chat",
+  "The ring next to the agent’s name: its plan usage or its costs against its limit. For all your chats; switched off, the numbers stay in the ⋯ menu.": "El anillo junto al nombre del agente: el consumo de su plan o sus costes frente a su límite. Para todos tus chats; desactivado, las cifras siguen en el menú ⋯.",
+  "The usage ring is shown next to the name": "El anillo de consumo se muestra junto al nombre",
+  "Usage only in the ⋯ menu": "Consumo solo en el menú ⋯",
+  "Costs today: {0}": "Costes hoy: {0}",
+  "Costs today: {0} of {1}": "Costes hoy: {0} de {1}",
+  "Costs this month: {0}": "Costes este mes: {0}",
+  "Costs this month: {0} of {1}": "Costes este mes: {0} de {1}",
+  "Share of its daily cost limit": "Parte de su límite de costes diario",
+  "Share of its monthly cost limit": "Parte de su límite de costes mensual"
 }

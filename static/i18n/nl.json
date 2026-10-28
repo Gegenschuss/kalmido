@@ -14830,5 +14830,21 @@
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
   "Embed a page": "Pagina insluiten",
-  "{0} open · {1} done": "{0} open · {1} klaar"
+  "{0} open · {1} done": "{0} open · {1} klaar",
+  "Private agent": "Privé-agent",
+  "Personal agent of {0} · {1}": "Persoonlijke agent van {0} · {1}",
+  "Personal agent · {0}": "Persoonlijke agent · {0}",
+  "Your personal agent · {0}": "Jouw persoonlijke agent · {0}",
+  "Team agent · {0}": "Teamagent · {0}",
+  "Show usage": "Verbruik tonen",
+  "Chat header": "Chatkop",
+  "The ring next to the agent’s name: its plan usage or its costs against its limit. For all your chats; switched off, the numbers stay in the ⋯ menu.": "De ring naast de naam van de agent: het verbruik van zijn abonnement of zijn kosten tegenover zijn limiet. Voor al je chats; uitgeschakeld blijven de cijfers in het ⋯-menu.",
+  "The usage ring is shown next to the name": "De verbruiksring staat naast de naam",
+  "Usage only in the ⋯ menu": "Verbruik alleen nog in het ⋯-menu",
+  "Costs today: {0}": "Kosten vandaag: {0}",
+  "Costs today: {0} of {1}": "Kosten vandaag: {0} van {1}",
+  "Costs this month: {0}": "Kosten deze maand: {0}",
+  "Costs this month: {0} of {1}": "Kosten deze maand: {0} van {1}",
+  "Share of its daily cost limit": "Aandeel van zijn dagelijkse kostenlimiet",
+  "Share of its monthly cost limit": "Aandeel van zijn maandelijkse kostenlimiet"
 }

@@ -147,6 +147,27 @@ def usage_state(c, a):
             "reached": lim["hard"] is not None and used >= lim["hard"], "resets_at": iso(end.astimezone(timezone.utc))}
 
 
+def usage_cost_public(c, a, uid=None):
+    """2.407.0 B (#3493): the costs of agent a for its chat header -- agents with an API key report costs, not a plan quota.
+    {period, pct}: the cost so far in the period of its cost limit against that limit (the hard one, else the soft one;
+    both None without a cost limit = no ring). Who may read its usage numbers (the owner of a personal agent, instance
+    admins: #2928) also gets {today, month, limit} in USD. None = no cost reported this month and no cost limit."""
+    lim = usage_limits(a)
+    lim = lim if lim and lim["metric"] == "cost" else None
+    today = local_now().date().isoformat()
+    r = c.execute("""SELECT SUM(cost_usd) AS m, SUM(CASE WHEN day=? THEN cost_usd END) AS d FROM agent_usage
+                     WHERE agent_id=? AND day>=?""", (today, a["user_id"], usage_period("month")[1])).fetchone()
+    month, day = (r["m"], r["d"]) if r else (None, None)
+    if month is None and not lim:
+        return None
+    cap = (lim["hard"] if lim["hard"] is not None else lim["soft"]) if lim else None
+    used = ((day if lim["period"] == "day" else month) or 0) if lim else None
+    out = {"period": lim["period"] if lim else None, "pct": round(100 * used / cap, 1) if cap else None}
+    if uid and (a["owner_id"] == uid or is_admin_id(c, uid)):
+        out.update(today=round(day or 0, 6), month=round(month or 0, 6), limit=cap)
+    return out
+
+
 def usage_fmt(v, metric, lg=None):
     """1234567 tokens -> "1,234,567 tokens" (German: 1.234.567 Tokens); cost -> "$1.23"."""
     if metric == "cost":

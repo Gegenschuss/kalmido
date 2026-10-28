@@ -478,8 +478,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .chath.chh2 .chqp{font-size:var(--fs-xs)}
 .chath.chh2 > .spacer{flex:0 0 0}
 .chath.chh2 .msbtn{display:none}
-/* the usage ring only near its limit (yellow / red); its numbers are in the ⋯ menu (Usage: …) */
-.chath.chh2 .chring:is(.q-ok,.q-stale){display:none}
+/* 2.407.0 B (#3493): the usage ring is always shown (accent, yellow, red, grey when outdated); its numbers also in the ⋯ menu */
 /* the state's dot turns into a small spinning circle while the agent works (instead of a second sign beside the name) */
 .chath.chh2 .chst .adot.st-working{box-sizing:border-box;width:.625rem;height:.625rem;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);background:none;animation:aspin .9s linear infinite}
 @media (prefers-reduced-motion:reduce){ .chath.chh2 .chst .adot.st-working{animation:none;background:var(--accent);border:0} }

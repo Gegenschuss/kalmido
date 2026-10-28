@@ -384,7 +384,8 @@ const ACSET_OPTS = [
 function acset_html(a) {
   return `<div class="kbhead"><h3>${esc(tr('Chat settings'))}</h3><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="shint">${esc(tr('Applies to your chat with {0} on all your devices.', a?.name || ''))}</div>
-    ${ACSET_OPTS.map(([k, t, os, h]) => `<fieldset class="acset-f"><legend>${esc(tr(t))}</legend>${os.map(([v, l]) => `<label class="acset-r"><input type="radio" name="acset-${k}" value="${v}" data-acset="${k}"${acset_get(k) === v ? ' checked' : ''}><span>${esc(tr(l))}</span></label>`).join('')}${h ? `<div class="shint">${esc(tr(h))}</div>` : ''}</fieldset>`).join('')}`;
+    ${ACSET_OPTS.map(([k, t, os, h]) => `<fieldset class="acset-f"><legend>${esc(tr(t))}</legend>${os.map(([v, l]) => `<label class="acset-r"><input type="radio" name="acset-${k}" value="${v}" data-acset="${k}"${acset_get(k) === v ? ' checked' : ''}><span>${esc(tr(l))}</span></label>`).join('')}${h ? `<div class="shint">${esc(tr(h))}</div>` : ''}</fieldset>`).join('')}
+    <fieldset class="acset-f"><legend>${esc(tr('Chat header'))}</legend><label class="acset-r"><input type="checkbox" id="acset-qshow"${quotaShowOn() ? ' checked' : ''}><span>${esc(tr('Show usage'))}</span></label><div class="shint">${esc(tr('The ring next to the agent’s name: its plan usage or its costs against its limit. For all your chats; switched off, the numbers stay in the ⋯ menu.'))}</div></fieldset>`;
 }
 async function acset_open() {
   const aid = S.chat.aid, a = agentById(aid); if (!aid) return;
@@ -392,6 +393,7 @@ async function acset_open() {
   const md = modal(acset_html(a)); md.classList.add('acsetmd');
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
   md.addEventListener('change', async e => {  // autosave per field, like the other settings
+    if (e.target.id === 'acset-qshow') { quotaShow(e.target.checked); return; }  // 2.407.0 B (#3493): per person, not per chat
     const i = e.target.closest('[data-acset]'); if (!i || !i.checked) return;
     const k = i.dataset.acset, was = acset_get(k);
     try { const r = await api('PUT', `/api/agents/${aid}/chat-prefs`, {[k]: i.value}); if (S.chat.aid === aid) S.chat.cp = r.prefs; }
@@ -597,6 +599,9 @@ function chatModelHtml(a) {
 // 2.33.0 (#1045): the usage ring right of the name -- the agent's plan usage as its host reports it (PUT /api/v1/agent/quota).
 // Filled with the main window (the week); accent, from 75 % yellow, from its limit red + "paused until …" (under the name);
 // no report = no ring, a report older than 24 h = grey. Hover / focus / tap lists every window with % and reset time.
+// 2.407.0 B (#3493): always shown (also in the green), unless the person switched it off (agent_quota_show, the ⋯ menu and
+// the chat settings; the ⋯ menu keeps the numbers). Without a plan quota an agent with an API key fills it with its costs
+// against its cost limit (a.cost, kalmido/agents/usage.py usage_cost_public); amounts only for its owner / admins.
 const QUOTA_KEYS = {seven_day: N_('Week'), five_hour: N_('5 hours'), spend_limit: N_('Spend limit'),
   // 2.80.0 (#1841): further windows a host reports by key; an unknown key reads "Other quota" instead of the raw English key
   seven_day_overage_included: N_('Week (incl. extra usage)'), seven_day_opus: N_('Week (Opus)'), seven_day_sonnet: N_('Week (Sonnet)')};
@@ -606,22 +611,43 @@ const quotaIdle = (q, w, i) => i !== q.main && w.key?.startsWith('seven_day_') &
 const quotaWhen = iso => fmtStamp(new Date(iso));  // 2.368.0 B (#2982): one locale source
 const quotaPct = v => Math.round(+v || 0).toLocaleString(LOCALE()) + ' %';
 const quotaStale = q => q.stale || !q.at || Date.now() - new Date(q.at) > 864e5;
-function chatRingHtml(a) {
-  const q = a.quota; if (!q?.windows?.length) return '';
+const quotaShowOn = () => S.settings?.agent_quota_show !== '0';
+// 2.407.0 B (#3493): "Costs today / this month: $x" (of $y when its cost limit runs over that period)
+function costLines(c) {
+  if (c?.month == null) return [];
+  const of = per => c.limit != null && c.period === per, lim = fmtUsd(c.limit);
+  return [of('day') ? tr('Costs today: {0} of {1}', fmtUsd(c.today), lim) : tr('Costs today: {0}', fmtUsd(c.today)),
+    of('month') ? tr('Costs this month: {0} of {1}', fmtUsd(c.month), lim) : tr('Costs this month: {0}', fmtUsd(c.month))];
+}
+// {ring, lv, p, t, lines}: what the ring and the ⋯ menu show (plan quota first, else the cost limit); null = nothing to show
+function chatUseInfo(a) {
+  const q = a.quota, c = a.cost, cl = costLines(c);
+  if (!q?.windows?.length) {
+    if (c?.pct != null) {
+      const p = +c.pct;
+      return {ring: true, lv: p >= 100 ? 'over' : p >= 75 ? 'warn' : 'ok', p: Math.max(0, Math.min(100, p)), t: tr('Usage: {0}', quotaPct(p)),
+        lines: cl.length ? cl : [c.period === 'day' ? tr('Share of its daily cost limit') : tr('Share of its monthly cost limit')]};
+    }
+    return cl.length ? {ring: false, t: cl[1], lines: cl.slice(0, 1)} : null;
+  }
   const stale = quotaStale(q), lv = stale ? 'stale' : q.level || 'ok', p = Math.max(0, Math.min(100, +q.percent || 0));
   const lbl = w => !w.key ? w.label : tr(QUOTA_KEYS[w.key] || N_('Other quota'));
   const lines = q.windows.map((w, i) => quotaIdle(q, w, i) ? '' : `${lbl(w)}${i === q.main && q.windows.length > 1 ? ' (' + tr('in the ring') + ')' : ''}: ${quotaPct(w.percent)}` + (w.resets_at ? ' · ' + tr('resets {0}', quotaWhen(w.resets_at)) : w.reset_passed ? ' · ' + tr('has reset') : '')).filter(Boolean);
   if (q.limit != null) lines.push(tr('Limit: {0}', quotaPct(q.limit)));
   if (q.paused_until) lines.push(tr('paused until {0}', quotaWhen(q.paused_until)));
   lines.push(stale ? tr('Outdated, last report {0}', quotaWhen(q.at)) : tr('Reported {0}', quotaWhen(q.at)));
-  const r = 7, cf = 2 * Math.PI * r, t = tr('Usage: {0}', quotaPct(q.percent));
+  return {ring: true, lv, p, t: tr('Usage: {0}', quotaPct(q.percent)), lines: [...lines, ...cl]};
+}
+function chatRingHtml(a) {
+  const u = quotaShowOn() && chatUseInfo(a); if (!u?.ring) return '';
+  const {lv, p, t, lines} = u, r = 7, cf = 2 * Math.PI * r;
   return `<button type="button" class="ib chring q-${lv}" data-ii="chat-ring" aria-describedby="chat-ring" aria-expanded="false" aria-label="${esc(t)}"><svg viewBox="0 0 18 18" aria-hidden="true"><circle class="rbg" cx="9" cy="9" r="${r}"/><circle class="rfg" cx="9" cy="9" r="${r}" stroke-dasharray="${(cf * p / 100).toFixed(2)} ${cf.toFixed(2)}" transform="rotate(-90 9 9)"/></svg></button><span class="shint iisrc pl" id="chat-ring" data-ii="1">${esc(t + '\n' + lines.join('\n'))}</span>`;
 }
 const chatPausedHtml = a => a.quota?.paused_until && !quotaStale(a.quota) ? `<span class="chqp">${esc(tr('paused until {0}', quotaWhen(a.quota.paused_until)))}</span>` : '';
-function chatHeadSync(a) {
+function chatHeadSync(a, force) {
   const hd = $('#chat-msgs')?.parentElement, nm = hd && $('.chnm', hd), l2 = hd && $('.chl2', hd); if (!nm || !l2 || !a) return;
   const rh = chatRingHtml(a) + chatPausedHtml(a);
-  if (nm._rh !== undefined && nm._rh !== rh) {  // 2.33.0 (#1045): a new usage report while the chat is open
+  if ((force || nm._rh !== undefined) && nm._rh !== rh) {  // 2.33.0 (#1045): a new usage report while the chat is open (2.407.0 B: or the switch)
     const f = document.activeElement?.classList?.contains('chring');
     $$('.chring, #chat-ring', nm).forEach(x => x.remove()); $('b', nm)?.insertAdjacentHTML('afterend', chatRingHtml(a));
     $$('.chqp', l2).forEach(x => x.remove()); l2.insertAdjacentHTML('beforeend', chatPausedHtml(a));
@@ -687,11 +713,21 @@ document.addEventListener('click', e => {
   menu(b, [...chatStopItem(agentById(S.chat.aid)), ...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
     {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
+    {label: tr('Show usage'), icon: 'chart', cls: 'chmi-qshow', on: quotaShowOn(), fn: () => quotaShow(!quotaShowOn())},  // 2.407.0 B (#3493)
     {label: tr('Chat settings'), icon: 'cog', fn: () => acset_open()},  // 2.233.0 A (#2848)
     ...S.chat.job ? [] : ['-', {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]]);
 });
 // 2.350.0 A (#2790 #3317): what the header showed before, as menu entries with their current value: permissions (opens the
 // mode menu, chatModeMenu), model, workspace, usage (its windows one level down); then search, fold and own window
+// 2.407.0 B (#3493): instead of "Workspace: X" the kind of agent: private, personal (whose) or team agent of the organisation
+function chatKindLbl(a) {
+  if (!a.org_id) return tr('Private agent');
+  const o = (typeof wsOrg === 'function' && wsOrg(a.org_id)?.name) || tr('Organisation');
+  if (!a.owner_id) return tr('Team agent · {0}', o);
+  if (a.owner_id === S.me?.id) return tr('Your personal agent · {0}', o);
+  const n = personNameAny(a.owner_id);
+  return n ? tr('Personal agent of {0} · {1}', n, o) : tr('Personal agent · {0}', o);
+}
 function chatHeadInfo(b) {
   const a = agentById(S.chat.aid); if (!a) return [];
   const it = [], info = label => ({label, dis: true, cls: 'minfo'});
@@ -702,17 +738,19 @@ function chatHeadInfo(b) {
   }
   const mr = a.host?.model || '', ms = a.runtime_model || '';
   if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
-  if (typeof wsOn === 'function' && wsOn()) it.push({...info(tr('Workspace: {0}', wsName(a.org_id ? 'org:' + a.org_id : 'private'))), icon: 'folder'});
-  const q = a.quota;
-  if (q?.windows?.length) {
-    const lines = ($('#chat-ring')?.textContent || '').split('\n').slice(1).filter(Boolean);
-    const u = tr('Usage: {0}', quotaPct(q.percent));
-    it.push(lines.length ? {label: u, icon: 'chart', cls: 'chmi-use', more: lines.map(info)} : {...info(u), icon: 'chart'});
-  }
+  it.push({...info(chatKindLbl(a)), icon: 'folder', cls: 'chmi-kind'});  // 2.407.0 B (#3493): what kind of agent, always
+  const u = chatUseInfo(a);  // 2.407.0 B (#3493): also with the ring switched off; costs of API-key agents
+  if (u) it.push(u.lines.length ? {label: u.t, icon: 'chart', cls: 'chmi-use', more: u.lines.map(info)} : {...info(u.t), icon: 'chart', cls: 'chmi-use'});
   const fl = !S.chat.job && !chatFull() && !!$('#achat.float'), mn = fl && $('#achat')?.classList.contains('min');
   return [...it, ...it.length ? ['-'] : [], {label: tr('Search in this chat'), icon: 'search', fn: () => msSearchToggle('a', a.id)},
     ...fl ? [{label: mn ? tr('Unfold') : tr('Fold'), icon: 'chev', fn: () => chatFloatMin(!mn)}] : [],
     ...!chatFull() && typeof dw_winBtn === 'function' && dw_winBtn('agents', a.id) ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => dw_chatOpen('agents', a.id)}] : [], '-'];
+}
+// 2.407.0 B (#3493): the usage ring in the header on / off (per person, all chats)
+function quotaShow(on) {
+  stepsSet('agent_quota_show', on);
+  const a = agentById(S.chat.aid); if (a) chatHeadSync(a, true);
+  toast(on ? tr('The usage ring is shown next to the name') : tr('Usage only in the ⋯ menu'));
 }
 function stepsAlways() {
   const on = !stepsAlwaysOn(); stepsSet('agent_steps_always', on); S.jobOpen = {};
@@ -784,7 +822,7 @@ function chatInner(aid) {
   const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const gc = ac_color(a.id), gcs = gc ? ` agcol" style="--agcol:${gc}` : '';  // 2.144.0 B (#2411): the agent's own colour on the header and the box
-  // 2.350.0 A (#2790 #3317): one header on the phone and the desktop: name + ONE state (the usage ring only near its limit);
+  // 2.350.0 A (#2790 #3317): one header on the phone and the desktop: name + ONE state (2.407.0 B, #3493: the usage ring always);
   // permissions, model, workspace, usage, search and the window actions sit in the ⋯ menu. Right at most the side panel
   // switch, ⋯ and close as one group (the phone: only ⋯). The search button stays hidden as the anchor of the search bar.
   return `<div class="chath chh2${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
