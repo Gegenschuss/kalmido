@@ -16,7 +16,7 @@ function calsHtml(chk, hint) {
       <li>${tr('<b>iCloud:</b> in the Calendar app, share the calendar as a public calendar and copy the link (webcal://…). Or add your whole account via CalDAV: server caldav.icloud.com, your Apple ID and an app-specific password (account.apple.com).')}</li>
       <li>${tr('<b>Outlook / Microsoft 365:</b> Settings > Calendar > Shared calendars > Publish a calendar > copy the ICS link.')}</li>
       <li>${tr('<b>Nextcloud, Radicale, Baïkal, Fastmail, mailbox.org …:</b> CalDAV account with the server address, your username and password (an app password where possible).')}</li>
-      <li>${tr('Servers in your own network (for example 10.x.x.x or a VPN address) are blocked for safety until an admin allows the host under Settings > Administration > Advanced.')}</li></ul></details>`;
+      <li>${tr('Servers in your own network (for example 10.x.x.x or a VPN address) are blocked for safety until an admin allows the host under Settings > Server > Server > Advanced.')}</li></ul></details>`;
 }
 function calStatus(x) {
   if (x.status === 'error') return `<span class="calerr" role="alert">${esc(x.error_text || tr('Error'))}</span>` + (x.synced_at ? ' · ' + esc(tr('last synced {0}', relTime(x.synced_at))) : '');

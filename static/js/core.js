@@ -133,10 +133,15 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
   sheets: N_('Simple tables with formulas like a spreadsheet; every cell can fetch figures from Kalmido (hours booked, budget, open tasks), for quotations, budgets and lists'),  // 2.89.0 (#1916)
   progress: N_('Progress bar in the project header and the project status (“Where is it stuck?”); with collaboration also a status per project')};
+// 2.364.0 B (#3018): a person without an organisation reads no "only within your organisation" (their clients are their own)
+const FEAT_DESC_SOLO = {clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
 // sharing / assigning in the UI (data stays; with the server switch off the API refuses them too)
 const collab = () => feat('collab') && S.collabAll !== false;
+// 2.364.0 D (#3036): "has collaborators": a project of mine is shared with another person or an agent, or one of my
+// organisations has someone else. Without it the team entries (assign, waiting on someone, approval) stay out of the menus.
+const hasPeers = () => collab() && (!!S.orgPeers || (S.lists || []).some(l => l.shared));
 // 2.0.6 (#315): comments are a module of their own (personal notes); mentions, activity, reactions and the typing
 // indicator only where people work together: collaboration on and the task's list shared
 const cmtOn = () => feat('comments');
@@ -999,6 +1004,7 @@ function applyState(j) {
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
   S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || []; S.folderShares = j.folder_shares || {};  /* 2.41.0 (#1428) */  // 2.29.0 (#1030 / #929)
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
+  S.orgPeers = !!j.org_peers;  // 2.364.0 D (#3036): see hasPeers
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
   S.sample = j.sample || null;
@@ -1282,6 +1288,16 @@ function viewSafeRender() { if (lpHold() || (editing() && $('#view')?.contains(d
 // 1.8.1: the Inbox comes first (sidebar, tab choices, palette) and is the start view (START_KEY) until another view
 // was opened: the app reopens on the last task view of the device (LS 'lastKey')
 const START_KEY = 'inbox';
+// 2.364.0 B (#3031): the app opened without a page in its address shows the chosen start page (setting start_page): Start
+// (default), the basket, Today or 'last' = the last task view of this device (the way before); a link with a page keeps it
+const START_PAGES = [['home', N_('Start|home')], ['inbox', N_('Basket')], ['today', N_('Today')], ['last', N_('The last opened view')]];
+// A fresh account whose welcome tour is still to come opens in Projects as before: the tour starts only there (tourAuto,
+// #2821), so Start comes from the next opening on
+function st_landing() {
+  const p = S.settings?.start_page || 'home';
+  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !START_PAGES.some(x => x[0] === p) || S.settings?.tour === 'pending') return;
+  history.replaceState(history.state, '', location.pathname + location.search + '#' + p);
+}
 const SMART = {
   inbox: {name: N_('Basket'), icon: 'inbox'},
   today: {name: N_('Today'), icon: 'sun'},

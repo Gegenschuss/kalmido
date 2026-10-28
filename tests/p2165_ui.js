@@ -27,6 +27,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const x = await call(CA, 'POST', '/api/users', {username: u, display_name: n, password: 'password123', email: u + '@example.com'});
     check(x.http < 300, `P4: ${u} (no organisation) ${x.http}`);
     users[u] = await login(u);
+    // 2.364.0 (#3032): accounts an admin made first answer "What do you use Kalmido for?" (p2364_a_*); answered here, this suite is about the tour
+    execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE user_settings SET value='done' WHERE key='purpose_ask'"]);
     await call(users[u], 'PATCH', '/api/settings', {lang: 'en', tour: 'pending'});
   }
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done'});

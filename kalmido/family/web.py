@@ -6,7 +6,7 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import lang, tr, trn
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..core.access import Denied, need_list, need_task
 from ..tasks.validation import as_int, TITLE_MAX, valid_date
@@ -163,7 +163,9 @@ def me_purpose():
     am = b.get("all_modules")
     if am is not None and not isinstance(am, bool):
         return err(tr("Invalid value: {0}", "all_modules"))
-    out = purpose_apply(c, uid, b.get("purpose"), b.get("examples") is True, am)
+    out = purpose_apply(c, uid, b.get("purpose"), b.get("examples") is True, am, only=b.get("only") is True)
+    if usettings(c, uid).get("purpose_ask", "done") != "done":  # 2.364.0 A (#3032): the first start's question is answered
+        uset(c, uid, "purpose_ask", "done")
     bump(c)
     c.commit()
     return jsonify(out)

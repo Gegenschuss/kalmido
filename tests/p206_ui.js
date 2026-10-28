@@ -256,7 +256,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   check(!w.eval('tabletDock()') && !d.querySelector('#fab').classList.contains('gone'), 'phone: the "+" as before');
   w.close();
   // 2.19.0 (#669): the height part is decided in tdockSync() (html.tdock, without the on-screen keyboard), not in CSS
-  check(/@media \(min-width:600px\) and \(max-width:899px\)\{[\s\S]{0,400}?html\.tdock \.qdock\{display:block;bottom:0;/.test(css) && /html\.tdock #view:has\(> \.lwrap\)\{padding-bottom:calc\(var\(--tabs-h\)/.test(css), 'CSS: the dock shows on portrait tablets (html.tdock), right on the tab bar (2.25.0, UX-39: #view keeps the tab bar as padding)');
+  check(/* 2.364.0 (#3040): the tablet dock 600-767 px */ /@media \(min-width:600px\) and \(max-width:767px\)\{[\s\S]{0,400}?html\.tdock \.qdock\{display:block;bottom:0;/.test(css) && /html\.tdock #view:has\(> \.lwrap\)\{padding-bottom:calc\(var\(--tabs-h\)/.test(css), 'CSS: the dock shows on portrait tablets (html.tdock), right on the tab bar (2.25.0, UX-39: #view keeps the tab bar as padding)');
 
   // ================= #318 a menu from inside a dialog goes above it (phone sheet and desktop)
   for (const mobile of [false, true]) {

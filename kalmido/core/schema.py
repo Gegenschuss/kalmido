@@ -4085,6 +4085,7 @@ USER_DEFAULTS = {
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the figure celebrates an emptied Today / a completed list or project
     "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
+    "start_page": "home",       # 2.364.0 B (#3031): the page the app opens on: home (Start) | inbox | today | last (last task view)
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
     "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
@@ -4105,6 +4106,8 @@ USER_DEFAULTS = {
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
     "sample_ask": "1",          # 1.8.0: the welcome tour offers the sample project (0 = decided in the setup / created once)
+    "purpose_ask": "done",      # 2.364.0 A (#3032): "What do you use Kalmido for?" on the first start of an account an admin made
+                                # (user admin, organisation invitation, import): the preselected purpose = pending | done
     # 1.9.0: which events create a News item (groups, see NEWS_GROUPS). Default: everything but "completed by others"
     "news_kinds": "mention,assign,comment,unblock,share,status",
     # 2.1.0 (#317): the rest of the notification matrix, json {event: {news?, push?}} (see NOTIF_ROWS; '' = defaults)

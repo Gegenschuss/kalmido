@@ -216,7 +216,7 @@ def disc_set():
     email = disc_norm(u["email"] or "")
     if not email:
         c.rollback()
-        return err(tr("Your account has no e-mail address yet. An admin can add it under Settings > Administration > Users."))
+        return err(tr("Your account has no e-mail address yet. An admin can add it under Settings > Organisation > People."))
     p = c.execute("SELECT email, confirmed_at FROM disc_profiles WHERE user_id=?", (uid,)).fetchone()
     if p and p["confirmed_at"] and p["email"] == email:
         c.commit()

@@ -133,7 +133,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(w.eval('S.sel') === T1, 'a task file opens its task');
   w.eval('closeDetail && closeDetail()'); await sleep(100);
   // members + time
-  check(/Bob/.test(d.querySelector('#pov-people').textContent) && /Viewer/.test(d.querySelector('#pov-people').textContent), 'members with roles');
+  check(/Bob/.test(d.querySelector('#pov-people').textContent) && /Read-only/.test(d.querySelector('#pov-people').textContent), 'members with roles');  // 2.364.0 C (#3041): one role word
   // leave the overview: back to the list's own view
   click(w, d.querySelector('#top [data-act="view-timeline"]'));
   await until(() => d.querySelector('#view .tl'));

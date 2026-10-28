@@ -35,6 +35,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
   const SW = (await call('POST', '/api/lists', {name: 'Software', kind: 'project', tickets: true})).id;
   await call('PUT', `/api/lists/${SW}/members`, {user_id: BOB, role: 'edit'});
   await call('PATCH', '/api/settings', {show_progress: String(SW)});  // 2.40.0 (#1190): the progress bar of a project is off by default
+  // 2.364.0 (#3031): Today's review shows from the account's second week on -> the accounts of this suite are older
+  { const [DBC, DBN] = require('fs').readFileSync(path.join(DATA, '.kalmido-db'), 'utf8').trim().split(/\s+/);
+    execFileSync('docker', ['exec', DBC, 'psql', '-U', 'kalmido', '-d', DBN, '-Atqc', "UPDATE users SET created_at='2025-01-01T00:00:00Z'"]); }
   const HOME = (await call('POST', '/api/lists', {name: 'Home'})).id;
   const mk = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
   const OVER = await mk('Weekly report', SW, {due: day(-2), priority: 5});

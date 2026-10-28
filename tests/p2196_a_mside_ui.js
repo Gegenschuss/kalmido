@@ -48,7 +48,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     const btns = [...document.querySelectorAll('#side .sbmr .srb[data-sbb]')], dock = document.querySelector('#side .sbdock');
     return {open: s.classList.contains('open'), row: !!row, ids: btns.map(b => b.dataset.sbb), on: (document.querySelector('#side .sbmr .srb.on') || {dataset: {}}).dataset.sbb || '',
       rail: typeof SBB_RAIL === 'undefined' ? [] : SBB_RAIL.map(r => r[0]).filter(id => btns.some(b => b.dataset.sbb === id)),
-      oneLine: btns.length > 0 && btns.every(b => Math.abs(R(b).top - R(btns[0]).top) < 1), scrolls: !!row && row.scrollWidth > row.clientWidth + 1, minH: Math.min(...btns.map(b => R(b).height)),
+      oneLine: btns.length > 0 && btns.every(b => Math.abs(R(b).top - R(btns[0]).top) < 1), rows: new Set(btns.map(b => Math.round(R(b).top))).size, inRow: !!row && btns.every(b => R(b).right <= R(row).right + 1 && R(b).left >= R(row).left - 1), scrolls: !!row && row.scrollWidth > row.clientWidth + 1, minH: Math.min(...btns.map(b => R(b).height)),
       search: !!document.querySelector('#side .sbfix .scmd'), today: !!document.querySelector('#side .sbfix .srow[data-go="today"]'), inbox: !!document.querySelector('#side .sbfix .srow[data-drop="inbox"]'),
       rowFixed: !!document.querySelector('#side .sbfix .sbmr'), lists: !!document.querySelector('#side .sg-lists'), office: !!document.querySelector('#side [data-ofmg]'), wiki: !!document.querySelector('#side .sbbp, #side [data-act="sbb-tree"], #side .sbbtl'),
       todayTwice: document.querySelectorAll('#side .srow[data-go="today"]').length, set: !!(dock && dock.querySelector('.sset')), acct: !!(dock && dock.querySelector('.sbacct')),
@@ -72,9 +72,9 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await sleep(400);
     let s = (await ev(SIDE)) || {};
     await shot(`p2196a-tasks-${w}.png`);
-    check(s.row && s.ids.length >= 5 && s.ids.join() === s.rail.join() && s.ids[0] === 'tasks' && ['cal', 'office', 'wiki'].every(x => s.ids.includes(x)), `${tag}: the row of area icons in the order of the computer's bar ` + JSON.stringify(s));
-    check(s.oneLine && s.minH >= 43, `${tag}: one line, big enough to tap ` + JSON.stringify(s));
-    if (w <= 360) check(s.scrolls, `${tag}: a narrow phone: the row scrolls sideways ` + JSON.stringify(s));
+    check(s.row && s.ids.length >= 5 && s.ids.join() === s.rail.join() && s.ids[0] === 'home' && s.ids[1] === 'tasks' /* 2.364.0 (#3031): Start first */ && ['cal', 'office', 'wiki'].every(x => s.ids.includes(x)), `${tag}: the row of area icons in the order of the computer's bar ` + JSON.stringify(s));
+    // 2.364.0 (#3040): a grid of rows (two or more), every icon in sight, nothing to swipe sideways (was one swiping row)
+    check(s.rows >= 2 && !s.scrolls && s.inRow && s.minH >= 43, `${tag}: a grid of rows, all in sight, big enough to tap ` + JSON.stringify(s));
     check(s.on === 'tasks' && s.search && s.today && s.inbox && s.rowFixed && s.todayTwice === 1, `${tag}: on top search, Today, Inbox and the row; Today only once ` + JSON.stringify(s));
     check(s.lists && !s.office && s.fshr && s.ws && s.inside, `${tag}: the Tasks panel: projects (shared folder with its share symbol), the workspace switch stays ` + JSON.stringify(s));
     check(s.set && s.acct && Math.abs(s.dockBottom) <= 2, `${tag}: at the bottom Settings and the account ` + JSON.stringify(s));
@@ -164,7 +164,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     check(await open(ev), 'P4: the drawer opens');
     await sleep(300);
     const s = (await ev(SIDE)) || {};
-    check(s.row && s.ids[0] === 'tasks' && s.ids.includes('cal') && s.ids.includes('office') && s.ws && s.set && s.acct, 'P4: the row, the switch, Settings and the account without an organisation ' + JSON.stringify(s));
+    check(s.row && s.ids[0] === 'home' && s.ids[1] === 'tasks' /* 2.364.0 (#3031): Start first */ && s.ids.includes('cal') && s.ids.includes('office') && s.ws && s.set && s.acct, 'P4: the row, the switch, Settings and the account without an organisation ' + JSON.stringify(s));
     await ev(tap('#side .sbmr .srb[data-sbb="cal"]'));
     check(await ready(ev, `S.route.mod === 'cal' && !!document.querySelector('#side.open')`, 40), 'P4: the calendar opens, the drawer stays');
   }, true);

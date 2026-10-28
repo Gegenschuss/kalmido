@@ -274,7 +274,7 @@ def adopt_orphans(c, uid):
 
 
 def create_user(c, username, display_name="", password=None, proxy_login=None, is_admin=False,
-                ntfy_topic=None, seed_global=False, drop_token=None, paperless_access=None, onboard=False):
+                ntfy_topic=None, seed_global=False, drop_token=None, paperless_access=None, onboard=False, ask_purpose=None):
     """Inserts a user with settings (+ inbox unless the caller adopts an existing one). Returns the id.
     Paperless access defaults to admins only."""
     pl = is_admin if paperless_access is None else paperless_access
@@ -300,6 +300,10 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         vals["ntfy_topic"] = ntfy_topic
     if onboard and ONBOARDING_ENV:  # new account (setup / user admin): sample list + welcome tour on first start
         vals["tour"] = vals["onboard"] = "pending"
+        # 2.364.0 A (#3032): an account an admin made asks "What do you use Kalmido for?" first; ask_purpose = the inviting
+        # admin's id (preselected: the purpose they picked for themselves) or 0 ("For me"); None = no question
+        if ask_purpose is not None:
+            vals["purpose_ask"] = (usettings(c, ask_purpose).get("purpose") if ask_purpose else "") or "me"
     # 2.250.0 C (#2995): no lean sidebar for added accounts any more (2.25.0 UX-26 hid Tomorrow / Next 7 days / Now doable):
     # a new account starts like the self-set-up one. Existing accounts keep their choice.
     if not vals["ntfy_topic"]:

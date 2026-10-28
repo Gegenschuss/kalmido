@@ -64,7 +64,7 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   const box = await until(() => d.querySelector('#s-aud .audr:not(.audh)') && d.querySelector('#s-aud'));
   // 2.46.6 (#1710): the log moved to Settings > Administration > Agents
   check(box && !d.querySelector('#admp-agents').hidden && d.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', 'Settings > Administration: the sub-tab Agents with the log');
-  check(d.querySelector('.spane:not(.hidden)')?.dataset.pane === 'users', 'focus activity opens Administration');
+  check(d.querySelector('.spane:not(.hidden)')?.dataset.pane === 'org', 'focus activity opens Organisation');  // 2.364.0 C (#3041)
   let rs = [...d.querySelectorAll('#s-aud .audr:not(.audh)')];
   check(rs.length === 20, 'first page: 20 rows (2.5.1): ' + rs.length);
   const top = rs[0];

@@ -500,7 +500,7 @@ function dpOpen(anchor, o) {
 }
 function dpPlace() {
   const el = DP.el; if (!el) return;
-  if (matchMedia('(max-width:899px)').matches) { el.classList.add('sheet'); return; }
+  if (matchMedia('(max-width:767px)').matches) { el.classList.add('sheet'); return; }  // 2.364.0 B (#3040): was 899 px
   const r = DP.anchor?.getBoundingClientRect?.() || {left: innerWidth / 2 - 150, bottom: innerHeight / 3, top: innerHeight / 3};
   const w = el.offsetWidth || 300, h = el.offsetHeight || 330;
   let x = Math.min(r.left, innerWidth - w - 12), y = r.bottom + 6;
@@ -783,13 +783,14 @@ function taskMenu(anchor, id, o = {}) {
     // waiting
     ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
-      : {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
+      : hasPeers() ? {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)} : null].filter(Boolean) : []),  // 2.364.0 D (#3036): alone: no "Waiting on someone…" 
     // 2.23.0 (#463): an approval (a person of the shared list decides)
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
     // 2.218.0 A (#2799): with its state (a check when on); in a narrow task panel Pin and Lock are only here
     {label: t.pinned ? tr('Pinned') : tr('Pin'), icon: 'pin', on: !!t.pinned, fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
-    ...(inPanel && t.id > 0 && $('#detail .dtop .tlkb') ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),
+    ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
+    ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     {head: tr('Time|menu')},

@@ -288,7 +288,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => (await call('GET', '/api/state')).timer?.task_id === tt), 'one tap starts it again');
   await w.eval('timerStop()');
   const css2 = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
-  check(/@media \(max-width:899px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
+  check(/* 2.364.0 (#3040): the phone layout ends at 767 px */ /@media \(max-width:767px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
 
   // ================= (j) archived lists: one plain row "Archived" like Trash (1.6.1), a main view lists them
   w.eval(`go('today')`); await sleep(300);

@@ -84,7 +84,10 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(/^width=900/.test(vp(390, 844)) && /^width=900/.test(vp(700, 820)), '#3270: "Computer": a phone / a portrait screen gets the width 900');
   check(/device-width/.test(vp(390, 844, false)), '#3270: "Computer": a mouse screen still keeps its width');
   w.eval(`localStorage.setItem('tasks.vmode', '"phone"')`);
-  check(/device-width/.test(vp(820, 700)) && /device-width/.test(vp(884, 1060)), '#3270: "Phone": never scaled (also not the near-square screen of K13)');
+  // 2.364.0 (#3040): the computer layout starts at 768 px; "Phone" on a touch screen of 768-899 px keeps the phone layout by
+  // laying the page out 767 px wide (was: never scaled); a phone and a screen from 900 px keep their width
+  check(/device-width/.test(vp(390, 844)) && /device-width/.test(vp(1000, 880)), '#3270: "Phone": a phone and a wide screen are never scaled');
+  check(/^width=767/.test(vp(820, 700)) && /^width=767/.test(vp(884, 1060)), '#3270: "Phone" at 768-899 px: laid out 767 px wide (the phone layout)');
   w.eval(`localStorage.removeItem('tasks.vmode')`); vp(880, 760);
   check(w.eval('LS_KEEP.has("tasks.vmode") && !LOOK_KEYS.includes("vmode")'), '#3270: the view stays on this device on logout and is not sent to the account');
   // Settings > Appearance: the switch Automatic / Phone / Computer and the grey line of what the screen reports
@@ -211,12 +214,12 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   w.eval(`settingsModal('users')`); await sleep(500);
   let md = d.querySelector('.smodal');
   const subs = [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub);
-  check(subs.join() === 'users,signin,org,agents,server,log', '#826: Administration in sub-tabs ' + subs.join());  // 2.46.6 (#1710): + agents (the API is on here)
+  check(subs.join() === 'users,agents,odata,signin,server,log', '#826: Administration in sub-tabs ' + subs.join());  // 2.364.0 C (#3041): Organisation (People, Agents, Data) + Server  // 2.46.6 (#1710): + agents (the API is on here)
   check(!md.querySelector('[data-admp="users"]').hidden && md.querySelector('[data-admp="server"]').hidden && md.querySelector('[data-admp="server"] #s-quota'), '#826: People shown, Server hidden (but there)');
   click(w, md.querySelector('[data-admsub="server"]')); await sleep(100);
   check(!md.querySelector('[data-admp="server"]').hidden && w.__store['tasks.admSub'] === '"server"', '#826: a sub-tab opens and is remembered');
   check(md.querySelector('#s-quota').value === '1' && md.querySelector('#s-support').value === 'help@example.com' && md.querySelector('#s-ann-text') && md.querySelector('#s-maillim'), '#910 / #907 / #899: Server: storage, support address, notice, mail limit');
-  click(w, md.querySelector('[data-admsub="org"]')); await sleep(100);
+  click(w, md.querySelector('[data-admsub="agents"]')); await sleep(100);  // 2.364.0 C (#3041): the switch is under Organisation > Agents
   const oa = md.querySelector('#s-orgagents');
   check(oa && !oa.checked && /Members may connect agents/.test(oa.closest('label').textContent), '#896: Organisation: "Members may connect agents", off by default');
   oa.checked = true; oa.dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -269,11 +272,13 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
 
   // ================= #907: the notice
   await call('PUT', '/api/admin/announcement', {text: 'Maintenance tonight at 22:00', level: 'maintenance', minutes: 60});
+  const annSec = Math.floor(Date.now() / 1000);  // 2.364.0 C: the notice id has whole seconds (admin/hosting.py)
   w = await boot({user: 'bob', hash: 'inbox'}); d = w.document;
   let bar = d.querySelector('#main #annbar');
   check(bar && bar.classList.contains('maint') && /Maintenance tonight/.test(bar.textContent) && bar.getAttribute('role') === 'status', '#907: the notice above the header');
   click(w, bar.querySelector('[data-act="ann-hide"]')); await sleep(100);
   check(!d.querySelector('#annbar'), '#907: hidden on this device');
+  await until(() => Math.floor(Date.now() / 1000) > annSec + 1, 30);  // a changed notice in the same second keeps the id (flake seen in 2.364)
   await call('PUT', '/api/admin/announcement', {text: 'Update at 23:00'});
   // 2.351.2 (#1507): saved within the same second as the first one (the id once was only the time, so it stayed hidden)
   await w.eval('load()'); w.eval('render()'); await sleep(100);

@@ -317,6 +317,18 @@ def workspaces_for(c, uid):
             for r in c.execute(f"SELECT id, name, icon, color FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
+def org_peers(c, uid):
+    """2.364.0 D (#3036): does uid work with someone in an organisation (another member or an agent of one of its
+    organisations)? Part of the app's mark "has collaborators" (with the shared projects, the client)."""
+    oids = user_orgs(c, uid)
+    if not oids:
+        return False
+    q = ",".join("?" * len(oids))
+    with system_ctx(c):  # memberships are structure (ids only), as user_orgs
+        return bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({q}) AND user_id<>? LIMIT 1", (*oids, uid)).fetchone()
+                    or c.execute(f"SELECT 1 FROM agents WHERE org_id IN ({q}) LIMIT 1", oids).fetchone())
+
+
 def list_org(c, lid):
     r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
     return r["org_id"] if r else None

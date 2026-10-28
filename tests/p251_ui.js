@@ -174,8 +174,8 @@ function backdate(agentId, ids) {
   click(w, pane.querySelector('[data-aiu-m="tokens"]')); await sleep(300);
 
   // Log (2.46.6 (#1710): moved to Settings > Administration > Agents)
-  const apane = md.querySelector('[data-pane="users"]');
-  click(w, md.querySelector('.snav [data-sec="users"]')); click(w, apane.querySelector('[data-admsub="agents"]'));
+  const apane = md.querySelector('[data-pane="org"]');  // 2.364.0 C (#3041): Organisation > Agents
+  click(w, md.querySelector('.snav [data-sec="org"]')); click(w, apane.querySelector('[data-admsub="agents"]'));
   await until(() => apane.querySelector('#s-aud .audr:not(.audh)'));
   let lr = [...apane.querySelectorAll('#s-aud .audr:not(.audh)')];
   check(lr.length === 20 && !lr.some(r => /agent\/events/.test(r.textContent)), 'Log: 20 rows, no event polling: ' + lr.length);
@@ -258,12 +258,12 @@ function backdate(agentId, ids) {
   w.eval(`settingsModal('activity')`);
   await until(() => d.querySelector('#s-aud .audr:not(.audh)'));
   pane = d.querySelector('.smodal [data-pane="ai"]');
-  const apd = d.querySelector('.smodal [data-pane="users"]');  // 2.46.6 (#1710): Log and Verwaltung moved to Admin > Agenten
+  const apd = d.querySelector('.smodal [data-pane="org"]');  // 2.364.0 C (#3041)  // 2.46.6 (#1710): Log and Verwaltung moved to Admin > Agenten
   // 2.152.2 (#2624): project instead of list
   check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Projekte,Verbrauch,Einrichten,Sicher nutzen', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
   // 2.152.2 (#2624): project instead of list
   check(/Ereignis-Abfragen ausblenden/.test(apd.textContent) && /Anfragen/.test(apd.querySelector('#aud-sum').textContent) && /Welche Projekte sie sehen/.test(pane.textContent) && /Was sind Agenten\?/.test(pane.textContent), 'German texts');
-  check(d.querySelector('.smodal .snav [data-sec="users"] span')?.textContent === 'Verwaltung' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');  // 2.165.3 (#2655): Verwaltung
+  check(d.querySelector('.smodal .snav [data-sec="org"] span')?.textContent === 'Organisation' && apd.querySelector('[data-admsub="agents"]')?.getAttribute('aria-selected') === 'true', '2.46.6 (#1710): the area is called Admin, settingsModal(activity) opens its sub-tab Agenten');  // 2.165.3 (#2655): Verwaltung
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
@@ -279,8 +279,8 @@ function backdate(agentId, ids) {
       await ev(`localStorage.setItem('tasks.audPoll', '1'); if (S.aud) S.aud.poll = true; settingsModal('ai')`); await sleep(400);
       for (const k of ['agents', 'lists', 'usage', 'log']) {
         // 2.46.6 (#1710): the log is Settings > Administration > Agents
-        await ev(k === 'log' ? `document.querySelector('.smodal .snav [data-sec="users"]').click(); document.querySelector('.smodal [data-admsub="agents"]').click()` : `document.querySelector('.smodal [data-aisub="${k}"]').click()`); await sleep(1800);
-        const [SP, PN] = k === 'log' ? ['#sp-users', '#admp-agents'] : ['#sp-ai', '#aisp-' + k];
+        await ev(k === 'log' ? `document.querySelector('.smodal .snav [data-sec="org"]').click(); document.querySelector('.smodal [data-admsub="agents"]').click()` : `document.querySelector('.smodal [data-aisub="${k}"]').click()`); await sleep(1800);
+        const [SP, PN] = k === 'log' ? ['#sp-org', '#admp-agents'] : ['#sp-ai', '#aisp-' + k];
         if (k === 'lists') { await ev(`document.querySelector('#s-ai-tbl [data-aiall="1"]')?.click()`); await sleep(300); }
         if (k === 'usage') { await ev(`(() => { const x = document.querySelector('#aiu-det'); x.open = true; })()`); await sleep(300); }
         const m = await ev(`(() => {
@@ -292,7 +292,8 @@ function backdate(agentId, ids) {
           const labs = ax.filter(b => b.top >= bot - 2).map(b => [b.left, b.right]).sort((a, b) => a[0] - b[0]);
           const overlap = labs.some((x, i) => i && x[0] < labs[i - 1][1] - 0.5);
           const ctl = document.querySelector('#aud-ctl');
-          return {doc: document.documentElement.scrollWidth - innerWidth, paneOver: sp.scrollWidth - sp.clientWidth, over, cut, labs: labs.length, overlap,
+          const sr = sp.getBoundingClientRect(), spOver = [...sp.querySelectorAll('*')].filter(e => { const b = e.getBoundingClientRect(); return b.right > sr.right + 1 || (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible' && e.clientWidth); }).map(e => (e.getAttribute('class') || e.tagName) + (e.id ? '#' + e.id : '') + ':' + Math.round(e.getBoundingClientRect().right - sr.right) + '/' + (e.scrollWidth - e.clientWidth)).slice(0, 8);  // 2.364.0 C (#3041): what sticks out of the area
+          return {doc: document.documentElement.scrollWidth - innerWidth, paneOver: sp.scrollWidth - sp.clientWidth, spOver, over, cut, labs: labs.length, overlap,
             h: Math.round(sp.scrollHeight), ctl: ctl ? getComputedStyle(ctl).display : null, sel: [...pane.querySelectorAll('.aitd select')].map(s => Math.round(s.getBoundingClientRect().width)).slice(0, 2)};
         })()`);
         heights[`${k}@${W}`] = m.h;
