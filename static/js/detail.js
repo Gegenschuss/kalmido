@@ -143,9 +143,11 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // 2.26.0 (#932): the sidebar too (grip on its right edge; ← → reversed there: → = wider). Only next to the list: the drawer
 // (side-rail) and phones keep their fixed widths.
 // 2.350.0 D (#2750): chat and sidebar have no upper limit any more (1000 rem = never reached); the list keeps LIST_FLOOR_PX
-const PW = {det: [25.5, 20, 48], chat: [26, 20, 1000], side: [15, 12, 1000]};  // rem: standard, min, max
-const LIST_FLOOR_PX = 192, OLD_MAX = {chat: 44, side: 26};  // 12 rem; the former maximums
-// 2.350.0 D (#2750): a chat / sidebar wider than the former maximum may squeeze the list down to 12 rem (else 320 px as before)
+// 2.406.0 A (#3504): usable minimums: the sidebar at least 14 rem, the list at least 18 rem (288 px); stored narrower widths
+// are lifted on load (panelRem), a window too narrow for both folds the sidebar into the drawer (lay2209)
+const PW = {det: [25.5, 20, 48], chat: [26, 20, 1000], side: [15, 14, 1000]};  // rem: standard, min, max
+const LIST_FLOOR_PX = 288, OLD_MAX = {chat: 44, side: 26};  // 18 rem; the former maximums
+// 2.350.0 D (#2750): a chat / sidebar wider than the former maximum may squeeze the list down to 18 rem (else 320 px as before)
 const listFloor = () => (document.body.classList.contains('chat-open') && panelRem('chat') > OLD_MAX.chat) || panelRem('side') > OLD_MAX.side ? LIST_FLOOR_PX : LIST_SQUEEZE_PX;
 // 2.319.0 B (#3288): the app bar's width in rem (app.css --srW: narrower without its labels)
 const srW = () => document.documentElement.classList.contains('rail-nolabel') ? 3.25 : 4.5;
@@ -161,7 +163,7 @@ function panelMax(k) {  // the widest the panel may get now, in rem (the list ke
   const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? panelEff('chat') * rem : 0;
   const detW = app.classList.contains('detail-open') ? panelEff('det') * rem : 0;
   const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;
-  const room = (innerWidth - side - other - (k === 'det' ? (PWE.sq ? LIST_SQUEEZE_PX : LIST_MIN_PX) : LIST_FLOOR_PX)) / rem;  // 2.350.0 D (#2750): chat + sidebar down to 12 rem
+  const room = (innerWidth - side - other - (k === 'det' ? (PWE.sq ? LIST_SQUEEZE_PX : LIST_MIN_PX) : LIST_FLOOR_PX)) / rem;  // 2.350.0 D (#2750): chat + sidebar down to LIST_FLOOR_PX
   return Math.max(PW[k][1], Math.min(PW[k][2], room));
 }
 // 2.209.0 A (#2772): the stored width that shows v rem while fitLayout shrinks the panels (so a dragged edge stays where it
@@ -343,7 +345,8 @@ function crumbsHtml(t, l, parent) {
 }
 async function copyTaskLink(id) {
   const url = `${location.origin}/#t/${id}`;
-  try { if (isTouch() && navigator.share) { await navigator.share({url, title: '#' + id + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', '#' + id)); }
+  const k = tkOf(taskById(id)) || '#' + id;  // 2.390.0 (#3353): the key when the project has one
+  try { if (isTouch() && navigator.share) { await navigator.share({url, title: k + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', k)); }
   catch { toast(url, null, 6000); }
 }
 function crumbMenu(anchor, k, id) {  // 2.25.0 (UX-44)

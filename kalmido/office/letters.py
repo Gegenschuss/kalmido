@@ -504,8 +504,9 @@ def lt_pdf(c, oid, d):
             if hide_head:  # the letterhead brings logo, name and fold marks
                 pass
             elif logo:
-                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
-                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
+                fw, fh, left = P.pdf_logo_frame(co)  # 2.406.0 (#3501): size and side from the office settings
+                lw, lh_ = P.pdf_logo_fit(logo, fw, fh)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL if left else PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 # bundle 2.305 (#3170): the name lines one under the other, as the templates and the other office PDFs print
                 # them (2.99.0 D #2188; the joined name of several lines ran out of the page on the left)
@@ -535,8 +536,8 @@ def lt_pdf(c, oid, d):
     for s in lt_addr_lines(d):  # 2.296.0 E (#3170): every wrapped part of every line (was the first part of the first 9 lines)
         page.text(PL, yy, s, body_sz)
         yy += lh
-    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
-    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
+    info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(d.get("letter_date") or local_now().date().isoformat(), _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
     if d.get("tracking_no") and d.get("channel") == "registered":

@@ -269,7 +269,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id = the project) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
@@ -472,6 +472,12 @@ In projects with story points on (`points_on`) a task can carry `points` (1, 2, 
 when the project's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
 for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person.
+
+### Finding tasks (2.390.0)
+Ask `list_tasks` precisely instead of reading whole projects: `priority` / `priority_min`, `section_id`, `sprint_id`
+(`current` = the running sprint, `none` = backlog), `created_by`, `reviewer` + `review` (`reviewer: me, review: pending` = what
+waits for your review), `field_values` (custom fields), `q` (words in title or notes) and `sort` (`-priority`, `due`, ...).
+Tasks carry `sprint_id`, `reviewer_id` and `review`; `create_task` / `update_task` set `sprint_id` and `reviewer_id`.
 
 ### Reminders at a fixed time (2.138.1)
 "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in

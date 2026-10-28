@@ -24,7 +24,7 @@ function nwl_open() {
 }
 async function nwl_load() {
   const seq = ++NWL.seq;
-  let d; try { d = await api('GET', `/api/newsletter?ws=${encodeURIComponent(NWL.ws)}`); } catch { d = null; }
+  let d; NWL.denied = false; try { d = await api('GET', `/api/newsletter?ws=${encodeURIComponent(NWL.ws)}`); } catch (e) { d = null; NWL.denied = e.status === 403; }  // 2.361.0 A (#2938): only a refusal means "not an admin"
   if (seq !== NWL.seq) return;
   NWL.d = d; nwl_draw();
 }
@@ -47,7 +47,7 @@ function nwl_formHtml(kind, c) {
 }
 function nwl_html() {
   const d = NWL.d;
-  if (!d) return `${nwl_wsSel()}<p class="muted">${tr('Only admins of the organisation can change this')}</p>`;
+  if (!d) return `${nwl_wsSel()}<p class="muted">${NWL.denied ? tr('Only admins of this workspace can change this') : tr('The newsletter settings could not be loaded.')}</p>`;
   // 2.298.0 A2 (#3186): one visible sentence, the why behind (i)
   const why = `<div class="muted nwl-why">${tr('Kalmido sends no newsletters; a connected service does (with proof of consent and an unsubscribe link).')}<div class="shint">${tr('It handles bounces and sends from its own well-known servers. Kalmido keeps your contacts, segments and consent and syncs them with it.')}</div></div>`;
   const c = d.conn;

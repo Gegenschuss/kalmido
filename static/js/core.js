@@ -124,8 +124,8 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per project (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing projects and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per project and task, CSV export and a printable timesheet'),
-  clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within your organisation)'),
-  workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
+  clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within the workspace)'),
+  workload: N_('How much each person of the workspace has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a project; agents can sort it in'),
   dispo: N_('Book crew and equipment for shoot days as option or firm, see who and what is free per day, double bookings and absences as warnings (a tab of the workload)'),  // 2.50.0 (#1194)
   agents: N_('A tab with the agents (AI assistants, bots) you share projects with: their status, jobs to approve and the chat'),
@@ -133,7 +133,7 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
   sheets: N_('Simple tables with formulas like a spreadsheet; every cell can fetch figures from Kalmido (hours booked, budget, open tasks), for quotations, budgets and lists'),  // 2.89.0 (#1916)
   progress: N_('Progress bar in the project header and the project status (“Where is it stuck?”); with collaboration also a status per project')};
-// 2.364.0 B (#3018): a person without an organisation reads no "only within your organisation" (their clients are their own)
+// 2.364.0 B (#3018): a person without an organisation reads no "only within the organisation" sentence (their clients are their own)
 const FEAT_DESC_SOLO = {clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month')};
 // 2.409.0 (#3490): + the areas switched off in the shown workspace (areas.js wsa_featOff; the module switch stays the main switch)
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f) && !(typeof wsa_featOff === 'function' && wsa_featOff(f));

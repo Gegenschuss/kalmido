@@ -239,6 +239,7 @@ ORDER = (
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail
+    "accounts.orgleave",  # 2.361.0 (#2920 / #2922): what leaving / deleting an organisation means for its members
     "family.family",
     "family.web",
     "family.pin",  # 2.49.0 B (#1551)
@@ -369,6 +370,7 @@ ORDER = (
     "files.officeprev",  # 2.92.0 C (#1926): preview + text of .docx / .xlsx (limited worker), who can summarise a file
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
+    "tasks.ticketkey",  # 2.390.0 (#3353): ticket keys APP-123 (no routes)
     "team.forms",
     "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal

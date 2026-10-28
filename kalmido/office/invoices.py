@@ -48,7 +48,7 @@ TITLE_FALLBACK = {"invoice": N_("Invoice|document"), "credit": N_("Credit note|d
                   "delivery": N_("Delivery note|document"), "delivery_service": N_("Proof of service|document"),  # 2.120.0 D (#2089)
                   "offer": N_("Quotation|document")}  # 2.113.2 (#2253): a finalised quotation is mailed too
 # 2.185.0 C (#2520): the standard mail text of a document in its language (English names "the document" for every kind)
-INV_MAIL_TEXT = N_("Dear Sir or Madam,\n\nplease find attached {0} {1}.\n\nKind regards\n{2}|document mail")
+INV_MAIL_TEXT = N_("Dear Sir or Madam,\n\nPlease find attached {0} {1}.\n\nKind regards\n{2}|document mail")
 INV_TAX_ON = N_("{0} on {1}|tax line with its taxable amount")  # 2.296.0 B (#3175): "MwSt. 19 % auf 9.570,00 €"
 INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
                  "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
@@ -1534,7 +1534,7 @@ def inv_payment_delete(did, pid):
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if not _ofr_pay(c, uid, oid):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     b = body()
     note = b.get("note") if isinstance(b, dict) and isinstance(b.get("note"), str) else ""
     inv_pay_del(c, oid, did, pid, note=note, uid=uid)
@@ -1731,7 +1731,7 @@ def fd_fee_post(did):
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
     if not _ofr_pay(c, uid, oid):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:
         raise Denied(409, tr("Only the fee of a finalised reminder can be waived or marked as paid"))

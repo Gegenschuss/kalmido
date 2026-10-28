@@ -139,7 +139,7 @@ function multiDateMenu(a) {
 function filterModal(id) {
   const f = id ? S.filters.find(x => x.id === id) : {name: '', rules: {}};
   if (!f) return;
-  const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], ...JSON.parse(JSON.stringify(f.rules || {}))};
+  const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], who: [], secs: [], sprints: [], ms: [], text: '', ...JSON.parse(JSON.stringify(f.rules || {}))};
   r.cf = r.cf && typeof r.cf === 'object' ? r.cf : {};
   // custom fields of the visible lists that the filter engine understands
   const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
@@ -153,6 +153,13 @@ function filterModal(id) {
     return `<div class="cfrow"><div class="cfn">${esc(lname(listById(fd.list_id)))} › <b>${esc(fd.name)}</b></div>${ctl}</div>`;
   };
   const tags = [...new Set([...S.tasks.values()].flatMap(t => t.tags))].sort((a, b) => a.localeCompare(b, 'de'));
+  // 2.390.0 B (#3355): assignee, column, sprint, milestone (only what occurs in the visible projects, or is chosen already)
+  const liveL = id => { const l = listById(id); return l && !l.archived ? l : null; };
+  const whoIds = [...new Set([...S.tasks.values()].filter(t => t.assignee_id && t.assignee_id !== S.me?.id && liveL(t.list_id)).map(t => t.assignee_id))];
+  const who = [['me', tr('Me')], ['none', tr('Nobody')], ...whoIds.map(id => [String(id), personNameAny(id) || '#' + id]).sort((a, b) => a[1].localeCompare(b[1], 'de'))];
+  const secs = S.sections.filter(s => liveL(s.list_id) && (!r.lists.length || r.lists.includes(s.list_id))).map(s => [String(s.id), `${lname(liveL(s.list_id))} › ${s.name}`]);
+  const mss = [...S.tasks.values()].filter(t => t.ms && !t.deleted_at && liveL(t.list_id)).map(t => [String(t.id), t.title]);
+  const sprOn = S.lists.some(l => !l.archived && spr_on(l)) || r.sprints.length;
   const chips = (key, opts, translate) => `<div class="fchips" data-key="${key}">${opts.map(([v, n]) => (translate ? [v, tr(n)] : [v, n])).map(([v, n]) => `<button class="${r[key].includes(v) ? 'on' : ''}" data-v="${esc(String(v))}">${esc(n)}</button>`).join('')}</div>`;
   const md = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
     <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
@@ -163,6 +170,11 @@ function filterModal(id) {
     ${ticketsAny() || r.types.length ? `<h4>${tr('Ticket type')}</h4>${chips('types', [...TTYPES.map(([k, n]) => [k, n]), ['', N_('No type')]], true)}` : ''}
     ${tags.length ? `<h4>${tr('Tags')}</h4>${chips('tags', tags.map(g => [g, '#' + g]))}` : ''}
     ${cfs.length ? `<h4>${tr('Custom fields')}</h4><div class="cffilters">${cfs.map(cfRow).join('')}</div>` : ''}
+    <h4>${tr('Assignee')}</h4>${chips('who', who)}
+    ${secs.length || r.secs.length ? `<h4>${tr('Column')}</h4>${chips('secs', [...secs, ['none', tr('No column')]])}` : ''}
+    ${sprOn ? `<h4>${tr('Sprint')}</h4>${chips('sprints', [['cur', tr('Current sprint')], ['none', tr('Backlog')]])}` : ''}
+    ${mss.length || r.ms.length ? `<h4>${tr('Milestone')}</h4>${chips('ms', [...mss, ['none', tr('No milestone')]])}` : ''}
+    <h4><label for="f-text">${tr('Text')}</label></h4><input id="f-text" value="${esc(r.text)}" placeholder="${esc(tr('Title or notes contain …'))}" autocomplete="off">
     <div class="muted" id="f-count" style="font-size:var(--fs-m);margin-top:.875rem"></div>
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const count = () => { const n = openTasks().filter(t => !t.parent_id && filterMatch(t, r)).length; $('#f-count', md).textContent = trn('Currently matches {0} open task. Within a category, “or” applies.', 'Currently matches {0} open tasks. Within a category, “or” applies.', n); };
@@ -173,7 +185,7 @@ function filterModal(id) {
     count();
   };
   md.addEventListener('change', e => { if (e.target.dataset.cfnum) numRule(e.target.dataset.cfnum); });
-  md.addEventListener('input', e => { if (e.target.dataset.cfnumv) numRule(e.target.dataset.cfnumv); });
+  md.addEventListener('input', e => { if (e.target.dataset.cfnumv) numRule(e.target.dataset.cfnumv); if (e.target.id === 'f-text') { r.text = e.target.value; count(); } });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     const cbox = b.closest('.fchips[data-cf]');

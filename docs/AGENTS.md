@@ -1309,7 +1309,8 @@ change its job (title, state, log: `409`). At most 20 requests wait per agent.
 #1512. A project can switch on a review step (project settings > *Review step*, or `set_list_review`): a default reviewer, the
 review section (default: the section named *Review*) and *Done only after approval*. Every task can have a reviewer
 (`reviewer_id`, a person or an agent with access to the project) and a review state (`review`: `pending`, `approved`,
-`changes`).
+`changes`). 2.390.0 (#3355): both stand on every task of the API (with `sprint_id`); `create_task` / `update_task` set
+`reviewer_id` with the same checks, `list_tasks` `reviewer: me, review: pending` lists what waits for your review.
 
 - Moving a task into the review section (board, detail, API) or `review_task` action `request` asks for the review: the
   default reviewer when the task has none, state `pending`. A person gets a News item + push (notification row *Reviews*,
@@ -3307,6 +3308,12 @@ Kalmido's part:
   with `approval: null`: they are not a go.
 - While the agent reports `working` with the task (`set_status` with `task_id`), the task shows *<agent> is working on it*.
 - `fixes #<id>` in the merged pull request completes the task (once; *Undo* in the history).
+- Ticket keys (2.390.0): a project can have a key (*Ticket key* in the project dialog, e.g. `APP`); its tasks then carry
+  `key` (`APP-12`) next to `id`. `APP-12` in a commit, pull request title / text or a branch name (`app-12-login`,
+  `feature/APP-12`) links like `#12`, `fixes APP-12` completes. `GET /api/v1/tasks/APP-12` (MCP `get_task` with `key`)
+  reads the task, also by an old key (moved, key changed). In a project with a key, `#<id>` counts only while the
+  repository's switch *Also read #number* is on (on for repositories connected before 2.390.0, off for new ones: no
+  clash with the Git server's issue numbers).
 
 What Kalmido never does: it never gets write access to a repository (a read-only token is enough), never merges, never
 hands the repository token to anyone (agents cannot read or set it and cannot connect repositories). The agent pushes and
@@ -3351,7 +3358,7 @@ You are the coding agent of the Kalmido project "<project>". You work through th
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
@@ -3421,7 +3428,9 @@ with the scope it needs). The tools:
   `set_list_columns`, `list_members`, `share_list`, `unshare_list`, `list_groups`, `get_group`, `list_list_groups`,
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
-- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
+- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
+  filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
+  `q` and `sort`, see *Task filters* in docs/API.md),
   `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,

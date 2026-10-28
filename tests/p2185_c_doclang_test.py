@@ -121,7 +121,7 @@ OLD_KEYS = {  # the other former tables (ledger, terms, girocode, invoices mail)
     "Owner|company, male": "Inhaber", "Owner|company, female": "Inhaberin", "Executive board|company": "Vorstand", "Partners|company": "Partner",
     "Partners|company, GbR": "Gesellschafter", "Our terms and conditions (as of {0}) apply, see attachment.|terms": "Es gelten unsere AGB (Stand {0}), siehe Anhang.",
     "Scan with banking app|girocode": "Mit Banking-App scannen",
-    "Dear Sir or Madam,\n\nplease find attached {0} {1}.\n\nKind regards\n{2}|document mail": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {0} {1}.\n\nMit freundlichen Grüßen\n{2}",
+    "Dear Sir or Madam,\n\nPlease find attached {0} {1}.\n\nKind regards\n{2}|document mail": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {0} {1}.\n\nMit freundlichen Grüßen\n{2}",
     "the document|mail": "das Dokument", "the document|mail, quotation": "das Angebot", "the document|mail, invoice": "die Rechnung",
     "the document|mail, credit note": "die Gutschrift", "the document|mail, reminder": "die Mahnung", "the document|mail, delivery note": "den Lieferschein",
     "Re quotation No.|pack": "zu Angebot Nr."}

@@ -414,6 +414,8 @@ function ofcSettingsHtml() {
     ${ta('os-register', tr('Register lines'), co.register_lines, tr('legal form, register, managing director'))}
     ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><div class="shint keep">${tr('PNG, JPEG or WebP, at least 600 px wide, up to 4 MB')}</div></div>
+    ${ofcRowF('os-logo-size', tr('Logo size'), ofcSel('os-logo-size', ['s', 'l'].includes(s.logo_size) ? s.logo_size : 'm', [['s', tr('Small')], ['m', tr('Medium')], ['l', tr('Large')]]))}${/* 2.406.0 (#3501) */ ''}
+    ${ofcRowF('os-logo-pos', tr('Logo position'), ofcSel('os-logo-pos', s.logo_pos === 'l' ? 'l' : 'r', [['l', tr('Left')], ['r', tr('Right')]]), tr('For all office documents created from now on. No effect when your own letterhead leaves out our head.'))}
     ${typeof agbSettingsHtml === 'function' ? agbSettingsHtml() : ''}${/* 2.113.2 (#2253): the terms and conditions (PDF) */ ''}
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
@@ -716,7 +718,8 @@ function ofcSettingsBody(form) {
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
-    color: v('#os-color').trim(), ...($('#os-paper', form) ? {paper: v('#os-paper')} : {}), lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),
+    color: v('#os-color').trim(), ...($('#os-paper', form) ? {paper: v('#os-paper')} : {}),
+    ...($('#os-logo-size', form) ? {logo_size: v('#os-logo-size'), logo_pos: v('#os-logo-pos')} : {}),  // 2.406.0 (#3501) lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),
     ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
@@ -769,6 +772,7 @@ const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'curren
   'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
   'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
   'os-paper': 'paper',  // 2.357.0 A (#3156)
+  'os-logo-size': 'logo_size', 'os-logo-pos': 'logo_pos',  // 2.406.0 (#3501)
   'os-dun-on': 'dunning_suggest', 'os-dun-days': 'dunning_grace_days', 'os-girocode': 'girocode',  // 2.147.1 B (#2054): each saves alone
   'os-dun-int': 'dunning_interest', 'os-dun-flat': 'dunning_flat_fee', 'os-dun-base': 'base_rate', 'os-dun-kind': 'dunning_client_kind',  // 2.355.0 D (#2846)
   'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)

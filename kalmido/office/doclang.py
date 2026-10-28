@@ -52,20 +52,20 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("Credit note for invoice No.|pack"), N_("Re quotation No.|pack"), N_("Customer No.|pack"), N_("Service period|pack"),
              N_("Due on|pack"), N_("Exchange rate €1|pack"), N_("Subtotal|pack"), N_("Total amount due|pack"), N_("Credit total|pack"),
              N_("Already paid|pack"), N_("Amount outstanding|pack"), N_("Reminder fee|pack"), N_("Amount|pack"), N_("Payment|pack"), N_("Due|pack"),
-             N_("thank you for your enquiry. We are pleased to submit the following quotation:|pack"), N_("Dear Sir or Madam,|pack"),
+             N_("Thank you for your enquiry. We are pleased to submit the following quotation:|pack"), N_("Dear Sir or Madam,|pack"),
              N_("We look forward to working with you and are happy to answer any questions.|pack"), N_("All prices plus 7 % or 19 % VAT.|pack"),
              N_("All prices net, without VAT.|pack"), N_("Our general terms and conditions apply.|pack"),
              N_("This quotation is valid until {date}.|pack"),
-             N_("regarding the project referenced above, we are pleased to submit the following charges for our services:|pack"),
+             N_("Regarding the project referenced above, we are pleased to submit the following charges for our services:|pack"),
              N_("Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply.|pack"),
-             N_("the following goods or services have been delivered:|pack"), N_("Goods or services received in full and in good condition.|pack"),  # 2.296.0 D (#3167)
-             N_("regarding the invoice referenced below we issue the following credit note:|pack"),
+             N_("The following goods or services have been delivered:|pack"), N_("Goods or services received in full and in good condition.|pack"),  # 2.296.0 D (#3167)
+             N_("Regarding the invoice referenced below we issue the following credit note:|pack"),
              N_("We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions.|pack"),
-             N_("it may have escaped your attention that the following invoices are still outstanding:|pack"),
+             N_("It may have escaped your attention that the following invoices are still outstanding:|pack"),
              N_("Please transfer the outstanding amount within {days} days to the bank account above.|pack"),
-             N_("despite our payment reminder, we have not yet received payment for the following invoices:|pack"),
+             N_("Despite our payment reminder, we have not yet received payment for the following invoices:|pack"),
              N_("Please transfer the total amount outstanding within {days} days to the bank account above. If you have already arranged payment, please disregard this letter.|pack"),
-             N_("despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack"),
+             N_("Despite our payment reminder and our reminder notice, the following invoices remain unpaid:|pack"),
              N_("This is our final request to transfer the total amount outstanding within {days} days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you.|pack"),
              N_("Payable by {date} without deduction.|pack"), N_("Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|pack"),
              N_("VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC).|pack"),
@@ -79,13 +79,13 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("the client's country|pack"), N_("the client's region|pack"),
              # 2.296.0 B (#3168, #3175): invoice correction, client VAT id, buyer reference, the two reverse charge texts
              N_("Invoice correction|pack"), N_("Invoice correction No.|pack"), N_("Correction of invoice No.|pack"), N_("Correction total|pack"),
-             N_("regarding the invoice referenced above we issue the following invoice correction:|pack"), N_("Client VAT ID|pack"),
+             N_("Regarding the invoice referenced above we issue the following invoice correction:|pack"), N_("Client VAT ID|pack"),
              N_("Leitweg ID|pack"), N_("Buyer reference|pack"),
              N_("Reverse charge: VAT to be accounted for by the recipient (section 13b German VAT Act).|pack"),
              # 2.357.0 D (#3183): sentence case, "Description" for the service column, the service date of one day
              N_("Description|pack"), N_("Unit price|pack"), N_("Net total|pack"), N_("Gross total|pack"), N_("Duration of licence|pack"),
              N_("Territorial rights|pack"), N_("Rights by medium|pack"), N_("Service date|pack"),
-             N_("regarding the invoice referenced above we issue the following credit note:|pack"))
+             N_("Regarding the invoice referenced above we issue the following credit note:|pack"))
 
 def _dpk(w, lang):
     # 2.185.0 (#2520): looked up directly, not via tr(): an own text with a "|" must come back whole
@@ -210,7 +210,7 @@ def _defaults(c, oid, s, cur, lang, level, ct):
             icands |= {inv_default_texts(c, oid, s, kind, lang, lv)[0] for lv in (1, 2, 3)}
         out["intro"] = (intro, icands, False)
         out["closing"] = (closing, cands, False)
-    if doc_lg(lang) in ("fr", "es"):  # 2.357.0 D (#3183): their standard intros up to 2.356 began with a small letter
+    if doc_lg(lang) != "de":  # 2.357.0 D (#3183): fr / es standard intros up to 2.356 began with a small letter; 2.390.0 A (#3349): en / it / nl up to 2.389
         i0, ic, im = out["intro"]
         out["intro"] = (i0, ic | {x[:1].lower() + x[1:] for x in ic if x}, im)
     return out

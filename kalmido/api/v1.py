@@ -12,12 +12,13 @@ from datetime import datetime, timedelta
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, like_escape, st_ids, system_ctx
 from ..core.i18n import N_, tr
+from ..core.numtext import user_num
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
-from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
+from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
 from ..core.serializers import load_tasks
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
@@ -25,9 +26,11 @@ from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND
 from ..lists.groups import (
     groups_for, grp_dict, grp_of_user, list_group_del, list_group_set, list_groups_get, need_group, task_take_web,
 )
+from ..lists.fields import fmt_num
 from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
+from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
 from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, user_names
@@ -246,6 +249,10 @@ def task_core(r, tags, fields):
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
             "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
+            # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
+            "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
+            "reviewer_id": r["reviewer_id"] if "reviewer_id" in r.keys() else None,
+            "review": (r["review"] or None) if "review" in r.keys() else None,
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
 
@@ -270,6 +277,7 @@ def waiting_of(r):
 def v1_task(d):
     out = task_core(d, d["tags"], d.get("fields") or {})
     out["list_tags"] = d.get("ltags") or []
+    out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -293,7 +301,7 @@ def task_for(c, row, uid):
     if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
         from ..lists.formula import fx_fill
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
-    out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
+    out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
@@ -309,6 +317,9 @@ V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority"
               "family", "rotation", "stars", "people", "snippets", "locked")
 V1_TASK_IN += ("points",)  # 2.60.0 (#1511): story points 1, 2, 3, 5, 8, 13 (null = none)
 V1_TASK_IN += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local time "YYYY-MM-DDTHH:MM" (null = none)
+# 2.390.0 B (#3355): an open sprint of the task's list (null = backlog) and the reviewer (null = none; set through the
+# review step's checks after the task itself, see v1_reviewer_set)
+V1_TASK_IN += ("sprint_id", "reviewer_id")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -411,6 +422,7 @@ def v1_list(d):
             "stale_days": d.get("stale_days"), "agent_followup": bool(d.get("agent_followup")),
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
+            "ticket_key": d.get("ticket_key") or None,  # 2.390.0 (#3353): the project's key APP (its tasks: APP-1, APP-2, ...)
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
@@ -718,6 +730,7 @@ def v1_list_patch(lid):
                                                "stale_days", "agent_followup", "folder_adopt", "time_tracking",
                                                "org_visibility", "org_edit", "sort_mode", "group_field"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
     unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (the owner)
+    unknown = [k for k in unknown if k != "ticket_key"]  # 2.390.0 (#3353): the project's ticket key (owner / list admins)
     if "points_on" in b and not isinstance(b["points_on"], bool):
         raise BadInput(tr("Invalid value: {0}", "points_on"))
     if unknown:
@@ -818,9 +831,11 @@ def _v1_since(v):
 @v1_view
 def v1_tasks():
     """Visible tasks (not in the trash), oldest id first, cursor pages. Filters: list_id, status, due_from, due_to,
-    tag, assignee (me | none | id), updated_since, parent_id, top_level."""
+    tag, assignee (me | none | id), updated_since, parent_id, top_level. 2.390.0 B (#3355): + priority, priority_min,
+    section_id, sprint_id, created_by, reviewer, review, field_<id>, q and sort (see v1_tasks_more)."""
     a = v1_args(("list_id", "status", "due_from", "due_to", "tag", "list_tag", "assignee", "updated_since", "parent_id", "top_level",
-                 "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned", "milestone", "milestone_id"))
+                 "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned", "milestone", "milestone_id",
+                 *V1_TASKS_MORE, *(k for k in request.args if V1_FIELD_ARG.fullmatch(k))))
     if a.get("fields") not in (None, "", "full", "compact"):
         raise BadInput(tr("Invalid value: {0}", "fields"))
     c, uid = db(), me()
@@ -891,6 +906,9 @@ def v1_tasks():
             raise BadInput(tr("Invalid value: {0}", "type"))
         where.append("ttype=?")
         args.append("" if a["type"] == "none" else a["type"])
+    v1_tasks_more(c, uid, a, where, args)
+    if a.get("sort"):
+        return v1_tasks_sorted(c, a, where, args)
     after, limit = cursor_dec("i", a.get("cursor")), v1_limit(a)
     where.append("id>?")
     args += [after, limit + 1]
@@ -907,6 +925,164 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
               "assignee_id")
 
 
+# ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
+V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
+V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
+# sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
+V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
+            "created": ("created_at", "created_at"), "updated": ("updated_at", "updated_at"),
+            "title": ("lower(title)", "lower(title)"), "manual": ("sort", "sort")}
+
+
+def _v1_who(a, k, uid, none=True):
+    """me (uid None: not allowed) | none | an id -> (SQL condition on the column, args)."""
+    v = a[k]
+    if v == "none" and none:
+        return "IS NULL", []
+    return "=?", [uid if v == "me" and uid else as_int(v, k, 1)]
+
+
+def _v1_multi(a, k):
+    """A parameter given repeatedly or comma separated -> its values."""
+    return [x.strip() for v in a.getlist(k) for x in v.split(",") if x.strip()]
+
+
+def v1_tasks_more(c, uid, a, where, args):
+    """priority (none | low | medium | high, several: comma separated or repeated), priority_min, section_id (id | none),
+    sprint_id (id | current = the active sprint of the task's list | none = backlog), created_by (me | id), reviewer
+    (me | none | id), review (pending | approved | changes | none), field_<id> (a custom field of a list you see: select =
+    option id or name, text = contains, number, checkbox true / false, other types the stored value), q (words in title
+    or notes, the full-text index), key (2.390.0: a ticket key APP-12, current or old)."""
+    from ..tasks.ftsearch import fts_query, fts_terms
+    if a.get("priority"):
+        ps = _v1_multi(a, "priority")
+        if not ps or any(p not in PRIO_VALUES for p in ps):
+            raise BadInput(tr("Invalid value: {0}", "priority"))
+        where.append("priority = ANY(CAST(? AS BIGINT[]))")
+        args.append(st_ids({PRIO_VALUES[p] for p in ps}))
+    if a.get("priority_min"):
+        if a["priority_min"] not in PRIO_VALUES:
+            raise BadInput(tr("Invalid value: {0}", "priority_min"))
+        where.append("priority>=?")
+        args.append(PRIO_VALUES[a["priority_min"]])
+    if a.get("section_id"):
+        w, x = _v1_who(a, "section_id", None)
+        where.append("section_id " + w)
+        args += x
+    if a.get("sprint_id"):
+        if a["sprint_id"] == "current":
+            where.append("sprint_id IN (SELECT id FROM sprints s WHERE s.list_id=tasks.list_id AND s.state='active')")
+        else:
+            w, x = _v1_who(a, "sprint_id", None)
+            where.append("sprint_id " + w)
+            args += x
+    if a.get("key"):  # 2.390.0 (#3353): the task(s) with a ticket key "APP-12" (current or old); a bad key: 400
+        pair = tk_parse(a["key"])
+        if not pair:
+            raise BadInput(tr("Invalid value: {0}", "key"))
+        kids = tk_ids_ordered(c, pair)[:50] or [0]
+        where.append(f"id IN ({','.join('?' * len(kids))})")
+        args += kids
+    if a.get("created_by"):
+        w, x = _v1_who(a, "created_by", uid, none=False)
+        where.append("created_by " + w)
+        args += x
+    if a.get("reviewer"):
+        w, x = _v1_who(a, "reviewer", uid)
+        where.append("reviewer_id " + w)
+        args += x
+    if a.get("review"):
+        if a["review"] not in ("pending", "approved", "changes", "none"):
+            raise BadInput(tr("Invalid value: {0}", "review"))
+        where.append("review=?")
+        args.append("" if a["review"] == "none" else a["review"])
+    for k in sorted(request.args):
+        m = V1_FIELD_ARG.fullmatch(k)
+        if m:
+            v1_field_filter(c, int(m.group(1)), a[k], where, args)
+    if a.get("q") not in (None, ""):
+        tsq = fts_query(fts_terms(a["q"]))
+        if not tsq:
+            raise BadInput(tr("Invalid value: {0}", "q"))
+        where.append("id IN (SELECT f.task_id FROM task_fts f WHERE f.vec @@ to_tsquery('simple'::regconfig, ?))")
+        args.append(tsq)
+
+
+def v1_field_filter(c, fid, v, where, args):
+    """field_<fid>=v: only tasks of the field's list (a list you see) whose value of that field matches."""
+    f = c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()
+    if not f or not list_role(c, f["list_id"]):
+        raise BadInput(tr("Invalid value: {0}", f"field_{fid}"))
+    have = "id IN (SELECT v.task_id FROM task_field_values v WHERE v.field_id=? AND {0})"
+    where.append("list_id=?")
+    args.append(f["list_id"])
+    t, v = f["type"], str(v).strip()
+    if t == "formula":
+        raise BadInput(tr("{0} is calculated and cannot be set", f["name"]))
+    if t == "checkbox":
+        if v not in ("1", "true", "0", "false"):
+            raise BadInput(tr("Invalid value: {0}", f"field_{fid}"))
+        where.append(("" if v in ("1", "true") else "NOT ") + have.format("TRUE"))
+        args.append(fid)
+        return
+    if t in ("select", "multiselect"):  # an option id or its name (any case)
+        opts = json.loads(f["options"] or "{}").get("options", [])
+        o = next((o for o in opts if o["id"] == v), None) or next((o for o in opts if str(o["name"]).lower() == v.lower()), None)
+        if not o:
+            raise BadInput(tr("{0}: unknown option", f["name"]))
+        cond, x = ("v.value=?", o["id"]) if t == "select" else ("? = ANY(string_to_array(v.value, ','))", o["id"])
+    elif t == "text":
+        cond, x = "v.value ILIKE ? ESCAPE '\\'", "%" + like_escape(v) + "%"
+    elif t in ("number", "currency"):
+        try:
+            cond, x = "v.value=?", fmt_num(user_num(v))
+        except ValueError:
+            raise BadInput(tr("{0}: number expected", f["name"])) from None
+    else:
+        cond, x = "v.value=?", v
+    where.append(have.format(cond))
+    args += [fid, x]
+
+
+def _v1_scur(sort, s):
+    """The cursor of a sorted page: [sort, last sort value, last id] (a cursor of another sort or value type is refused)."""
+    kind = {"priority": (int,), "manual": (int, float)}.get(sort.lstrip("-"), (str,))
+    try:
+        cur = json.loads(base64.urlsafe_b64decode(s + "=" * (-len(s) % 4)).decode())
+        if isinstance(cur, list) and len(cur) == 3 and cur[0] == sort and type(cur[2]) is int and type(cur[1]) in kind:
+            return cur[1], cur[2]
+    except (ValueError, UnicodeDecodeError):
+        pass
+    raise BadInput(tr("Invalid value: {0}", "cursor"))
+
+
+def v1_tasks_sorted(c, a, where, args):
+    """sort = priority | due | created | updated | title | manual, "-" before it = descending (no due date stays last); the
+    id breaks ties. The cursor carries the last row's sort value and id, so pages stay stable with equal values."""
+    sort = a["sort"]
+    desc = sort.startswith("-")
+    if sort.lstrip("-") not in V1_SORTS:
+        raise BadInput(tr("Invalid value: {0}", "sort"))
+    ex = V1_SORTS[sort.lstrip("-")][1 if desc else 0]
+    limit = v1_limit(a)
+    if a.get("cursor"):
+        v, i = _v1_scur(sort, a["cursor"])
+        where.append(f"({ex} {'<' if desc else '>'} ? OR ({ex} = ? AND id > ?))")
+        args += [v, v, i]
+    keys = c.execute(f"SELECT id, {ex} AS k FROM tasks WHERE {' AND '.join(where)} ORDER BY {ex} {'DESC' if desc else 'ASC'}, id "
+                     "LIMIT ?", [*args, limit + 1]).fetchall()
+    more = len(keys) > limit
+    keys = keys[:limit]
+    byid = {d["id"]: d for d in load_tasks(c, "id = ANY(CAST(? AS BIGINT[]))", (st_ids(k["id"] for k in keys),))} if keys else {}
+    out = [v1_task(byid[k["id"]]) for k in keys if k["id"] in byid]
+    if a.get("fields") == "compact":
+        out = [{k: x.get(k) for k in V1_COMPACT} for x in out]
+    nxt = None
+    if more:
+        nxt = base64.urlsafe_b64encode(json.dumps([sort, keys[-1]["k"], keys[-1]["id"]]).encode()).decode().rstrip("=")
+    return jsonify(data=out, next_cursor=nxt)
+
+
 @app.post("/api/v1/tasks")
 @v1_view
 def v1_task_create():
@@ -919,12 +1095,41 @@ def v1_task_create():
         raise BadInput(tr("Invalid value: {0}", "client_ref"))
     b = v1_task_in(raw)
     c = db()
+    rid = b.pop("reviewer_id", None)
+    if rid is not None:  # a subtask without list_id lands in its parent's list (review of 2.390: not the inbox)
+        lid0 = b.get("list_id")
+        if not lid0 and b.get("parent_id"):
+            need_task(c, int(b["parent_id"]), write=False)
+            lid0 = c.execute("SELECT list_id FROM tasks WHERE id=?", (int(b["parent_id"]),)).fetchone()[0]
+        v1_reviewer_check(c, lid0 or my_inbox(c), rid)
     again = bool(ref) and c.execute("SELECT 1 FROM tasks WHERE created_by=? AND client_ref=?", (me(), ref)).fetchone()
     j = v1_call(task_create, body={**b, **({"client_ref": ref} if ref else {})})
+    if rid is not None and not again:
+        v1_reviewer_set(c, j["id"], rid)
     r = jsonify(v1_one(c, j["id"]))
     r.headers["Location"] = f"{API_PREFIX}tasks/{j['id']}"
     r.status_code = 200 if again else 201
     return r
+
+
+def v1_reviewer_check(c, lid, rid, tid=None):
+    """2.390.0 B (#3355): reviewer_id of a task body (null = none): the same checks as the review step (collaboration on, someone
+    with access to list lid; an agent opened to it), before anything is written."""
+    from ..tasks.review import rvw_reviewer_problem
+    if rid is not None and (not isinstance(rid, int) or isinstance(rid, bool)):
+        raise BadInput(tr("Invalid value: {0}", "reviewer_id"))
+    need_collab()
+    e = rvw_reviewer_problem(c, lid, rid, tid) if rid is not None else None
+    if e:
+        raise BadInput(e)
+
+
+def v1_reviewer_set(c, tid, rid):
+    """2.390.0 B (#3355): the review step's "reviewer" action (its notice, history entry and the lock of a review gate)."""
+    from ..tasks.review import rvw_apply
+    rvw_apply(c, tid, {"action": "reviewer", "reviewer_id": rid})
+    bump(c)
+    c.commit()
 
 
 @app.get("/api/v1/tasks/<int:tid>")
@@ -934,6 +1139,25 @@ def v1_task_get(tid):
     c = db()
     need_task(c, tid, write=False)
     return jsonify(v1_one(c, tid))
+
+
+@app.get("/api/v1/tasks/<key>")
+@v1_view
+def v1_task_by_key(key):
+    """2.390.0 (#3353): a task by its ticket key "APP-12" (also an old key of a task that moved or whose project's key
+    changed); 404 when no task the caller sees has it. Several (the same key in two workspaces the caller sees): the one
+    with the current key first, then the lowest id."""
+    v1_args(())
+    c, pair = db(), tk_parse(key)
+    if not pair:
+        raise Denied(404)
+    for tid in tk_ids_ordered(c, pair):
+        try:
+            need_task(c, tid, write=False)  # the same checks as GET /api/v1/tasks/<id> (token lists, participants)
+        except Denied:
+            continue
+        return jsonify(v1_one(c, tid))
+    raise Denied(404)
 
 
 def _v1_live(c, tid, write=True, full=False):
@@ -968,7 +1192,7 @@ def v1_prev_in(p):
             out["ttype"] = v or ""
         elif k == "family":
             out["fam"] = v
-        elif k not in ("deadline", "deadline_in_today", "list_tags"):  # not compared (no single column / own table)
+        elif k not in ("deadline", "deadline_in_today", "list_tags", "reviewer_id"):  # not compared (no single column / own table; 2.390.0 B (#3355): the reviewer goes through the review step)
             out[k] = v
     return out
 
@@ -1007,12 +1231,22 @@ def v1_task_update(tid):
         return stale
     prev = v1_prev_in(raw.pop("_prev")) if "_prev" in raw else None
     b = v1_task_in(raw)
-    if not b:
+    rv = "reviewer_id" in b
+    rid = b.pop("reviewer_id", None)
+    if not b and not rv:
         raise BadInput(tr("Nothing to change"))
+    if rv:  # 2.390.0 B (#3355): checked first (against the list the task ends up in); set before the fields unless it moves
+        v1_reviewer_check(c, b.get("list_id") or c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], rid, tid)
+        if not b.get("list_id"):
+            v1_reviewer_set(c, tid, rid)
+    if not b:
+        return jsonify(v1_one(c, tid))
     if b.get("list_id"):
         from ..agents.safety import move_gate
         move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
     r = v1_call(task_update, tid, body={**b, "shift_chain": sc, **({"_prev": prev} if prev else {})})
+    if rv and b.get("list_id"):
+        v1_reviewer_set(c, tid, rid)
     out = v1_one(c, tid)
     ch = (r or {}).get("chain") or {}
     if ch.get("moved") or ch.get("skipped"):
@@ -1122,7 +1356,12 @@ def v1_subtask_create(tid):
     c = db()
     _v1_live(c, tid)
     b = v1_task_in(v1_json(), tuple(k for k in V1_TASK_IN if k not in ("parent_id", "list_id")))
+    rid = b.pop("reviewer_id", None)
+    if rid is not None:  # 2.390.0 B (#3355): a subtask is in its parent's list
+        v1_reviewer_check(c, c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], rid)
     j = v1_call(task_create, body={**b, "parent_id": tid})
+    if rid is not None:
+        v1_reviewer_set(c, j["id"], rid)
     r = jsonify(v1_one(c, j["id"]))
     r.status_code, r.headers["Location"] = 201, f"{API_PREFIX}tasks/{j['id']}"
     return r

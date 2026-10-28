@@ -83,7 +83,8 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     await ev(DRAG);
     // #1607 / #1643: the folder row
     const a = await ev(RECTS);
-    check(a.fcar < a.sic && a.cL >= a.nR && a.cL - a.nR < 16, `${tag}: #1607: arrow before the folder icon, the number right after the name ` + JSON.stringify(a));
+    // 2.406.0 (#3492): the arrow sits at the row's end now (was before the folder icon, #1607)
+    check(a.fcar > a.cR && a.cL >= a.nR && a.cL - a.nR < 16, `${tag}: #3492: the arrow at the row's end, the number right after the name ` + JSON.stringify(a));
     check(Math.abs(a.fshrR - a.shrR) <= 1 && Math.abs(a.fshrR - a.kidShrR) <= 1, `${tag}: #1607: the folder's share icon in the column of the lists' share icon ` + JSON.stringify(a));
     check(Math.abs(a.hF - a.hL) <= 1, `${tag}: #1643: a folder row as high as a list row ` + JSON.stringify(a));
     check(a.kidSic > a.sic, `${tag}: #1607: the lists inside start further in than the folder icon (a tree) ` + JSON.stringify(a));
@@ -160,7 +161,7 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     await ev(`(() => { document.querySelector('[data-act="side"]').click(); return 1; })()`); await sleep(600);
     const a = await ev(RECTS);
     check(Math.abs(a.hF - a.hL) <= 1 && a.hF >= 43, `${tag}: #1643: folder row as high as a list row (44 px) ` + JSON.stringify(a));
-    check(a.fcar < a.sic && a.nL - a.fL >= 40, `${tag}: #1607: the arrow first, at least 40 px to tap left of the name ` + JSON.stringify(a));
+    check(a.fcar > a.cR && a.sic - a.fL <= 12, `${tag}: #3492: the folder icon at the row's start, the arrow at its end (was first, #1607) ` + JSON.stringify(a));  // 2.406.0 (#3492)
     // 2.144.2 (#1730): on the phone the "…" stays visible at the end, the share icon before it lines up with the lists' share icon
     check(Math.abs(a.fshrR - a.shrR) <= 1.5 && a.menuOp === 1, `${tag}: #1730: phone - the folder's share icon in the column of the lists' share icon ` + JSON.stringify(a));
     // a tap on the arrow folds, a tap on the name opens the folder

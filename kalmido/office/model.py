@@ -28,7 +28,7 @@ from ..core.pg import write_lock  # 2.269.0 C (#3017)
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
-OFFICE_ADMIN_ONLY = N_("Only an admin of this organisation can do this")
+OFFICE_ADMIN_ONLY = N_("Only an admin of this workspace can do this")
 OFFICE_OFF = N_("Office & finance is turned off in your settings")
 UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649): percent = a rate on the external fees (KSK)
 TAXES = ("standard", "reduced", "exempt")
@@ -120,6 +120,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "letterhead": {},
                      # 2.357.0 A (#3156): the paper size of the office PDFs: "a4" (DIN 5008) or "letter" (US-Letter 8.5 x 11 in)
                      "paper": "a4",
+                     # 2.406.0 (#3501): the logo in the letterhead: size "s" | "m" | "l" (30 x 14, 45 x 22, 60 x 30 mm), side "l" | "r"
+                     "logo_size": "m", "logo_pos": "r",
                      # 2.113.2 (#2253): the terms and conditions as PDF per language (set only by their own routes, office/terms.py)
                      "terms": {},
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
@@ -457,6 +459,10 @@ def office_settings_clean(c, oid, b, cur):
         elif k in ("skonto_pct", "skonto_days"):  # 2.120.0 A (#2087)
             from .abschlag import abs_settings_clean
             abs_settings_clean(k, v, out)
+        elif k in ("logo_size", "logo_pos"):  # 2.406.0 (#3501)
+            if v not in (("s", "m", "l") if k == "logo_size" else ("l", "r")):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "paper":  # 2.357.0 A (#3156)
             if v not in ("a4", "letter"):
                 raise BadInput(tr("Invalid value: {0}", k))

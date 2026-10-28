@@ -89,7 +89,10 @@ def model(name="Beispielstudio GmbH", rights=True, accept=True):
 
 
 # ---------------------------------------------------------------- 1. #2388 rights appendix
-data, r, pages = render(model())
+# 2.406.0 (#3491): enough positions that the appendix keeps its own page (a short quotation now takes it onto page 1)
+m1 = model()
+m1["lines"] = [item(i, f"Leistung {i}") for i in range(1, 15)]
+data, r, pages = render(m1)
 check(data.startswith(b"%PDF"), "the PDF renders")
 rp = next((p for p in pages if any(t["s"] == "Zeitliche Auswertung" for t in p.rec)), None)
 check(rp is not None, "the rights appendix page exists")

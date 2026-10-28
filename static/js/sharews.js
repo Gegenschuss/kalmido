@@ -19,6 +19,9 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-shws]'); if (!b) return;
   const box = b.closest('.shws'); if (box?._shws) { e.preventDefault(); box._shws(b); }
 });
+// 2.361.0 A (#2938): the empty people list of a Share dialog: with workspaces the way is the e-mail address field above (no admin
+// needed); only on a server without workspaces somebody else has to add the people
+const noPeopleTxt = () => S.peopleVis === 'contacts' || S.instanceMode === 'workspaces' ? tr('No other people yet. Share by e-mail address or invite them.') : tr('No other users yet. An admin can add them in the settings.');
 // <option>s of the people select: those who do not fit the workspace are disabled with the reason
 function shWsOptions(users, org, taken = []) {
   return users.filter(u => !taken.some(m => m.user_id === u.id)).map(u => {

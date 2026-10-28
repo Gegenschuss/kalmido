@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgdelnotice', 'orggone']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -218,6 +218,7 @@ function newsText(it, U) {
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || ''))  // 2.28.0 (#935)
       + (d.lists ? ' ' + esc(trn('Your {0} project of the organisation stayed with it ({1}).', 'Your {0} projects of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
+      + (d.back ? ' ' + esc(trn('{0} project you had brought in is back in your private space.', '{0} projects you had brought in are back in your private space.', d.back)) : '')  // 2.361.0 (#2922)
       : tr('{0} removed you from the project {1}', who, q(newsListName(it)));
     case 'owner': return (d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
       + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
@@ -247,6 +248,10 @@ function newsText(it, U) {
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'orgjoin': return tr('{0} invites you to join the organisation {1}', who, q(d.name || ''));  // 2.148.1 A (#2480): oinvview.js
+    // 2.361.0 (#2920): the server admin deletes my organisation on a day / took that back / deleted it (with what of mine was in it)
+    case 'orgdelnotice': return d.day ? tr('The organisation {0} will be deleted on {1}. Save what you want to keep before that day.', q(d.name || ''), esc(fmtDayAbs(d.day)))
+      + (olvText(d.own) ? ' ' + esc(tr('Yours in it: {0}.', olvText(d.own))) : '') : tr('The deletion of the organisation {0} was called off.', q(d.name || ''));
+    case 'orggone': return tr('The organisation {0} was deleted.', q(d.name || '')) + (olvText(d.own) ? ' ' + esc(tr('Yours that went with it: {0}.', olvText(d.own))) : '');
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
     case 'connok': return tr('{0} accepted your connection request', who);
     case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
@@ -282,6 +287,15 @@ function newsText(it, U) {
 }
 const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
+/** @type {any} */ (NEWS_ICON).orgdelnotice = /** @type {any} */ (NEWS_ICON).orggone = 'alert';  // 2.361.0 (#2920)
+// 2.361.0 (#2920 / #2922): what of a person is in an organisation (accounts/orgleave.py OLV_STAYS, the same words)
+const OLV_WORDS = {files: n => trn('{0} file', '{0} files', n), wiki_pages: n => trn('{0} knowledge page', '{0} knowledge pages', n),
+  tables: n => trn('{0} table', '{0} tables', n), bookmarks: n => trn('{0} bookmark', '{0} bookmarks', n), polls: n => trn('{0} poll', '{0} polls', n),
+  videos: n => trn('{0} video review', '{0} video reviews', n), drafts: n => trn('{0} office draft', '{0} office drafts', n),
+  clients: n => trn('{0} client', '{0} clients', n), absences: n => trn('{0} absence', '{0} absences', n),
+  leave_quota: n => trn('{0} vacation account', '{0} vacation accounts', n), timesheets: n => trn('{0} timesheet', '{0} timesheets', n),
+  time: n => trn('{0} time entry', '{0} time entries', n), drives: n => trn('{0} drive', '{0} drives', n)};
+const olvText = c => Object.keys(OLV_WORDS).filter(k => (c || {})[k]).map(k => OLV_WORDS[k](c[k])).join(', ');
 /** @type {any} */ (NEWS_ICON).signoff = 'check';  // 2.266.0 (#2965)
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
@@ -469,7 +483,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);

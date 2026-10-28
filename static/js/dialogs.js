@@ -625,7 +625,7 @@ function shareModal(id, opt = {}) {
       shWsFill($('#sh-ws', md), cur.org_id || null, own && !cur.is_inbox ? () => $('[data-m="list-edit"]', md)?.click() : null);
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
         (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, cur.org_id || null)}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
-          : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
+          : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : noPeopleTxt()}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
           : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
     }
     const aw = $('#sh-agwrap', md);
@@ -971,6 +971,7 @@ function listModal(id, folder = '', o = {}) {
     ${id ? ptypeRowHtml(l) : ''}
     ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
+    ${tk_listRow(l)}${''/* 2.390.0 (#3353): ticket key (git.js) */}
     ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
     ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>

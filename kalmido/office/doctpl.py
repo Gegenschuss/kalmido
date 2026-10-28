@@ -235,6 +235,7 @@ def dt_company(c, oid, lang):
         logo = p if os.path.isfile(p) else None
     color = s.get("color") or ""
     co["logo_path"] = logo
+    co["logo_size"], co["logo_pos"] = s.get("logo_size") or "m", s.get("logo_pos") or "r"  # 2.406.0 (#3501)
     co["color"] = color if re.fullmatch(r"#[0-9a-fA-F]{6}", color) else "#2f5d8a"
     return co
 
@@ -506,8 +507,9 @@ def dt_pdf(c, oid, d, signed=None, client=None):
             if hide_head:  # 2.357.0 C (#3182): the letterhead brings logo, name and fold marks
                 pass
             elif logo:
-                lw, lh_ = P.pdf_logo_fit(logo, P.PDF_LOGO_MAX_W, P.PDF_LOGO_MAX_H)  # 2.357.0 B (#3179): at most 200 dpi
-                p.image("Logo", PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
+                fw, fh, left = P.pdf_logo_frame(co)  # 2.406.0 (#3501): size and side from the office settings
+                lw, lh_ = P.pdf_logo_fit(logo, fw, fh)  # 2.357.0 B (#3179): at most 200 dpi
+                p.image("Logo", PL if left else PL + PCW - lw, P.PDF_TOP + 2 * P.MM, lw, lh_)
             else:
                 nl = (co.get("name_lines") or [co.get("name") or ""])[:3]  # 2.99.0 D (#2188): the name lines one under the other
                 for i, ln in enumerate(nl):
@@ -539,8 +541,8 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     for ln in [w for x in addr[:8] for w in P.pdf_wrap(x, body_sz, P.PDF_ADDR_W)]:  # 2.217.0 B (#2800): wraps within the address field
         page.text(PL, yy, ln, body_sz)
         yy += lh
-    info_x = PL + P.PDF_ADDR_W + 8 * P.MM
-    info_w = PCW - P.PDF_ADDR_W - 8 * P.MM
+    info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
+    info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     when = (d.get("final_at") or d.get("updated_at") or iso(now_utc()))[:10]
     from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)

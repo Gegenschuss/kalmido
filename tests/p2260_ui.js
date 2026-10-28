@@ -182,7 +182,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   check(+JSON.parse(w.__store['tasks.pw.side'] || '0') === 16, '#932: → = 1 rem wider, stored per device ' + w.__store['tasks.pw.side']);
   check(d.documentElement.style.getPropertyValue('--sideW') === '16rem', '#932: --sideW follows');
   key(w, g, 'ArrowLeft', {shiftKey: true}); await sleep(50);
-  check(+JSON.parse(w.__store['tasks.pw.side'] || '0') === 12, '#932: Shift+← = 4 rem narrower');
+  check(+JSON.parse(w.__store['tasks.pw.side'] || '0') === 14, '#932: Shift+← = narrower, down to the 14 rem minimum');  // 2.406.0 (#3504): the sidebar's minimum is 14 rem (was 12)
   key(w, g, 'Home'); key(w, g, 'Enter'); await sleep(50);
   check(!w.__store['tasks.pw.side'] && d.documentElement.style.getPropertyValue('--sideW') === '15rem', '#932: Enter = the standard width (not stored)');
   w.close();

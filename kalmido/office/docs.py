@@ -1177,7 +1177,9 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
-                    "sender_line": sender_line, "logo_path": logo_path, "color": color},  # 2.99.0 D (#2188): name_lines; 2.97.1 (#2224): sender_line
+                    "sender_line": sender_line, "logo_path": logo_path, "color": color,
+                    # 2.406.0 (#3501): the logo frame; a finalised document keeps the one frozen with it (none = medium, right)
+                    "logo_size": (snd if locked else s).get("logo_size") or "m", "logo_pos": (snd if locked else s).get("logo_pos") or "r"},  # 2.99.0 D (#2188): name_lines; 2.97.1 (#2224): sender_line
         "recipient": rec, "meta": meta, "intro": r["intro"] or "", "lines": t["lines"],
         "totals": {"net": t["net"], "net_text": fmt_money(t["net"], lang, cur), "tax_lines": t["tax_lines"], "tax_total": t["tax_total"],
                    "gross": t["gross"], "net_incl_raw": t.get("net_incl_raw"),
@@ -1630,7 +1632,7 @@ def odoc_delete(did):
     write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
     if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time, independent of OFFER_DELETE_TESTPHASE
         paths = trial_drop_doc(c, oid, r)
         bump(c)
@@ -1639,7 +1641,7 @@ def odoc_delete(did):
         return jsonify(ok=True)
     if idt_applies(r):  # 2.162.0 A (#2603): test phase, a finalised / sent invoice with confirm_number (+ cash=0|1)
         if office_role(c, uid, oid) != "admin":  # 2.237.0 B (#2864): only the admin of the office area, not office groups with manage
-            raise Denied(403, tr("Only an admin of this organisation can do this"))
+            raise Denied(403, tr("Only an admin of this workspace can do this"))
         resp, paths = idt_delete(c, oid, uid, r)
         if resp[1] != 200:
             c.rollback()
@@ -1737,7 +1739,7 @@ def otrial_delete_all():
     without an organisation is their own admin; members 403) -> {ok, docs, gen_docs}. The TEST series starts again."""
     c, uid, oid = _ctx()
     if not _ofr_may(c, uid, oid, "manage"):
-        raise Denied(403, tr("Only an admin of this organisation can do this"))
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
     write_lock(c, f"office_mail_{int(oid)}")  # the same locks as odoc_delete
     gens = c.execute("SELECT id, status, node_id, signed_node_id FROM office_gen_docs WHERE org_id=? AND trial=1 ORDER BY id", (oid,)).fetchall()
     fs_ids, fs_paths = [], []
