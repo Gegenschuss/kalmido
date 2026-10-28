@@ -46,7 +46,7 @@ class RecPage(_Base):  # every text / line call per page (y from the top)
 
     def text(self, x, y, s, size, bold=False, color=pdf.C_INK, align="l", spacing=0.0, width=None):
         if str(s or ""):
-            self.rec.append({"y": y, "s": str(s), "size": size})
+            self.rec.append({"y": y, "s": str(s), "size": size, "x": x, "align": align, "width": width, "bold": bold, "spacing": spacing})
         return super().text(x, y, s, size, bold, color, align, spacing, width)
 
     def line(self, x1, y1, x2, y2, w=0.5, color=pdf.C_RULE, dash=None):
@@ -168,16 +168,17 @@ for kind in ("offer", "invoice"):
             _, op = render(model(n, kind, cl))
             old_gaps(True)
             tag = f"{kind} {n}/{cl}"
-            if len(pages) != len(op):
-                worse.append(f"{tag}: {len(op)} -> {len(pages)}")
             k, g = sum_gap(pages)
             if g is None:
                 continue
-            go = sum_gap(op)[1]  # before 2.294.0: 8 pt, a tight page took up to 4 of them (2.138.0 E #2238)
+            go = sum_gap(op)[1]
             look_a = kind == "offer"  # 2.406.0 (#3491): look A fills the page above the totals (p2406_lead_pdf); pages still counted
-            if go is not None and g < go - 0.3 and not look_a:
+            # 2.380.0 A (#3415): one page more only where the old layout pressed the totals below the new minimum (they break instead)
+            if len(pages) != len(op) and not (len(pages) == len(op) + 1 and go is not None and go < pdf.PDF_SUM_GAP_MIN - 0.3):
+                worse.append(f"{tag}: {len(op)} -> {len(pages)}")  # before 2.294.0: 8 pt, a tight page took up to 4 of them (2.138.0 E #2238)
+            if go is not None and g < go - 0.3 and len(pages) == len(op) and not look_a:
                 worse.append(f"{tag}: gap {g:.1f} pt below the old {go:.1f} pt")
-            if k == len(pages) - 1 and len(pages) == len(op) and not look_a:
+            if k == len(pages) - 1 and not look_a:
                 if pdf.PDF_SUM_GAP_MIN + 0.3 < g < pdf.PDF_SUM_GAP - 0.3:
                     squeezed.append((tag, round(g / MM, 1)))
                 elif abs(g - pdf.PDF_SUM_GAP_MIN) <= 0.1:
@@ -195,6 +196,45 @@ check(len(at_min) >= 1 or near_min, f"a nearly full page sets the minimum ~4 mm 
 check(len(multi_wish) >= 1, f"a multi-page document keeps the wished gap on its last page ({multi_wish[:3]})")
 if at_min:
     shot("p2294-fast-voll", at_min[0][2])
+
+# ---------------------------------------------------------------- 2b. 2.380.0 A (#3415): fixed wishes in mm (do not follow the constants)
+for kind in ("offer", "invoice"):
+    k, g = sum_gap(render(model(3, kind))[1])
+    check(g is not None and g >= 18 * MM - 0.6, f"#3415 {kind}, a few positions: >= 18 mm between the last position and the totals ({g and round(g / MM, 1)} mm)")
+check(pdf.PDF_SUM_GAP >= 18 * MM - 0.01 and pdf.PDF_SUM_GAP_MIN >= 8 * MM - 0.01, "#3415: wish 18 mm, minimum 8 mm")
+tight = []
+for kind in ("offer", "invoice"):
+    for cl in (1, 2, 3):
+        for n in range(1, 46):
+            pgs = render(model(n, kind, cl))[1]
+            k, g = sum_gap(pgs)
+            if g is not None and k == len(pgs) - 1 and g < 8 * MM - 0.6:
+                tight.append(f"{kind} {n}/{cl}: {g / MM:.1f} mm")
+check(not tight, f"#3415: never below 8 mm between the last position and the totals ({tight[:4]})")
+
+
+def edge_gap(pages, head):  # points between the right edge of the price text and the left edge of the VAT text (head: the 7.4 pt heads / 8.8 + 8 pt values)
+    rec = pages[0].rec
+    if head:
+        h = [t for t in rec if t["size"] == 7.4]
+        pr, vt = h[3], h[4]  # POS, SERVICE, QTY, RATE, VAT, TOTAL
+    else:
+        i = next(i for i, t in enumerate(rec) if t["size"] == 8 and t["align"] == "c" and t["s"].endswith("%") and rec[i - 1]["size"] == 8.8)
+        pr, vt = rec[i - 1], rec[i]
+    right = pr["x"] + pr["width"]
+    tw = pdf.pdf_text_width(vt["s"], vt["size"], vt["bold"], vt["spacing"])
+    return (vt["x"] + vt["width"] / 2 - tw / 2) - right
+
+
+mixed = model(3, "invoice")  # two rates -> the VAT column is printed
+mixed["lines"][1]["tax_pct"] = 7
+mixed["lines"][0]["rate"], mixed["lines"][0]["rate_text"] = 1620, "1.620,00 €"
+_, pgs = render(mixed)
+check(edge_gap(pgs, True) >= 9, f"#3415: PREIS and MWST. heads {edge_gap(pgs, True):.1f} pt apart (>= 9)")
+check(edge_gap(pgs, False) >= 9, f"#3415: price and VAT values {edge_gap(pgs, False):.1f} pt apart (>= 9)")
+mixed["kind"] = "offer"
+mixed["title"] = "Kostenvoranschlag"
+check(len(render(mixed)[1]) == 1, "#3415: a quotation with a VAT column renders")
 
 # ---------------------------------------------------------------- 3. delivery note: no totals, no totals air
 data, pages = render(model(4, noprice=True))

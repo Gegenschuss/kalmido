@@ -382,7 +382,7 @@ function dashCard(k) {
     // 2.45.0 (#1504): only active projects (not complete, not on hold), at most 5; none at all = no card
     // 2.55.0 (#1065): settings (lyopts.js): all projects or only active ones, the order, how many
     const act = lyo_get('home', 'projects', 'active', true), srt = lyo_get('home', 'projects', 'sort', 'side');
-    const all = S.lists.filter(l => !l.archived && isTracked(l)),  // 2.352.0 B (#2752): tracked = has a status
+    const all = S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)),  // 2.352.0 B (#2752): tracked = has a status; 2.380.2 (#3407): the shown workspace
       ps = all.filter(l => !act || !['complete', 'on_hold'].includes(l.status));
     if (!all.length) return '';
     if (!ps.length) return slim(tr('Active projects: nothing'));

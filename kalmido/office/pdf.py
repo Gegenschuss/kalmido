@@ -66,8 +66,8 @@ PDF_ADDR_W = 85 * MM
 PDF_INFO_X = 125 * MM    # 2.390.0 A (#3350): the info block begins 125 mm from the sheet edge (DIN 5008 form B)
 PDF_FOOT_H = 20 * MM     # footer (four columns + page line) reserved at the bottom of every page
 PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
-PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
-PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the page breaks
+PDF_SUM_GAP = 18 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page; 2.380.0 A (#3415): was 11 mm
+PDF_SUM_GAP_MIN = 8 * MM   # ... reduced step by step down to this before the page breaks; 2.380.0 A (#3415): was 4 mm
 PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
 # 2.406.0 (#3491): look A of the quotation PDF (chosen 27.10.2026), only while a quotation is laid out (PDF_LOOK_A);
 # 2.434.0 A (#3603): also invoices, credit notes and reminders (PDF_LOOK_A_KINDS), delivery notes keep the old look
@@ -1383,7 +1383,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
-    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
+    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 56, 76  # 2.380.0 A (#3415): c_vat was 36 (the price and VAT columns almost touched)
     np_ = bool(m.get("noprice"))  # 2.120.0 D (#2089): delivery note / timesheet: no price, VAT or total columns
     if np_:
         c_pos, c_rate, c_vat, c_tot = int(m.get("pos_w") or 22), 0, 0, 0
@@ -1974,12 +1974,20 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             nd = need(i, j, first_on_page)
             sqa = room_sq(i, j)
             aira = room_air(i, j)
+            # 2.380.0 A (#3415): the totals' gap never goes below its minimum: if the closing is still too long with the air at its
+            # minimum (no top gap given up either), it breaks (the totals with the last position on the next page)
+            hold = any(blocks[k]["air_kind"] == "sum" for k in range(i, j + 1))
+            if hold:
+                aira = room_air(i, j, True)
+                sqa = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in range(i, j + 1) if not blocks[k]["air"])
             if y + nd > bot + 0.01 and sqa + aira > 0 and y + nd - sqa - aira <= bot + 0.01:
                 # 2.294.0 (#3154): first the air around the totals down to its minimum, then (2.138.0 E #2238) the group a little
                 # tighter (top gaps only, same font sizes), the air below its minimum last -- instead of breaking the page
                 over = cut_air(i, j, y + nd - bot, True)
                 for with_air in (False, True):  # the top gaps of the blocks with air (the totals' own) only with the air below its minimum
                     ks = [k for k in range(i, j + 1) if bool(blocks[k]["air"]) == with_air]
+                    if with_air and hold:
+                        break
                     if with_air and over > 0:
                         over = cut_air(i, j, over, False)
                     sqk = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in ks)
@@ -2059,8 +2067,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if any(b["air"] for b in blocks):
         base = lay(True, {})[0]
         res = [(t, lay(True, t)) for t in tries]
-        # all of them tight: the totals' air alone (presses the totals no more than the old layout did) or none
-        tries = [next((t for t, (n, tight) in res if n <= base and not tight), None) or next((t for t, (n, _) in res[-2:] if n <= base), {})]
+        # 2.380.0 A (#3415): the totals' air never goes below its minimum (a break instead); the first try without an extra page,
+        # else the one with the fewest pages (the full air, then less intro air)
+        ns = [(t, lay(True, t)[0]) for t in tries[:4]]
+        tries = [next((t for t, n in ns if n <= base), None) or min(ns, key=lambda x: x[1])[0]]
     lay(False, tries[0])
     total = len(pages)
     for n, p in enumerate(pages, 1):

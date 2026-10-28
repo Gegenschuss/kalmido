@@ -50,19 +50,19 @@ async function run(user, ck, tag) {
   const pv = d.querySelector('.ofdhead .ofdpdf'), dl = d.querySelector('.ofdhead .ofddl');
   check(pv && pv.tagName === 'BUTTON' && pv.dataset.ofd === 'pdf-ask' && pv.getAttribute('aria-label') === 'Open PDF' && /Preview/.test(pv.textContent)
     && dl && dl.dataset.ofd === 'pdf-ask' && dl.dataset.dl === '1', `${tag}: a draft's PDF buttons ask first (buttons, labels kept)`);
+  // 2.380.0 A (#3410): Preview opens the draft at once (no question); the download keeps asking
   click(w, pv);
+  await until(() => w.__pv.length, 30);
+  check(w.__pv.length === 1 && w.__pv[0].url === `/api/office/docs/${q.id}/pdf?inline=1` && !dlg(d), `${tag}: Preview opens the draft without a question ` + JSON.stringify(w.__pv));
+  check((await call('GET', `/api/office/docs/${q.id}`, null, ck)).locked === false, `${tag}: Preview keeps the draft`);
+  click(w, dl);
   const m = await until(() => dlg(d), 30);
   check(m && /not finalised yet/.test(m.textContent) && m.querySelector('[data-pa="final"]') && m.querySelector('[data-pa="draft"]') && m.querySelector('[data-pa=""]')
-    && m.getAttribute('role') === 'alertdialog', `${tag}: the question: Finalise now / Show as draft / Cancel ` + (m?.textContent || '').slice(0, 160));
+    && m.getAttribute('role') === 'alertdialog', `${tag}: the download asks: Finalise now / Show as draft / Cancel ` + (m?.textContent || '').slice(0, 160));
   click(w, m?.querySelector('[data-pa=""]'));
   await until(() => !dlg(d), 20); await sleep(300);
   const q1 = await call('GET', `/api/office/docs/${q.id}`, null, ck);
-  check(!dlg(d) && !w.__pv.length && q1.locked === false && q1.status === 'draft', `${tag}: Cancel does nothing (no PDF, still a draft)`);
-  click(w, pv);
-  click(w, await until(() => dlg(d)?.querySelector('[data-pa="draft"]'), 30));
-  await until(() => w.__pv.length, 20);
-  check(w.__pv.length === 1 && w.__pv[0].url === `/api/office/docs/${q.id}/pdf?inline=1` && !dlg(d), `${tag}: Show as draft opens the preview ` + JSON.stringify(w.__pv));
-  check((await call('GET', `/api/office/docs/${q.id}`, null, ck)).locked === false, `${tag}: Show as draft keeps the draft`);
+  check(!dlg(d) && w.__pv.length === 1 && q1.locked === false && q1.status === 'draft', `${tag}: Cancel does nothing (still a draft)`);
   click(w, dl);
   click(w, await until(() => dlg(d)?.querySelector('[data-pa="draft"]'), 30));
   await until(() => !dlg(d), 20);
@@ -72,12 +72,12 @@ async function run(user, ck, tag) {
 
   // ---- a draft invoice: Finalise now gives the number, then the PDF; afterwards plain links
   [w, d] = await editor(user, inv.id);
-  click(w, d.querySelector('.ofdhead .ofdpdf'));
+  click(w, d.querySelector('.ofdhead .ofddl'));  // 2.380.0 A (#3410): the download asks (Preview no longer)
   click(w, await until(() => dlg(d)?.querySelector('[data-pa="final"]'), 30));
   const srv = await until(async () => { const j = await call('GET', `/api/office/docs/${inv.id}`, null, ck); return j.locked && j; }, 60);
   check(srv && srv.locked && /\d/.test(srv.number || ''), `${tag}: Finalise now finalises and gives the number ` + (srv && srv.number));
-  await until(() => w.__pv.length, 30);
-  check(w.__pv.length === 1 && w.__pv[0].url === `/api/office/docs/${inv.id}/pdf?inline=1` && w.__pv[0].name === `${srv.number}.pdf`, `${tag}: then the PDF opens ` + JSON.stringify(w.__pv));
+  await sleep(300);
+  check(w.__pv.length === 0, `${tag}: then the PDF downloads (no viewer) ` + JSON.stringify(w.__pv));
   await until(() => d.querySelector('a.ofdpdf[data-ofd="pdf"]'), 30);
   const a = d.querySelector('a.ofdpdf[data-ofd="pdf"]');
   check(a && a.getAttribute('href') === `/api/office/docs/${inv.id}/pdf?inline=1` && d.querySelector('a.ofddl[data-ofd="pdf"]')?.hasAttribute('download') && !d.querySelector('[data-ofd="pdf-ask"]'),

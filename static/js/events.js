@@ -135,6 +135,12 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
 
 // ------------------------------------------------------------------ quick add wiring
 function currentQuickInput() { return $('#qinput'); }
+// 2.380.2 (#3403): a chip picked after the text names the same thing wins for this task (qovPick)
+function qovChipWins(type) {
+  const inp = $('#qinput'); if (!inp) return;
+  if (parseQuick(inp.value, S.quick.ignore).chips.some(c => c.type === type && !c.off)) S.qov.win = {...S.qov.win, [type]: 1};
+  updateChips(inp); inp.focus();
+}
 function updateChips(input) {
   if (input.id === 'qinput') qdockChips();
   input.closest('.qadd.dock')?.classList.toggle('has-text', !!input.value.trim());  // 2.24.0 (UX-30)
@@ -182,7 +188,8 @@ async function submitQuick(input, extra = {}) {
   if (!r.title && d.files?.length) r.title = d.files[0].name.replace(/\.[^.]+$/, '');  // shared file without a title
   if (!r.title) return;
   const o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};  // chips of the docked composer
-  const body = {title: r.title, list_id: o.list_id || r.list_id || d.list_id, due: 'due' in o ? o.due : r.due || d.due, due_time: r.due_time || d.due_time, priority: 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0,
+  const q = qovPick(o, r, d);  // 2.380.2 (#3403): the text wins over a chip
+  const body = {title: r.title, list_id: q.list_id, due: q.due, due_time: r.due_time || d.due_time, priority: q.priority,
     tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || '', section_id: d.section_id, content: d.content || ''};
   if (url) body.url = url;
   if (r.ttype) body.ttype = r.ttype;  // 2.4.0 (#340): !bug / !feature / !task
@@ -202,7 +209,7 @@ async function submitQuick(input, extra = {}) {
   const raw = input.value; let created;
   input.dataset.qbusy = '1';
   try { created = await createTask(body); } catch { return; } finally { delete input.dataset.qbusy; }  // api() said why
-  if (input.value === raw) { input.value = ''; S.quick.ignore = new Set(); updateChips(input); }
+  if (input.value === raw) { input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input); }  // 2.380.2 (#3403): the chips stay, their win over the text not
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
@@ -674,13 +681,13 @@ document.addEventListener('click', async e => {
     case 'purge': if (await askConfirm(tr('Delete permanently?'), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) { await api('DELETE', `/api/tasks/${id}?hard=1`); await load(); render(); } break;
     case 'done-clean': doneCleanup(); break;
     case 'qd-date': {
-      const inp = $('#qinput'), cur = 'due' in (S.qov || {}) ? S.qov.due : parseQuick(inp?.value || '', S.quick.ignore).due || quickDefaults().due || '';
-      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qdockChips(); $('#qinput')?.focus(); }});
+      const inp = $('#qinput'), cur = qovPick(S.qov || {}, parseQuick(inp?.value || '', S.quick.ignore), quickDefaults()).due || '';
+      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qovChipWins('date'); }});
       break;
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
-    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qdockChips(); $('#qinput')?.focus(); }}))); break;
-    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qdockChips(); $('#qinput')?.focus(); }}))); break;
+    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
+    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
     case 'mx-due': mxSet({due: a.dataset.k}); break;
@@ -930,7 +937,7 @@ S.qfiles = {};  // input id -> [File]
 function qTargetList(input) {
   const r = parseQuick(input.value, S.quick.ignore), o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};
   const d = input.id === 'qsheet' && S.quickPreset.capture ? {} : {...quickDefaults(), ...(input.id === 'qsheet' ? S.quickPreset : {})};
-  return listById(o.list_id || r.list_id || d.list_id || inbox()?.id);
+  return listById(r.list_id || o.list_id || d.list_id || inbox()?.id);
 }
 function qPeople(input) {
   const l = qTargetList(input);

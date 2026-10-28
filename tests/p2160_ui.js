@@ -51,7 +51,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const acct = d.querySelector('#kbar .kbacct');  // 2.152.3 (#2619): the picture moved from the bottom of the bar into the head bar
   check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && /^Account: Alice( · |$)/.test(acct.getAttribute('aria-label')), '#641: the account picture in the head bar, named');  // 2.152.3 (#2619): the head bar
   check(!d.querySelector('#side .suser') && !d.querySelector('#side .sdtop'), '#641: the old account rows (drawer top, sidebar bottom) are gone');
-  check(d.querySelector('#kbar .kbsw') && d.querySelector('#srail .sset'), 'the workspace switch and the Settings button stay');  // 2.152.3 (#2619): the workspace switch moved from the panel head into the head bar  // 2.152.2 (#2622): Settings at the bottom of the bar  // 2.138.2 (#2392): no logo in the sidebar
+  check(d.querySelector('#kbar .kbsw') && !d.querySelector('#srail .sset'), 'the workspace switch (with Settings in its menu) stays'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the workspace switch moved from the panel head into the head bar  // 2.152.2 (#2622): Settings at the bottom of the bar  // 2.138.2 (#2392): no logo in the sidebar
   click(w, acct); await sleep(150);
   let mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml') || b).textContent.trim());
   check(mi[0] === 'Alice · alice' && mi.includes('Account') && mi.includes('Settings') && mi.includes('Log out'), '#641: the menu: who, Account, Settings, Log out ' + mi.join('|'));

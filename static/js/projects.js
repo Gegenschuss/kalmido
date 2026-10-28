@@ -101,11 +101,12 @@ async function statusModal(lid) {
 }
 // ---- "Where is it stuck?" overview (module view, from the state)
 S.ov = {only: LS.get('ovOnly', false)};
-const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && (l.status === 'at_risk' || l.status === 'off_track'));
+// 2.380.2 (#3407): every view under Projects shows the lists of the shown workspace only ('all' = everything)
+const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l) && (l.status === 'at_risk' || l.status === 'off_track'));
 const ovProblems = () => statusOn() ? riskLists().length : 0;
 function ovRows() {
   const open = openTasks(), t0 = today();
-  return S.lists.filter(l => !l.archived && isTracked(l)).map(l => {  // 2.352.0 B (#2752): tracked projects
+  return S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)).map(l => {  // 2.352.0 B (#2752): tracked projects; 2.380.2 (#3407): only the shown workspace
     const ts = open.filter(t => t.list_id === l.id);
     const overdue = ts.filter(t => t.due && t.due < t0).sort((a, b) => a.due.localeCompare(b.due));
     const blocked = depsOn() ? ts.filter(t => t.blocked) : [];
@@ -126,7 +127,7 @@ function viewOverview() {
   const sum = k => rows.reduce((n, r) => n + r[k].length, 0);
   const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('blocked'), tr('tasks blocked by another task')],
     ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('projects at risk or off track')]] : []),
-    ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
+    ...(collab() && S.lists.some(l => l.shared && inWs(l)) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared projects')]] : [])];
   // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
   const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}" title="${esc(s)}"><b>${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`};
   let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All projects')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
@@ -414,7 +415,7 @@ document.addEventListener('click', async e => {
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });
-document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; } });  // 2.12.2 (#453 B3): the draft survives any re-render
+document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; autosize(e.target); } });  // 2.380.2 (#3399): grows while typing  // 2.12.2 (#453 B3): the draft survives any re-render
 // 2.331.0 A (#3307): the file search filters the rows in place; while searching, every match shows (the 8-row limit is off)
 document.addEventListener('input', e => {
   const q = e.target.classList?.contains('povfq') ? e.target : null, list = q && q.nextElementSibling;

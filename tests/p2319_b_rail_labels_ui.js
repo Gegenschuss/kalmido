@@ -48,7 +48,7 @@ const named = b => { const n = b.querySelector('.srbn')?.textContent || ''; retu
   check(d.documentElement.classList.contains('rail-nolabel'), 'off: the page gets rail-nolabel');
   check(w.localStorage.getItem('tasks.railLabels') === 'false', 'off: kept on the device');
   check(await until(() => icons(d).length > 2 && icons(d).every(named)), 'off: every icon names its area as title and aria-label');
-  check(d.querySelector('#srail .srb.sset')?.getAttribute('aria-label') === 'Settings', 'off: Settings keeps its name for screen readers');
+  check(!d.querySelector('#srail .srb.sset') && !!d.querySelector('#kbar .kbsw[aria-label]'), 'off: the Kalmido menu (with Settings) keeps its name for screen readers'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)
   check(d.querySelectorAll('#srail .srb.on[aria-current="page"]').length === 1, 'off: the open area stays marked');
   check(await until(async () => (await look()).railLabels === false), 'off: saved to the account like the other appearance settings');
   w.close();
