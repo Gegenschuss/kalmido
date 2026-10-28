@@ -14771,5 +14771,6 @@
   "Default of the space": "Standaard van de ruimte",
   "Diagram": "Diagram",
   "The diagram could not be drawn": "Het diagram kon niet worden getekend",
-  "The formula could not be drawn": "De formule kon niet worden gezet"
+  "The formula could not be drawn": "De formule kon niet worden gezet",
+  "{0} table stays in the tables' trash": ["{0} tabel blijft in de prullenbak van de tabellen", "{0} tabellen blijven in de prullenbak van de tabellen"]
 }

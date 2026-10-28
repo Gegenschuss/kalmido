@@ -262,7 +262,8 @@ function lt_foldRow() {
   return fs.length ? ofcRowF('lt-sfold', tr('Folder'), ofcSel('lt-sfold', '', [['', tr('No folder')], ...fs.map(f => [String(f.id), oft_path('letters', f)])])) : '';
 }
 async function ltSentModal(d) {
-  if (typeof oft_load === 'function' && !OFT.d.letters) await oft_load('letters');  // 2.351.0 A (#2823): the folders to pick
+  // 2.351.0 A (#2823): the folders to pick -- 2.373.0 (#3337): also waits on a load that is running (OFT.busy)
+  if (typeof oft_load === 'function' && (OFT.busy.letters || OFT.d.letters?.key !== oft_key())) await oft_load('letters');
   /** @type {any} */
   const md = modal(`<h3>${tr('Mark as sent')}</h3><p class="muted">${esc(tr('The letter is then fixed and its PDF is filed in the documents.'))}</p>
     ${ofcRowF('lt-schan', tr('Sent by'), ofcSel('lt-schan', d.channel || 'post', Object.entries(LT_CH).map(([k, n]) => [k, tr(n)])))}

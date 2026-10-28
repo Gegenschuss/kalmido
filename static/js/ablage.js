@@ -252,9 +252,10 @@ async function ab_delete(n) {
   offerUndo([tr('“{0}” moved to the trash', n.name), fs_keptText(r?.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Delete “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`), redo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`)}));
 }
 async function ab_restore(n) {
-  try { await api('POST', `/api/files/nodes/${n.id}/restore`); } catch { return; }
+  let r; try { r = await api('POST', `/api/files/nodes/${n.id}/restore`); } catch { return; }
   ab_reload();
-  offerUndo(tr('“{0}” restored', n.name), histAdd({label: tr('Restore “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
+  const st = r?.stays?.sheet;  // 2.373.0 (#3335): a table the person may not edit stays in the tables' trash
+  offerUndo([tr('“{0}” restored', n.name), st ? trn("{0} table stays in the tables' trash", "{0} tables stay in the tables' trash", st) : ''].filter(Boolean).join(' · '), histAdd({label: tr('Restore “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
 async function ab_purge(n) {
   if (!await askConfirm(tr('Delete “{0}” for good?', n.name), tr('All versions are removed. This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;

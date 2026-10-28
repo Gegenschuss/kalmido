@@ -14771,5 +14771,6 @@
   "Default of the space": "Vorgabe des Bereichs",
   "Diagram": "Diagramm",
   "The diagram could not be drawn": "Das Diagramm ließ sich nicht zeichnen",
-  "The formula could not be drawn": "Die Formel ließ sich nicht setzen"
+  "The formula could not be drawn": "Die Formel ließ sich nicht setzen",
+  "{0} table stays in the tables' trash": ["{0} Tabelle bleibt im Papierkorb der Tabellen", "{0} Tabellen bleiben im Papierkorb der Tabellen"]
 }

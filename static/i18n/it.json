@@ -14771,5 +14771,6 @@
   "Default of the space": "Predefinito dello spazio",
   "Diagram": "Diagramma",
   "The diagram could not be drawn": "Impossibile disegnare il diagramma",
-  "The formula could not be drawn": "Impossibile comporre la formula"
+  "The formula could not be drawn": "Impossibile comporre la formula",
+  "{0} table stays in the tables' trash": ["{0} tabella resta nel cestino delle tabelle", "{0} tabelle restano nel cestino delle tabelle"]
 }
