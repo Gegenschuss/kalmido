@@ -2565,6 +2565,8 @@ CREATE INDEX IF NOT EXISTS rate_known_at ON rate_known(at);
 CREATE TABLE IF NOT EXISTS list_folder_skip (
   list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+-- 2.352.0 (#2748): deleting a user (ON DELETE CASCADE) and the fkindex check need the user's side indexed
+CREATE INDEX IF NOT EXISTS list_folder_skip_user ON list_folder_skip(user_id);
 -- 2.361.2 (#2923): a member asks the admins of an organisation to give back what they brought in or made (kind list | sheet |
 -- file ..., accounts/orgout.py OO_KINDS; obj_id = its id; name = what the admins see): state open | approved | declined |
 -- used. An approved request lets that person move that one thing into their private space for a while (OO_GRANT_DAYS).

@@ -254,6 +254,7 @@ def lf_lists_below(c, nid):
 
 
 def lf_roots(c):
+    # system_ctx: fs_area_roots is the server's own table of the area roots (no org_id / owner); reading the root ids grants nothing
     with system_ctx(c):
         return [r[0] for r in c.execute("SELECT node_id FROM fs_area_roots WHERE area=?", (LF_AREA,))]
 
@@ -779,6 +780,7 @@ def lf_tree_move():
         nid, pid = int(b.get("node_id")), int(b.get("parent_id"))
     except (TypeError, ValueError):
         return err(tr("Invalid value: {0}", "node_id"))
+    # system_ctx: the node may lie in another person's tree (shared folder); access is checked right below (404 / 403)
     with system_ctx(c):
         n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         nchain = fs_chain(c, nid) if n is not None else []
@@ -807,6 +809,7 @@ def lf_tree_move():
             c.execute("UPDATE fs_nodes SET parent_id=?, sort_no=NULL, updated_at=? WHERE id=?", (pid, _now(), nid))
             _log(c, nid, "move", str(pid))
     _after(c, uid, nid, ctx)
+    # system_ctx: the path runs through folders of the tree's owner that this person may not see by RLS (checked above)
     with system_ctx(c):
         path = lf_node_path(c, c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone())
     bump(c)

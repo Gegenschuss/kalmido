@@ -92,11 +92,12 @@ const span = (s, e) => `${ds(s)}..${ds(e)}`;
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();
 
-  // ================= the list setting: on by default in a project list, off in a plain list; off = nothing moves
+  // ================= the list setting: on by default in a project list and (2.352.0, #2752: every list is a project) in a
+  // list made without kind; off = nothing moves
   w = await boot({user: 'alice', hash: 'l/' + PLAIN}); d = w.document;
   await sleep(300);
   w.eval(`listModal(${PLAIN})`); await sleep(300);
-  check(lastModal(d)?.querySelector('#l-depshift') && !lastModal(d).querySelector('#l-depshift').checked, 'plain list: the setting is off');
+  check(lastModal(d)?.querySelector('#l-depshift') && lastModal(d).querySelector('#l-depshift').checked, 'a list without kind: the setting is on (2.352.0)');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + PRJ}); d = w.document;
   check(await until(() => bar(A)), 'timeline again');
