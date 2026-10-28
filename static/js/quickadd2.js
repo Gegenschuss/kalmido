@@ -46,7 +46,7 @@ function qa2_early(take, out, cur) {
         if (r.title || !(r.due || r.due_time) || r.repeat || r.list_id || r.priority || r.tags?.length || r.url) continue;
         const d = r.due || today(), hm = r.due_time || rat_allday();
         const at = `${d}T${hm}`;
-        take(new RegExp(qa2_re(k[0] + txt) + '(?=\\s)'), 'rem', () => { out.remind_at = at; return `${tr('Reminder')} ${dayLabel(d)} ${hm}`; });
+        take(new RegExp(qa2_re(k[0] + txt) + '(?=\\s)'), 'rem', () => { out.remind_at = at; return `${tr('Reminder')} ${dayLabel(d)} ${fmtTimeLoc(hm)}`; });
         break;
       }
     }

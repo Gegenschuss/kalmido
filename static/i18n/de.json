@@ -14632,5 +14632,11 @@
   "Inbox|folder": "Eingang",
   "Emails|folder": "E-Mails",
   "Kalmido-files|zip": "Kalmido-Dateien",
-  "Recognise files put into the folder “{0}” of the file store": "Dateien im Ordner „{0}“ der Ablage erkennen"
+  "Recognise files put into the folder “{0}” of the file store": "Dateien im Ordner „{0}“ der Ablage erkennen",
+  "Region and formats": "Region und Formate",
+  "First day of the week": "Erster Tag der Woche",
+  "Time format": "Uhrzeitformat",
+  "24 hours ({0})": "24 Stunden ({0})",
+  "12 hours ({0})": "12 Stunden ({0})",
+  "Automatic follows the language and the region of this browser.": "Automatisch richtet sich nach der Sprache und der Region dieses Browsers."
 }

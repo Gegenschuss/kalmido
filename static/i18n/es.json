@@ -14632,5 +14632,11 @@
   "Inbox|folder": "Entrada",
   "Emails|folder": "Correos",
   "Kalmido-files|zip": "Kalmido-archivos",
-  "Recognise files put into the folder “{0}” of the file store": "Reconocer los archivos colocados en la carpeta «{0}» del archivo"
+  "Recognise files put into the folder “{0}” of the file store": "Reconocer los archivos colocados en la carpeta «{0}» del archivo",
+  "Region and formats": "Región y formatos",
+  "First day of the week": "Primer día de la semana",
+  "Time format": "Formato de hora",
+  "24 hours ({0})": "24 horas ({0})",
+  "12 hours ({0})": "12 horas ({0})",
+  "Automatic follows the language and the region of this browser.": "Automático sigue el idioma y la región de este navegador."
 }

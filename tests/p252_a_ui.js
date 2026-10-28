@@ -206,7 +206,7 @@ const ALL = 'cal,events,comments';
     // hold 0.4 s, then drag: the block
     p = await at(e, W3, 13 * 60 + 7);
     await touch(p.x, p.y, 600, p.H * 1.5); await sleep(400);
-    check(await e(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && /13:00.14:30/.test(b.textContent); })()`), 'phone: hold and drag: a block "New event" 13:00-14:30');
+    check(await e(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && b.textContent.includes(fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:30')); })()`), 'phone: hold and drag: a block "New event" 13:00-14:30');
     check(await e(`(() => { const b = document.querySelector('#view .cgnew'); if (!b) return false; const r = b.getBoundingClientRect(), d = b.querySelector('.cgdet').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + .5 && d.height >= 43.5; })()`), 'phone: the block fits, "Details" is a 44 px target');
     await shot('p252a-390-new.png');
     await e(`(() => { const i = document.querySelector('#view .cgnew .cgin'); i.value = 'Call'; i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true})); return 1; })()`);

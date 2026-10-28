@@ -256,7 +256,7 @@ function apvJump(mid) {
   const n = $('#apv-' + mid); if (!n) { toast(tr('The question is further up: answer it here.')); return; }
   n.scrollIntoView({block: 'center', behavior: 'smooth'}); n.querySelector('.cchb')?.focus({preventScroll: true});
 }
-const chatHM = iso => { try { return new Date(iso).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}); } catch { return ''; } };
+const chatHM = iso => { const d = new Date(iso); return isNaN(+d) ? '' : fmtTimeAt(d); };  // 2.368.0 B (#2982): one locale source
 function chatChoiceSt(m) {
   const ch = m.choices; if (!ch) return null;
   if (m.choice) return 'answered';
@@ -599,7 +599,7 @@ const QUOTA_KEYS = {seven_day: N_('Week'), five_hour: N_('5 hours'), spend_limit
 // 2.80.0 (#1841): a further weekly window at 0 % that resets with the week tells nothing new -- left out of the list
 const quotaIdle = (q, w, i) => i !== q.main && w.key?.startsWith('seven_day_') && !(+w.percent) && !!w.resets_at
   && q.windows.some(o => o.key === 'seven_day' && o.resets_at === w.resets_at);
-const quotaWhen = iso => { const d = new Date(iso); return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'}); };
+const quotaWhen = iso => fmtStamp(new Date(iso));  // 2.368.0 B (#2982): one locale source
 const quotaPct = v => Math.round(+v || 0).toLocaleString(LOCALE()) + ' %';
 const quotaStale = q => q.stale || !q.at || Date.now() - new Date(q.at) > 864e5;
 function chatRingHtml(a) {
@@ -1268,10 +1268,10 @@ const audHtml = () => `<div class="shint">${tr('Every API request made with an a
     ${dateIn('aud-day', S.aud.day, {label: tr('Day'), empty: tr('All days'), max: today()})}</div>
   <div class="audtbl" id="s-aud" role="table" aria-label="${esc(tr('Activity log'))}"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 function audRow(r) {
-  const d = new Date(r.at), time = d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  const d = new Date(r.at), time = fmtTimeAt(d, true);
   const cls = r.denied ? 'den' : r.status >= 500 ? 'err' : r.status < 400 ? 'ok' : '';
   const ids = [r.task_id ? (r.task_title ? `#${r.task_id} ${r.task_title}` : tr('Task {0}', '#' + r.task_id)) : '', r.list_id ? (r.list_name ? tr('Project {0}', r.list_name) : tr('Project {0}', '#' + r.list_id)) : ''].filter(Boolean).join(' · ');
-  return `<div class="audr ${r.denied ? 'den' : ''}" role="row" data-audid="${r.id}"><span class="audt" role="cell" title="${esc(d.toLocaleString(LOCALE()))}">${esc(time)}${ds(d) === today() ? '' : `<small>${esc(shortDay(ds(d)))}</small>`}</span>
+  return `<div class="audr ${r.denied ? 'den' : ''}" role="row" data-audid="${r.id}"><span class="audt" role="cell" title="${esc(fmtStamp(d))}">${esc(time)}${ds(d) === today() ? '' : `<small>${esc(shortDay(ds(d)))}</small>`}</span>
     <span class="auda" role="cell">${esc(r.agent_name)}</span><span class="audrt" role="cell" title="${esc(r.method + ' ' + r.route)}"><b>${esc(r.method)}</b>${esc(r.route)}</span>
     <span class="auds" role="cell"><span class="audc ${cls}" ${r.denied ? `title="${esc(tr('Denied'))}"` : ''}>${r.status}</span></span><span class="audi" role="cell" ${ids ? `title="${esc(ids)}"` : ''}>${esc(ids || '–')}</span><span class="audd" role="cell">${esc(tr('{0} ms', r.ms))}</span></div>`;
 }

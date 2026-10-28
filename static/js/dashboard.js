@@ -337,7 +337,7 @@ function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
   const card = (body, more = '', n = '', title = tr(name)) => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
   // 2.45.0 (#1504): the list as a label after the title (not the basket), the date right: overdue = the day, else the time or the day
-  const hpDue = t => t.due < t0 ? dayLabel(t.due) : t.due_time || dayLabel(t.due);
+  const hpDue = t => t.due < t0 ? dayLabel(t.due) : fmtTimeLoc(t.due_time) || dayLabel(t.due);  // 2.368.0 B (#2982)
   const tasksList = (ts, n = 6) => ts.length ? `<ul class="dtl">${ts.slice(0, n).map(t => { const l = listById(t.list_id); return `<li><button type="button" class="chk p${t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="false" aria-label="${esc(tr('Complete: {0}', mdPlain(t.title)))}"></button><a href="#t/${t.id}" class="dtt">${mdTitleNL(t.title)}</a>${l && !l.is_inbox ? `<span class="hpll">${esc(lname(l))}</span>` : ''}${t.due ? `<span class="dt ${dueClass(t)}">${esc(hpDue(t))}</span>` : ''}</li>`; }).join('')}</ul>${ts.length > n ? `<p class="muted dmore">${tr('{0} more', ts.length - n)}</p>` : ''}` : '';
   // 2.45.0 (#1504): an empty card is one slim line ("Waiting for you: nothing"), still a named section
   const slim = (txt = tr('{0}: nothing', tr(name))) => `<section class="dcard dempty dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}"><span>${esc(txt)}</span></h3></section>`;

@@ -36,7 +36,7 @@ function shc_nice(lo, hi) {  // the axis: [min, max, step] with round steps, 0 a
   return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step, step];
 }
 function shc_num(v) {
-  try { return new Intl.NumberFormat(S.lang || undefined, {notation: 'compact', maximumFractionDigits: 1}).format(v); } catch (e) { return String(Math.round(v * 10) / 10); }
+  try { return new Intl.NumberFormat(LOCALE(), {notation: 'compact', maximumFractionDigits: 1}).format(v); } catch (e) { return String(Math.round(v * 10) / 10); }
 }
 function shc_cut(t, n) { return t.length > n ? t.slice(0, n - 1) + '…' : t; }
 function shc_svg(sh, ch, dt) {

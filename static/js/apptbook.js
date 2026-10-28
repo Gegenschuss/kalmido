@@ -22,7 +22,7 @@ async function apbOpen() {
 }
 function apbReload() { return apbLoad().then(apbDraw).catch(() => {}); }
 
-const apbWhen = iso => { const d = new Date(iso); return `${WDL[d.getDay()]}, ${d.toLocaleDateString(LOCALE())} ${d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'})}`; };
+const apbWhen = iso => { const d = new Date(iso); return `${WDL[d.getDay()]}, ${fmtStamp(d)}`; };
 // 2.94.1 (#1929): the app's own time picker (ux1: no native time inputs); the hidden input keeps data-apbhm
 const apbHM = (v, n) => timeIn('apb-hm-' + n, v || '', {label: n.endsWith('a') ? tr('From') : tr('To'), empty: '--:--', attrs: `data-apbhm="${n}"`});
 function apbDayHtml(d, rows) {

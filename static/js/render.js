@@ -32,7 +32,7 @@ function annSync() {
   const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
   if (!on) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
-  const until = a.ends_at ? tr('until {0}', new Date(a.ends_at).toLocaleString(I18N.code || 'en', {weekday: 'short', hour: '2-digit', minute: '2-digit'})) : '';
+  const until = a.ends_at ? tr('until {0}', ((d) => `${WD[d.getDay()]} ${fmtTimeAt(d)}`)(new Date(a.ends_at))) : '';
   const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
   bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
   if (bar.innerHTML !== html) bar.innerHTML = html;

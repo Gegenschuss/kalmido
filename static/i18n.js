@@ -16,7 +16,8 @@ const I18N_EN = {
   _months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
   _months_short: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   // near: 2-6 days ahead, short: this year, year: other year, long: calendar day view title
-  _date_formats: {near: '{wd}, {mon} {d}', short: '{wd}, {mon} {d}', year: '{wd}, {mon} {d}, {y}', long: '{wdl}, {month} {d}'},
+  // 2.368.0 B (#2982): British order like the locale en-GB ("Mon 26 Oct", not the US "Mon, Oct 26")
+  _date_formats: {near: '{wd} {d} {mon}', short: '{wd} {d} {mon}', year: '{wd} {d} {mon} {y}', long: '{wdl} {d} {month}'},
 };
 let I18N = {code: 'en', dict: {}};
 const I18N_PENDING = {};

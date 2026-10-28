@@ -494,7 +494,7 @@ const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('po
   payment: N_('payment recorded'), payment_delete: N_('payment reversed'), send: N_('sent by e-mail'), datev: N_('sent to the DATEV inbox'), undo: N_('import undone'), reminder_fee: N_('reminder fee waived / paid / open again / cancelled'), recovery_key: N_('recovery key shown'),
   agent_read: N_('read (agent)'), agent_write: N_('drafted (agent)'), from_sheet: N_('created from a table'), restore: N_('restored|office log')};  // 2.113.2 (#2253): + restore  // 2.89.0 (#1916, D): + from_sheet  // 2.51.0 A (#1348)  // 2.42.0 (#828): + recovery_key  // 2.39.1 (#1182): + undo; 2.40.0 (#1368): + reminder_fee
 const ofdActText = a => tr(OFD_ACTIONS[a] || a);
-const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
+const ofdWhen = iso => { const d = new Date(iso); return isNaN(+d) ? iso || '' : fmtStamp(d); };  // 2.368.0 B (#2982)
 function ofdLogHtml(d) {
   if (!OFD.open.log) return `<p class="muted">${tr('Open to load the history.')}</p>`;
   if (OFD.logFor !== d.id || !OFD.log) { setTimeout(() => ofdLoadLog(d.id), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }

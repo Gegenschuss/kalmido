@@ -38,7 +38,7 @@ const rsy_sideShr = () => S.settings?.side_share !== '0';
 // the live preview in Settings > Appearance (lookHtml): the meta line of preview row i under the chosen level
 function rsy_pv(i) {
   const m = i ? [['due', `<span class="dt">${ic('cal', 's')}${dayLabel(addDays(today(), 3))}</span>`], ['sub', `<span class="subc">${ic('sub', 's')}1/3</span>`], ['attach', `<span>${ic('clip', 's')}2</span>`], ['tracked', `<span class="tchip">${ic('clock', 's')}<b>0:45</b></span>`]]
-    : [['due', `<span class="dt today">${ic('cal', 's')}${tr('Today')} 09:30</span>`], ['remind', `<span>${ic('bell', 's')}</span>`], ['note', `<span>${ic('edit', 's')}</span>`], ['tags', `<span class="tag">#${tr('home')}</span>`]];
+    : [['due', `<span class="dt today">${ic('cal', 's')}${tr('Today')} ${fmtTimeLoc('09:30')}</span>`], ['remind', `<span>${ic('bell', 's')}</span>`], ['note', `<span>${ic('edit', 's')}</span>`], ['tags', `<span class="tag">#${tr('home')}</span>`]];
   return m.filter(([k]) => rsy_on(k)).map(([, h]) => h).join('');
 }
 

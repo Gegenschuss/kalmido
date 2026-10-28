@@ -14632,5 +14632,11 @@
   "Inbox|folder": "Inbox",
   "Emails|folder": "E-mails",
   "Kalmido-files|zip": "Kalmido-bestanden",
-  "Recognise files put into the folder “{0}” of the file store": "Bestanden in de map ‘{0}’ van de opslag herkennen"
+  "Recognise files put into the folder “{0}” of the file store": "Bestanden in de map ‘{0}’ van de opslag herkennen",
+  "Region and formats": "Regio en notaties",
+  "First day of the week": "Eerste dag van de week",
+  "Time format": "Tijdnotatie",
+  "24 hours ({0})": "24 uur ({0})",
+  "12 hours ({0})": "12 uur ({0})",
+  "Automatic follows the language and the region of this browser.": "Automatisch volgt de taal en de regio van deze browser."
 }
