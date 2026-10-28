@@ -78,6 +78,12 @@ check(Bo.get(B + "/api/office/settings").ok, "#3490: the office opens again")
 pages = Bo.get(B + "/api/wiki", params={"space": f"org:{ORG}"}).json().get("pages", [])
 check(any(p["id"] == PID for p in pages), "#3490: the page is still there (nothing deleted)")
 check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": "time,reading"}).json().get("areas_off") == ["time", "reading"], "#3490: csv is taken too")
+# the file store: only its own views are locked (the office keeps its files), the documents' parameter is "ws"
+A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["ablage"]})
+check(Bo.get(B + "/api/files", params={"space": f"org:{ORG}"}).status_code == 403, "#3490: file store off: its view of the organisation 403")
+check(Bo.get(B + "/api/docs", params={"ws": f"org:{ORG}"}).status_code == 403, "#3490: ... the documents of the organisation (ws) 403")
+check(Bo.get(B + "/api/docs", params={"ws": "private"}).status_code != 403, "#3490: ... his private documents stay open while the organisation is the workspace")
+check(Bo.get(B + "/api/office/settings").ok, "#3490: ... the office (which keeps its files there) stays open")
 A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": []})
 
 # ================================================================== the own choice per workspace (setting ws_areas_off)
