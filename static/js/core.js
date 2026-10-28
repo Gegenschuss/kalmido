@@ -133,10 +133,10 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   wiki: N_('Pages in Markdown for processes, checklists and know-how of your organisation (or only for you), with links between them and to tasks'),  // 2.49.0 (#1199)
   sheets: N_('Simple tables with formulas like a spreadsheet; every cell can fetch figures from Kalmido (hours booked, budget, open tasks), for quotations, budgets and lists'),  // 2.89.0 (#1916)
   progress: N_('Progress bar in the project header and the project status (“Where is it stuck?”); with collaboration also a status per project')};
-// 2.409.0 (#3490): + the areas switched off in the shown workspace (areas.js wsa_featOff; the module switch stays the main switch)
 // 2.364.0 B (#3018): a person without an organisation reads no "only within your organisation" (their clients are their own)
 const FEAT_DESC_SOLO = {clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month')};
-const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
+// 2.409.0 (#3490): + the areas switched off in the shown workspace (areas.js wsa_featOff; the module switch stays the main switch)
+const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f) && !(typeof wsa_featOff === 'function' && wsa_featOff(f));
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
 // sharing / assigning in the UI (data stays; with the server switch off the API refuses them too)
 const collab = () => feat('collab') && S.collabAll !== false;
