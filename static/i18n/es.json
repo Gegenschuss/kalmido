@@ -14770,6 +14770,9 @@
   "Diagram": "Diagrama",
   "The diagram could not be drawn": "No se pudo dibujar el diagrama",
   "The formula could not be drawn": "No se pudo componer la fórmula",
+  "Logo size": "Tamaño del logotipo",
+  "Logo position": "Posición del logotipo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado.",
   "Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Cada lista de tareas es un proyecto con página de proyecto, progreso y dependencias. Dale un estado para seguirlo en la página de inicio y en «¿Dónde está bloqueado?»; borra el estado para dejar de seguirlo. Menú del proyecto … (u Ordenar) > Mostrar completadas al final: lo que marcas sigue visible al final y vuelve con un toque, por ejemplo en listas de la compra.",
   "What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Lo que marcas sigue visible al final y vuelve con un toque, por ejemplo en listas de la compra.",
   "Sum of the subtasks": "Suma de las subtareas",
@@ -14795,8 +14798,5 @@
   "Ordered (stages): show as a stage bar": "Ordenado (etapas): mostrar como barra de etapas",
   "Kind of the option": "Tipo de opción",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un estado especial (p. ej. Aparcado) no es una etapa propia: la barra lo muestra con su color en la etapa siguiente.",
-  "Unknown signal colour": "Color de señal desconocido",
-  "Logo size": "Tamaño del logotipo",
-  "Logo position": "Posición del logotipo",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Para todos los documentos de oficina creados a partir de ahora. Sin efecto si tu propio papel con membrete oculta nuestro encabezado."
+  "Unknown signal colour": "Color de señal desconocido"
 }

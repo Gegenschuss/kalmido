@@ -14770,6 +14770,9 @@
   "Diagram": "Diagram",
   "The diagram could not be drawn": "Het diagram kon niet worden getekend",
   "The formula could not be drawn": "De formule kon niet worden gezet",
+  "Logo size": "Logogrootte",
+  "Logo position": "Logopositie",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat.",
   "Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Elke takenlijst is een project met een projectpagina, voortgang en afhankelijkheden. Geef het een status om het te volgen op de startpagina en in ‘Waar zit het vast?’; wis de status om het niet meer te volgen. Projectmenu … (of Sorteren) > Voltooide onderaan tonen: wat je afvinkt, blijft onderaan zichtbaar en komt met één tik terug, bijvoorbeeld in boodschappenlijsten.",
   "What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Wat je afvinkt, blijft onderaan zichtbaar en komt met één tik terug, bijvoorbeeld in boodschappenlijsten.",
   "Sum of the subtasks": "Som van de subtaken",
@@ -14795,8 +14798,5 @@
   "Ordered (stages): show as a stage bar": "Geordend (fasen): als fasebalk tonen",
   "Kind of the option": "Soort optie",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Een speciale status (bijv. Geparkeerd) is geen eigen fase: de balk toont hem in zijn kleur bij de volgende fase.",
-  "Unknown signal colour": "Onbekende signaalkleur",
-  "Logo size": "Logogrootte",
-  "Logo position": "Logopositie",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat."
+  "Unknown signal colour": "Onbekende signaalkleur"
 }

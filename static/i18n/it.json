@@ -14770,6 +14770,9 @@
   "Diagram": "Diagramma",
   "The diagram could not be drawn": "Impossibile disegnare il diagramma",
   "The formula could not be drawn": "Impossibile comporre la formula",
+  "Logo size": "Dimensione del logo",
+  "Logo position": "Posizione del logo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Per tutti i documenti d’ufficio creati da ora in poi. Nessun effetto se la tua carta intestata nasconde la nostra intestazione.",
   "Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Ogni lista di attività è un progetto con pagina del progetto, avanzamento e dipendenze. Assegnagli uno stato per seguirlo nella pagina iniziale e in «Dove si blocca?»; cancella lo stato per smettere di seguirlo. Menu progetto … (o Ordina) > Mostra le completate in fondo: ciò che spunti resta visibile in fondo e torna con un tocco, per esempio nelle liste della spesa.",
   "What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Ciò che spunti resta visibile in fondo e torna con un tocco, per esempio nelle liste della spesa.",
   "Sum of the subtasks": "Somma delle sottoattività",
@@ -14795,8 +14798,5 @@
   "Ordered (stages): show as a stage bar": "Ordinato (fasi): mostra come barra delle fasi",
   "Kind of the option": "Tipo di opzione",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Uno stato speciale (es. In sospeso) non è una fase a sé: la barra lo mostra con il suo colore sulla fase successiva.",
-  "Unknown signal colour": "Colore di segnalazione sconosciuto",
-  "Logo size": "Dimensione del logo",
-  "Logo position": "Posizione del logo",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Per tutti i documenti d’ufficio creati da ora in poi. Nessun effetto se la tua carta intestata nasconde la nostra intestazione."
+  "Unknown signal colour": "Colore di segnalazione sconosciuto"
 }

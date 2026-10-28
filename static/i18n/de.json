@@ -14770,6 +14770,9 @@
   "Diagram": "Diagramm",
   "The diagram could not be drawn": "Das Diagramm ließ sich nicht zeichnen",
   "The formula could not be drawn": "Die Formel ließ sich nicht setzen",
+  "Logo size": "Logo-Größe",
+  "Logo position": "Logo-Position",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet.",
   "Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Jede Aufgabenliste ist ein Projekt mit Projektseite, Fortschritt und Abhängigkeiten. Gib ihm einen Status, um es auf der Startseite und in „Wo hakt es?“ zu verfolgen; Status leeren beendet das Verfolgen. Projektmenü … (oder Sortieren) > Erledigte unten zeigen: Abgehaktes bleibt unten sichtbar und kommt mit einem Tipp zurück, zum Beispiel in Einkaufslisten.",
   "What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Abgehaktes bleibt unten sichtbar und kommt mit einem Tipp zurück, zum Beispiel in Einkaufslisten.",
   "Sum of the subtasks": "Summe der Unteraufgaben",
@@ -14795,8 +14798,5 @@
   "Ordered (stages): show as a stage bar": "Geordnet (Stufen): als Stufenleiste zeigen",
   "Kind of the option": "Art der Option",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Ein Sonderzustand (z. B. Geparkt) ist keine eigene Stufe: die Leiste zeigt ihn in seiner Farbe an der nächsten Stufe.",
-  "Unknown signal colour": "Unbekannte Signalfarbe",
-  "Logo size": "Logo-Größe",
-  "Logo position": "Logo-Position",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet."
+  "Unknown signal colour": "Unbekannte Signalfarbe"
 }

@@ -14770,6 +14770,9 @@
   "Diagram": "Diagramme",
   "The diagram could not be drawn": "Impossible de dessiner le diagramme",
   "The formula could not be drawn": "Impossible d’afficher la formule",
+  "Logo size": "Taille du logo",
+  "Logo position": "Position du logo",
+  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Pour tous les documents de bureau créés à partir de maintenant. Sans effet si ton propre papier à en-tête masque notre en-tête.",
   "Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Chaque liste de tâches est un projet avec une page de projet, un avancement et des dépendances. Donnez-lui un statut pour le suivre sur la page d’accueil et dans « Où ça bloque ? » ; effacez le statut pour ne plus le suivre. Menu du projet … (ou Trier) > Afficher les terminées en bas : ce que vous cochez reste visible en bas et revient d'un simple toucher, par exemple dans les listes de courses.",
   "What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.": "Ce que vous cochez reste visible en bas et revient d'un simple toucher, par exemple dans les listes de courses.",
   "Sum of the subtasks": "Somme des sous-tâches",
@@ -14795,8 +14798,5 @@
   "Ordered (stages): show as a stage bar": "Ordonné (étapes) : afficher en barre d’étapes",
   "Kind of the option": "Type de l’option",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un état spécial (p. ex. En attente) n’est pas une étape : la barre l’affiche dans sa couleur sur l’étape suivante.",
-  "Unknown signal colour": "Couleur de signal inconnue",
-  "Logo size": "Taille du logo",
-  "Logo position": "Position du logo",
-  "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Pour tous les documents de bureau créés à partir de maintenant. Sans effet si ton propre papier à en-tête masque notre en-tête."
+  "Unknown signal colour": "Couleur de signal inconnue"
 }
