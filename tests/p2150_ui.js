@@ -202,7 +202,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]}]});
     await cmd('input.releaseActions', {context: ctx});
   };
-  const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`;
+  const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({block: 'center', behavior: 'instant'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`;
   for (const [vw, vh, touch, th] of [[390, 844, true, 'dark'], [1440, 900, false, 'light']]) await firefox(async o => {
     const {cmd, ev, ctx, nav, shot} = o, tag = String(vw);
     check(await ffLogin(o, th) === 200, tag + ': login');
@@ -223,13 +223,16 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     const before = await ev(`document.querySelector('.modal:last-of-type [data-scope="export"]')?.checked ?? [...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`);
     // 2.364.0 C: the permission of the dialog on top (the settings dialog behind can hold scope boxes too), scrolled into view
     const q = await ev(`(() => { const e = [...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]'); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
-    const q2 = await ev(`(() => { const m = [...document.querySelectorAll('.modal')].pop(), l = m.querySelector('[data-scope="export"]').closest('label'), r = l.getBoundingClientRect(); return {x: r.left + r.width * .7, y: r.top + r.height / 2}; })()`);
+    // 2.358.0 (#3286): scroll the label of the LAST dialog itself into view (instant) and take its point only once it lies in the
+    // viewport and stands still (Vorprüfung red under load: "move target (257, 1192) out of bounds" of the 390 x 844 phone)
+    const PT2 = `(() => { const m = [...document.querySelectorAll('.modal')].pop(), l = m.querySelector('[data-scope="export"]').closest('label'); l.scrollIntoView({block: 'center', behavior: 'instant'}); const r = l.getBoundingClientRect(), p = {x: r.left + r.width * .7, y: r.top + r.height / 2}; const ok = p.y > 0 && p.y < innerHeight && p.x > 0 && p.x < innerWidth && window.__pt2 === p.x + ',' + p.y; window.__pt2 = p.x + ',' + p.y; return ok ? p : null; })()`;
+    const q2 = await until(() => ev(PT2).catch(() => null)) || await ev(PT2.replace('return ok ? p : null', 'return p'));
     if (touch) await tap(o, q2.x, q2.y); else await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(q2.x), y: Math.round(q2.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
     await until(async () => await ev(`[...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`) !== before);  // 2.308.0 (#3252): wait for the toggle instead of a fixed time
     const after = await ev(`[...document.querySelectorAll('.modal')].pop().querySelector('[data-scope="export"]').checked`);
     check(q && after === !before, `${tag}: ${touch ? 'a tap' : 'a click'} on the label toggles the permission`);
     // the (i) of the legend: one permission per line, inside the viewport
-    const ib = await ev(`(() => { const b = [...document.querySelectorAll('.modal')].pop().querySelector('.scopes legend .ib'); b.scrollIntoView({block: 'center'}); const r = b.getBoundingClientRect(); const a = parseFloat(getComputedStyle(b, '::after').top) || 0; return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width - 2 * a, h: r.height - 2 * a}; })()`);
+    const ib = await ev(`(() => { const b = [...document.querySelectorAll('.modal')].pop().querySelector('.scopes legend .ib'); b.scrollIntoView({block: 'center', behavior: 'instant'}); const r = b.getBoundingClientRect(); const a = parseFloat(getComputedStyle(b, '::after').top) || 0; return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width - 2 * a, h: r.height - 2 * a}; })()`);
     if (touch) await tap(o, ib.x, ib.y); else await ev(`(() => { [...document.querySelectorAll('.modal')].pop().querySelector('.scopes legend .ib').click(); return 1; })()`);
     await until(() => ev(`!!document.querySelector('#iitip:not(.hidden)')`).catch(() => false));  // 2.308.0 (#3252): wait for the tip instead of a fixed time
     const tip = await ev(`(() => { const t = document.querySelector('#iitip'); if (!t || t.classList.contains('hidden')) return null; const r = t.getBoundingClientRect(); return {ws: getComputedStyle(t).whiteSpace, l: r.left, r: innerWidth - r.right, top: r.top, b: innerHeight - r.bottom, lines: Math.round(r.height / parseFloat(getComputedStyle(t).lineHeight))}; })()`);

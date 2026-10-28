@@ -232,8 +232,8 @@ const V = B + 'api/v1';
     await o.nav(B + '#today'); await ready(ev);
     check(await ev(`!!document.querySelector('#kbar .kbsw')`), `${tag}: #935 the switch in the head bar`);  // 2.152.3 (#2619): the switch moved from the panel into the head bar
     await shot(`p2280-${th}-1440-today-all.png`);
-    await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`); await sleep(700);
-    check(await ev(`!!document.querySelector('#kbar .kbsw .wsn') && getComputedStyle(document.querySelector('#kbar .kbsw .wsn')).display !== 'none' && !document.querySelector('#top .wschip')`), `${tag}: #935 the workspace named in the head bar`);  // 2.152.3 (#2619): the header chip became the head bar's switch
+    await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`);
+    check(await until(() => ev(`!!document.querySelector('#kbar .kbsw .wsn') && getComputedStyle(document.querySelector('#kbar .kbsw .wsn')).display !== 'none' && !document.querySelector('#top .wschip')`).catch(() => false)), `${tag}: #935 the workspace named in the head bar`);  // 2.152.3 (#2619): the header chip became the head bar's switch
     await shot(`p2280-${th}-1440-today-org.png`);
     // #976: a REAL right-click on the list row right next to the sidebar grip
     const geo = await ev(`(() => { const r = document.querySelector('#side .srow[data-list="${W1}"]').getBoundingClientRect(), g = document.querySelector('#pgrip-side'); const gr = g ? g.getBoundingClientRect() : null; return {x: Math.round(r.right - 14), y: Math.round(r.top + r.height / 2), grip: gr ? [Math.round(gr.left), Math.round(gr.right)] : null}; })()`);
