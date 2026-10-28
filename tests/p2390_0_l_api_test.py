@@ -103,7 +103,8 @@ check(Fr.patch(B + f"/api/lists/{Q}", json={"ticket_key": "WEB"}).ok, "#3353: WE
 AL = A.post(B + "/api/lists", json={"name": "Shared one", "kind": "project"}).json()["id"]
 check(A.put(B + f"/api/lists/{AL}/members", json={"user_id": FID, "role": "edit"}).ok, "setup: shared with the freelancer (edit)")
 check(Fr.patch(B + f"/api/lists/{AL}", json={"ticket_key": "SHR"}).status_code == 403, "#3353: a member (edit) cannot set the key: 403")
-check(requests.patch(V + f"/lists/{P}", headers=FH, json={"ticket_key": "APP"}).ok, "#3353: API v1 PATCH accepts ticket_key (unchanged)")
+r = requests.patch(V + f"/lists/{P}", headers=tok(Fr, ("read", "structure")), json={"ticket_key": "APP"})
+check(r.ok and r.json().get("ticket_key") == "APP", "#3353: API v1 PATCH accepts ticket_key (unchanged) " + r.text[:160])
 
 # moves and aliases
 check(Fr.patch(B + f"/api/tasks/{T[1]}", json={"list_id": Q}).ok, "setup: APP-2 moved to Website")

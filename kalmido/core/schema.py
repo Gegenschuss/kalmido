@@ -3969,10 +3969,11 @@ CREATE INDEX IF NOT EXISTS hub_mails_org ON hub_mails(org_id) WHERE org_id IS NO
 -- 2.209.0 C (#2589): the documents whose split preview waits for the queue's page scan (the idle look stays an index read)
 CREATE INDEX IF NOT EXISTS doc_meta_split_wait ON doc_meta(node_id) WHERE split_scan ILIKE '%"state":"scan"%';
 -- 2.390.0 (#3353): ticket keys. A key is unique per workspace (organisation, else the owner's private one, a list in the
--- trash keeps its key). list_ticket_seq = the last number given per project (its own table, so a new task does not touch
+-- trash keeps its key), checked where a key is set (tasks/ticketkey.py tk_set), not by the index: a project that moves to
+-- another workspace never fails on it (the lookup then takes the first one the reader sees). list_ticket_seq = the last number given per project (its own table, so a new task does not touch
 -- the lists row), task_keys = the keys a task had before (moved out of the project, the project's key changed), so old
 -- commits, links and "APP-12" in texts still find it. New tables + indexes only: older versions ignore them
-CREATE UNIQUE INDEX IF NOT EXISTS lists_ticket_key ON lists(COALESCE(org_id, -owner_id), ticket_key) WHERE ticket_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS lists_ticket_key ON lists(ticket_key) WHERE ticket_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS tasks_ticket_no ON tasks(list_id, ticket_no) WHERE ticket_no IS NOT NULL;
 CREATE TABLE IF NOT EXISTS list_ticket_seq (
   list_id BIGINT PRIMARY KEY REFERENCES lists(id) ON DELETE CASCADE, seq BIGINT NOT NULL DEFAULT 0);
