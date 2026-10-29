@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import uuid
+from datetime import timedelta
 
 from flask import jsonify
 
@@ -719,6 +720,24 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
     return cmap, kmap
 
 
+OFM_RECOPY_S = 600  # 2.407.0 (#3396 review): a copy into the same workspace within this time = the race, not a wish
+
+
+def ofm_copied_already(c, what, rows, to):
+    """2.407.0 (#3396 #3397): a row a copy move into the same workspace archived a moment ago (a "src" row of a move not
+    undone) is not copied a second time - a parallel request that reads only after the first one's commit sees the same rows
+    before and after the lock. An older copy (weeks ago) or one into another workspace stays possible."""
+    t = "clients" if what == "clients" else OFM_TABLE.get(what)
+    since = iso(now_utc() - timedelta(seconds=OFM_RECOPY_S))
+    for r in rows:
+        if t and dict(r).get("archived") and c.execute(
+                "SELECT 1 FROM space_moves WHERE kind=? AND to_org IS NOT DISTINCT FROM ? AND at>=? AND (detail::jsonb->'rows') @> ?::jsonb "
+                "AND COALESCE(detail::jsonb->>'undone', '')='' LIMIT 1",
+                (f"office_{what}", to, since, json.dumps([{"t": t, "id": r["id"], "src": 1}]))).fetchone():
+            return True
+    return False
+
+
 @app.post("/api/office/move-space")
 def ofm_move_space():
     smv_refuse_agent()
@@ -742,6 +761,8 @@ def ofm_move_space():
             raise Denied(409, tr("Changed in the meantime"))
     frm_ws = ofm_ws(c, src)
     to = smv_target(c, uid, b.get("to"))
+    if not b.get("dry") and ofm_copied_already(c, what, rows, to):  # 2.407.0 (#3396): still under the lock
+        raise Denied(409, tr("Changed in the meantime"))
     smv_same(frm_ws, to)
     if what == "office" and to is not None:  # 2.356.0 A (#2926)
         raise BadInput(tr(OFM_OFFICE_TO))

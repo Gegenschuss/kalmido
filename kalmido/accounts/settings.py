@@ -61,6 +61,7 @@ SETTINGS_FLAGS += ("cal_holidays", "cal_abs", "cal_abs_team")  # 2.155.0 B (#207
 SETTINGS_FLAGS += ("chat_kbd_agent", "chat_kbd_team")  # 2.235.0 D (#2899): close the phone keyboard after sending (agent chat / team chat)
 SETTINGS_FLAGS += ("office_ws_hint",)  # 2.356.0 B (#2932): the hint "which office is this" was shown once (static/js/office.js)
 SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo players without asking (static/js/videorev.js)
+SETTINGS_FLAGS += ("agent_quota_show",)  # 2.407.0 B (#3493): the usage ring in the agent chat header (0 = only in the ⋯ menu)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)

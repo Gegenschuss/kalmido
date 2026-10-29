@@ -619,6 +619,7 @@ function renderDetail0() {
       ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
+      ${t.working ? `<div class="dagw">${agwChip(t)}</div>` : ''}${''/* 2.407.0 A (#3513): an agent works on it */}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}

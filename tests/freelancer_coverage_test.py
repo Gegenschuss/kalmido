@@ -759,6 +759,9 @@ ROUTES = {
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
     "POST /api/lists/{}/move-space": "lists",  # 2.401.0 (#2924): p2401_a_api_test.py (409 without an organisation: no other workspace)
+    # 2.407.0 A (#3513): "agent is working" on a task (p2407_a_api_test.py: the own agent of a person without an organisation)
+    "GET /api/v1/tasks/{}/working": "agents", "POST /api/v1/tasks/{}/working": "agents",
+    "PATCH /api/v1/tasks/{}/working": "agents", "DELETE /api/v1/tasks/{}/working": "agents",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",

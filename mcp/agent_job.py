@@ -529,7 +529,10 @@ def cmd_progress(argv):
     text = " ".join(redact(" ".join(argv[1:])).split())[:300]
     line = f"{time.strftime('%H:%M')} {text}"
     api = Api()
-    api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": line})
+    # 2.407.0 (#3513): a job for a task: the line goes there as "working" (the dot at the task, live in the app); an older
+    # server, a task without write access or a job that is not running: the plain log line as before
+    if not (j.get("task") and api.soft("PATCH", f"/tasks/{int(j['task'])}/working", {"text": line, "job_id": int(j["id"])})):
+        api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": line})
     with open(os.path.join(job_dir(j["id"]), "progress.log"), "a", encoding="utf-8") as f:
         f.write(line + "\n")
     print("ok")
