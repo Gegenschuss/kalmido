@@ -64,6 +64,7 @@ SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo pla
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
+DETAIL_FOLD_KEYS = ("subtasks", "deps", "links", "attachments", "video", "tags", "custom", "time", "comments")  # 2.380 F (#3435): detail.js DFOLD_KEYS
 SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
@@ -80,6 +81,11 @@ def clean_setting(k, v):
     if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
+    if k == "detail_fold":  # 2.380 F (#3435): "subtasks,tags,..." -- known keys only, each once
+        ks = [x for x in sv.split(",") if x]
+        if len(sv) > 200 or any(x not in DETAIL_FOLD_KEYS for x in ks):
+            raise bad
+        return ",".join(dict.fromkeys(ks))
     if k == "allday_time":
         if not valid_hm(sv):
             raise bad
