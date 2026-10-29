@@ -71,8 +71,10 @@ function shareHtml(hint) {
 // 2.1.0 (#317): Settings > Notifications: one matrix, events x News (the bell) / Push. The server decides (notif_ok) with
 // the same rules; this mirrors them for the checkboxes. News of the events older than 2.1.0 lives in news_kinds, the rest
 // (every push, News of reply / follow / new tasks / approvals / follow-ups) in the setting "notify" (json).
+// #1786: the order of the server's NEWS_GROUPS - the server stores news_kinds in that order (partial matrix change), a
+// different order here made the local value differ from the synced one and Undo saw "changed elsewhere" (p210_ui)
 const NEWS_KINDS = [['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['comment', N_('Comments on my tasks')],
-  ['unblock', N_('A task blocking mine was completed')], ['share', N_('Projects shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
+  ['complete', N_('Others completed my tasks')], ['unblock', N_('A task blocking mine was completed')], ['share', N_('Projects shared with me')], ['status', N_('Project status changes')]];
 // one checkbox -> the two stored values {notify, news_kinds}
 function notifPatch(s, row, ch, on) {
   const o = nmStored(s);
