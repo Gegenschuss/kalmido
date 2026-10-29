@@ -94,6 +94,7 @@ SPECIAL_ROUTES = {
     # release: finalise, take back, send (mail, e-invoice network, the DATEV inbox counts as export), make a series' invoice now
     "POST /api/office/docs/<int:did>/finalize": "release", "POST /api/office/docs/<int:did>/unlock": "release",
     "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
+    "GET /api/office/docs/<int:did>/recipients": "release",  # 2.433.0 (#3599): the send dialog's addresses (the e-mail for invoices)
     "POST /api/office/series/<int:sid>/run": "release",
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books
     "POST /api/office/docs/<int:did>/payments": "pay", "DELETE /api/office/docs/<int:did>/payments/<int:pid>": "pay",

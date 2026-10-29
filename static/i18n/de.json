@@ -15152,5 +15152,7 @@
   "Invoice corrections count in the invoice series": "Rechnungskorrekturen zählen in der Rechnungsreihe mit",
   "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "An: Eine Korrektur bekommt die nächste Nummer aus dem Rechnungszähler (z. B. 423_R, 424_RK, 425_R) und behält ihr eigenes Schema. Aus: Korrekturen haben einen eigenen Zähler. Schon vergebene Nummern bleiben.",
   "Counts with the invoice numbers": "Zählt mit den Rechnungsnummern",
-  "Invoice corrections count with the invoice numbers; set the next number there": "Rechnungskorrekturen zählen mit den Rechnungsnummern; die nächste Nummer stellst du dort ein"
+  "Invoice corrections count with the invoice numbers; set the next number there": "Rechnungskorrekturen zählen mit den Rechnungsnummern; die nächste Nummer stellst du dort ein",
+  "Gets invoices": "Bekommt Rechnungen",
+  "several: separated by commas": "mehrere: mit Komma getrennt"
 }

@@ -1131,6 +1131,9 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
+INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail
+
+
 def inv_send(c, oid, uid, r, b, later=False):
     """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
     sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
@@ -1147,8 +1150,11 @@ def inv_send(c, oid, uid, r, b, later=False):
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
-    if not re.fullmatch(mail_re, to) or (cc and not re.fullmatch(mail_re, cc)):
+    # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
+    ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
+    if not re.fullmatch(mail_re, to) or len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
         raise BadInput(tr("Invalid value: {0}", "to"))
+    cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
@@ -1167,7 +1173,7 @@ def inv_send(c, oid, uid, r, b, later=False):
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
     if own:
         inv_own_text_quota(c, oid, uid)
-    h6c_send_budget(c, oid, uid, [to] + ([cc] if cc else []))  # 2.86.0 (N27)
+    h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     sheet = []
@@ -1589,6 +1595,18 @@ def inv_pay_del(c, oid, did, pid, note="", uid=None):
     # a bank booking matched by this payment is open again
     c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL "
               "WHERE org_id=? AND payment_id=?", (oid, pid))
+
+
+@app.get("/api/office/docs/<int:did>/recipients")
+def inv_recipients_get(did):
+    """2.433.0 (#3599): the addresses the send dialog of document did starts with ({to, cc: [...]}, contacts_cl.fk_send_rcpts):
+    invoices / corrections / reminders to the e-mail for invoices with the contact persons for invoices in copy,
+    quotations to the default contact person with the e-mail for invoices in copy."""
+    from .contacts_cl import fk_send_rcpts
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    return jsonify(fk_send_rcpts(c, r["client_id"], oid, r["kind"]))
 
 
 @app.post("/api/office/docs/<int:did>/send")

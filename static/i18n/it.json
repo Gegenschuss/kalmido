@@ -15152,5 +15152,7 @@
   "Invoice corrections count in the invoice series": "Le fatture di rettifica contano nella serie delle fatture",
   "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "Attivo: una rettifica prende il numero successivo del contatore delle fatture (ad es. 423_R, 424_RK, 425_R) e mantiene il proprio schema. Disattivo: le rettifiche hanno un contatore proprio. I numeri già assegnati restano.",
   "Counts with the invoice numbers": "Conta con i numeri delle fatture",
-  "Invoice corrections count with the invoice numbers; set the next number there": "Le rettifiche contano con i numeri delle fatture; imposta lì il numero successivo"
+  "Invoice corrections count with the invoice numbers; set the next number there": "Le rettifiche contano con i numeri delle fatture; imposta lì il numero successivo",
+  "Gets invoices": "Riceve le fatture",
+  "several: separated by commas": "più indirizzi: separati da virgole"
 }
