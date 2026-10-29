@@ -138,7 +138,7 @@ if r.status_code == 201:
     FAG, FH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
     check(F.patch(B + f"{O}/agents/{FAG}", json={"office_drafts": True}).ok and F.put(B + O + "/settings", json={"agents_read": 1}).ok,
           "setup: both office switches of the personal office")
-    r = requests.post(B + "/api/v1/office/offers", headers=FH, json={"title": "Zeile eins\r\nZeile zwei\rZeile drei", "items": [{"title": "Schnitt", "qty": 1, "rate": 300}]})
+    r = requests.post(B + "/api/v1/office/offers", headers=FH, json={"title": "Zeile eins\r\nZeile zwei\rZeile drei", "items": [{"text": "Schnitt", "qty": 1, "unit": "flat", "price": 300}]})
     check(r.status_code == 201, "#3594: the agent's quotation draft " + r.text[:200])
     did = (r.json().get("doc") or {}).get("id") if r.status_code == 201 else None
     pt = F.get(B + f"{D}/{did}").json().get("project_title") if did else None
