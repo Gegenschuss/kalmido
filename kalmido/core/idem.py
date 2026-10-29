@@ -23,6 +23,7 @@ from .db import connect, db, iso, now_utc
 
 IDEM_HEADER = "Idempotency-Key"
 IDEM_DAYS = 14  # 2.380 H (#3387): as long as the offline queue lives (a change sent after days is no false conflict)
+IDEM_MAX_KEYS = 5000  # 2.380 (#3387 review): kept keys per person; the oldest beyond go (14 days must not mean unbounded)
 IDEM_MAX_BODY = 256 * 1024  # bytes of a stored answer; a larger one is replayed as {"ok": true}
 IDEM_WAIT = 3.0  # s: a repeat that arrives while the first request is still running waits this long for its answer
 _IDEM_KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")
@@ -53,6 +54,8 @@ def idem_claim():
         return None
     c, uid, ts = db(), g.user["id"], now_utc()
     c.execute("DELETE FROM idem_keys WHERE user_id=? AND created_at<?", (uid, iso(ts - timedelta(days=IDEM_DAYS))))
+    c.execute("DELETE FROM idem_keys WHERE user_id=? AND k IN (SELECT k FROM idem_keys WHERE user_id=? ORDER BY created_at DESC OFFSET ?)",
+              (uid, uid, IDEM_MAX_KEYS))
     # a second request with the same key waits here until the first one commits or rolls back (the row's lock)
     if c.execute("INSERT INTO idem_keys(user_id, k, method, path, created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING RETURNING k",
                  (uid, k, request.method, request.path, iso(ts))).fetchone():

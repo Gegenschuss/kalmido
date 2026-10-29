@@ -187,6 +187,14 @@ r = A.patch(B + f"/api/tasks/{T}", json={"title": "Eins"}, headers=K1)
 check(r.ok and r.headers.get("Idempotent-Replayed") == "true", f"#3387: the change sent again after 10 days gets its answer back "
       f"({r.status_code} {r.headers.get('Idempotent-Replayed')})")
 check(A.get(B + f"/api/tasks/{T}").json().get("title") == "Zwei", "#3387: and changes nothing a second time")
+# 2.380 review: the keys of one person are capped (IDEM_MAX_KEYS 5000), the oldest go first
+dbx("INSERT INTO idem_keys(user_id,k,method,path,status,body,created_at) SELECT ?, 'p2380h-f' || g, 'PATCH', '/x', 200, '{}', ? "
+    "FROM generate_series(1, 5000) g", (ALICE, iso_s(tnow() - timedelta(days=1))))
+r = A.patch(B + f"/api/tasks/{T}", json={"title": "Zwei"}, headers={"Idempotency-Key": "p2380h-k3"})
+check(r.ok and one("SELECT COUNT(*) FROM idem_keys WHERE user_id=?", (ALICE,)) == 5000
+      and one("SELECT COUNT(*) FROM idem_keys WHERE user_id=? AND k='p2380h-k1'", (ALICE,)) == 0
+      and one("SELECT COUNT(*) FROM idem_keys WHERE user_id=? AND k='p2380h-k3'", (ALICE,)) == 1,
+      "#3387 review: at most 5000 keys per person, the oldest went, the new one stays")
 
 # ================================================================== #3392: the guest list of an event
 CAL = A.post(B + "/api/evcals", json={"name": "Alice Termine", "org_id": None}).json()["id"]
@@ -245,7 +253,7 @@ IMG = upload(Fr, "plan.png", PNG, "image/png", space="private")
 TXT = upload(Fr, "notiz.txt", b"geheime Notiz", "text/plain", space="private")
 IMG2 = upload(Fr, "anderes.png", png(3, 3), "image/png", space="private")
 r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": "Kunde Y/Plan",
-                                         "body": f"# Plan\n\n![Der Plan](/api/files/nodes/{IMG}/content)\n\n![Notiz](/api/files/nodes/{TXT}/content)\n"})
+                                         "body": f"# Plan\n\n![Der Plan](/api/files/nodes/{IMG}/content)\n\n![Notiz](/api/files/nodes/{TXT}/content)\n\n```\n![Code](/api/files/nodes/{IMG2}/content)\n```\n\n`![Inline](/api/files/nodes/{IMG2}/content)`\n"})
 assert r.status_code == 201, r.text
 PID = r.json()["id"]
 check(Fr.post(B + "/api/wiki/shares", json={"page_id": PID, "kind": "link", "images": "ja"}).status_code == 400, "#2356: images not a boolean = 400")
@@ -265,7 +273,7 @@ q = requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG}")
 check(q.ok and q.content == PNG and q.headers.get("Content-Type", "").startswith("image/png") and "nosniff" in q.headers.get("X-Content-Type-Options", "")
       and "no-store" in q.headers.get("Cache-Control", ""), f"#2356: the picture comes through the link ({q.status_code} {q.headers.get('Content-Type')})")
 check(requests.get(B + f"/s/w/{T1}/img/{PID}/{TXT}").status_code == 404, "#2356: the text file never comes through the route")
-check(requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG2}").status_code == 404, "#2356: a picture not embedded in the page never comes")
+check(requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG2}").status_code == 404, "#2356: a picture only named in code (not embedded) never comes")
 check(requests.get(B + f"/s/w/{T0}x/img/{PID}/{IMG}").status_code in (404, 410), "#2356: an unknown link: nothing")
 # a guest (person share by e-mail address) with the switch
 r = Fr.post(B + "/api/wiki/shares", json={"page_id": PID, "kind": "person", "email": "bob@example.com", "images": True})
@@ -333,7 +341,8 @@ check(polls and not polls[0][2].startswith("import:") and polls[0][2] != one("SE
       "#2398: the poll has a new link")
 nopts = [x[0] for x in dbx("SELECT id FROM sched_poll_options WHERE poll_id=? ORDER BY start", (NP,))]
 check(len(nopts) == 2 and not set(nopts) & set(OPTS), f"#2398: its options came along {nopts}")
-votes = dbx("SELECT name, answers, ip_hash FROM sched_poll_votes WHERE poll_id=?", (NP,))
+votes = dbx("SELECT name, answers, ip_hash, edit_hash FROM sched_poll_votes WHERE poll_id=?", (NP,))
+check(votes and votes[0][3] and votes[0][3] != "x" * 64, "#2398 review: the vote gets a new edit hash, never the exported one")
 ans = json.loads(votes[0][1]) if votes else {}
 check(len(votes) == 1 and votes[0][0] == "Gast Beispiel" and len(nopts) == 2 and ans == {str(nopts[0]): "y", str(nopts[1]): "n"} and votes[0][2] == "",
       f"#2398: the vote came along and names the new options {votes}")
