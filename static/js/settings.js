@@ -772,9 +772,11 @@ function settingsModal(focus) {
   // 2.365.2 (#2789): what was set inside a module: Company & office (the office's settings, following the workspace) and Documents
   pane.biz = typeof biz_paneHtml === 'function' ? biz_paneHtml() : '';
   pane.docs = typeof dcs_paneHtml === 'function' ? dcs_paneHtml() : '';
+  pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -1575,7 +1577,8 @@ const SS_AREA = [
     'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
-      [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'],
+      [N_('Bank & taxes'), ['steuer', 'steuerrücklage', 'tax reserve', 'ust', 'vat', 'ist', 'soll', 'steuertermine', 'tax dates', 'kasse', 'kassen', 'cash box', 'anfangsbestand', 'kilometer', 'km', 'pauschale', 'mileage', 'bank'], '#s-biz-tax', 'tax'],
       [N_('Documents & numbers'), ['nummer', 'nummern', 'number', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice'], '', 'docs'],
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
       [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
@@ -1584,10 +1587,10 @@ const SS_AREA = [
       [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
-      [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
+      [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
       [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},
-  {src: ['bkSettingsHtml'], area: N_('Office|area'), name: N_('Bookkeeping'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],
-    on: () => modOn('office') && ss_ofm('books'), open: () => go('office/books'), root: '#bk-sh', secs: [[N_('Settings'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping'], '#bk-sh']]}];
+  {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
+    on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];
 // the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
 function ss_areaHits(q, max = 6) {
   const out = [], lo = s => String(s || '').toLowerCase();
@@ -1639,4 +1642,19 @@ async function biz_draw(md) {
   if (S.route.mod === 'office' && ofcTab() === 'settings' && !['import', 'rights'].includes(S.route.tab)) go('office/start');  // one settings form on the screen
   if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
   setTimeout(biz_paint, 0);
+}
+// 2.365.2 D (#2789): Settings > Data > Office: the master data file (export at once; import and the transfers sit in Company &
+// office > Data next to the office's other data) and the page of the legacy imports; Settings > Integrations > E-invoice:
+// the way to the Peppol access (its fields stay in one place, with the invoices). data-setgo: events.js
+function biz_dataHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<h4 id="s-ofdata-h">${tr('Office')}</h4><div class="shint">${tr('Master data, legacy data and transfers of the office of the current workspace.')}</div>
+    <div class="row lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export master data')}</a>
+    <button type="button" class="btn sm" data-setgo="biz-data">${ic('upload', 's')} ${tr('Import and transfer…')}</button>
+    <button type="button" class="btn sm" data-setgo="#office/import">${ic('archive', 's')} ${tr('Import legacy data')}</button></div>`;
+}
+function biz_integrHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<h4 id="s-pep-h">${tr('E-invoice (Peppol)')}</h4><div class="shint">${tr('The Peppol access of the office (provider, account, sender id) is set with its invoices.')}</div>
+    <div class="row"><button type="button" class="btn sm" data-setgo="biz-peppol">${ic('building', 's')} ${esc(tr('Settings › Company & office › {0}', tr('Peppol')))}</button></div>`;
 }

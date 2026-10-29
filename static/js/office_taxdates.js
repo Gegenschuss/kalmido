@@ -1,4 +1,4 @@
-// 2.90.0 C (#1922): tax dates as tasks (section in the bookkeeping tab)
+// 2.90.0 C (#1922): tax dates as tasks (section in the bookkeeping tab; 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes)
 const TXD = {data: null, loading: false};
 async function txdLoad() {
   if (TXD.loading) return;
@@ -9,8 +9,9 @@ async function txdLoad() {
 }
 const TXD_NAMES = {ustva: N_('VAT return'), est: N_('Income tax prepayment'), gewst: N_('Trade tax prepayment')};
 function txdSectionHtml() {
+  if (TXD.oid !== OFC.info?.org_id) { TXD.oid = OFC.info?.org_id; TXD.data = null; }  // 2.365.2 D (#2789): Settings follow the workspace
   const d = TXD.data;
-  if (!d) { if (!TXD.loading) txdLoad(); return ''; }
+  if (!d) { if (!TXD.loading) setTimeout(txdLoad, 0); return ''; }
   const ppl = d.people || [], tasksOn = Object.values(d.tasks || {}).some(Boolean);
   const yr = d.ustva === 'year';  // 2.122.0 D (#2315): only the annual VAT return, no extension
   const nxt = (d.next || []).map(n => `<li><b>${esc(yr && n.kind === 'ustva' ? tr('Annual VAT return') : tr(TXD_NAMES[n.kind]))}</b> <span class="muted">${esc(tr('Deadline {0}', fmtDateLoc(n.date)))} · ${esc(tr('Task due {0}', fmtDateLoc(n.due)))}</span></li>`).join('');

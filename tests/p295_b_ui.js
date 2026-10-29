@@ -39,8 +39,13 @@ const XLSX = execFileSync('python3', ['-I', path.join(__dirname, 'p295_b_xlsx.py
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
     await nav(B + '#office/travel');
-    check(await ready(ev, `!!document.querySelector('.office [data-rki="pick"]')`, 80), 'the empty trip list offers the import');
-    check(await ev(`/Take over from Excel/.test(document.querySelector('[data-rki="pick"]').textContent)`), 'the button text');
+    // 2.365.2 D (#2789): the import is on the legacy data page; the empty trip list links there
+    check(await ready(ev, `!!document.querySelector('.office a[href="#office/import/trips"]') && !document.querySelector('.office [data-rki="pick"]')`, 80), 'the empty trip list links to the import');
+    await nav(B + '#office/import/trips');
+    check(await ready(ev, `!!document.querySelector('.office #oim-trips [data-rki="pick"]')`, 80), 'the legacy data page offers the trips import');
+    check(await ev(`/Take over from Excel/.test(document.querySelector('#oim-trips [data-rki="pick"]').textContent)`), 'the button text');
+    await nav(B + '#office/travel');
+    await ready(ev, `!!document.querySelector('.office a[href="#office/import/trips"]')`, 80);
     // ---- the preview (the file handed to the same function the file picker calls)
     await ev(`(() => { const b = Uint8Array.from(atob('${XLSX}'), c => c.charCodeAt(0)); rk_impPreview(new File([b], 'reisen.xlsx')); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.rki-dlg .rki-sheet').length === 2 && document.querySelectorAll('.rki-dlg .fcirow').length === 6`), 'the preview: two sheets, six rows');
@@ -69,7 +74,7 @@ const XLSX = execFileSync('python3', ['-I', path.join(__dirname, 'p295_b_xlsx.py
     check(await ready(ev, `/4 trips imported/.test(document.querySelector('#toast')?.textContent || '')`), 'a toast with undo');
     await ev(`(() => { const b = [...document.querySelectorAll('#toast button')].find(x => /undo/i.test(x.textContent)); b?.click(); return !!b; })()`);
     check(await ready(ev, `${trips}.then(n => n === 0)`, 40), 'the undo removes the imported trips');
-    check(await ready(ev, `!document.querySelector('.rklist') && !!document.querySelector('.office [data-rki="pick"]')`), 'the list is empty again');
+    check(await ready(ev, `!document.querySelector('.rklist') && !!document.querySelector('.office a[href="#office/import/trips"]')`), 'the list is empty again');
   }, false);
 
   console.log(`p295_b_ui: ${ok} ok, ${F.length} failed`);

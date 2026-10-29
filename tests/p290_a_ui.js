@@ -88,10 +88,15 @@ const today = TC.today();
     check(await ready(ev, `!document.querySelector('.bk-sheet') && [...document.querySelectorAll('[data-bk="rc"]')].some(b => /Software/.test(b.textContent) && /119\\.00/.test(b.textContent))`, 60),
       'the receipt is in the list of the month with category and amount');
     check(await ev(`${api('GET', `/api/office/books/euer?year=${year}`)}.then(j => j.expenses.some(x => x.label === 'Software' && x.vat === '19.00'))`), 'the receipt counts in the EUeR with 19 % input tax');
-    // the basis switch
-    await ev(`(() => { document.querySelector('[data-bk="basis"][data-v="soll"]').click(); return 1; })()`);
+    // the basis switch; 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes, the bookkeeping links there
+    check(await ev(`!document.querySelector('.office [data-bk="basis"]') && !!document.querySelector('.office [data-setgo="biz-tax"]')`), 'the bookkeeping links to its settings');
+    await ev(`(() => { document.querySelector('.office [data-setgo="biz-tax"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.smodal [data-bk="basis"][data-v="soll"]')`, 60), 'Settings > Company & office has the switch');
+    await ev(`(() => { document.querySelector('.smodal [data-bk="basis"][data-v="soll"]').click(); return 1; })()`);
     check(await ready(ev, `${api('GET', '/api/office/settings')}.then(j => j.settings.vat_basis === 'soll')`), 'accrual basis saved');
-    check(await ready(ev, `document.querySelector('[data-bk="basis"][data-v="soll"]')?.getAttribute('aria-pressed') === 'true'`), 'the switch shows it');
+    check(await ready(ev, `document.querySelector('.smodal [data-bk="basis"][data-v="soll"]')?.getAttribute('aria-pressed') === 'true'`), 'the switch shows it');
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.smodal')`);
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);
