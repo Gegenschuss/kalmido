@@ -20,9 +20,10 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app, APP_NAME, APP_VERSION
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
-from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, now_utc, usettings
+from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
 from ..accounts.login import seal, unseal
+from ..accounts.orgs import is_org_admin
 from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
 from ..core.errors import BadInput
@@ -81,7 +82,7 @@ def need_wh():
 
 
 def wh_allow(c):
-    return frozenset(cal_allow(c) | set(cal_allow_parse(WH_ALLOW_ENV)[0]))
+    return frozenset(cal_allow(c, "webhooks") | set(cal_allow_parse(WH_ALLOW_ENV)[0]))
 
 
 def wh_url_check(c, u):
@@ -218,6 +219,32 @@ def wh_actor(c):
     return {"id": u["id"], "name": u["display_name"] or u["username"], "kind": "agent" if u["kind"] == "agent" else "person"}
 
 
+def wh_today():
+    return local_now().date().isoformat()
+
+
+def wh_grace_ok(c, w, oid):
+    """2.380 G (#3391): a personal webhook still delivers events of an organisation's lists (grace period of the webhooks that
+    existed before 2.380). The first event after the last day ends it for good (org_grace_until = '') and tells the owner
+    with a News item which organisation now needs an organisation webhook. The caller commits."""
+    until = w["org_grace_until"] or ""
+    if until and until >= wh_today():
+        return True
+    if until:
+        with system_ctx(c):  # the webhook's own row and a News item for its owner (the event may come from anyone)
+            if c.execute("UPDATE webhooks SET org_grace_until='' WHERE id=? AND org_grace_until<>''", (w["id"],)).rowcount:
+                o = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
+                c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) "
+                          "VALUES(?,'whorgcut',NULL,NULL,NULL,NULL,?,?)",
+                          (w["user_id"], json.dumps({"webhook_id": w["id"], "webhook": w["name"] or wh_host(w["url"]),
+                                                     "org_id": oid, "org": o["name"] if o else ""}, ensure_ascii=False), iso_ms(now_utc())))
+    return False
+
+
+def wh_host(url):
+    return urllib.parse.urlsplit(url or "").hostname or ""
+
+
 def wh_enqueue(c, n):
     hooks = c.execute("""SELECT w.* FROM webhooks w JOIN users u ON u.id=w.user_id
                          WHERE w.enabled=1 AND u.disabled=0 AND w.agent=0 ORDER BY w.id""").fetchall()
@@ -237,6 +264,8 @@ def wh_enqueue(c, n):
     def org_ok(w, lid):  # 2.115.0 A (#2061): an organisation's webhook only for lists of that organisation
         lst(lid)
         if not w["org_id"] and orgs.get(lid):  # 2.190.0 C (#2496): a personal webhook: an organisation's list only when owned / shared
+            if not wh_grace_ok(c, w, orgs[lid]):  # 2.380 G (#3391): ... and only during its grace period
+                return False
             return bool(c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? UNION ALL SELECT 1 FROM list_members WHERE list_id=? "
                                   "AND user_id=? LIMIT 1", (lid, w["user_id"], lid, w["user_id"])).fetchone())
         return not w["org_id"] or orgs.get(lid) == w["org_id"]
@@ -493,6 +522,18 @@ def need_webhook(c, wid, oid=None):
     return r
 
 
+def wh_org_hits(c, r):
+    """2.380 G (#3391): a personal webhook's organisations with lists of its owner (owned or shared) -> [{id, name, admin}]: the
+    dialog says it delivers their events too (until org_grace_until) or no longer, and offers an organisation admin to set
+    the same webhook up as one of the organisation."""
+    if r["org_id"]:
+        return []
+    rows = c.execute("""SELECT DISTINCT o.id, o.name FROM lists l JOIN orgs o ON o.id=l.org_id
+                        WHERE l.deleted_at IS NULL AND (l.owner_id=? OR EXISTS (SELECT 1 FROM list_members m
+                              WHERE m.list_id=l.id AND m.user_id=?)) ORDER BY o.name""", (r["user_id"], r["user_id"])).fetchall()
+    return [{"id": o["id"], "name": o["name"], "admin": is_org_admin(c, r["user_id"], o["id"])} for o in rows]
+
+
 def wh_public(c, r):
     last = c.execute("SELECT ok, status, error, created_at FROM webhook_log WHERE webhook_id=? AND attempt>0 ORDER BY id DESC LIMIT 1",
                      (r["id"],)).fetchone()
@@ -500,7 +541,9 @@ def wh_public(c, r):
             "enabled": bool(r["enabled"]), "disabled_reason": r["disabled_reason"], "created_at": r["created_at"],
             "pending": c.execute("SELECT COUNT(*) FROM webhook_queue WHERE webhook_id=?", (r["id"],)).fetchone()[0],
             "last": {"ok": bool(last["ok"]), "status": last["status"], "error": last["error"],
-                     "error_text": wh_err_text(last["error"], last["status"]) if last["error"] else "", "at": last["created_at"]} if last else None}
+                     "error_text": wh_err_text(last["error"], last["status"]) if last["error"] else "", "at": last["created_at"]} if last else None,
+            # 2.380 G (#3391): the organisations it reaches (personal webhooks) and the last day it still delivers their lists
+            "org_hits": wh_org_hits(c, r), "org_until": (r["org_grace_until"] or "") if (r["org_grace_until"] or "") >= wh_today() else ""}
 
 
 def wh_fields(c, b, old=None):

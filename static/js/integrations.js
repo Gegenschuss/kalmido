@@ -246,8 +246,16 @@ async function whDraw(md) {
       <button class="iconbtn" data-wh="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${w.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-wh="log" title="${tr('Delivery log')}" aria-label="${tr('Delivery log')}">${ic('list', 's')}</button>
       <button class="iconbtn" data-wh="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
-      <button class="iconbtn danger" data-wh="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')
+      <button class="iconbtn danger" data-wh="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>${whOrgHint(w)}`).join('')
     : `<div class="muted mhint">${tr('No webhooks yet.')}</div>`;
+}
+// 2.380 G (#3391): a personal webhook that reaches lists of an organisation: until when it still delivers them (the webhooks from
+// before 2.380, 30 days) or that it no longer does, and for that organisation's admins "Set up as organisation webhook"
+function whOrgHint(w) {
+  return (w.org_hits || []).map(o => `<div class="shint lhint whorg" data-whorg="${o.id}" data-whid="${w.id}">${esc(w.org_until
+    ? tr('Also delivers events of the organisation {0}, until {1}. After that only an organisation webhook does.', o.name, fmtDayAbs(w.org_until))
+    : tr('Events of the organisation {0} are not delivered here: that needs an organisation webhook.', o.name))}${o.admin
+    ? ` <button type="button" class="linkbtn" data-wh="toorg">${ic('plus', 's')} ${tr('Set up as organisation webhook')}</button>` : ''}</div>`).join('');
 }
 function whWire(md) {
   md.addEventListener('click', async e => {
@@ -258,6 +266,15 @@ function whWire(md) {
     const a = b.dataset.wh;
     if (a === 'edit') whModal(w, box._j, () => whDraw(md));
     if (a === 'log') whLog(w);
+    if (a === 'toorg') {  // 2.380 G (#3391): the same name, address and events as a webhook of the organisation (its own new secret)
+      const oid = +b.closest('[data-whorg]').dataset.whorg, o = (w.org_hits || []).find(x => x.id === oid); if (!o) return;
+      if (!await askConfirm(tr('Set up “{0}” as a webhook of {1}?', w.name || urlHost(w.url), o.name), tr('It gets its own signing secret. Your personal webhook stays as it is.'), {ok: tr('Set up')})) return;
+      b.disabled = true;
+      try { const r = await calReq('POST', `/api/orgs/${oid}/webhooks`, {name: w.name, url: w.url, events: w.events});
+        secretModal(tr('Signing secret'), r.secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).')); }
+      catch (x) { toast(x.message); } finally { b.disabled = false; }
+      whDraw(md);
+    }
     if (a === 'test') {
       b.disabled = true;
       try { const r = await api('POST', `/api/me/webhooks/${w.id}/test`); toast(r.ok ? tr('Test delivered (HTTP {0}, {1} ms)', r.status, r.ms) : tr('Test failed: {0}', r.error_text)); } catch { /* api() showed it */ }

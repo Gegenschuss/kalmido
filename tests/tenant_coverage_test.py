@@ -898,7 +898,8 @@ ROUTES = {
     "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
     "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
     "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
-    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
+    "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "list",  # 2.380 G (#2289): header variant
+    "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
     "POST /api/hooks-in/{}/restore": "list",
     # ---- 2.34.0 (#264 #265): the briefing (a person's own, an agent: of a person it may chat with, only shared lists) and

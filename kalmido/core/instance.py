@@ -66,7 +66,7 @@ def update_state(c):
 def about_info(c, u):
     """Version for everyone logged in; update check result and switches only for admins."""
     from ..personal.timetrack import time_day_h
-    from ..calendars.subscriptions import CAL_ALLOW_ENV, cal_allow_parse, cal_allow_text, CAL_ON
+    from ..calendars.subscriptions import allow_by_purpose, CAL_ALLOW_ENV, cal_allow_parse, cal_allow_text, CAL_ON
     from ..admin.backup import BK_ON_ENV
     from ..api.v1 import PUB_ENV
     d = {"version": APP_VERSION, "legal": legal_links(c)}  # 2.306.0 B (#2887): privacy / imprint links in Settings > Help
@@ -77,6 +77,7 @@ def about_info(c, u):
                  checked_at=info.get("checked_at") or "", latest=info.get("latest") or "", error=info.get("error") or "",
                  url=info.get("url") or "", available=bool(update_enabled(c) and latest and cur and latest > cur),
                  cal_on=CAL_ON, cal_allow_hosts=gsetting(c, "cal_allow_hosts"),
+                 allow_hosts_by_purpose=allow_by_purpose(c),  # 2.380 G (#3389): one line per purpose in the admin settings
                  cal_allow_env=cal_allow_text(cal_allow_parse(CAL_ALLOW_ENV)[0]),
                  twofa_required=gsetting(c, "twofa_required") == "1", passkey_login=gsetting(c, "passkey_login") != "0",
                  oidc=oidc_public(c), backups_env=BK_ON_ENV,
@@ -168,7 +169,7 @@ def admin_settings():
     from ..personal.timetrack import clean_day_hours
     from ..accounts.users import need_admin
     from ..notify.alerts import aa_now, aa_switch
-    from ..calendars.subscriptions import cal_allow_parse, cal_allow_text
+    from ..calendars.subscriptions import ALLOW_PURPOSES, allow_by_purpose, cal_allow_parse, cal_allow_text
     need_admin()
     b, c = body(), db()
     old = {k: gsetting(c, k) not in ("0", "") for k in ("collab_all", "time_all", "update_check") + AUTH_SWITCHES}
@@ -184,20 +185,36 @@ def admin_settings():
         if e:
             return e
     hosts = None
-    if "cal_allow_hosts" in b:  # internal hosts calendar subscriptions may reach (SSRF allow-list)
-        v = b["cal_allow_hosts"]
+
+    def allow_clean(v, what):  # -> (normalised hosts text, None) | (None, error answer)
         if not isinstance(v, str) or len(v) > 5000:
-            return err(tr("Invalid value: {0}", "cal_allow_hosts"))
+            return None, err(tr("Invalid value: {0}", what))
         ent, bad = cal_allow_parse(v)
         if bad:
-            return err(tr("Not a host name or host:port: {0}", ", ".join(bad[:5])))
+            return None, err(tr("Not a host name or host:port: {0}", ", ".join(bad[:5])))
         if len(ent) > 50:
-            return err(tr("At most {0} hosts", 50))
-        hosts = cal_allow_text(list(dict.fromkeys(ent)))
-        if hosts == gsetting(c, "cal_allow_hosts"):
-            hosts = None
-        else:
-            gset(c, "cal_allow_hosts", hosts)
+            return None, err(tr("At most {0} hosts", 50))
+        return cal_allow_text(list(dict.fromkeys(ent))), None
+    by = allow_by_purpose(c)
+    new_by = dict(by)
+    if "cal_allow_hosts" in b:  # internal hosts calendar subscriptions may reach (SSRF allow-list)
+        v, e = allow_clean(b["cal_allow_hosts"], "cal_allow_hosts")
+        if e:
+            return e
+        if v != gsetting(c, "cal_allow_hosts"):
+            gset(c, "cal_allow_hosts", v)
+            new_by = {p: v for p in ALLOW_PURPOSES}  # 2.380 G (#3389): the old field (an older client) = one list for every purpose
+    if "allow_hosts_by_purpose" in b:  # 2.380 G (#3389): {purpose: hosts} -- only the purposes named change
+        v = b["allow_hosts_by_purpose"]
+        if not isinstance(v, dict) or any(k not in ALLOW_PURPOSES for k in v):
+            return err(tr("Invalid value: {0}", "allow_hosts_by_purpose"))
+        for k, t in v.items():
+            new_by[k], e = allow_clean(t, k)
+            if e:
+                return e
+    if new_by != by:
+        gset(c, "allow_hosts_by_purpose", json.dumps(new_by, sort_keys=True))
+        hosts = "; ".join(f"{p}: {new_by[p] or '-'}" for p in ALLOW_PURPOSES if new_by[p] != by[p])
     if "time_day_h" in b:  # 2.7.0 (#407): hours per day / shift for every list without its own value
         dh = clean_day_hours(b["time_day_h"])
         if dh is False:

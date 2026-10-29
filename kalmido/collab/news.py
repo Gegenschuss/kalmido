@@ -50,6 +50,7 @@ NEWS_KINDS += ("wiki_shared",)  # 2.126.2 B (#2355): someone shared knowledge pa
 NEWS_KINDS += ("orgjoin",)  # 2.148.1 A (#2480): an organisation invites me to join (always, no push; accounts/orginvite.py)
 NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined through a link (row "signoff", office/signoff.py)
 NEWS_KINDS += ("orgdelnotice", "orggone")  # 2.361.0 (#2920): my organisation is deleted on a day / was deleted (always, no push; accounts/orgleave.py)
+NEWS_KINDS += ("whorgcut",)  # 2.380 G (#3391): my personal webhook no longer delivers an organisation's lists (always, no push; integrations/webhooks.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -69,6 +70,7 @@ NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
 NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
 NEWS_FOR_ME += ("orgdelnotice", "orggone")  # 2.361.0 (#2920)
+NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
@@ -539,8 +541,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..accounts.orgleave import olv_news_live
             if not olv_news_live(c, uid, r["data"]):
                 continue
-        elif kind == "orggone":  # 2.361.0 (#2920): the organisation is gone (name + my numbers in data)
-            pass
+        elif kind in ("orggone", "whorgcut"):  # 2.361.0 (#2920): the organisation is gone (name + my numbers in data)
+            pass  # 2.380 G (#3391): whorgcut = webhook + organisation names in data, no task, no list
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

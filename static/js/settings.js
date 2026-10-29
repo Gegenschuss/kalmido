@@ -1256,10 +1256,14 @@ function instanceHtml(chk, hint) {
     ${hint(tr('Projects show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
     ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
-    ${hint(tr('Calendar subscriptions and webhooks only reach public addresses. List servers in your own network here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
-    <div class="row"><textarea id="s-calhosts" rows="2" spellcheck="false" autocapitalize="off" aria-labelledby="s-calhosts-h" placeholder="nextcloud.home.arpa, 10.0.0.20:5232">${esc(a.cal_allow_hosts || '')}</textarea></div>
+    ${hint(tr('Connections from the server only reach public addresses. List servers in your own network per service here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed for every service by the server configuration: {0}', a.cal_allow_env)) : ''))}
+    ${ALLOWP.map(([k, n]) => `<div class="row"><label for="s-allowp-${k}">${esc(tr(n))}</label><input id="s-allowp-${k}" data-allowp="${k}" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="nextcloud.home.arpa, 10.0.0.20:5232" value="${esc((a.allow_hosts_by_purpose || {})[k] ?? a.cal_allow_hosts ?? '')}"></div>`).join('')}
     </details>` : ''}`;
 }
+// 2.380 G (#3389): the allowed internal hosts per service (server: calendars/subscriptions.py ALLOW_PURPOSES), saved in calview.js
+const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('Mail (IMAP / SMTP)')],
+  ['git', N_('Git')], ['newsletter', N_('Newsletter')], ['ntfy', N_('ntfy')], ['peppol', N_('Peppol')], ['feeds', N_('Feeds (RSS)')],
+  ['oidc', N_('Single sign-on (OIDC)')], ['paperless', N_('Paperless')], ['karakeep', N_('Karakeep')], ['servers', N_('Servers')]];
 // 2.102.0 E (#1999): the browser's own errors (static/js/clienterr.js) as bug tickets in one project list with error reports
 // on (list dialog > Repository); only lists the admin manages. "Off" = the browsers send nothing.
 function cer_html(a, hint) {

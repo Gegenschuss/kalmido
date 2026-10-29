@@ -438,7 +438,8 @@ APP_ONLY = [
     # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the
     # other tool (n8n, Make, Zapier, Home Assistant); agents create tasks through POST /tasks with their own token
     ("2.115.0 (#2061): inbound webhooks of a list: their secret URL is shown once to people (owner / list admins); the URL is "
-     "called by another tool, not by a client; agents create tasks with POST /tasks", ("* /api/lists/{}/hooks-in", "* /api/hooks-in/", "POST /api/hooks/in/")),
+     "called by another tool, not by a client; agents create tasks with POST /tasks", ("* /api/lists/{}/hooks-in", "* /api/hooks-in/", "POST /api/hooks/in/",
+                                                                                 "POST /api/hooks/in")),  # 2.380 G (#2289): header variant
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),

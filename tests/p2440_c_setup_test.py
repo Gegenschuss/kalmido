@@ -79,7 +79,8 @@ for b in BASHES:
 TOKEN = "abk_stub_secret_token_4711"
 ST = {"status": [], "redeem": [], "remove": [], "enabled": True, "remove_code": 200, "base": None,  # 2.360.0: base = another starter address  # 2.47.3 (#1729): remove_code 401 = the key is already revoked
       "revoked": False,  # 2.157.0 (#1517): GET /api/v1/agent answers 401 (computer removed in Kalmido)
-      "polls": 0}  # 2.206.0 B (#2513): GET /api/v1/agent count: "nothing happens for N polls" instead of a fixed sleep
+      "polls": 0,  # 2.206.0 B (#2513): GET /api/v1/agent count: "nothing happens for N polls" instead of a fixed sleep
+      "sha": None}  # 2.380 G (#3390): the checksums the redeem answer sends (None: none, like an older Kalmido)
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -127,7 +128,8 @@ class Stub(BaseHTTPRequestHandler):
             if b.get("code") != "ks_good_code":
                 return self._json(400, {"error": "This setup code is invalid, used or expired. Create a new one in Kalmido."})
             return self._json(200, {"token": TOKEN, "url": "https://ignored.example", "version": "2.44.0",
-                                    "agent": {"id": 9, "name": "Helper", "username": "helper"}, "starter_base": ST["base"] or f"{URL}/mcp/"})
+                                    "agent": {"id": 9, "name": "Helper", "username": "helper"}, "starter_base": ST["base"] or f"{URL}/mcp/",
+                                    **({"starter_sha256": ST["sha"]} if ST["sha"] is not None else {})})
         if self.path == "/api/agent-setup/remove":
             ST["remove"].append(self.headers.get("Authorization"))
             if ST["remove_code"] != 200:
@@ -331,11 +333,38 @@ for b in BASHES:
                        env=env, capture_output=True, text=True, timeout=120)
     ST["base"] = None
     check(r.returncode != 0 and "without https://" in r.stderr, f"{b}: starter files from a plain http address are refused: {r.stderr[-300:]}")
+    # 2.380 G (#3390): the checksums of the redeem answer (mcp/starter_sha256.txt): matching -> installed; one file differs -> the
+    # setup stops before that file is installed
+    with open(os.path.join(MCP, "starter_sha256.txt"), encoding="utf-8") as f:
+        SHA = {ln.split()[1]: ln.split()[0] for ln in f if ln.strip() and not ln.startswith("#")}
+    check("starter_files.txt" in SHA and "agent_run.py" in SHA, f"starter_sha256.txt lists the list and the files: {sorted(SHA)}")
+    agents = os.path.join(home, ".kalmido", "agents")
+    ST["sha"] = SHA
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/shaok", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=120)
+    inst = [os.path.join(agents, d) for d in os.listdir(agents) if d.startswith("shaok-")]
+    check(r.returncode == 0 and inst and os.path.isfile(os.path.join(inst[0], "agent_run.py")) and os.path.isfile(os.path.join(inst[0], "starter_sha256.txt")),
+          f"{b}: #3390 matching checksums: installed: {r.returncode} {r.stderr[-300:]}")
+    ST["sha"] = {**SHA, "agent_run.py": "0" * 64}
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/shabad", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=120)
+    inst = [os.path.join(agents, d) for d in os.listdir(agents) if d.startswith("shabad-")]
+    # the stop undoes the setup (token revoked, the instance folder gone), so nothing of it runs
+    check(r.returncode != 0 and "does not match the checksum" in r.stderr and not any(os.path.exists(os.path.join(i, "agent_run.py")) for i in inst),
+          f"{b}: #3390 a differing file stops the setup, not installed: {r.returncode} {inst} {r.stderr[-300:]}")
+    ST["sha"] = {k: v for k, v in SHA.items() if k != "agent_job.py"}
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/shamiss", "--cmd", "fakeagent", "--no-autostart"],
+                       env=env, capture_output=True, text=True, timeout=120)
+    check(r.returncode != 0 and "agent_job.py does not match" in r.stderr, f"{b}: #3390 a file without a checksum is refused too: {r.stderr[-300:]}")
+    ST["sha"] = None
     shutil.rmtree(home, ignore_errors=True)
 
 # ---- setup.ps1 (dry run with pwsh when there is one)
 src = read(SETUP_PS1)
 check("param(" in src and "-AtLogOn" in src and "RunLevel Limited" in src and "SetAccessRuleProtection" in src, "setup.ps1: task at logon without admin, file only for the user")
+# 2.380 G (#3390): setup.ps1 checks the same checksums (Get-FileHash) before a starter file is moved into place
+check("$r.starter_sha256" in src and "Get-FileHash" in src and "ShaOk $name $tmp" in src and "Move-Item -LiteralPath $tmp" in src,
+      "setup.ps1: starter files checked against starter_sha256 before they are installed")
 PWSH = os.environ.get("PWSH") or shutil.which("pwsh")
 if PWSH:
     home = tempfile.mkdtemp(prefix="kalmido-p2440c-ps-")

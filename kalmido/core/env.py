@@ -223,7 +223,7 @@ VARS = (
     _v("KALMIDO_CALDAV_HTTP", "0", "Switch: allow CalDAV logins over plain http (only in a trusted network).", "integrations"),
     _v("KALMIDO_CALDAV_DONE_DAYS", "90", "Days completed tasks stay visible over CalDAV.", "integrations"),
     _v("KALMIDO_CALENDARS", "1", "Switch: calendar subscriptions (ICS / CalDAV).", "integrations"),
-    _v("KALMIDO_CALENDAR_ALLOW_HOSTS", "", "Internal hosts calendar subscriptions may reach.", "integrations"),
+    _v("KALMIDO_CALENDAR_ALLOW_HOSTS", "", "Internal hosts every service may reach (calendars, address books, webhooks, mail, Git, newsletter, ntfy, Peppol, feeds, OIDC, Paperless, Karakeep, servers); the admin's lists per service add to it (2.380).", "integrations"),
     _v("KALMIDO_CALENDAR_MAX_MB", "10", "Size in MB of one calendar download.", "integrations"),
     _v("KALMIDO_CALENDAR_MAX_EVENTS", "5000", "Stored occurrences per subscription.", "integrations"),
     _v("KALMIDO_CALENDAR_RATE", "30", "Calendar adds, discoveries and manual refreshes per person in 15 minutes.", "integrations"),

@@ -3462,6 +3462,12 @@ MIGRATIONS = [
     # who set it up / switched it on). 2.114 never reads it: there an organisation's webhook would act as its creator's own one
     # (same person, events of what that admin sees) until 2.115 runs again
     ("webhooks", "org_id", "ALTER TABLE webhooks ADD COLUMN org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE"),
+    # 2.380 G (#3391): a personal webhook delivers events of an organisation's lists only until this day (YYYY-MM-DD, '' = never):
+    # the ones that exist when 2.380 starts keep them 30 more days, new ones never get them (an organisation webhook does).
+    # Older versions ignore it (personal webhooks deliver shared organisation lists as before)
+    ("webhooks", "org_grace_until", "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS org_grace_until TEXT NOT NULL DEFAULT ''"),
+    ("webhooks", "org_grace_until", "UPDATE webhooks SET org_grace_until=to_char(now() + interval '30 days', 'YYYY-MM-DD') "
+                                    "WHERE org_id IS NULL AND agent=0"),
     # 2.126.0 C (#1979 I3): the person whose calendar app wrote dav_meta.extra (NULL = before 2.126: sent to everyone as before);
     # its alarms and attachments go back to that person only. Older versions never read it
     ("dav_meta", "extra_by", "ALTER TABLE dav_meta ADD COLUMN extra_by BIGINT"),
@@ -4266,6 +4272,7 @@ GLOBAL_DEFAULTS = {
     "aa_update_notified": "",   # last version an update alert went out for
     "aa_digest_sent": "",       # day of the last daily summary
     "cal_allow_hosts": "",      # admin: internal hosts calendar subscriptions may reach ("host, host:port")
+    "allow_hosts_by_purpose": "",  # 2.380 G (#3389): JSON {purpose: "host, host:port"} (calendars/subscriptions.py ALLOW_PURPOSES)
     # sign-in (package A): 2FA policy for built-in logins, passwordless passkey login, OIDC auto-create
     "twofa_required": "0",      # admin: users with a password must use a second factor (enrol at the next login)
     "passkey_login": "1",       # admin: passkeys may log in without the password (user verification required)

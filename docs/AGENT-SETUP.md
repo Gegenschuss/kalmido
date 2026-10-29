@@ -65,8 +65,8 @@ The examples use these names; change them if you like, but consistently:
 ## Quickest: one command on your computer
 
 2.44.0 (#1517): for a project agent on your own Mac, Windows PC or Linux computer, *Settings > Agents >* (agent) *> Set up
-on a computer* gives you one command with a one-time code; it installs the starter, keeps the token in a private file and
-starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
+on a computer* gives you one command with a one-time code; it installs the starter (since 2.380 only files whose checksum
+matches the one your server sends), keeps the token in a private file and starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
 [AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 

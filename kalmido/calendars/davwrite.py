@@ -133,7 +133,7 @@ def _cdw_sub(c, sid):
 
 
 def _cdw_auth(c, r):
-    return cal_unseal(c, r["user_id"], r["url"]), (r["username"], cal_unseal(c, r["user_id"], r["password"])), cal_allow(c)
+    return cal_unseal(c, r["user_id"], r["url"]), (r["username"], cal_unseal(c, r["user_id"], r["password"])), cal_allow(c, "calendar")
 
 
 def _cdw_fields(b, need_times):

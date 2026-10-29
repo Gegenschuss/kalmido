@@ -262,7 +262,7 @@ def plh_allow(c, url=None):
     from ..admin.hosting import hosted
     from ..calendars.subscriptions import cal_allow
     if not hosted():
-        return cal_allow(c)
+        return cal_allow(c, "paperless")  # 2.380 G (#3389)
     return frozenset() if url is None or str(url).lower().startswith("https://") else None
 
 

@@ -28,7 +28,7 @@ from flask import jsonify, request
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
 from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
-from ..core.db import body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
+from ..core.db import ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
@@ -161,9 +161,32 @@ def cal_allow_text(entries):
     return ", ".join((f"[{h}]" if ":" in h else h) + (f":{p}" if p else "") for h, p in entries)
 
 
-def cal_allow(c):
-    """Hosts that may be internal: env KALMIDO_CALENDAR_ALLOW_HOSTS + the admin setting."""
-    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + cal_allow_parse(gsetting(c, "cal_allow_hosts"))[0])
+# 2.380 G (#3389): the internal hosts are allowed per purpose (the service that connects, core/db.py ALLOW_PURPOSES), no
+# longer one list for all: the admin setting allow_hosts_by_purpose = JSON {purpose: "host, host:port"}; a one-shot at the
+# start (core/db.py, flag migr_allow2380) copies the old list cal_allow_hosts into every purpose, so nothing that worked stops.
+# KALMIDO_CALENDAR_ALLOW_HOSTS (the server configuration) still counts for every purpose. cal_allow_hosts stays as it was
+# (an older version reads it).
+
+
+def allow_by_purpose(c):
+    """{purpose: the admin's hosts text} for every purpose (a purpose the setting lacks: the old shared list)."""
+    try:
+        d = json.loads(gsetting(c, "allow_hosts_by_purpose") or "{}")
+    except ValueError:
+        d = {}
+    d = d if isinstance(d, dict) else {}
+    old = gsetting(c, "cal_allow_hosts")
+    return {p: d[p] if isinstance(d.get(p), str) else old for p in ALLOW_PURPOSES}
+
+
+def cal_allow(c, purpose=None):
+    """Hosts that may be internal for one purpose (ALLOW_PURPOSES): env KALMIDO_CALENDAR_ALLOW_HOSTS + the admin's list of
+    that purpose. 2.380 G (#3389): no purpose (a caller not sorted yet) = the hosts of every purpose, never more than before."""
+    by = allow_by_purpose(c)
+    if purpose is not None and purpose not in by:
+        raise ValueError(f"unknown allow-list purpose {purpose!r}")
+    texts = [by[purpose]] if purpose else list(by.values())
+    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + [e for t in texts for e in cal_allow_parse(t)[0]])
 
 
 def cal_host_allowed(allow, host, port):
@@ -786,7 +809,7 @@ def cal_sync(c, sid, force=False):
         fresh = not force and bool(s["fetched_at"]) and parse_iso(s["fetched_at"]).astimezone(TZ).date() == local_now().date()
         upd, url, lg = {}, "", lang(c, s["user_id"])
         try:
-            allow = cal_allow(c)
+            allow = cal_allow(c, "calendar")  # 2.380 G (#3389)
             url = cal_unseal(c, s["user_id"], s["url"])
             auth = (s["username"], cal_unseal(c, s["user_id"], s["password"])) if s["kind"] == "caldav" else None
             c.commit()  # 2.37.0 (#1150): no open transaction while the calendar server is asked (snapshot, pool)
@@ -993,7 +1016,7 @@ def cal_discover_api():
     if not cal_rate(me()):
         return _cal_limited()
     try:
-        cals = caldav_discover(url, (user.strip(), pw), cal_allow(db()))
+        cals = caldav_discover(url, (user.strip(), pw), cal_allow(db(), "calendar"))
     except CalError as e:
         return jsonify(error=cal_err_text(e.stored()), code=e.code), 400
     return jsonify(calendars=cals)
