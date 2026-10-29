@@ -69,6 +69,13 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
         const hs = [...d.querySelectorAll('#s-sres [data-hit]')].map(b => b.textContent);
         check(hs.some(t => /Company & office ›/.test(t) && t.includes(lab)), `${who}: search "${q}" offers Company & office › ${lab} ` + JSON.stringify(hs));
       }
+      // the setups moved into Integrations (part B) by the words people type
+      for (const [q, lab, id] of [['newsletter', 'Newsletter service', 's-nwl-h'], ['carddav', 'Birthdays from your contacts', 's-carddav-h'], ['buchungsseite', 'Booking page', 's-apb-h']]) {
+        if (!d.getElementById(id)) continue;  // (the block shows only with its module)
+        sq.dispatchEvent(new w.FocusEvent('focus')); sq.value = q; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
+        const hs = [...d.querySelectorAll('#s-sres [data-hit]')].map(b => b.textContent);
+        check(hs.some(t => t.includes(lab)), `${who}: search "${q}" offers ${lab} ` + JSON.stringify(hs));
+      }
       sq.value = ''; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
     }
     // Company & office goes away with the office module
