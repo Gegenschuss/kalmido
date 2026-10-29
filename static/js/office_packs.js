@@ -200,7 +200,13 @@ const OCF_FEATS = [
   ['books.vat_return', 'chart', N_('VAT return figures'), N_('The figures of the advance VAT return in the bookkeeping; filing stays with your tax software')],
   ['books.tax_dates', 'cal', N_('Tax dates'), N_('Deadlines of the VAT return and tax prepayments as recurring tasks')],
   ['books.export_csv', 'download', N_('Export for the tax advisor'), N_('Booking list as CSV, with invoices and receipts as ZIP - readable by any tax advisor')],
-  ['books.gobd', 'lock', N_('Finalising rules'), N_('Finalised documents stay locked, number gaps need a reason. Always on.')]];
+  ['books.gobd', 'lock', N_('Finalising rules'), N_('Finalised documents stay locked, number gaps need a reason. Always on.')],
+  // 2.380 F (#3411): points of Money in every country pack; off = no menu point, the data stays
+  ['money.cashflow', 'trend', N_('Cash flow'), N_('Expected income and expenses of the next months')],
+  ['money.kpi', 'chart', N_('Figures'), N_('Revenue, open items and margin per client')],
+  ['money.travel', 'plane', N_('Travel expenses'), N_('Trips with per diem allowances and receipts')],
+  ['money.meals', 'meal', N_('Entertainment receipts'), N_('Business meals with guests and reason')],
+  ['money.subs', 'repeat', N_('Subscriptions & tools'), N_('Running subscriptions, seats and what they cost')]];
 const OCF_FIXED = ['books.gobd'];  // cannot be switched off (packs.PACK_FEATURES switch false)
 const ocf_offers = () => OFC.info?.pack?.offers || {};
 const ocf_name = code => { const p = (PKC.packs?.country || []).find(x => x.code === code); return p ? pkc_nm(p) : code; };

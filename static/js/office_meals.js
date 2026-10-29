@@ -6,7 +6,7 @@
 // receipt, the evaluation 70 / 30 (CSV / PDF) and the choice lists in the office settings. Admins of the office only.
 // Server: kalmido/office/meals.py.
 const BW = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), person: '', personName: '', occ: '', view: 'list', rep: null, oid: undefined, gen: 0};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['meals', 'meal', N_('Entertainment receipts'), 1, () => bw_html(), 'money']));  // admins only, menu group Money
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['meals', 'meal', N_('Entertainment receipts'), 1, () => bw_html(), 'money', 'money.meals']));  // admins only, menu group Money
 const BW_U = '/api/office/meals';
 const bw_reload = () => { BW.data = null; BW.rep = null; BW.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const bw_meal = id => (BW.data?.meals || []).find(m => m.id === id);

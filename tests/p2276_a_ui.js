@@ -2,8 +2,8 @@
 // people only. freelancer-matrix: office (no new route; GET /api/office/settings has a new field "used") -- carol and dave
 // have no organisation (each the admin of the own office, P4).
 // - computer: a fresh office without a kept point opens on Quotes & invoices; the group Money is folded; opened by hand it
-//   shows Receipts, Bank, Bookkeeping, Cash book and "Show more" (cash flow, figures, travel, entertainment, subscriptions wait
-//   until used); the hand's choice stays after reloading
+//   shows Receipts first and every other point of Money (2.380 F, #3411: "Show more" is gone, a point is switched off under
+//   Settings > Functions instead); the hand's choice stays after reloading
 // - Receipts (#office/receipts): the upload of the bookkeeping, the kinds (entertainment, travel) and the list; a file through
 //   "Photograph receipt" -> POST /api/docs -> the receipt sheet -> a row in the list; then Money is open on its own
 // - the Pipeline is the start only once there is an inquiry; the first invoice opens Money and shows the figures
@@ -67,9 +67,7 @@ const today = TC.today();
     check(await ev(`!!document.querySelector('#view .ofmstart [data-ofmg="sell"] [data-ofm="offers"]')`), 'phone: Sell stays open');
     await shot('p2276a-phone-start.png');
     await click(ev, '#view [data-act="ofm-group"]');
-    check(await ready(ev, `(() => { const s = document.querySelector('#view .ofmstart [data-ofmg="money"]'); return !!s && !s.classList.contains('closed') && s.querySelector('[data-act="ofm-group"]').getAttribute('aria-expanded') === 'true' && !!s.querySelector('[data-ofm="receipts"]') && !!s.querySelector('[data-act="ofm-more"]') && !s.querySelector('[data-ofm="kpi"]'); })()`, 20), 'phone: a tap opens Money (Receipts, "Show more", no figures yet)');
-    await click(ev, '#view [data-act="ofm-more"]');
-    check(await ready(ev, `!!document.querySelector('#view .ofmstart [data-ofmg="money"] [data-ofm="kpi"]') && !document.querySelector('#view [data-act="ofm-more"]')`, 20), 'phone: "Show more" shows the waiting points');
+    check(await ready(ev, `(() => { const s = document.querySelector('#view .ofmstart [data-ofmg="money"]'); return !!s && !s.classList.contains('closed') && s.querySelector('[data-act="ofm-group"]').getAttribute('aria-expanded') === 'true' && !!s.querySelector('[data-ofm="receipts"]') && !!s.querySelector('[data-ofm="kpi"]') && !s.querySelector('[data-act="ofm-more"]'); })()`, 20), 'phone: a tap opens Money (2.380 F, #3411: every point, no "Show more")');
 
     // ================= computer 1280: carol's fresh office
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
@@ -82,11 +80,12 @@ const today = TC.today();
     await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     check(await ready(ev, `${money} === 'true'`, 20), 'Money opens by hand');
     const pts = await ev(side);
-    check(pts === 'receipts,bank,books,cashbook' && await ev(`!!document.querySelector('#side [data-ofmg="money"] [data-act="ofm-more"]')`), '#3039: Receipts first, points used later wait behind "Show more" ' + pts);
+    // 2.380 F (#3411): every point of Money at once, no "Show more"
+    check(pts === 'receipts,cashflow,kpi,bank,books,subs,travel,meals,cashbook' && await ev(`!document.querySelector('#side [data-act="ofm-more"]')`), '#3411: Receipts first, every point of Money shown ' + pts);
     await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true'`, 80), '#3039: the hand\'s choice stays after reloading');
     await ev(`(() => { localStorage.removeItem('tasks.sbbUnfold'); return 1; })()`);
-    // a direct link still opens a waiting point (and keeps it in the menu)
+    // a direct link opens a point of Money
     await nav(B + '#office/kpi');
     check(await ready(ev, `!!document.querySelector('.office[data-ofctab="kpi"]') && !!document.querySelector('#side [data-ofm="kpi"][aria-current="page"]') && ${money} === 'true'`, 60), '#3039: #office/kpi by link: shown, Money open while on it');
 
@@ -137,7 +136,7 @@ const today = TC.today();
     await fresh(ev, nav, 'dave');
     await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && OFC.info.used?.invoice === true && ${money} === 'true'`, 80), '#3039: with an invoice Money is open on its own');
-    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !document.querySelector('#side [data-ofm="travel"]')`), '#3039: the figures and the cash flow show, travel still waits ' + await ev(side));
+    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !!document.querySelector('#side [data-ofm="travel"]')`), '#3039: the figures and the cash flow show (2.380 F, #3411: travel too, nothing waits) ' + await ev(side));
   }, false);
 
   console.log(`p2276_a_ui: ${ok} ok, ${F.length} failed`);

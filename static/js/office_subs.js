@@ -4,7 +4,7 @@
 // change goes through /api/office/fixed-costs (the cash flow counts them once). Server: kalmido/office/subs.py.
 const ABO = {data: null, err: null, oid: null, low: false, loading: false, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross'};
 const ABO_SOON = 14;  // "cancel by" in red below this many days
-OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['subs', 'repeat', N_('Subscriptions & tools'), 1, () => aboHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
+OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['subs', 'repeat', N_('Subscriptions & tools'), 1, () => aboHtml(), 'money', 'money.subs']);  // admins only; 2.92.1 (#1917): in the menu group Money
 
 // the subscription fields of a fixed cost as the routes take them (the undo of a delete posts them again)
 const aboFields = o => ({sub: o.sub || 0, notice_days: o.notice_days || 0, seats: o.seats || [], low_use: o.low_use || 0, remind_days: o.remind_days || 0, remind_user: o.remind_user || null, url: o.url || ''});

@@ -4,7 +4,7 @@
 // receipts on to a draft quotation / invoice (purchase = amount, never twice). Server: kalmido/office/travel.py.
 const rk_dv = () => typeof ofcFeat !== 'function' || ofcFeat('books.datev');  // 2.147.0 (#2460): DATEV on in this office
 const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set(), gen: 0};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml()]);  // admins only
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml(), 'money', 'money.travel']);  // admins only; 2.380 F (#3411): [6] the switch
 const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
 const rk_reload = () => { RK.data = null; RK.rep = null; RK.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;

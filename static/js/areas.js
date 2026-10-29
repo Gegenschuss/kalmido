@@ -71,9 +71,9 @@ const OFM_ITEMS = [
   {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
   {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
-  {key: 'cashflow', go: 'office/cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'kpi', go: 'office/kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'travel', go: 'office/travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'cashflow', go: 'office/cashflow', need: 'money.cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'kpi', go: 'office/kpi', need: 'money.kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'travel', go: 'office/travel', need: 'money.travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'services', go: 'office/services', icon: 'list', name: N_('Services'), group: 'admin', on: ofm_ofc, tpl: 1},
   {key: 'equipment', go: 'office/equipment', icon: 'camera', name: N_('Equipment'), group: 'admin', on: ofm_ofc},
   {key: 'contracts', go: 'office/contracts', icon: 'file', name: N_('Framework contracts'), group: 'sell', on: ofm_ofc},
@@ -90,8 +90,8 @@ const OFM_ITEMS = [
   // bookkeeping (GET /api/office/settings submit; office_receipts.js rsb_tabHtml): shown by their right in the area receipts
   {key: 'receipts', go: 'office/receipts', icon: 'ticket', get name() { return ofm_sub() ? N_('Submit receipt') : N_('Receipts'); }, group: 'money', on: ofm_ofc,
     get adm() { return ofm_sub() ? 0 : 1; }, get lvk() { return ofm_sub() ? 'receipts' : 'books'; }},
-  {key: 'subs', go: 'office/subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'meals', go: 'office/meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'subs', go: 'office/subs', need: 'money.subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'meals', go: 'office/meals', need: 'money.meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & insurance'), group: 'admin', on: ofm_ofc, adm: 1},
   // 2.187.1 B (#2735): the own times to bill -- only a person ruled by office groups (the others bill from the quotations)
@@ -132,10 +132,8 @@ const ofm_ok = i => { const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
-// points of Money shown once used; before that they wait behind "More" at the group's end (ofm_later). Shown anyway: the
-// point open now, one opened before on this device (LS ofmSeen, also by a direct link) or after "More" (LS ofmAll)
-const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
-const ofm_later = i => { const f = OFM_LATER[i.key], u = ofm_used(); return !!f && !!u && !f(u) && !LS.get('ofmAll', false) && !(LS.get('ofmSeen', []) || []).includes(i.key) && !(S.route?.mod === 'office' && S.route.tab === i.key); };
+// 2.380 F (#3411): no "More" any more -- every point allowed is shown; a point of Money nobody needs is switched off under
+// Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
@@ -146,8 +144,7 @@ const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'cont
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
-const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !ofm_later(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));  // 2.276.0 A (#3039): ofm_later
-const ofm_hidden = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && ofm_later(i));  // 2.276.0 A (#3039): behind "More"
+const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
@@ -160,7 +157,6 @@ function ofm_cur(mod) {
 // 2.276.0 A (#3039): nothing kept = Quotes & invoices for everybody; the Pipeline only once the office has an inquiry / lead
 function ofm_remember(key) {
   const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key);
-  const v = LS.get('ofmSeen', []) || []; if (key in OFM_LATER && !v.includes(key)) LS.set('ofmSeen', [...v, key]);  // 2.276.0 A (#3039)
 }
 function ofm_entry() {
   const its = ofm_items(), last = LS.get('ofmLast', null);
@@ -229,12 +225,11 @@ function ofm_startHtml() {
   const its = ofm_items();
   const fig = (ofm_lv() ? ofm_lv().kpi && ofm_lv().kpi !== 'none' : ofm_adm()) && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
   const row = i => `<button type="button" class="oflr" data-go="${i.go}" data-ofm="${i.key}">${ic(i.icon)}<span>${esc(tr(i.name))}</span>${ic('chev', 's')}</button>`;
-  // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded), its hidden points behind "More"
-  const more = g => g === 'money' && ofm_hidden().length ? `<button type="button" class="oflr ofmmore" data-act="ofm-more">${ic('dots')}<span>${esc(tr('Show more'))}</span></button>` : '';
+  // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded)
   const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
   const norc = typeof bnr_startHtml === 'function' && ofm_adm() ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
-  return `<div class="ofmstart">${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}${more(g[0])}</div>`}</section>` : ''; }).join('')}</div></div>`;
+  return `<div class="ofmstart">${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
 // so an arrangement from before 2.44.0 that hid both still hides the area, and 2.43.1 reads what this one writes)
@@ -572,8 +567,7 @@ function sbb_officeHtml() {
   const its = ofm_items(), here = sbb_area() === 'office', cur = here ? ofm_cur(S.route.mod) : '';
   return OFM_GROUPS.map(g => {
     const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
-    const more = g[0] === 'money' && ofm_hidden().length ? `<button type="button" class="srow smod sbbi ofmmore" data-act="ofm-more">${ic('dots')}<span class="n">${esc(tr('Show more'))}</span></button>` : '';  // 2.276.0 A (#3039)
-    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('') + more}</div>`;
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('')}</div>`;
   }).join('')  // 2.351.0 A (#3312): a document area opens as a tree (office_tree.js: its folders, 20 newest, More…); no group "Folders"
     + (typeof ctf_panelHtml === 'function' ? ctf_panelHtml() : '');  // 2.351.0 B (#2749): the address book's folders (ctfold.js, on its page)
 }
@@ -743,13 +737,12 @@ document.addEventListener('click', e => {
   sbb_foldSet(g, !sbb_folded(g)); renderSide();  // 2.276.0 A (#3039): was the toggle in sbbFold
   $(`#side [data-act="sbb-group"][data-g="${CSS.escape(g)}"]`)?.focus({preventScroll: true});
 });
-// 2.276.0 A (#3039): the phone's start page folds Money (same choice as the panel); "More" shows every point of Money from now on
+// 2.276.0 A (#3039): the phone's start page folds Money (same choice as the panel); 2.380 F (#3411): "More" is gone
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-act="ofm-group"],[data-act="ofm-more"]'); if (!b) return;
-  if (b.dataset.act === 'ofm-more') LS.set('ofmAll', true); else sbb_foldSet('office:money', !sbb_folded('office:money'));
-  const fo = b.dataset.act === 'ofm-group' ? '#view [data-act="ofm-group"]' : '';
+  const b = e.target.closest?.('[data-act="ofm-group"]'); if (!b) return;
+  sbb_foldSet('office:money', !sbb_folded('office:money'));
   renderSide(); if (b.closest('#view')) renderView();
-  if (fo) $(fo)?.focus({preventScroll: true});
+  $('#view [data-act="ofm-group"]')?.focus({preventScroll: true});
 });
 function sbb_panelHtml(id) {
   const d = sbb_def(id); if (!d) return '';
