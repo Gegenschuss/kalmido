@@ -1922,8 +1922,12 @@ themselves and have their own proposals API); child accounts get `403`.
 
 Tools like n8n, Make, Zapier or Home Assistant create tasks through a secret URL, without a login. The owner or an
 admin of a list adds one under **List settings > Inbound webhook** (up to 10 per list; not in the basket, health,
-budget or locked lists). The URL `https://kalmido.example.com/api/hooks/in/<token>` is shown **once** (Kalmido stores
-only its SHA-256); *New URL* stops the old one at once, *Delete* too (undo brings the same URL back for 30 days).
+budget or locked lists). The token is shown **once** (Kalmido stores only its SHA-256); *New URL* stops the old one at
+once, *Delete* too (undo brings the same URL back for 30 days).
+
+*Since 2.380:* send the token as the header `X-Kalmido-Hook-Token: <token>` to `POST /api/hooks/in` (recommended: the
+token stays out of reverse-proxy logs). The older form with the token in the path, `POST /api/hooks/in/<token>`, keeps
+working for tools that cannot set headers.
 
 Each `POST` creates **one task in exactly this list**, through the normal way of creating a task (history line "via
 webhook", pushes, agent events, outgoing webhooks, list rules), with the rights of the person who set the webhook up.
@@ -1944,9 +1948,9 @@ fields of other lists are **ignored** (never created) and named in `ignored`, so
 changes.
 
 ```bash
-curl -X POST -H 'Content-Type: application/json' \
+curl -X POST -H 'X-Kalmido-Hook-Token: khi_...' -H 'Content-Type: application/json' \
   -d '{"title": "Washing machine done", "due": "2026-11-02", "priority": "high", "tags": ["Home"]}' \
-  'https://kalmido.example.com/api/hooks/in/khi_...'
+  'https://kalmido.example.com/api/hooks/in'
 ```
 
 Home Assistant (`configuration.yaml`):
@@ -1954,13 +1958,15 @@ Home Assistant (`configuration.yaml`):
 ```yaml
 rest_command:
   kalmido_task:
-    url: "https://kalmido.example.com/api/hooks/in/khi_..."
+    url: "https://kalmido.example.com/api/hooks/in"
     method: POST
+    headers:
+      X-Kalmido-Hook-Token: "khi_..."
     content_type: "application/json"
     payload: '{"title": "{{ title }}"}'
 ```
 
-n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and the other keys). Behind a login proxy
+n8n: an *HTTP Request* node, method POST, the URL, the header `X-Kalmido-Hook-Token`, body JSON with `title` (and the other keys). Behind a login proxy
 (forward auth, single sign-on) the path `/api/hooks/` must bypass the proxy login, like the other inbound hooks.
 
 ## Settings: single entries and parallel saves (2.269.0)
