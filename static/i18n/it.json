@@ -14829,5 +14829,14 @@
   "Section not found: {0}": "Sezione non trovata: {0}",
   "Daily note": "Nota del giorno",
   "Go to day": "Vai al giorno",
-  "Embed a page": "Incorpora una pagina"
+  "Embed a page": "Incorpora una pagina",
+  "The file is no longer on this device": "Il file non è più su questo dispositivo",
+  "Guest list visible to guests": "Elenco degli ospiti visibile agli ospiti",
+  "Pictures shown": "Immagini visibili",
+  "Hide pictures": "Nascondi immagini",
+  "Show pictures": "Mostra immagini",
+  "Show embedded pictures": "Mostra le immagini incorporate",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Solo immagini dell'archivio incorporate nella pagina e che puoi vedere. Gli altri file restano nascosti.",
+  "Scheduling polls": "Sondaggi di date",
+  "Scheduling polls got new links: the old links no longer work.": "I sondaggi di date hanno nuovi link: i vecchi link non funzionano più."
 }

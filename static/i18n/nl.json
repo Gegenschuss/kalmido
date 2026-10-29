@@ -14829,5 +14829,14 @@
   "Section not found: {0}": "Sectie niet gevonden: {0}",
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
-  "Embed a page": "Pagina insluiten"
+  "Embed a page": "Pagina insluiten",
+  "The file is no longer on this device": "Het bestand staat niet meer op dit apparaat",
+  "Guest list visible to guests": "Gastenlijst zichtbaar voor gasten",
+  "Pictures shown": "Afbeeldingen zichtbaar",
+  "Hide pictures": "Afbeeldingen verbergen",
+  "Show pictures": "Afbeeldingen tonen",
+  "Show embedded pictures": "Ingesloten afbeeldingen tonen",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Alleen afbeeldingen uit de opslag die in de pagina zijn ingesloten en die je mag zien. Andere bestanden blijven verborgen.",
+  "Scheduling polls": "Datumprikkers",
+  "Scheduling polls got new links: the old links no longer work.": "Datumprikkers hebben nieuwe links: de oude links werken niet meer."
 }

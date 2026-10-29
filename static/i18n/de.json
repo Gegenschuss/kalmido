@@ -14829,5 +14829,14 @@
   "Section not found: {0}": "Abschnitt nicht gefunden: {0}",
   "Daily note": "Tagesnotiz",
   "Go to day": "Zum Tag springen",
-  "Embed a page": "Seite einbetten"
+  "Embed a page": "Seite einbetten",
+  "The file is no longer on this device": "Die Datei ist nicht mehr auf diesem Gerät",
+  "Guest list visible to guests": "Gästeliste für Gäste sichtbar",
+  "Pictures shown": "Bilder sichtbar",
+  "Hide pictures": "Bilder ausblenden",
+  "Show pictures": "Bilder zeigen",
+  "Show embedded pictures": "Eingebettete Bilder mitzeigen",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Nur Bilder aus der Ablage, die in der Seite eingebettet sind und die du sehen darfst. Andere Dateien bleiben verborgen.",
+  "Scheduling polls": "Terminumfragen",
+  "Scheduling polls got new links: the old links no longer work.": "Terminumfragen haben neue Links bekommen: die alten Links funktionieren nicht mehr."
 }
