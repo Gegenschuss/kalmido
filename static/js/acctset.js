@@ -121,6 +121,8 @@ function accountHtml() {
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
+    ${mvHas() ? `<h4 id="s-mview-h">${tr('View as member')}</h4><div class="row"><label class="chkl"><input type="checkbox" id="s-mview" ${mvOn() ? 'checked' : ''}> ${tr('View as member')}</label></div>
+    <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
@@ -135,7 +137,7 @@ const UA8_FLT = [['people', N_('People')], ['active', N_('Active')], ['disabled'
 const UA8_PAGE = 50;
 const usersHtml = () => `<h4>${tr('Users')}</h4>
   <div class="ua8bar"><input type="search" id="a-uq" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="a-uflt" aria-label="${esc(tr('Filter'))}">${UA8_FLT.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
-  <div class="ua8sel" id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
+  <div id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
   <div class="members" id="a-users" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="ua8pg" id="a-upg"></div>
   <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
@@ -713,18 +715,22 @@ function ua8_wire(md, us, draw) {
     const t = e.target;
     if (t.id === 'a-uflt') { us.flt = t.value; us.off = 0; draw(); return; }
     if (t.dataset?.usel) { const id = +t.dataset.usel; t.checked ? us.sel.add(id) : us.sel.delete(id); ua8_selDraw(md, us); return; }
-    if (t.id === 'a-uborg' && +t.value) {
-      const o = (S.orgs || []).find(x => x.id === +t.value); t.value = '';
-      if (o && await askConfirm(trn('Add {0} person to “{1}”?', 'Add {0} people to “{1}”?', us.sel.size, o.name), tr('They become members of the organisation; their other organisations stay.'), {ok: tr('Add')})) await ua8_bulk(md, us, draw, 'org_add', o.id);
-    }
   });
+  const orgAdd = async o => {
+    if (await askConfirm(trn('Add {0} person to “{1}”?', 'Add {0} people to “{1}”?', us.sel.size, o.name), tr('They become members of the organisation; their other organisations stay.'), {ok: tr('Add')})) await ua8_bulk(md, us, draw, 'org_add', o.id);
+  };
+  const clear = () => { us.sel.clear(); $$('[data-usel]', md).forEach(x => { x.checked = false; }); ua8_selDraw(md, us); };
+  md.addEventListener('keydown', e => { if (e.key === 'Escape' && us.sel.size && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); clear(); } });  // 2.428.0 A (#3581): Esc ends the selection first
   md.addEventListener('click', async e => {
     const p = e.target.closest('[data-upg]');
     if (p) { us.off = Math.max(0, us.off + (+p.dataset.upg) * UA8_PAGE); draw(); $('#a-uq', md)?.scrollIntoView({block: 'nearest'}); return; }
     const b = e.target.closest('[data-ubulk]'); if (!b) return;
-    if (b.dataset.ubulk === 'clear') { us.sel.clear(); $$('[data-usel]', md).forEach(x => { x.checked = false; }); ua8_selDraw(md, us); return; }
-    if (b.dataset.ubulk === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
-    await ua8_bulk(md, us, draw, b.dataset.ubulk);
+    const k = b.dataset.ubulk;
+    if (k === 'close' || k === 'clear') { clear(); return; }
+    if (k === 'all') { $$('[data-usel]:not(:disabled)', md).forEach(x => { x.checked = true; us.sel.add(+x.dataset.usel); }); ua8_selDraw(md, us); return; }
+    if (k === 'more') { menu(b, ua8_orgs().map(o => ({label: o.name, icon: 'building', fn: () => orgAdd(o)})), null, null, tr('Add to an organisation')); return; }
+    if (k === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
+    await ua8_bulk(md, us, draw, k);
   });
 }
 function ua8_pagerDraw(md, us) {
@@ -733,14 +739,14 @@ function ua8_pagerDraw(md, us) {
   box.innerHTML = us.total > UA8_PAGE ? `<button type="button" class="iconbtn" data-upg="-1" aria-label="${esc(tr('Previous page'))}" title="${esc(tr('Previous page'))}" ${us.off ? '' : 'disabled'}>${ic('left', 's')}</button><span class="muted">${esc(tr('{0}–{1} of {2}', us.off + 1, to, us.total))}</span><button type="button" class="iconbtn" data-upg="1" aria-label="${esc(tr('Next page'))}" title="${esc(tr('Next page'))}" ${to < us.total ? '' : 'disabled'}>${ic('right', 's')}</button>`
     : us.total > 1 ? `<span class="muted">${esc(trn('{0} account', '{0} accounts', us.total))}</span>` : '';
 }
+const ua8_orgs = () => S.instanceMode === 'workspaces' ? (S.orgs || []) : [];
+// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Disable, Enable; "Add to an organisation" under "More"
 function ua8_selDraw(md, us) {
   const box = $('#a-usel', md); if (!box) return;
   box.hidden = !us.sel.size;
   if (!us.sel.size) { box.innerHTML = ''; return; }
-  const os = S.instanceMode === 'workspaces' ? (S.orgs || []) : [];
-  box.innerHTML = `<span class="n">${esc(tr('{0} selected', us.sel.size))}</span><button type="button" class="btn sm" data-ubulk="disable">${tr('Disable')}</button><button type="button" class="btn sm" data-ubulk="enable">${tr('Enable')}</button>`
-    + (os.length ? `<select id="a-uborg" aria-label="${esc(tr('Add to an organisation'))}"><option value="0">${tr('Add to an organisation …')}</option>${os.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select>` : '')
-    + `<button type="button" class="linkbtn" data-ubulk="clear">${tr('Clear selection')}</button>`;
+  box.innerHTML = ms_barHtml('ua-sbar', 'ubulk', us.sel.size, '', [['all', 'all', tr('All')], ['disable', 'ban', tr('Disable')], ['enable', 'check', tr('Enable')],
+    ...ua8_orgs().length ? [['more', 'dots', tr('More')]] : []]);
 }
 async function ua8_bulk(md, us, draw, action, orgId) {
   const ids = [...us.sel];

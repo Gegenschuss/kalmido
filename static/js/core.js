@@ -611,7 +611,7 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
+  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -622,6 +622,19 @@ async function api(method, url, body) {
     }
     throw e;
   }
+}
+// 2.436.0 (#3620): "View as member": the one place the own admin marks read as a member's (display only; settings.js mvSet)
+const MV = {me: null};
+const mvOn = () => S.settings?.member_view === '1';
+const mvOrg = o => o?.role === 'admin' ? {...o, role: 'member', real_role: 'admin'} : o;
+const mvMe = me => me ? {...me, real_admin: !!me.is_admin, is_admin: false, ...(Array.isArray(me.workspaces) ? {workspaces: me.workspaces.map(mvOrg)} : {})} : me;
+function mvResp(url, j) {
+  if (!j || typeof j !== 'object') return j;
+  const p = String(url).split('?')[0];
+  if (p === '/api/state') { if (j.me) MV.me = j.me; return j.me && j.settings?.member_view === '1' ? {...j, me: mvMe(j.me)} : j; }
+  if (!mvOn()) return j;
+  if (p === '/api/me') return mvMe(j);
+  return p === '/api/orgs' && Array.isArray(j.orgs) ? {...j, orgs: j.orgs.map(mvOrg)} : j;
 }
 // 2.359.0 A (#3023): the address with a temporary id replaced: the real id once its create went out (this tab or another,
 // the service worker); null = its create still waits in the queue; false = no create waits for it (it failed)

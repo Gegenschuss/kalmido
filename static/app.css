@@ -6227,16 +6227,17 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 /* 2.45.0 B (#1515) self-hosting: setup code field, missing server key */
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
 
-/* 2.46.1 C (#1554): several contacts at once - the selection bar (looks like the tasks' #mbar), a tick per row */
-#ct-sbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-h) + var(--safe-b));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto;scrollbar-width:none}
-#ct-sbar .mcount{font:var(--fs-s) var(--mono);padding:0 .5rem;white-space:nowrap;color:var(--accent)}
-#ct-sbar .mbb{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.125rem;min-width:2.75rem;min-height:2.75rem;padding:.125rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-xs);line-height:1.1;cursor:pointer;flex:none}
-#ct-sbar .mbb:hover:not(:disabled){background:var(--bg4);color:var(--text)}
-#ct-sbar .mbb:disabled{opacity:.45;cursor:default}
-#ct-sbar .mbb.danger{color:var(--danger)}
-#ct-sbar .mbb .mbl{white-space:nowrap}
-#ct-sbar .mbx{flex:none}
-@media (max-width:767px){ #ct-sbar{left:.625rem;right:.625rem;transform:none;justify-content:space-between;gap:0;padding:.25rem .375rem} #ct-sbar .mcount{padding:0 .25rem;font-size:var(--fs-xs)} #ct-sbar .mbb{flex:1 1 0;min-width:3.25rem} }
+/* 2.46.1 C (#1554): several contacts at once - the selection bar (looks like the tasks' #mbar), a tick per row;
+   2.428.0 A (#3581): class .mselbar = every selection's bar (multisel.js ms_barHtml) */
+.mselbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-h) + var(--safe-b));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto;scrollbar-width:none}
+.mselbar .mcount{font:var(--fs-s) var(--mono);padding:0 .5rem;white-space:nowrap;color:var(--accent)}
+.mselbar .mbb{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.125rem;min-width:2.75rem;min-height:2.75rem;padding:.125rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-xs);line-height:1.1;cursor:pointer;flex:none}
+.mselbar .mbb:hover:not(:disabled){background:var(--bg4);color:var(--text)}
+.mselbar .mbb:disabled{opacity:.45;cursor:default}
+.mselbar .mbb.danger{color:var(--danger)}
+.mselbar .mbb .mbl{white-space:nowrap}
+.mselbar .mbx{flex:none}
+@media (max-width:767px){ .mselbar{left:.625rem;right:.625rem;transform:none;justify-content:space-between;gap:0;padding:.25rem .375rem} .mselbar .mcount{padding:0 .25rem;font-size:var(--fs-xs)} .mselbar .mbb{flex:1 1 0;min-width:3.25rem} }
 .ctpicking .ctlistw{padding-bottom:5rem}
 .ctrow .ctchk{width:1.25rem;height:1.25rem;border:1.5px solid var(--line2);border-radius:.375rem;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--bg)}
 .ctrow .ctchk.on{background:var(--accent);border-color:var(--accent)}
@@ -7961,10 +7962,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
    buttons share the width and long labels end with an ellipsis (the full name stays in title / aria-label) */
 @media (hover:none),(max-width:767px){ #toast button:not(.tx){min-height:2.75rem;min-width:2.75rem} }
 @media (max-width:767px){
-  #ct-sbar{flex-wrap:wrap;overflow-x:hidden;row-gap:.125rem}
-  #ct-sbar .mcount{flex:1 0 100%;padding:.25rem .375rem 0}
-  #ct-sbar .mbb{min-width:2.75rem;max-width:100%}
-  #ct-sbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .mselbar{flex-wrap:wrap;overflow-x:hidden;row-gap:.125rem}
+  .mselbar .mcount{flex:1 0 100%;padding:.25rem .375rem 0}
+  .mselbar .mbb{min-width:2.75rem;max-width:100%}
+  .mselbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .ctpicking .ctlistw{padding-bottom:6.5rem}
 }
 /* 2.83.0 C (#1427) themes, header strips of lists and folders, small moments (listhead.js) */
@@ -8103,9 +8104,14 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.96.0 A (#1941): choosing rows in the file store (to move them, also into the other workspace) */
 .absel{display:flex;align-items:center;justify-content:center;flex:0 0 2.75rem;min-height:2.75rem;cursor:pointer}
 .absel input{width:1.25rem;height:1.25rem;accent-color:var(--accent)}
-.abselbar{position:sticky;bottom:.75rem;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.75rem;padding:.5rem .75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}
-.abselbar .btn,.abselbar .iconbtn{min-height:2.75rem}
-/* 2.102.0 B (#2206): while choosing, room below the list as high as the sticky bar, so the last row stays tappable */
+/* 2.428.0 A (#3581): the bar is the shared floating one (.mselbar); before choosing a row's box shows on hover (computer) over
+   the row's start, without moving the row; phones start with a long press. The knowledge rows (.wkrow) the same. */
+.ablist:not(.abselon) .abrow,.wkrow:not(.wkselrow){position:relative}
+.ablist:not(.abselon) .absel,.wkrow:not(.wkselrow)>.absel{position:absolute;left:0;top:0;bottom:0;z-index:1;min-height:0;opacity:0;pointer-events:none;background:var(--bg2);border-radius:var(--radius)}
+@media (hover:hover) and (pointer:fine){ .ablist:not(.abselon) .abrow:hover .absel,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>.absel{opacity:1;pointer-events:auto} }
+.wkrow:not(.wkselrow)>.absel{bottom:auto;height:2.5rem}
+@media (hover:none),(pointer:coarse){ .ablist:not(.abselon) .absel,.wkrow:not(.wkselrow)>.absel{display:none} }
+/* 2.102.0 B (#2206): while choosing, room below the list as high as the floating bar, so the last row stays tappable */
 .ablist.abselon{padding-bottom:7.5rem}
 
 /* 2.119.0 B (#2301): switched on = filled shape in the accent (or priority) colour, off = outline (like the star .hfav) */
@@ -8115,9 +8121,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.119.0 B (#2210): the Agents section of the dialog "All people …" */
 .sbpmd .sbph{margin:.75rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:none}
 .sbpmd .mrow[data-aid] .sdot{flex:none}
-/* 2.112.1 A (#2058): download / trash in the selection bar; phones: icons only, the moves in its "..." menu */
-.abselm{display:none}
-@media (max-width:599px){ .abselbar .abselt,.abselbar .abselx{display:none} .abselm{display:inline-flex} .abselbar .btn{min-width:2.75rem;justify-content:center} }
 /* 2.115.0 A (#2061) inbound webhooks of a list (hookin.js): the URL shown once, the curl example */
 .whi-url code{overflow-wrap:anywhere;word-break:break-all}
 .whi-ex{margin-top:.375rem}

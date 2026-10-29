@@ -128,7 +128,10 @@ function ofm_lv() {
   return (LS.get('ofmLv', {}) || {})[ofm_ws()] || null;
 }
 // a menu point: an office area = its level is not "none" (Settings stays: "My rights" lives there); else as before (adm)
-const ofm_ok = i => { const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm(); };  // 2.276.0 A (#3039): lvk
+// 2.436.0 (#3620): "View as member" in an organisation's office: no settings / contracts / bank; daily work stays
+const MV_OFM = ['settings', 'agreements', 'bank'];
+const mvOfc = () => mvOn() && (typeof OFC !== 'undefined' && OFC.info ? !OFC.info.personal : String(wsCur()).startsWith('org:'));
+const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm(); };  // 2.276.0 A (#3039): lvk
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }

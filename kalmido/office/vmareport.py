@@ -22,7 +22,7 @@ from .model import office_settings
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .rights import ofr_own_uid
 from .travel import _csv_safe, _ctx, rk_trips
-from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate
+from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate, vma_table_year
 
 VMR_CUR = "EUR"  # the BMF rates are in euros, whatever the office currency
 
@@ -47,6 +47,8 @@ def vmr_hint_text(h, lg="de"):
         return tr("8 hours or less: no per diem")
     if k == "year":
         return tr("No per diem rates for {0}", h.get("year"))
+    if k == "older":
+        return tr("Rates of {0} used, the BMF letter for {1} is not entered yet", h.get("used"), h.get("year"))
     if k in ("alias", "lu"):
         return tr("Rate of {0} used for {1}", vma_country_name(h.get("used"), lg), vma_country_name(h.get("country"), lg))
     return k or ""
@@ -113,7 +115,9 @@ def vmr_report(c, oid, year, person=None, lg="de"):
             row["breakdown"] = vma_breakdown({"lines": lines}, lg, VMR_CUR)
             if cut:
                 row["breakdown"].append(tr("Meals provided: -{0}", vmr_num(cut, lg) + " €"))
-            sources.add(VMA_YEARS[year])
+            sources.add(VMA_YEARS[vma_table_year(year)])
+            if year not in VMA_YEARS:  # 2.428.0 (#3522): never silently: the hint goes along (view, CSV, Excel, PDF)
+                row["breakdown"].append(vmr_hint_text({"key": "older", "year": year, "used": vma_table_year(year)}, lg))
         ppl = t["people"] or [{"name": ""}]
         if not t["people"] and own is not None and t.get("own_ro") == 0:  # own_ro 0: entered by the person (rk_trips)
             ppl = [{"id": own, "name": me}]
@@ -132,7 +136,8 @@ def vmr_report(c, oid, year, person=None, lg="de"):
     for g in people:
         g["total"] = dstr(money(g["total"]))
     return {"year": year, "currency": VMR_CUR, "people": people, "total": dstr(money(total)), "open": sum(g["open"] for g in people),
-            "source": sorted(sources) or ([VMA_YEARS[year]] if year in VMA_YEARS else []), "rates": year in VMA_YEARS}
+            "source": sorted(sources) or ([VMA_YEARS[vma_table_year(year)]] if vma_table_year(year) else []),
+            "rates": vma_table_year(year) is not None}
 
 
 def vmr_num(v, lg):
@@ -170,11 +175,14 @@ def vmr_rates_get():
     _ctx()
     year = vmr_year()
     places = vma_places(year)
-    out = {"years": sorted(VMA_YEARS), "year": year, "source": VMA_YEARS.get(year, ""), "home": None, "countries": [], "hint": None}
+    ty = vma_table_year(year)
+    out = {"years": sorted(VMA_YEARS), "year": year, "source": VMA_YEARS.get(ty, ""), "home": None, "countries": [], "hint": None}
     if places is None:
         out["hint"] = {"key": "year", "year": year}
         return jsonify(out)
-    f, p = VMA_HOME[year]
+    if ty != year:  # 2.428.0 (#3522): a later year shows the newest table, with the hint
+        out["hint"] = {"key": "older", "year": year, "used": ty}
+    f, p = VMA_HOME[ty]
     out["home"] = {"full": f, "partial": p}
     for code, pl in places.items():
         r = vma_rate(year, code, "")

@@ -5,6 +5,7 @@ may be changed with 'edit' on it. Settings, rules, labels and the mail address o
 admins; of a person's own workspace: that person. Agents use the API v1 (docs/v1.py), not these routes."""
 import os
 import re
+from decimal import Decimal, InvalidOperation
 
 from flask import g, jsonify, request
 
@@ -163,9 +164,34 @@ def _doc(c, nid, write=False):
 
 
 # ---- list + search ------------------------------------------------------------------------------------------------------
+# 2.428.0 (#3579): the sort of the list (?sort=&dir=), only from this list. SQL for the plain columns; sender names and amounts
+# are sealed at rest and sorted here after opening (None = sealed in Python).
+DOC_SORTS = {"date": "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", "added": "n.created_at", "due": "NULLIF(d.due_date, '')",
+             "title": "lower(n.name)", "sender": None, "amount": None}
+
+
+def doc_sort(args):
+    """(key, descending) of ?sort=&dir= (default: document date, newest first; names A-Z)."""
+    key = str(args.get("sort") or "date")
+    key = key if key in DOC_SORTS else "date"
+    d = str(args.get("dir") or "")
+    return key, (d == "desc") if d in ("asc", "desc") else key not in ("title", "sender")
+
+
+def _sort_value(c, r, key):
+    """The sealed sort value of a row (sender name lower case / amount as a number), None when there is none."""
+    if key == "sender":
+        name = S.label_name(c, r["ws"], "sender", r["sender_id"]) if r["sender_id"] else None
+        return name.casefold() if name else None
+    try:
+        return Decimal(str(S.doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or "").replace(",", "."))
+    except (InvalidOperation, ValueError):
+        return None
+
+
 def doc_query(c, uid, args):
     """The documents account uid sees, filtered by args (ws, q, sender, type, tag, from, to, review, state) -> (rows, total,
-    review count). Rows: doc_meta + node columns, newest document date first."""
+    review count). Rows: doc_meta + node columns, sorted by doc_sort (newest document date first by default)."""
     where, params = [f"n.id IN {fs_visible_sql(uid, c)}", "n.kind='file'"], []
     ws = str(args.get("ws") or "all")
     if ws == "private":
@@ -204,9 +230,20 @@ def doc_query(c, uid, args):
         offset = max(0, int(args.get("offset") or 0))
     except ValueError:
         limit, offset = 50, 0
-    rows = c.execute(f"""SELECT d.*, n.id AS nid {sql} ORDER BY COALESCE(d.doc_date, substr(n.created_at, 1, 10)) DESC, n.id DESC
-                         LIMIT {limit} OFFSET {offset}""", params).fetchall()
-    return rows, total, review
+    key, desc = doc_sort(args)
+    way = "DESC" if desc else "ASC"
+    if DOC_SORTS[key]:  # empty values last in both directions, the id keeps the pages stable
+        rows = c.execute(f"""SELECT d.*, n.id AS nid {sql} ORDER BY {DOC_SORTS[key]} {way} NULLS LAST, n.id {way}
+                             LIMIT {limit} OFFSET {offset}""", params).fetchall()
+        return rows, total, review
+    keyed = [(_sort_value(c, r, key), r["nid"]) for r in c.execute(f"SELECT d.node_id, d.ws, d.sender_id, d.amount, n.id AS nid {sql}", params)]
+    has = sorted((x for x in keyed if x[0] is not None), reverse=desc)
+    ids = [x[1] for x in has + sorted((x for x in keyed if x[0] is None), key=lambda x: x[1], reverse=desc)][offset:offset + limit]
+    if not ids:
+        return [], total, review
+    got = {r["nid"]: r for r in c.execute(f"SELECT d.*, n.id AS nid FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id "
+                                          f"WHERE d.node_id IN ({','.join('?' * len(ids))})", ids)}
+    return [got[i] for i in ids if i in got], total, review
 
 
 def facets(c, uid, ws_filter):
@@ -243,7 +280,8 @@ def facets(c, uid, ws_filter):
 
 @app.get("/api/docs")
 def docs_list():
-    """Documents I can see: ?ws=all|private|org:<id>&q=&sender=&type=&tag=&from=&to=&review=1&state=&limit=&offset=.
+    """Documents I can see: ?ws=all|private|org:<id>&q=&sender=&type=&tag=&from=&to=&review=1&state=&limit=&offset=&sort=&dir=
+    (2.428.0 #3579: sort date|added|sender|amount|due|title, dir asc|desc).
     2.122.0 B (#2294): sender / type / tag / folder repeatable (comma ids = one name), tag_mode=all|any, not_tag=, added_from=,
     added_to=, no_tag=1, no_sender=1, no_type=1, ftype=pdf,image,office,text,other; q takes the syntax of docs/dsearch.py."""
     c = db()

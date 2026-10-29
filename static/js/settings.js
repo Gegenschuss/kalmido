@@ -91,6 +91,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
   's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
+  's-mview': ['member_view', N_('View as member'), 'chk'],  // 2.436.0 (#3620): core.js mvResp
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -136,7 +137,28 @@ async function setAfter(patch) {
   if ('lang' in patch) { await i18nLoad(patch.lang); LS.set('lang', patch.lang); document.documentElement.lang = patch.lang; }
   if ('features' in patch || 'nav_order' in patch) { try { await load(); } catch { /* offline: the local copy is right */ } await route(); return; }  // route: a view whose module went off
   if ('assistant_on' in patch) asst_onSync(patch.assistant_on);  // 2.75.0 (#1411): the entry points follow the switch
+  if ('member_view' in patch) { await mvAfter(); return; }  // 2.436.0 (#3620): the whole view follows (core.js)
   if (Object.keys(patch).some(k => SET_RENDER.includes(k))) render();
+}
+// 2.436.0 (#3620): the person has something "View as member" hides (only then Settings > Account offers it)
+const mvHas = () => !!(S.me?.real_admin || S.me?.is_admin || (S.me?.workspaces || []).some(w => (w.real_role || w.role) === 'admin'));
+// 2.436.0 (#3620): "View as member" (core.js mvResp): the view follows a change of the switch: the account at once, then the state again; an open Settings is drawn anew
+async function mvAfter() {
+  if (MV.me && MV.me.id === S.me?.id) { const raw = {...S.me, is_admin: MV.me.is_admin, workspaces: MV.me.workspaces}; delete raw.real_admin; S.me = mvOn() ? mvMe(raw) : raw; }
+  try { await load(); } catch { /* offline: the account above holds until the next load */ }
+  if (typeof OFC !== 'undefined') OFC.data = {};  // the office's lists follow its menu
+  render();
+  const md = $$('.smodal').pop();
+  if (md) { md._noflush = true; md.remove(); settingsModal(mvOn() || LS.get('settingsSec', 'account') === 'org' ? 'account' : LS.get('settingsSec', 'account')); }
+}
+// the way back (the entry under the settings' areas, the account menu): one click, no question
+async function mvSet(on) {
+  const v = on ? '1' : '0';
+  if ((S.settings?.member_view || '0') === v) return;
+  try { await api('PATCH', '/api/settings', {member_view: v}); } catch { return; }
+  S.settings.member_view = v;
+  await mvAfter();
+  toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
 }
 // local (per device) settings: appearance, tab bar
 function setLocal(label, get, set, to) {
@@ -775,9 +797,10 @@ function settingsModal(focus) {
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
+    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back

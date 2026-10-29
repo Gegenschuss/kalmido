@@ -69,6 +69,8 @@ function viewAblage() {
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
   const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
+  AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
@@ -362,6 +364,7 @@ document.addEventListener('click', e => {
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
+  if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_smvPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
   if (a === 'open' && n) { if (n.kind === 'folder') go('ablage/' + n.id); else ab_openFile(n); return; }
   if (a === 'menu' && n) { ab_menu(b, n); return; }
   if (a === 'restore' && n) ab_restore(n);
@@ -375,7 +378,7 @@ cm_bind('#view .abview .abrow', r => {  // the panel's folders: sbb_treeReg('ab'
   const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
   ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n); });
   return true;
-});
+}, r => { const id = +r.dataset.abid; if (AB.selHere && r.closest('.ablist') && ab_item(id)) ab_smvPick(id); else { const m = r.querySelector('[data-ab="menu"]'), n = m && ab_item(m.dataset.id); if (n) ab_menu(m, n); } });  // 2.428.0 A (#3581): a long press selects
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
 document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ab_item(r.dataset.abid)?.locked ? '' : r.querySelector('.abname')?.textContent || ''); });  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
@@ -428,19 +431,18 @@ document.addEventListener('click', e => {
 const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && ab_canWrite(n.role);
 const ab_smvSel = () => (AB.data?.items || []).filter(n => AB.sel.has(n.id));
 const ab_smvTools = d => d?.items?.length && !(typeof ftxtActive === 'function' && ftxtActive()) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
-const ab_smvBox = n => AB.selOn ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
+const ab_smvBox = n => AB.selOn || AB.selHere ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
+// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Move, Download, Delete (trash); another workspace under "More"
 function ab_smvBar() {
   if (!AB.selOn) return '';
-  const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk), from = ns[0]?.org_id || null;
-  return `<div class="abselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="absn" aria-live="polite">${esc(tr('{0} selected', ns.length))}</span>
-    <button type="button" class="linkbtn" data-absel="all">${ns.length === all ? tr('Select none') : tr('Select all')}</button><span class="spacer"></span>
-    <button type="button" class="btn sm" data-absel="dl" ${ns.length && ns.some(abm_dlOk) ? '' : 'disabled'}>${ic('download', 's')} <span class="abselt">${tr('Download')}</span></button>
-    <button type="button" class="btn sm" data-absel="trash" ${ns.length && ns.every(abm_trashOk) ? '' : 'disabled'} aria-label="${esc(tr('Move to the trash'))}" title="${esc(tr('Move to the trash'))}">${ic('trash', 's')} <span class="abselt">${tr('Move to the trash')}</span></button>
-    <button type="button" class="btn sm abselx" data-absel="move" ${ok ? '' : 'disabled'}>${ic('arrow', 's')} ${tr('Move to…')}</button>
-    ${smv_can(from) ? `<button type="button" class="btn sm abselx" data-absel="space" ${ok ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
-    <button type="button" class="iconbtn abselm" data-absel="more" ${ok ? '' : 'disabled'} aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>
-    <button type="button" class="iconbtn" data-absel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
+  const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk);
+  const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
+    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ['trash', 'trash', tr('Delete'), 'danger'], ...smv_can(ns[0]?.org_id || null) ? [['more', 'dots', tr('More')]] : []]);
+  // a button some of the chosen rows cannot take stays off (as before); the bar's own rule only knows "nothing chosen"
+  const off = {move: !ok, dl: !ns.some(abm_dlOk), trash: !ns.every(abm_trashOk), more: !ok};
+  return h.replace(/<button type="button" class="mbb [^"]*" data-absel="(\w+)"/g, (m, k) => off[k] && ns.length ? m + ' disabled' : m);
 }
+const ab_smvMore = (b, ns) => menu(b, [{label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => ab_smvSpace(ns)}], null, null, tr('Selection'));
 const ab_smvEnd = () => { AB.sel.clear(); AB.selOn = false; };
 // several rows into one folder of the same space (the server refuses another tree / a folder into itself)
 async function ab_smvMoveDlg(ns) {
@@ -488,18 +490,29 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-absel]'); if (!b || !b.closest('.abview') || b.dataset.absel === 'one') return;
   const a = b.dataset.absel, items = AB.data?.items || [];
   if (a === 'mode') { AB.selOn = !AB.selOn; AB.sel.clear(); ab_draw(); }
-  else if (a === 'off') { ab_smvEnd(); ab_draw(); }
-  else if (a === 'all') { const all = ab_smvSel().length === items.length; AB.sel = new Set(all ? [] : items.map(n => n.id)); ab_draw(); }
+  else if (a === 'off' || a === 'close') { ab_smvEnd(); ab_draw(); }
+  else if (a === 'all') { const all = !!items.length && ab_smvSel().length === items.length; AB.sel = new Set(all ? [] : items.map(n => n.id)); ab_draw(); }
   else if (a === 'move') ab_smvMoveDlg(ab_smvSel());
   else if (a === 'space') ab_smvSpace(ab_smvSel());
   else if (a === 'dl') abm_download(ab_smvSel());  // 2.112.1 A (#2058)
   else if (a === 'trash') abm_trash(ab_smvSel());
-  else if (a === 'more') { const ns = ab_smvSel(); menu(b, [{label: tr('Move to…'), icon: 'arrow', fn: () => ab_smvMoveDlg(ns)},
-    smv_can(ns[0]?.org_id || null) ? {label: tr('Move to another workspace…'), icon: 'building', fn: () => ab_smvSpace(ns)} : null], null, null, tr('Selection')); }
+  else if (a === 'more') ab_smvMore(b, ab_smvSel());
 });
+// 2.428.0 A (#3581): a box ticked on hover starts choosing; Ctrl / Cmd / Shift + click on a row (computer) chooses it, a tap
+// while choosing too; a long press (phone) starts it (cm_bind below); Esc ends it
+function ab_smvPick(id, shift) {
+  if (!AB.selOn) { AB.selOn = true; AB.sel.clear(); AB.selLast = null; }
+  const order = (AB.data?.items || []).map(n => n.id);
+  const ids = shift && AB.selLast != null ? ms_range(order, AB.selLast, id) : [id], on = !AB.sel.has(id);
+  for (const x of ids) if (on) AB.sel.add(x); else AB.sel.delete(x);
+  AB.selLast = id; if (typeof dt_rsAnchor === 'function') dt_rsAnchor('ab:' + AB.dkey, id);  // tagsel.js takes the next Shift / Ctrl-click from here
+  ab_draw();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && AB.selOn && $('#view .abview') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ab_smvEnd(); ab_draw(); } });
 document.addEventListener('change', e => {
   const b = e.target.closest?.('[data-absel="one"]'); if (!b) return;
   const id = +b.dataset.id; if (b.checked) AB.sel.add(id); else AB.sel.delete(id);
+  AB.selOn = true; AB.selLast = id;  // 2.428.0 A (#3581): a box ticked on hover starts choosing
   ab_draw();
 });
 

@@ -75,7 +75,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     await ev(`(() => { const c = document.querySelector('#a-users .ua8chk:not(:disabled)'); c.click(); return 1; })()`);
     await sleep(400);
     const top1 = await ev(`Math.round(document.querySelector('#a-users').getBoundingClientRect().top)`);
-    const bar = await ev(`(() => { const r = document.querySelector('#a-usel').getBoundingClientRect(); return {hidden: document.querySelector('#a-usel').hidden, b: Math.round(r.bottom), vh: innerHeight}; })()`);
+    const bar = await ev(`(() => { const r = document.querySelector('#ua-sbar').getBoundingClientRect(); return {hidden: document.querySelector('#a-usel').hidden, b: Math.round(r.bottom), vh: innerHeight}; })()`);
     check(top0 === top1, 'phone: the list stays put on the first tick ' + top0 + ' -> ' + top1);
     check(bar && !bar.hidden && bar.b <= bar.vh, 'phone: the selection bar is inside the screen ' + JSON.stringify(bar));
     await shot('p292d-users-390.png');
