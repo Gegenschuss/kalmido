@@ -75,7 +75,7 @@ const VIEW = `(() => { const md = document.querySelector('.modal.smodal'); if (!
   check(w.eval(`S.me.workspaces.find(o => o.id === ${ORG})?.role === 'member' && S.me.workspaces.find(o => o.id === ${ORG})?.real_role === 'admin'`), '#3620: ... the organisation\'s role reads member (real_role admin)');
   check(await until(async () => (await call('GET', '/api/state')).settings.member_view === '1'), '#3620: ... saved for the person (all devices)');
   check(await until(() => d.querySelector('.modal.smodal .snmv') && d.getElementById('s-mview')?.checked), '#3620: the settings are drawn anew: the switch on, "Show administration again" under the areas');
-  const mv = await settle(w);
+  const mv = await until(async () => { const v = await settle(w); return v === bob ? v : null; }, 8) || w.eval(VIEW);
   check(mv === bob, '#3620: the settings show what a real member sees\n   as member: ' + mv + '\n   bob:       ' + bob);
   // an answer of /api/orgs read later (the organisation's boxes) reads member too
   check(await w.eval(`api('GET', '/api/orgs').then(j => j.orgs.find(o => o.id === ${ORG}).role)`) === 'member', '#3620: GET /api/orgs reads member for the display');
@@ -113,7 +113,9 @@ const VIEW = `(() => { const md = document.querySelector('.modal.smodal'); if (!
   check(back && /Show administration again/.test(back.textContent) && !back.closest('[role="tablist"]'), '#3620: the way back under the areas (not inside the tab list)');
   back?.click();
   check(await until(() => w.eval(`S.me.is_admin === true && S.settings.member_view === '0'`)), '#3620: one click there: the admin view is back');
-  check(!d.querySelector('.modal.smodal .snmv') && await settle(w) === adm0, '#3620: ... the settings show the admin parts again');
+  // the boxes that load on their own take their time on a busy machine: wait for the state, not for a fixed time
+  const adm1 = await until(async () => { const v = await settle(w); return v === adm0 ? v : null; }, 8) || w.eval(VIEW);
+  check(!d.querySelector('.modal.smodal .snmv') && adm1 === adm0, '#3620: ... the settings show the admin parts again\n   now:    ' + adm1 + '\n   before: ' + adm0);
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
