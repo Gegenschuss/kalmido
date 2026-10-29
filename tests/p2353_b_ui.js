@@ -83,7 +83,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     await until(() => d.querySelector('#s-dcs [data-dcs="go-integr"]'));
     check(!d.querySelector('#s-dcs .dsc-dl') && !d.querySelector('#s-dcs .dsc-new') && !!d.querySelector('#s-dcs [data-dcs="go-integr"]'), 'document settings: only the pointer to Integrations');
     click(w, d.querySelector('#s-dcs [data-dcs="go-integr"]'));
-    check(await until(() => !d.querySelector('#s-dcs') && d.querySelector('#s-scan .dsc-way')), 'the pointer opens Integrations at the section (one click)');
+    check(await until(() => !d.querySelector('[data-pane="integr"]')?.classList.contains('hidden') && d.querySelector('#s-scan .dsc-way')), 'the pointer opens Integrations at the section (one click)');
     w.close();
   }
 

@@ -58,7 +58,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ---- Settings > Integrations: the download and a new inbox (the code once)
   const em = await until(() => d.querySelector('#s-scan .dsc-new'));
   const etxt = () => d.querySelector('#s-scan')?.textContent || '';
-  check(!d.querySelector('#s-dcs') && /Folder watcher/.test(etxt()), 'the link opens Integrations at the section');
+  check(!d.querySelector('[data-pane="integr"]')?.classList.contains('hidden') && /Folder watcher/.test(etxt()), 'the link opens Integrations at the section');
   // 2.207.0 (#2763): the image builds the programs (Dockerfile stage folderwatch) -> download buttons instead of the hint
   check((d.querySelector('#s-scan .dsc-dl')?.children.length || 0) >= 3 && !/Not available on this server/.test(etxt()), 'the programs of the image: download buttons, no hint');
   check(em?.open, 'no inbox yet: "New scan inbox" is open');

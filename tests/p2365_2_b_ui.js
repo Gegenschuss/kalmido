@@ -30,7 +30,7 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   CK = await login('frida');
   const st = await call('GET', '/api/state');
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: [...new Set([...(st.settings?.features || '').split(','), 'files', 'docs', 'events', 'contacts', 'family', 'reading'])].filter(Boolean).join(',')});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: [...new Set([...(st.settings?.features || '').split(','), 'cal', 'files', 'docs', 'events', 'contacts', 'family', 'reading'])].filter(Boolean).join(',')});
   check(((await call('GET', '/api/state')).me.workspaces || []).length === 0, 'frida has no organisation');
   const s0 = await call('GET', '/api/docs/settings?ws=private');
   check(s0.http === 200 && s0.can_manage, 'frida manages her own documents (her own admin)');
@@ -90,7 +90,8 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   for (const [h, what] of [['#s-kk-h', 'Karakeep'], ['#s-nwl-h', 'the newsletter service'], ['#s-bmlet-h', 'the bookmark button'], ['#s-carddav-h', 'the address books for birthdays'], ['#s-apb-h', 'the booking page']])
     check(!!d.querySelector(`.smodal [data-pane="integr"] ${h}`), `Integrations has ${what} (${h})`);
   check(await until(() => d.querySelector('#s-kk #kk-url')) && d.querySelector('#s-kk #kk-tok').type === 'password', 'Karakeep: address and API key (password field)');
-  check(await until(() => d.querySelector('.nwl-set #nwl-url'), 60), 'the newsletter service: the connection form (no service yet)');
+  // the form needs the server key (KALMIDO_SECRET_KEY, p255_e_ui sets it); without it the block says so
+  check(await until(() => d.querySelector('.nwl-set #nwl-url') || /server key is missing/.test(d.querySelector('.nwl-set')?.textContent || ''), 60) && /sends no newsletters/.test(d.querySelector('.nwl-set')?.textContent || ''), 'the newsletter service: drawn in Integrations (form or the missing server key)');
   check(!d.querySelector('.nwl-set [data-nwl="seg-new"]'), '… without the segments (they stay with the newsletter)');
   check(/^javascript:/.test(d.querySelector('#s-bmlet-h + .caprow .capbm')?.getAttribute('href') || '') && /bm=1/.test(d.querySelector('.capbm').getAttribute('href')), 'the bookmark button: a javascript link to /share?bm=1');
   check(await until(() => d.querySelector('#s-carddav #ct-url')), 'the address books: the form to connect one');
