@@ -14984,5 +14984,8 @@
   "{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back.": "Mancano {0} file condivisi di questo backup nella cartella dei backup. Scarica il backup dal server che lo ha creato (un file completo) oppure rimetti a posto i file condivisi.",
   "This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.": "Questo backup è stato cifrato con una passphrase precedente. Inserisci quella passphrase per verificarlo o ripristinarlo; il download richiede quella attuale.",
   "The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.": "I file condivisi di questo backup non sono noti (manca il suo file di riferimenti); il prossimo backup verrà caricato di nuovo.",
-  "{0} newly stored": "{0} salvati di nuovo"
+  "{0} newly stored": "{0} salvati di nuovo",
+  "Send by mail…": "Invia per e-mail…",
+  "Change server": "Cambia server",
+  "Notifications are not available in the iPhone app yet.": "Le notifiche non sono ancora disponibili nell'app per iPhone."
 }

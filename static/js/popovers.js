@@ -1078,7 +1078,7 @@ document.addEventListener('contextmenu', e => {
 // Bigger text: the system's font size is still followed (rem based). 2.331.0 E (#3311): the timelines zoom themselves
 // (timeline.js), the page stays locked there.
 let tchVp = null;
-const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
+const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || (typeof shellInfo === 'function' && !!shellInfo()); } catch { return false; } };
 const tch_zoomFree = () => !!document.querySelector('.lightbox');
 function tch_zoomSync() {
   if (typeof document === 'undefined' || !document) return;  // a closed window (observer after unload)

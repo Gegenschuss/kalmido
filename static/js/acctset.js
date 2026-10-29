@@ -130,6 +130,7 @@ function accountHtml() {
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
     ${acz_linkHtml(S.api?.enabled)}</details>${''/* 2.166.0 (#2633): the API tokens moved to Access */}
+    ${shellServerUrl() ? `<div class="row"><label>${tr('Server|settings')}</label><button class="btn sm" data-acc="shell-server">${ic('link', 's')} ${tr('Change server')}</button></div>` : ''}${''/* 2.435.0 B (#3578): only in the app shell */}
     ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
 // 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once
@@ -335,6 +336,7 @@ function accountWire(md) {
         $('#a-cur', md).value = ''; $('#a-new', md).value = ''; toast(tr('Password changed'));
       }
       if (a === 'logout') logout();
+      if (a === 'shell-server') { const u = shellServerUrl(); if (u) location.href = u; }  // 2.435.0 B (#3578)
       if (a === 'user-new') userModal(null, () => { drawUsers(); orgsDraw(md); });  // 2.58.0 (#1724): the organisations' member counts follow at once
       if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));

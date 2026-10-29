@@ -20,7 +20,8 @@ async function wpDraw(md) {
   const sub = await wpSub(), mine = sub && j.subs.find(x => x.endpoint === sub.endpoint);
   const hint = t => `<div class="shint">${t}</div>`;
   let h = '';
-  if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
+  if (shellIOS()) h += hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
+  else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
   else if (!wpSupported()) h += hintK(tr('This browser does not support Web Push'));
   else {
     h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;
@@ -35,9 +36,9 @@ async function wpDraw(md) {
   // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Turn on" / "Send test"
   const now = $('#s-pushnow', md);
   if (now) {
-    const can = wpSupported() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
+    const can = wpSupported() && !shellIOS() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
     now.className = 'pushnow ' + (mine ? 'on' : 'off');
-    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(!wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
+    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(shellIOS() ? tr('Notifications are not available in the iPhone app yet.') : !wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
       + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Turn on')}</button>` : '');
   }
 }

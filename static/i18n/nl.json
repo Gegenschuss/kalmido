@@ -14984,5 +14984,8 @@
   "{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back.": "{0} gedeelde bestanden van deze back-up ontbreken in de back-upmap. Download de back-up van de server die hem maakte (een volledig bestand) of zet de gedeelde bestanden terug.",
   "This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.": "Deze back-up is versleuteld met een eerdere wachtzin. Voer die wachtzin in om hem te controleren of terug te zetten; voor het downloaden is de huidige nodig.",
   "The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.": "De gedeelde bestanden van deze back-up zijn onbekend (het verwijzingsbestand ontbreekt); de volgende back-up wordt opnieuw geüpload.",
-  "{0} newly stored": "{0} nieuw opgeslagen"
+  "{0} newly stored": "{0} nieuw opgeslagen",
+  "Send by mail…": "Per e-mail versturen…",
+  "Change server": "Server wijzigen",
+  "Notifications are not available in the iPhone app yet.": "Meldingen zijn nog niet beschikbaar in de iPhone-app."
 }
