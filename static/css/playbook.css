@@ -15,7 +15,7 @@
 .pbedbar{display:flex;align-items:center;gap:.5rem;margin:.5rem 0;flex-wrap:wrap}
 .pbtext{width:100%;box-sizing:border-box;min-height:14rem;font-family:var(--mono);font-size:var(--fs-s);line-height:var(--lh);resize:vertical}
 .pbprevw{min-height:14rem}
-.pbcnt{font-size:var(--fs-s)}
+.pbcnt{font-family:var(--mono);font-size:var(--fs-xs)}
 .pbcnt.over{color:var(--danger);font-weight:600}
 .pbconfl{display:inline-flex;gap:.5rem;flex-wrap:wrap;margin-top:.375rem}
 .pbconfl .btn{color:var(--text)}

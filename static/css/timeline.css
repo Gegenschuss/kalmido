@@ -44,7 +44,7 @@
 .rm-ce{margin-left:auto;display:inline-flex;gap:.125rem}
 .rm-chips .rm-ce .iconbtn{border:0;min-height:0;padding:.375rem;color:var(--muted)}
 .rm-hint{display:inline-flex;align-items:center;gap:.3125rem;font-size:var(--fs-s);color:var(--muted)}
-.rm-empty{padding:2rem 1rem;text-align:center;border:1px dashed var(--line2);border-radius:var(--radius);font-size:var(--fs-m)}
+.rm-empty{padding:3rem 1rem;text-align:center;font-size:var(--fs-m)}
 .tl.rm .tl-scroll{overflow:auto;height:min(var(--rm-h),calc(100dvh - 15rem));min-height:12rem;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}
 .tl.rm .tl-inner{min-height:100%}
 .tl.rm .tl-headrow{height:var(--hh)}

@@ -126,7 +126,7 @@
 .agown{display:inline-flex;align-items:center;gap:.125rem;font-size:var(--fs-xs);color:var(--muted);margin-left:.25rem}
 .chnm{display:flex;align-items:center;min-width:0}
 .chnm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chmode{flex:none;margin-left:.375rem;padding:1px .4375rem;border-radius:62rem;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1rem;cursor:default;white-space:nowrap}
+.chmode{flex:none;margin-left:.375rem;padding:1px .4375rem;border-radius:99rem;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1rem;cursor:default;white-space:nowrap}
 button.chmode{cursor:pointer}
 button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .chmode.pm-auto{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -353,7 +353,7 @@ button.jcdh{cursor:pointer}
 .jcddot{flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
 .jcdt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .jcdv{flex:none;font-size:var(--fs-xs);color:var(--muted)}
-.jcdst{flex:none;padding:0 .4375rem;border-radius:62.5rem;font-size:var(--fs-xs);line-height:var(--lh);background:var(--bg3);color:var(--muted)}
+.jcdst{flex:none;padding:0 .4375rem;border-radius:99rem;font-size:var(--fs-xs);line-height:var(--lh);background:var(--bg3);color:var(--muted)}
 .jcdst.st-running{background:color-mix(in srgb,var(--accent) 16%,var(--bg3));color:var(--accent)}
 .jcdst.st-failed,.jcdst.st-stopped{background:color-mix(in srgb,var(--danger) 14%,var(--bg3));color:var(--danger)}
 .jcdt time{flex:none;margin-left:auto;font-size:var(--fs-xs);color:var(--muted)}

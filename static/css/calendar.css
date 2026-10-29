@@ -78,7 +78,7 @@
 .tpo-o.tpo-best,.tpo-o.tpo-chosen{border-color:var(--accent);background:var(--accent-soft)}
 .tpo-oh{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
 .tpo-ow{font-weight:600}
-.tpo-tag{font-size:var(--fs-xs);color:var(--accent);border:1px solid var(--accent);border-radius:1rem;padding:0 .5rem}
+.tpo-tag{font-size:var(--fs-xs);color:var(--accent);border:1px solid var(--accent);border-radius:var(--r-s);min-height:1.125rem;box-sizing:border-box;padding:0 .5rem}
 .tpo-bar{display:flex;height:.375rem;border-radius:.25rem;background:var(--bg4);overflow:hidden}
 .tpo-by{background:var(--accent)}
 .tpo-bm{background:color-mix(in srgb,var(--accent) 40%,var(--bg4))}

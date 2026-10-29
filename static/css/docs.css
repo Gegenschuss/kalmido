@@ -23,7 +23,7 @@
 .dc-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dc-mt{color:var(--muted);font-size:var(--fs-s)}
 .dc-tags{display:flex;flex-wrap:wrap;gap:.25rem}
-.dc-tag{padding:0 .375rem;border-radius:99rem;background:var(--bg3);font-size:var(--fs-xs)}
+.dc-tag{padding:0 .375rem;min-height:1.125rem;box-sizing:border-box;border-radius:var(--r-s);background:var(--bg3);font-size:var(--fs-xs)}
 .dc-st{font-size:var(--fs-xs);color:var(--muted)}
 .dc-st.failed{color:var(--danger)}
 .dc-revdot{align-self:flex-start;padding:0 .375rem;border-radius:99rem;background:var(--accent-soft);color:var(--text);font-size:var(--fs-xs)}
