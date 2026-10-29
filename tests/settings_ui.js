@@ -1,4 +1,5 @@
 // Settings dialog tests (jsdom). Needs the api_test.py DB (alice en admin, bob de, eve collab off).
+// stages-needs: api   (alice / bob / eve come from api_test.py; ONLY settings_ui alone = "login alice 401", main red 29.10. #3506)
 const {boot, errs, sleep} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
