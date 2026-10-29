@@ -8985,9 +8985,7 @@
   "Only visible now": "Alleen nu zichtbaar",
   "Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.": "Start het programma. Mac: open de eerste keer Systeeminstellingen > Privacy en beveiliging en kies ‘Open toch’ (het programma is niet door Apple ondertekend). Windows: kies in de SmartScreen-melding ‘Meer informatie’ > ‘Toch uitvoeren’.",
   "Paste the code and choose the folder to watch.": "Plak de code en kies de map die bewaakt moet worden.",
-  "ScanSnap: in ScanSnap Home create or edit a profile and set “Save to” to this folder (PDF; searchable is not needed, Kalmido recognises the text itself).": "ScanSnap: maak of bewerk in ScanSnap Home een profiel en zet ‘Opslaan in’ op deze map (pdf; doorzoekbaar is niet nodig, Kalmido herkent de tekst zelf).",
   "By e-mail": "Per e-mail",
-  "ScanSnap: in a profile choose “Send by e-mail” and send to this address.": "ScanSnap: kies in een profiel ‘Verzenden per e-mail’ en stuur naar dit adres.",
   "E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.": "E-mail is niet end-to-end versleuteld. Mailproviders onderweg kunnen de inhoud en de bijlagen lezen, zoals bij een ansichtkaart. Gebruik voor vertrouwelijke stukken de mapbewaker.",
   "Got it": "Begrepen",
   "Mail is not end-to-end encrypted; confidential papers better via the folder watcher.": "E-mail is niet end-to-end versleuteld; vertrouwelijke stukken liever via de mapbewaker.",
@@ -15069,5 +15067,7 @@
   "Work as a team": "Samenwerken in een team",
   "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Deel een project via het menu ‘…’: wie je toevoegt, ziet alleen wat je deelt, en met @naam wijs je taken toe.",
   "{0} invites you to {1}.": "{0} nodigt je uit voor {1}.",
-  "You are invited to {0}.": "Je bent uitgenodigd voor {0}."
+  "You are invited to {0}.": "Je bent uitgenodigd voor {0}.",
+  "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner: stel in de scansoftware een profiel in dat als pdf in deze map opslaat (doorzoekbaar is niet nodig, Kalmido herkent de tekst zelf).",
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: kies in de scansoftware ‘Verzenden per e-mail’ en stuur naar dit adres."
 }

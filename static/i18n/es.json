@@ -8985,9 +8985,7 @@
   "Only visible now": "Solo visible ahora",
   "Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.": "Inicia el programa. Mac: la primera vez abre Ajustes del Sistema > Privacidad y seguridad y elige «Abrir igualmente» (el programa no está firmado por Apple). Windows: en el aviso de SmartScreen elige «Más información» > «Ejecutar de todas formas».",
   "Paste the code and choose the folder to watch.": "Pega el código y elige la carpeta que se vigilará.",
-  "ScanSnap: in ScanSnap Home create or edit a profile and set “Save to” to this folder (PDF; searchable is not needed, Kalmido recognises the text itself).": "ScanSnap: en ScanSnap Home crea o edita un perfil y pon «Guardar en» en esta carpeta (PDF; no hace falta que sea con búsqueda, Kalmido reconoce el texto por sí mismo).",
   "By e-mail": "Por correo electrónico",
-  "ScanSnap: in a profile choose “Send by e-mail” and send to this address.": "ScanSnap: en un perfil elige «Enviar por correo electrónico» y envía a esta dirección.",
   "E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.": "El correo electrónico no está cifrado de extremo a extremo. Los proveedores de correo por el camino pueden leer el contenido y los adjuntos, como una postal. Para documentos confidenciales usa el vigilante de carpetas.",
   "Got it": "Entendido",
   "Mail is not end-to-end encrypted; confidential papers better via the folder watcher.": "El correo no está cifrado de extremo a extremo; lo confidencial, mejor con el vigilante de carpetas.",
@@ -15069,5 +15067,7 @@
   "Work as a team": "Trabajar en equipo",
   "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Comparte un proyecto desde su menú «…»: quien añadas solo ve lo que compartes, y le asignas tareas con @nombre.",
   "{0} invites you to {1}.": "{0} te invita a {1}.",
-  "You are invited to {0}.": "Estás invitado a {0}."
+  "You are invited to {0}.": "Estás invitado a {0}.",
+  "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Escáner: en el software de escaneo configura un perfil que guarde en PDF en esta carpeta (no hace falta que sea consultable, Kalmido reconoce el texto por sí mismo).",
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Escáner: en el software de escaneo elige «Enviar por correo electrónico» y envía a esta dirección."
 }

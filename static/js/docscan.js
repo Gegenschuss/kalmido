@@ -56,7 +56,7 @@ function dsc_codeHtml() {
     <div class="dsc-row"><input id="dsc-code" readonly value="${esc(DSCN.code)}" aria-label="${esc(tr('Setup code'))}"><button type="button" class="btn sm" data-dsc="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <ol class="dsc-steps"><li>${tr('Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.')}</li>
       <li>${tr('Paste the code and choose the folder to watch.')}</li>
-      <li>${tr('ScanSnap: in ScanSnap Home create or edit a profile and set “Save to” to this folder (PDF; searchable is not needed, Kalmido recognises the text itself).')}</li></ol></div>`;
+      <li>${tr('Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).')}</li></ol></div>`;
 }
 function dsc_mailHtml(s, sc) {
   const m = s.mail || {enabled: false, address: ''};
@@ -66,7 +66,7 @@ function dsc_mailHtml(s, sc) {
     <p class="muted">${tr('PDFs and images attached to mails sent to this address become documents here.')}</p>
     ${m.address ? `<div class="dsc-row dc-mail"><code>${esc(m.address)}</code><button type="button" class="btn sm" data-dsc="mailcopy">${ic('copy', 's')} ${tr('Copy')}</button></div>
       <p><button type="button" class="linkbtn" data-dcs="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dcs="maildel">${tr('Turn off')}</button></p>
-      <p class="muted">${tr('ScanSnap: in a profile choose “Send by e-mail” and send to this address.')}</p>`
+      <p class="muted">${tr('Scanner: in the scan software choose “Send by e-mail” and send to this address.')}</p>`
       : `<button type="button" class="btn sm" data-dcs="mailnew">${tr('Create address')}</button>`}
     ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
       <button type="button" class="btn sm" data-dsc="notice">${tr('Got it')}</button></div></div>`

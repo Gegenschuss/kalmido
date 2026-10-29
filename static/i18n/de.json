@@ -8963,9 +8963,7 @@
   "Only visible now": "Nur jetzt sichtbar",
   "Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.": "Programm starten. Mac: beim ersten Mal Systemeinstellungen > Datenschutz & Sicherheit öffnen und „Trotzdem öffnen“ wählen (das Programm ist nicht von Apple signiert). Windows: im SmartScreen-Hinweis „Weitere Informationen“ > „Trotzdem ausführen“ wählen.",
   "Paste the code and choose the folder to watch.": "Code einfügen und den Ordner wählen, der beobachtet werden soll.",
-  "ScanSnap: in ScanSnap Home create or edit a profile and set “Save to” to this folder (PDF; searchable is not needed, Kalmido recognises the text itself).": "ScanSnap: in ScanSnap Home ein Profil anlegen oder bearbeiten und „Speichern in“ auf diesen Ordner stellen (PDF; durchsuchbar braucht es nicht, Kalmido erkennt den Text selbst).",
   "By e-mail": "Per E-Mail",
-  "ScanSnap: in a profile choose “Send by e-mail” and send to this address.": "ScanSnap: in einem Profil „Per E-Mail senden“ wählen und an diese Adresse schicken.",
   "E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.": "E-Mail ist nicht Ende-zu-Ende verschlüsselt. Mail-Anbieter unterwegs können Inhalt und Anhänge lesen, wie bei einer Postkarte. Für vertrauliche Unterlagen nimm den Ordner-Wächter.",
   "Got it": "Verstanden",
   "Mail is not end-to-end encrypted; confidential papers better via the folder watcher.": "E-Mail ist nicht Ende-zu-Ende verschlüsselt; Vertrauliches besser über den Ordner-Wächter.",
@@ -15069,5 +15067,7 @@
   "Work as a team": "Im Team arbeiten",
   "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Teile ein Projekt über sein Menü „…“: Wen du hinzufügst, sieht nur, was du teilst, und mit @Name weist du Aufgaben zu.",
   "{0} invites you to {1}.": "{0} lädt dich zu {1} ein.",
-  "You are invited to {0}.": "Du bist zu {0} eingeladen."
+  "You are invited to {0}.": "Du bist zu {0} eingeladen.",
+  "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner: in der Scan-Software ein Profil so einstellen, dass es als PDF in diesen Ordner speichert (durchsuchbar ist nicht nötig, Kalmido erkennt den Text selbst).",
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: in der Scan-Software „Per E-Mail senden“ wählen und an diese Adresse schicken."
 }

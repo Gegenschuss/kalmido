@@ -8985,9 +8985,7 @@
   "Only visible now": "Visibile solo ora",
   "Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.": "Avvia il programma. Mac: la prima volta apri Impostazioni di Sistema > Privacy e sicurezza e scegli «Apri comunque» (il programma non è firmato da Apple). Windows: nell'avviso di SmartScreen scegli «Ulteriori informazioni» > «Esegui comunque».",
   "Paste the code and choose the folder to watch.": "Incolla il codice e scegli la cartella da osservare.",
-  "ScanSnap: in ScanSnap Home create or edit a profile and set “Save to” to this folder (PDF; searchable is not needed, Kalmido recognises the text itself).": "ScanSnap: in ScanSnap Home crea o modifica un profilo e imposta «Salva in» su questa cartella (PDF; non serve che sia ricercabile, Kalmido riconosce il testo da solo).",
   "By e-mail": "Per e-mail",
-  "ScanSnap: in a profile choose “Send by e-mail” and send to this address.": "ScanSnap: in un profilo scegli «Invia per e-mail» e invia a questo indirizzo.",
   "E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.": "L'e-mail non è cifrata end-to-end. I provider di posta lungo il percorso possono leggere il contenuto e gli allegati, come una cartolina. Per documenti riservati usa l'osservatore cartelle.",
   "Got it": "Ho capito",
   "Mail is not end-to-end encrypted; confidential papers better via the folder watcher.": "L'e-mail non è cifrata end-to-end; i documenti riservati meglio con l'osservatore cartelle.",
@@ -15069,5 +15067,7 @@
   "Work as a team": "Lavorare in team",
   "Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.": "Condividi un progetto dal suo menu «…»: chi aggiungi vede solo ciò che condividi, e gli assegni attività con @nome.",
   "{0} invites you to {1}.": "{0} ti invita in {1}.",
-  "You are invited to {0}.": "Sei invitato in {0}."
+  "You are invited to {0}.": "Sei invitato in {0}.",
+  "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner: nel software di scansione imposta un profilo che salvi in PDF in questa cartella (non serve che sia ricercabile, Kalmido riconosce il testo da solo).",
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: nel software di scansione scegli «Invia per e-mail» e invia a questo indirizzo."
 }

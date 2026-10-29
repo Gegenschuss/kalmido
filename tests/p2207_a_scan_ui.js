@@ -64,7 +64,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   d.querySelector('[data-dsc="new"]').click();
   const code = await until(() => d.querySelector('#dsc-code')?.value);
   check(code && code.startsWith('kalmido-scan:1:') && /Only visible now/.test(etxt()), 'the setup code is shown once: ' + (code || '').slice(0, 20));
-  check(d.querySelectorAll('#s-scan .dsc-steps li').length === 3 && /Open Anyway/.test(etxt()) && /ScanSnap Home/.test(etxt()), 'the three steps (Mac / Windows, code, ScanSnap)');
+  check(d.querySelectorAll('#s-scan .dsc-steps li').length === 3 && /Open Anyway/.test(etxt()) && /in the scan software set up a profile/.test(etxt()) && !/ScanSnap/i.test(etxt()), 'the three steps (Mac / Windows, code, scanner without a device name)');  // 2.427.0 (#3577): no device name
   check([...d.querySelectorAll('#s-scan .dsc-key')].some(x => /Flur/.test(x.textContent) && /Your own documents/.test(x.textContent)), 'the inbox is listed with its place');
   d.querySelector('[data-dsc="copy"]').click();
   check(await until(() => copied.includes(code)), 'copy button: the code in the clipboard');
