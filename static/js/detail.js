@@ -494,7 +494,31 @@ function renderDetail() {
   const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
   cmxShown = S.sel; cmxScrollSet(s);
   wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
+  fitDtop();
   return r;
+}
+// 2.431.0 A (#3593): the header's words fall away step by step (dtl1..dtl5: -1 day, +1 day / Tomorrow, Today, Lock / Time / Pin,
+// Priority) until nothing is cut or overflows; the words stay as tooltips. Like fitTop() for #top.
+const DTOP_LVLS = 5;
+let dtopW = 0, dtopRO = null;
+function fitDtop() {
+  const d = document.getElementById('detail'), t = d && d.querySelector('.dtop');
+  if (!t || !t.clientWidth) return;  // no layout (hidden, jsdom)
+  dtopW = t.clientWidth;
+  const br = t.querySelector('.dbr');  // touch below 28rem: the second row (words included) is the CSS's job
+  if (br && getComputedStyle(br).display !== 'none') { for (let i = 1; i <= DTOP_LVLS; i++) t.classList.remove('dtl' + i); }
+  else {
+  const cut = () => { const c = t.querySelector('.dchip .dct'); return t.scrollWidth > t.clientWidth + 1 || (c && c.scrollWidth > c.clientWidth + 1); };
+  let l = 0;
+  for (; l <= DTOP_LVLS; l++) {
+    for (let i = 1; i <= DTOP_LVLS; i++) t.classList.toggle('dtl' + i, i <= l);
+    if (!cut()) break;
+  }
+  }
+  if (typeof ResizeObserver === 'function' && !dtopRO) {
+    dtopRO = new ResizeObserver(() => { const x = document.querySelector('#detail .dtop'); if (x && x.clientWidth !== dtopW) fitDtop(); });
+  }
+  if (dtopRO) { dtopRO.disconnect(); dtopRO.observe(t); }
 }
 // 2.280.0 A (#3108): a long note is not in the start state (no content, content_n = its length): the detail loads it
 // (GET /api/tasks/<id>). Until it is there - or offline - the detail shows no note field at all, so an empty note is never

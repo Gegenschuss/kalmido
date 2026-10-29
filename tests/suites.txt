@@ -2220,3 +2220,5 @@ fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2354_c_ui node p2354_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.380.0 (#3420): the film pack offers Producing by amount, also switchable in a quotation made before the pack; freelancer-matrix: office
 fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.431.0 A (#3593): the task header keeps every icon whole; its words fall away step by step
+fresh; run p2431_a_ui node p2431_a_ui.js "$KALMIDO_TEST_DATA"

@@ -5036,6 +5036,11 @@ button.lkchip:hover{border-color:var(--accent)}
 /* UX-42 review: wide task panels show Today / Tomorrow with their words too */
 @media (pointer:fine){ @container dtop (min-width:27rem){ .dtop .dq{padding:0 .5rem;width:auto} .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} } }
 @media not (pointer:coarse){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip; 2.53.0: "not coarse" so a pointer-less narrow window (no hover) gets it too */
+/* 2.431.0 A (#3593): fitDtop() (detail.js) sets dtl1..dtl5 while the header does not fit: the words go one step at a time, the icons stay */
+.dtop.dtl1 .dq[data-d="-1"] .dql,.dtop.dtl2 .dq[data-d="1"] .dql,.dtop.dtl3 .dq[data-d="0"] .dql,.dtop.dtl4 .tlkb .dpw,.dtop.dtl4 .dtime .dpw,.dtop.dtl4 .dpin,.dtop.dtl4 .asstb .dpw,.dtop.dtl5 .iconbtn[data-act="prio"] .dpw{display:none}
+.dtop.dtl1 .dq[data-d="-1"],.dtop.dtl2 .dq[data-d="1"],.dtop.dtl3 .dq[data-d="0"]{padding:.375rem}
+.dtop.dtl4 .tlkb,.dtop.dtl4 .dtime,.dtop.dtl4 .iconbtn[data-act="pin"],.dtop.dtl5 .iconbtn[data-act="prio"]{padding:.375rem}
+@media (pointer:coarse){ .dtop.dtl1 .dq[data-d="-1"],.dtop.dtl2 .dq[data-d="1"],.dtop.dtl3 .dq[data-d="0"],.dtop.dtl4 .tlkb,.dtop.dtl4 .dtime,.dtop.dtl4 .iconbtn[data-act="pin"],.dtop.dtl5 .iconbtn[data-act="prio"]{padding:0} }
 /* 2.26.0 (#932 #936 #937) */
 /* #932: the sidebar takes its width from --sideW (the grip on its right edge, see placeGrips) */
 #app:not(.side-rail) #side{min-width:0}
