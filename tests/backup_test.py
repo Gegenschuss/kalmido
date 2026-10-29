@@ -46,7 +46,10 @@ MAGIC = b"KALMIDO-BACKUP-ENC\x00"
 
 def start(extra=(), backups="1"):
     env = dict(os.environ, KALMIDO_ADMIN_ALERTS="1",
+               # 2.432.0 (#3584): this suite checks the complete archive (format 2); the shared store (format 3, from 64 KiB
+               # on) has its own suite p2432_bkstore_test.py, so the threshold is above every file here
                EXTRA=" ".join(["-e KALMIDO_BACKUP_TICK=1", "-e KALMIDO_BACKUP_MAX_MB=5", "-e KALMIDO_ADMIN_ALERT_WINDOW=3",
+                               "-e KALMIDO_BACKUP_SHARED_MIN=1048576",
                                f"-e KALMIDO_BACKUPS={backups}", *extra]))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
