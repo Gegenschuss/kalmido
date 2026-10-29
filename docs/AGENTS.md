@@ -2059,6 +2059,10 @@ projects you can see) -> `suggest_receipt`. The project must be one you can see,
 your project restriction (else `400`); a new suggestion replaces your open one. Amount (gross, more than 0, at most two decimals) and VAT rate (`19`, `7`, `0`) are suggestions as well: the person may change them when accepting, and Undo brings the old values back. The document then waits in *To review*. You
 can never set, move or delete it yourself.
 
+2.420.0 (#3448): **Checked** receipts. A person of the bookkeeping ticks a receipt as checked (who and when, like the check
+mark in DATEV). `get_document` shows it as `receipt_checked` (`{at, by}` or null), read only: agents never tick or untick
+a receipt (the office route answers `403` to an agent token), so do not offer it as a step of yours.
+
 ### Office: drafts only
 
 *Since 2.51.0.*

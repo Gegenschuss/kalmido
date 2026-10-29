@@ -997,6 +997,19 @@ booking list with invoices, payments and travel expenses stays the export of the
 `status=all|paid|open`, `category`, `supplier`, `project`, `novat=1`, `q`; the list also `limit`, `offset`); people only,
 agents get 403.
 
+**Checked** (since 2.420, #3448): next to *paid* every receipt has a tick **Checked**, like the check mark in DATEV: who
+ticked it and when. Tick it in the receipt sheet (the box *Checked* with "Checked by ... on ..."), or several at once in
+*All receipts*: **Select**, tick the rows (or *Select all*), then **Mark as checked** or **Remove check** (one undo step;
+only the receipts whose state changed go back). The list marks checked receipts and filters *Checked / Not checked*
+(`checked=all|yes|no`). A receipt of a locked month cannot be ticked or unticked any more (409), a multiple choice with
+one of them changes nothing. The exports carry it: the CSV of the list has *Checked on* and *Checked by* after *Paid on*,
+the GoBD export's `receipts.csv` has `Geprueft_am` and `Geprueft_von` after `Bezahlt_am`, the DATEV booking batch puts
+it into the additional information of the receipt's line (*Zusatzinformation - Art 1* `Geprueft`, *Inhalt 1* the day;
+the batch has no field of its own for it). Only people tick: agents read the state (`receipt_checked` of the document)
+and get 403. The automatic check of a receipt (its hints) stays apart. Route: `POST /api/office/books/receipts/checked`
+`{node_ids: [ids] (up to 500), checked: true|false}` -> `{changed, rows: [{node_id, checked_at, checked_by}]}`; the
+rights of the receipts list (office group area *Receipts*, level edit). The same in a personal office.
+
 An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area is recognised with its values
 (supplier, amount, date, VAT rate), but becomes a receipt only once you take it over (since 2.237): under **Receipts this
 month** the list *e-invoices to check* shows it with **Take over** (one tap, the VAT rate of the invoice); the receipt sheet
