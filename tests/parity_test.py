@@ -768,6 +768,8 @@ for name, _, schema, fn in mcp.TOOLS:
         base["base64"] = "eA=="
     if name == "send_chat":
         base["body"] = "x"
+    if name == "get_task":  # 2.390.0 (#3353): task_id or key - neither is required alone
+        base["task_id"] = 1
     for extra in [{}] + TOOL_VARIANTS.get(name, []):
         rec.tool = name
         try:
