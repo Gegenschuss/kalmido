@@ -2046,7 +2046,7 @@ only**: a person reserves the number, finalises, sends, deletes and books. Three
 - the scope `office` of the agent's token (Settings > Agents > Permissions: *Office drafts*);
 - the agent's switch **May draft office documents** (in its settings dialog; set by an admin of its office area, in a
   personal office by the person);
-- the area's privacy switch **Agents may read office data** (Office > Settings > Agents): client and price data go to the
+- the area's privacy switch **Agents may read office data** (Settings > Company & office > Access): client and price data go to the
   agent's AI model.
 
 The agent works in the office area of its workspace (`agents.org_id`); a personal agent without one works in its owner's
@@ -2057,7 +2057,7 @@ for something lately (a chat message, an @mention, an assignment, a job, *Let an
 last 48 hours): else `403` ("this person has not asked the agent") -- act for the person who asked you, never pick another one.
 
 **Office access of an agent: the office rights groups (2.187.0).** The office gives each person and agent its areas
-through groups (Office > Settings > Rights: levels none / own / view / edit / manage per area). An agent without a group
+through groups (Settings > Company & office > Rights in the office: levels none / own / view / edit / manage per area). An agent without a group
 has no office access; an agent that had the switch *May draft office documents* on before keeps that previous access
 until someone puts it into a group, then only its groups count (the switch no longer matters). 2.223.2: in an organisation
 that previous access is the quotes' scope (services, text blocks, framework contracts, clients, documents); payment

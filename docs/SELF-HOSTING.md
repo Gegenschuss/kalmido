@@ -963,7 +963,7 @@ organisation.
   report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
   models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
   Markdown from the unlocked space), scheduling polls and bookmarks (personal).
-- **A personal office** (2.139.1): its owner exports it the same way (*Office > Settings > Export the office*: the office and
+- **A personal office** (2.139.1): its owner exports it the same way (*Settings > Company & office > Data > Export the office*: the office and
   the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
   office of the importing person.
 
