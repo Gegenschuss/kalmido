@@ -199,6 +199,7 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "overrides": {"type": "array", "items": {"type": "object"}, "description": "Changed occurrences {rid, title, start, end, ...}"},
         "reminders": {"type": "array", "items": {"type": "integer"}, "description": "Minutes before the start"},
         "status": {"type": "string", "enum": list(EV_STATUS)}, "busy": {"type": "boolean"}, "url": nul("string"),
+        "guests_visible": {"type": "boolean", "description": "The invitation to external guests names all guests (false: only the recipient)"},
         "task_id": nul("integer", description="The linked preparation task"), "attendees": {"type": "array", "items": att},
         "role": {"type": "string", "enum": ["owner", "edit", "view", "attendee"]}, "partstat": {"type": "string", "enum": list(EV_PARTSTAT)},
         "created_by": nul("integer"), "created_at": {"type": "string"}, "updated_at": {"type": "string"}}}
@@ -217,6 +218,8 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "start": {"type": "string"}, "end": {"type": "string"}, "tz": {"type": "string"}, "rrule": {"type": "string"},
         "exdates": {"type": "array", "items": {"type": "string"}}, "reminders": {"type": "array", "items": {"type": "integer"}},
         "status": {"type": "string", "enum": list(EV_STATUS)}, "busy": {"type": "boolean"}, "url": nul("string"), "task_id": nul("integer"),
+        # 2.380 H (#3392)
+        "guests_visible": {"type": "boolean", "description": "The invitation mail to external guests names all guests; default false (only the recipient)"},
         "attendees": {"type": "array", "items": {"type": "object", "properties": {
             "user_id": {"type": "integer"}, "contact_id": {"type": "integer"}, "email": {"type": "string"}, "name": {"type": "string"},
             "partstat": {"type": "string", "enum": list(EV_PARTSTAT)}, "role": {"type": "string", "enum": ["req", "opt"]}}}},

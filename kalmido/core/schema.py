@@ -3765,6 +3765,12 @@ MIGRATIONS = [
     ("lists", "ticket_key", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS ticket_key TEXT"),
     ("tasks", "ticket_no", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ticket_no BIGINT"),
     ("git_conns", "hash_ids", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS hash_ids BIGINT NOT NULL DEFAULT 1"),
+    # 2.380 H (#3392): the invitation to external guests names all guests (1) or only the recipient (0, the default = as since
+    # 2.360). Older versions ignore it (only the recipient)
+    ("events", "guests_visible", "ALTER TABLE events ADD COLUMN IF NOT EXISTS guests_visible BIGINT NOT NULL DEFAULT 0"),
+    # 2.380 H (#2356): a page share shows the file store pictures embedded in the page (1) or placeholders (0, the default =
+    # as before). Older versions ignore it (placeholders)
+    ("wiki_shares", "images", "ALTER TABLE wiki_shares ADD COLUMN IF NOT EXISTS images BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -965,7 +965,9 @@ ROUTES = {
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
+    "GET /api/wiki/shared/pages/{}/img/{}": "wiki",  # 2.380 H (#2356): p2380r_h_api_test.py (a person without an organisation)
     "GET /s/w/{}": "wiki", "GET /s/w/{}/p/{}": "wiki", "GET /s/w/{}/file/{}": "wiki",
+    "GET /s/w/{}/img/{}/{}": "wiki",  # 2.380 H (#2356)
     # 2.123.0 A (#2102): the history of a page (a page of another organisation / person: 404, p2123_a_api_test.py)
     "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
     "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",

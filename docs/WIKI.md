@@ -211,9 +211,13 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   longer counts as a live share (mark, limit). Make a new link if it is still needed.
 
 Routes: `GET /api/wiki/shares?page=<id> | space=&folder=`, `POST /api/wiki/shares {page_id | space + folder, kind: person |
-link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELETE /api/wiki/shares/<id>` (revoke),
+link, user_id | email, expires, images}`, `PATCH /api/wiki/shares/<id> {expires, images}`, `DELETE /api/wiki/shares/<id>` (revoke),
 `POST /api/wiki/shares/<id>/restore`; the guest: `GET /api/wiki/shared`, `GET /api/wiki/shared/pages/<id>`,
 `GET /api/wiki/shared/files/<id>`; the public page: `GET /s/w/<token>`, `/s/w/<token>/p/<id>`, `/s/w/<token>/file/<id>`.
+2.380: `images: true` (the switch *Show embedded pictures*, default off) shows the pictures of the file store embedded in the
+page (`![…](/api/files/nodes/<id>/content)`, image types only, never a locked folder, only while the person who made the share
+may still see them) through `GET /api/wiki/shared/pages/<id>/img/<node>` and `/s/w/<token>/img/<page>/<node>`; other files stay
+placeholders.
 
 ## Mind map
 

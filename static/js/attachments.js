@@ -79,12 +79,13 @@ async function qfSend() {
   try {
     const idm = LS.get('idmap', {});
     for (const r of await st.all()) {
-      if (r.uid !== S.me.id) continue;
+      if (r.uid !== S.me.id || r.rej) continue;  // 2.380 H (#3387): a refused one waits for its download in the conflicts dialog
       const id = HIST.ids[r.tmp] || idm[r.tmp];
       if (!id) {
         if (OUT.q.some(x => x.tmp === r.tmp)) continue;  // its create still waits
-        S.conflicts.push({tid: 0, title: r.title, field: 'rejected', server: tr('The new task could not be created'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
+        S.conflicts.push({tid: 0, title: r.title, field: 'rejected', server: tr('The new task could not be created'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), qf: r.tmp, at: Date.now()});
         LS.set('conflicts', S.conflicts); renderTop();
+        await st.put({...r, rej: 1}); continue;
       } else {
         // 2.376.1 CI fix: the new task not in the local state yet (load() with changes still queued leaves the reload to the
         // next flush): uploadFiles would refuse it as "view only" and the files were dropped unseen - they wait for that load
@@ -92,14 +93,26 @@ async function qfSend() {
         const up = await uploadFiles(id, r.files.map(f => new File([f.blob], f.name, {type: f.type})));
         if (up === false) continue;  // offline again: the next flush
         if (!up) {  // refused here (too large, no right; an encrypted list answers with its file): named in the conflicts dialog, never lost unseen
-          S.conflicts.push({tid: id, title: r.title, field: 'rejected', server: tr('File upload'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), at: Date.now()});
+          S.conflicts.push({tid: id, title: r.title, field: 'rejected', server: tr('File upload'), mine: tr('Files not uploaded: {0}', r.files.map(f => f.name).join(', ')), qf: r.tmp, at: Date.now()});
           LS.set('conflicts', S.conflicts); renderTop();
+          await st.put({...r, rej: 1}); continue;
         }
       }
       await st.del(r.tmp);
     }
   } catch (e) { console.warn('qfiles', e); } finally { QF.busy = false; }
 }
+// 2.380 H (#3387): the files of a refused offline quick add are kept until their conflict is dismissed: Download saves them
+async function qfDownload(tmp) {
+  const st = qfStore(), r = st && (await st.all().catch(() => [])).find(x => x.tmp === tmp);
+  if (!r) { toast(tr('The file is no longer on this device')); return; }
+  for (const f of r.files) {
+    const u = URL.createObjectURL(f.blob), a = document.createElement('a');
+    a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  }
+}
+function qfForget(tmps) { const st = qfStore(); if (st) for (const t of tmps) if (t) st.del(t).catch(() => {}); }
 function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
   const t = taskById(S.sel), imgs = (list || (t?.attachments || []).filter(isImg)).filter(a => !upLocked(a));  // 2.61.0 (#1818): never a locked file
   let i = Math.max(0, imgs.findIndex(a => a.id === id));

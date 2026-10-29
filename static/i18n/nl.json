@@ -14834,5 +14834,14 @@
   "Tables are independent. The ones you attached to this project appear here.": "Tabellen zijn zelfstandig. Hier staan de tabellen die je aan dit project hebt gekoppeld.",
   "Close the keyboard after sending": "Toetsenbord sluiten na verzenden",
   "The keyboard closes after sending": "Het toetsenbord sluit na het verzenden",
-  "The keyboard stays open after sending": "Het toetsenbord blijft open na het verzenden"
+  "The keyboard stays open after sending": "Het toetsenbord blijft open na het verzenden",
+  "The file is no longer on this device": "Het bestand staat niet meer op dit apparaat",
+  "Guest list visible to guests": "Gastenlijst zichtbaar voor gasten",
+  "Pictures shown": "Afbeeldingen zichtbaar",
+  "Hide pictures": "Afbeeldingen verbergen",
+  "Show pictures": "Afbeeldingen tonen",
+  "Show embedded pictures": "Ingesloten afbeeldingen tonen",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Alleen afbeeldingen uit de opslag die in de pagina zijn ingesloten en die je mag zien. Andere bestanden blijven verborgen.",
+  "Scheduling polls": "Datumprikkers",
+  "Scheduling polls got new links: the old links no longer work.": "Datumprikkers hebben nieuwe links: de oude links werken niet meer."
 }

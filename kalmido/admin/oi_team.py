@@ -9,6 +9,7 @@ the preview (others: left out with a warning); into the private space only the i
 private). Browser ciphertexts (chat messages of locked channels, encrypted / locked notes) are taken over as they are.
 Secrets never come with an export: forms and customer reports get new links, a newsletter connection must be connected again."""
 import json
+import os
 import secrets
 
 from ..core.i18n import N_
@@ -16,6 +17,9 @@ from .orgimport import OiFix, OiT, _oid, _txt, tr  # noqa: F401
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.278.0 B (#3094)
 from .acctimport import umz_billed  # 2.278.0 B (#3094)
+from ..accounts.login import seal  # 2.380 H (#2398)
+from ..accounts.session import _token_hash  # 2.380 H (#2398)
+from .orgexport import _safe_part  # 2.380 H (#2398)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -143,6 +147,43 @@ def _nl_conn(c, run, src, d, ctx):
     d["ws"] = doc_ws(run.org, ctx.uid)
     d.update(secret="", hint="", auto=0, error=tr("The access data does not come with an export: connect the newsletter service again."))
     run.warning(N_("Newsletter connection taken over without its access data: connect it again."))
+    return d
+
+
+def _poll(c, run, src, d, ctx):
+    """2.380 H (#2398): a poll gets its link after the insert (_poll_link: sealed with the new id); a unique stand-in till then."""
+    d.update(token="", token_hash="import:" + secrets.token_hex(16))
+    return d
+
+
+def _poll_link(c, run, src, nid, ctx):
+    """2.380 H (#2398): the new link of an imported poll (the old one stays dead); the report says so."""
+    tok = secrets.token_urlsafe(18)  # the shape of calendars/polls.py
+    c.execute("UPDATE sched_polls SET token=?, token_hash=? WHERE id=?", (seal(c, f"poll:{nid}", tok), _token_hash(tok), nid))
+    run.warning(N_("Scheduling polls got new links: the old links no longer work."))
+
+
+def _vote(c, run, src, d, ctx):
+    """2.380 H (#2398): the answers name the options by their new ids (an option that did not come along is left out); the
+    voter's own edit link stays dead with the old poll link, the address hash of the old server means nothing here."""
+    try:
+        a = json.loads(src.get("answers") or "{}")
+    except (TypeError, ValueError):
+        a = {}
+    m = {str(run.m("sched_poll_options", k)): v for k, v in (a.items() if isinstance(a, dict) else ()) if run.m("sched_poll_options", k)}
+    d.update(answers=json.dumps(m), ip_hash="", edit_hash=_txt(src.get("edit_hash"), 100) or _token_hash(secrets.token_urlsafe(18)))
+    return d
+
+
+def _bookmark(c, run, src, d, ctx):
+    """2.380 H (#2398): a bookmark with its picture (sealed for the target space like bookmarks.bm_store_image)."""
+    img = str(src.get("image") or "")
+    d["image"] = ""
+    if img:
+        got = ctx.file(f"files/bookmarks/{_oid(src.get('id')) or 0}-{_safe_part(os.path.basename(img))}", "bookmarks",
+                       os.path.basename(img), mime=str(src.get("image_mime") or ""))
+        if got:
+            d["image"] = got[0]
     return d
 
 
@@ -402,5 +443,13 @@ SPECS = [
         people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("Absences and bookings"), prep=_mail, after=_mail_index),
     # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)
     OiT("hub/mailbox.json", "hub_mailboxes", people={"created_by": "null"}, label=N_("Mailbox"), prep=_mbx),
+    # 2.380 H (#2398): scheduling polls with their options and votes (a new link), bookmarks with their pictures
+    OiT("polls.json", "sched_polls", refs={"event_id": "events", "task_id": "tasks", "client_id": "clients", "list_id": "lists"},
+        late={"chosen_id": "sched_poll_options"}, people={"user_id": "me"}, fixed=_NEW_TOKEN, label=N_("Scheduling polls"), prep=_poll,
+        after=_poll_link),
+    OiT("polls/options.json", "sched_poll_options", refs={"poll_id": "sched_polls"}, need=("poll_id",), space=(), label=N_("Scheduling polls")),
+    OiT("polls/votes.json", "sched_poll_votes", refs={"poll_id": "sched_polls"}, need=("poll_id",), space=(), label=N_("Scheduling polls"),
+        prep=_vote),
+    OiT("bookmarks.json", "bookmarks", people={"user_id": "me"}, label=N_("Bookmarks"), prep=_bookmark),
 ]
 FIXES = [OiFix("tasks", "tasks", "sprint_id", "sprints")]  # the sprint of a task

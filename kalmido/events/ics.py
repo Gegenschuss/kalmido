@@ -23,7 +23,8 @@ from ..events.model import (
 OV_KEYS = ("title", "location", "description", "all_day", "start", "end", "status", "delete")
 # properties of a VEVENT that map to event fields (everything else is kept as it came and sent back)
 EV_MAPPED = {"UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SEQUENCE", "SUMMARY", "LOCATION", "DESCRIPTION", "DTSTART", "DTEND",
-             "DURATION", "RRULE", "EXDATE", "STATUS", "TRANSP", "URL", "ATTENDEE", "ORGANIZER", "RECURRENCE-ID"}
+             "DURATION", "RRULE", "EXDATE", "STATUS", "TRANSP", "URL", "ATTENDEE", "ORGANIZER", "RECURRENCE-ID",
+             "X-KALMIDO-GUESTS-VISIBLE"}  # 2.380 H (#3392)
 EV_SINGLE = {"UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SEQUENCE", "SUMMARY", "LOCATION", "DESCRIPTION", "DTSTART", "DTEND",
              "DURATION", "STATUS", "TRANSP", "URL", "RRULE", "ORGANIZER", "RECURRENCE-ID"}
 EXTRA_MAX = 16000
@@ -98,6 +99,8 @@ def ev_lines(c, r, atts=None):
     L.append("TRANSP:" + ("OPAQUE" if r["busy"] else "TRANSPARENT"))
     if r["url"]:
         L.append(f"URL:{r['url']}")
+    if r["guests_visible"]:  # 2.380 H (#3392): only when on (an event without it keeps its ETag)
+        L.append("X-KALMIDO-GUESTS-VISIBLE:TRUE")
     extra = (r["extra"] or "").split("\n") if r["extra"] else []
     if atts:
         if not any(_prop_name(x) == "ORGANIZER" for x in extra):
@@ -366,6 +369,8 @@ def _read_group(comps, raws, mi):
                 v["url"] = u
             else:
                 keep.append(line)
+        elif name == "X-KALMIDO-GUESTS-VISIBLE":  # 2.380 H (#3392): a client without the line leaves the switch as it is
+            v["guests_visible"] = val.strip().upper() in ("TRUE", "1", "YES")
         elif name == "ATTENDEE":
             p = _params(line)
             addr = val.strip()
@@ -501,6 +506,8 @@ def _parsed_cols(c, uid, v):
     """The event columns of read_vevent() values (store_parsed; 2.273.0 C #3048: the import compares them first)."""
     f = {k: v[k] for k in ("title", "location", "description", "all_day", "start", "end", "tz", "rrule", "exdates", "overrides",
                            "reminders", "status", "busy", "url", "extra")}
+    if v.get("guests_visible") is not None:  # 2.380 H (#3392): only a file with the line changes the switch
+        f["guests_visible"] = 1 if v["guests_visible"] else 0
     me_ = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
     if me_ and me_[0]:  # the writer's own address as organiser: Kalmido writes its own (no account e-mail reaches others)
         f["extra"] = "\n".join(x for x in f["extra"].split("\n")

@@ -14834,5 +14834,14 @@
   "Tables are independent. The ones you attached to this project appear here.": "Las tablas son independientes. Aquí aparecen las que has vinculado a este proyecto.",
   "Close the keyboard after sending": "Cerrar el teclado tras enviar",
   "The keyboard closes after sending": "El teclado se cierra tras enviar",
-  "The keyboard stays open after sending": "El teclado sigue abierto tras enviar"
+  "The keyboard stays open after sending": "El teclado sigue abierto tras enviar",
+  "The file is no longer on this device": "El archivo ya no está en este dispositivo",
+  "Guest list visible to guests": "Lista de invitados visible para los invitados",
+  "Pictures shown": "Imágenes visibles",
+  "Hide pictures": "Ocultar imágenes",
+  "Show pictures": "Mostrar imágenes",
+  "Show embedded pictures": "Mostrar las imágenes insertadas",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Solo imágenes del archivo insertadas en la página que puedes ver. Los demás archivos quedan ocultos.",
+  "Scheduling polls": "Encuestas de fechas",
+  "Scheduling polls got new links: the old links no longer work.": "Las encuestas de fechas tienen enlaces nuevos: los enlaces antiguos ya no funcionan."
 }

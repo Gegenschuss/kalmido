@@ -169,7 +169,7 @@ def evi_ics(c, r, method, atts, org_addr, org_name):
             alarm -= x == "END:VALARM"
             continue
         n = re.split(r"[;:]", x, maxsplit=1)[0].upper()
-        if n in ("ORGANIZER", "ATTENDEE"):
+        if n in ("ORGANIZER", "ATTENDEE", "X-KALMIDO-GUESTS-VISIBLE"):  # 2.380 H (#3392): the switch is Kalmido's own
             continue
         if n == "DTSTAMP":
             x = f"DTSTAMP:{stamp}"
@@ -271,8 +271,11 @@ def evi_after_save(c, uid, eid, snap, send, only_invited=False):
     if not req and not cancel:
         c.commit()
         return 0
-    # 2.360.0 D (#2496): the attached calendar names the recipient only -- the other guests' addresses stay with the organiser
-    mails = [evi_mail(c, uid, r, "REQUEST", a, [a], update=a["invited_seq"] is not None) for a in req]
+    # 2.360.0 D (#2496): the attached calendar names the recipient only -- the other guests' addresses stay with the organiser;
+    # 2.380 H (#3392): unless the event says so (guests_visible): then every external guest is named
+    seen_all = set()
+    every = [a for a in ext if not (a["email"].lower() in seen_all or seen_all.add(a["email"].lower()))][:EV_ATT_MAX]
+    mails = [evi_mail(c, uid, r, "REQUEST", a, every if r["guests_visible"] else [a], update=a["invited_seq"] is not None) for a in req]
     ts = iso(now_utc())
     sent = {a["email"].lower() for a in req}
     for a in ext:

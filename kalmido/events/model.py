@@ -250,7 +250,7 @@ def cal_member_set(c, cid, uid, role):
 
 # ---- validation of an event body (web + API)
 EV_KEYS = ("title", "location", "description", "all_day", "start", "end", "tz", "rrule", "exdates", "reminders", "status",
-           "busy", "url", "task_id", "attendees", "cal_id")
+           "busy", "url", "task_id", "attendees", "cal_id", "guests_visible")
 
 
 def _txt(b, k, n, single=True):
@@ -377,6 +377,11 @@ def ev_fields(c, uid, b, old=None):
         if not isinstance(b["busy"], bool):
             raise BadInput(tr("Invalid value: {0}", "busy"))
         f["busy"] = 1 if b["busy"] else 0
+    # 2.380 H (#3392): the invitation to external guests names all guests (default off: only the recipient, as since 2.360)
+    if "guests_visible" in b:
+        if not isinstance(b["guests_visible"], bool):
+            raise BadInput(tr("Invalid value: {0}", "guests_visible"))
+        f["guests_visible"] = 1 if b["guests_visible"] else 0
     if "url" in b:
         u = b["url"] or None
         if u is not None and (not isinstance(u, str) or not valid_url(u.strip())):
@@ -673,6 +678,7 @@ def ev_dict(c, r, uid, role=None, att=None):
          "overrides": [{k: o.get(k) for k in ("rid", "title", "start", "end", "all_day", "location", "description", "status")
                         if k in o} for o in ov_list(r)],
          "reminders": [int(x) for x in (r["reminders"] or "").split(",") if x.strip()], "status": r["status"], "busy": bool(r["busy"]),
+         "guests_visible": bool(r["guests_visible"]),  # 2.380 H (#3392)
          "url": r["url"], "task_id": None if hide else r["task_id"], "attendees": atts, "role": role, "created_by": r["created_by"],
          "created_at": r["created_at"], "updated_at": r["updated_at"]}
     mine = next((a for a in atts if a["user_id"] == uid), None)
@@ -767,7 +773,7 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
                 "description": f.get("description", ""), "all_day": f.get("all_day", 0), "start": f["start"], "end": f["end"],
                 "tz": f.get("tz", ""), "rrule": f.get("rrule", ""), "exdates": f.get("exdates", ""), "overrides": f.get("overrides", ""),
                 "reminders": f.get("reminders", ""), "status": f.get("status", "confirmed"), "busy": f.get("busy", 1), "url": f.get("url"),
-                "task_id": f.get("task_id"), "extra": f.get("extra", ""), "created_by": uid, "created_at": ts, "updated_at": ts}
+                "task_id": f.get("task_id"), "extra": f.get("extra", ""), "guests_visible": f.get("guests_visible", 0), "created_by": uid, "created_at": ts, "updated_at": ts}
         eid = insert_id(c, f"INSERT INTO events({','.join(map(pgb_col, cols))}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
         who_note("event.created", "event", eid)
     else:

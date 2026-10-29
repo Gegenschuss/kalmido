@@ -14834,5 +14834,14 @@
   "Tables are independent. The ones you attached to this project appear here.": "Tabellen sind eigenständig. Hier erscheinen die, die du an diese Liste angehängt hast.",
   "Close the keyboard after sending": "Tastatur nach dem Senden schließen",
   "The keyboard closes after sending": "Die Tastatur schließt sich nach dem Senden",
-  "The keyboard stays open after sending": "Die Tastatur bleibt nach dem Senden offen"
+  "The keyboard stays open after sending": "Die Tastatur bleibt nach dem Senden offen",
+  "The file is no longer on this device": "Die Datei ist nicht mehr auf diesem Gerät",
+  "Guest list visible to guests": "Gästeliste für Gäste sichtbar",
+  "Pictures shown": "Bilder sichtbar",
+  "Hide pictures": "Bilder ausblenden",
+  "Show pictures": "Bilder zeigen",
+  "Show embedded pictures": "Eingebettete Bilder mitzeigen",
+  "Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.": "Nur Bilder aus der Ablage, die in der Seite eingebettet sind und die du sehen darfst. Andere Dateien bleiben verborgen.",
+  "Scheduling polls": "Terminumfragen",
+  "Scheduling polls got new links: the old links no longer work.": "Terminumfragen haben neue Links bekommen: die alten Links funktionieren nicht mehr."
 }

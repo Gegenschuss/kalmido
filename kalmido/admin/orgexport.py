@@ -351,6 +351,12 @@ OX_AREAS = (
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
     ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
     ("hub/mailbox.json", "hub_mailboxes", "org_id=?"),  # 2.144.5 B (#2410): the workspace mailbox (servers, user names, sender; never "secret")
+    # 2.380 H (#2398): the organisation's scheduling polls (options, votes; never the link: the import makes a new one) and
+    # bookmarks (their pictures under files/bookmarks/); a person's own ones (no organisation) go with the account export
+    ("polls.json", "sched_polls", "org_id=?"),
+    ("polls/options.json", "sched_poll_options", "poll_id IN (SELECT id FROM sched_polls WHERE org_id=? AND deleted_at IS NULL)"),
+    ("polls/votes.json", "sched_poll_votes", "poll_id IN (SELECT id FROM sched_polls WHERE org_id=? AND deleted_at IS NULL)"),
+    ("bookmarks.json", "bookmarks", "org_id=?"),
 )
 OX_NOT_INCLUDED = (
     "private lists and private sharing of the members (lists without the organisation), other organisations",
@@ -359,6 +365,8 @@ OX_NOT_INCLUDED = (
     "deleted rows and files (the trash, undone entries)",  # 2.223.3 B (#2879)
     "passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets",
     "connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)",
+    # 2.380 H (#2398): the polls come along, their links do not
+    "the links of the scheduling polls (the import makes new ones; the old links stop working)",
     "personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats",
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
     "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
@@ -594,6 +602,11 @@ def ox_build(c, oid, out, by=None):
                 full = _under(ATT_DIR, r.get("path"))
                 if full and not lk("sheet", r, r.get("name")):
                     _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+        if "bookmarks" in have:  # 2.380 H (#2398): the pictures of the organisation's bookmarks (decrypted like the attachments)
+            for r in _rows(c, oid, "bookmarks", ox_live(c, "bookmarks", "org_id=? AND image<>''"), (oid,)):
+                full = _under(ATT_DIR, r.get("image"))
+                if full:
+                    _put_bytes(zf, man, f"files/bookmarks/{int(r['id'])}-{_safe_part(os.path.basename(r['image']))}", _read(c, full))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
         if os.path.isdir(odir):
