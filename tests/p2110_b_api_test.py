@@ -242,7 +242,8 @@ for n in files:
     check(hashlib.sha256(z.read(n)).hexdigest() == HASH[nid], f"ZIP: bytes = original {n}")
 check(any(n.startswith(f"belege/2025-11-20_Buchladen-KG_107.00_{R2}.pdf") for n in files), f"ZIP: name date_supplier_gross_id.ext {files}")
 zc = list(csv.reader(io.StringIO(z.read("belege.csv").decode("utf-8").lstrip("﻿")), delimiter=";"))
-check(sorted(x[16] for x in zc[1:]) == sorted(files), f"ZIP: the CSV names the files in the ZIP {[x[16] for x in zc[1:]]} {files}")
+# 2.420.0 (#3448): the file name is the second last column (Checked on / Checked by came in after Paid on)
+check(sorted(x[-2] for x in zc[1:]) == sorted(files), f"ZIP: the CSV names the files in the ZIP {[x[-2] for x in zc[1:]]} {files}")
 r = A.get(B + RL + ".zip?" + ALL + "&q=nichtvorhanden")
 check(r.ok and zipfile.ZipFile(io.BytesIO(r.content)).namelist() == ["belege.csv"], "ZIP: empty filter = only the CSV")
 # 2.153.0 (#2055, review): a file lost on the disk does not break the whole ZIP, its CSV row stays
