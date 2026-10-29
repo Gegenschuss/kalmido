@@ -14836,5 +14836,16 @@
   "Sorting automatically, archive numbers, rules": "Tri automatique, numéros d’archive, règles",
   "Applies to": "S’applique à",
   "Who may see and change which part of the office.": "Qui peut voir et modifier quelle partie du bureau.",
-  "Rights in the office": "Droits dans le bureau"
+  "Rights in the office": "Droits dans le bureau",
+  "Change in Settings > Organisation": "Modifier dans Réglages > Organisation",
+  "Signature for letters": "Signature pour les lettres",
+  "Edit signature…": "Modifier la signature…",
+  "Greeting, name and picture under your letters (the same dialog as in the Office, Letters).": "Formule de politesse, nom et image sous vos lettres (la même boîte de dialogue que dans le bureau, Lettres).",
+  "Absences and vacation": "Absences et congés",
+  "Change in Settings > General": "Modifier dans Réglages > Général",
+  "Public holidays of": "Jours fériés de",
+  "Shows in your calendar and lowers your workload on these days.": "Apparaît dans votre calendrier et réduit votre charge ces jours-là.",
+  "Vacation approval: in Settings > Organisation": "Validation des congés : dans Réglages > Organisation",
+  "Steps in the chat": "Étapes dans le chat",
+  "The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.": "Les courtes notes qu’un agent écrit entre ses étapes restent au-dessus de chaque réponse et dans l’historique de chaque tâche. L’interrupteur du chat de l’agent fait la même chose."
 }

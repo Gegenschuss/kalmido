@@ -500,6 +500,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 /* ---------- pomodoro ---------- */
 .pomo{display:flex;flex-direction:column;align-items:center;padding-top:.625rem}
 .pomo .seg{margin-bottom:1.125rem}
+.pomoset{align-self:flex-end;margin-bottom:.5rem}
 .ring{position:relative;width:min(17.5rem,72vw);aspect-ratio:1}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:3}

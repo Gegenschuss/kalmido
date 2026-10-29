@@ -14836,5 +14836,16 @@
   "Sorting automatically, archive numbers, rules": "Automatisch sorteren, archiefnummers, regels",
   "Applies to": "Geldt voor",
   "Who may see and change which part of the office.": "Wie welk deel van het kantoor mag zien en wijzigen.",
-  "Rights in the office": "Rechten in het kantoor"
+  "Rights in the office": "Rechten in het kantoor",
+  "Change in Settings > Organisation": "Wijzigen in Instellingen > Organisatie",
+  "Signature for letters": "Handtekening voor brieven",
+  "Edit signature…": "Handtekening bewerken…",
+  "Greeting, name and picture under your letters (the same dialog as in the Office, Letters).": "Groet, naam en afbeelding onder je brieven (hetzelfde venster als in het kantoor, Brieven).",
+  "Absences and vacation": "Afwezigheid en vakantie",
+  "Change in Settings > General": "Wijzigen in Instellingen > Algemeen",
+  "Public holidays of": "Feestdagen van",
+  "Shows in your calendar and lowers your workload on these days.": "Verschijnt in je agenda en verlaagt je werkdruk op die dagen.",
+  "Vacation approval: in Settings > Organisation": "Vakantiegoedkeuring: in Instellingen > Organisatie",
+  "Steps in the chat": "Stappen in de chat",
+  "The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.": "De korte notities die een agent tussen zijn werkstappen schrijft blijven boven elk antwoord en in de geschiedenis van elke taak staan. De schakelaar in de agentchat doet hetzelfde."
 }

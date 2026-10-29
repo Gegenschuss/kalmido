@@ -70,8 +70,9 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
     check(await ready(ev, `[...document.querySelectorAll('.evcmodal .cvxgrp')].some(x => /Holidays and absences/.test(x.textContent))`, 60), 'the group "Holidays and absences"');
     check(await ev(`document.querySelector('.evcmodal [data-key="x:hol"]').checked && document.querySelector('.evcmodal [data-key="x:abs"]').checked && !document.querySelector('.evcmodal [data-key="x:team"]').checked`),
       'holidays + my absences on, the team off');
-    check(await ready(ev, `!!document.querySelector('#abc-state option[value="AT"]') && /Bayern/.test(document.querySelector('#abc-state option[value=""]').textContent)`),
-      'the state picker: "As my organisation (Bayern)", Austria offered');
+    // 2.365.2 C (#2789): the state picker moved to Settings > General; the window shows the state and a link
+    check(await ready(ev, `!document.querySelector('#abc-state') && /Bayern/.test(document.querySelector('.evcmodal .abcst [data-act="mod-settings"]')?.textContent || '')`),
+      'the state: "As my organisation (Bayern)" with a link to Settings');
     check(!!(await ev(`document.querySelector('.evcmodal [data-abc="feed"]')`)), 'the subscription link button');
     // 2.240.0 C (#2868): whose busy times colleagues see (org | all | off), saved like the other settings
     check(await ev(`document.querySelector('#abc-fb')?.value === 'org' && document.querySelectorAll('#abc-fb option').length === 3`), 'the free / busy picker: org by default, three choices');
