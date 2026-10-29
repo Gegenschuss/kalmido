@@ -246,7 +246,7 @@ function rcm_settingsHtml() {
       : `<p><button type="button" class="btn sm" data-rcm="make">${tr('Create address')}</button></p>`}
     <details class="rcm-gmail"><summary>${tr('Forward automatically from Gmail')}</summary><ol>
       <li>${esc(tr('In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.'))}</li>
-      <li>${esc(tr('Search for your invoice mails, for example subject:(invoice OR Rechnung OR receipt), and choose “Create filter”.'))}</li>
+      <li>${esc(tr('Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.'))}</li>
       <li>${esc(tr('Tick “Forward it to”, pick this address and create the filter.'))}</li></ol></details>`;
 }
 document.addEventListener('click', async e => {
@@ -257,7 +257,8 @@ document.addEventListener('click', async e => {
     try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); }
     return;
   }
-  if (k === 'renew' && !await askConfirm(tr('New address?'), tr('The old address stops working.'), {ok: tr('New address')})) return;
+  // 2.424.0 B2 (#3450, review): the address is the documents space's one -- its documents address and letters' reply address change too
+  if (k === 'renew' && !await askConfirm(tr('New address?'), tr('The old address stops working. The documents address and the reply address of letters of this area change with it.'), {ok: tr('New address')})) return;
   try { RCM.d = await api('POST', '/api/office/receipt-mail', {renew: k === 'renew'}); } catch { return; }
   ofcDraw();
 });

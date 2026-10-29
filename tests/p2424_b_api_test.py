@@ -19,6 +19,12 @@ freelancer-matrix: office
  - the forwarding address in the office settings (GET / POST /api/office/receipt-mail): the personal office of a person
    without an organisation and the company office are separate addresses, equal to the documents settings' address of that
    space, POST keeps the address, renew makes a new one (the old one stops), agents 403
+ - 2.424.0 B2 (#3450, review findings): only the real invoice hosts count as known (no google.com / paypal.com / apple.com);
+   a server sending its headers drop by drop ends at the mail's deadline (cal_http until, "timeout"); the downloads of
+   one mail stop at ML_MAIL_DEADLINE; the hourly budget per document address (30 downloads, 60 mails without a file, a new
+   hour starts again) and a spent budget downloads / files nothing; the IMAP poll downloads BEFORE the database work
+   (outside the gate, with the deadline); an inline logo does not stop the link (an attached image does); a member
+   with the level "own" in Receipts sees the own forwarding address
 usage: p2424_b_api_test.py <datadir>"""
 import base64
 import email.message
@@ -244,7 +250,7 @@ from kalmido.docs import ingest as I, maillink as ML
 ARGS = json.loads(%r)
 PDFS = {k: base64.b64decode(v) for k, v in ARGS["pdfs"].items()}
 calls = []
-def fake(url, allow=frozenset()):
+def fake(url, allow=frozenset(), until=None):  # 2.424.0 B2 (#3450): ml_get takes the mail's deadline (until)
     calls.append(url)
     if "login" in url:
         return 200, {"Content-Type": "text/html"}, b"<html>Bitte anmelden</html>", url
@@ -327,6 +333,146 @@ check(DO and dbx("SELECT org_id FROM fs_nodes WHERE id=?", (DO,)) == [(ORG,)], f
 check(Fr.get(B + f"/api/docs/{DO}").status_code == 404, "the freelancer does not see Alpha's document")
 check(not nid("oldorg") and calls("oldorg") == 0, f"the renewed-away address takes nothing in, downloads nothing ({j.get('oldorg')})")
 check(not dbx("SELECT 1 FROM tasks WHERE tt_id LIKE 'mail:<p2424b-%'"), "no task from a document mail")
+
+# ---------------------------------------------------------------- 4. 2.424.0 B2 (#3450): the review findings
+B2 = r"""
+import base64, email.message, email.policy, http.server, json, threading, time, app
+from kalmido.core.db import connect, now_iso
+from kalmido.core.pg import system_ctx
+from kalmido.accounts.session import GATE
+from kalmido.docs import ingest as I, maillink as ML
+from kalmido.integrations import mail as MI
+from kalmido.calendars.subscriptions import CalError
+ARGS = json.loads(%r)
+PDFS = {k: base64.b64decode(v) for k, v in ARGS["pdfs"].items()}
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+I.docs_kick = lambda: None
+out = {}
+tok = lambda a: a.split("+", 1)[1].split("@", 1)[0]
+# (1c) known hosts: exactly the hosts that serve the invoice
+out["hosts"] = [ML.ml_pick(u, t) for u, t in (("https://payments.google.com/invoice/7", "View invoice"),
+                ("https://www.paypal.com/invoice/p/x", "Invoice"), ("https://apps.apple.com/receipt/1", "Receipt"),
+                ("https://invoice.stripe.com/i/acct_1/x", "Download invoice"), ("https://my.paddle.com/receipt/1", "Receipt"))]
+# (2) a server that drips its headers: the deadline ends it (connect + header phase too)
+class Drip(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+    def do_GET(self):
+        try:
+            self.wfile.write(b"HTTP/1.1 200 OK\r\n")
+            self.wfile.flush()
+            for _ in range(600):
+                self.wfile.write(b"X")
+                self.wfile.flush()
+                time.sleep(0.2)
+        except OSError:
+            pass
+srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Drip)
+srv.daemon_threads = True
+PORT = srv.server_address[1]
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+t0 = time.monotonic()
+try:
+    ML.ml_get(f"http://127.0.0.1:{PORT}/r.pdf", allow=frozenset({("127.0.0.1", PORT)}), until=time.monotonic() + 2)
+    out["drip"] = ["ok"]
+except CalError as e:
+    out["drip"] = [e.code]
+out["drip_s"] = round(time.monotonic() - t0, 1)
+# (2) all the downloads of one mail end at ML_MAIL_DEADLINE
+def mk(to, mid, html=None, text="Danke.", att=None, logo=False):
+    m = email.message.EmailMessage()
+    m["From"], m["To"], m["Subject"], m["Message-ID"] = "billing@example.com", to, "Your invoice", mid
+    m.set_content(text)
+    if html:
+        m.add_alternative(html, subtype="html")
+        if logo:
+            m.get_payload()[1].add_related(PNG, "image", "png", cid="<logo>", filename="logo.png", disposition="inline")
+    if att:
+        m.add_attachment(PNG, maintype="image", subtype="png", filename="scan.png")
+    return m
+slow = []
+def slow_get(u):
+    slow.append(u)
+    time.sleep(0.6)
+    return 200, {"Content-Type": "text/html"}, b"<html>login</html>", u
+ML.ML_MAIL_DEADLINE = 1
+three = mk(ARGS["f"], "<p2424b2-0@example.com>", text="\n".join(f"Rechnung {i}: https://example.org/r/{i}.pdf" for i in range(3)))
+ML.ml_collect(three, get=slow_get)
+out["slow"] = len(slow)
+ML.ML_MAIL_DEADLINE = 40
+# (1a) the hourly budget of one document address
+T = tok(ARGS["a_priv"])
+c = connect()
+try:
+    with system_ctx(c):
+        out["b_links"] = [ML.ml_budget(c, T, "links", 25), ML.ml_budget(c, T, "links", 25), ML.ml_budget(c, T, "links", 1)]
+        out["b_eml"] = sum(ML.ml_budget(c, T, "eml") for _ in range(61))
+        c.execute("UPDATE doc_mail SET hits_hour='2000-01-01T00' WHERE token=?", (T,))
+        out["b_hour"] = [ML.ml_budget(c, T, "links", 3), ML.ml_budget(c, T, "eml")]
+        c.execute("UPDATE doc_mail SET hits_hour=?, hits_links=30, hits_eml=60 WHERE token=?", (now_iso()[:13], T))
+    c.commit()
+finally:
+    c.close()
+calls = []
+def fake(url, allow=frozenset(), until=None):
+    calls.append((GATE.active, until is not None))
+    return 200, {"Content-Type": "application/pdf"}, PDFS["pre"], url
+ML.ml_get = fake
+def imp(m, pre=None):
+    raw = bytes(m)
+    c = connect()
+    try:
+        return I.docs_mail_import(c, email.message_from_bytes(raw, policy=email.policy.default), raw, pre)
+    finally:
+        c.close()
+LH = '<p>Danke.</p><a href="https://invoice.stripe.com/i/acct_7/inv_7">Download invoice</a>'
+spent = mk(ARGS["a_priv"], "<p2424b2-1@example.com>", LH)
+pre = MI.mail_import(None, bytes(spent))
+out["spent"] = {"pre": [len(pre[0]), len(pre[1])], "calls": len(calls), "nid": imp(spent, pre)}
+# (2) the IMAP poll: the download runs before the database work (outside the gate), with the mail's deadline
+open("/data/mail/in/901.eml", "wb").write(bytes(mk(ARGS["f"], "<p2424b2-2@example.com>", LH)))
+out["poll"] = MI.mail_poll_once()
+out["poll_calls"] = calls[:]
+# (3) an inline logo is no receipt: the link is followed; an attached image is one: no download
+PDFS["pre"] = PDFS["logo"]
+n0 = len(calls)
+out["logo"] = {"nid": imp(mk(ARGS["f"], "<p2424b2-3@example.com>", LH, logo=True)), "calls": len(calls) - n0}
+n0 = len(calls)
+out["attimg"] = {"nid": imp(mk(ARGS["f"], "<p2424b2-4@example.com>", LH, att=True)), "calls": len(calls) - n0}
+print(json.dumps(out))
+"""
+ARGS2 = json.dumps({"f": FADDR, "a_priv": A_PRIV, "pdfs": {"pre": base64.b64encode(text_pdf(["Rechnung", "Rechnungs-Nr.: B2-1"])).decode(),
+                    "logo": base64.b64encode(text_pdf(["Rechnung", "Rechnungs-Nr.: B2-2"])).decode()}})
+j = py(B2 % ARGS2)
+check(j.get("hosts") == [False, False, False, True, True],
+      f"known hosts: only the invoice hosts (not payments.google.com / paypal.com / apple.com) ({j.get('hosts')})")
+check(j.get("drip") == ["timeout"] and (j.get("drip_s") or 99) < 8,
+      f"headers dripping: ended at the deadline ({j.get('drip')}, {j.get('drip_s')} s)")
+check(j.get("slow") in (1, 2), f"the downloads of one mail stop at the mail's deadline ({j.get('slow')} of 3)")
+check(j.get("b_links") == [25, 5, 0] and j.get("b_eml") == 60, f"budget per address and hour: 30 downloads, 60 mails ({j.get('b_links')} {j.get('b_eml')})")
+check(j.get("b_hour") == [3, 1], f"a new hour: the budget starts again ({j.get('b_hour')})")
+sp = j.get("spent") or {}
+check(sp.get("pre") == [1, 0] and sp.get("calls") == 0 and not sp.get("nid"),
+      f"budget spent: the link found but not fetched, the mail not filed ({sp})")
+check(not dbx("SELECT 1 FROM doc_meta WHERE ext_id LIKE 'mail:<p2424b2-1@%'"), "budget spent: no document")
+check(j.get("poll") == 1 and j.get("poll_calls") == [[0, True]],
+      f"IMAP poll: one download, outside the gate (no transaction), with the deadline ({j.get('poll')} {j.get('poll_calls')})")
+check(dbx("SELECT count(*) FROM doc_meta WHERE ext_id='mail:<p2424b2-2@example.com>:link:0'") == [(1,)], "IMAP poll: the link PDF is a document")
+lg = j.get("logo") or {}
+check(lg.get("calls") == 1 and lg.get("nid") and dbx("SELECT ext_id FROM doc_meta WHERE node_id=?", (lg.get("nid"),)) == [("mail:<p2424b2-3@example.com>:link:0",)],
+      f"an inline logo: the link is still followed, the PDF is the document ({lg})")
+ai = j.get("attimg") or {}
+check(ai.get("calls") == 0 and ai.get("nid") and dbx("SELECT ext_id FROM doc_meta WHERE node_id=?", (ai.get("nid"),)) == [("mail:<p2424b2-4@example.com>:0",)],
+      f"an attached image: it is the receipt, no download ({ai})")
+# (5) the level "own" in Receipts: the own forwarding address
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob Member", "password": "password123", "email": "bob@example.com"})
+assert r.ok, r.text
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"}).ok
+assert A.put(B + f"/api/office/rights/people/{r.json()['id']}", json={"groups": ["tpl:staff"]}).ok
+Bo = sess("bob")
+Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
+r = Bo.get(B + "/api/office/receipt-mail")
+check(r.status_code == 200 and r.json().get("ws") == f"org:{ORG}", f"group Staff (receipts: own): GET receipt-mail 200 ({r.status_code} {r.text[:120]})")
 
 print(f"p2424_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

@@ -14952,6 +14952,7 @@
   "Forward invoices to this address: attached PDFs and download links that need no login become documents and receipt suggestions.": "Inoltra le fatture a questo indirizzo: i PDF allegati e i link di download senza accesso diventano documenti e proposte di ricevuta.",
   "Forward automatically from Gmail": "Inoltra automaticamente da Gmail",
   "In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.": "In Gmail: Impostazioni > Visualizza tutte le impostazioni > Inoltro e POP/IMAP > Aggiungi un indirizzo di inoltro. Inserisci questo indirizzo; il codice di conferma arriva qui come documento.",
-  "Search for your invoice mails, for example subject:(invoice OR Rechnung OR receipt), and choose “Create filter”.": "Cerca le tue e-mail di fattura, per esempio subject:(invoice OR Rechnung OR receipt), e scegli «Crea filtro».",
-  "Tick “Forward it to”, pick this address and create the filter.": "Spunta «Inoltra a», scegli questo indirizzo e crea il filtro."
+  "Tick “Forward it to”, pick this address and create the filter.": "Spunta «Inoltra a», scegli questo indirizzo e crea il filtro.",
+  "The old address stops working. The documents address and the reply address of letters of this area change with it.": "Il vecchio indirizzo smetterà di funzionare. Cambiano anche l’indirizzo dei documenti e l’indirizzo di risposta delle lettere di quest’area.",
+  "Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.": "Cerca le e-mail dei tuoi mittenti di fatture, per esempio from:(stripe.com OR paddle.com OR apple.com), e scegli «Crea filtro»."
 }

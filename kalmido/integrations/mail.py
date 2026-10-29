@@ -130,9 +130,10 @@ def mail_token_del():
     return jsonify(ok=True)
 
 
-def mail_text(msg, limit=MAIL_BODY_MAX):
+def mail_text(msg, limit=MAIL_BODY_MAX, att_images=False):
     """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags.
-    2.84.0 (#1198): limit = characters kept (the hub files longer texts)."""
+    2.84.0 (#1198): limit = characters kept (the hub files longer texts). att_images (2.424.0 B2, #3450, the documents
+    mail input): an image is a file only with Content-Disposition attachment (an inline logo of an invoice mail is not)."""
     plain = html_ = None
     files = []
     for part in msg.walk():
@@ -141,6 +142,8 @@ def mail_text(msg, limit=MAIL_BODY_MAX):
         disp = (part.get_content_disposition() or "").lower()
         ctype = part.get_content_type()
         name = part.get_filename()
+        if att_images and ctype.startswith("image/") and disp != "attachment":
+            continue
         if disp == "attachment" or (name and disp != "inline") or (name and not ctype.startswith("text/")):
             try:
                 data = part.get_payload(decode=True) or b""
@@ -203,16 +206,20 @@ class MailKept(int):
     """2.240.0 A (#2883): a task id whose mail stays in the mailbox (an attachment could not be stored)."""
 
 
-def mail_import(c, raw):
+def mail_import(c, raw, pre=None):
     """One message (bytes) -> one task. Returns the task id, MAIL_DROP when it is for nobody or already imported, None
-    when another importer (documents, hub, data protection) took nothing in (2.240.0 A, #2883: that mail stays)."""
+    when another importer (documents, hub, data protection) took nothing in (2.240.0 A, #2883: that mail stays).
+    2.424.0 B2 (#3450): c None = the step before the database transaction (mail_fetch prefetch): the invoice link
+    downloads of a documents mail -> pre, handed back in with the mail (docs/ingest.py docs_mail_prefetch)."""
     msg = email.message_from_bytes(raw, policy=email.policy.default)
+    from ..docs.ingest import docs_mail_import, docs_mail_prefetch  # 2.48.0 (#1111): a document address -> its attachments become documents
+    if c is None:
+        return docs_mail_prefetch(msg)
     from ..office.privacy import dsb_mail_import  # 2.154.0 C (#2192): a reply with the code of a mailed data protection sheet
     p = dsb_mail_import(c, msg, raw)
     if p is not None:
         return p or None
-    from ..docs.ingest import docs_mail_import  # 2.48.0 (#1111): a document address -> its attachments become documents
-    d = docs_mail_import(c, msg, raw)
+    d = docs_mail_import(c, msg, raw, pre)
     if d is not None:
         return d or None
     from ..hub.hubmail import hbm_mail_import  # 2.84.0 (#1198): a hub address (client / project / hub inbox) -> a filed mail
@@ -311,14 +318,16 @@ def mail_seen_prune():
         c.close()
 
 
-def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False):
+def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False, prefetch=False):
     """2.141.0 A (#2141): the unseen mails of folder (a logged-in IMAP connection) -> importer(c, raw), each one marked \\Seen
     afterwards (also when it was for nobody or failed: it is never looked at again). Returns how many were taken in.
     max_bytes (review): a mail whose RFC822.SIZE is larger is not fetched (marked seen) -- a workspace's own server.
     box (2.193.0 D, #2220): the mailbox's key for mail_seen_claim (a message is handled once, also by two processes).
     delete (2.240.0 A, #2883): a mail taken in whole (or MAIL_DROP: for nobody / a double) is deleted (\\Deleted + UID EXPUNGE);
     one that failed, was taken in only in part (MailKept), was refused by an importer (None / 0) or skipped as too large
-    stays (marked \\Seen)."""
+    stays (marked \\Seen).
+    prefetch (2.424.0 B2, #3450): importer(None, raw) runs first, outside the gate and any database transaction (the
+    invoice link downloads, up to 40 s), its result goes in as importer(c, raw, pre)."""
     n, gone = 0, []
     max_bytes = max_bytes or MAIL_LITERAL_MAX  # 2.148.1 G (#2485): a too large mail is skipped (seen), never fetched again
     mail_cap_literals(M, max_bytes + 1024 * 1024)  # 2.148.1 D (#2485)
@@ -337,6 +346,13 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False):
         typ, parts = M.uid("FETCH", u, "(RFC822)")
         raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
         done = False
+        pre = None
+        if raw and prefetch:
+            try:
+                pre = importer(None, raw)
+            except Exception as e:  # noqa: BLE001 -- no downloads then; the mail itself goes on
+                print("mail: prefetch failed:", type(e).__name__, flush=True)
+                pre = False
         if raw:
             with GATE.bg():
                 c = connect()
@@ -344,7 +360,7 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False):
                     res = None
                     if box and not mail_seen_claim(c, box, u, raw):  # 2.193.0 D (#2220): another process had it
                         c.rollback()
-                    elif (res := importer(c, raw)):
+                    elif (res := (importer(c, raw, pre) if prefetch else importer(c, raw))):
                         n += 1
                         c.commit()  # (the importer committed; the claim went with it)
                     elif box:  # for nobody: nothing of it stays but the claim
@@ -393,7 +409,7 @@ def mail_poll_once():
     M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60, ssl_context=_admin_tls_ctx()) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
     try:
         M.login(IMAP["user"], IMAP["password"])
-        return mail_fetch(M, IMAP["folder"], mail_import, box="instance", delete=not IMAP_KEEP)
+        return mail_fetch(M, IMAP["folder"], mail_import, box="instance", delete=not IMAP_KEEP, prefetch=True)
     finally:
         try:
             M.logout()

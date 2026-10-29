@@ -3826,6 +3826,11 @@ MIGRATIONS = [
     ("lists", "ticket_key", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS ticket_key TEXT"),
     ("tasks", "ticket_no", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ticket_no BIGINT"),
     ("git_conns", "hash_ids", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS hash_ids BIGINT NOT NULL DEFAULT 1"),
+    # 2.424.0 B2 (#3450): the hourly budget of a document address (docs/maillink.py ml_budget): hits_hour = the hour
+    # (YYYY-MM-DDTHH, UTC), hits_links = invoice links downloaded, hits_eml = mails filed without a file. Older versions ignore them
+    ("doc_mail", "hits_hour", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS hits_hour TEXT NOT NULL DEFAULT ''"),
+    ("doc_mail", "hits_links", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS hits_links BIGINT NOT NULL DEFAULT 0"),
+    ("doc_mail", "hits_eml", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS hits_eml BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

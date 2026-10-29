@@ -131,6 +131,8 @@ OWN_ROUTES = {
     "GET /api/office/trips/report", "GET /api/office/trips/vma", "GET /api/office/meals/report", "GET /api/office/logbook/report",
     # 2.356.0 D (#3129): hand in a receipt and see the own ones handed in (office/rcsubmit.py filters by the person)
     "POST /api/office/receipts/submit", "GET /api/office/receipts/mine",
+    # 2.424.0 B2 (#3450, review): the person's own forwarding address for receipts (office/lettermail.py, always the caller's)
+    "GET /api/office/receipt-mail",
 }
 
 TPL_LEGACY = "legacy"

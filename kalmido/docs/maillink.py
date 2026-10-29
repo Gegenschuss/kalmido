@@ -2,7 +2,7 @@
 documents mail input (docs/ingest.py docs_mail_import) follows such a link once and files the PDF it gets as a document.
 
  - Links: the <a href> of the HTML part (with the link text) and the bare URLs of the text part, at most ML_SCAN looked at.
-   Taken (at most ML_LINKS per mail): a link to a known invoice host (ML_HOSTS, the host or a subdomain) whose text or URL
+   Taken (at most ML_LINKS per mail): a link to a known invoice host (ML_HOSTS, exactly that host) whose text or URL
    speaks of an invoice / receipt / PDF, or any link whose text or URL says invoice / Rechnung / receipt / Beleg ... and
    that points to a PDF (the path ends in .pdf or the text says PDF).
  - Fetch (ml_get): https only, through the SSRF guard of the calendar subscriptions (cal_http): every address the host
@@ -10,14 +10,18 @@ documents mail input (docs/ingest.py docs_mail_import) follows such a link once 
    reserved, also inside IPv4-mapped / NAT64 / 6to4 IPv6 -- checked at connect time on every hop and the socket connects
    to exactly the checked address; the admin allow-list of internal calendar hosts does NOT apply (allow is empty). At most
    5 redirects, never https -> http, a redirect to another host only over https; no proxy, no cookies, no credentials,
-   ML_MAX_BYTES, ML_TIMEOUT per socket operation and ML_DEADLINE for the whole download. Only a 200 answer whose bytes
+   ML_MAX_BYTES, ML_TIMEOUT per socket operation, ML_DEADLINE for the whole download and ML_MAIL_DEADLINE for all the
+   downloads of one mail (2.424.0 B2: also the connect and header phase). Only a 200 answer whose bytes
    start with %PDF- (and whose Content-Type is a PDF / binary one, or missing) counts.
  - No login, no form, no JavaScript, no second page followed (no scraping): an HTML page, a 401 / 403 or anything else is
    "needs a login" -- the mail itself then becomes the document, tagged ML_TAG (docs_mail_import).
+2.424.0 B2 (#3450, review): the downloads run before the mail's database transaction (docs/ingest.py docs_mail_prefetch),
+at most ML_HOUR_LINKS downloads and ML_HOUR_EML mails filed without a file per document address and hour (ml_budget).
 Kalmido calls no language model here."""
 import html.parser
 import re
 import secrets
+import time
 import urllib.parse
 
 from ..core.config import APP_NAME, APP_VERSION, MAX_FILE_MB
@@ -29,12 +33,15 @@ ML_LINKS = 3          # links followed per mail
 ML_SCAN = 200         # links of one mail looked at
 ML_MAX_BYTES = min(MAX_FILE_MB, 20) * 1024 * 1024
 ML_TIMEOUT, ML_DEADLINE = 10, 25  # s per socket operation / for one download
+ML_MAIL_DEADLINE = 40  # 2.424.0 B2 (#3450): s for all the downloads of one mail
+ML_HOUR_LINKS, ML_HOUR_EML = 30, 60  # 2.424.0 B2 (#3450): per document address and hour: downloads / mails filed without a file
 ML_TAG = N_("Receipt link needs a login")
 ML_UA = f"{APP_NAME}/{APP_VERSION} (receipt link)"
-# invoice / receipt senders whose mails carry a download link instead of the PDF (the host or any subdomain of it)
-ML_HOSTS = ("stripe.com", "paddle.com", "paddle.net", "apple.com", "google.com", "paypal.com", "gumroad.com",
-            "lemonsqueezy.com", "fastspring.com", "chargebee.com", "recurly.com", "invoice.zoho.eu", "invoice.zoho.com",
-            "sevdesk.de", "lexoffice.de", "debitoor.com", "billomat.net", "fastbill.com", "easybill.de")
+# invoice / receipt hosts whose mails carry a download link instead of the PDF (exactly these hosts). 2.424.0 B2 (#3450,
+# review): only the hosts that serve the invoice itself -- no whole provider domains (google.com, apple.com, paypal.com
+# with every subdomain: any spam with "Invoice" could make the server fetch from them); others need words + PDF
+ML_HOSTS = ("invoice.stripe.com", "pay.stripe.com", "my.paddle.com", "app.lemonsqueezy.com", "app.gumroad.com",
+            "invoice.zoho.eu", "invoice.zoho.com")
 ML_KW = re.compile(r"invoice|rechnung|receipt|quittung|beleg|facture|fattura|factura|factuur|faktura", re.I)
 _PDF_TYPES = ("application/pdf", "application/x-pdf", "application/octet-stream", "binary/octet-stream", "application/download",
               "application/force-download", "")
@@ -64,7 +71,7 @@ class _Links(html.parser.HTMLParser):
 
 def _host_known(host):
     h = (host or "").lower().rstrip(".")
-    return any(h == k or h.endswith("." + k) for k in ML_HOSTS)
+    return h in ML_HOSTS
 
 
 def ml_pick(url, text=""):
@@ -125,11 +132,12 @@ def ml_links(msg):
     return out
 
 
-def ml_get(url, allow=frozenset()):
+def ml_get(url, allow=frozenset(), until=None):
     """One download through the SSRF guard -> (status, headers, body, final url). The mail import never passes allow
-    (public addresses only); the tests let their stub server on 127.0.0.1 through with it."""
+    (public addresses only); the tests let their stub server on 127.0.0.1 through with it. until: the time.monotonic()
+    point all the downloads of the mail end at (cal_http until: also the connect and header phase)."""
     return cal_http(url, headers={"User-Agent": ML_UA, "Accept": "application/pdf, */*;q=0.1"}, allow=allow,
-                    cross_redirects=True, max_bytes=ML_MAX_BYTES, timeout=ML_TIMEOUT, deadline=ML_DEADLINE)
+                    cross_redirects=True, max_bytes=ML_MAX_BYTES, timeout=ML_TIMEOUT, deadline=ML_DEADLINE, until=until)
 
 
 def _name(hdrs, final, url):
@@ -167,15 +175,42 @@ def ml_fetch(url, get=None, https_only=True):
     return _name(hdrs, final, url), bytes(data)
 
 
-def ml_collect(msg, get=None):
-    """(links, [(index of the link, name, PDF bytes)]) of a mail: the invoice links found and what could be downloaded."""
-    links, got = ml_links(msg), []
-    for i, u in enumerate(links):
+def ml_collect(msg, get=None, limit=ML_LINKS, links=None):
+    """(links, [(index of the link, name, PDF bytes)]) of a mail: the invoice links found and what could be downloaded
+    (the first `limit` of them, all within ML_MAIL_DEADLINE). get: the download (default ml_get with the mail's deadline)."""
+    links = ml_links(msg) if links is None else links
+    until = time.monotonic() + ML_MAIL_DEADLINE
+    fetch = get or (lambda u: ml_get(u, until=until))
+    got = []
+    for i, u in enumerate(links[:max(0, limit)]):
+        if time.monotonic() >= until:
+            print("docs: receipt link not taken timeout", flush=True)
+            break
         try:
-            got.append((i, *ml_fetch(u, get=get)))
+            got.append((i, *ml_fetch(u, get=fetch)))
         except CalError as e:
             print("docs: receipt link not taken", e.code, flush=True)  # the code only, never the link (it may carry a token)
     return links, got
+
+
+def ml_budget(c, token, kind, n=1):
+    """2.424.0 B2 (#3450): how many of n downloads (kind "links") / mails filed without a file (kind "eml") the document
+    address `token` may still have this hour (ML_HOUR_LINKS / ML_HOUR_EML), taken from its budget at once. Counted on
+    the doc_mail row (hits_hour = the hour, hits_links / hits_eml); call inside system_ctx, the caller commits."""
+    col, cap = ("hits_links", ML_HOUR_LINKS) if kind == "links" else ("hits_eml", ML_HOUR_EML)
+    r = c.execute(f"SELECT hits_hour, {col} AS used FROM doc_mail WHERE token=? FOR UPDATE", (token,)).fetchone()
+    if not r or n <= 0:
+        return 0
+    hour = now_iso()[:13]
+    used = int(r["used"] or 0) if r["hits_hour"] == hour else 0
+    k = max(0, min(n, cap - used))
+    if r["hits_hour"] != hour:
+        c.execute("UPDATE doc_mail SET hits_hour=?, hits_links=0, hits_eml=0 WHERE token=?", (hour, token))
+    if k:
+        c.execute(f"UPDATE doc_mail SET {col}={col}+? WHERE token=?", (k, token))
+    if k < n:
+        print("docs: mail budget spent", kind, n - k, flush=True)  # a count only, never the address or a link
+    return k
 
 
 def ml_mail_name(msg):

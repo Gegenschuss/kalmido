@@ -2,6 +2,8 @@
 // 2.424.0 B (#3450) UI test, jsdom: receipts by e-mail in the office settings (area Data) of a person without an organisation.
 // - the section "Receipts by e-mail" shows a button "Create address" while there is none; a press shows the address
 // - the copy button puts exactly that address on the clipboard; the Gmail filter guide (three steps) sits folded below
+// - 2.424.0 B2 (#3450, review): the guide filters by sender (from:), a new address says first that the documents address
+//   and the letters' reply address of the area change too (cancel keeps it)
 // - without the mail input on the server (no IMAP set up) the section is not there at all (separate container start)
 // Own container (start.sh with the mail address of the server set).
 // freelancer-matrix: office
@@ -62,6 +64,15 @@ async function openData() {
   check(g && !g.open && g.querySelectorAll('li').length === 3 && /Gmail/.test(g.querySelector('summary').textContent),
     'the Gmail guide: folded, three steps');
   check(d.querySelector('[data-rcm="renew"]'), 'a link for a new address');
+  // 2.424.0 B2 (#3450, review): the guide filters by the invoice senders, not by subject words (spam says "Invoice" too)
+  check(g && /from:\(stripe\.com/.test(g.textContent) && !/subject:/.test(g.textContent), 'the Gmail guide: a filter by sender (from:), not by subject');
+  // 2.424.0 B2 (#3450, review): a new address asks first and says that the documents and the letters' reply address change too
+  d.querySelector('[data-rcm="renew"]')?.click();
+  const cb = await until(() => d.querySelector('#cdlg-b'));
+  check(cb && /documents address and the reply address of letters/.test(cb.textContent), 'renew: the question says the documents and letter reply address change too: ' + (cb && cb.textContent));
+  d.querySelector('[data-cd="no"]')?.click();
+  await until(() => !d.querySelector('#cdlg-b'));
+  check((await call('GET', '/api/office/receipt-mail', null, FK)).address === addr, 'cancelled: the address stays');
   w.close();
   check(!errs.length, 'no script errors: ' + errs.slice(0, 3).join(' | '));
 
