@@ -8,7 +8,11 @@
    and gives the owner ONE News item (whorgcut); the list of webhooks names the organisations (org_hits, admin flag) and the
    last day (org_until); private lists reach every personal webhook as before; an organisation admin sets the same webhook
    up as one of the organisation; a person without an organisation: org_hits empty, private events as before
+ - #3390: the redeem answer of the agent setup carries starter_sha256 = mcp/starter_sha256.txt (made by tools/starter_sha.py,
+   in the image), for a person without an organisation too; the file matches the starter files (tools/starter_sha.py --check)
 usage: p2380r_g_api_test.py <datadir>      (KMT_NOSTART=1 / P2380RG_NOSTART=1: a running server)"""
+import os
+import subprocess
 import sys
 
 import requests
@@ -118,5 +122,22 @@ check(FW.get("org_hits") == [] and FW.get("org_until") == "", f"#3391 freelancer
 F.post(B + "/api/tasks", json={"list_id": L, "title": "Frida private task"})
 q = until(lambda: queued("Frida private task"), 15)
 check(FW.get("id") in (q or set()), f"#3391 freelancer: the private task reaches the personal webhook: {q}")
+
+# ================================================================ #3390: checksums of the starter files in the redeem answer
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(ROOT, "mcp", "starter_sha256.txt"), encoding="utf-8") as f:
+    WANT = {ln.split()[1]: ln.split()[0] for ln in f if ln.strip() and not ln.startswith("#")}
+r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "starter_sha.py"), "--check"], capture_output=True, text=True)
+check(r.returncode == 0, f"#3390: mcp/starter_sha256.txt matches the starter files: {r.stdout} {r.stderr}")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read"]})
+check(r.ok, f"#3390 setup: a personal agent of a person without an organisation: {r.status_code} {r.text[:160]}")
+if r.ok:
+    rc = F.post(B + f"/api/my/agents/{r.json()['id']}/setup-code", json={"os": "linux", "folder": "/work/x"})
+    check(rc.ok, f"#3390 setup: a setup code {rc.text[:160]}")
+    rr = requests.post(B + "/api/agent-setup/redeem", headers=H, json={"code": rc.json().get("code", ""), "host": "box", "folder": "/work/x", "os": "linux"})
+    got = rr.json().get("starter_sha256")
+    check(rr.ok and got == WANT and "agent_run.py" in got and "starter_files.txt" in got,
+          f"#3390: the redeem answer sends the checksums of this version: {rr.status_code} {str(got)[:200]}")
 
 sys.exit(done("p2380r_g_api"))

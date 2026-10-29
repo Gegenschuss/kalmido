@@ -72,6 +72,8 @@ $MsgEn = @{
   nolistfetch = 'cannot fetch the starter file list ({0}starter_files.txt); this version may not be published yet - try again later or use -From DIR'
   skippath = '  skipped {0} (no paths allowed)'
   nofetch = 'cannot fetch {0}'
+  shabad = '{0} does not match the checksum Kalmido sent - not installed. The download address serves another file than this version; ask your Kalmido admin'
+  shanone = '  (Kalmido sent no checksums of the starter files: an older version, not checked)'
   skipfile = '  {0} not available (skipped)'
   dry_mcp = '  (dry run) write {0} (MCP server kalmido: {1} {2})'
   s_auto = 'Starting it at every login'
@@ -126,6 +128,8 @@ $MsgDe = @{
   nolistfetch = 'die Liste der Starter-Dateien ({0}starter_files.txt) kann nicht geladen werden; diese Version ist vielleicht noch nicht veröffentlicht – versuche es später noch einmal oder nimm -From ORDNER'
   skippath = '  {0} übersprungen (keine Pfade erlaubt)'
   nofetch = '{0} kann nicht geladen werden'
+  shabad = '{0} weicht von der Prüfsumme ab, die Kalmido geschickt hat – nicht installiert. Die Download-Adresse liefert eine andere Datei als diese Version; frag deinen Kalmido-Admin'
+  shanone = '  (Kalmido hat keine Prüfsummen der Starter-Dateien geschickt: ältere Version, nicht geprüft)'
   skipfile = '  {0} nicht verfügbar (übersprungen)'
   dry_mcp = '  (Probelauf) {0} schreiben (MCP-Server kalmido: {1} {2})'
   s_auto = 'Starte bei jeder Anmeldung'
@@ -246,6 +250,7 @@ if (-not $AllowHttp -and $Url -notmatch '^https://' -and $Url -notmatch '^http:/
 Step (M 's_connect')
 $HostN = ([Environment]::MachineName -split '\.')[0]
 $StarterBase = ''
+$StarterSha = @{}  # 2.380 G (#3390): file name -> sha256 from the redeem answer (empty: an older Kalmido, nothing checked)
 if ($DryRun) { Say (M 'dry_redeem' @($Url, $HostN)) }
 else {
   New-Item -ItemType Directory -Force -Path $Inst | Out-Null
@@ -283,6 +288,9 @@ else {
   if ([string]$r.version -match '^\d+(\.\d+){1,3}$') { [IO.File]::WriteAllText((Join-Path $Inst 'VERSION'), "$($r.version)`n") }
   $script:Redeemed = $true
   $StarterBase = [string]$r.starter_base
+  if ($r.starter_sha256) {
+    foreach ($p in $r.starter_sha256.PSObject.Properties) { if ([string]$p.Value -match '^[0-9a-f]{64}$') { $StarterSha[$p.Name] = [string]$p.Value } }
+  }
   Say (M 'agent' @($AgName, $EnvF))
   switch ($perm) {
     'kept' { Say (M 'perm_kept' @($EnvF)) }
@@ -299,13 +307,28 @@ function Fetch([string]$name, [string]$dest) {
   if ($From) { $src = Join-Path $From $name; if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $dest -Force; return $true }; return $false }
   try { Invoke-WebRequest -Uri ($StarterBase + $name) -OutFile $dest -UseBasicParsing -TimeoutSec 60; return $true } catch { return $false }
 }
+# 2.380 G (#3390): a downloaded starter file must have the checksum Kalmido sent with the token; a file that differs or is not
+# in the list stops the setup before it is installed. -From DIR (a local copy) and an older Kalmido without checksums: no check
+function ShaOk([string]$name, [string]$file) {
+  if ($From -or $StarterSha.Count -eq 0) { return $true }
+  if (-not $StarterSha.ContainsKey($name)) { return $false }
+  return (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -eq $StarterSha[$name]
+}
+function InstallStarter([string]$name, [string]$dest) {  # fetch into dest.new, check, then move into place -> $true when installed
+  $tmp = "$dest.new"
+  if (-not (Fetch $name $tmp)) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; return $false }
+  if (-not (ShaOk $name $tmp)) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; Die (M 'shabad' @($name)) }
+  Move-Item -LiteralPath $tmp -Destination $dest -Force
+  return $true
+}
 if ($DryRun) { Say (M 'dry_files' @($(if ($From) { $From } else { 'starter' }), $Inst)) }
 else {
   if (-not $From -and -not $StarterBase) { Die (M 'nobase') }
   # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
   if (-not $From -and $StarterBase -notmatch '^https://' -and -not $StarterBase.StartsWith($Url + '/')) { Die (M 'basehttp' @($StarterBase)) }
+  if (-not $From -and $StarterSha.Count -eq 0) { Say (M 'shanone') }
   $list = Join-Path $Inst 'starter_files.txt'
-  if (-not (Fetch 'starter_files.txt' $list)) {
+  if (-not (InstallStarter 'starter_files.txt' $list)) {
     if ($From) { Die (M 'nolist' @($From)) }
     # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version
     Die (M 'nolistfetch' @($StarterBase))
@@ -314,7 +337,7 @@ else {
     $f = ($raw -replace '#.*$', '').Trim()
     if (-not $f) { continue }
     if ($f.Contains('/') -or $f.Contains('\') -or $f.StartsWith('..')) { Say (M 'skippath' @($f)); continue }
-    if (Fetch $f (Join-Path $Inst $f)) { Say "  $f" }
+    if (InstallStarter $f (Join-Path $Inst $f)) { Say "  $f" }
     elseif ($Required -contains $f) { Die (M 'nofetch' @($f)) }
     else { Say (M 'skipfile' @($f)) }
   }

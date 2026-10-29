@@ -208,6 +208,10 @@ only over `https://` or from the Kalmido itself. The script, served by your own 
    the token is never printed,
 3. fetches the starter files listed in [`mcp/starter_files.txt`](../mcp/starter_files.txt) (from the release of your
    server's version; `KALMIDO_STARTER_BASE` on the server points to a mirror; `--from DIR` / `-From DIR` takes a local copy),
+   *since 2.380:* every downloaded file must have the SHA-256 that your server sends with the token (`starter_sha256`, from
+   [`mcp/starter_sha256.txt`](../mcp/starter_sha256.txt), made by `tools/starter_sha.py` and checked in CI); a file that
+   differs is not installed and the setup stops (a local copy via `--from` and an older server without checksums are not
+   checked),
    2.306.0 (#2927): for a **team agent** (no owner) the person who made the setup code answers its permission questions by
    default: Kalmido sends that account id with the token and the script writes it as `KALMIDO_PERM_USER` into
    `kalmido-agent.env` (`KALMIDO_OWNER_IDS` would also narrow who gives orders, so it is not set). A `KALMIDO_PERM_USER` /
