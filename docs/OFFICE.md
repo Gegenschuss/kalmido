@@ -721,8 +721,8 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 
 *Since 2.95.*
 
-Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
-evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
+Office -> Settings -> **Import legacy data** -> **Trips from a per diem spreadsheet** -> **Take over from Excel** (2.365.2:
+on the legacy data page; the trip list and the evaluation link there) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 
 - **One sheet = one person.** The name comes from the title above the header ("... Arbeitsliste <name> - <year>") or the
@@ -880,12 +880,12 @@ reason, VAT per row, net and gross) and the office it goes into; "Take over N ro
 removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
 Freelancers without an organisation import into their personal office.
 
-**Monthly check** (optional): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
+**Monthly check** (optional; 2.365.2: set in **Settings > Company & office > Bank & taxes**, the cash flow links there): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
 on the 1st of every month in that person's basket, with only a link to the cash flow (never an amount). Another person
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
 person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
 
-**Account balance** (2.123): a rough orientation also when not everything is in Kalmido. In the office settings, section
+**Account balance** (2.123): a rough orientation also when not everything is in Kalmido. In **Settings > Company & office > Bank & taxes** (2.365.2; before: the office settings), section
 **Cash flow**, the admin enters a **starting balance** (may be negative) and its **reference date** (saved on change, one undo
 step; empty = no balance). The cash flow then shows per month the **account balance at the end of the month** (computed):
 the starting balance plus all money in minus all money out from the reference date on - actual and planned, so also in
@@ -930,7 +930,8 @@ rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year count
 section lists the figures (fields 81, 86, 21, 45, 66, 83; 2.355: also 41 goods to EU businesses, 43 exports, 48 other
 tax-free sales, 60 reverse charge at home) for a month, a quarter or the whole year to type into ELSTER, on cash
 or accrual basis (on accrual basis a cash discount taken lowers the base in the month of its payment; a reversed payment
-counts on the day of the payment it takes back); with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+counts on the day of the payment it takes back); with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. Tax reserve, cash or accrual basis and the tax dates are set in **Settings > Company & office > Bank & taxes** (2.365.2; the
+bookkeeping links there). A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
 **Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
@@ -1173,6 +1174,7 @@ personal office). First add a **vehicle**: name, plate, kind (**private car used
 - **Year report** per vehicle: km total / business / private / home - workplace, the business share and the **mileage
   allowance** (business km of private cars x the rate per km, default 0.30, changeable in the report). Export as CSV
   (semicolon, decimal comma) or PDF, both with the change log of the year.
+- The rate is set in **Settings > Company & office > Bank & taxes** (2.365.2; the year report names it and links there).
 - The **rate per business km is kept per year**: changing it for one year never changes the allowance of earlier years.
   Every new or changed vehicle and every rate change is written to the office log and listed in the change log of the
   CSV / PDF of the year. Taking a drive over into the travel expenses is logged too (only the destination goes into the
@@ -1206,8 +1208,8 @@ correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; ea
 
 The menu group **Money** has the point **Cash book** (admins of the office area; without an organisation your personal
 office) for cash income and expenses. Every office has a **default cash box** (made on the first look, opening balance 0
-from that day); more boxes can be added under **Cash boxes** (name, opening balance, the day of the opening balance; saved
-on change). Boxes are archived, never deleted; the default box stays.
+from that day); more boxes can be added under **Cash boxes** in **Settings > Company & office > Bank & taxes** (2.365.2; the cash
+book's bar links there; name, opening balance, the day of the opening balance; saved on change). Boxes are archived, never deleted; the default box stays.
 
 - **Quick entry** on top (phone first): income or expense, amount, text, date (today), VAT rate 19 / 7 / 0 %, category
   (the receipt categories as suggestion, free text allowed). Every entry gets the **next number of its box, without

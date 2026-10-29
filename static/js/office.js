@@ -421,6 +421,7 @@ function ofcSettingsHtml() {
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
     ${ofcRowF('os-paper', tr('Paper size'), ofcSel('os-paper', s.paper === 'letter' ? 'letter' : 'a4', [['a4', tr('A4 (DIN 5008)')], ['letter', tr('US-Letter (8.5 × 11 in)')]]))}${/* 2.357.0 A (#3156) */ ''}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
+    </fieldset>${ost_p('tax', dis)}${ost_taxHtml()}${/* 2.365.2 D (#2789) */ ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, (S.languages || []).map(L => [L.code, L.name])))}
@@ -495,8 +496,7 @@ function ofcSettingsHtml() {
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
-    ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
-    </fieldset>${ost_p('company')}
+    </fieldset>${ost_p('data')}${''/* 2.365.2 D (#2789): the start balance moved to Bank & taxes, the master data file to Data */}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Services, equipment, sets, text blocks, contracts and these settings as a JSON file. Import adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
@@ -749,7 +749,21 @@ function ofcSettingsBody(form) {
 // ---- 2.113.0 (#2247): the settings in five areas (the pattern of Settings > Administration): one shown, the last one
 // remembered per device; an area may have several parts in the page's order (ost_p), fields sit in a fieldset that is
 // disabled for members
-const OST_SUBS = [['company', 'building', N_('Company')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('Bank & taxes')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+// 2.365.2 D (#2789): Bank & taxes -- what the tabs Bookkeeping, Logbook, Cash flow and Cash book set before (tax reserve and VAT
+// basis, tax dates, mileage allowance, start balance and monthly check of the cash flow, cash boxes). Every part keeps its own
+// route, autosave and undo (data-fg-skip: not a field of this form); the tabs keep a link here (ofcSetLink).
+function ost_taxHtml() {
+  if (!ofcAdmin()) return `<p class="muted">${tr('Only admins and the bookkeeping change this.')}</p>`;
+  return `<div class="ostax" data-fg-skip>${[typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
+    typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '',
+    typeof lb_rateSetHtml === 'function' ? lb_rateSetHtml() : '', typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : '',
+    typeof fci_setHtml === 'function' ? fci_setHtml() : '', typeof cb_setHtml === 'function' ? cb_setHtml() : ''].join('')}</div>`;
+}
+// Enter in one of these fields saves it (blur = its change), never the whole settings form
+document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.tagName === 'INPUT' && x.closest?.('#ofc-set .ostax')) { e.preventDefault(); x.blur(); } }, true);
+// where a setting of a tab moved: a quiet line with the way into Settings > Company & office (events.js data-setgo)
+const ofcSetLink = (k, what) => `<p class="muted ofchint ofcsetl">${ic('gear', 's')} <span>${esc(what)}:</span> <button type="button" class="linkbtn" data-setgo="biz-${k}">${esc(tr('Settings › Company & office › {0}', tr(OST_SUBS.find(x => x[0] === k)?.[2] || 'Company & office')))}</button></p>`;
 const ost_cur = want => { const k = want || LS.get('ofcSetSub', 'company'); return OST_SUBS.some(x => x[0] === k) ? k : 'company'; };
 function ost_subsHtml() {
   const cur = ost_cur();
@@ -785,6 +799,19 @@ function biz_paint() {
       fs.forEach(f => { f.hidden = false; f.removeAttribute('role'); f.setAttribute('aria-labelledby', h.id); });
     }
   });
+  if (S.bizJump) biz_jump(box);
+}
+// 2.365.2 D (#2789): settingsModal('biz-<part>') (settings.js sets S.bizJump) scrolls once to the part's heading or to one of
+// these places, with the soft ring of the settings search
+const BIZ_AT = {peppol: '#pep-set', agents: '#os-agents-read', datev: '.dxset'};
+function biz_jump(box) {
+  const k = S.bizJump; S.bizJump = null;
+  const at = () => $(BIZ_AT[k] || '#s-biz-' + k, box) || $('#s-biz-' + (k === 'peppol' ? 'docs' : k === 'agents' ? 'access' : k === 'datev' ? 'data' : k), box);
+  setTimeout(() => {
+    const el = at(), r = el && (el.closest('.row, details, h3, h4') || el); if (!r) return;
+    for (let det = r.closest('details'); det; det = det.parentElement?.closest('details')) det.open = true;
+    r.scrollIntoView?.({block: el.matches('h4') ? 'start' : 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600);
+  }, 30);
 }
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
 // a group the server keeps together goes as one (the DATEV booking export)

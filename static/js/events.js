@@ -982,3 +982,13 @@ document.addEventListener('click', e => {
   const fs = S.qfiles[b.dataset.in] || []; fs.splice(+b.dataset.i, 1);
   const inp = document.getElementById(b.dataset.in); if (inp) { qFilesDraw(inp); inp.focus(); }
 }, true);
+// 2.365.2 D (#2789): a link to Settings from a module, a dialog or another settings area (data-setgo="biz-tax" = a part of
+// Company & office, "agents" = an area, "#office/import" = a page): the dialog around it closes (asking first when it holds
+// unsaved input), an open Settings dialog makes room for the new one
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-setgo]'); if (!a) return;
+  e.preventDefault();
+  const m = a.closest('.modal'); if (m && !m.classList.contains('smodal')) modalClose(m);
+  const sm = $('.smodal'); if (sm) { sm._noflush = true; sm.remove(); }
+  const to = a.dataset.setgo; if (to.startsWith('#')) location.hash = to; else settingsModal(to);
+});
