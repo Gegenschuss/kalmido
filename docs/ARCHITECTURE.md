@@ -133,6 +133,7 @@ The most used helpers:
 | `core/csvimport.py` | 2.140.0 (#2134): the statement reader of the household budget and the office's bank reconciliation: CSV (delimiter, header row, guess, known bank layouts, mapping, rows), CAMT.052 / .053 (no DOCTYPE / ENTITY), the duplicate count. |
 | `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
 | `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
+| `core/mailframe.py` | 2.420.0 (#3499): the one HTML frame of every mail (mail_html: table layout, 560 px card, petrol button, escaped texts); the text parts stay with their callers. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
 | `lists/lists.py` | Lists: create, change, share (people + agents), members, sidebar order. |

@@ -22,6 +22,7 @@ from ..accounts.session import me
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import Denied
 from ..core.errors import BadInput
+from ..core.mailframe import mail_html
 from ..events.model import EV_ATT_MAX, need_event, wall
 
 EVI_DAY_MAX = 200  # invitation mails per person and day
@@ -202,7 +203,6 @@ def evi_when(r, lg):
 def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     """(to, subject, text, html, reply_to, from_name, attachments) of one invitation / cancellation mail to attendee a;
     ics_atts = the attendees the attached calendar lists."""
-    import html as _h
     from ..collab.comments import lang_of
     lg = lang_of(usettings(c, uid))
     addr, name = _sender(c, uid, r)
@@ -224,9 +224,7 @@ def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     foot = tr("The event is attached as a calendar file. Your answer goes to {0}.", name, lg=lg) if method != "CANCEL" else \
         tr("Your calendar app removes the event with the attached file.", lg=lg)
     text = "\n\n".join(lines + [foot]) + "\n"
-    hb = ('<div style="font-family:system-ui,sans-serif;max-width:34rem;line-height:1.5">'
-          + "".join(f"<p>{_h.escape(x).replace(chr(10), '<br>')}</p>" for x in lines)
-          + f'<p style="color:#777;font-size:.85rem">{_h.escape(foot)}</p></div>')
+    hb = mail_html(subj, lines, foot=foot, lang=lg, brand=name)  # 2.420.0 B (#3499): the shared mail frame
     ics = evi_ics(c, r, method, ics_atts, addr, name).encode("utf-8")
     return a["email"], subj, text, hb, addr, name, [("invite.ics" if method == "REQUEST" else "cancel.ics", ics, "text/calendar")]
 

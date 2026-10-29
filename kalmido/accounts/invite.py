@@ -16,6 +16,7 @@ from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, client_ip
 from ..accounts.login import login_log_ip, login_log_who  # 2.239.0 B (#2888)
 from ..accounts.login import finish_login, pend_cookie, pend_new
 from ..core.access import Denied
+from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 
@@ -94,7 +95,7 @@ def invite_mail(c, u, link, kind, inviter):
     e = html.escape
     name = u["display_name"] or u["username"]
     host = PUBLIC_URL.split("://", 1)[-1].rstrip("/")
-    acc, ink, bg, card, muted = "#1a7f8e", "#14272b", "#eef5f6", "#ffffff", "#5f6b6e"  # 2.300.0 (#3198): petrol (was violet)
+    acc, bg, muted = MAIL_ACC, MAIL_BG, MAIL_MUTED  # 2.300.0 (#3198): petrol (was violet); 2.420.0 B (#3499): from the mail frame
     from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
     org = (org_names(c, u["id"]) or [""])[0]
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
@@ -115,37 +116,16 @@ def invite_mail(c, u, link, kind, inviter):
     valid = t(N_("The link works once and for {0} days."), INVITE_DAYS)
     steps = [t(N_("Choose your own password on the page the button opens.")), t(N_("Best right away: turn on two-factor sign-in (an app code or a passkey).")),
              t(N_("On the phone: in the browser “Add to home screen” – then {0} runs like an app, with notifications."), APP_NAME)]
-    body_html = f"""<!doctype html><html lang="{lg}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<meta name="color-scheme" content="light"><title>{e(subject)}</title></head>
-<body style="margin:0;padding:0;background:{bg};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:{ink}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{bg};padding:32px 12px"><tr><td align="center">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:{card};border-radius:18px;overflow:hidden;box-shadow:0 2px 12px rgba(40,20,90,.08)">
-<tr><td style="background:#16141f;padding:28px 32px" align="left">
- <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-  <td><img src="cid:logo" width="48" height="48" alt="" style="display:block;border-radius:12px"></td>
-  <td style="padding-left:14px;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:.2px">{e(brand)}</td></tr></table>
-</td></tr>
-<tr><td style="padding:32px 32px 8px">
- <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3">{e(head)}</h1>
- <p style="margin:0 0 16px;font-size:16px;line-height:1.55">{e(intro)}</p>
-</td></tr>
-<tr><td style="padding:0 32px">
- <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{bg};border-radius:12px">
+    box = Safe(f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{bg};border-radius:12px">
   <tr><td style="padding:18px 20px;font-size:15px;line-height:1.7">
    <div style="color:{muted};font-size:13px">{e(t(N_("Address")))}</div><div style="font-weight:600"><a href="{e(PUBLIC_URL)}" style="color:{acc};text-decoration:none">{e(host)}</a></div>
    <div style="color:{muted};font-size:13px;margin-top:10px">{e(t(N_("Username")))}</div><div style="font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace">{e(u["username"])}</div>
-  </td></tr></table>
-</td></tr>
-<tr><td style="padding:24px 32px 8px" align="left">
- <a href="{e(link)}" style="display:inline-block;background:{acc};color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:13px 26px;border-radius:12px">{e(button)}</a>
- <p style="margin:12px 0 0;font-size:13px;line-height:1.5;color:{muted}">{e(valid)}</p>
-</td></tr>
-{"" if kind in ("reset", "signup") else f'''<tr><td style="padding:16px 32px 8px">
- <h2 style="margin:0 0 8px;font-size:16px">{e(t(N_("Getting started")))}</h2>
- <ol style="margin:0;padding-left:20px;font-size:15px;line-height:1.6">{"".join(f"<li>{e(x)}</li>" for x in steps)}</ol>
-</td></tr>'''}
-<tr><td style="border-top:1px solid #ece9f5;padding:18px 32px;font-size:12px;color:{muted}">{e(t(N_("This e-mail was sent by {0}. If you did not expect it, you can ignore it."), APP_NAME))}</td></tr>
-</table></td></tr></table></body></html>"""
+  </td></tr></table>""")
+    start = [] if kind in ("reset", "signup") else [Safe(f'<h2 style="margin:0 0 8px;font-size:16px">{e(t(N_("Getting started")))}</h2>'
+                                                         f'<ol style="margin:0;padding-left:20px">{"".join(f"<li>{e(x)}</li>" for x in steps)}</ol>')]
+    # 2.420.0 B (#3499): the invitation's frame is now the shared one (core/mailframe.py)
+    body_html = mail_html(subject, [intro, box], button, link, t(N_("This e-mail was sent by {0}. If you did not expect it, you can ignore it."), APP_NAME),
+                          head, lang=lg, brand=brand, logo=True, note=valid, after=start)
     text = "\n".join([head, "", intro, "", f"{t('Address')}: {PUBLIC_URL}", f"{t('Username')}: {u['username']}", "", f"{button}: {link}", valid, ""]
                      + ([] if kind in ("reset", "signup") else [t(N_("Getting started")) + ":"] + [f"{i + 1}. {x}" for i, x in enumerate(steps)]))
     return subject, text, body_html

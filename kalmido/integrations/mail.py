@@ -30,6 +30,7 @@ from ..notify.alerts import aa_err, aa_fail, aa_ok
 from ..agents.core import is_agent
 from ..collab.teamchat import tchat_unread
 from ..core.env import env_bool
+from ..core.mailframe import Safe, mail_html  # noqa: F401  2.420.0 B (#3499): the one mail frame (re-exported here)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -636,9 +637,7 @@ def digest_mail_content(c, uid, today):
         return None
     subj = f"{APP_NAME}: " + (trn("{0} task today", "{0} tasks today", len(tod) + len(over), lg=lg) if tod or over else tr("Your day", lg=lg))
     text = "\n\n".join(parts) + f"\n\n{PUBLIC_URL}/#today\n"
-    hb = "".join(f"<p>{html.escape(p).replace(chr(10), '<br>')}</p>" for p in parts)
-    hb += f'<p><a href="{html.escape(PUBLIC_URL)}/#today">{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p>'
-    return subj, text, f"<!doctype html><html><body style=\"font-family:sans-serif\">{hb}</body></html>"
+    return subj, text, mail_html(subj, parts, tr("Open {0}", APP_NAME, lg=lg), f"{PUBLIC_URL}/#today", lang=lg)  # 2.420.0 B (#3499)
 
 
 def digest_mail_user(c, uid, s, today):

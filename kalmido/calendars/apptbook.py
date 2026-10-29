@@ -30,6 +30,7 @@ from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.errors import BadInput
+from ..core.mailframe import mail_html
 from ..tasks.validation import as_int, valid_date, valid_hm
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
@@ -1095,13 +1096,9 @@ def apb_mail_bg(to, subject, text, html_body, reply_to, from_name):
         print("apptbook mail failed:", type(ex).__name__, flush=True)
 
 
-def apb_mail_html(lines, url=None, button=None, foot=""):
-    e = html.escape
-    return ('<div style="font-family:system-ui,sans-serif;max-width:34rem;line-height:1.5">'
-            + "".join(f"<p>{e(x).replace(chr(10), '<br>')}</p>" for x in lines if x)
-            + (f'<p><a href="{e(url)}" style="display:inline-block;background:#6d4ad8;color:#fff;padding:.6rem 1rem;border-radius:.5rem;'
-               f'text-decoration:none">{e(button)}</a></p>' if url else "")
-            + (f'<p style="color:#777;font-size:.85rem">{e(foot)}</p>' if foot else "") + "</div>")
+def apb_mail_html(lines, url=None, button=None, foot="", subject="", brand=None, lg=""):
+    # 2.420.0 B (#3499): the shared mail frame (was a bare violet one); the head bar names the person of the booking page
+    return mail_html(subject, lines, button if url else None, url, foot or None, lang=lg, brand=brand)
 
 
 def apb_mail_meta(c, uid):
@@ -1119,8 +1116,9 @@ def apb_mail_confirm(c, p, t, r, tok):
              tr("Without your confirmation the time is released after 30 minutes.", lg=lg)]
     foot = tr("If you did not book this, you can ignore this mail.", lg=lg)
     rt, fn = apb_mail_meta(c, r["user_id"])
-    return (r["email"], tr("Please confirm your booking", lg=lg), "\n\n".join(lines) + f"\n\n{url}\n\n{foot}",
-            apb_mail_html(lines, url, tr("Confirm the booking", lg=lg), foot), rt, fn)
+    subj = tr("Please confirm your booking", lg=lg)
+    return (r["email"], subj, "\n\n".join(lines) + f"\n\n{url}\n\n{foot}",
+            apb_mail_html(lines, url, tr("Confirm the booking", lg=lg), foot, subj, fn, lg), rt, fn)
 
 
 def apb_mail_confirmed(c, p, t, r, ctok):
@@ -1130,8 +1128,9 @@ def apb_mail_confirmed(c, p, t, r, ctok):
     lines = [tr("Hello {0},", r["name"], lg=lg), tr("your appointment is booked: {0}, {1}.", t["name"], when, lg=lg),
              (tr("Location: {0}", t["location"], lg=lg) if t["location"] else ""), tr("If you cannot come, please cancel it with this link.", lg=lg)]
     rt, fn = apb_mail_meta(c, r["user_id"])
-    return (r["email"], tr("Your appointment is booked", lg=lg), "\n\n".join(x for x in lines if x) + f"\n\n{url}",
-            apb_mail_html(lines, url, tr("Cancel the appointment", lg=lg)), rt, fn)
+    subj = tr("Your appointment is booked", lg=lg)
+    return (r["email"], subj, "\n\n".join(x for x in lines if x) + f"\n\n{url}",
+            apb_mail_html(lines, url, tr("Cancel the appointment", lg=lg), "", subj, fn, lg), rt, fn)
 
 
 def apb_mail_cancelled(c, r, reason):
@@ -1143,8 +1142,9 @@ def apb_mail_cancelled(c, r, reason):
              (tr("Reason: {0}", reason, lg=lg) if reason else ""), tr("You can book a new time on the booking page.", lg=lg)]
     url = apb_url(p["slug"]) if p and p["enabled"] else None
     rt, fn = apb_mail_meta(c, r["user_id"])
-    return (r["email"], tr("Your appointment was cancelled", lg=lg), "\n\n".join(x for x in lines if x) + (f"\n\n{url}" if url else ""),
-            apb_mail_html(lines, url, tr("Book an appointment", lg=lg) if url else None), rt, fn)
+    subj = tr("Your appointment was cancelled", lg=lg)
+    return (r["email"], subj, "\n\n".join(x for x in lines if x) + (f"\n\n{url}" if url else ""),
+            apb_mail_html(lines, url, tr("Book an appointment", lg=lg) if url else None, "", subj, fn, lg), rt, fn)
 
 
 def apb_push(c, r, what):

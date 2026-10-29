@@ -30,6 +30,7 @@ from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..core.mailframe import Safe, mail_html
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 PT_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
@@ -414,12 +415,9 @@ def _pt_mail_bg(to, subject, text, html_body):
         print("portal mail failed:", type(ex).__name__, flush=True)
 
 
-def _pt_mail_html(lines, url, button, foot=""):
-    e = html.escape
-    return ('<div style="font-family:system-ui,sans-serif;max-width:34rem;line-height:1.5">'
-            + "".join(f"<p>{e(x).replace(chr(10), '<br>')}</p>" for x in lines if x)
-            + f'<p><a href="{e(url)}" style="display:inline-block;background:#6d4ad8;color:#fff;padding:.6rem 1rem;border-radius:.5rem;'
-              f'text-decoration:none">{e(button)}</a></p>' + (f'<p style="color:#777;font-size:.85rem">{foot}</p>' if foot else "") + "</div>")
+def _pt_mail_html(lines, url, button, foot="", subject=""):
+    """foot is ready HTML (the callers escape it). 2.420.0 B (#3499): the shared mail frame (was a bare violet one)."""
+    return mail_html(subject, lines, button, url, Safe(foot) if foot else None)
 
 
 def pt_limit_note(c, org_id, owner_id):
@@ -788,7 +786,7 @@ def pt_mail_tick(c):
             text = "\n\n".join([head, *body_, tr("Status and answers: {0}", url, lg=lg), foot])
             hfoot = html.escape(tr("You get this mail because you sent the report.", lg=lg)) + \
                 f' <a href="{html.escape(stop)}">{html.escape(tr("No more mails about this report", lg=lg))}</a>'
-            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot)))
+            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj)))
         c.commit()
     for m in mails:
         bgj_add("mail:portal", *m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
