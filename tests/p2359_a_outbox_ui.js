@@ -129,9 +129,14 @@ const rejected = w => w.eval('S.conflicts').filter(c => c.field === 'rejected');
     online(w);
     check(await until(() => qf.size === 0 && w.eval('OUT.q.length') === 0, {timeout: 20000}), `${title}: sent, the kept file is gone (${qf.size})`);
     if (!refuse) {
-      const t = (await call('GET', '/api/state')).tasks.find(x => x.title === title);
-      const full = t && await call('GET', '/api/tasks/' + t.id);
-      check(!!full && (full.attachments || []).some(a => a.name === 'shot.png'), `${title}: the file is attached to the new task ` + JSON.stringify((full || {}).attachments));
+      // 2.421.0 (#3087): the upload lands after the task's POST - fetch again until the file is there instead of once
+      let full = null;
+      const att = await until(async () => {
+        const t = (await call('GET', '/api/state')).tasks.find(x => x.title === title);
+        full = t && await call('GET', '/api/tasks/' + t.id);
+        return !!full && (full.attachments || []).some(a => a.name === 'shot.png');
+      }, {timeout: 20000});
+      check(att, `${title}: the file is attached to the new task ` + JSON.stringify((full || {}).attachments));
     } else check(rejected(w).some(c => /refused\.png/.test(c.mine)), `${title}: the dialog names the file ` + JSON.stringify(rejected(w)));
   }
   w.eval("S.conflicts = []; LS.set('conflicts', [])");

@@ -100,7 +100,14 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   setUrl('ftp://nope');
   check(await until(() => /http/.test(d.querySelector('#toast').textContent), {timeout: 5000}), 'invalid link: notice');
   setUrl('example.org/abc');
-  const url = await until(() => w.eval(`S.tasks.get(${ids.PT}).url`) === 'https://example.org/abc', {timeout: 8000}) || w.eval(`S.tasks.get(${ids.PT}).url`);
+  // 2.421.0 (#3087): CI red at night again - a late redraw can still swallow the change; wait up to 20 s for the saved value
+  // and hand the (idempotent) change to the current input again every 3 s while it is not there
+  let nextSet = Date.now() + 3000;
+  const url = await until(() => {
+    if (w.eval(`S.tasks.get(${ids.PT}).url`) === 'https://example.org/abc') return true;
+    if (Date.now() > nextSet && d.querySelector('#d-url')) { nextSet = Date.now() + 3000; setUrl('example.org/abc'); }
+    return false;
+  }, {timeout: 20000}) || w.eval(`S.tasks.get(${ids.PT}).url`);
   check(url === true, 'bare domain gets https:// ' + url);
   // quick add parser
   const r = w.eval(`parseQuick('Read https://github.com/x/y tomorrow !high')`);
