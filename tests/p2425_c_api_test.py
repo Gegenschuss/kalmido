@@ -214,8 +214,9 @@ check(not any(f["name"] == "Buero-PC" for f in Ca.get(B + "/api/docs/fetchers?ws
 check([f["name"] for f in Ca.get(B + f"/api/docs/fetchers?ws=org:{ORG}").json()["fetchers"]] == ["Buero-PC"], "listed with Alpha")
 check(not Bo.get(B + f"/api/docs/fetchers?ws=org:{ORG}").json()["fetchers"], "bob (admin of Alpha) does not see carol's fetcher")
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{CAROL}").ok, "setup: bob takes carol out of Alpha")
-check(requests.get(V + "/fetcher", headers=bearer(K2)).status_code == 403 and up(K2, pdf("danach"), portal="telekom").status_code == 403,
-      "after carol left Alpha the key gets 403")
+# 2.425.0 (#3453 review): leaving deletes the fetcher, so the key is unknown now (401; before the review fix it stayed and got 403)
+check(requests.get(V + "/fetcher", headers=bearer(K2)).status_code == 401 and up(K2, pdf("danach"), portal="telekom").status_code == 401,
+      "after carol left Alpha the key gets 401")
 check(kt.dbx("SELECT 1 FROM doc_fetchers WHERE user_id=? AND org_id=?", (CAROL, ORG)) == [],
       "2.425.0 (#3453 review): leaving Alpha ends carol's fetcher of Alpha (coming back does not wake the old key)")
 
