@@ -3895,6 +3895,10 @@ MIGRATIONS = [
     ("task_field_values", "set_at", "UPDATE task_field_values v SET set_at=a.m FROM (SELECT task_id, data->>'id' AS fid, "
      "MAX(created_at) AS m FROM activity WHERE kind='field' GROUP BY task_id, data->>'id') a "
      "WHERE a.task_id=v.task_id AND a.fid=CAST(v.field_id AS TEXT) AND v.set_at IS NULL"),
+    # 2.420.0 C (#3448): a person ticked the receipt as checked (office/receiptlist.py rcl_set_checked): who and when (NULL =
+    # not checked, as every receipt before). Older versions ignore both
+    ("rc_receipts", "checked_at", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS checked_at TEXT"),
+    ("rc_receipts", "checked_by", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS checked_by BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

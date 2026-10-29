@@ -1090,3 +1090,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bka-rawt th{color:var(--muted);width:40%}
 .bka-ro{border-left:.2rem solid var(--accent);padding:.25rem .75rem;margin:.5rem 0}
 @media (max-width:767px){.bka-row{flex-wrap:wrap}.bka-day{min-width:0;flex-basis:100%}.bka-fgrid{grid-template-columns:1fr 1fr}}
+/* 2.420.0 C (#3448): receipts ticked as checked (office_receipts.js, office_books.js) */
+.rcl-chk{color:var(--accent);flex:none}
+.rcl-chk .i{width:.875rem;height:.875rem}
+.rcl-selbar{flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .5rem}
+.rcl-selbar .btn{min-height:2.75rem}
+.rcl-pick{cursor:pointer;gap:.75rem}
+.rcl-pick input{flex:none;width:1.25rem;height:1.25rem;margin:0}
+.bk-chkrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem;margin:.25rem 0}

@@ -40,6 +40,8 @@ from .rcsubmit import rsb_who  # 2.356.0 D (#3129)
 RCL_PAGE = 200  # rows per page of the list
 RCL_PAGE_MAX = 500
 RCL_STATUS = ("all", "paid", "open")
+RCL_CHECKED = ("all", "yes", "no")  # 2.420.0 C (#3448): the filter checked / not checked
+RCL_CHECK_MAX = 500  # 2.420.0 C (#3448): receipts ticked in one request (the multiple choice of the list)
 RCL_NAME_MAX = 120
 RCL_RCK = ("rchk", "rchk_at", "rchk_ok", "updated_at", "extracted", "amount", "doc_date", "currency", "sender_id", "type_id", "set_at",
            "category", "vat_pct")  # 2.299.0 D (#3193): what rck_seen reads (receipts/rchecks.py rck_stamp)
@@ -64,6 +66,9 @@ def rcl_args(args):
         raise BadInput(tr("Invalid value: {0}", "by"))
     if status not in RCL_STATUS:
         raise BadInput(tr("Invalid value: {0}", "status"))
+    checked = args.get("checked") or "all"
+    if checked not in RCL_CHECKED:
+        raise BadInput(tr("Invalid value: {0}", "checked"))
     ids = {}
     for k in ("supplier", "project"):
         v = args.get(k) or ""
@@ -75,7 +80,7 @@ def rcl_args(args):
         offset = int(args.get("offset") or 0)
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "limit"))
-    return {"from": frm, "to": to, "by": by, "status": status, "category": (args.get("category") or "").strip()[:200],
+    return {"from": frm, "to": to, "by": by, "status": status, "checked": checked, "category": (args.get("category") or "").strip()[:200],
             "supplier": ids["supplier"], "project": ids["project"], "novat": args.get("novat") in ("1", "true"),
             "hints": args.get("hints") in ("1", "true"),  # 2.299.0 D (#3193): only receipts with hints of the check
             "q": (args.get("q") or "").strip().lower()[:200], "limit": max(1, min(limit, RCL_PAGE_MAX)), "offset": max(0, offset)}
@@ -94,7 +99,7 @@ def rcl_all(c, oid, f, uid, own=False):
     day = ("COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if f["by"] == "paid"
            else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))")
     rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, r.list_name, d.doc_date, d.due_date, d.amount, d.currency, "
-                     f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, r.submitted_by, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+                     f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, r.submitted_by, r.checked_at, r.checked_by, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
                      + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
                      + f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"]) + ((uid,) if own else ())).fetchall()
@@ -124,7 +129,8 @@ def rcl_all(c, oid, f, uid, own=False):
                     "vat_pct": vat_pct, "net": net, "vat": vat, "amount": gross, "currency": home,
                     "orig_amount": money(a) if cur != home else None, "orig_currency": cur if cur != home else None,
                     "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(meta_json(c, r, "extracted", {})),
-                    "submitted_by": _rcl_who(c, r["submitted_by"])})  # 2.356.0 D (#3129): handed in by a member
+                    "submitted_by": _rcl_who(c, r["submitted_by"]),  # 2.356.0 D (#3129): handed in by a member
+                    "checked_at": r["checked_at"] or None, "checked_by": _rcl_who(c, r["checked_by"]) if r["checked_at"] else None})  # 2.420.0 C (#3448)
     from ..docs.dups import dup_seen
     dups = dup_seen(c, [x["node_id"] for x in out], uid)  # 2.185.0 A (#2583): a possible duplicate (marked, still counted)
     for x in out:
@@ -165,6 +171,8 @@ def rcl_filter(rows, f):
             continue
         if f["status"] == "open" and x["paid_at"]:
             continue
+        if f.get("checked", "all") != "all" and bool(x.get("checked_at")) != (f["checked"] == "yes"):
+            continue  # 2.420.0 C (#3448)
         if f["novat"] and x["vat_pct"] is not None:
             continue
         if f.get("hints") and not x.get("hints"):
@@ -199,7 +207,8 @@ def rcl_public(x):
             "net": dstr(x["net"]), "vat": dstr(x["vat"]), "amount": dstr(x["amount"]), "currency": x["currency"],
             "orig_amount": dstr(x["orig_amount"]) if x["orig_amount"] is not None else None, "orig_currency": x["orig_currency"],
             "dup": bool(x.get("dup")), "hints": x.get("hints") or 0,  # 2.185.0 A (#2583); 2.299.0 D (#3193): + hints
-            "submitted_by": x.get("submitted_by")}  # 2.356.0 D (#3129)
+            "submitted_by": x.get("submitted_by"),  # 2.356.0 D (#3129)
+            "checked_at": x.get("checked_at"), "checked_by": x.get("checked_by")}  # 2.420.0 C (#3448): a person's tick
 
 
 def _rcl_load(c, oid, uid, fill=False):
@@ -244,11 +253,12 @@ def rcl_csv_text(c, oid, rows):
     day = (lambda v: f"{v[8:10]}.{v[5:7]}.{v[:4]}" if v and DAY_RE.match(v) else "") if comma else (lambda v: v if v and DAY_RE.match(v) else "")  # noqa: E731
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if comma else ",", lineterminator="\r\n")
-    w.writerow([tr("Receipt date"), tr("Paid on"), tr("Supplier"), tr("VAT ID"), tr("Invoice number"), tr("E-invoice"), tr("Title"),
+    w.writerow([tr("Receipt date"), tr("Paid on"), tr("Checked on"), tr("Checked by"), tr("Supplier"), tr("VAT ID"), tr("Invoice number"), tr("E-invoice"), tr("Title"),
                 tr("Category"), tr("Project"), tr("Net"), tr("VAT rate"), tr("VAT"), tr("Gross"), tr("Currency"), tr("Original amount"),
                 tr("Original currency"), tr("File name in the ZIP"), tr("Kalmido ID")])
     for x in rows:
-        w.writerow([day(x["doc_date"]), day(x["paid_at"]), bk_csv_cell(x["supplier"]), bk_csv_cell(x["vat_id"]), bk_csv_cell(x["number"]),
+        w.writerow([day(x["doc_date"]), day(x["paid_at"]), day((x.get("checked_at") or "")[:10]), bk_csv_cell(x.get("checked_by") or ""),  # 2.420.0 C (#3448)
+                    bk_csv_cell(x["supplier"]), bk_csv_cell(x["vat_id"]), bk_csv_cell(x["number"]),
                     tr("yes") if x["einvoice"] else tr("no"), bk_csv_cell(x["title"]), bk_csv_cell(x["category"]), bk_csv_cell(x["project"] or ""),
                     num(dstr(x["net"])), x["vat_pct"] if x["vat_pct"] is not None else "", num(dstr(x["vat"])), num(dstr(x["amount"])),
                     bk_csv_cell(x["currency"]), num(dstr(x["orig_amount"])) if x["orig_amount"] is not None else "",
@@ -264,7 +274,7 @@ def _fname(f, ext):
 # ---------------------------------------------------------------- routes
 @app.get("/api/office/books/receipts")
 def rcl_get():
-    """?from=&to= (ISO days, default: this year) &by=doc|paid &status=all|paid|open &category= &supplier=<sender id>
+    """?from=&to= (ISO days, default: this year) &by=doc|paid &status=all|paid|open &checked=all|yes|no (2.420.0 C, #3448) &category= &supplier=<sender id>
     &project=<list id> &novat=1 &q= &limit= (200, max 500) &offset= -> {rows (newest first), total {gross, net, vat, count},
     more, categories, suppliers, projects (of the period), currency, from, to, by}. 2.299.0 D (#3193): &hints=1 only receipts
     with hints of the check (or a possible duplicate); + hints (receipts of the period with hints), hints_pending (not
@@ -277,6 +287,63 @@ def rcl_get():
                    categories=cats, suppliers=sup, projects=pro, currency=_home(office_settings(c, oid)),
                    hints=sum(1 for x in rows if x.get("hints")), hints_pending=f.get("_rck_pending") or 0,  # 2.299.0 D (#3193)
                    **{"from": f["from"], "to": f["to"], "by": f["by"]})
+
+
+def rcl_set_checked(c, oid, uid, ids, on):
+    """2.420.0 C (#3448): tick (on) or untick receipts ids of office area oid as checked by person uid (who + when, like the
+    check mark of DATEV) -> the ids whose state changed. All or nothing: 404 when one is no receipt of this area the person
+    sees (or in the trash), 403 when the person may only read one, 409 when one lies in a locked month (office/periodlock.py).
+    Only people: the office routes refuse agent tokens (model.office_gate). The automatic check (receipts/rchecks.py) is apart."""
+    from ..files.store import fs_chain, fs_deleted, fs_role
+    from ..core.db import now_iso
+    from .periodlock import pl_receipt_need_open
+    q = ",".join("?" * len(ids))
+    found = {r["node_id"]: r for r in c.execute(
+        f"SELECT r.node_id, r.checked_at FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+        f"WHERE r.node_id IN ({q}) AND d.ws=? AND n.kind='file' AND n.deleted_at IS NULL", (*ids, bk_ws(c, oid))).fetchall()}
+    for nid in ids:
+        chain = fs_chain(c, nid) if nid in found else None
+        role = fs_role(c, nid, uid, chain=chain) if chain and not fs_deleted(chain) else None
+        if not role:
+            raise Denied(404)
+        if role not in ("owner", "edit"):
+            raise Denied(403, tr("You may only read this receipt"))
+        pl_receipt_need_open(c, nid)  # a receipt of a locked month stays as it was handed over
+    changed = [nid for nid in ids if bool(found[nid]["checked_at"]) != on]
+    if changed:
+        q = ",".join("?" * len(changed))
+        c.execute(f"UPDATE rc_receipts SET checked_at=?, checked_by=? WHERE node_id IN ({q})",
+                  ((now_iso(), uid) if on else (None, None)) + tuple(changed))
+    return changed
+
+
+@app.post("/api/office/books/receipts/checked")
+def rcl_checked_post():
+    """2.420.0 C (#3448): {node_ids: [ids] (one or up to 500, the multiple choice of the list), checked: true|false} -> {changed:
+    [ids whose state changed], rows: [{node_id, checked_at, checked_by}]}. A person of the bookkeeping (the rights of the
+    receipts list, POST = edit); agents 403."""
+    from ..core.db import body
+    from .ledger import ofx_log
+    c, uid, oid = _ctx()
+    b = body()
+    extra = sorted(set(b) - {"node_ids", "checked"})
+    if extra:
+        raise BadInput(tr("Unknown field: {0}", ", ".join(extra)[:200]))
+    ids, on = b.get("node_ids"), b.get("checked")
+    if not isinstance(on, bool):
+        raise BadInput(tr("Invalid value: {0}", "checked"))
+    if (not isinstance(ids, list) or not ids or len(ids) > RCL_CHECK_MAX
+            or not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 1 << 62 for x in ids)):
+        raise BadInput(tr("Invalid value: {0}", "node_ids"))
+    ids = list(dict.fromkeys(ids))
+    changed = rcl_set_checked(c, oid, uid, ids, on)
+    if changed:
+        ofx_log(c, oid, "receipt_checked" if on else "receipt_unchecked", target="books", detail={"node_ids": changed[:100], "count": len(changed)})
+    c.commit()
+    q = ",".join("?" * len(ids))
+    rows = c.execute(f"SELECT node_id, checked_at, checked_by FROM rc_receipts WHERE node_id IN ({q}) ORDER BY node_id", tuple(ids)).fetchall()
+    return jsonify(changed=changed, rows=[{"node_id": r["node_id"], "checked_at": r["checked_at"],
+                                           "checked_by": _rcl_who(c, r["checked_by"]) if r["checked_at"] else None} for r in rows])
 
 
 def _rcl_export_ctx():

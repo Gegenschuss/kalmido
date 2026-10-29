@@ -15043,5 +15043,17 @@
   "Ordered (stages): show as a stage bar": "Ordenado (etapas): mostrar como barra de etapas",
   "Kind of the option": "Tipo de opción",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un estado especial (p. ej. Aparcado) no es una etapa propia: la barra lo muestra con su color en la etapa siguiente.",
-  "Unknown signal colour": "Color de señal desconocido"
+  "Unknown signal colour": "Color de señal desconocido",
+  "Not checked": "Sin revisar",
+  "Checked on": "Revisado el",
+  "Checked by": "Revisado por",
+  "Checked by {0} on {1}": "Revisado por {0} el {1}",
+  "You may only read this receipt": "Solo puedes leer este recibo",
+  "Mark as checked": "Marcar como revisado",
+  "Remove check": "Quitar revisión",
+  "Already checked": "Ya revisado",
+  "Receipt marked as checked": "Recibo marcado como revisado",
+  "Check removed": "Revisión quitada",
+  "{0} receipt marked as checked": ["{0} recibo marcado como revisado", "{0} recibos marcados como revisados"],
+  "Check removed from {0} receipt": ["Revisión quitada de {0} recibo", "Revisión quitada de {0} recibos"]
 }

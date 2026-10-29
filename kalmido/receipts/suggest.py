@@ -206,6 +206,8 @@ def rc_state(c, node, m, uid):
     cur = {"project": {"id": lid, "name": _list_name(c, lid) if list_role(c, lid, uid) else None} if lid else None,
            "category": (r["category"] or None) if r else None, "set_by": _who(c, r["set_by"]) if r else None,
            "vat_pct": r["vat_pct"] if r else None, "paid_at": r["paid_at"] if r else None, "is_receipt": bool(r)}  # 2.90.0 A (#1921)
+    cur["checked_at"] = r["checked_at"] if r else None  # 2.420.0 C (#3448): a person's tick (office/receiptlist.py)
+    cur["checked_by"] = _who(c, r["checked_by"]) if r and r["checked_at"] else None
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
     projects = [{"id": x["id"], "name": x["name"]} for x in c.execute(
         "SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",

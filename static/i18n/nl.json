@@ -15043,5 +15043,17 @@
   "Ordered (stages): show as a stage bar": "Geordend (fasen): als fasebalk tonen",
   "Kind of the option": "Soort optie",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Een speciale status (bijv. Geparkeerd) is geen eigen fase: de balk toont hem in zijn kleur bij de volgende fase.",
-  "Unknown signal colour": "Onbekende signaalkleur"
+  "Unknown signal colour": "Onbekende signaalkleur",
+  "Not checked": "Niet gecontroleerd",
+  "Checked on": "Gecontroleerd op",
+  "Checked by": "Gecontroleerd door",
+  "Checked by {0} on {1}": "Gecontroleerd door {0} op {1}",
+  "You may only read this receipt": "Je mag deze bon alleen lezen",
+  "Mark as checked": "Als gecontroleerd markeren",
+  "Remove check": "Controle verwijderen",
+  "Already checked": "Al gecontroleerd",
+  "Receipt marked as checked": "Bon als gecontroleerd gemarkeerd",
+  "Check removed": "Controle verwijderd",
+  "{0} receipt marked as checked": ["{0} bon als gecontroleerd gemarkeerd", "{0} bonnen als gecontroleerd gemarkeerd"],
+  "Check removed from {0} receipt": ["Controle van {0} bon verwijderd", "Controle van {0} bonnen verwijderd"]
 }

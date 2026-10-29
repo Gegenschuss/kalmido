@@ -263,6 +263,7 @@ async function bkSheet(id, fresh) {
     ${ofcRowF('bk-vat', tr('VAT rate'), ofcSel('bk-vat', r.vat_pct ?? (!r.is_receipt && doc.einvoice ? doc.extracted?.vat_pct ?? '' : ''), BK_VATS, tr('unknown')))}
     ${ofcRowF('bk-amount', tr('Amount (gross)'), ofcIn('bk-amount', doc.amount ? fmtNum(+doc.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     <div class="row"><label id="bk-datel">${tr('Date')}</label>${dateIn('bk-date', doc.date || '', {label: tr('Date')})}</div>
+    ${r.is_receipt ? `<div class="bk-chkrow"><label class="chkl"><input type="checkbox" id="bk-chk" ${r.checked_at ? 'checked' : ''}><span>${tr('Checked')}</span></label> <small class="muted bk-chkby" aria-live="polite">${esc(bkChkTxt(r))}</small></div>` : ''}
     <div class="aerr" role="alert"></div>
     ${BK.billed[id] ? `<p class="muted bk-billed">${esc(bkBilledTxt(BK.billed[id]))}</p>` : ''}
     <div class="foot"><a class="btn ghost" href="#docs/${id}">${tr('Open document')}</a>${!BK.billed[id] && r.is_receipt && doc.amount ? `<button class="btn ghost" data-m="bill">${tr('Bill on to a client …')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
@@ -278,6 +279,7 @@ async function bkSheet(id, fresh) {
   if (wait) bkPoll(id, md, touched, 0);
   bkAcctLine(md);
   $('#bk-cat', md)?.addEventListener('input', () => bkAcctLine(md));
+  $('#bk-chk', md)?.addEventListener('change', e => bkChkSet(md, id, e.target.checked));  // 2.420.0 C (#3448): at once, apart from Save
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
@@ -372,6 +374,23 @@ function bkRxAfter(id) {  // 2.121.0 A (#2092): taken over / undone -> the sheet
   const md = $(`.bk-sheet[data-rxid="${id}"]`);
   if (!md) return;
   md.remove(); bkSheet(id); bkReload();
+}
+// 2.420.0 C (#3448): the tick "Checked" of a receipt (who + when, like DATEV; office/receiptlist.py). Only people tick it;
+// in a locked month the server refuses (409) and the box goes back. One undo step.
+const bkChkTxt = r => r.checked_at ? tr('Checked by {0} on {1}', r.checked_by?.name || r.checked_by || '?', fmtDateLoc(String(r.checked_at).slice(0, 10))) : '';
+async function bkChkPut(id, on) {
+  const j = await api('POST', '/api/office/books/receipts/checked', {node_ids: [id], checked: on});
+  bkReload();
+  return j.rows?.[0] || {};
+}
+async function bkChkSet(md, id, on) {
+  const box = $('#bk-chk', md), el = $('.bk-chkby', md);
+  if (box) box.disabled = true;
+  let x; try { x = await bkChkPut(id, on); } catch (err) { if (box) { box.checked = !on; box.disabled = false; } $('.aerr', md).textContent = err.message || ''; return; }
+  if (box) box.disabled = false;
+  if (el) el.textContent = bkChkTxt(x);
+  const label = on ? tr('Receipt marked as checked') : tr('Check removed');
+  histToast(label, histAdd({label, undo: async () => { await bkChkPut(id, !on); return {}; }, redo: async () => { await bkChkPut(id, on); return {}; }}));
 }
 async function bkSave(id, v) {
   await api('PATCH', `/api/docs/${id}`, v.doc);

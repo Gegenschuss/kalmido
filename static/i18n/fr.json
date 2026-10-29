@@ -15043,5 +15043,17 @@
   "Ordered (stages): show as a stage bar": "Ordonné (étapes) : afficher en barre d’étapes",
   "Kind of the option": "Type de l’option",
   "A special state (e.g. Parked) is no stage of its own: the bar shows it in its colour on the next stage.": "Un état spécial (p. ex. En attente) n’est pas une étape : la barre l’affiche dans sa couleur sur l’étape suivante.",
-  "Unknown signal colour": "Couleur de signal inconnue"
+  "Unknown signal colour": "Couleur de signal inconnue",
+  "Not checked": "Non vérifié",
+  "Checked on": "Vérifié le",
+  "Checked by": "Vérifié par",
+  "Checked by {0} on {1}": "Vérifié par {0} le {1}",
+  "You may only read this receipt": "Tu peux seulement lire ce justificatif",
+  "Mark as checked": "Marquer comme vérifié",
+  "Remove check": "Retirer la vérification",
+  "Already checked": "Déjà vérifié",
+  "Receipt marked as checked": "Justificatif marqué comme vérifié",
+  "Check removed": "Vérification retirée",
+  "{0} receipt marked as checked": ["{0} justificatif marqué comme vérifié", "{0} justificatifs marqués comme vérifiés"],
+  "Check removed from {0} receipt": ["Vérification retirée de {0} justificatif", "Vérification retirée de {0} justificatifs"]
 }

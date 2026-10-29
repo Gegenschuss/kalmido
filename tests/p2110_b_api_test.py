@@ -208,7 +208,8 @@ t = r.content.decode("utf-8")
 check(t.startswith("﻿"), "CSV: BOM")
 rows = list(csv.reader(io.StringIO(t.lstrip("﻿")), delimiter=";"))
 head = rows[0]
-check(head == ["Receipt date", "Paid on", "Supplier", "VAT ID", "Invoice number", "E-invoice", "Title", "Category", "Project", "Net",
+# 2.420.0 (#3448): + Checked on / Checked by after Paid on
+check(head == ["Receipt date", "Paid on", "Checked on", "Checked by", "Supplier", "VAT ID", "Invoice number", "E-invoice", "Title", "Category", "Project", "Net",
                "VAT rate", "VAT", "Gross", "Currency", "Original amount", "Original currency", "File name in the ZIP", "Kalmido ID"],
       f"CSV: all columns {head}")
 body = {int(x[-1]): dict(zip(head, x)) for x in rows[1:]}
