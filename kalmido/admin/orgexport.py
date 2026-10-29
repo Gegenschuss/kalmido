@@ -72,7 +72,6 @@ OX_SECRET_COLS = frozenset((
     "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "p256dh",  # 2.138.0 C (#1907): the hashes too
     "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
     "etags", "api_key", "access_token", "refresh_token",
-    "edit_hash", "ip_hash",  # 2.380 (#2398 review): a poll voter's edit key hash and address hash
     "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
 
 _OX = {}  # org id -> the running thread
@@ -149,6 +148,8 @@ def _ox_dec_row(c, oid, table, row):
         if isinstance(v, str) and v.startswith("kenc1:"):
             row[k] = oc_dec(c, oid, f"{table}.{k}", v)
     row.pop("cost_enc", None)
+    if table == "sched_poll_votes":  # 2.380 (#2398 review): a voter's edit key hash and address hash never leave (kept empty: required columns)
+        row.update(edit_hash="", ip_hash="")
     if table == "portal_tickets":  # 2.81.0 (#1866): sealed with the server key -> plain inside the encrypted archive; the
         from ..accounts.login import unseal  # keyed hash only works on this server (token / token_hash: OX_SECRET_COLS)
         try:

@@ -55,7 +55,7 @@ def idem_claim():
     c, uid, ts = db(), g.user["id"], now_utc()
     c.execute("DELETE FROM idem_keys WHERE user_id=? AND created_at<?", (uid, iso(ts - timedelta(days=IDEM_DAYS))))
     c.execute("DELETE FROM idem_keys WHERE user_id=? AND k IN (SELECT k FROM idem_keys WHERE user_id=? ORDER BY created_at DESC OFFSET ?)",
-              (uid, uid, IDEM_MAX_KEYS))
+              (uid, uid, IDEM_MAX_KEYS - 1))  # room for the key claimed next
     # a second request with the same key waits here until the first one commits or rolls back (the row's lock)
     if c.execute("INSERT INTO idem_keys(user_id, k, method, path, created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING RETURNING k",
                  (uid, k, request.method, request.path, iso(ts))).fetchone():
