@@ -719,7 +719,8 @@ function ofcSettingsBody(form) {
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
     color: v('#os-color').trim(), ...($('#os-paper', form) ? {paper: v('#os-paper')} : {}),
-    ...($('#os-logo-size', form) ? {logo_size: v('#os-logo-size'), logo_pos: v('#os-logo-pos')} : {}),  // 2.406.0 (#3501) lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),
+    ...($('#os-logo-size', form) ? {logo_size: v('#os-logo-size'), logo_pos: v('#os-logo-pos')} : {}),  // 2.406.0 (#3501)
+    lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),  // 2.424.0 A (#3572): out of the comment again
     ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
