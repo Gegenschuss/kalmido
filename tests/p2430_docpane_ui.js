@@ -110,7 +110,7 @@ async function upload(name, lines) {
   check(await until(() => w.eval('DC.selOn') && w.eval(`DC.sel.has(${order[0]})`) && !d.querySelector('.dc-md')), 'Ctrl-click chooses the card, nothing opens');
   click(w, d.querySelector(`[data-dcchk="${order[1]}"]`));
   check(await until(() => w.eval(`DC.sel.has(${order[1]})`) && d.querySelector(`[data-dcchk="${order[1]}"]`)?.getAttribute('aria-checked') === 'true' && !d.querySelector('.dc-md')), 'the box chooses a second card');
-  check(/2 selected/.test(d.querySelector('.dc-selbar')?.textContent || ''), '... the bar: 2 selected');
+  check(/2 selected/.test(d.querySelector('#dc-sbar')?.textContent || ''), '... the bar: 2 selected');  // 2.428.0 (#3581): the shared bar
   click(w, card(order[2]));
   check(await until(() => paneId() === order[2] && !w.eval(`DC.sel.has(${order[2]})`)), 'a plain click opens even while choosing (and does not choose)');
   check(w.eval('DC.sel.size') === 2, '... the choice stays');
