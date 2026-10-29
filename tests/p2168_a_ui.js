@@ -56,13 +56,13 @@ const FEAT = 'clients,office,collab';
     check(film && other && film.closest('.mgrp')?.querySelector('.mgh')?.textContent === 'Projects of the client' && items.indexOf(film) < items.indexOf(other), `${who}: both projects to pick, the client's first`);
     check(film?.querySelector('.lic'), `${who}: the project's icon in the picker`);
     check(!mobile || d.querySelector('#pop .tch-sh'), `${who}: a sheet with a head on the phone`);
-    const q = d.querySelector('#pop #mq-q');
-    check(!!q, `${who}: a search field from 10 entries`);
-    if (q) {
-      q.value = 'extra 3'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const sq = d.querySelector('#pop #mq-q');
+    check(!!sq, `${who}: a search field from 10 entries`);
+    if (sq) {
+      sq.value = 'extra 3'; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
       const shown = [...pop.querySelectorAll('[role="menuitem"]')].filter(b => !b.closest('[hidden]'));
       check(shown.length === 1 && /Extra 3/.test(shown[0].textContent), `${who}: the search leaves one entry ` + shown.map(b => b.textContent).join(' | '));
-      q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+      sq.value = ''; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
     }
     film?.click();
     check(await until(async () => (await lidOf(q.id)) === L), `${who}: picking saves the project`);
