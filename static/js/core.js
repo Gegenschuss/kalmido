@@ -1023,7 +1023,8 @@ function applyState(j) {
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && typeof OIM !== 'undefined' && OIM.clients && S.route?.mod === 'office' && S.route.tab === 'import') fx8a_oimClients(true);  // 2.80.0 (#1836): the import's client choice too
   if (S.booted && S.route?.mod === 'office' && typeof onumListFresh === 'function') onumListFresh();  // 2.138.0 D (#2256): the document list follows changes made elsewhere
-  if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
+  if (S.booted && S.route?.mod === 'clients') ms_clLive();  // a change elsewhere: the client's sums again; 2.431.0 C (#3602): quietly, drawn only when changed
+  if (S.booted && S.route?.mod === 'contacts' && typeof ct_live === 'function') ct_live();  // 2.431.0 C (#3602)
   // 2.50.0 (#1195, #1194); 2.50.1: the shown tab loads again and keeps its rows until the new ones are there (a null
   // without a redraw left absence and booking rows that no longer opened on a tap)
   if (S.booted && S.route?.mod === 'workload') { const t = WLV.tab === 'dispo' && !dp_on() ? 'wl' : WLV.tab, ld = typeof AB2 !== 'undefined'; if (ld && t !== 'abs') AB2.data = null; if (ld && t !== 'dispo') DPV.data = null; if (t !== 'wl') WLV.data = null; if (t === 'wl') wlLoad(); else if (ld) { if (t === 'abs') ab2_load(); else dp_load(); } }  // 2.149.0 F (#2518): absence.js / dispo.js load on demand (not there yet: their stand-in loads and fetches); lazy-ok: ld = the module is loaded
