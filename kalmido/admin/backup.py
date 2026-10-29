@@ -1914,7 +1914,7 @@ def backups_upload():
                 with zipfile.ZipFile(p) as z:
                     man = bk_check_zip(z)
                 meta = {k: v for k, v in man.items() if not k.startswith("_") and k != "files"}
-                meta["format_version"] = 1 if man["_legacy"] else 2
+                meta["format_version"] = 1 if man["_legacy"] else man.get("format_version", 2)  # 2.432.0 (#3584, review N7): 3 stays 3
             except zipfile.BadZipFile:
                 raise BackupError("format") from None
         else:
