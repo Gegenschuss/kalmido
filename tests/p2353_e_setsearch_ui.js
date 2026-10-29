@@ -45,8 +45,8 @@ const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until((
     for (const q of ['scanner', 'download', 'Scanner']) {
       check(await openSettings(w, d), `${who}: the settings open`);
       type(w, d, q);
-      const hb = hits(d).find(b => /Integrations ›/.test(b.textContent) && /Scans from your computer/.test(b.textContent));
-      check(!!hb, `${who}: "${q}" finds Integrations › Scans from your computer ` + JSON.stringify(hits(d).map(b => b.textContent)));
+      const hb = hits(d).find(b => /Integrations ›/.test(b.textContent) && /Documents: inboxes/.test(b.textContent));
+      check(!!hb, `${who}: "${q}" finds Integrations › Documents: inboxes ` + JSON.stringify(hits(d).map(b => b.textContent)));
       if (hb) {
         click(w, hb);
         check(!!(await until(() => d.querySelector(SCAN))), `${who}: "${q}": the jump marks the folder watcher's section`);
@@ -55,18 +55,18 @@ const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until((
       d.querySelector('.smodal [data-m="close"]')?.click();
       await until(() => !d.querySelector('#s-search'));
     }
-    // ---- a hit from the documents window: names the area, opens the window, marks the section
+    // ---- 2.365.2 B (#2789): the documents' settings are a section of the settings now (Settings > Documents)
     await openSettings(w, d);
     type(w, d, 'sorting');
-    let hb = hits(d).find(b => /Settings of the documents/.test(b.textContent));
-    check(hb && /File store/.test(hb.textContent) && /Sorting automatically/.test(hb.textContent), `${who}: "sorting" offers File store › Settings of the documents › Sorting automatically ` + JSON.stringify(hits(d).map(b => b.textContent)));
+    let hb = hits(d).find(b => /Sorting automatically/.test(b.textContent) && /Documents/.test(b.textContent));
+    check(!!hb, `${who}: "sorting" offers Documents › Sorting automatically ` + JSON.stringify(hits(d).map(b => b.textContent)));
     if (hb) {
       click(w, hb);
-      check(!!(await until(() => !d.querySelector('#s-search') && d.querySelector('.dc-smd'))), `${who}: the settings close, the documents' settings window opens`);
-      const fl = await until(() => d.querySelector('.dc-smd .sflash'));
+      const fl = await until(() => d.querySelector('#s-dcs-auto-h.sflash, #s-dcs .sflash'));
       check(fl && /Sorting automatically/.test(fl.textContent), `${who}: the section "Sorting automatically" is marked ` + (fl && fl.outerHTML.slice(0, 80)));
-      check(w.eval('S.route.mod') === 'docs', `${who}: the area of the window is open (docs) ` + w.eval('S.route.mod'));
-      d.querySelector('.dc-smd [data-dcs="close"]')?.click(); d.querySelector('.dc-smd')?.remove();
+      check(!d.querySelector('[data-pane="docs"]')?.classList.contains('hidden'), `${who}: Documents is the shown section`);
+      await until(() => !d.querySelector('.sflash'));
+      d.querySelectorAll('.modal').forEach(m => m.remove());
     }
     // ---- a hit from the office settings: Settings > Company & office, the section marked
     // 2.365.2 (#2789): the office settings live in Settings > Company & office (was the page office/settings)
@@ -92,7 +92,7 @@ const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until((
     check(md && md.classList.contains('sidx'), `${who} phone: the overview of the settings is shown`);
     check(ss && w.getComputedStyle(ss).display !== 'none' && !ss.closest('[hidden], .hidden'), `${who} phone: the search field is visible in the head of the overview`);
     type(w, d, 'download');
-    hb = hits(d).find(b => /Scans from your computer/.test(b.textContent) && /Integrations ›/.test(b.textContent));
+    hb = hits(d).find(b => /Documents: inboxes/.test(b.textContent) && /Integrations ›/.test(b.textContent));
     check(!!hb, `${who} phone: "download" finds the folder watcher`);
     if (hb) { click(w, hb); check(!!(await until(() => d.querySelector(SCAN))) && !md.classList.contains('sidx'), `${who} phone: the hit leaves the overview and marks the section`); }
     await until(() => !d.querySelector('.sflash'));  // the ring is over (its observer stopped) before the window goes
@@ -106,7 +106,7 @@ const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until((
   await openSettings(w, d);
   for (const q of ['sorting', 'letterhead']) {
     type(w, d, q);
-    check(!hits(d).some(b => /Settings of the documents|Office ›/.test(b.textContent)), `module off: "${q}" offers no window of a switched-off area ` + JSON.stringify(hits(d).map(b => b.textContent)));
+    check(!hits(d).some(b => /Settings of the documents|Sorting automatically|Office ›/.test(b.textContent)), `module off: "${q}" offers no window of a switched-off area ` + JSON.stringify(hits(d).map(b => b.textContent)));
   }
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);

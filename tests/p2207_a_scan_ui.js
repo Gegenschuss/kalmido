@@ -1,6 +1,7 @@
 // 2.207.0 A UI tests (#2763, own container, start.sh; P2207A_NOSTART=1: the container runs already). jsdom:
 // - a person without an organisation: Documents > Settings shows "Scans from your computer" with the folder watcher (no
 //   programs on this server: the honest hint) and the mail way
+//   2.365.2 B (#2789): all of it is one block "Documents: inboxes" in Settings > Integrations
 // - "Create inbox" shows the setup code once with a copy button and the three steps; the inbox is listed; the code is gone
 //   when the dialog is opened again
 // - the mail note is big until "Got it", then one quiet line (remembered on the server); the address has a copy button
@@ -32,30 +33,32 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await call('POST', '/api/docs/mail', {ws: 'private'});
 
   const w = await boot({user: 'frida', hash: 'docs'}), d = w.document;
-  await until(() => w.eval('typeof dc_settings === "function" && typeof dsc_slot === "function"'), 60);
+  await until(() => w.eval('typeof dc_settings === "function" && typeof dsc_integrHtml === "function"'), 60);
   const copied = [];
   Object.defineProperty(w.navigator, 'clipboard', {value: {writeText: async t => { copied.push(t); }}, configurable: true});
-  w.eval('dc_settings()');
-  const sm = await until(() => d.querySelector('.dc-smd .dsc-way'));
-  const txt = () => d.querySelector('.dc-smd')?.textContent || '';
-  // 2.353.0 B (#2773): the document settings keep the mail way and a short pointer; the folder watcher moved to Settings > Integrations
-  check(sm && /Scans from your computer/.test(txt()) && /Folder watcher/.test(txt()) && /By e-mail/.test(txt()), 'the section: pointer + mail way');
-  check(!d.querySelector('.dc-smd .dsc-dl') && !d.querySelector('.dc-smd .dsc-new') && d.querySelector('.dc-smd [data-dsc="tointegr"]'), 'no second copy of the download: only the link to Integrations');
+  // 2.365.2 B (#2789): the gear opens Settings > Documents, which points to the one block "Documents: inboxes" in Integrations
+  // (folder of the file store, folder watcher, scan inboxes, mail way); the module has no second copy
+  (await until(() => d.querySelector('#view [data-dc="settings"]')))?.click();
+  const gi = await until(() => d.querySelector('.smodal #s-dcs [data-dcs="go-integr"]'));
+  check(gi && !d.querySelector('#s-dcs .dsc-way') && !d.querySelector('#s-dcs [data-dsc]'), 'Settings > Documents: only the pointer to Integrations');
+  gi?.click();
+  const sm = await until(() => d.querySelector('#s-scan .dc-mail code') && d.querySelector('#s-scan'));
+  const txt = () => d.querySelector('#s-scan')?.textContent || '';
+  check(sm && /Documents: inboxes/.test(d.querySelector('#s-scan-h')?.textContent || '') && /Folder watcher/.test(txt()) && /By e-mail/.test(txt()) && d.querySelector('#s-scan [data-dsc="inbox"]'), 'one block: file store folder, folder watcher, mail way');
 
   // ---- the mail way: copy button, the note big once
-  check(d.querySelector('.dc-smd .dc-mail code')?.textContent.includes('@'), 'the forwarding address is shown');
+  check(d.querySelector('#s-scan .dc-mail code')?.textContent.includes('@'), 'the forwarding address is shown');
   d.querySelector('[data-dsc="mailcopy"]').click();
   check(await until(() => copied.some(x => x.includes('@'))), 'copy button: the address in the clipboard');
-  check(d.querySelector('.dc-smd .dsc-note') && /like a postcard/.test(txt()), 'the mail note is big the first time');
+  check(d.querySelector('#s-scan .dsc-note') && /like a postcard/.test(txt()), 'the mail note is big the first time');
   d.querySelector('[data-dsc="notice"]').click();
-  check(await until(() => !d.querySelector('.dc-smd .dsc-note') && d.querySelector('.dc-smd .dsc-hint')), 'after "Got it": one quiet line');
+  check(await until(() => !d.querySelector('#s-scan .dsc-note') && d.querySelector('#s-scan .dsc-hint')), 'after "Got it": one quiet line');
   check((await call('GET', '/api/docs/scan-keys?ws=private')).mail_notice === true, 'remembered on the server');
 
   // ---- Settings > Integrations: the download and a new inbox (the code once)
-  d.querySelector('.dc-smd [data-dsc="tointegr"]').click();
   const em = await until(() => d.querySelector('#s-scan .dsc-new'));
   const etxt = () => d.querySelector('#s-scan')?.textContent || '';
-  check(!d.querySelector('.dc-smd') && /Folder watcher/.test(etxt()), 'the link closes the document settings and opens Integrations at the section');
+  check(!d.querySelector('[data-pane="integr"]')?.classList.contains('hidden') && /Folder watcher/.test(etxt()), 'the link opens Integrations at the section');
   // 2.207.0 (#2763): the image builds the programs (Dockerfile stage folderwatch) -> download buttons instead of the hint
   check((d.querySelector('#s-scan .dsc-dl')?.children.length || 0) >= 3 && !/Not available on this server/.test(etxt()), 'the programs of the image: download buttons, no hint');
   check(em?.open, 'no inbox yet: "New scan inbox" is open');
@@ -73,11 +76,9 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   await until(() => d.querySelector('#s-scan .dsc-key'));
   check(!d.querySelector('#dsc-code') && !etxt().includes(code), 'opened again: the code is gone');
   w.eval(`document.querySelectorAll('.modal').forEach(m => modalClose(m))`);
-  w.eval('dc_settings()');
-  await until(() => d.querySelector('.dc-smd .dsc-way'));
-  check(!d.querySelector('.dc-smd .dsc-note'), 'opened again: the mail note stays small');
-  d.querySelector('.dc-smd [data-dsc="tointegr"]').click();
+  w.eval(`settingsModal('scans')`);
   await until(() => d.querySelector('#s-scan .dsc-key'));
+  check(!d.querySelector('#s-scan .dsc-note') && d.querySelector('#s-scan .dsc-hint'), 'opened again: the mail note stays small');
 
   // ---- revoke asks first
   const kid = (await call('GET', '/api/docs/scan-keys?ws=private')).keys[0]?.id;
@@ -97,7 +98,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
     for (const [vw, vh] of [[1280, 900], [390, 844]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
       await nav(B + '?v=' + (++nr) + '#docs');
-      for (let i = 0; i < 40 && !(await ev(`typeof dsc_slot === 'function' && typeof settingsModal === 'function'`).catch(() => false)); i++) await sleep(300);
+      for (let i = 0; i < 40 && !(await ev(`typeof dsc_integrHtml === 'function' && typeof settingsModal === 'function'`).catch(() => false)); i++) await sleep(300);
       await ev(`(() => { settingsModal('scans'); return 1; })()`);
       for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#s-scan [data-dsc="new"]')`).catch(() => false)); i++) await sleep(200);
       await ev(`(() => { const d = document.querySelector('#s-scan .dsc-new'); if (d) d.open = true; document.querySelector('#dsc-name').value = 'Scanner ${vw}'; document.querySelector('#s-scan [data-dsc="new"]').click(); return 1; })()`);

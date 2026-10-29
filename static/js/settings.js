@@ -238,7 +238,7 @@ function integrCardsHtml() {
   const C = [['cal', N_('Calendar on your phone'), N_('Your tasks with a date in the phone’s calendar app'), S.caldav?.enabled && S.me ? '#s-dav-h' : '#s-ical-h'],
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
     ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
-    ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Scans from your computer'), N_('Folder watcher program for Mac and Windows, scan inboxes'), '#s-scan-h']] : []),  // 2.353.0 B (#2773)
+    ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Documents: inboxes'), N_('Folder of the file store, folder watcher for Mac and Windows, scan inboxes, e-mail address'), '#s-scan-h']] : []),  // 2.353.0 B (#2773); 2.365.2 B (#2789): all inboxes
     ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
@@ -700,7 +700,7 @@ function settingsModal(focus) {
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
-    integr: integrCardsHtml() + calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
+    integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
       <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared projects)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
@@ -716,14 +716,16 @@ function settingsModal(focus) {
       ${caldavHtml(hint)}
       ${feat('docs') && typeof dsc_integrHtml === 'function' ? dsc_integrHtml() : ''}${''/* 2.353.0 B (#2773): docscan.js, drawn by dsc_integrDraw */}
       ${feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : ''}
+      ${kks_html()}${nwls_html()}${apbs_html()}${''/* 2.365.2 B (#2789): Karakeep, newsletter service, booking page (integrations.js) */}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
         ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+      ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
-      ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
+      ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}${nwls_impLinkHtml()}
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
       <div class="shelp impHelp" id="s-imp-help">${impHelp('todoist')}</div>
       <div class="row"><label for="s-import">${tr('File')}</label>${fileBtn('s-import', IMP_ACCEPT.todoist)}</div>
@@ -779,7 +781,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
@@ -811,6 +813,7 @@ function settingsModal(focus) {
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
+  if (INTB_FOCUS[focus]) setTimeout(() => $(INTB_FOCUS[focus], md)?.scrollIntoView({block: 'start'}), 50);  // 2.365.2 B (#2789)
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
@@ -824,7 +827,7 @@ function settingsModal(focus) {
     if (k === 'general' && typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789)
     if (k === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
     if (k === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
-    if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
+    if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); intB_draw(md); }
     if (k === 'access') { acz_draw(md); const nb = $('.snav [data-sec="access"]', md); if (nb) nb.hidden = false; }  // 2.166.0 (#2633); 2.364.0 C (#3044): listed once opened
     if (k === 'notify') wpDraw(md);
     if (k === 'users' || k === 'org') ad_secDraw(md);  // 2.364.0 C (#3041)
@@ -967,7 +970,7 @@ function settingsModal(focus) {
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
-  if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
+  if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); intB_draw(md); }
   if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
   if (cur === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
   if (cur === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
@@ -1511,7 +1514,7 @@ const SS_SYN = [  // [the words in every language, the label(s) to look for inst
   [['logo', 'signet', 'emblem', 'emblema', 'emblème'], () => [tr('Symbol')]],
   [['mitglieder', 'mitglied', 'members', 'member', 'miembros', 'membres', 'membri', 'leden'], () => [tr('People|admin'), tr('People')]],
   // 2.353.0 E (#2775): the words people type for the integrations (the scan program is under Integrations since #2773)
-  [['scanner', 'scannen', 'scan', 'wächter', 'waechter', 'ordner-wächter', 'watcher', 'folder watcher', 'download', 'herunterladen', 'mac', 'macos', 'windows', 'programm', 'program'], () => [tr('Scans from your computer')]],
+  [['scanner', 'scannen', 'scan', 'wächter', 'waechter', 'ordner-wächter', 'watcher', 'folder watcher', 'download', 'herunterladen', 'mac', 'macos', 'windows', 'programm', 'program', 'eingang', 'eingänge', 'inbox', 'mail-eingang'], () => [tr('Documents: inboxes')]],  // 2.365.2 B (#2789)
   [['import', 'importieren', 'einlesen', 'importer', 'importar', 'importeren'], () => [tr('Import')]],
   [['export', 'exportieren', 'exporter', 'exportar', 'exporteren'], () => [tr('Export')]],
   [['token', 'tokens', 'api', 'api-key', 'api key', 'zugangsschlüssel', 'app-passwort'], () => [tr('API tokens'), tr('App passwords')]],
@@ -1574,11 +1577,12 @@ function ss_hits(md, q, shown, SYN) {
 const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
 const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
 const SS_AREA = [
-  {src: ['dc_settings', 'dc_sDraw', 'dc_cfSettings', 'dsc_slot'], area: N_('File store|area'), name: N_('Settings of the documents'), words: ['dokumente', 'documents', 'ablage', 'erkennung', 'recognition', 'paperless'],
-    on: () => modOn('docs') && typeof dc_settings === 'function', open: async () => { go('docs'); await ss_until(() => $('[data-dc="settings"]')); return dc_settings(); }, root: '.dc-smd',
-    secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise', 'archivnummer', 'asn', 'trennblatt']], [N_('Rules'), ['regel', 'rule']],
-      [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
-      [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
+  // 2.365.2 B (#2789): Settings > Documents (docs.js dcs_paneHtml, drawn by dc_sDraw); the lists and fields open from there in the module
+  {src: ['dc_settings', 'dc_sDraw', 'dc_cfSettings'], area: N_('Settings'), name: N_('Documents|settings'), words: ['dokumente', 'documents', 'ablage', 'erkennung', 'recognition', 'paperless'],
+    on: () => feat('docs') && typeof dcs_paneHtml === 'function', open: () => settingsModal('docs'), root: '#s-dcs',
+    secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise'], '#s-dcs-auto-h'], [N_('Archive numbers'), ['archivnummer', 'asn', 'trennblatt', 'separator'], '#s-dcs-asn-h'],
+      [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
+      [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
     'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office

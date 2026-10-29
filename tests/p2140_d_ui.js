@@ -51,6 +51,7 @@ const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ui-c1\r\nFN:Erik Beispiel\r\nBDA
   w.eval('contactsModal()');
   const sw = () => d.querySelector(`[data-ctwb="${S1.id}"]`);
   check(!!await until(() => sw(), 60), 'the writable address book has the switch');
+  check(!!d.querySelector('.smodal #s-carddav'), '2.365.2 B (#2789): the address books are in Settings > Integrations');
   check(sw() && !sw().checked && sw().closest('.swc'), 'off by default, a switch (.swc)');
   check(/Write changes back to the address book/.test(sw()?.closest('.ctwb')?.textContent || ''), 'the switch is labelled');
   check(!d.querySelector(`[data-ctwb="${S2.id}"]`) && /Read only/.test(d.querySelector(`[data-ctwbro="${S2.id}"]`)?.textContent || ''), 'the mirror: a hint instead of the switch');
@@ -67,7 +68,7 @@ const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ui-c1\r\nFN:Erik Beispiel\r\nBDA
   yes.click();
   check(await until(async () => (await call('GET', '/api/family/contacts')).sources.find(x => x.id === S1.id).writeback === true), 'Switch on: saved on the server');
   check(await until(() => sw() && sw().checked), 'the switch shows on after the reload of the list');
-  d.querySelector('.modal [data-m="close"]')?.click();
+  d.querySelectorAll('.modal').forEach(m => m.remove());  // 2.365.2 B (#2789): the settings dialog
   w.eval('contactsModal()');
   check(await until(() => sw() && sw().checked, 60), 'reopened: still on');
   // off saves at once (no question)
