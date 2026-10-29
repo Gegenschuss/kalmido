@@ -179,14 +179,13 @@ def allow_by_purpose(c):
     return {p: d[p] if isinstance(d.get(p), str) else old for p in ALLOW_PURPOSES}
 
 
-def cal_allow(c, purpose=None):
+def cal_allow(c, purpose):
     """Hosts that may be internal for one purpose (ALLOW_PURPOSES): env KALMIDO_CALENDAR_ALLOW_HOSTS + the admin's list of
-    that purpose. 2.380 G (#3389): no purpose (a caller not sorted yet) = the hosts of every purpose, never more than before."""
+    that purpose. 2.380 G (#3389): the purpose is required (review: a caller without one must not get every purpose's hosts)."""
     by = allow_by_purpose(c)
-    if purpose is not None and purpose not in by:
+    if purpose not in by:
         raise ValueError(f"unknown allow-list purpose {purpose!r}")
-    texts = [by[purpose]] if purpose else list(by.values())
-    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + [e for t in texts for e in cal_allow_parse(t)[0]])
+    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + cal_allow_parse(by[purpose])[0])
 
 
 def cal_host_allowed(allow, host, port):
