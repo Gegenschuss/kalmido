@@ -30,15 +30,18 @@ const asks = w => { const e = new w.Event('beforeunload', {cancelable: true}); w
   check(await until(() => w.eval('OUT.me === S.me.id')), 'setup: the server said who is logged in');
 
   // ================= formguard: the registration itself
-  w.eval('window.__sent = 0; window.__wait = true; window.__off = fgPending(() => { window.__sent++; }, () => window.__wait)');
-  check(asks(w) === true, 'fgPending: beforeunload asks while ask() says something waits');
-  w.dispatchEvent(new w.Event('pagehide'));
-  check(w.eval('window.__sent') === 1, 'fgPending: pagehide runs send()');
-  w.eval('window.__wait = false');
-  check(asks(w) === false, 'fgPending: nothing waits = no question');
-  w.eval('window.__wait = true; window.__off()');
-  w.dispatchEvent(new w.Event('pagehide'));
-  check(w.eval('window.__sent') === 1 && asks(w) === false, 'fgPending: an ended registration neither sends nor asks');
+  check(w.eval('typeof fgPending') === 'function', 'formguard has fgPending');
+  if (w.eval('typeof fgPending') === 'function') {
+    w.eval('window.__sent = 0; window.__wait = true; window.__off = fgPending(() => { window.__sent++; }, () => window.__wait)');
+    check(asks(w) === true, 'fgPending: beforeunload asks while ask() says something waits');
+    w.dispatchEvent(new w.Event('pagehide'));
+    check(w.eval('window.__sent') === 1, 'fgPending: pagehide runs send()');
+    w.eval('window.__wait = false');
+    check(asks(w) === false, 'fgPending: nothing waits = no question');
+    w.eval('window.__wait = true; window.__off()');
+    w.dispatchEvent(new w.Event('pagehide'));
+    check(w.eval('window.__sent') === 1 && asks(w) === false, 'fgPending: an ended registration neither sends nor asks');
+  }
 
   // ================= the list dialog: typed within the debounce, then the page goes away
   w.eval(`listModal(${P})`);
