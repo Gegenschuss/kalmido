@@ -265,6 +265,7 @@ ROUTES = {
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
