@@ -329,9 +329,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   retrying with another date. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
   work for -- only somebody who asked you (chat, mention, assignment, job, letter request; else 403, 2.223.2); `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
   suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
-  2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
+  2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.delivery`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
-  XRechnung, no VAT return figures in an office that does not use them.
+  XRechnung, no VAT return figures, no delivery notes (creating one answers `404`) in an office that does not use them.
   Letters (2.153.0) the same way: after the event `letter_draft_requested` ONE `create_letter_draft` (`answers` = the
   document); a person checks, signs and sends it.
   2.144.10: documents carry `trial` (a trial document: TEST number, SAMPLE on the PDF, never real business; no

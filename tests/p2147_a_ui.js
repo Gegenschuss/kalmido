@@ -55,7 +55,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(tab('functions'));
     check(await ev(shown) === 'functions', '#2460: the area Functions shown alone');
     const feats = await ev(`[...document.querySelectorAll('#ofc-set [data-feat]')].map(x => x.dataset.feat + ':' + (x.checked ? 1 : 0) + (x.disabled ? 'd' : '')).join(',')`);
-    check(feats === 'books.datev:1,docs.einvoice:1,books.vat_return:1,books.tax_dates:1,books.export_csv:1,books.gobd:1d', '#2460: DE offers every function, finalising rules locked ' + feats);
+    check(feats === 'books.datev:1,docs.delivery:1,docs.einvoice:1,books.vat_return:1,books.tax_dates:1,books.export_csv:1,books.gobd:1d', '#2460: DE offers every function, finalising rules locked ' + feats);  // 2.434.0 (#3608): + docs.delivery
     check(await ev(`document.querySelector('#ofc-set [data-feat="books.datev"]').getAttribute('role') === 'switch'`), '#2460: a switch (role switch)');
     await shot('p2147-a-functions.png');
     await ev(flip('books.datev'));

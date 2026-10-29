@@ -11,7 +11,8 @@ const OFD_KINDS = [['offer', N_('Quotations')], ['invoice', N_('Invoices')], ['c
 const OFD_SECS = {offers: ['offer', 'archive'], invoices: ['invoice', 'credit', 'reminder', 'delivery', 'archive']};
 const ofd_sec = () => S.route?.tab === 'invoices' ? 'invoices' : 'offers';
 const ofd_secOf = kind => kind === 'offer' ? 'offers' : 'invoices';
-const ofd_kinds = () => OFD_KINDS.filter(x => OFD_SECS[ofd_sec()].includes(x[0]));
+const ofd_lsOn = () => typeof ofcFeat !== 'function' || ofcFeat('docs.delivery');  // 2.434.0 B (#3608): delivery notes switched off = no tab, no buttons (existing ones stay readable by link)
+const ofd_kinds = () => OFD_KINDS.filter(x => OFD_SECS[ofd_sec()].includes(x[0]) && (x[0] !== 'delivery' || ofd_lsOn()));
 const ofd_href = (id, kind) => `office/${kind ? ofd_secOf(kind) : ofd_sec()}/${id}`;
 const ofd_tabOn = () => typeof ofcTab === 'function' && Object.hasOwn(OFD_SECS, ofcTab());
 // the kind tab shown when the area changes: each area keeps its own (a kind set before a go() of its area wins)
@@ -20,7 +21,7 @@ function ofd_secSync() {
   if (OFD.sec && OFD_SECS[OFD.sec].includes(OFD.kind)) OFD.kindOf[OFD.sec] = OFD.kind;
   OFD.sec = sec;
   if (S.route.id) return;  // the document decides (ofdLoadDoc)
-  const ks = OFD_SECS[sec], k = ks.includes(OFD.kind) && OFD.kind !== 'archive' ? OFD.kind : OFD.kindOf[sec] || ks[0];
+  const ks = OFD_SECS[sec].filter(x => x !== 'delivery' || ofd_lsOn()), k = ks.includes(OFD.kind) && OFD.kind !== 'archive' ? OFD.kind : ks.includes(OFD.kindOf[sec]) ? OFD.kindOf[sec] : ks[0];
   if (k !== OFD.kind) { OFD.kind = k; OFD.status = ''; OFD.list = null; }
 }
 // an old link #office/offers/<id> of an invoice (or a quotation under office/invoices): the address of the document's area
@@ -172,7 +173,7 @@ function ofdListHtml() {
   const newBtn = k === 'offer' ? tri_newBtn('btn sm pri')  // 2.380.0 B (#3418): + the trial document
     : k === 'invoice' ? `${typeof dx_btn === 'function' && ofcFeat('books.datev') ? dx_btn() : ''}<button class="btn sm" data-ofd="remind">${ic('clock', 's')}<span>${tr('Create reminder')}</span></button><button class="btn sm pri" data-ofd="new-inv" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New invoice')}</span></button>`
     : k === 'reminder' ? `<button class="btn sm pri" data-ofd="remind">${ic('plus', 's')}<span>${tr('Create reminder')}</span></button>`
-    : k === 'delivery' ? `<button class="btn sm pri" data-ofd="new-ls">${ic('plus', 's')}<span>${tr('New delivery note')}</span></button>` : '';  // 2.120.0 D (#2089)
+    : k === 'delivery' && ofd_lsOn() ? `<button class="btn sm pri" data-ofd="new-ls">${ic('plus', 's')}<span>${tr('New delivery note')}</span></button>` : '';  // 2.120.0 D (#2089)
   const kinds = `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${ofd_kinds().map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>`;
   // 2.46.1 (#1637): an empty offer list shows its one big button below the text, not a second one up here
   const noTop = k === 'offer' && rows && !rows.length && !q && !OFD.status && !OFD.trial;
@@ -238,7 +239,7 @@ function ofdEditorHtml() {
   const acts = [];
   if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; 2.144.7 (#2572): + "Create invoice"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
-  if (kind === 'offer' || kind === 'invoice') acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
+  if ((kind === 'offer' || kind === 'invoice') && ofd_lsOn()) acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
   if ((inv || kind === 'offer') && lk && !ofr_noSp('offers', 'release')) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.113.2 (#2253): a finalised quotation is mailed too
   if (vf) acts.length = 0;
   const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${inv ? esc(absKindName(d) || ofdKindName(kind, true)) + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>

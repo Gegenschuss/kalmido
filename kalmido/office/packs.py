@@ -22,6 +22,7 @@ _cache = {}
 # features_off); a function that is not switchable (the finalising rules) stays in force whatever the settings say.
 PACK_FEATURES = {
     "books.datev": {"switch": True},         # DATEV: booking batch (EXTF), document inbox, SKR accounts, travel "in DATEV"
+    "docs.delivery": {"switch": True},       # 2.434.0 B (#3608): delivery notes / proofs of service (creating them; existing ones stay readable)
     "docs.einvoice": {"switch": True},       # e-invoice XML (XRechnung / ZUGFeRD / Factur-X) on finalising and mailing
     "books.vat_return": {"switch": True},    # the VAT return figures (UStVA); the filing itself (ELSTER) stays outside
     "books.tax_dates": {"switch": True},     # tax dates as tasks (deadlines)
@@ -207,9 +208,11 @@ def pack_features(d):
     d = d or {}
     ft = d.get("features")
     if isinstance(ft, dict):
-        return {k: v.get("status") for k, v in ft.items() if isinstance(v, dict) and (k in PACK_FEATURES or k in PACK_FEATURES_PLANNED)}
+        out = {k: v.get("status") for k, v in ft.items() if isinstance(v, dict) and (k in PACK_FEATURES or k in PACK_FEATURES_PLANNED)}
+        out.setdefault("docs.delivery", "ready")  # 2.434.0 B (#3608): packs built before the switch keep their delivery notes
+        return out
     # (review 2.147.0: an office on such a pack had the VAT return figures and tax dates before -- they stay)
-    out = {"books.export_csv": "ready", "books.gobd": "ready", "books.vat_return": "ready", "books.tax_dates": "ready"}
+    out = {"docs.delivery": "ready", "books.export_csv": "ready", "books.gobd": "ready", "books.vat_return": "ready", "books.tax_dates": "ready"}
     ev, bk = d.get("einvoice") or {}, d.get("bookkeeping") or {}
     if ev.get("formats"):
         out["docs.einvoice"] = ev.get("status") or "planned"

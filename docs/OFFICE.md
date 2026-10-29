@@ -221,6 +221,7 @@ The country pack decides which office functions exist at all; the office admin s
 | Function | Key | Germany (`DE`) | Base pack (`XX`) |
 |---|---|---|---|
 | DATEV: booking batch, document inbox, SKR accounts, travel receipts "in DATEV" | `books.datev` | yes | - |
+| Delivery notes / proofs of service: tab, buttons, number series, closing texts (existing ones stay readable; creating one is `404` while off) | `docs.delivery` | yes | - |
 | E-invoice XML on finalising and mailing (ZUGFeRD / Factur-X, XRechnung) | `docs.einvoice` | yes | ZUGFeRD / Factur-X only |
 | VAT return figures (advance return; filing stays with your tax software) | `books.vat_return` | yes | - |
 | Tax dates as recurring tasks | `books.tax_dates` | yes | - |
