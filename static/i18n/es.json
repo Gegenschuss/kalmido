@@ -14839,5 +14839,9 @@
   "Connect a newsletter service first: Settings > Integrations.": "Conecta primero un servicio de boletines: Ajustes > Integraciones.",
   "Consents to the newsletter from a CSV file: Contacts > Newsletter.": "Consentimientos para el boletín desde un archivo CSV: Contactos > Newsletter.",
   "Segments, the sync by hand and the consent import: Contacts > Newsletter.": "Segmentos, la sincronización manual y la importación de consentimientos: Contactos > Newsletter.",
-  "Settings of the service": "Ajustes del servicio"
+  "Settings of the service": "Ajustes del servicio",
+  "Company & office": "Empresa y oficina",
+  "Documents|settings": "Documentos",
+  "Company, documents and numbers, invoices, taxes": "Empresa, documentos y números, facturas, impuestos",
+  "Sorting automatically, archive numbers, rules": "Ordenar automáticamente, números de archivo, reglas"
 }

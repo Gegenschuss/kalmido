@@ -14839,5 +14839,9 @@
   "Connect a newsletter service first: Settings > Integrations.": "Koppel eerst een nieuwsbriefdienst: Instellingen > Integraties.",
   "Consents to the newsletter from a CSV file: Contacts > Newsletter.": "Toestemmingen voor de nieuwsbrief uit een CSV-bestand: Contacten > Nieuwsbrief.",
   "Segments, the sync by hand and the consent import: Contacts > Newsletter.": "Segmenten, handmatig synchroniseren en het importeren van toestemmingen: Contacten > Nieuwsbrief.",
-  "Settings of the service": "Instellingen van de dienst"
+  "Settings of the service": "Instellingen van de dienst",
+  "Company & office": "Bedrijf en kantoor",
+  "Documents|settings": "Documenten",
+  "Company, documents and numbers, invoices, taxes": "Bedrijf, documenten en nummers, facturen, belastingen",
+  "Sorting automatically, archive numbers, rules": "Automatisch sorteren, archiefnummers, regels"
 }
