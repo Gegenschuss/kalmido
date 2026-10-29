@@ -26,12 +26,21 @@ own routes (/api/wiki/files/<id>, /api/list-files/<id>, /api/sheets/<id>/files/<
 """
 from flask import jsonify, request
 
+from ..core.access import acx_of, vis_sql
 from ..core.config import app
-from ..core.db import db
+from ..core.db import db, usettings
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
 from ..accounts.session import me
+from ..accounts.wsareas import wsa_org_check, wsa_org_off
+from ..lists.projects import need_overview
+from ..sheets.core import sh_need
+from ..wiki.pages import wiki_space_sql
+from ..wiki.wikiatt import wka_locked, wka_url
+from ..wiki.wkfolder import wkf_role
+from .fsroots import fs_area_ws
+from .store import fs_role
 
 FSV_MAX = 500  # files per collection
 # collection key -> its name; an area belongs to a key by fsv_key
@@ -83,7 +92,6 @@ def _space(c, uid, v):
     if v == "private":
         return None
     if v.startswith("org:") and v[4:].isdigit():
-        from ..core.access import acx_of
         oid = int(v[4:])
         if oid in acx_of(c, uid).org_ids:
             return oid
@@ -102,9 +110,6 @@ def _item(kind, i, name, mime, size, created_at, url, dl):
 
 def _wiki(c, uid, oid, limit):
     """[(title, open, items)] -- the files of the knowledge pages of the space uid may read, per page (no locked space)."""
-    from ..wiki.pages import wiki_space_sql
-    from ..wiki.wikiatt import wka_locked, wka_url
-    from ..wiki.wkfolder import wkf_role
     w, a = wiki_space_sql(oid, uid)
     rows = c.execute(f"""SELECT id, page_id, name, mime, size, created_at FROM wiki_files WHERE deleted_at IS NULL AND {w}
                          ORDER BY page_id, name, id LIMIT {_cap(limit)}""", a).fetchall()
@@ -134,8 +139,6 @@ def _wiki(c, uid, oid, limit):
 
 def _lists(c, uid, oid, limit):
     """[(title, open, items)] -- the project files of the space's projects uid may open (the project's full roles), per project."""
-    from ..core.access import vis_sql
-    from ..lists.projects import need_overview
     sp, a = ("l.org_id=?", [oid]) if oid else ("l.org_id IS NULL", [])
     rows = c.execute(f"""SELECT f.id, f.list_id, f.name, f.mime, f.size, f.created_at, l.name AS list_name FROM list_files f
                          JOIN lists l ON l.id=f.list_id WHERE f.list_id IN {vis_sql()} AND f.deleted_at IS NULL
@@ -162,7 +165,6 @@ def _lists(c, uid, oid, limit):
 
 def _sheets(c, uid, oid, limit):
     """[(title, open, items)] -- the files of the file cells of the space's tables uid may read (sheets/core.sh_need), per table."""
-    from ..sheets.core import sh_need
     sp, a = ("s.org_id=?", [oid]) if oid else ("s.org_id IS NULL AND s.owner_id=?", [uid])
     rows = c.execute(f"""SELECT f.id, f.sheet_id, f.name, f.mime, f.size, f.created_at, s.title FROM sheet_files f
                          JOIN sheets s ON s.id=f.sheet_id WHERE f.deleted_at IS NULL AND s.deleted_at IS NULL AND {sp}
@@ -188,8 +190,6 @@ def _sheets(c, uid, oid, limit):
 
 def _fs(c, uid, oid, key, limit):
     """[(title, None, items)] -- the files lying in the folders of the space's roots of key that uid may see, per folder."""
-    from .fsroots import fs_area_ws
-    from .store import fs_role
     ws = fs_area_ws(oid, uid)
     with system_ctx(c):  # the area roots of the space (the server's own table; reading the ids grants nothing)
         roots = [r[0] for r in c.execute("SELECT node_id, area FROM fs_area_roots WHERE ws=? AND node_id IS NOT NULL", (ws,))
@@ -232,10 +232,8 @@ def _key_on(c, uid, oid, key):
     a = FSV_GATE.get(key)
     if not a:
         return True
-    from ..core.db import usettings
     if a not in (usettings(c, uid).get("features") or "").split(","):
         return False
-    from ..accounts.wsareas import wsa_org_off
     return a not in wsa_org_off(c, oid)
 
 
@@ -287,7 +285,6 @@ def files_collection(key):
         raise Denied(404)
     oid = _space(c, uid, request.args.get("space"))
     if oid:
-        from ..accounts.wsareas import wsa_org_check
         wsa_org_check(c, oid, "ablage")  # the file store switched off by the organisation's admins (like its other views)
     groups = fsv_groups(c, uid, oid, key, limit=FSV_MAX + 1)
     total, cut = 0, False
