@@ -4590,6 +4590,17 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctav img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .ctcard{overflow:auto;min-height:0;padding:.25rem .25rem 2rem;display:flex;flex-direction:column;gap:.75rem}
 .ctcard.ctnone{align-items:center;justify-content:center;gap:.5rem}
+/* 2.431.0 C (#3598): two columns (clients, contacts): the page itself stands still - the search bar stays on top, the list on the
+   left and the card on the right scroll each for themselves (the office wrap and #view used to grow with the list, so the whole
+   page scrolled); phones (one column) unchanged */
+@media (min-width:768px){
+  #view:has(.ctview > .ctcols){display:flex;flex-direction:column;overflow:hidden;padding-bottom:1rem}
+  #view:has(.ctview > .ctcols) > .ofwrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
+  #view:has(.ctview > .ctcols) .ofbody{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+  #view:has(.ctview > .ctcols) .ofbody > :not(.ctview),#view:has(.ctview > .ctcols) > :not(.ofwrap,.ctview){flex-shrink:0}
+  .ctview:has(> .ctcols){flex:1;height:auto}
+  .ctview > .ctcols{grid-template-rows:minmax(0,1fr)}
+}
 .cthead{display:flex;align-items:center;gap:.75rem}
 .cthn{min-width:0;flex:1}
 .cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}  /* 2.217.0 A (#2794): two lines, break inside a word only as last resort */
