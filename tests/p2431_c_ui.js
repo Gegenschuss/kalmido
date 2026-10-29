@@ -50,6 +50,7 @@ const N = 40;
     const lg = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'frida', password: 'password123'})}).then(r => r.status)`);
     check(lg === 200, 'login frida');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 800}});
+    check(await ev(`matchMedia('(hover:hover) and (pointer:fine)').matches`), 'a computer with a mouse (not the touch tablet layout)');
     // what the columns do: the view's own scroll, the list's, where the bar and the card stand
     const geo = `(() => { const v = document.querySelector('#view'), l = v.querySelector('.ctlistw'), b = v.querySelector('.ctbar'), c = v.querySelector('.ctcard'); if (!l || !b || !c) return null;
       const vr = v.getBoundingClientRect(), r = e => Math.round(e.getBoundingClientRect().top);
@@ -104,7 +105,7 @@ const N = 40;
     check(await until(`document.querySelectorAll('#view .msclients .ctrow').length >= ${N}`, 80), 'phone: the clients list');
     const ph = await ev(`(() => { const v = document.querySelector('#view'), c = v.querySelector('.ctcols'); return {vy: getComputedStyle(v).overflowY, cols: getComputedStyle(c).gridTemplateColumns.split(' ').length, card: !!v.querySelector('.ctcard')}; })()`);
     check(ph.vy === 'auto' && ph.cols === 1 && !ph.card, `phone #3598: one column as before (the computer's rules do not apply) (${JSON.stringify(ph)})`);
-  });
+  }, false);  // a mouse: Firefox's default matched the touch tablets' office rule (#2445), which hid the bug
   console.log(`p2431_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
