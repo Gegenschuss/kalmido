@@ -813,6 +813,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
+    ...(inPanel && typeof df_menuItem === 'function' ? df_menuItem() : []),  // 2.380 F (#3435): fold / unfold all sections
     '-',
     {label: t.status === -1 ? tr('Reopen') : tr("Won’t do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),

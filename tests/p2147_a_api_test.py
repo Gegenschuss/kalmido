@@ -38,6 +38,7 @@ FEAT = "cal,comments,office,clients"
 O, D = "/api/office", "/api/office/docs"
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 ALL = {"books.datev", "docs.einvoice", "books.vat_return", "books.tax_dates", "books.export_csv", "books.gobd"}
+ALL |= {"money.cashflow", "money.kpi", "money.travel", "money.meals", "money.subs"}  # 2.380 (#3411): the points of Money, offered by every pack
 
 
 def dbx(sql, args=(), write=False):

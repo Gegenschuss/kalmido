@@ -14860,5 +14860,15 @@
   "Your webhook {0} no longer delivers events of the organisation {1}. An admin of it can set it up as an organisation webhook.": "Dein Webhook {0} liefert keine Ereignisse der Organisation {1} mehr. Ein Admin der Organisation kann ihn als Organisations-Webhook anlegen.",
   "Recommended: send the token as the header {0} to {1}": "Empfohlen: das Token als Kopfzeile {0} an {1} senden",
   "Or the URL with the token in it (for tools without headers):": "Oder die URL mit dem Token darin (für Werkzeuge ohne Kopfzeilen):",
-  "Shown only now, keep it secret.": "Nur jetzt sichtbar, halte es geheim."
+  "Shown only now, keep it secret.": "Nur jetzt sichtbar, halte es geheim.",
+  "Expected income and expenses of the next months": "Erwartete Einnahmen und Ausgaben der nächsten Monate",
+  "Revenue, open items and margin per client": "Umsatz, offene Posten und Marge je Kunde",
+  "Trips with per diem allowances and receipts": "Reisen mit Verpflegungspauschalen und Belegen",
+  "Business meals with guests and reason": "Geschäftsessen mit Gästen und Anlass",
+  "Running subscriptions, seats and what they cost": "Laufende Abos, Plätze und was sie kosten",
+  "New messages": "Neue Nachrichten",
+  "all done": "alle erledigt",
+  "{0} sign-off": ["{0} Abnahme", "{0} Abnahmen"],
+  "Fold all sections": "Alle Bereiche einklappen",
+  "Unfold all sections": "Alle Bereiche ausklappen"
 }

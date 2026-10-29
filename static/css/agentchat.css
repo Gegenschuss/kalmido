@@ -10,6 +10,9 @@
 .chst .chtask{font-size:inherit;padding:0}
 .agpct{display:inline-flex;align-items:center;gap:.375rem}
 .agpct input{width:5.5rem}
+/* 2.380 F (#3381): the line above the first message not seen yet */
+.chunread{display:flex;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--accent);font-size:var(--fs-xs);font-weight:600}
+.chunread::before,.chunread::after{content:"";flex:1;border-top:1px solid currentColor;opacity:.5}
 .cnotice{align-self:center;max-width:90%;padding:.125rem .75rem;text-align:center;font-size:var(--fs-xs);line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
 .cnotice a{color:inherit;text-decoration:underline dotted;text-underline-offset:.15em;display:inline-block;min-height:1.5rem;padding:.125rem 0}
 .aiuctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.5rem}

@@ -664,7 +664,7 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
 PTYPES = {
     "agency": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": ("time", "fields"),
                "sections": (N_("Request"), N_("Concept"), N_("Production"), N_("Approval"), N_("Billing")),
-               "fields": ((N_("Client"), "text"), (N_("Budget h"), "number"))},
+               "fields": ((N_("Budget h"), "number"),)},  # 2.380 F (#3438): no "Client" text field, the client is the project's (lists.client_id)
     "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps"),
                  "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")), "fields": ()},
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),

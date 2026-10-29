@@ -4121,6 +4121,7 @@ USER_DEFAULTS = {
     # 2.31.0 (#344): the task panel on a desktop: the properties' share above the comments area in % (20-85) and whether
     # the comments area is folded (1); per user, so every desktop shows it the same way
     "detail_split": "60", "detail_cm_fold": "0",
+    "detail_fold": "",  # 2.380 F (#3435): the folded sections of the task panel, for all tasks (static/js/detail.js DFOLD_KEYS)
     # 2.32.0 (#1081): an agent's steps in the chat: live under the typing dots (1) and kept above every answer (always, 0)
     "agent_steps_live": "1", "agent_steps_always": "0",
     "chat_read_receipts": "1",  # 2.139.0 A (#2129): others see when I read team chat messages (off: I see nobody's either)

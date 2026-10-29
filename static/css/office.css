@@ -1041,7 +1041,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .oflgt .fcar{width:.75rem;height:.75rem;transition:transform .15s}
 .oflg.closed .oflgt .fcar{transform:rotate(-90deg)}
 .oflgt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius)}
-.oflr.ofmmore{color:var(--muted)}
 .rcp-kinds{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 /* 2.356.0 D (#3006, #3129): the members' line (why Money is short, the way to hand in receipts), locked company fields,
    "Submit receipt" with the person's own receipts and their status */

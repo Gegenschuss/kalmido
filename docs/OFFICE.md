@@ -216,6 +216,15 @@ The country pack decides which office functions exist at all; the office admin s
 | Tax dates as recurring tasks | `books.tax_dates` | yes | - |
 | Export for any tax advisor (booking list CSV, ZIP with invoices and receipts) | `books.export_csv` | yes | yes |
 | Finalising rules (locked documents, number gaps with a reason, date order) | `books.gobd` | always on | always on |
+| Cash flow (menu point under Money) | `money.cashflow` | yes | yes |
+| Figures (menu point and the start page block) | `money.kpi` | yes | yes |
+| Travel expenses | `money.travel` | yes | yes |
+| Entertainment receipts | `money.meals` | yes | yes |
+| Subscriptions & tools | `money.subs` | yes | yes |
+
+*Since 2.380:* the five points of Money are offered by every country pack. Switched off, the point leaves the sidebar and
+the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: every
+point a person may open is shown.
 
 - **Off only hides.** Nothing is deleted: the DATEV address and booking settings, tax date settings and stored XML files
   stay; switching on again brings everything back. The server checks too: the routes of a function that is off answer

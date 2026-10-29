@@ -18,7 +18,7 @@ from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop
 from ..core.errors import BadInput
-from .packs import office_pack, office_pack_codes, office_pack_for
+from .packs import office_pack, office_pack_codes, office_pack_for, office_feature_on, office_path_feature
 from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
 from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
@@ -173,6 +173,10 @@ def office_org(c, uid, admin=False, area=None):
     2.187.0 (#2476): a member ruled by office groups (office/rights.py) is checked by the level of the request's area
     (area: given by a caller outside /api/office) instead of the admin role; everybody else exactly as before."""
     oid, role = office_where(c, uid)
+    if oid and has_request_context():  # 2.380 F (#3411): a point of Money switched off answers 404 (its data stays)
+        fk = office_path_feature(request.path)
+        if fk and not office_feature_on(office_settings(c, oid), fk):
+            raise Denied(404, tr(OF_FEATURE_OFF))
     from ..accounts.orgroles import office_allowed
     no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
     if role != "admin" and has_request_context():
@@ -350,14 +354,12 @@ OF_FEATURE_OFF = N_("This function is not switched on in this office")
 def office_need_feature(c, oid, key, s=None):
     """2.147.0 (#2459, #2460): the server half of the country pack's functions -- a route of a function the pack does not
     offer or the admin switched off answers 404 (nothing is deleted; switching it on again brings everything back)."""
-    from .packs import office_feature_on
     if not office_feature_on(s if s is not None else office_settings(c, oid), key):
         raise Denied(404, tr(OF_FEATURE_OFF))
 
 
 def office_feature(c, oid, key, s=None):
     """2.147.0 (#2459): True when the function is on in office area oid (background work: auto mailing, XML on finalising)."""
-    from .packs import office_feature_on
     return office_feature_on(s if s is not None else office_settings(c, oid), key)
 
 

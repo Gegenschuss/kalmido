@@ -4902,6 +4902,15 @@ button.lkchip:hover{border-color:var(--accent)}
 .dchip.dwho .avatar{width:1.25rem;height:1.25rem;font-size:.625rem}
 .dchip.dwho .dct{font-family:var(--sans)}
 .dmore{margin-top:.75rem;border-top:1px solid var(--line);padding-top:.25rem}
+/* 2.380 F (#3435): a section of the task panel folds by its heading (detail.js dfWrap); folded = the heading and its short line */
+.dfold>h5{display:flex;align-items:center;gap:.25rem;cursor:pointer}
+.dfold>h5 .dfbtn{width:1.5rem;height:1.5rem;min-width:0;margin-left:-.375rem;flex:none}
+.dfold>h5 .dfbtn .fcar{width:.75rem;height:.75rem;transition:transform .15s}
+.dfold.dfolded>h5 .dfbtn .fcar{transform:rotate(-90deg)}
+.dfold.dfolded>:not(h5){display:none}
+.dfsum{font-weight:400;font-size:var(--fs-xs);text-transform:none;letter-spacing:0}
+.dfsum.dfbad{color:var(--danger)}
+.dfsum.dfwait{color:var(--accent)}
 .dmore > summary{display:flex;align-items:center;gap:.375rem;min-height:2.75rem;cursor:pointer;color:var(--muted);font-size:var(--fs-s);font-weight:600;list-style:none}
 .dmore > summary::-webkit-details-marker{display:none}
 .dmore > summary .fcar{transform:rotate(-90deg);transition:transform .15s}

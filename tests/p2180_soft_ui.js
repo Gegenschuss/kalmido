@@ -75,7 +75,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   const st = await call('GET', '/api/state'), ib = st.lists.find(l => l.is_inbox).id;
   check((await call('PATCH', `/api/lists/${ib}`, {ptype: 'private'})).status === 400, 'the inbox cannot get a project type');
   const ag = await call('PATCH', `/api/lists/${L}`, {ptype: 'agency'});
-  check(ag.ptype_missing.fields.map(f => f.name).join() === 'Client,Budget h' && ag.modules_on !== undefined, 'agency: missing fields named, modules reported');
+  // 2.380 (#3438): the agency type has no field Client any more
+  check(ag.ptype_missing.fields.map(f => f.name).join() === 'Budget h' && ag.modules_on !== undefined, 'agency: missing fields named, modules reported');
   await call('PATCH', `/api/lists/${L}`, {ptype: 'software'});
   // v1
   const tk = await call('POST', '/api/me/tokens', {name: 'p2180', scopes: ['read', 'write']});

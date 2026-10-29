@@ -14860,5 +14860,15 @@
   "Your webhook {0} no longer delivers events of the organisation {1}. An admin of it can set it up as an organisation webhook.": "Je webhook {0} levert geen gebeurtenissen van de organisatie {1} meer. Een beheerder ervan kan hem als organisatiewebhook aanmaken.",
   "Recommended: send the token as the header {0} to {1}": "Aanbevolen: stuur het token als header {0} naar {1}",
   "Or the URL with the token in it (for tools without headers):": "Of de URL met het token erin (voor tools zonder headers):",
-  "Shown only now, keep it secret.": "Alleen nu zichtbaar, houd het geheim."
+  "Shown only now, keep it secret.": "Alleen nu zichtbaar, houd het geheim.",
+  "Expected income and expenses of the next months": "Verwachte inkomsten en uitgaven van de komende maanden",
+  "Revenue, open items and margin per client": "Omzet, openstaande posten en marge per klant",
+  "Trips with per diem allowances and receipts": "Reizen met dagvergoedingen en bonnen",
+  "Business meals with guests and reason": "Zakelijke maaltijden met gasten en aanleiding",
+  "Running subscriptions, seats and what they cost": "Lopende abonnementen, plekken en wat ze kosten",
+  "New messages": "Nieuwe berichten",
+  "all done": "alles klaar",
+  "{0} sign-off": ["{0} goedkeuring", "{0} goedkeuringen"],
+  "Fold all sections": "Alle onderdelen inklappen",
+  "Unfold all sections": "Alle onderdelen uitklappen"
 }

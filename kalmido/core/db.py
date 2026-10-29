@@ -226,7 +226,7 @@ def topic_prefix():
 
 
 def random_topic():
-    # 2.306.0 C (#2889): was "kalmido-" + secrets ...; the export table (kalmido-export.sh) still lists that line
+    # 2.306.0 C (#2889): was "moarch-tasks-" + secrets ...; the export table (kalmido-export.sh) still lists that line
     return topic_prefix() + "-tasks-" + secrets.token_urlsafe(9).replace("_", "").replace("-", "").lower()
 
 
@@ -1071,6 +1071,20 @@ def init_db(guard=True, load=None):
             old = gsetting(c, "cal_allow_hosts")
             gset(c, "allow_hosts_by_purpose", json.dumps({p: old for p in ALLOW_PURPOSES}, sort_keys=True))
             gset(c, "migr_allow2380", "1")
+        if gsetting(c, "migr_agcl2380") != "1":  # 2.380 F (#3438): one way -- the agency projects' "Client" text fields go
+            # when no task has a value in them (the client is the project's, lists.client_id); a field with a value stays
+            names = sorted({tr("Client", lg=x).strip().lower() for x in LANGS} | {"client"})
+            ids = [r[0] for r in c.execute(
+                f"SELECT f.id FROM list_fields f JOIN lists l ON l.id=f.list_id WHERE l.ptype='agency' AND f.type='text' "
+                f"AND LOWER(TRIM(f.name)) IN ({','.join('?' * len(names))}) AND NOT EXISTS (SELECT 1 FROM task_field_values v "
+                f"WHERE v.field_id=f.id AND v.value<>'')", names).fetchall()]
+            for fid in ids:
+                c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,))
+                c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
+                c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))
+            gset(c, "migr_agcl2380", "1")
+            if ids:
+                print("agency projects:", len(ids), "empty field(s) \"Client\" removed", flush=True)
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         from ..collab.msgsearch import msg_index_init
