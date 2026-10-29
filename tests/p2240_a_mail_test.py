@@ -107,7 +107,9 @@ class FakeIMAP:
     def login(self, u, p): return "OK", []
     def logout(self): pass
     def read(self, n): return b""
-def importer(c, raw):
+def importer(c, raw, pre=None):
+    if c is None:  # the instance poll's prefetch step (2.424.0 B2, #3450): no downloads here
+        return None
     if raw == b"mail2": raise smtplib.SMTPRecipientsRefused({"bob.secret@example.com": (550, b"no such user")})
     return {b"mail1": 11, b"mail3": M.MAIL_DROP, b"mail4": None, b"mail5": M.MailKept(15)}[raw]  # 3 for nobody, 4 refused, 5 in part
 out = {}
