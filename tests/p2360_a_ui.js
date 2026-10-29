@@ -183,7 +183,8 @@ const settings = async () => (await call('GET', '/api/state')).settings;
       check(m.dot === m.icol && m.icol !== m.text /* 2.53.0 (#1426): the colour is the nearest palette tone now, not the stored #7048e8 */, `${tag}: the whole icon in the list colour, no separate dot ` + JSON.stringify([m.icol, m.dot]));
       check(m.onRow && m.active !== m.text && m.activeCr >= 3, `${tag}: the open list's icon keeps its colour and stays readable ` + JSON.stringify([m.active, m.activeCr]));
       check(m.bar > 0 && m.bar <= 1.01, `${tag}: the progress bar is 1 px ` + m.bar);
-      check(m.fhFs < m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head is smaller and grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
+      // 2.424.0 (#3572): one sidebar row rule (#3492, 2.406) - the folder head has the rows' size now, it stays grey
+      check(m.fhFs === m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head has the rows' size and is grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
       // a real mouse over the row (WebDriver BiDi pointer), then the keyboard: Tab focus inside the sidebar
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: m.hov.x, y: m.hov.y, duration: 0}]}]}); await sleep(400);
       const op1 = await ev(`+getComputedStyle(document.querySelector('#side .srow[data-list="${CART}"] .shr:not(.bellm)')).opacity`);
