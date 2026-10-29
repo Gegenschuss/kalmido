@@ -18,9 +18,9 @@ function whiRowsHtml(lid) {
     const st = [h.uses ? trn('{0} task created', '{0} tasks created', h.uses) : tr('Not used yet'), h.last_used_at ? tr('last {0}', relTime(h.last_used_at)) : ''].filter(Boolean).join(' · ');
     const nm = h.name || tr('Inbound webhook');
     const u = d.url, hdr = u && u.token ? `<div class="whi-hdr">${esc(tr('Recommended: send the token as the header {0} to {1}', u.header || 'X-Kalmido-Hook-Token', u.endpoint))}
-      <code>${esc(u.token)}</code> <button type="button" class="linkbtn" data-whi-copy="token">${ic('copy', 's')} ${tr('Copy')}</button></div>
+      <code class="whi-tok">${esc(u.token)}</code> <button type="button" class="linkbtn" data-whi-copy="token">${ic('copy', 's')} ${tr('Copy')}</button></div>
       <div class="muted">${esc(tr('Or the URL with the token in it (for tools without headers):'))}</div>` : `${esc(tr('Webhook URL (shown only now, keep it secret):'))} `;
-    const shown = u && u.id === h.id ? `<div class="shint lhint whi-url" role="status">${u.token ? `${esc(tr('Shown only now, keep it secret.'))} ` : ''}${hdr}<code>${esc(u.url)}</code>
+    const shown = u && u.id === h.id ? `<div class="shint lhint whi-url" role="status">${u.token ? `${esc(tr('Shown only now, keep it secret.'))} ` : ''}${hdr}<code class="whi-u">${esc(u.url)}</code>
       <button type="button" class="linkbtn" data-whi-copy="url">${ic('copy', 's')} ${tr('Copy')}</button>
       <div class="whi-ex"><span class="muted">${tr('Example')}</span> <code>${esc(whiCurl(u))}</code> <button type="button" class="linkbtn" data-whi-copy="curl">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : '';
     return `<div class="mrow rul-row whi-row${h.paused_reason ? ' off' : ''}" data-whi="${h.id}">${ic('zap', 's')}

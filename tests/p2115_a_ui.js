@@ -47,8 +47,8 @@ const FEAT = 'cal,comments,collab,events,files,time';
   check(!!inp, '#2061: "Add" asks for a name');
   inp.value = 'Home Assistant';
   d.querySelector('.cdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  await until(() => box()?.querySelector('.whi-url code'));
-  const url = box()?.querySelector('.whi-url code')?.textContent || '';
+  await until(() => box()?.querySelector('.whi-url code.whi-u'));
+  const url = box()?.querySelector('.whi-url code.whi-u')?.textContent || '';  // 2.380 G (#2289): the token (header variant) shows first
   check(/\/api\/hooks\/in\/khi_/.test(url), '#2061: the URL shows once: ' + url.slice(0, 60));
   check(!!box()?.querySelector('[data-whi-copy="url"]') && !!box()?.querySelector('[data-whi-copy="curl"]'), '#2061: copy buttons for the URL and the curl example');
   check(/curl -X POST/.test(box()?.querySelector('.whi-ex')?.textContent || ''), '#2061: the curl example');
