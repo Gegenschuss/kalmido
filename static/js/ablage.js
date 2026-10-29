@@ -504,7 +504,8 @@ function ab_smvPick(id, shift) {
   const order = (AB.data?.items || []).map(n => n.id);
   const ids = shift && AB.selLast != null ? ms_range(order, AB.selLast, id) : [id], on = !AB.sel.has(id);
   for (const x of ids) if (on) AB.sel.add(x); else AB.sel.delete(x);
-  AB.selLast = id; ab_draw();
+  AB.selLast = id; if (typeof dt_rsAnchor === 'function') dt_rsAnchor('ab:' + AB.dkey, id);  // tagsel.js takes the next Shift / Ctrl-click from here
+  ab_draw();
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && AB.selOn && $('#view .abview') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ab_smvEnd(); ab_draw(); } });
 document.addEventListener('change', e => {
