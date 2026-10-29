@@ -49,6 +49,7 @@ from ..api.common import (  # noqa: F401  2.149.0 G (#2517): the route helpers m
     _HITS, _HITS_LOCK, act_via, cursor_dec, cursor_enc, hit_budget, hit_limit, RATE_WINDOW_S, v1_args, v1_call, v1_err,
     v1_error, v1_feature, v1_json, v1_out, v1_page, v1_view, V1_CODES, V1Error,
 )
+from ..api.common import V1_KEY_KINDS  # 2.425.0 C (#3453)
 
 
 # ---------------------------------------------------------------- package B: REST API with personal access tokens
@@ -131,6 +132,9 @@ def api_authenticate():
     auth = request.headers.get("Authorization", "")
     tok = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
     c = db()
+    kind = next((f for p, f in V1_KEY_KINDS.items() if tok.startswith(p)), None)
+    if kind and not request.headers.get("X-Kalmido-Replay"):  # 2.425.0 C (#3453): a receipt fetcher's key: its own table, its own routes
+        return kind(c, tok, bad)
     # 2.207.0 A (#2763): an upload key is stored as UPLOAD_HASH_PREFIX + hash, so a version before 2.207 never finds it
     row = c.execute("SELECT * FROM api_tokens WHERE token_hash IN (?,?)", (_token_hash(tok), UPLOAD_HASH_PREFIX + _token_hash(tok))).fetchone() \
         if API_TOKEN_RE.fullmatch(tok) else None

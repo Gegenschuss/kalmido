@@ -356,6 +356,10 @@ APP_ONLY = [
     ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
      "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
      ("* /api/docs/scan-keys", "=POST /api/docs/mail-notice", "* /api/docs/folder-watcher/")),
+    # 2.425.0 C (#3453)
+    ("2.425.0 C (#3453): receipt fetchers (a helper program with its own key kind: setup code, portals on / off, disconnect) are a "
+     "person's setup in Settings > Integrations; agents never connect, see or switch them",
+     ("* /api/docs/fetchers",)),
     # 2.353.0 D (#2759)
     ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
      "documents); agents keep their shares, read and change documents with /documents and files with /files",
@@ -784,6 +788,9 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /tasks/{}/working": "2.407.0 A (#3513): set_working answers the same (working + job); the job itself via get_job",
     "PATCH /tasks/{}/working": "2.407.0 A (#3513): set_working (POST) adds the line as well while working; PATCH is for scripts that must not start one",
     "GET /documents/upload-target": "2.207.0 A (#2763): only for scan inbox keys (docs:upload, the folder watcher); never agents",
+    "GET /fetcher": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
+    "PUT /fetcher/status": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
+    "POST /fetcher/documents": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",

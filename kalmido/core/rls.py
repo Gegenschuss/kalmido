@@ -59,6 +59,7 @@ TABLES = (
     "wiki_versions",  # 2.123.0 A (#2102): the history of knowledge pages (NULL = private, the app checks the page)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
+    "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): receipt fetchers (NULL = the person's own documents, the app checks user_id)
     "fs_area_roots",  # 2.199.0 C (#2742): an area's root folder in a workspace (NULL = a person's own tree, the app checks owner_id)
     "fs_locks",  # 2.353.0 A (#2758): locked folders of the file store (NULL = a person's own tree, the app checks the folder)
     "bg_jobs",  # 2.193.0 D (#2220): the queue of short background work (NULL = none / private; written and read as "system")

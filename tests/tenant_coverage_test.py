@@ -1022,6 +1022,11 @@ ROUTES = {
     # the upload key's place, the mail note (one's own setting); the folder watcher programs are the same files for everyone (no data)
     "GET /api/docs/scan-keys": "document", "POST /api/docs/scan-keys": "document", "DELETE /api/docs/scan-keys/{}": "document",
     "GET /api/v1/documents/upload-target": "document", "POST /api/docs/mail-notice": "document", "GET /api/docs/folder-watcher/{}": "public",
+    # 2.425.0 C (#3453): receipt fetchers (only one's own; the place checked with the rights at every upload / report,
+    # p2425_c_api_test.py: another person sees, switches and deletes nothing, a stranger's key reaches nothing)
+    "GET /api/docs/fetchers": "document", "POST /api/docs/fetchers": "document", "DELETE /api/docs/fetchers/{}": "document",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "document", "GET /api/v1/fetcher": "document", "PUT /api/v1/fetcher/status": "document",
+    "POST /api/v1/fetcher/documents": "document",
     # 2.154.0 A (#1111): a stack split into documents, the link with an existing task, the documents of a task; the separator
     # sheet is the same PDF for everyone (no data)
     "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",

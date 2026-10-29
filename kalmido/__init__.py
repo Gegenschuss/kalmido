@@ -421,6 +421,7 @@ ORDER = (
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.scankeys",  # 2.207.0 A (#2763): scan inboxes (upload-only keys) + the folder watcher downloads
+    "docs.fetcher",  # 2.425.0 C (#3453): receipt fetchers (own key kind: upload receipts + report the portals' state)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)

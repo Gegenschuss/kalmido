@@ -54,7 +54,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/wkimport.js', '/static/js/stats.js', '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js',
   '/static/js/calyear.js', '/static/js/listcal.js', '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js', '/static/js/docs.js',
   '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js',
-  '/static/js/docscan.js', '/static/js/abdocs.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js',
+  '/static/js/docscan.js', '/static/js/docfetch.js', '/static/js/abdocs.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js',
   '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js',
   '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js',
   '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js',
