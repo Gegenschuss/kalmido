@@ -284,6 +284,14 @@ def clean_setting(k, v):
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}:(offer|invoice)", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
+    if k == "trial_mode":  # 2.417.0 C (#3445): ["<org id>", ...] - the test mode of the office, per person and office
+        try:
+            o = json.loads(sv or "[]")
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
         try:
             o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
@@ -526,7 +534,7 @@ def clean_look_pref(v):
 
 # 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
 SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
-SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards")  # 2.353.0 D (#2759): ab_cards
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards", "trial_mode")  # 2.353.0 D (#2759): ab_cards; 2.417.0 C (#3445): trial_mode
 
 
 def set_delta_apply(cur, d):

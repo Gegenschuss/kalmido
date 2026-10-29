@@ -163,7 +163,7 @@ function viewOffice() {
   const ro = ['readonly', 'accounting'].includes(OFC.info?.role)  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
     || (!!ofr_grp() && !!ofr_area(tab) && ['none', 'view'].includes(ofr_lvOf(ofr_area(tab))) && !(tab === 'receipts' && OFC.info?.submit));  // 2.356.0 D (#3129): hands in  // 2.187.0 A (#2476): the group's level of this area
   // 2.147.2 A (#2500): the role words here, not oinvRoleSel (settings module): a direct start of the office threw and stayed on "Loading…"
-  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}><div class="ofchead">${OFC.info ? `${ofcAreaHtml()/* 2.356.0 B (#2932) */}<span class="muted ofcorg">${OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : ''}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}>${OFC.info && typeof tri_stripHtml === 'function' ? tri_stripHtml() : '' /* 2.417.0 C (#3445): the test mode strip */}<div class="ofchead">${OFC.info ? `${ofcAreaHtml()/* 2.356.0 B (#2932) */}<span class="muted ofcorg">${OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : ''}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (ofcDocTab(tab) && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === tab) ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }
@@ -497,6 +497,8 @@ function ofcSettingsHtml() {
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
     ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
+    </fieldset>${ost_p('docs')}${''/* 2.417.0 C (#3445): the test mode, per person (members too: a fieldset of its own, never disabled) */}
+    ${typeof tri_settingsHtml === 'function' ? tri_settingsHtml() : ''}
     </fieldset>${ost_p('company')}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Services, equipment, sets, text blocks, contracts and these settings as a JSON file. Import adds what is missing.')}</p>

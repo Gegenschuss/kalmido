@@ -4159,6 +4159,7 @@ USER_DEFAULTS = {
     "wgstd_hide": "{}",         # 2.46.2 (#1726): per view the signature of the arrangement whose "differs from the standard" note was dismissed
     "office_ws_hint": "0",      # 2.356.0 B (#2932): the office's "you are now working in the office of …" hint was shown
     "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
+    "trial_mode": "[]",         # 2.417.0 C (#3445): the offices whose test mode I switched on (every new document is a trial one): ["<org id>"]
     "ab_cards": "[]",           # 2.353.0 D (#2759): the file store's folders shown as cards (all devices): ["n:<id>", "s:<space>"]
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)

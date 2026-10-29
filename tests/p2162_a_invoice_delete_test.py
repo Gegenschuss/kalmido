@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
-"""2.162.0 A (#2603) API tests: test phase - an admin deletes a finalised / sent invoice (invoices.INVOICE_DELETE_TESTPHASE,
-#2604: off before the launch). Own container (start.sh), invented companies and people only (@example.com / .example).
- - a finalised, sent invoice with a payment, a matched bank booking, a billed time entry, a credit note and a reminder:
-   the admin sees can_delete + delete_confirm + delete_info (sent, credits, reminders, payments, bank, time); a member
-   does not (403 on DELETE)
- - DELETE without / with a wrong confirm_number: 409 code confirm_number; with the number: gone with credit note, reminder,
-   payments; the bank booking is open again, the time entry free, the stored files gone, the office log says
-   "delete" with testphase; afterwards the quotation it came from may be deleted (#2573)
- - cash book: without cash a 409 code cash with the count; cash=1 deletes the open entry, the one on a closed day stays
-   (its reference emptied); cash=0 keeps the entries without the reference
- - a reminder listing another invoice too: 409, nothing deleted
- - a person without an organisation (freelancer-matrix: office) deletes an own finalised invoice the same way
- - switch off (a fresh process in the container): idt_applies false = the rule before (numbered invoices stay, 409)
+"""2.162.0 A (#2603) API tests, turned round by 2.417.0 C (#2604): the test phase deletion of finalised / sent invoices is
+gone (invoices.INVOICE_DELETE_TESTPHASE, office/invdelete.py and confirm_number removed) - a finalised or sent invoice stays
+(GoBD), the correction is a cancellation / credit note. Own container (start.sh), invented companies and people only.
+ - a finalised, sent invoice with a payment and a credit note: no can_delete / delete_confirm / delete_info for the admin,
+   not in the list row either; DELETE without / with confirm_number (and cash=1): 409 naming GoBD, the invoice, its payment
+   and its credit note stay; the finalised credit note stays too; the quotation it came from stays (an invoice was made)
+ - a sent invoice that was never finalised: 409; a member: 403
+ - still deletable: an invoice draft without a number (to the office trash), a finalised trial invoice (at any time)
+ - an agent token (scope office): DELETE of the finalised invoice does not go through, the invoice stays
+ - a person without an organisation (freelancer-matrix: office): the same in the personal office
+ - the switch and the module are gone (a fresh process in the container)
 usage: p2162_a_invoice_delete_test.py <datadir>      (a fresh container; P2162A_NOSTART=1 = the server already runs)"""
 import base64
-import glob
-import json
 import os
 import subprocess
 import sys
@@ -109,13 +105,10 @@ def delete(s, did, num=None, cash=None):
     return s.delete(B + f"{D}/{did}" + ("?" + "&".join(q) if q else ""))
 
 
-def office_files(oid, did):
-    return glob.glob(os.path.join(DATA, "office", str(int(oid)), f"doc{int(did)}-*"))
-
-
 CL = setup_office(A)
+GOBD = "GoBD"  # the reason names the rule (ODOC_INV_KEPT)
 
-# ================================================================== the full invoice: payments, bank, time, credit note, reminder
+# ================================================================== a finalised, sent invoice with a payment and a credit note
 r = A.post(B + D, json={"kind": "offer", "project_title": "Film", "client_id": CL})
 Q1 = r.json()["id"]
 A.put(B + f"{D}/{Q1}/items", json={"items": [{"title": "Shoot", "qty": 1, "rate": 1000}]})
@@ -129,107 +122,58 @@ check(r.ok, "the invoice finalised " + r.text[:200])
 NUM = number(A, INV)
 check(NUM, f"the invoice has a number {NUM}")
 dbx("UPDATE office_docs SET status='sent', sent_at=? WHERE id=?", (T0 + "T09:00:00Z", INV))  # mailed (no mail server in the test)
-check(delete(A, Q1).status_code == 409, "before: the invoiced quotation stays (BGA_USED)")
 r = A.post(B + f"{D}/{INV}/payments", json={"date": T0, "amount": "100.00"})
 check(r.status_code in (200, 201), "a payment " + r.text[:200])
-# a bank booking matched on the invoice (books another payment)
-csv = "Buchungstag;Auftraggeber/Empfänger;Verwendungszweck;Betrag\n" + f"{de(T0)};Example Client AG;Rechnung {NUM};50,00\n"
-pv = A.post(B + O + "/bank/import/preview", json={"text": csv}).json()
-mp = {k: (pv.get("guess") or {}).get(k) for k in ("date", "amount", "amount_in", "amount_out", "title", "counterpart", "decimal", "date_format")}
-r = A.post(B + O + "/bank/import", json={"text": csv, "filename": "konto.csv", "mapping": mp})
-check(r.status_code == 201, "bank import " + r.text[:200])
-TX = next((t for t in A.get(B + O + "/bank/tx?state=all").json().get("items", []) if NUM in (t.get("purpose") or "")), {})
-check(A.post(B + O + f"/bank/tx/{TX.get('id')}/match", json={"kind": "invoice", "id": INV}).ok, "the booking matched on the invoice")
-# a time entry billed on it
-dbx("INSERT INTO time_entries(user_id, task_title, start, \"end\", seconds, note, source, created_at, updated_at, billed_doc_id, billed_at) "
-    "VALUES(?,?,?,?,?,?,?,?,?,?,?)", (ALICE, "Edit", T0 + "T08:00:00Z", T0 + "T09:00:00Z", 3600, "", "manual", T0 + "T09:00:00Z", T0 + "T09:00:00Z", INV, T0))
-TE = dbx("SELECT id FROM time_entries WHERE billed_doc_id=?", (INV,))[0][0]
 r = A.post(B + f"{D}/{INV}/credit")
 check(r.status_code == 201, "a credit note draft " + r.text[:200])
 CR = r.json().get("id")
-dbxm.overdue(DATA, [INV])  # 2.355.0 D (#2846): reminders only for overdue invoices
-r = A.post(B + D + "/reminder", json={"doc_ids": [INV], "level": 1})
-REM = r.json().get("id") if r.status_code == 201 else None
-check(REM, "a reminder over the invoice " + r.text[:200])
-files_before = office_files(ORG, INV)
 
-check("delete_info" not in A.get(B + f"{D}/{INV}").json(), "plain document view: no delete_info (#2603 review: only for the dialog)")
 d = A.get(B + f"{D}/{INV}?delete_info=1").json()
-info = d.get("delete_info") or {}
-check(d.get("can_delete") is True and d.get("delete_confirm") is True, f"admin: can_delete + delete_confirm {d.get('can_delete')} {d.get('delete_confirm')} {d.get('delete_block')}")
-check(info.get("number") == NUM and info.get("sent") is True, f"delete_info: number + sent {info}")
-check(len(info.get("credits") or []) == 1 and len(info.get("reminders") or []) == (1 if REM else 0), f"delete_info: credit note + reminder {info}")
-check(info.get("payments", 0) >= 2 and info.get("bank") == 1 and info.get("time") == 1, f"delete_info: payments / bank / time {info}")
+check(d.get("can_delete") is False and "delete_confirm" not in d and "delete_info" not in d and "delete_block" not in d,
+      f"admin: no can_delete / delete_confirm / delete_info {d.get('can_delete')} {d.get('delete_confirm')} {d.get('delete_info')}")
 row = next((x for x in A.get(B + D + "?kind=invoice").json().get("docs", []) if x["id"] == INV), {})
-check(row.get("can_delete") is True and row.get("delete_confirm") is True, f"the list row offers Delete {row.get('can_delete')}")
-# a member: never
-dm = Bo.get(B + f"{D}/{INV}").json()
-check(not dm.get("can_delete") and "delete_info" not in dm, "member: no can_delete, no delete_info")
-check(delete(Bo, INV, NUM).status_code == 403, "member: DELETE 403")
-# the number is checked by the server too
-r = delete(A, INV)
-check(r.status_code == 409 and r.json().get("code") == "confirm_number", "no confirm_number: 409 " + r.text[:200])
-r = delete(A, INV, NUM + "X")
-check(r.status_code == 409 and r.json().get("code") == "confirm_number", "a wrong number: 409 " + r.text[:200])
-check(A.get(B + f"{D}/{INV}").ok, "still there after the 409s")
-r = delete(A, INV, NUM)
-check(r.ok and r.json().get("deleted") == (3 if REM else 2), "deleted with the number " + r.text[:200])
-check(A.get(B + f"{D}/{INV}").status_code == 404 and A.get(B + f"{D}/{CR}").status_code == 404, "the invoice and its credit note are gone")
-if REM:
-    check(A.get(B + f"{D}/{REM}").status_code == 404, "the reminder is gone")
-check(not dbx("SELECT 1 FROM office_payments WHERE doc_id=?", (INV,)), "the payments are gone")
-t = dbx("SELECT match_kind, match_id, payment_id FROM office_bank_tx WHERE id=?", (TX.get("id"),))
-check(t and t[0][0] is None and t[0][1] is None and t[0][2] is None, f"the bank booking is open again {t}")
-check(dbx("SELECT billed_doc_id FROM time_entries WHERE id=?", (TE,))[0][0] is None, "the time entry is free again")
-check(files_before == [] or office_files(ORG, INV) == [], f"the stored files are gone {office_files(ORG, INV)}")
-log = A.get(B + O + "/log?limit=50").json().get("log", [])
-lx = [x for x in log if x["action"] == "delete" and x.get("doc_id") == INV]
-check(lx and lx[0]["detail"].get("testphase") is True and lx[0]["detail"].get("number") == NUM and lx[0]["detail"].get("kind") == "invoice",
-      f"the office log: delete with testphase {lx[:1]}")
-check(any(x["action"] == "delete" and x.get("doc_id") == CR and x["detail"].get("with") == NUM for x in log), "the office log: the credit note with it")
-# 2.144.8 (#2573): nothing is made from the quotation any more
-check(delete(A, Q1).ok, "afterwards the quotation may be deleted")
+check(not row.get("can_delete") and "delete_confirm" not in row, f"the list row offers no Delete {row.get('can_delete')}")
+for q, what in (("", "no number"), (f"?confirm_number={requests.utils.quote(NUM)}", "the number typed"),
+                (f"?confirm_number={requests.utils.quote(NUM)}&cash=1", "the number + cash=1")):
+    r = A.delete(B + f"{D}/{INV}{q}")
+    check(r.status_code == 409 and GOBD in r.text and r.json().get("code") != "confirm_number", f"{what}: 409 (GoBD) " + r.text[:200])
+check(A.get(B + f"{D}/{INV}").ok and A.get(B + f"{D}/{CR}").ok, "the invoice and its credit note stay")
+check(dbx("SELECT count(*) FROM office_payments WHERE doc_id=?", (INV,))[0][0] == 1, "its payment stays")
+check(not [x for x in A.get(B + O + "/log?limit=50").json().get("log", []) if x["action"] == "delete" and x.get("doc_id") == INV],
+      "the office log has no delete entry")
+r = A.post(B + f"{D}/{CR}/finalize")
+check(r.ok and r.json().get("locked") is True, "the credit note finalised " + r.text[:200])
+r = A.delete(B + f"{D}/{CR}")
+check(r.status_code == 409 and GOBD in r.text, "a finalised credit note: 409 " + r.text[:200])
+check(A.delete(B + f"{D}/{Q1}").status_code == 409, "the invoiced quotation stays (BGA_USED)")
+check(Bo.delete(B + f"{D}/{INV}?confirm_number={requests.utils.quote(NUM)}").status_code == 403, "member: DELETE 403")
 
-# ================================================================== cash book: ask first, closed days stay
-BK = A.get(B + CBS).json()["books"][0]["id"]
-check(A.patch(B + f"{CBS}/{BK}", json={"opening": "100", "opening_day": Y5}).ok, "the cash box opening")
-INV2 = make(A, CL, "Cash paid")
-NUM2 = number(A, INV2)
-r = A.post(B + f"{CBS}/{BK}/entries", json={"day": Y1, "dir": "in", "amount": "20", "text": "Cash part 1", "invoice_id": INV2})
-check(r.status_code == 201, "a cash entry (yesterday) " + r.text[:200])
-E_CLOSED = r.json().get("id")
-check(A.post(B + f"{CBS}/{BK}/closing", json={"day": Y1}).ok, "yesterday closed")
-r = A.post(B + f"{CBS}/{BK}/entries", json={"day": T0, "dir": "in", "amount": "30", "text": "Cash part 2", "invoice_id": INV2})
-check(r.status_code == 201, "a cash entry (today) " + r.text[:200])
-E_OPEN = r.json().get("id")
-r = delete(A, INV2, NUM2)
-check(r.status_code == 409 and r.json().get("code") == "cash" and r.json().get("cash") == 1 and r.json().get("cash_closed") == 1,
-      "cash entries: 409 code cash, one open, one closed " + r.text[:200])
-check(A.get(B + f"{D}/{INV2}").ok, "still there after the cash question")
-r = delete(A, INV2, NUM2, cash=1)
-check(r.ok and r.json().get("cash_deleted") == 1 and r.json().get("cash_kept") == 1, "cash=1: deleted " + r.text[:200])
-check(not dbx("SELECT 1 FROM office_cash_entries WHERE id=?", (E_OPEN,)), "the open cash entry is gone")
-ce = dbx("SELECT invoice_id FROM office_cash_entries WHERE id=?", (E_CLOSED,))
-check(ce and ce[0][0] is None, f"the entry on the closed day stays, without the reference {ce}")
-INV3 = make(A, CL, "Cash kept")
-r = A.post(B + f"{CBS}/{BK}/entries", json={"day": T0, "dir": "in", "amount": "10", "text": "Cash kept", "invoice_id": INV3})
-E_KEEP = r.json().get("id")
-r = delete(A, INV3, number(A, INV3), cash=0)
-check(r.ok and r.json().get("cash_deleted") == 0, "cash=0: the invoice deleted " + r.text[:200])
-ce = dbx("SELECT invoice_id FROM office_cash_entries WHERE id=?", (E_KEEP,))
-check(ce and ce[0][0] is None, f"cash=0: the entry stays without the reference {ce}")
+# ================================================================== sent, never finalised
+SN = make(A, CL, "Sent draft", final=False)
+dbx("UPDATE office_docs SET status='sent', sent_at=? WHERE id=?", (T0 + "T09:00:00Z", SN))
+check(A.get(B + f"{D}/{SN}").json().get("can_delete") is False, "a sent invoice draft: no can_delete")
+check(A.delete(B + f"{D}/{SN}").status_code == 409 and A.get(B + f"{D}/{SN}").ok, "a sent invoice draft: 409, it stays")
 
-# ================================================================== a reminder over two invoices: 409
-INV4, INV5 = make(A, CL, "Two A"), make(A, CL, "Two B")
-dbxm.overdue(DATA, [INV4, INV5])  # 2.355.0 D (#2846)
-r = A.post(B + D + "/reminder", json={"doc_ids": [INV4, INV5], "level": 1})
-if r.status_code == 201:
-    r = delete(A, INV4, number(A, INV4))
-    check(r.status_code == 409 and "code" not in r.json(), "a reminder listing another invoice too: 409 " + r.text[:200])
-    check(A.get(B + f"{D}/{INV4}").ok, "the invoice stays")
-    check(A.get(B + f"{D}/{INV4}").json().get("delete_block"), "doc_public names why (delete_block)")
-else:
-    check(False, "a reminder over two invoices " + r.text[:200])
+# ================================================================== still deletable: a draft without a number, a trial invoice
+DR = make(A, CL, "Plain draft", final=False)
+check(number(A, DR) == "" and A.get(B + f"{D}/{DR}").json().get("can_delete") is True, "an invoice draft without a number: can_delete")
+r = A.delete(B + f"{D}/{DR}")
+check(r.ok and r.json().get("trash_id") and A.get(B + f"{D}/{DR}").status_code == 404, "the draft goes to the office trash " + r.text[:200])
+r = A.post(B + D, json={"kind": "invoice", "project_title": "Trial", "client_id": CL, "service_from": Y5, "service_to": T0, "trial": True})
+check(r.status_code == 201 and r.json().get("trial") is True, "a trial invoice " + r.text[:200])
+TR = r.json()["id"]
+A.put(B + f"{D}/{TR}/items", json={"items": [{"title": "Shoot", "qty": 1, "rate": 100}]})
+check(A.post(B + f"{D}/{TR}/finalize").ok, "the trial invoice finalised")
+check(A.get(B + f"{D}/{TR}").json().get("can_delete") is True, "a finalised trial invoice: can_delete")
+check(A.delete(B + f"{D}/{TR}").ok and A.get(B + f"{D}/{TR}").status_code == 404, "a finalised trial invoice goes at any time")
+
+# ================================================================== an agent token never deletes a finalised invoice
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = A.post(B + "/api/my/agents", json={"username": "officebot", "display_name": "Office Bot", "scopes": ["read", "office"], "org_id": ORG})
+check(r.ok and r.json().get("token"), "an office agent " + r.text[:200])
+AH = {**H, "Authorization": "Bearer " + (r.json().get("token") or "")}
+r = requests.delete(B + f"{D}/{INV}?confirm_number={requests.utils.quote(NUM)}", headers=AH)
+check(not r.ok and A.get(B + f"{D}/{INV}").ok, f"agent token: DELETE refused ({r.status_code}), the invoice stays")
 
 # ================================================================== freelancer-matrix: office (a person without an organisation)
 FID, F = freelancer(B, A)
@@ -237,24 +181,19 @@ FCL = setup_office(F)
 check(F.get(B + O + "/settings").json().get("role") == "admin", "freelancer: admin of the personal office")
 FI = make(F, FCL, "Solo invoice")
 FN = number(F, FI)
-fd = F.get(B + f"{D}/{FI}").json()
-check(fd.get("can_delete") is True and fd.get("delete_confirm") is True, "freelancer: may delete the own finalised invoice")
-check(delete(F, FI, "nope").status_code == 409, "freelancer: a wrong number 409")
-check(delete(F, FI, FN).ok, "freelancer: deleted with the number")
-check(F.get(B + f"{D}/{FI}").status_code == 404, "freelancer: gone")
+check(F.get(B + f"{D}/{FI}").json().get("can_delete") is False, "freelancer: the own finalised invoice has no can_delete")
+r = F.delete(B + f"{D}/{FI}?confirm_number={requests.utils.quote(FN)}")
+check(r.status_code == 409 and GOBD in r.text and F.get(B + f"{D}/{FI}").ok, "freelancer: 409 with the number, it stays " + r.text[:200])
+FD = make(F, FCL, "Solo draft", final=False)
+check(F.delete(B + f"{D}/{FD}").ok, "freelancer: an invoice draft without a number goes")
 
-# ================================================================== switch off = the rule before (a fresh process in the container)
-INV6 = make(A, CL, "Switch")
-code = ("import json, app\nimport kalmido.office.invoices as inv\nimport kalmido.office.invdelete as m\nimport kalmido.office.docs as d\n"
-        "c = app.connect()\ntry:\n    r = c.execute('SELECT * FROM office_docs WHERE id=?', (%d,)).fetchone()\n    on = m.idt_applies(r)\n"
-        "    inv.INVOICE_DELETE_TESTPHASE = False\n    off = m.idt_applies(r)\n    print('RULE' + json.dumps([on, off, d.odoc_seq_numbered(r), bool(d.ofx_locked(r))]))\n"
-        "finally:\n    c.close()\n") % INV6
+# ================================================================== the switch and the module are gone
+code = ("import importlib.util, json, app\nimport kalmido.office.invoices as inv\n"
+        "print('RULE' + json.dumps([hasattr(inv, 'INVOICE_DELETE_TESTPHASE'), importlib.util.find_spec('kalmido.office.invdelete') is not None]))\n")
 p = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
 line = next((x for x in p.stdout.splitlines() if x.startswith("RULE")), None)
-check(line, "switch off: the check ran " + (p.stdout + p.stderr)[-400:])
-res = json.loads(line[4:]) if line else [None] * 4
-check(res[0] is True and res[1] is False, f"switch off: the test phase rule no longer applies {res}")
-check(res[2] is True and res[3] is True, f"switch off: the old rule keeps it (numbered + finalised = 409) {res}")
+check(line, "the check ran " + (p.stdout + p.stderr)[-400:])
+check(line == "RULE[false, false]", f"no switch, no invdelete module {line}")
 
 print(f"p2162_a_invoice_delete: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

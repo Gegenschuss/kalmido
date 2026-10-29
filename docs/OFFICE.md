@@ -172,8 +172,8 @@ filters and the client filter). A document opens in its own area (`#office/invoi
 itself, so links from mails, agents and bookmarks keep working. Both areas use the rights of the office area
 *Quotes & invoices* (no new right). In the sidebar each area is its own tree with its own root folder (`GET
 /api/office/docs/tree` = quotations, `?sec=invoices` = the invoice kinds; folders are made the same way). *New quotation*
-and *Empty invoice* create the draft at once; *Trial document (SAMPLE)* sits in the menu next to *New quotation* and in
-*New invoice*, the one-time hint about trial documents shows in the head of a trial document's editor.
+and *Empty invoice* create the draft at once; trial documents come only from the office test mode (since 2.417.0, #3445:
+the menu entry *Trial document (SAMPLE)* and its one-time hint are gone).
 
 *Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
 sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20
@@ -1492,7 +1492,8 @@ document is fixed at creation (no later switch) and:
 
 Every document (detail and list) carries `trial`; `GET /api/office/docs?trial=1|0` filters, the list also answers
 `trial_count` (trial documents + trial documents from templates), `first: {offer, invoice}` (true = no real quotation /
-invoice yet: the dialog shows the hint once per person, setting `trial_hint_seen`) and `office_id`.
+invoice yet) and `office_id`; `GET /api/office/trial` (2.417.0, anyone in the office) answers the same three without the
+documents (the test mode section of the settings).
 `GET /api/office/gen-docs` items carry `trial` too (`?trial=1|0`).
 
 Purchase and surplus (2.47): a new position of a service takes the purchase (`cost`) of the service's freelancer role
@@ -1588,15 +1589,20 @@ A trial document
   "Delete trial document?"). A person without an organisation is the admin of the personal office.
 
 The lists mark trial documents with a small tag "Trial", the editor head as well; documents from templates show the same
-tag. As soon as the office has trial documents, the list gets a filter "All / Real only / Trial only" (kept on this
-device) and admins see the line "Delete all trial documents": after a confirmation that names the number, all trial
-documents of the office go for good, with their payments, share links and stored PDFs. Real documents stay.
+tag. Test mode (2.417.0): trial documents come from one switch, "Test mode" in the office settings (section Documents), per
+person and office (user setting `trial_mode`, a list of office ids); off is the default and colleagues notice nothing of
+it. While it is on, a strip "Test mode - documents get a TEST number and the watermark MUSTER" with "Switch off" sits
+above the office, every new quotation, invoice, delivery note and document from a template is a trial one (also "Add
+invoice" of the command palette), and the list has the filter "All / Real only / Trial only" (kept on this device,
+reset when the test mode goes off) and the line "N trial documents". With the test mode off there is neither; existing
+trial documents keep their tag "Trial". Admins find "Delete all N trial documents" in the same settings section: after a
+confirmation that names the number, all trial documents of the office go for good, with their payments, share links and
+stored PDFs. Real documents stay. "New quotation" / "Empty invoice" always create the draft at once, without a dialog.
 
 A real document cannot be turned into a trial one later, nor the other way round.
 
-The first time someone creates a quotation or an invoice in an office that has no real one yet, the create dialog shows a
-hint about "Just to try". It goes away with its X or with "Create" and does not come back for this person and office
-(user setting `trial_hint_seen`).
+Before 2.417 a hint about "Just to try" showed once per person and office (user setting `trial_hint_seen`, kept but no
+longer read).
 
 ## Finalising
 

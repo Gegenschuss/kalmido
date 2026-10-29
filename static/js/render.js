@@ -112,7 +112,7 @@ function tabItem(id) {
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
   if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
-  if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Projects')};  // 2.24.0 (UX-36): opens the drawer
+  if (id === 'lists') return {id, go: sbb_target('tasks'), icon: ic('list', 'l'), label: tr('Projects'), mod: 'tasks', area: 'tasks'};  // 2.417.0 A (#3559): the page kept in Projects, like the other areas (was: the drawer)
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
   return null;
 }
@@ -153,11 +153,12 @@ function renderTabs() {
   // 2.31.0 (#1057): with "Search" in the tab bar the phone has ONE search: no magnifier in the header, no search field in the
   // drawer and no search button next to it (CSS body.tab-search); without the tab they stay, so search is always reachable
   document.body.classList.toggle('tab-search', shown.some(t => t.id === 'search'));
-  $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
+  // 2.417.0 A (#3559): the tab of the area open now leads to the area's start page (tapping it again)
+  $('#tabs').innerHTML = shown.map(t => tabBtn(t.area && t.area === sbb_area() ? {...t, go: sbb_home(t.area)} : t, t.id === on)).join('') +
     (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
   an_tabs();  // 2.46.1 (#1560): the underline of the tab that became active slides in
 }
-const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"
+const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"; 2.417.0 A (#3559): the tab opens the page now, this stays for the drawer at Lists
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
 function sideToLists() {
   const sd = $('#side'), g = $('#side .sg-lists'); if (!sd || !g) return;
@@ -176,7 +177,7 @@ function tabsMore(anchor) {
   const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, {head: tr('Conversations|nav')}, '-', null];
   const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
   menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)}))]);
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.area && t.area === sbb_area() ? sbb_home(t.area) : t.go)}))]);  // 2.417.0 A (#3559)
 }
 function counts() {
   const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, byme: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
@@ -308,6 +309,37 @@ const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `ro
 const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 // 2.308.0 (#3273): a redraw of the sidebar (a live update, the office's folders that load later) dropped the keyboard focus on
 // the page: the same button gets it back, like the head bar and the view (keepFocus); a closed phone drawer is left alone
+// 2.417.0 A (#3559): what the sidebar's Projects panel and the start page of Projects (viewProjStart) both show, from one place:
+// the projects of the shown workspace, the folders shown, the Plan rows ([key, html], '' = not shown now)
+const sideLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+// 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
+const sideFolderShown = (lists, x) => wsCur() === 'all' || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
+  ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
+  ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+  ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
+  ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
+  ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
+  ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
+  ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
+// 2.417.0 A (#3559): the start page of Projects (#projects): the views of Plan and the filters, then every project grouped by
+// its folders in the sidebar's order (the same lists, folders and hidden entries as the panel), each row opens its page
+function viewProjStart() {
+  const c = counts(), lists = sideLists(), hid = x => sideHidden(x), cnt = n => rsy_sideCnt() && n || '';
+  const row = (key, icon, name, n) => `<button type="button" class="psrow" data-go="${esc(keyToHash(key))}">${icon}<span class="n">${esc(name)}</span><span class="c">${cnt(n)}</span></button>`;
+  const lrow = l => { const em = !l.icon && leadEmoji(l.name); return row('l:' + l.id, `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`, em ? listName(l.name).slice(em.length).trim() : listName(l.name), c.lists[l.id]); };
+  const grp = (cls, head, body) => body ? `<section class="psg ${cls}"><h2 class="pshead">${head}</h2><div class="psrows">${body}</div></section>` : '';
+  const plan = hid('g:focus') ? '' : sidePlan(row, c, false, '').filter(([x, h]) => h && !hid('e:' + x)).map(([, h]) => h).join('');
+  const fil = hid('g:filters') ? '' : S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join('');
+  const walk = f => [f, ...folderSubs(f).filter(x => sideFolderShown(lists, x)).flatMap(walk)];
+  const folders = folderNames().filter(x => !fParent(x) && sideFolderShown(lists, x)).flatMap(walk);
+  const loose = lists.filter(l => !l.folder).map(lrow).join('');
+  const fhead = f => `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
+  const proj = lists.length || folders.length ? grp('ps-lists', esc(tr('Projects')), loose) + folders.map(f => grp('ps-folder', fhead(f), lists.filter(l => l.folder === f).map(lrow).join('') || `<div class="muted psempty">${esc(tr('empty'))}</div>`)).join('')
+    : `<div class="empty">${ic('list')}${esc(tr('No projects yet'))}<br><button type="button" class="btn pri" data-act="list-new">${ic('plus', 's')}<span>${esc(tr('New project'))}</span></button></div>`;
+  const parts = {focus: grp('ps-plan', esc(tr('Plan|nav')), plan), lists: proj, filters: grp('ps-filters', esc(tr('Filters')), fil)};
+  return `<div class="pstart">${sideGroupOrder().filter(g => g in parts).map(g => parts[g]).join('')}</div>`;  // the sidebar's order of the groups
+}
 function renderSide() { return !isMobile() || $('#side')?.classList.contains('open') ? keepFocus($('#side'), renderSide0) : renderSide0(); }
 function renderSide0() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
@@ -318,7 +350,7 @@ function renderSide0() {
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
-  const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  const lists = sideLists();
   // 2.407.0 (#3518): a list / folder shows open/total (5/12) once something in it is done; the hint names both, the open number stays first
   const sideOD = (open, done) => done ? {v: `${open || 0}/${(open || 0) + done}`, tip: tr('{0} open · {1} done', open || 0, done)} : open;
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
@@ -346,9 +378,7 @@ function renderSide0() {
   // lists, then its subfolders, one level deeper); dragging a folder, its menu and the touch hold are the tree's (sidebar.js
   // lf_tree*), a list keeps its own drag (into a folder's head or body). Open / closed stays foldSet / foldClosed (all devices).
   const fempty = f => `<div class="fempty" data-folder="${esc(f)}">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
-  const wsAll = wsCur() === 'all';
-  // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
-  const fShown = x => wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+  const fShown = x => sideFolderShown(lists, x);
   const fnode = f => {
     const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
@@ -375,14 +405,7 @@ function renderSide0() {
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
-  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
-    ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
-    ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
-    ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
-    ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
-    ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
-    ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
-    ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
+  const plan = sidePlan(row, c, onTasks, k);
   const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
   const planHiddenRows = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x));
   const planHidden = planHiddenRows.length;
@@ -515,6 +538,7 @@ function renderTop0() {
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)
   let acts = '';
+  if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri" data-act="list-new" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
@@ -958,6 +982,7 @@ function renderView0() {
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
+  else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
   else if (isMindmap()) setHtml(el, vsegHtml(routeList()) + viewMindmap(routeList()));  // 2.49.0 (#1201)

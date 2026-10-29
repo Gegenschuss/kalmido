@@ -257,7 +257,7 @@ const MG_TAB_OLD = {'m:pomo': 'a:time', time: 'a:time', stats: 'a:review', 'm:fa
 const mg_tabIds = ids => ids ? [...new Set(ids.map(x => MG_TAB_OLD[x] || x))] : ids;
 function mg_tabItem(id) {
   const a = mg_area(id.slice(2)); if (!a || !mg_on(a[0])) return null;
-  return {id, go: mg_target(a[0]), icon: ic(mg_icon(a), 'l'), ico: mg_icon(a), label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
+  return {id, go: sbb_target(a[0]) /* 2.417.0 A (#3559): the page kept in the area, like the bar */, icon: ic(mg_icon(a), 'l'), ico: mg_icon(a), label: tr(mg_nameKey(a)), mod: a[0], area: a[0]};
 }
 const mg_tabOpts = opt => MG_IDS.filter(mg_on).map(id => opt('a:' + id, tr(mg_area(id)[2]))).join('');
 // ---- Settings > Modules: ONE switch per area; its parts below it (each can still be switched on its own)
@@ -366,6 +366,9 @@ function sbb_target(id) {
   if (ok) return h;
   return id === 'tasks' ? keyToHash(LS.get('lastKey', START_KEY)) : a ? mg_target(id) : id;
 }
+// 2.417.0 A (#3559): an area's start page: tapping the icon (or tab) of the area already open leads there. Projects: its start
+// page (#projects), an area of MG_AREAS: its first part shown (Office: the office overview), the others their own route
+const sbb_home = id => id === 'tasks' ? 'projects' : mg_area(id) ? (mg_partsShown(mg_area(id))[0] || mg_parts(mg_area(id))[0] || [id])[0] : id;
 // 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar" (LOOK_KEYS railLabels, on by default; only off is
 // stored). Off: icons only, the bar gets narrower (app.css :root.rail-nolabel), the name stays as title / aria-label
 const sbb_labelsOn = () => LS.get('railLabels', true) !== false;
@@ -387,7 +390,7 @@ function sbb_btnHtml(id, cur, hid, aw) {
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
   const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
   const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
-  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
 const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
 function sbb_railHtml(hid) {
@@ -419,7 +422,7 @@ const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
   const h = b.dataset.go; SBM.focus = b.dataset.sbb;
-  if (b.classList.contains('on') || !h) { b.focus({preventScroll: true}); return; }
+  if (!h || '#' + h === location.hash) { b.focus({preventScroll: true}); return; }  // 2.417.0 A (#3559): the open area's icon leads to its start page (sbb_btnHtml), unless already there
   SBM.keep = true; setTimeout(() => { SBM.keep = false; }, 3000);  // no route followed (same page): never hold a later one
   // the entry the drawer was opened on forgets "reopen the drawer" (#953), so Back from the area lands closed
   if (!history.state?.sbm && history.state?.side) try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ }

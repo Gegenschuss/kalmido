@@ -979,6 +979,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area, admin; a person without an organisation is their own admin (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): the count for the test mode section of the settings
     # 2.148.0 C (#2472): the procedure documentation (GoBD) of the office (p2148_c_api_test.py as a person without an organisation)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",

@@ -28,7 +28,7 @@
 .evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}
 /* 2.94.0 B (#1929): appointment booking (prefix apb-) */
 .apb-dlg .card{width:min(42rem,100%)}
-.apb-dlg h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m)}
+.apb-dlg h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);font-weight:600}
 .apb-onrow{display:flex;align-items:flex-start;gap:.75rem;min-height:2.75rem;cursor:pointer}
 .apb-onrow small{display:block;margin-top:.125rem}
 .apb-warn{margin:0 0 .75rem;padding:.5rem .75rem;border-radius:.5rem;background:var(--accent-soft);font-size:var(--fs-s)}

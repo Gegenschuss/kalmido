@@ -1201,6 +1201,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area one works in, admins only (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): only the count of the office open now (office_ctx; another organisation: its own office, never ours - p2417_c_api)
     # 2.148.0 C (#2472): the procedure documentation of the office area one works in, admins save versions (p2148_c_api_test.py)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
