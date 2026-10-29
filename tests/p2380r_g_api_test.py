@@ -99,6 +99,14 @@ check([o["id"] for o in hs[W1].get("org_hits", [])] == [ORG] and hs[W1]["org_hit
       f"#3391: the new webhook names the organisation (bob no admin), no last day: {hs[W1].get('org_hits')} {hs[W1].get('org_until')}")
 check(hs[W0].get("org_until") == "2099-12-31", f"#3391: the old webhook shows its last day: {hs[W0].get('org_until')}")
 dbx("UPDATE webhooks SET org_grace_until='2020-01-01' WHERE id=?", (W0,))  # the grace is over
+# review: an organisation list bob does not reach neither ends the grace nor makes a News item (no foreign names)
+OL2 = A.post(B + "/api/lists", json={"name": "Not for bob", "org_id": ORG}).json()["id"]
+A.post(B + "/api/tasks", json={"list_id": OL2, "title": "Foreign org task"})
+Bo.post(B + "/api/tasks", json={"list_id": PL, "title": "Private task between"})
+until(lambda: queued("Private task between"), 15)
+check(dbx("SELECT org_grace_until FROM webhooks WHERE id=?", (W0,))[0][0] == "2020-01-01"
+      and not [x for x in Bo.get(B + "/api/news").json()["items"] if x["kind"] == "whorgcut"],
+      "#3391 review: an event of a list the owner does not reach leaves the grace and makes no News item")
 A.post(B + "/api/tasks", json={"list_id": OL, "title": "Org task two"})
 A.post(B + "/api/tasks", json={"list_id": OL, "title": "Org task three"})
 Bo.post(B + "/api/tasks", json={"list_id": PL, "title": "Private task two"})

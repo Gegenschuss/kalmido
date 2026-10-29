@@ -264,10 +264,12 @@ def wh_enqueue(c, n):
     def org_ok(w, lid):  # 2.115.0 A (#2061): an organisation's webhook only for lists of that organisation
         lst(lid)
         if not w["org_id"] and orgs.get(lid):  # 2.190.0 C (#2496): a personal webhook: an organisation's list only when owned / shared
-            if not wh_grace_ok(c, w, orgs[lid]):  # 2.380 G (#3391): ... and only during its grace period
+            if not c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? UNION ALL SELECT 1 FROM list_members WHERE list_id=? "
+                             "AND user_id=? LIMIT 1", (lid, w["user_id"], lid, w["user_id"])).fetchone():
                 return False
-            return bool(c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? UNION ALL SELECT 1 FROM list_members WHERE list_id=? "
-                                  "AND user_id=? LIMIT 1", (lid, w["user_id"], lid, w["user_id"])).fetchone())
+            # 2.380 G (#3391): ... and only during its grace period; asked only for a list the owner reaches (review: an
+            # event of an unrelated organisation must neither end the grace nor name that organisation in the News item)
+            return wh_grace_ok(c, w, orgs[lid])
         return not w["org_id"] or orgs.get(lid) == w["org_id"]
 
     def sett(uid):
