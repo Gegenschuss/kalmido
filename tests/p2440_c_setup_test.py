@@ -349,8 +349,9 @@ for b in BASHES:
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/shabad", "--cmd", "fakeagent", "--no-autostart"],
                        env=env, capture_output=True, text=True, timeout=120)
     inst = [os.path.join(agents, d) for d in os.listdir(agents) if d.startswith("shabad-")]
-    check(r.returncode != 0 and "does not match the checksum" in r.stderr and inst and not os.path.exists(os.path.join(inst[0], "agent_run.py"))
-          and not os.path.exists(os.path.join(inst[0], "agent_run.py.new")), f"{b}: #3390 a differing file stops the setup, not installed: {r.returncode} {r.stderr[-300:]}")
+    # the stop undoes the setup (token revoked, the instance folder gone), so nothing of it runs
+    check(r.returncode != 0 and "does not match the checksum" in r.stderr and not any(os.path.exists(os.path.join(i, "agent_run.py")) for i in inst),
+          f"{b}: #3390 a differing file stops the setup, not installed: {r.returncode} {inst} {r.stderr[-300:]}")
     ST["sha"] = {k: v for k, v in SHA.items() if k != "agent_job.py"}
     r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/shamiss", "--cmd", "fakeagent", "--no-autostart"],
                        env=env, capture_output=True, text=True, timeout=120)
