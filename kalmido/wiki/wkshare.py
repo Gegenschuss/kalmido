@@ -17,6 +17,7 @@ shares stop serving when a space gets locked). Renaming a page or a folder takes
 moving pages to the other workspace (wkmove.py) ends their shares. Revoke = revoked_at (the app's Undo restores it).
 The text is read only through wiki_dict (the page's one reading place)."""
 import html
+import os
 import re
 import secrets
 from datetime import date, datetime, timedelta
@@ -35,6 +36,11 @@ from ..core.errors import BadInput
 from .pages import wiki_clean_path, wiki_dict, wiki_need, wiki_space, wiki_space_key
 from ..core.orgcrypt import oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..files.fslock import fl_is_locked
+from ..files.scan import sc_guard
+from ..files.store import fs_version_row
+from .wkembed import wem_visible
+from .wkhist import WikiUnreadable
 
 WSH_PREFIX = "/s/w/"
 WSH_MAX = 300  # live shares per space
@@ -96,7 +102,8 @@ def wsh_dict(c, r, names, target=None, gone=()):
     d = {"id": r["id"], "kind": r["kind"], "space": wiki_space_key(r["org_id"]), "path": r["path"], "folder": bool(r["is_folder"]),
          "expires_at": r["expires_at"], "expired": wsh_expired(r), "revoked": bool(r["revoked_at"]), "created_at": r["created_at"],
          "created_by": r["created_by"], "created_by_name": names.get(r["created_by"], ""), "views": r["views"], "last_used_at": r["last_used_at"],
-         "ended": r["id"] in gone}  # 2.126.2 B (#2358): its maker is no longer in the organisation -- the link does not work
+         "ended": r["id"] in gone,  # 2.126.2 B (#2358): its maker is no longer in the organisation -- the link does not work
+         "images": bool(r["images"])}  # 2.380 H (#2356): the pictures of the file store embedded in the page are shown
     if r["kind"] == "person" and r["token"]:  # 2.123.0 (#2104): shared by e-mail address -- show the typed address, never the account
         from ..accounts.login import unseal
         try:
@@ -190,6 +197,57 @@ def wsh_expiry(v):
     return iso(datetime(d.year, d.month, d.day, tzinfo=TZ))
 
 
+def wsh_images(v):
+    """2.380 H (#2356): the switch "show embedded pictures" of a share (default off) -> 1 | 0."""
+    if not isinstance(v, bool):
+        raise BadInput(tr("Invalid value: {0}", "images"))
+    return 1 if v else 0
+
+
+# 2.380 H (#2356): a picture of the file store embedded in a shared page: ![label](/api/files/nodes/<id>/content)
+WSH_NODE_RE = re.compile(r"/api/files/nodes/(\d{1,15})/content$")
+WSH_NODE_IMG_RE = re.compile(r"!\[[^\[\]\n]*\]\(\s*<?/api/files/nodes/(\d{1,15})/content>?")
+
+
+def wsh_img_nodes(c, shares, page, text):
+    """2.380 H (#2356): {node id: (node, version)} of the file store pictures a share may show in a page -- only with the switch
+    (images) of one of the shares, only pictures embedded in the page's text, of the page's own space (wem_visible), that
+    the person who made that share may still see now, an image type, never in a locked (end-to-end encrypted) folder."""
+    makers = sorted({s["created_by"] for s in shares if s["images"] and s["created_by"]})
+    ids = sorted({int(m.group(1)) for m in WSH_NODE_IMG_RE.finditer(text or "") if int(m.group(1)) < 2 ** 62})[:200]
+    out = {}
+    if not makers or not ids:
+        return out
+    # the share's guest / the public link reads as somebody else: the maker's rights on the file store decide (deliberately
+    # across the reader's context, for the pictures embedded in this shared page only)
+    with system_ctx(c):
+        for nid in ids:
+            if not any(wem_visible(c, u, nid, page) for u in makers) or fl_is_locked(c, nid):
+                continue
+            n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+            v = fs_version_row(c, nid, None)
+            if n and v and (v["mime"] or n["mime"] or "").startswith("image/"):
+                out[nid] = (n, v)
+    return out
+
+
+def wsh_img_send(c, n, v, public):
+    """2.380 H (#2356): the bytes of a shared file store picture (scanned, a sandbox like wsh_send; public: never cached)."""
+    full = os.path.join(ATT_DIR, v["path"])
+    with system_ctx(c):  # the scan state and the space key of the maker's file store (the reader is a guest / nobody)
+        sc_guard(c, "fs", n["id"], v["no"])
+        if not os.path.isfile(full):
+            raise Denied(404)
+        resp = oc_send_file(c, full, mimetype=v["mime"] or n["mime"], download_name=n["name"], conditional=True, max_age=0)
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Cache-Control"] = "no-store, private"
+    if public:
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
+
+
 def wsh_target(c, uid, b, write):
     """(org id, owner, path, is_folder) of {page_id} | {space, folder}; 404 unless the person manages its shares -- listing
     them too (2.200.0 F, #2747 review B1/B2: they hold link tokens, paths, people): who writes in its space (private: its
@@ -271,6 +329,7 @@ def wsh_create():
     if path.startswith("e2e1:") or wsh_locked(c, oid, owner):
         return jsonify(error=tr("Pages of a space encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     exp = wsh_expiry(b.get("expires"))
+    imgs = wsh_images(b.get("images", False))
     if len(wsh_rows(c, oid, owner)) >= WSH_MAX:
         raise BadInput(tr("Too many shares in this space (at most {0})", WSH_MAX))
     ts = iso(now_utc())
@@ -280,8 +339,8 @@ def wsh_create():
             return jsonify(error=tr("Public links are turned off on this server")), 409
         tok = secrets.token_urlsafe(24)  # 192 bits, the shape of the list links (lists/public.py PUB_TOKEN_RE)
         h = _token_hash(tok)
-        sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,token_hash,token,expires_at,created_by,created_at,page_id) "
-                           "VALUES(?,?,?,?,'link',?,?,?,?,?,?)", (oid, owner, path, 1 if folder else 0, h, seal(c, WSH_SEAL + h, tok), exp, uid, ts, page))
+        sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,token_hash,token,expires_at,created_by,created_at,page_id,images) "
+                           "VALUES(?,?,?,?,'link',?,?,?,?,?,?,?)", (oid, owner, path, 1 if folder else 0, h, seal(c, WSH_SEAL + h, tok), exp, uid, ts, page, imgs))
         print("wiki public link created", sid, flush=True)
     else:
         if oid is not None:
@@ -295,13 +354,13 @@ def wsh_create():
                         f"AND is_folder=? AND (page_id IS NULL OR page_id IS NOT DISTINCT FROM ?) AND {wsh_live('wiki_shares')}",
                         (owner, who, path, 1 if folder else 0, page, ts)).fetchone()
         if old:  # 2.126.2 B (#2355): the same live share again: no second News item
-            c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (exp, old["id"]))
+            c.execute("UPDATE wiki_shares SET expires_at=?, images=? WHERE id=?", (exp, imgs, old["id"]))
             sid = old["id"]
         else:
             # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
-            sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at,page_id) "
-                               "VALUES(NULL,?,?,?,'person',?,?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
-                                                                         seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts, page))
+            sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at,page_id,images) "
+                               "VALUES(NULL,?,?,?,'person',?,?,?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
+                                                                           seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts, page, imgs))
             # 2.126.2 B (#2355): a News item for exactly that person (the sharing row of their settings; no push); only the
             # path they may read now
             from ..collab.news import news_add
@@ -333,14 +392,17 @@ def wsh_person(c, uid, b):
 
 @app.patch("/api/wiki/shares/<int:sid>")
 def wsh_update(sid):
-    """{expires: YYYY-MM-DD | null}"""
+    """{expires: YYYY-MM-DD | null, images: bool}"""
     c = db()
     r = wsh_need(c, sid)
     b = body()
     if r["revoked_at"]:
         raise Denied(404)
-    if "expires" in b:
-        c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (wsh_expiry(b.get("expires")), sid))
+    if "expires" in b or "images" in b:
+        if "expires" in b:
+            c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (wsh_expiry(b.get("expires")), sid))
+        if "images" in b:  # 2.380 H (#2356)
+            c.execute("UPDATE wiki_shares SET images=? WHERE id=?", (wsh_images(b["images"]), sid))
         bump(c)
         c.commit()
     return jsonify(wsh_one(c, sid))
@@ -433,12 +495,14 @@ def wsh_shared_page(pid):
     d = wiki_dict(r)
     names = user_names(c, {r["owner_id"], r["updated_by"]})
     own = [f for f in files.values() if f["page_id"] == pid]
+    imgs = wsh_img_nodes(c, wsh_person_shares(c, uid, pid), r, d["body"])  # 2.380 H (#2356)
     x = info.get(pid)  # 2.200.0 B (#2747): a folder share shows the path from the shared folder on (not the folders above it)
     shown = (x["folder"] + "/" + r["path"].rsplit("/", 1)[-1] if x["folder"] else r["path"].rsplit("/", 1)[-1]) if x else r["path"]
     return jsonify(id=pid, path=shown, body=d["body"], attrs=d["attrs"], updated_at=r["updated_at"], updated_by_name=names.get(r["updated_by"], ""),
                    owner_name=names.get(r["owner_id"], ""), shared=True, role=_shared_role(c, uid, r, info),  # 2.200.0 B (#2747)
                    html=wsh_md(d["body"], lambda p: f"#wsh/{same[p.lower()]}" if p.lower() in same else None,
-                               lambda fid: (wsh_file_url("/api/wiki/shared/files/", files[fid]), files[fid]["mime"].startswith("image/")) if fid in files else None),
+                               lambda fid: (wsh_file_url("/api/wiki/shared/files/", files[fid]), files[fid]["mime"].startswith("image/")) if fid in files else None,
+                               node=lambda nid: f"/api/wiki/shared/pages/{pid}/img/{nid}" if nid in imgs else None),
                    files=[{"id": f["id"], "name": f["name"], "mime": f["mime"], "size": f["size"], "image": f["mime"].startswith("image/"),
                            "url": wsh_file_url("/api/wiki/shared/files/", f)} for f in own])
 
@@ -451,6 +515,27 @@ def wsh_shared_file(fid, name=None):
     if fid not in files:
         raise Denied(404)
     return wsh_send(c, files[fid], public=False)
+
+
+def wsh_person_shares(c, uid, pid):
+    """2.380 H (#2356): the live person shares that give uid the page pid (their switch "show embedded pictures")."""
+    return c.execute(f"SELECT s.* FROM wiki_shares s JOIN wiki_pages p ON p.id=? JOIN users o ON o.id=s.owner_id AND o.disabled=0 "
+                     f"WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER}",
+                     (pid, uid, iso(now_utc()))).fetchall()
+
+
+@app.get("/api/wiki/shared/pages/<int:pid>/img/<int:nid>")
+def wsh_shared_img(pid, nid):
+    """2.380 H (#2356): a file store picture embedded in a page shared with me, when the share shows pictures; 404 otherwise."""
+    c = db()
+    uid = me()
+    r = next((x for x in wsh_reach(c, uid)[0] if x["id"] == pid), None)
+    if not r:
+        raise Denied(404)
+    got = wsh_img_nodes(c, wsh_person_shares(c, uid, pid), r, wiki_dict(r)["body"]).get(nid)
+    if not got:
+        raise Denied(404)
+    return wsh_img_send(c, *got, public=False)
 
 
 def _shared_role(c, uid, r, info):
@@ -595,8 +680,10 @@ def wsh_pub_page(token, pid=None):
         d = wiki_dict(r)
     except WikiUnreadable:  # 2.126.2 B (#2358): a text that cannot be opened -- the page is gone for the link
         return pub_gone(lg)
+    imgs = wsh_img_nodes(c, [s], r, d["body"])  # 2.380 H (#2356)
     md = wsh_md(d["body"], lambda p: f"{base}/p/{same[p.lower()]}" if p.lower() in same else None,
-                lambda fid: (f"{base}/file/{fid}", files[fid]["mime"].startswith("image/")) if fid in files else None)
+                lambda fid: (f"{base}/file/{fid}", files[fid]["mime"].startswith("image/")) if fid in files else None,
+                node=lambda nid: f"{base}/img/{pid}/{nid}" if nid in imgs else None)
     own = [f for f in files.values() if f["page_id"] == pid]
     back = f'<p class="wkpback"><a href="{e(base)}">{e(s["path"].split("/")[-1])}</a></p>' if s["is_folder"] else ""
     flist = ('<ul class="files">' + "".join(f'<li><a href="{e(base)}/file/{f["id"]}?dl=1" download rel="nofollow">{e(f["name"])}</a></li>' for f in own)
@@ -622,6 +709,23 @@ def wsh_pub_file(token, fid):
     return wsh_send(c, files[fid], public=True)
 
 
+@app.get("/s/w/<token>/img/<int:pid>/<int:nid>")
+def wsh_pub_img(token, pid, nid):
+    """2.380 H (#2356): a file store picture embedded in a page of the link, when the link shows pictures (else 404)."""
+    c = db()
+    s, bad = wsh_open(c, token, files=True)
+    if bad:
+        return bad
+    r = next((p for p in wsh_pub_pages(c, s) if p["id"] == pid), None)
+    try:
+        got = r and wsh_img_nodes(c, [s], r, wiki_dict(r)["body"]).get(nid)
+    except WikiUnreadable:
+        got = None
+    if not got:
+        raise Denied(404)
+    return wsh_img_send(c, *got, public=True)
+
+
 # ---------------------------------------------------------------- Markdown -> HTML for shared pages (no scripts)
 # Everything is escaped first; only these shapes become tags. Links: web / mail addresses; [[Page]] only when that page is
 # shared too (else its label as text); /api/wiki/files/<id> only when the file belongs to a shared page; #123 stays text.
@@ -636,7 +740,7 @@ WSH_INLINE = re.compile(
 WSH_FILE_RE = re.compile(r"/api/wiki/files/(\d{1,15})(?:/.*)?$")
 
 
-def wsh_inline(s, link, file, depth=0):
+def wsh_inline(s, link, file, depth=0, node=None):
     e, out, pos = html.escape, [], 0
     if depth > 8:  # 2.123.0 (#2104): deep nesting is shown as text (no RecursionError on the public page)
         return e(s)
@@ -655,9 +759,12 @@ def wsh_inline(s, link, file, depth=0):
                 elif m.group(2) and got[1]:
                     out.append(f'<img src="{e(got[0])}" alt="{e(label)}" loading="lazy">')
                 else:
-                    out.append(f'<a href="{e(got[0])}?dl=1" rel="nofollow">{wsh_inline(label, link, file, depth + 1) or e(addr.rsplit("/", 1)[-1])}</a>')
+                    out.append(f'<a href="{e(got[0])}?dl=1" rel="nofollow">{wsh_inline(label, link, file, depth + 1, node) or e(addr.rsplit("/", 1)[-1])}</a>')
+            elif m.group(2) and node and WSH_NODE_RE.match(addr) and node(int(WSH_NODE_RE.match(addr).group(1))):
+                # 2.380 H (#2356): a picture of the file store the share shows (its switch, wsh_img_nodes)
+                out.append(f'<img src="{e(node(int(WSH_NODE_RE.match(addr).group(1))))}" alt="{e(label)}" loading="lazy">')
             elif re.match(r"(?i)(https?:|mailto:)", addr):
-                out.append(f'<a href="{e(addr)}" rel="nofollow noopener noreferrer">{wsh_inline(label, link, file, depth + 1) if label else e(addr)}</a>')
+                out.append(f'<a href="{e(addr)}" rel="nofollow noopener noreferrer">{wsh_inline(label, link, file, depth + 1, node) if label else e(addr)}</a>')
             else:
                 out.append(e(label or ""))  # relative addresses and pictures from elsewhere: the label only
         elif m.group(6) is not None:
@@ -670,24 +777,24 @@ def wsh_inline(s, link, file, depth=0):
             text = e(label.strip() if label and label.strip() else path)
             out.append(f'<a href="{e(href)}">{text}</a>' if href and not m.group(5) else text)
         elif m.group(8) is not None or m.group(9) is not None:
-            out.append(f"<strong>{wsh_inline(m.group(8) or m.group(9), link, file, depth + 1)}</strong>")
+            out.append(f"<strong>{wsh_inline(m.group(8) or m.group(9), link, file, depth + 1, node)}</strong>")
         elif m.group(10) is not None:
-            out.append(f"<del>{wsh_inline(m.group(10), link, file, depth + 1)}</del>")
+            out.append(f"<del>{wsh_inline(m.group(10), link, file, depth + 1, node)}</del>")
         elif m.group(11) is not None or m.group(12) is not None:
-            out.append(f"<em>{wsh_inline(m.group(11) or m.group(12), link, file, depth + 1)}</em>")
+            out.append(f"<em>{wsh_inline(m.group(11) or m.group(12), link, file, depth + 1, node)}</em>")
         else:
             out.append(f'<a href="{e(m.group(13))}" rel="nofollow noopener noreferrer">{e(m.group(13))}</a>')
     out.append(e(s[pos:]))
     return "".join(out)
 
 
-def wsh_md(text, link, file, depth=0):
+def wsh_md(text, link, file, depth=0, node=None):
     """HTML of a page's Markdown: headings, paragraphs, lists (with check boxes, shown only), quotes, code blocks, rules,
     simple tables; link(path) -> address | None, file(id) -> (address, is picture) | None."""
     text = re.sub(r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|\Z)", "", text or "", flags=re.S)
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     e, out, i, para = html.escape, [], 0, []
-    il = lambda s: wsh_inline(s, link, file, depth)  # noqa: E731
+    il = lambda s: wsh_inline(s, link, file, depth, node)  # noqa: E731
     if depth > 8:  # 2.123.0 (#2104): quotes nested deeper are shown as text
         return f"<p>{html.escape(text or '')}</p>"
 
@@ -742,7 +849,7 @@ def wsh_md(text, link, file, depth=0):
             while i < len(lines) and lines[i].strip().startswith(">"):
                 q.append(re.sub(r"^\s*>\s?", "", lines[i]))
                 i += 1
-            out.append(f"<blockquote>{wsh_md(chr(10).join(q), link, file, depth + 1)}</blockquote>")
+            out.append(f"<blockquote>{wsh_md(chr(10).join(q), link, file, depth + 1, node)}</blockquote>")
             continue
         if st.startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|?\s*:?-{2,}", lines[i + 1]):
             flush()
