@@ -14829,5 +14829,15 @@
   "Section not found: {0}": "Sectie niet gevonden: {0}",
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
-  "Embed a page": "Pagina insluiten"
+  "Embed a page": "Pagina insluiten",
+  "Expected income and expenses of the next months": "Verwachte inkomsten en uitgaven van de komende maanden",
+  "Revenue, open items and margin per client": "Omzet, openstaande posten en marge per klant",
+  "Trips with per diem allowances and receipts": "Reizen met dagvergoedingen en bonnen",
+  "Business meals with guests and reason": "Zakelijke maaltijden met gasten en aanleiding",
+  "Running subscriptions, seats and what they cost": "Lopende abonnementen, plekken en wat ze kosten",
+  "New messages": "Nieuwe berichten",
+  "all done": "alles klaar",
+  "{0} sign-off": ["{0} goedkeuring", "{0} goedkeuringen"],
+  "Fold all sections": "Alle onderdelen inklappen",
+  "Unfold all sections": "Alle onderdelen uitklappen"
 }

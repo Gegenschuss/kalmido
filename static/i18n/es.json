@@ -14829,5 +14829,15 @@
   "Section not found: {0}": "Sección no encontrada: {0}",
   "Daily note": "Nota diaria",
   "Go to day": "Ir al día",
-  "Embed a page": "Insertar una página"
+  "Embed a page": "Insertar una página",
+  "Expected income and expenses of the next months": "Ingresos y gastos previstos de los próximos meses",
+  "Revenue, open items and margin per client": "Facturación, partidas abiertas y margen por cliente",
+  "Trips with per diem allowances and receipts": "Viajes con dietas y justificantes",
+  "Business meals with guests and reason": "Comidas de negocios con invitados y motivo",
+  "Running subscriptions, seats and what they cost": "Suscripciones activas, plazas y lo que cuestan",
+  "New messages": "Mensajes nuevos",
+  "all done": "todo hecho",
+  "{0} sign-off": ["{0} aprobación", "{0} aprobaciones"],
+  "Fold all sections": "Contraer todas las secciones",
+  "Unfold all sections": "Expandir todas las secciones"
 }
