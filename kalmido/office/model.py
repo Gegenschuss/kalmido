@@ -760,13 +760,14 @@ def _slug(s):
     return s[:40]
 
 
-def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx):
+def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, ahead=0, **ctx):
     """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period).
-    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next)."""
+    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next).
+    2.431.0 B (#3605): ahead = a peek that many values further (the number after taken ones, docs.doc_next_number)."""
     period = office_scheme_period(scheme, d)
     if peek:
         r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
-        seq = (r["last"] if r else start) + 1
+        seq = (r["last"] if r else start) + 1 + ahead
     else:  # one atomic statement: two parallel requests never get the same counter value
         seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) "
                         "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period, start + 1)).fetchone()[0]
@@ -783,12 +784,17 @@ def trial_flag(v):
     return 1 if v in (1, True, "1", "true") else 0
 
 
-def office_trial_number(c, oid, did):
-    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock)."""
+def office_trial_number(c, oid, did, peek=False):
+    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock).
+    2.431.0 B (#3605): peek = the one it would get, the counter does not move (the finalise dialog)."""
     from .legacyimport import fi_number_taken
-    for _ in range(50):
-        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
-                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
+    last = None
+    if peek:
+        r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=''", (oid, TRIAL_KIND)).fetchone()
+        last = r["last"] if r else 0
+    for i in range(50):
+        seq = last + 1 + i if peek else c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
+                                                  "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
         num = f"TEST-{seq:03d}"
         if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
                 and not fi_number_taken(c, oid, num):
@@ -876,16 +882,16 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
     return high
 
 
-def onc_next(c, oid, s, r, scheme, d=None, peek=False, **ctx):
+def onc_next(c, oid, s, r, scheme, d=None, peek=False, ahead=0, **ctx):
     """office_number_next for document row r: a quotation counts per organisation, client or project (settings s)."""
     if r["kind"] != "offer":
-        return office_number_next(c, oid, r["kind"], scheme, d, peek, **ctx)
+        return office_number_next(c, oid, r["kind"], scheme, d, peek, ahead=ahead, **ctx)
     key = onc_key(s, r) or "offer"
     start = 0
     if key != "offer" and not c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?",
                                         (oid, key, office_scheme_period(scheme, d))).fetchone():
         start = onc_start(c, oid, s, r, key, scheme, d)
-    return office_number_next(c, oid, key, scheme, d, peek, start=start, **ctx)
+    return office_number_next(c, oid, key, scheme, d, peek, start=start, ahead=ahead, **ctx)
 
 
 def onc_version(c, oid, r, scheme, ctx_of):

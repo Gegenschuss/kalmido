@@ -1749,6 +1749,7 @@ body.tdrag .sdrop{display:flex}
 .modal.cdlg h3{margin-bottom:.5rem;line-height:1.35}
 .cdlg-b{color:var(--text2);font-size:var(--fs-b);line-height:1.5}
 .cdlg-b p{margin:0 0 .5rem}
+.cdlg-b .ofdfinno{color:var(--text);font-size:1.05em}.ofdfinno b{font-variant-numeric:tabular-nums;overflow-wrap:anywhere} /* 2.431.0 B (#3605): the number in the finalise dialog */
 .cdlg-l{margin:.25rem 0 .75rem;padding-left:1.25rem}
 .cdlg-l li{margin:.125rem 0}
 .modal.cdlg #cdlg-in{width:100%;margin-top:.5rem}

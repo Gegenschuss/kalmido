@@ -6090,6 +6090,7 @@
   "finalised": "bloccato",
   "Finalised": "Bloccato",
   "Finalised as {0}": "Bloccato come {0}",
+  "Will be finalised as {0}": "Sarà bloccato come {0}",
   "Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.": "Bloccato il {0} da {1}. Non può più essere modificato; duplicalo per una nuova versione.",
   "Finalise this document?": "Bloccare questo documento?",
   "Free lines (used where the fields above are empty)": "Righe libere (usate dove i campi sopra sono vuoti)",

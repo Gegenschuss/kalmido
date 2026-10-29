@@ -6090,6 +6090,7 @@
   "finalised": "cerrado",
   "Finalised": "Cerrado",
   "Finalised as {0}": "Cerrado como {0}",
+  "Will be finalised as {0}": "Se cerrará como {0}",
   "Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.": "Cerrado el {0} por {1}. Ya no se puede modificar; duplícalo para una nueva versión.",
   "Finalise this document?": "¿Cerrar este documento?",
   "Free lines (used where the fields above are empty)": "Líneas libres (se usan donde los campos de arriba están vacíos)",

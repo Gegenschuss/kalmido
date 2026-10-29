@@ -6070,6 +6070,7 @@
   "finalised": "festgeschrieben",
   "Finalised": "Festgeschrieben",
   "Finalised as {0}": "Festgeschrieben als {0}",
+  "Will be finalised as {0}": "Wird festgeschrieben als {0}",
   "Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.": "Festgeschrieben am {0} von {1}. Es kann nicht mehr geändert werden; für eine neue Version duplizieren.",
   "Finalise this document?": "Dieses Dokument festschreiben?",
   "Free lines (used where the fields above are empty)": "Freie Zeilen (gelten, wo die Felder oben leer sind)",

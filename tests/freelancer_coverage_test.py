@@ -473,6 +473,7 @@ ROUTES = {
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875)
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/number-preview": "office",  # 2.431.0 B (#3605): the number of the finalise dialog
     "POST /api/office/docs/{}/invoice": "office",
     "GET /api/office/docs/{}/progress": "office",  # 2.120.0 A (#2087): progress invoices of a quotation (p2120_a_api_test.py)
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",

@@ -6090,6 +6090,7 @@
   "finalised": "figé",
   "Finalised": "Figé",
   "Finalised as {0}": "Figé sous {0}",
+  "Will be finalised as {0}": "Sera figé sous {0}",
   "Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.": "Figé le {0} par {1}. Il ne peut plus être modifié ; dupliquez-le pour une nouvelle version.",
   "Finalise this document?": "Figer ce document ?",
   "Free lines (used where the fields above are empty)": "Lignes libres (utilisées là où les champs ci-dessus sont vides)",

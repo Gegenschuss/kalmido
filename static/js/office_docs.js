@@ -787,7 +787,10 @@ async function ofdClick(e) {
   if (a === 'it-disc') { d.items.push({kind: 'discount', title: '', detail: '', qty: 1, unit: 'flat', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); await ofdPutItems(); $(`${sc}.ofdits [data-i="${d.items.length - 1}"][data-k="rate"]`)?.focus(); return; }
   if (a === 'number') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/number`, {}); if (j) { d.number = j.number; ofdDraw(); } return; }
   if (a === 'finalize') {
-    if (!await askConfirm(tr('Finalise this document?'), tr('Number, positions, sums, sender and tax rates are frozen. Afterwards it can only be duplicated.'), {ok: tr('Finalise')})) return;
+    // 2.431.0 B (#3605): the dialog names the number it gets (its own one, else the next of the scheme, only looked at); no preview = as before
+    const pv = await rawFetch('GET', `/api/office/docs/${d.id}/number-preview`).catch(() => null);
+    const fin = tr('Number, positions, sums, sender and tax rates are frozen. Afterwards it can only be duplicated.');
+    if (!await askConfirm(tr('Finalise this document?'), fin, {ok: tr('Finalise'), ...(pv?.number ? {html: `<p class="ofdfinno">${esc(tr('Will be finalised as {0}', '\u0000')).replace('\u0000', `<b>${esc(pv.number)}</b>`)}</p><p>${esc(fin)}</p>`} : {})})) return;
     const j = await ofdSave('POST', `/api/office/docs/${d.id}/finalize`, {}); if (j) toast(tr('Finalised as {0}', j.number || ''));
     return;
   }

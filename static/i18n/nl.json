@@ -6090,6 +6090,7 @@
   "finalised": "vastgelegd",
   "Finalised": "Vastgelegd",
   "Finalised as {0}": "Vastgelegd als {0}",
+  "Will be finalised as {0}": "Wordt vastgelegd als {0}",
   "Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.": "Vastgelegd op {0} door {1}. Het kan niet meer worden gewijzigd; dupliceer het voor een nieuwe versie.",
   "Finalise this document?": "Dit document vastleggen?",
   "Free lines (used where the fields above are empty)": "Vrije regels (gebruikt waar de velden hierboven leeg zijn)",
