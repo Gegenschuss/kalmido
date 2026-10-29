@@ -2081,7 +2081,7 @@ out with. This applies to organisation offices and to the personal office alike.
   cannot be read as a PDF leave the quotation PDF unchanged (a log line, no error).
 - **Sending**: finalised quotations can be mailed too (status `sent`). A quotation goes out as ONE PDF with the terms
   inside (the send dialog says so instead of offering a tick); only when the terms cannot be joined they go along as their
-  own file as before. Invoices, credit notes and reminders have the tick *Attach terms and conditions* (unticked) when the
+  own file as before; `terms: false` in the send body has no effect for a quotation any more. Invoices, credit notes and reminders have the tick *Attach terms and conditions* (unticked) when the
   document's language has terms. The own file is named `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send"
   names the state (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The
   DATEV copy never carries them.

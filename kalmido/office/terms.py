@@ -36,7 +36,9 @@ import re
 import struct
 import subprocess
 import sys
+import threading
 import urllib.parse
+from collections import OrderedDict
 
 from flask import jsonify, request
 
@@ -63,7 +65,7 @@ AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
 # docs/split.py): stdin = 8 bytes length + the quotation + the terms, stdout = the joined PDF
 AGB_JOIN_WORKER = r"""
 import io, resource, struct, sys
-for k, v in ((resource.RLIMIT_AS, 1024 << 20), (resource.RLIMIT_CPU, 60), (resource.RLIMIT_FSIZE, 0), (resource.RLIMIT_CORE, 0)):
+for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 25), (resource.RLIMIT_FSIZE, 0), (resource.RLIMIT_CORE, 0)):
     try:
         resource.setrlimit(k, (v, v))
     except (ValueError, OSError):
@@ -206,10 +208,37 @@ def agb_attachment(c, oid, t):
     return (AGB_ATTACH[agb_lang(t.get("lang"))].format(t.get("date") or "undated"), oc_read_file(c, p), "application/pdf")
 
 
+AGB_JOIN_SEM = threading.BoundedSemaphore(2)  # 2.434.0 (#3619) review: at most two joins at once (public links, portal)
+AGB_JOIN_CACHE = OrderedDict()  # (sha256 of the PDF, sha256 of the terms) -> joined bytes, the newest last
+AGB_JOIN_CACHE_MB = 48
+AGB_JOIN_LOCK = threading.Lock()
+
+
 def agb_join(pdf, terms):
-    """The bytes of PDF pdf with the pages of PDF terms behind it; ValueError when pypdf cannot read / join them."""
+    """The bytes of PDF pdf with the pages of PDF terms behind it; ValueError when pypdf cannot read / join them or two
+    joins already run for 20 s. Results are kept in a small memory cache (the same quotation is fetched again and again)."""
+    key = (hashlib.sha256(pdf).hexdigest(), hashlib.sha256(terms).hexdigest())
+    with AGB_JOIN_LOCK:
+        hit = AGB_JOIN_CACHE.get(key)
+        if hit is not None:
+            AGB_JOIN_CACHE.move_to_end(key)
+            return hit
+    if not AGB_JOIN_SEM.acquire(timeout=20):
+        raise ValueError("busy")
+    try:
+        out = _agb_join_run(pdf, terms)
+    finally:
+        AGB_JOIN_SEM.release()
+    with AGB_JOIN_LOCK:
+        AGB_JOIN_CACHE[key] = out
+        while AGB_JOIN_CACHE and sum(len(v) for v in AGB_JOIN_CACHE.values()) > AGB_JOIN_CACHE_MB * 1024 * 1024:
+            AGB_JOIN_CACHE.popitem(last=False)
+    return out
+
+
+def _agb_join_run(pdf, terms):
     p = subprocess.run([sys.executable, "-I", "-c", AGB_JOIN_WORKER], input=struct.pack(">Q", len(pdf)) + pdf + terms,
-                       capture_output=True, timeout=90, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+                       capture_output=True, timeout=30, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
     if p.returncode != 0 or not p.stdout.startswith(b"%PDF-"):
         raise ValueError("unreadable")
     return p.stdout
@@ -230,7 +259,7 @@ def agb_offer_pdf(c, oid, r, pdf):
         if not a:
             raise OSError("terms file gone")
         return agb_join(pdf, a[1])
-    except (OSError, ValueError, Denied, subprocess.SubprocessError) as e:
+    except (OSError, ValueError, MemoryError, Denied, subprocess.SubprocessError) as e:
         print("office: terms not appended to the quotation", r["id"], type(e).__name__, flush=True)
         return pdf
 

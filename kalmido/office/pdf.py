@@ -1830,7 +1830,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         block(16 + 40 + acc_dy + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
     for h_, fn_ in pay_end:  # 2.434.0 A (#3603): bank line + GiroCode at the end of the main pages, right above the footer
-        block(h_, fn_, tail=True, foot=True)
+        block(h_, fn_, tail=True, foot=True, keep_prev=True)  # 2.434.0 (#3603) review: never alone on an otherwise empty page
 
     # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
     for part in m.get("parts") or []:
