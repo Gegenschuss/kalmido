@@ -125,7 +125,7 @@ def wkt_space_rows(c, oid, owner, uid, keys=None):
         hs = [wkt_hash(c, ws, k) for k in keys]
         cond = " AND ".join(["EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND x.h=?)"] * len(hs))
     else:
-        hs, cond = [], "EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND x.h LIKE 't:%')"
+        hs, cond = [], "EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND left(x.h, 2)='t:')"
     vis = wkf_visible_sql(c, uid)
     sql = (f"SELECT p.* FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} AND left(p.path, 5)<>'e2e1:' AND {vis} AND ")
     rows = {r["id"]: r for r in c.execute(sql + f"({cond}) ORDER BY lower(p.path) LIMIT {WIKI_INDEX_MAX}", [*a, *hs])
