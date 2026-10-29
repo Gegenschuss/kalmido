@@ -379,16 +379,18 @@ except CalError as e:
     out["drip"] = [e.code]
 out["drip_s"] = round(time.monotonic() - t0, 1)
 # (2) all the downloads of one mail end at ML_MAIL_DEADLINE
-def mk(to, mid, html=None, text="Danke.", att=None, logo=False):
+def mk(to, mid, html=None, text="Danke.", att=None, logo=False, photo=False):
     m = email.message.EmailMessage()
     m["From"], m["To"], m["Subject"], m["Message-ID"] = "billing@example.com", to, "Your invoice", mid
     m.set_content(text)
     if html:
-        m.add_alternative(html, subtype="html")
+        m.add_alternative(html + ('<img src="cid:logo">' if logo else ""), subtype="html")  # 2.424.0 (#3450): the HTML shows the logo
         if logo:
             m.get_payload()[1].add_related(PNG, "image", "png", cid="<logo>", filename="logo.png", disposition="inline")
     if att:
         m.add_attachment(PNG, maintype="image", subtype="png", filename="scan.png")
+    if photo:  # 2.424.0 (#3450): iPhone Mail sends a photographed receipt inline with a file name, not shown by cid
+        m.add_attachment(PNG + bytes(150_000), maintype="image", subtype="png", filename="IMG_1234.png", disposition="inline")
     return m
 slow = []
 def slow_get(u):
@@ -439,6 +441,8 @@ n0 = len(calls)
 out["logo"] = {"nid": imp(mk(ARGS["f"], "<p2424b2-3@example.com>", LH, logo=True)), "calls": len(calls) - n0}
 n0 = len(calls)
 out["attimg"] = {"nid": imp(mk(ARGS["f"], "<p2424b2-4@example.com>", LH, att=True)), "calls": len(calls) - n0}
+n0 = len(calls)
+out["photo"] = {"nid": imp(mk(ARGS["f"], "<p2424b2-6@example.com>", LH, photo=True)), "calls": len(calls) - n0}
 print(json.dumps(out))
 """
 ARGS2 = json.dumps({"f": FADDR, "a_priv": A_PRIV, "pdfs": {"pre": base64.b64encode(text_pdf(["Rechnung", "Rechnungs-Nr.: B2-1"])).decode(),
@@ -452,8 +456,8 @@ check(j.get("slow") in (1, 2), f"the downloads of one mail stop at the mail's de
 check(j.get("b_links") == [25, 5, 0] and j.get("b_eml") == 60, f"budget per address and hour: 30 downloads, 60 mails ({j.get('b_links')} {j.get('b_eml')})")
 check(j.get("b_hour") == [3, 1], f"a new hour: the budget starts again ({j.get('b_hour')})")
 sp = j.get("spent") or {}
-check(sp.get("pre") == [1, 0] and sp.get("calls") == 0 and not sp.get("nid"),
-      f"budget spent: the link found but not fetched, the mail not filed ({sp})")
+check(sp.get("pre") == [0, 0] and sp.get("calls") == 0 and not sp.get("nid"),
+      f"budget spent: the link not fetched and not counted (no 'needs a login' tag), the mail not filed ({sp})")  # 2.424.0 (#3450): review N2
 check(not dbx("SELECT 1 FROM doc_meta WHERE ext_id LIKE 'mail:<p2424b2-1@%'"), "budget spent: no document")
 check(j.get("poll") == 1 and j.get("poll_calls") == [[0, True]],
       f"IMAP poll: one download, outside the gate (no transaction), with the deadline ({j.get('poll')} {j.get('poll_calls')})")
@@ -464,6 +468,9 @@ check(lg.get("calls") == 1 and lg.get("nid") and dbx("SELECT ext_id FROM doc_met
 ai = j.get("attimg") or {}
 check(ai.get("calls") == 0 and ai.get("nid") and dbx("SELECT ext_id FROM doc_meta WHERE node_id=?", (ai.get("nid"),)) == [("mail:<p2424b2-4@example.com>:0",)],
       f"an attached image: it is the receipt, no download ({ai})")
+ph = j.get("photo") or {}
+check(ph.get("calls") == 0 and ph.get("nid") and dbx("SELECT ext_id FROM doc_meta WHERE node_id=?", (ph.get("nid"),)) == [("mail:<p2424b2-6@example.com>:0",)],
+      f"an inline photo with a file name (iPhone Mail): it is the receipt, no download ({ph})")  # 2.424.0 (#3450): review N1
 # (5) the level "own" in Receipts: the own forwarding address
 r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob Member", "password": "password123", "email": "bob@example.com"})
 assert r.ok, r.text

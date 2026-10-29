@@ -317,7 +317,7 @@ def docs_mail_prefetch(msg):
         finally:
             c.close()
     if not k:
-        return links, []
+        return [], []  # 2.424.0 (#3450): budget spent -> no links counted, so the mail is not tagged "needs a login"
     return ml_collect(msg, limit=k, links=links)
 
 

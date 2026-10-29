@@ -179,6 +179,8 @@ def ml_collect(msg, get=None, limit=ML_LINKS, links=None):
     """(links, [(index of the link, name, PDF bytes)]) of a mail: the invoice links found and what could be downloaded
     (the first `limit` of them, all within ML_MAIL_DEADLINE). get: the download (default ml_get with the mail's deadline)."""
     links = ml_links(msg) if links is None else links
+    if limit <= 0:
+        return [], []  # 2.424.0 (#3450): the hour's budget is spent - not a login link
     until = time.monotonic() + ML_MAIL_DEADLINE
     fetch = get or (lambda u: ml_get(u, until=until))
     got = []

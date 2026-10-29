@@ -130,19 +130,46 @@ def mail_token_del():
     return jsonify(ok=True)
 
 
+MAIL_DECOR_MAX = 100_000  # 2.424.0 (#3450): an inline image below this size that the HTML shows (or without a name) is decoration
+
+
+def _mail_cids(msg):
+    """The Content-IDs the HTML parts of a mail show (<img src="cid:...">), lower case, without angle brackets."""
+    out = set()
+    for part in msg.walk():
+        if part.get_content_type() == "text/html":
+            try:
+                out.update(m.lower() for m in re.findall(r'cid:([^"\'>\s]+)', part.get_content() or "", re.I))
+            except Exception:  # noqa: BLE001
+                continue
+    return out
+
+
+def _mail_decor(part, name, cids):
+    """2.424.0 (#3450): an inline image is decoration (a logo) when it is small and the HTML shows it or it has no file
+    name; a large inline photo (iPhone Mail sends receipts photographed like that) stays a file."""
+    try:
+        size = len(part.get_payload(decode=True) or b"")
+    except Exception:  # noqa: BLE001
+        size = 0
+    cid = str(part.get("Content-ID", "")).strip().strip("<>").lower()
+    return size < MAIL_DECOR_MAX and (not name or (cid and cid in cids))
+
+
 def mail_text(msg, limit=MAIL_BODY_MAX, att_images=False):
     """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags.
     2.84.0 (#1198): limit = characters kept (the hub files longer texts). att_images (2.424.0 B2, #3450, the documents
     mail input): an image is a file only with Content-Disposition attachment (an inline logo of an invoice mail is not)."""
     plain = html_ = None
     files = []
+    cids = _mail_cids(msg) if att_images else set()
     for part in msg.walk():
         if part.is_multipart():
             continue
         disp = (part.get_content_disposition() or "").lower()
         ctype = part.get_content_type()
         name = part.get_filename()
-        if att_images and ctype.startswith("image/") and disp != "attachment":
+        if att_images and ctype.startswith("image/") and disp != "attachment" and _mail_decor(part, name, cids):
             continue
         if disp == "attachment" or (name and disp != "inline") or (name and not ctype.startswith("text/")):
             try:
