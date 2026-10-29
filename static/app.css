@@ -4604,6 +4604,15 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctf a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:.2em;word-break:break-word}
 .ctf a:hover{text-decoration-color:var(--accent)}
 .ctsec h4{margin:.25rem 0;font-size:var(--fs-m);color:var(--muted)}
+/* 2.435.0 A (#3600): a block of the client card folds at its title (the title of the block itself then stays out) */
+.ctfh{margin:.25rem 0}
+.ctfb{display:inline-flex;align-items:center;gap:.375rem;min-height:2.25rem;padding:0 .25rem 0 0;border:0;background:none;color:var(--muted);font:inherit;font-size:var(--fs-m);font-weight:600;cursor:pointer}
+.ctfb:hover{color:var(--text)}
+.ctfb .fcar{width:.75rem;height:.75rem;transition:transform .15s;transform:rotate(-90deg)}
+.ctfw.on .ctfb .fcar{transform:none}
+.ctfn{font-weight:400}
+.ctfw>.ctsec>h4:first-child,.ctfw>.stcard>.sthead:first-child{display:none}
+.ctfw>.stcard{margin-top:.25rem}
 .ctlinks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
 .ctlinks .linkbtn.done{text-decoration:line-through;color:var(--muted)}
 .ctmore,.ctempty{padding:.5rem;font-size:var(--fs-s)}

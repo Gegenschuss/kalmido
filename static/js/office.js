@@ -795,6 +795,7 @@ function ost_part(el, full) {
   if (OST_SUB[id] && OST_SUB[id][0] === 'tax_rates') return {tax_rates: full.tax_rates || {}};  // 2.147.0 (#2461): both rates at once (an empty one = the pack's)
   if (OST_SUB[id]) { const [k, f] = OST_SUB[id]; return {[k]: {[f]: full[k][f]}}; }
   if (el.dataset.feat) return {features_off: ocf_off(el.dataset.feat, !el.checked)};  // 2.147.0 (#2460): one function on / off
+  if (el.dataset.ccb) return {client_blocks_off: ccb_off(el.dataset.ccb, !el.checked)};  // 2.435.0 A (#3600): one block of the client card
   // an industry pack box: only this pack switches (the list of the others stays as saved, also when not all boxes are drawn)
   if (id.startsWith('os-ind-')) return {industry_packs: ost_packs(el.dataset.ind || id.slice(7), el.checked)};
   if (el.dataset.pkcOn) return {industry_packs: ost_packs(el.dataset.pkcOn, el.checked)};  // 2.113.0 (#2246): the switch on a pack's card

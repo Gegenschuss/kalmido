@@ -14987,5 +14987,7 @@
   "{0} newly stored": "{0} guardados nuevos",
   "Send by mail…": "Enviar por correo…",
   "Change server": "Cambiar servidor",
-  "Notifications are not available in the iPhone app yet.": "Las notificaciones aún no están disponibles en la app del iPhone."
+  "Notifications are not available in the iPhone app yet.": "Las notificaciones aún no están disponibles en la app del iPhone.",
+  "Client card": "Ficha del cliente",
+  "The blocks switched on here show at every client of the office. Each person can still hide or fold them for themselves.": "Los bloques activados aquí se muestran en cada cliente de la oficina. Cada persona puede ocultarlos o plegarlos para sí misma."
 }

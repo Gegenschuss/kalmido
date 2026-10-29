@@ -50,8 +50,10 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await signIn(ev, 'alice');
     // ================= the section + the dialog
     await nav(B + `#client/${cl.id}`);
+    // 2.435.0 (#3600): the block Data protection starts folded (its own title then stays out, the fold title names it): open it
+    await ready(ev, `!!document.querySelector('#view [data-mscl="fold"][data-k="privacy"]')`, 80); await ev(click('#view [data-mscl="fold"][data-k="privacy"]'));
     check(await ready(ev, `!!document.querySelector('#view .dsbsec [data-dsb="new"]')`, 80), '#2192: the client card has the section with the button');
-    check(await ev(`document.querySelector('#view .dsbsec h4')?.textContent === 'Data protection' && !document.querySelector('#view .dsbsec li')`), '#2192: no sheet yet');
+    check(await ev(`/Data protection/.test(document.querySelector('#view [data-mscl="fold"][data-k="privacy"]')?.textContent || '') && !document.querySelector('#view .dsbsec li')`), '#2192: no sheet yet');
     await ev(click('#view .dsbsec [data-dsb="new"]'));
     check(await ready(ev, `!!document.querySelector('.modal.dsbdlg #dsb-kind')`, 60), '#2192: the dialog opens');
     check(await ev(`[...document.querySelectorAll('#dsb-kind option')].map(o => o.value).join() === 'dpa,info,consent'`), '#2192: three sheets');
