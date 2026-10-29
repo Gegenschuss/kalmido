@@ -112,6 +112,13 @@ g = coll(Fr, "lists").json().get("groups", [])
 check(len(g) == 1 and g[0]["title"] == "Garden" and g[0]["open"] == f"l/{LID}" and g[0]["items"][0]["name"] == "sketch.pdf",
       f"#3580: the project files grouped by the project {g}")
 
+# the knowledge module off for her: no collection of it (the area's own routes refuse too)
+Fr.patch(B + "/api/settings", json={"features": FEAT.replace("wiki,", "")})
+check("wiki" not in [c["key"] for c in top(Fr).get("collections", [])] and coll(Fr, "wiki").json().get("groups") == [],
+      "#3580: the knowledge module off: no 'From Knowledge'")
+Fr.patch(B + "/api/settings", json={"features": FEAT})
+check("wiki" in [c["key"] for c in top(Fr).get("collections", [])], "#3580: on again: 'From Knowledge' is back")
+
 # the page into the trash: its files leave the collection
 check(Fr.delete(B + f"/api/wiki/pages/{PAGE}").ok, "setup: the page into the trash")
 check("wiki" not in [c["key"] for c in top(Fr).get("collections", [])], "#3580: no 'From Knowledge' without a readable file")

@@ -223,9 +223,37 @@ def _fs(c, uid, oid, key, limit):
     return sorted(out.values(), key=lambda g: g[0].lower())
 
 
+FSV_GATE = {"wiki": "wiki", "sheets": "sheets", "office": "office", "contacts": "contacts"}  # key -> module / area switch
+
+
+def _key_on(c, uid, oid, key):
+    """Is the area of key on for uid in space oid: the person's module (settings features) and, in an organisation, not
+    switched off by its admins (accounts/wsareas.py) -- an area that is off shows no collection."""
+    a = FSV_GATE.get(key)
+    if not a:
+        return True
+    from ..core.db import usettings
+    if a not in (usettings(c, uid).get("features") or "").split(","):
+        return False
+    from ..accounts.wsareas import wsa_org_off
+    return a not in wsa_org_off(c, oid)
+
+
+def _unlocked(c, groups):
+    """Review: no file of a locked folder (fslock: names and contents encrypted in the browser) in a collection."""
+    from .fslock import fsl_map
+    ids = [x["id"] for g in groups for x in g[2] if x["kind"] == "fs"]
+    lk = fsl_map(c, ids) if ids else {}
+    if not lk:
+        return groups
+    return [(g[0], g[1], [x for x in g[2] if not (x["kind"] == "fs" and x["id"] in lk)]) for g in groups]
+
+
 def fsv_groups(c, uid, oid, key, limit=FSV_MAX):
     """The groups of collection key in space oid (None: private) for uid, at most limit files."""
     groups = []
+    if not _key_on(c, uid, oid, key):
+        return groups
     if key == "wiki":
         groups += _wiki(c, uid, oid, limit)
     elif key == "lists":
@@ -234,7 +262,7 @@ def fsv_groups(c, uid, oid, key, limit=FSV_MAX):
         groups += _sheets(c, uid, oid, limit)
     left = limit - sum(len(g[2]) for g in groups)
     if left > 0:
-        groups += _fs(c, uid, oid, key, left)
+        groups += _unlocked(c, _fs(c, uid, oid, key, left))
     for g in groups:
         g[2].sort(key=lambda x: x["name"].lower())
     return groups
@@ -258,6 +286,9 @@ def files_collection(key):
     if not _person():
         raise Denied(404)
     oid = _space(c, uid, request.args.get("space"))
+    if oid:
+        from ..accounts.wsareas import wsa_org_check
+        wsa_org_check(c, oid, "ablage")  # the file store switched off by the organisation's admins (like its other views)
     groups = fsv_groups(c, uid, oid, key, limit=FSV_MAX + 1)
     total, cut = 0, False
     for g in groups:
