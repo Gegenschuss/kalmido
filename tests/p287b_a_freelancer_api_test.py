@@ -6,7 +6,9 @@ tests/freelancer_fixture.py) on a server that has an organisation. Invented name
    budget, settings -- every write of a scenario answers 2xx
  - the sweep: EVERY GET route of the matrix areas of tests/freelancer_coverage_test.py, called as the freelancer (the web
    routes with the session, /api/v1 with a personal token, the agent API with the token of the freelancer's own agent);
-   placeholders get the ids of the freelancer's own objects. No 401 / 403 / 5xx, except the few in ALLOW with the reason
+   placeholders get the ids of the freelancer's own objects. No 401 / 403 / 5xx, except the few in ALLOW with the reason;
+   2.421.0 A (#2936): no other 4xx either, except EXPECT_4XX (status + reason, stale = red); at most MAX_SKIPPED routes
+   without an id of an own object (QUERY gives the GETs that need one their query)
  - nothing of the organisation leaks into the private space (state, people list, office)
 usage: p287b_a_freelancer_api_test.py <datadir>      (a fresh container; KMT_NOSTART=1 = the server already runs)"""
 import os
