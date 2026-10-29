@@ -424,9 +424,10 @@ def _credit_shared_switch(c, oid, out, cur, b):
     already given stay; the change goes into the office log with the settings' diff."""
     if out.get("credit_shared"):
         dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "GS-{yyyy}-{seq:03}"
-        if "credit_scheme" not in b and out.get("credit_scheme") in ("", dflt):
+        if (b.get("credit_scheme") in (None, cur.get("credit_scheme"))) and out.get("credit_scheme") in ("", dflt):  # (the whole form sends it unchanged)
             out["credit_scheme"] = office_scheme_clean(credit_rk_scheme(out.get("invoice_scheme") or ""), FE_SCHEME_NAMES["credit_scheme"], offer=False)
         return
+    write_lock(c, f"office_num_{int(oid)}")  # 2.433.0 (#3597 review): the lock of every counter write (docs._assign_number)
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) SELECT org_id, 'credit', period, last FROM office_numbers WHERE org_id=? AND kind='invoice' "
               "ON CONFLICT(org_id, kind, period) DO UPDATE SET last=GREATEST(office_numbers.last, excluded.last)", (oid,))
 
@@ -609,6 +610,11 @@ def office_settings_clean(c, oid, b, cur):
     _home_clean(c, oid, b, cur, out)
     if out.get("credit_shared") != (cur.get("credit_shared") or 0):
         _credit_shared_switch(c, oid, out, cur, b)
+    if out.get("credit_shared"):  # 2.433.0 (#3597 review): one counter needs one kind of period and two different schemes
+        if office_scheme_period(out.get("credit_scheme") or "") != office_scheme_period(out.get("invoice_scheme") or ""):
+            raise BadInput(tr("Invoice corrections count in the invoice series: both schemes need a year, or neither"))
+        if (out.get("credit_scheme") or "") == (out.get("invoice_scheme") or ""):
+            raise BadInput(tr("Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)"))
     return out
 
 

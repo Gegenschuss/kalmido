@@ -1131,7 +1131,7 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
-INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail
+INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
 
 
 def inv_send(c, oid, uid, r, b, later=False):
@@ -1152,8 +1152,10 @@ def inv_send(c, oid, uid, r, b, later=False):
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
     # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
     ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
-    if not re.fullmatch(mail_re, to) or len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
+    if not re.fullmatch(mail_re, to):
         raise BadInput(tr("Invalid value: {0}", "to"))
+    if len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
+        raise BadInput(tr("Invalid value: {0}", "cc"))
     cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")

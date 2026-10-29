@@ -15154,5 +15154,7 @@
   "Counts with the invoice numbers": "Zählt mit den Rechnungsnummern",
   "Invoice corrections count with the invoice numbers; set the next number there": "Rechnungskorrekturen zählen mit den Rechnungsnummern; die nächste Nummer stellst du dort ein",
   "Gets invoices": "Bekommt Rechnungen",
-  "several: separated by commas": "mehrere: mit Komma getrennt"
+  "several: separated by commas": "mehrere: mit Komma getrennt",
+  "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Rechnungskorrekturen zählen in der Rechnungsreihe mit: Beide Schemata brauchen ein Jahr oder keines",
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Rechnungskorrekturen zählen in der Rechnungsreihe mit: Ihr Schema muss sich vom Rechnungsschema unterscheiden (z. B. _RK)"
 }

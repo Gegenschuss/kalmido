@@ -15154,5 +15154,7 @@
   "Counts with the invoice numbers": "Conta con i numeri delle fatture",
   "Invoice corrections count with the invoice numbers; set the next number there": "Le rettifiche contano con i numeri delle fatture; imposta lì il numero successivo",
   "Gets invoices": "Riceve le fatture",
-  "several: separated by commas": "più indirizzi: separati da virgole"
+  "several: separated by commas": "più indirizzi: separati da virgole",
+  "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Le rettifiche contano nella serie delle fatture: entrambi gli schemi hanno bisogno di un anno, o nessuno",
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Le rettifiche contano nella serie delle fatture: il loro schema deve essere diverso da quello delle fatture (ad es. _RK)"
 }

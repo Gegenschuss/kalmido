@@ -15154,5 +15154,7 @@
   "Counts with the invoice numbers": "Telt mee met de factuurnummers",
   "Invoice corrections count with the invoice numbers; set the next number there": "Correcties tellen mee met de factuurnummers; stel het volgende nummer daar in",
   "Gets invoices": "Krijgt facturen",
-  "several: separated by commas": "meerdere: gescheiden door komma's"
+  "several: separated by commas": "meerdere: gescheiden door komma's",
+  "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Correcties tellen mee in de factuurreeks: beide schema's hebben een jaar nodig, of geen van beide",
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Correcties tellen mee in de factuurreeks: hun schema moet verschillen van het factuurschema (bijv. _RK)"
 }

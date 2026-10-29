@@ -43,6 +43,8 @@ def fk_contacts(c, cid, oid=None):
             for r in c.execute("SELECT * FROM office_client_contacts WHERE client_id=? ORDER BY is_default DESC, sort, id", (cid,))]
 
 
+FK_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (invoices.inv_send checks the same)
+FK_MAIL_RE = re.compile(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+")
 FK_INVOICE_KINDS = ("invoice", "credit", "reminder")  # 2.433.0 (#3599): invoices, corrections and reminders go to the invoice address
 
 
@@ -52,10 +54,11 @@ def fk_send_rcpts(c, cid, oid, kind):
     ticked "gets invoices" (none ticked: the default contact person). Quotations: to = the default contact person (else the
     client's e-mail), copy = the e-mail for invoices. Delivery notes as before (the invoice address, no copy). An address
     only once, empty ones left out."""
-    cl = c.execute("SELECT email, email_invoice FROM clients WHERE id=?", (cid,)).fetchone() if cid else None
+    from .model import pb_cl_sql
+    cl = c.execute(f"SELECT email, email_invoice FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone() if cid else None
     if cl is None:
         return {"to": "", "cc": []}
-    ks = [k for k in fk_contacts(c, cid, oid) if k["email"]]
+    ks = [k for k in fk_contacts(c, cid, oid) if FK_MAIL_RE.fullmatch(k["email"] or "")]  # only addresses a mail can carry
     inv, mail = (cl["email_invoice"] or "").strip(), (cl["email"] or "").strip()
     dflt = next((k["email"] for k in ks if k["is_default"]), "")
     if kind in FK_INVOICE_KINDS:
@@ -64,9 +67,11 @@ def fk_send_rcpts(c, cid, oid, kind):
         to, cc = dflt or mail, [inv]
     else:
         to, cc = inv or mail, []
+    if not FK_MAIL_RE.fullmatch(to):
+        to = ""
     seen, out = {to.lower()}, []
     for x in cc:
-        if x and x.lower() not in seen:
+        if x and FK_MAIL_RE.fullmatch(x) and x.lower() not in seen and len(out) < FK_CC_MAX:
             seen.add(x.lower())
             out.append(x)
     return {"to": to, "cc": out}

@@ -125,6 +125,11 @@ def run(S, who, tag):
     c3 = client(name="Drittkunde KG", email_invoice=m("emil"), contacts=[{"name": "Emil Einer", "email": m("emil"), "is_default": True}])
     j = rc(doc("invoice", c3["id"]))
     ok(j.get("to") == m("emil") and j.get("cc") == [], f"an address only once: {j}")
+    # review: at most five copy addresses, only addresses a mail can carry (the series' auto-send must not fail on them)
+    c5 = client(name="Vielkunde", email_invoice=m("rk5"), contacts=[{"name": f"Person {i}", "email": m(f"p{i}"), "gets_invoices": True} for i in range(6)]
+                + [{"name": "Komisch", "email": f"x;{m('odd')}", "gets_invoices": True}])
+    j = rc(doc("invoice", c5["id"]))
+    ok(j.get("to") == m("rk5") and len(j.get("cc") or []) == 5 and not any(";" in x for x in j["cc"]), f"at most five copy addresses, no odd one: {j}")
     c4 = client(name="Leerkunde")
     j = rc(doc("invoice", c4["id"]))
     ok(j.get("to") == "" and j.get("cc") == [], f"empty fields stay empty: {j}")

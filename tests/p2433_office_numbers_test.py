@@ -97,6 +97,11 @@ def run(S, who):
     st = r.json().get("settings", {})
     ok(r.ok and st.get("credit_shared") == 1 and st.get("credit_scheme") == "{seq}_{kuerzel}_{isodate}_RK",
        f"#3597: switched on, the correction scheme becomes the invoice scheme with _RK: {st.get('credit_scheme')} " + r.text[:120])
+    # review: one counter needs one kind of period and two different schemes
+    r = S.put(B + O + "/settings", json={"credit_scheme": "GS-{yyyy}-{seq:03}"})
+    ok(r.status_code == 400 and "a year, or neither" in r.json().get("error", ""), "#3597: shared with a yearly correction scheme and a scheme without year: 400 " + r.text[:120])
+    r = S.put(B + O + "/settings", json={"credit_scheme": sch})
+    ok(r.status_code == 400 and "differ" in r.json().get("error", ""), "#3597: shared with the same scheme as the invoices: 400 " + r.text[:120])
     log = S.get(B + O + "/log").json().get("log", [])
     ok(any("credit_shared" in str(x.get("detail")) for x in log), "#3597: the switch is in the office log")
     rg = {x["kind"]: x for x in S.get(B + O + "/number-ranges").json()["ranges"]}
