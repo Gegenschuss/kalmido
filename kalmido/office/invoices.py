@@ -127,24 +127,25 @@ def inv_manual_number(c, oid, r, s, num, reason=""):
     """2.38.0: a manual number of an invoice / credit note must follow the scheme and lie above the series' last value
     (no back-dating); the counter then continues from it. 2.39.1 (#1210 N2): more than one above the counter (a gap in
     the series) only with a reason (kept in the office log). The caller holds the number lock. BadInput otherwise."""
-    from .model import office_scheme_period
+    from .model import num_kind, num_scheme, office_scheme_period
     scheme = inv_scheme(s, r["kind"])
+    kind = num_kind(s, r["kind"])  # 2.433.0 (#3597): a correction on the invoices' shared counter (its period) follows that one
     seq = inv_manual_seq(scheme, num)
     if seq is None:
         raise BadInput(tr("The number must follow the scheme {0}", scheme))
     d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
-    period = office_scheme_period(scheme, d)
+    period = office_scheme_period(num_scheme(s, r["kind"]), d)
     y = inv_number_year(scheme, num)
     if period and y is not None and y != d.year:  # 2.355.0 A (#2839): never another year's number (nor its counter)
         raise Denied(409, tr("The number carries the year {0}, the invoice date is in {1}", y, d.year))
-    row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, r["kind"], period)).fetchone()
+    row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
     last = row["last"] if row else 0
     if seq < last or (seq == last and num != (r["number"] or "")):  # 2.38.0 review: re-setting its own number is fine
         raise BadInput(tr("The number must be above the last one of the series ({0})", last))
     if seq > last + 1 and len((reason or "").strip()) < INV_SKIP_REASON_MIN:
         raise BadInput(tr("The number skips {0} numbers of the series; give a reason (GoBD)", seq - last - 1))
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
-              (oid, r["kind"], period, seq))
+              (oid, kind, period, seq))
 
 
 # ---------------------------------------------------------------- payments and the derived state

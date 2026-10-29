@@ -15148,5 +15148,9 @@
   "Short code": "Korte code",
   "In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.": "In nummers als {kuerzel}, bijv. 673_TNP_R. Leeg = de eerste drie letters van de naam.",
   "Short code of the client": "Korte code van de klant",
-  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "De korte code heeft 2 tot 6 letters of cijfers nodig (bijv. TNP)"
+  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "De korte code heeft 2 tot 6 letters of cijfers nodig (bijv. TNP)",
+  "Invoice corrections count in the invoice series": "Factuurcorrecties tellen mee in de factuurreeks",
+  "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "Aan: een correctie krijgt het volgende nummer van de factuurteller (bijv. 423_R, 424_RK, 425_R) en houdt haar eigen schema. Uit: correcties hebben een eigen teller. Al gegeven nummers blijven.",
+  "Counts with the invoice numbers": "Telt mee met de factuurnummers",
+  "Invoice corrections count with the invoice numbers; set the next number there": "Correcties tellen mee met de factuurnummers; stel het volgende nummer daar in"
 }

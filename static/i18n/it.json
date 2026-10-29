@@ -15148,5 +15148,9 @@
   "Short code": "Sigla",
   "In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.": "Nei numeri come {kuerzel}, ad es. 673_TNP_R. Vuoto = le prime tre lettere del nome.",
   "Short code of the client": "Sigla del cliente",
-  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "La sigla richiede da 2 a 6 lettere o cifre (ad es. TNP)"
+  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "La sigla richiede da 2 a 6 lettere o cifre (ad es. TNP)",
+  "Invoice corrections count in the invoice series": "Le fatture di rettifica contano nella serie delle fatture",
+  "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "Attivo: una rettifica prende il numero successivo del contatore delle fatture (ad es. 423_R, 424_RK, 425_R) e mantiene il proprio schema. Disattivo: le rettifiche hanno un contatore proprio. I numeri già assegnati restano.",
+  "Counts with the invoice numbers": "Conta con i numeri delle fatture",
+  "Invoice corrections count with the invoice numbers; set the next number there": "Le rettifiche contano con i numeri delle fatture; imposta lì il numero successivo"
 }

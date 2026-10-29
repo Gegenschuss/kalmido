@@ -15148,5 +15148,9 @@
   "Short code": "Kürzel",
   "In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.": "In Nummern als {kuerzel}, z. B. 673_TNP_R. Leer = die ersten drei Buchstaben des Namens.",
   "Short code of the client": "Kunden-Kürzel",
-  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "Das Kürzel braucht 2 bis 6 Buchstaben oder Ziffern (z. B. TNP)"
+  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "Das Kürzel braucht 2 bis 6 Buchstaben oder Ziffern (z. B. TNP)",
+  "Invoice corrections count in the invoice series": "Rechnungskorrekturen zählen in der Rechnungsreihe mit",
+  "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "An: Eine Korrektur bekommt die nächste Nummer aus dem Rechnungszähler (z. B. 423_R, 424_RK, 425_R) und behält ihr eigenes Schema. Aus: Korrekturen haben einen eigenen Zähler. Schon vergebene Nummern bleiben.",
+  "Counts with the invoice numbers": "Zählt mit den Rechnungsnummern",
+  "Invoice corrections count with the invoice numbers; set the next number there": "Rechnungskorrekturen zählen mit den Rechnungsnummern; die nächste Nummer stellst du dort ein"
 }

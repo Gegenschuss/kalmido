@@ -75,6 +75,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.38.0 (#1021, F1): invoices -- number schemes per kind (defaults from the pack), payment terms, reminders,
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
                      "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "delivery_scheme": "", "payment_days": 14, "reminder_fee": 0,
+                     "credit_shared": 0,  # 2.433.0 (#3597): 1 = invoice corrections count with the invoices' counter (own scheme, num_kind)
                      "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
                      "invoice_closing_de": "", "invoice_closing_en": "", "delivery_closing_de": "", "delivery_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
@@ -410,6 +411,38 @@ def _id_or_none(c, v, table, oid, name):
     return i
 
 
+def credit_rk_scheme(inv):
+    """2.433.0 (#3597): the correction scheme suggested for a shared counter: the invoice scheme with _RK instead of its _R
+    (673_TNP_..._R -> ..._RK), else with _RK appended."""
+    return inv[:-1] + "RK" if re.search(r"[-_./ ]R$", inv) else inv + "_RK"
+
+
+def _credit_shared_switch(c, oid, out, cur, b):
+    """2.433.0 (#3597): switching the shared counter of invoice corrections. On: a correction scheme still at the pack's
+    value (and not sent in the same body) becomes the invoice scheme with _RK, so both series stay apart by name. Off: the
+    corrections' own counter continues above every number the shared counter gave (a counter never goes back). Numbers
+    already given stay; the change goes into the office log with the settings' diff."""
+    if out.get("credit_shared"):
+        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "GS-{yyyy}-{seq:03}"
+        if "credit_scheme" not in b and out.get("credit_scheme") in ("", dflt):
+            out["credit_scheme"] = office_scheme_clean(credit_rk_scheme(out.get("invoice_scheme") or ""), FE_SCHEME_NAMES["credit_scheme"], offer=False)
+        return
+    c.execute("INSERT INTO office_numbers(org_id, kind, period, last) SELECT org_id, 'credit', period, last FROM office_numbers WHERE org_id=? AND kind='invoice' "
+              "ON CONFLICT(org_id, kind, period) DO UPDATE SET last=GREATEST(office_numbers.last, excluded.last)", (oid,))
+
+
+def num_kind(s, kind):
+    """2.433.0 (#3597): the counter (office_numbers.kind) a document kind counts with: invoice corrections the invoices'
+    one while credit_shared is on, every other kind its own."""
+    return "invoice" if kind == "credit" and s.get("credit_shared") else kind
+
+
+def num_scheme(s, kind):
+    """The scheme whose year decides the counter's period of kind (num_kind): a shared counter has the invoices' period."""
+    k = num_kind(s, kind)
+    return s.get(k + "_scheme") or s.get("offer_scheme") or ""
+
+
 def _pack_switch(out, cur, b):
     """2.368.0 (#2979): choosing another pack takes along the document language the admin never chose and the number schemes
     that still hold the old pack's values; values set by hand -- or sent in the same body -- stay."""
@@ -507,7 +540,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers", "credit_shared"):  # 2.433.0 (#3597): credit_shared  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
@@ -574,6 +607,8 @@ def office_settings_clean(c, oid, b, cur):
                 if f in v:
                     out[k][f] = _id_or_none(c, v[f], "office_texts", oid, k)
     _home_clean(c, oid, b, cur, out)
+    if out.get("credit_shared") != (cur.get("credit_shared") or 0):
+        _credit_shared_switch(c, oid, out, cur, b)
     return out
 
 
@@ -790,10 +825,11 @@ def _slug(s):
     return s[:40]
 
 
-def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx):
+def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, pscheme=None, **ctx):
     """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period).
-    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next)."""
-    period = office_scheme_period(scheme, d)
+    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next).
+    2.433.0 (#3597): pscheme = the scheme whose year gives the period (a shared counter: the invoices'), default scheme."""
+    period = office_scheme_period(pscheme or scheme, d)
     if peek:
         r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
         seq = (r["last"] if r else start) + 1
@@ -908,8 +944,8 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
 
 def onc_next(c, oid, s, r, scheme, d=None, peek=False, **ctx):
     """office_number_next for document row r: a quotation counts per organisation, client or project (settings s)."""
-    if r["kind"] != "offer":
-        return office_number_next(c, oid, r["kind"], scheme, d, peek, **ctx)
+    if r["kind"] != "offer":  # 2.433.0 (#3597): an invoice correction may count with the invoices (num_kind)
+        return office_number_next(c, oid, num_kind(s, r["kind"]), scheme, d, peek, pscheme=num_scheme(s, r["kind"]), **ctx)
     key = onc_key(s, r) or "offer"
     start = 0
     if key != "offer" and not c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?",

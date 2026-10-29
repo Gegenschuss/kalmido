@@ -30,10 +30,14 @@ function onumRedraw() { const box = $('#onum-box'); if (box) box.outerHTML = onu
 function onumHtml() {
   if (typeof ofcAdmin !== 'function' || !ofcAdmin()) return '';
   const s = OFC.info?.settings || {}, sch = k => (k === 'offer' ? s.offer_scheme : s[k + '_scheme'] || s.offer_scheme) || '';
-  const sig = [OFC.info?.org_id, s.offer_counter || 'org', ...Object.keys(ONUM_NAMES).map(sch)].join('|');
+  const sig = [OFC.info?.org_id, s.offer_counter || 'org', s.credit_shared ? 1 : 0, ...Object.keys(ONUM_NAMES).map(sch)].join('|');  // 2.433.0 (#3597): + the shared counter
   if (ONUM.sig !== sig) { ONUM.sig = sig; ONUM.ranges = null; }  // another office area / a saved scheme: read again
   if (!ONUM.ranges) { if (!ONUM.loading) setTimeout(onumLoad, 0); return `<div id="onum-box" class="onum" data-fg-skip></div>`; }
   const rows = ONUM.ranges.map(r => {
+    // 2.433.0 (#3597): invoice corrections on the invoices' counter - the row greyed, the next number set with the invoices
+    if (r.shared) return `<div class="row onumrow onumshared" data-kind="${r.kind}"><label for="onum-${r.kind}">${esc(tr(ONUM_NAMES[r.kind]))}</label>
+      <span class="lacts"><input id="onum-${r.kind}" type="text" value="${esc(String(r.next))}" class="numin" disabled aria-describedby="onum-${r.kind}-h"><span class="muted ofcpv">${esc(tr('next: {0}', onumFmt(r.scheme, r.next)))}</span></span>
+      <span class="muted ofchint" id="onum-${r.kind}-h">${esc(tr('Counts with the invoice numbers'))}</span></div>`;
     const id = 'onum-' + r.kind, v = ONUM['v' + r.kind] ?? String(r.next), n = parseInt(v, 10), jump = n > r.min_next;
     const pv = n >= 1 ? tr('next: {0}', onumFmt(r.scheme, n)) : '';
     const hint = [tr('at least {0}', r.min_next), r.yearly ? tr('applies to {0}', r.period) : ''].filter(Boolean).join(' · ');

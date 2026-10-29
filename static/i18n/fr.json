@@ -15148,5 +15148,9 @@
   "Short code": "Code court",
   "In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.": "Dans les numéros comme {kuerzel}, p. ex. 673_TNP_R. Vide = les trois premières lettres du nom.",
   "Short code of the client": "Code court du client",
-  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "Le code court demande 2 à 6 lettres ou chiffres (p. ex. TNP)"
+  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "Le code court demande 2 à 6 lettres ou chiffres (p. ex. TNP)",
+  "Invoice corrections count in the invoice series": "Les factures rectificatives comptent dans la série des factures",
+  "On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.": "Activé : une rectification prend le numéro suivant du compteur des factures (p. ex. 423_R, 424_RK, 425_R) et garde son propre schéma. Désactivé : les rectifications ont leur propre compteur. Les numéros déjà attribués restent.",
+  "Counts with the invoice numbers": "Compte avec les numéros de facture",
+  "Invoice corrections count with the invoice numbers; set the next number there": "Les rectifications comptent avec les numéros de facture ; règle le numéro suivant là-bas"
 }
