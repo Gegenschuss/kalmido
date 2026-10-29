@@ -1,4 +1,4 @@
-// 2.168.0 part A UI test (#2665), own container (start.sh): a document's project. The editor of a FINALISED quotation shows
+// 2.168.0 part A UI test (#2665; 2.435.0 #3606: the button + project picker), own container (start.sh): a document's project. The editor of a FINALISED quotation shows
 // the row "Project" outside the locked fieldset (usable), the client's projects in their own group on top; picking one saves
 // it, "Open project" links to it; "Create new project" shows a name field preset with "Client – project title" and creates
 // it. The project page shows "Quotations & invoices" with number, status and amount (a click opens the document); a member
@@ -28,6 +28,7 @@ const FEAT = 'clients,office,collab';
   const C = await call('POST', '/api/clients', {name: 'Example Client AG', street: 'Marktstrasse 5', zip: '50667', city: 'Koeln', country: 'DE', org_id: ORG});
   const L = (await call('POST', '/api/lists', {name: 'Film project', kind: 'project', org_id: ORG})).id, L2 = (await call('POST', '/api/lists', {name: 'Other work', kind: 'project', org_id: ORG})).id;
   await call('PATCH', '/api/lists/' + L, {client_id: C.id});
+  for (let i = 1; i <= 9; i++) await call('POST', '/api/lists', {name: 'Extra ' + i, kind: 'project', org_id: ORG});  // 2.435.0 (#3606): a long list gets a search
   const mk = async title => {
     const q = await call('POST', '/api/office/docs', {kind: 'offer', project_title: title, client_id: C.id});
     await call('PUT', '/api/office/docs/' + q.id + '/items', {items: [{title: 'Shoot', qty: 1, rate: 1200}]});
@@ -43,10 +44,27 @@ const FEAT = 'clients,office,collab';
     const sel = await until(() => d.querySelector('#view #dpj-sel'));
     check(!!sel, `${who}: the editor has the project row`);
     check(sel && !sel.disabled && !sel.closest('fieldset[disabled]') && !sel.closest('.ofdfs'), `${who}: usable on a finalised quotation (outside the locked fieldset)`);
-    const groups = [...(sel?.querySelectorAll('optgroup') || [])].map(g => g.label);
-    check(groups[0] === 'Projects of the client' && groups[1] === 'Other projects', `${who}: the client's projects on top ` + groups.join(' | '));
-    check(sel?.querySelector('optgroup')?.querySelector(`option[value="${L}"]`) && sel?.querySelector(`option[value="${L2}"]`), `${who}: both projects to pick`);
-    sel.value = String(L); sel.dispatchEvent(new w.Event('change', {bubbles: true}));
+    // 2.435.0 (#3606): a button with the project's icon + name opens the project picker (no native select any more)
+    check(sel?.tagName === 'BUTTON' && sel.getAttribute('aria-haspopup') === 'menu' && /No project/.test(sel.textContent), `${who}: a button "No project" ` + sel?.tagName);
+    sel.click();
+    const pop = await until(() => { const p = d.querySelector('#pop:not(.hidden) .menu-list'); return p && p.querySelector('[role="menuitem"]') ? p : null; });
+    const heads = [...(pop?.querySelectorAll('.mgh') || [])].map(g => g.textContent);
+    const items = [...(pop?.querySelectorAll('[role="menuitem"]') || [])];
+    check(/No project/.test(items[0]?.textContent || '') && items[0]?.classList.contains('on'), `${who}: "No project" on top, checked`);
+    check(heads[0] === 'Projects of the client' && heads[1] === 'Other projects', `${who}: the client's projects on top ` + heads.join(' | '));
+    const film = items.find(b => /Film project/.test(b.textContent)), other = items.find(b => /Other work/.test(b.textContent));
+    check(film && other && film.closest('.mgrp')?.querySelector('.mgh')?.textContent === 'Projects of the client' && items.indexOf(film) < items.indexOf(other), `${who}: both projects to pick, the client's first`);
+    check(film?.querySelector('.lic'), `${who}: the project's icon in the picker`);
+    check(!mobile || d.querySelector('#pop .tch-sh'), `${who}: a sheet with a head on the phone`);
+    const q = d.querySelector('#pop #mq-q');
+    check(!!q, `${who}: a search field from 10 entries`);
+    if (q) {
+      q.value = 'extra 3'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+      const shown = [...pop.querySelectorAll('[role="menuitem"]')].filter(b => !b.closest('[hidden]'));
+      check(shown.length === 1 && /Extra 3/.test(shown[0].textContent), `${who}: the search leaves one entry ` + shown.map(b => b.textContent).join(' | '));
+      q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+    }
+    film?.click();
     check(await until(async () => (await lidOf(q.id)) === L), `${who}: picking saves the project`);
     check(await until(() => d.querySelector(`#view a[href="#l/${L}"]`)), `${who}: "Open project" links to it`);
     const box = d.querySelector('#view #dpj-new');
@@ -60,7 +78,7 @@ const FEAT = 'clients,office,collab';
     check(nl, `${who}: a new project created and set`);
     const lists = (await call('GET', '/api/state')).lists || [];
     check(lists.some(l => l.id === nl && /Example Client AG – .* (desktop|phone)$/.test(l.name) && l.client_id === C.id), `${who}: the new project with name and client`);
-    check(await until(() => d.querySelector('#view #dpj-sel')?.value === String(nl)), `${who}: the editor shows the new project`);
+    check(await until(() => d.querySelector('#view #dpj-sel')?.dataset.lid === String(nl) && /Example Client AG/.test(d.querySelector('#view #dpj-sel').textContent)), `${who}: the editor shows the new project`);  // 2.435.0 (#3606): the button
     w.close();
   }
   await call('POST', `/api/office/docs/${Q1.id}/project`, {list_id: L});

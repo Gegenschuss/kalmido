@@ -992,6 +992,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.168.0 A (#2665): a document's project (editor, outside the locked fieldset) and a project page's documents */
 .dpjrow{margin-bottom:.5rem}
 .dpjrow select{max-width:100%}
+/* 2.435.0 (#3606): the project button (icon + name + chevron) instead of the select */
+.dpjpick{max-width:100%;min-width:12rem;justify-content:flex-start;font-weight:400}
+.dpjpick .lic{width:1rem;flex:none}
+.dpjpick .dpjnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.dpjpick .dpjchev{flex:none;color:var(--muted)}
 .dpjlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem;max-width:40rem}
 .dpjdoc{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border:1px solid var(--line);border-radius:var(--r-m,.625rem);color:inherit;text-decoration:none}
 .dpjdoc:hover{background:var(--bg3)}

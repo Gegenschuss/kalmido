@@ -111,7 +111,7 @@ function popFocusBack() {
 }
 document.addEventListener('keydown', e => {
   const m = e.target.closest?.('#pop [role="menu"]'); if (!m || e.altKey || e.ctrlKey || e.metaKey) return;
-  const it = $$('[role="menuitem"]:not([disabled])', m), i = it.indexOf(e.target.closest('[role="menuitem"]'));
+  const it = $$('[role="menuitem"]:not([disabled])', m).filter(b => !b.closest('[hidden]')), i = it.indexOf(e.target.closest('[role="menuitem"]'));  // 2.435.0 (#3606): not the ones a search hid
   // 2.31.0 (#1056): → on an entry with a second level opens it, ← inside a second level goes back
   const p = $('#pop');
   if (e.key === 'ArrowRight' && e.target.closest('.msubm') && p._menuOpen) { e.preventDefault(); e.stopPropagation(); e.target.closest('.msubm').click(); return; }
@@ -736,16 +736,40 @@ const moveListItem = (anchor, id) => ({label: tr('Move to project…'), icon: 'l
 // 2.38.0 (#1177): ONE list picker for "Move to list…" (task menu, a note, the Inbox's move button): the Inbox first, then the
 // lists in the sidebar's order; a folder is only a heading with its lists indented below it (a subfolder one step deeper).
 // opts: filter(list) = which lists, pick(list) = what a choice does, title = the sheet's title (default "Move to list")
+// 2.435.0 (#3606): pre = menu items on top (e.g. "No project"), first = {head, lists, rest} a group on top (e.g. the client's
+// projects) with the other lists below the heading rest, on = the current list's id (a check), search = a search field
+// from this many entries
 function tch_listPicker(anchor, o = {}) {
-  const ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
-  const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', fn: () => o.pick(l)});
-  const ls = sideOrder().filter(ok), rows = [...(ok(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it)];
+  const top = o.first?.lists || [], ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
+  const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', on: !!o.on && l.id === o.on, fn: () => o.pick(l)});
+  const ls = sideOrder().filter(l => ok(l) && !top.includes(l)), rows = [...(o.pre || [])];
+  if (top.length) rows.push({head: o.first.head, keep: true}, ...sideOrder().filter(l => top.includes(l) && ok(l)).map(it), {head: o.first.rest || tr('Other projects'), keep: true});
+  rows.push(...(ok(ib) && !top.includes(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it));
   for (const f of folderNames()) {
     const fl = ls.filter(l => l.folder === f), sub = !!fParent(f);
     if (!fl.length && (sub || !ls.some(l => fUnder(l.folder, f)))) continue;  // a folder without lists here is left out
     rows.push({head: sub ? fName(f) : f, cls: 'tch-fd' + (sub ? ' tch-fd2' : ''), keep: !sub}, ...fl.map(it));
   }
-  return menu(anchor, rows, null, null, o.title || tr('Move to project'));
+  const p = menu(anchor, rows, null, null, o.title || tr('Move to project'));
+  if (o.search && rows.filter(r => !r.head).length >= o.search) tch_menuSearch(p);
+  return p;
+}
+// 2.435.0 (#3606): a search field above a long menu (like the phone's choice sheet): typing hides the entries without the
+// text and the empty groups, Enter picks the first one left, ↓ goes into the list
+function tch_menuSearch(p) {
+  const ml = p.querySelector('.menu-list'); if (!ml) return;
+  ml.insertAdjacentHTML('beforebegin', `<div class="sssearch mqs">${ic('search', 's')}<input id="mq-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>`);
+  const q = /** @type {HTMLInputElement} */ (p.querySelector('#mq-q'));
+  const vis = () => [...ml.querySelectorAll('[role="menuitem"]:not([disabled])')].filter(b => !b.closest('[hidden]'));
+  q.addEventListener('input', () => {
+    const v = q.value.trim().toLowerCase();
+    ml.querySelectorAll('[role="menuitem"]').forEach(b => { b.hidden = !!v && !b.textContent.toLowerCase().includes(v); });
+    ml.querySelectorAll('.mgrp').forEach(g => { g.hidden = !!v && !g.querySelector('[role="menuitem"]:not([hidden])'); });
+  });
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); vis()[0]?.click(); } else if (e.key === 'ArrowDown') { e.preventDefault(); vis()[0]?.focus(); }
+  });
+  setTimeout(() => { if (q.isConnected && !isTouch()) q.focus({preventScroll: true}); }, 0);  // after the menu's own focus
 }
 function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
