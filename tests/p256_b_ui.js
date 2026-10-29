@@ -77,7 +77,8 @@ const FEAT = 'cal,comments,collab,agents';
   click(w, brow().querySelector('[data-oa="edit"]')); await until(() => d.querySelector('.olemd'));
   click(w, em().querySelector('#ole-emo'));
   click(w, em().querySelector('#ole-emogrid [data-licon="kalmido"]'));
-  await until(async () => (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(x => x.id === BT)?.icon);
+  // CI of 2.409.0 (#3506): the name loses its emoji in a second request after the picture (PATCH after PUT icon) - wait for both
+  await until(async () => { const x = (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(y => y.id === BT); return x?.icon && x.name === 'Team Nord'; });
   srv = (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(x => x.id === BT);
   check(srv.icon === '/static/icon.svg', '#1795: a preset picture is set at once');
   check(srv.name === 'Team Nord', '#1795: the picture takes the emoji out of the name (as in the list dialog) ' + srv.name);
