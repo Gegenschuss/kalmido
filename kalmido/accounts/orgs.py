@@ -1347,6 +1347,7 @@ def org_leave(c, oid, uid, heir, back=None):
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     with system_ctx(c):  # 2.223.2 B (#2860): their office rights groups go too (coming back = no old groups)
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
+        c.execute("DELETE FROM doc_fetchers WHERE org_id=? AND user_id=?", (oid, uid))  # 2.425.0 (#3453 review): their receipt fetchers end (coming back = no old key)
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.351.0 D (#3214): their read marks in the organisation's channels / groups and list conversations go too (tchat_sig_q
     # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible)

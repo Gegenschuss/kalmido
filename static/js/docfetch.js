@@ -4,7 +4,6 @@
 // documents. Here: connect one with a setup code (shown once), its portals with on / off, last run, new receipts and an error,
 // and disconnect it. Only with the office. Kalmido stores no passwords, cookies or logins (the helper keeps its own sign-ins).
 const FXS = {code: '', ws: '', j: /** @type {any} */ (null)};
-NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out')]);
 function fx_html() {
   if (!feat('office')) return '';
   return `<h4 id="s-fetch-h">${tr('Receipt fetcher')}</h4><div id="s-fetch" class="dsc-embed fx-box"><div class="muted mhint">${tr('Loading…')}</div></div>`;

@@ -34,6 +34,8 @@ const report = (key, portals) => fetch(B + 'api/v1/fetcher/status', {method: 'PU
 
   // ---- frida: the section, the setup code, the portals
   const w = await boot({user: 'frida', media: DESK}), d = w.document;
+  // 2.425.0 (#3453 review): the notification row is there before the documents' code is loaded (docfetch.js comes lazily)
+  check(w.eval("NOTIF_ROWS.some(r => r[0] === 'fetcher')"), 'the notification row "Receipt fetcher" is there right after the start (lazy docfetch.js loaded: ' + w.eval("typeof fx_html === 'function'") + ')');
   await until(() => w.eval('S.booted && typeof dsc_integrDraw === "function" && typeof fx_draw === "function"'), 60);
   w.eval(`settingsModal('integr')`);
   check(!!await until(() => d.querySelector('.icard[data-jump="#s-fetch-h"]')), 'Integrations: a card "Receipt fetcher"');

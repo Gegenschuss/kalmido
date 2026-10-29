@@ -216,6 +216,8 @@ def v1_fetcher_upload():
         raise Denied(409, tr("The portal {0} is switched off in Kalmido", p["name"]))
     f = files[0]
     data = h6d_read(f)
+    if len(data) > MAX_FILE_MB * 1024 * 1024:  # 2.425.0 (#3453 review): 413 as docs/API.md says (fs_put's ValueError would be 400)
+        raise Denied(413, tr("The file is too large (at most {0} MB)", MAX_FILE_MB))
     if not data.startswith(b"%PDF-"):
         raise BadInput(tr("Only PDF files"))
     name = os.path.basename(f.filename or "") or f"{p['name']}-{order or 'receipt'}.pdf"

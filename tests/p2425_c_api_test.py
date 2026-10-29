@@ -155,6 +155,9 @@ check(r.status_code == 400, f"a .pdf name without the PDF magic: 400 {r.status_c
 check(up(K, pdf("x1"), data={"password": "geheim"}).status_code == 400, "an extra form field: 400")
 check(requests.post(V + "/fetcher/documents", headers=bearer(K), json={"portal": "amazon"}).status_code == 400, "JSON instead of multipart: 400")
 check(up(K, pdf("x2"), portal="ebay").status_code == 400, "an unknown portal: 400")
+# 2.425.0 (#3453 review): larger than the upload limit (the test container: 1 MB) = 413 as docs/API.md says, nothing stored
+r = up(K, b"%PDF-1.4\n" + b"0" * (1024 * 1024 + 64), order="BIG")
+check(r.status_code == 413 and not kt.dbx("SELECT 1 FROM doc_meta WHERE ext_id='abholer:amazon:BIG'"), f"too large: 413 {r.status_code}")
 
 # ---- a new error tells frida once; the same error again does not; the switch turns it off
 check(news(Fr) == [], "no notice yet")
@@ -213,6 +216,8 @@ check(not Bo.get(B + f"/api/docs/fetchers?ws=org:{ORG}").json()["fetchers"], "bo
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{CAROL}").ok, "setup: bob takes carol out of Alpha")
 check(requests.get(V + "/fetcher", headers=bearer(K2)).status_code == 403 and up(K2, pdf("danach"), portal="telekom").status_code == 403,
       "after carol left Alpha the key gets 403")
+check(kt.dbx("SELECT 1 FROM doc_fetchers WHERE user_id=? AND org_id=?", (CAROL, ORG)) == [],
+      "2.425.0 (#3453 review): leaving Alpha ends carol's fetcher of Alpha (coming back does not wake the old key)")
 
 # ---- disconnect: the key stops at once; the documents stay
 check(Fr.delete(B + f"/api/docs/fetchers/{FX}").ok, "frida disconnects her fetcher")
