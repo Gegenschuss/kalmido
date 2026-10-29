@@ -44,7 +44,8 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
-                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0)"),
+                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
+                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -703,6 +704,7 @@ ROUTES = {
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
+    "POST /api/orgs": "org",  # 2.422.0 (#2937): p2422_orgself_test.py
     "GET /api/admin/orgs/{}/delete-info": "org",  # 2.152.0 A (#2167): numbers for the delete dialog (instance admin)
     "GET /api/orgs/{}/leave-info": "org",  # 2.361.0 (#2922): the leave preview (the member / an admin of it)
     "POST /api/admin/orgs/{}/delete-notice": "org", "DELETE /api/admin/orgs/{}/delete-notice": "org",  # 2.361.0 (#2920): instance admin

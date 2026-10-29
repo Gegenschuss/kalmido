@@ -13,7 +13,7 @@ invitation, a switch per server, default off), own container (start.sh, SMTP sin
      password): open works, a registration with an organisation's e-mail domain stays a private account (never joins
      it); off again: the mode falls back to off
 usage: p2422_orgself_test.py <datadir>      (P2422_NOSTART=1: a running server, no start.sh)
-freelancer-matrix: own"""
+freelancer-matrix: own  tenant-matrix: org"""
 import json
 import os
 import shutil
