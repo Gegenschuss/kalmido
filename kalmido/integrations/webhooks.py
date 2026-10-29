@@ -14,16 +14,16 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
 from cryptography.exceptions import InvalidTag
 from flask import g, has_request_context, jsonify
 
-from ..core.config import app, APP_NAME, APP_VERSION, TZ
+from ..core.config import app, APP_NAME, APP_VERSION
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
-from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, now_utc, usettings
+from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
 from ..accounts.login import seal, unseal
+from ..accounts.orgs import is_org_admin
 from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
 from ..core.errors import BadInput
@@ -82,7 +82,7 @@ def need_wh():
 
 
 def wh_allow(c):
-    return frozenset(cal_allow(c) | set(cal_allow_parse(WH_ALLOW_ENV)[0]))
+    return frozenset(cal_allow(c, "webhooks") | set(cal_allow_parse(WH_ALLOW_ENV)[0]))
 
 
 def wh_url_check(c, u):
@@ -220,7 +220,7 @@ def wh_actor(c):
 
 
 def wh_today():
-    return datetime.now(TZ).date().isoformat()
+    return local_now().date().isoformat()
 
 
 def wh_grace_ok(c, w, oid):
@@ -528,7 +528,6 @@ def wh_org_hits(c, r):
     the same webhook up as one of the organisation."""
     if r["org_id"]:
         return []
-    from ..accounts.orgs import is_org_admin
     rows = c.execute("""SELECT DISTINCT o.id, o.name FROM lists l JOIN orgs o ON o.id=l.org_id
                         WHERE l.deleted_at IS NULL AND (l.owner_id=? OR EXISTS (SELECT 1 FROM list_members m
                               WHERE m.list_id=l.id AND m.user_id=?)) ORDER BY o.name""", (r["user_id"], r["user_id"])).fetchall()

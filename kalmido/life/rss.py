@@ -243,7 +243,7 @@ def rss_get(c, url, etag="", modified=""):
     if modified:
         hd["If-Modified-Since"] = modified[:100]
     try:
-        return cal_http(url, headers=hd, allow=cal_allow(c), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
+        return cal_http(url, headers=hd, allow=cal_allow(c, "feeds"), cross_redirects=True, max_bytes=RSS_MAX_BYTES,
                         timeout=RSS_TIMEOUT, deadline=RSS_DEADLINE)
     except CalError as e:  # 2.172.0 B (#2678): cal_http maps 401 and 403 to "auth"; for feeds only 401 is a login
         if e.code == "auth" and e.detail == "403":

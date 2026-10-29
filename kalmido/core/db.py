@@ -1,5 +1,6 @@
 """Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage.
 2.37.0 (#1150): Postgres only; the driver layer is core/pg.py (placeholders, rows, pool, request context)."""
+import json
 import os
 import re
 import secrets
@@ -1066,6 +1067,10 @@ def init_db(guard=True, load=None):
             gset(c, "migr_kind2352", "1")  # once: a status cleared later (= not tracked) stays cleared
             if n:
                 print("list types:", n, "projects without a status became 'on track'", flush=True)
+        if gsetting(c, "migr_allow2380") != "1":  # 2.380 G (#3389): the one list of internal hosts -> a copy per purpose
+            old = gsetting(c, "cal_allow_hosts")
+            gset(c, "allow_hosts_by_purpose", json.dumps({p: old for p in ALLOW_PURPOSES}, sort_keys=True))
+            gset(c, "migr_allow2380", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         from ..collab.msgsearch import msg_index_init
@@ -1211,6 +1216,11 @@ def repair_data(c):
                 c.execute("UPDATE user_settings SET value=? WHERE user_id=? AND key=?", (dflt, r["user_id"], k))
                 bump_n("setting_" + k)
     return n
+
+
+# 2.380 G (#3389): the purposes of the allowed internal hosts (one admin list each, calendars/subscriptions.py cal_allow)
+ALLOW_PURPOSES = ("calendar", "carddav", "webhooks", "mail", "git", "newsletter", "ntfy", "peppol", "feeds", "oidc",
+                  "paperless", "karakeep", "servers")
 
 
 def gsetting(c, key):

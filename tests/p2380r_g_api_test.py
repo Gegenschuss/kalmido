@@ -10,6 +10,10 @@
    up as one of the organisation; a person without an organisation: org_hits empty, private events as before
  - #3390: the redeem answer of the agent setup carries starter_sha256 = mcp/starter_sha256.txt (made by tools/starter_sha.py,
    in the image), for a person without an organisation too; the file matches the starter files (tools/starter_sha.py --check)
+ - #3389: the allowed internal hosts per purpose (13 purposes): the start's one-shot copied the old list into every purpose,
+   a purpose without an entry falls back to the old list; PATCH allow_hosts_by_purpose changes only the purposes named
+   (unknown purpose / a URL 400, non-admins 403, never shown to them); the old field cal_allow_hosts sets every purpose;
+   a host allowed for calendars only does not open webhooks (and the other way round)
 usage: p2380r_g_api_test.py <datadir>      (KMT_NOSTART=1 / P2380RG_NOSTART=1: a running server)"""
 import os
 import subprocess
@@ -139,5 +143,37 @@ if r.ok:
     got = rr.json().get("starter_sha256")
     check(rr.ok and got == WANT and "agent_run.py" in got and "starter_files.txt" in got,
           f"#3390: the redeem answer sends the checksums of this version: {rr.status_code} {str(got)[:200]}")
+
+# ================================================================ #3389: allowed internal hosts per purpose
+PURPOSES = {"calendar", "carddav", "webhooks", "mail", "git", "newsletter", "ntfy", "peppol", "feeds", "oidc", "paperless", "karakeep", "servers"}
+
+
+def by():
+    return A.get(B + "/api/about").json().get("allow_hosts_by_purpose") or {}
+
+
+check(dbx("SELECT value FROM settings WHERE key='migr_allow2380'")[0][0] == "1", "#3389: the one-shot copy ran at the start")
+check(set(by()) == PURPOSES and all(v == "" for v in by().values()), f"#3389: every purpose, empty on a fresh server: {by()}")
+r = A.patch(B + "/api/admin/settings", json={"cal_allow_hosts": "10.9.8.6:8443"})
+check(r.ok and set(r.json()["allow_hosts_by_purpose"].values()) == {"10.9.8.6:8443"}, f"#3389: the old field sets every purpose: {r.text[:200]}")
+dbx("UPDATE settings SET value=? WHERE key='allow_hosts_by_purpose'", ('{"calendar": "10.9.8.5"}',))  # a purpose missing in the setting
+b0 = by()
+check(b0.get("calendar") == "10.9.8.5" and b0.get("webhooks") == "10.9.8.6:8443", f"#3389: a purpose without an entry = the old list (what the copy gives): {b0}")
+r = A.patch(B + "/api/admin/settings", json={"allow_hosts_by_purpose": {"calendar": "10.9.8.8:8443", "webhooks": "10.9.8.7:8443 10.9.8.7:8443"}})
+b1 = r.json().get("allow_hosts_by_purpose") or {}
+check(r.ok and b1.get("calendar") == "10.9.8.8:8443" and b1.get("webhooks") == "10.9.8.7:8443" and b1.get("git") == "10.9.8.6:8443",
+      f"#3389: only the purposes named change, normalised: {r.text[:300]}")
+check(A.patch(B + "/api/admin/settings", json={"allow_hosts_by_purpose": {"printer": "x.lan"}}).status_code == 400, "#3389: an unknown purpose 400")
+check(A.patch(B + "/api/admin/settings", json={"allow_hosts_by_purpose": {"git": "http://x.lan/"}}).status_code == 400, "#3389: a URL instead of a host 400")
+check(A.patch(B + "/api/admin/settings", json={"allow_hosts_by_purpose": ["git"]}).status_code == 400, "#3389: not an object 400")
+check(by().get("git") == "10.9.8.6:8443", "#3389: a refused change changes nothing")
+check(Bo.patch(B + "/api/admin/settings", json={"allow_hosts_by_purpose": {"git": "x.lan"}}).status_code == 403, "#3389: only admins")
+check("allow_hosts_by_purpose" not in Bo.get(B + "/api/about").json(), "#3389: non-admins never see the lists")
+r = Bo.post(B + "/api/me/webhooks", json={"name": "cal host", "url": "http://10.9.8.8:8443/hook", "events": ["task.created"]})
+check(r.status_code == 400, f"#3389: a host allowed for calendars only does not open webhooks: {r.status_code} {r.text[:120]}")
+r = Bo.post(B + "/api/me/webhooks", json={"name": "wh host", "url": "http://10.9.8.7:8443/hook", "events": ["task.created"]})
+check(r.status_code == 201, f"#3389: the host allowed for webhooks: {r.status_code} {r.text[:120]}")
+r = F.post(B + "/api/me/webhooks", json={"name": "wh host", "url": "http://10.9.8.7:8443/hook", "events": ["task.created"]})
+check(r.status_code == 201, f"#3389 freelancer: the same list for a person without an organisation: {r.status_code} {r.text[:120]}")
 
 sys.exit(done("p2380r_g_api"))

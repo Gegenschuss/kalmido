@@ -136,7 +136,7 @@ class OidcError(Exception):
 
 def oidc_allow(c):
     from ..calendars.subscriptions import cal_allow, cal_allow_parse
-    return frozenset(cal_allow(c) | set(cal_allow_parse(OIDC_ALLOW_ENV)[0]))
+    return frozenset(cal_allow(c, "oidc") | set(cal_allow_parse(OIDC_ALLOW_ENV)[0]))
 
 
 def _oidc_url_ok(u, allow):

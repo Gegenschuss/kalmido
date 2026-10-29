@@ -122,7 +122,7 @@ def git_norm_base_url(u):
             port = p.port or 80
         except ValueError:
             return None
-        if not cal_host_allowed(cal_allow(db()), p.hostname, port):
+        if not cal_host_allowed(cal_allow(db(), "git"), p.hostname, port):
             raise BadInput(tr("The Git server needs https:// (http:// only for hosts an admin allowed)"))
     u = u.rstrip("/")
     if u.lower().endswith("/api"):
@@ -306,7 +306,7 @@ def git_public(c, r, manage=False):
 
 def git_ctx(c, r):
     api = git_urls(r["provider"], r["base_url"])[0]
-    return {"api": api, "provider": r["provider"], "token": git_unseal(r["id"], "token", r["token"]), "allow": cal_allow(c),
+    return {"api": api, "provider": r["provider"], "token": git_unseal(r["id"], "token", r["token"]), "allow": cal_allow(c, "git"),
             "path": git_repo_path(r["provider"], r["owner"], r["repo"]), "low": None}
 
 
@@ -1017,7 +1017,7 @@ def git_connect(c, lid, provider, base, owner, name, token, folder=None):
     if not cal_rate(me()):
         return err(tr("Too many attempts, please wait a few minutes"), 429)
     # check it at once (read the repository with the token): errors show in the dialog, nothing is stored
-    k = {"api": git_urls(provider, base)[0], "provider": provider, "token": token, "allow": cal_allow(c), "low": None,
+    k = {"api": git_urls(provider, base)[0], "provider": provider, "token": token, "allow": cal_allow(c, "git"), "low": None,
          "path": git_repo_path(provider, owner, name)}
     try:
         _, _, j = git_http(k, k["path"])

@@ -150,13 +150,15 @@ const STUB = 'http://127.0.0.1:8095';
   click(w, md.querySelector(`#s-cals [data-cal="${added.id}"] [data-calact="del"]`)); await sleep(900);
   j = await api(w, 'GET', '/api/calendars');
   check(!j.subs.some(x => x.id === added.id) && !md.querySelector(`#s-cals [data-cal="${added.id}"]`), 'remove');
-  // admin allow-list
+  // admin allow-list. 2.380 G (#3389): one field per service; the calendar's field carries the old list
   click(w, md.querySelector('[data-sec="users"]')); await sleep(600);
-  const ta = md.querySelector('#s-calhosts');
-  check(ta && ta.value === 'evil.test:8095, other.lan' && /127\.0\.0\.1:8095/.test(md.querySelector('#sp-users').textContent), 'admin: allow-list with the env note');
+  const ta = md.querySelector('#s-allowp-calendar');
+  check(ta && ta.value === 'evil.test:8095, other.lan' && md.querySelector('#s-allowp-webhooks')?.value === 'evil.test:8095, other.lan'
+    && /127\.0\.0\.1:8095/.test(md.querySelector('#sp-users').textContent), 'admin: allow-list per service with the env note');
   ta.value = 'evil.test:8095 other.lan nextcloud.home.arpa';
   ta.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);  // 1.5: saved when leaving the field
-  check(ta.value === 'evil.test:8095, other.lan, nextcloud.home.arpa', 'admin: allow-list saved + normalized');
+  check(ta.value === 'evil.test:8095, other.lan, nextcloud.home.arpa' && md.querySelector('#s-allowp-webhooks')?.value === 'evil.test:8095, other.lan',
+    'admin: allow-list saved + normalized, only for that service');
   ta.value = 'http://nope/';
   ta.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
   check(/Not a host name/.test(d.querySelector('#toast').textContent), 'admin: invalid entry refused');
@@ -170,7 +172,7 @@ const STUB = 'http://127.0.0.1:8095';
   w.eval(`settingsModal('calendars')`); await sleep(900);
   md = d.querySelector('.smodal');
   check(md.querySelector('#s-cals-h')?.textContent === 'Kalender' && md.querySelectorAll('#s-cals .calsub').length === 20 && /Kalender hinzufügen/.test(md.textContent), 'German settings, carol\'s 20 calendars');
-  check(!md.querySelector('#s-calhosts'), 'non-admin: no allow-list');
+  check(!md.querySelector('[data-allowp]'), 'non-admin: no allow-list');  // 2.380 G (#3389)
   md.remove(); w.close();
   check(!errs.length, 'no script errors: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);

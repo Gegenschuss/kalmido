@@ -995,8 +995,12 @@ a *Send test* button.
 **Which URLs are allowed.** Only `https://` to public addresses. Every address the host name resolves to is checked when
 connecting (so DNS tricks do not help): private networks (RFC 1918), loopback, link-local
 (169.254.x, cloud metadata), CGNAT (100.64.0.0/10, e.g. VPN overlays), IPv6 unique-local and similar are refused. Servers in your
-own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts* (the same
-project as for calendar subscriptions) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`.
+own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts*, line
+*Webhooks* (since 2.380 one line per service: a host allowed for calendars does not open webhooks; the update copied the
+former single list into every line) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`. The admin
+API: `PATCH /api/admin/settings {"allow_hosts_by_purpose": {"webhooks": "host, host:port"}}` (purposes `calendar`, `carddav`,
+`webhooks`, `mail`, `git`, `newsletter`, `ntfy`, `peppol`, `feeds`, `oidc`, `paperless`, `karakeep`, `servers`; only the
+ones named change; the older `cal_allow_hosts` sets all of them).
 Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 ## Behind a reverse proxy

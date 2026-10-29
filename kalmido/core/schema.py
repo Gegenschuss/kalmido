@@ -4266,6 +4266,7 @@ GLOBAL_DEFAULTS = {
     "aa_update_notified": "",   # last version an update alert went out for
     "aa_digest_sent": "",       # day of the last daily summary
     "cal_allow_hosts": "",      # admin: internal hosts calendar subscriptions may reach ("host, host:port")
+    "allow_hosts_by_purpose": "",  # 2.380 G (#3389): JSON {purpose: "host, host:port"} (calendars/subscriptions.py ALLOW_PURPOSES)
     # sign-in (package A): 2FA policy for built-in logins, passwordless passkey login, OIDC auto-create
     "twofa_required": "0",      # admin: users with a password must use a second factor (enrol at the next login)
     "passkey_login": "1",       # admin: passkeys may log in without the password (user verification required)

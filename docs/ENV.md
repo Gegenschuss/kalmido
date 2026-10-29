@@ -230,7 +230,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_CALDAV_DONE_DAYS` | `90` | Days completed tasks stay visible over CalDAV. |
 | `KALMIDO_CALDAV_HTTP` | `0` | Switch: allow CalDAV logins over plain http (only in a trusted network). |
 | `KALMIDO_CALENDARS` | `1` | Switch: calendar subscriptions (ICS / CalDAV). |
-| `KALMIDO_CALENDAR_ALLOW_HOSTS` | `(empty)` | Internal hosts calendar subscriptions may reach. |
+| `KALMIDO_CALENDAR_ALLOW_HOSTS` | `(empty)` | Internal hosts every service may reach (calendars, address books, webhooks, mail, Git, newsletter, ntfy, Peppol, feeds, OIDC, Paperless, Karakeep, servers); the admin's lists per service add to it (2.380). |
 | `KALMIDO_CALENDAR_MAX_EVENTS` | `5000` | Stored occurrences per subscription. |
 | `KALMIDO_CALENDAR_MAX_MB` | `10` | Size in MB of one calendar download. |
 | `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per person in 15 minutes. |
