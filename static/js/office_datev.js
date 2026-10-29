@@ -14,7 +14,7 @@ const DX_CHART = {SKR03: {standard: '8400', reduced: '8300', exempt: '8100', rev
 const dx_months = () => Array.from({length: 12}, (_, i) => [i + 1, MON[i]]);
 const dx_ph = (st, k) => { const d = (DX_CHART[st.chart] || DX_CHART.SKR03)[k] || ''; return d.padEnd((+st.acct_len || 4) + (k === 'debtor' ? 1 : 0), '0'); };
 
-// the block in Office > Settings > Invoices (admins edit, members see); 2.148.0 D (#2458): + the DATEV import (office_datevimp.js)
+// the block in Settings > Company & office > Data (was Office > Settings) (admins edit, members see); 2.148.0 D (#2458): + the DATEV import (office_datevimp.js)
 // 2.298.0 A2 (#3186): one sentence on top says where the values come from (no "from your tax advisor" per field)
 function dx_settingsHtml(s, dis) {
   const st = Object.assign({advisor_no: '', client_no: '', fy_start: 1, acct_len: 4, chart: 'SKR03', accounts: {}, bu: {}, debtor: '', bank: '', cash: ''}, s.datev_extf || {});
