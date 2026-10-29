@@ -39,6 +39,7 @@ function chatOpen(aid, o = {}) {
   S.chat = o.jc && S.chat.job ? {aid: +aid, msgs: [], err: null, job: S.chat.job} : {aid: +aid, msgs: S.chat.aid === +aid && !S.chat.job ? S.chat.msgs : [], more: S.chat.aid === +aid && !S.chat.job && S.chat.more, err: null};  // 2.56.0 (#1793): o.jc = a job's history (jobchat.js)
   LS.set('chatLast', +aid);  // 2.29.0 (#363): the pop-up button opens this one next time
   let p = $('#achat');
+  const ob = p && $('#chat-msgs', p); if (ob) ob._cs = 0;  // 2.380 F (#3381): opened again = its place / first new message
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
   if (p.classList.contains('float') !== fl) { p.innerHTML = ''; delete p.dataset.aid; delete p.dataset.cw; p.classList.remove('cwsplit'); }
   p.classList.toggle('float', fl); p.classList.remove('min'); document.body.classList.toggle('chat-float', fl); document.body.classList.toggle('chat-open', !fl);
@@ -46,6 +47,7 @@ function chatOpen(aid, o = {}) {
   p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
 function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
+  chs_save($('#chat-msgs'));  // 2.380 F (#3381): the place as left
   if (typeof jc_hist === 'function') jc_hist(false, !(S.route.mod === 'agents' && S.route.agent));  // 2.152.8 (#2711)
   if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
 function chatPop(aid) {
@@ -139,16 +141,68 @@ function chatRows() {
   if (!S.chat.msgs.length && !csdBusy('a:' + S.chat.aid)) return [`<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the projects you share.', esc(a?.name || ''))}</div>`];
   const pend = chatPending(), off = a && pend && (!a.enabled || agentOffline(a));
   const older = S.chat.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="chat-older">${tr('Load older messages')}</button></div>` : '';
-  return [older, ...jcd_rows(a, jcf_row(m => { if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206); 2.96.0 C (#2015): jcd_rows = job cards + filter
-    const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
-    // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
-    const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
-    const jb = !mine && ux_jobOf(m), jcol = jb ? jn9_jobColor(jb) : '';  // 2.47.3 (#1764), 2.59.0 (#1827): from the name
-    return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${cpnMark(m)}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`; }))
+  return [older, ...jcd_rows(a, jcf_row(m => chs_lineHtml(m) + chatRowHtml(m, a)))
     , csdHtml('a:' + S.chat.aid, S.chat.msgs, m => m.from !== 'agent')  // 2.62.0 (#1530): "Sending…"
     , off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : ''];
 }
+function chatRowHtml(m, a) {
+  if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206); 2.96.0 C (#2015): jcd_rows = job cards + filter
+  const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
+  // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
+  const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
+  const ap = !mine && apvKind(m), apo = ap && chatChoiceSt(m) === 'open', ed = mine && S.chat.edit === m.id;  // 2.39.0 (#1179): my message in edit mode
+  const jb = !mine && ux_jobOf(m), jcol = jb ? jn9_jobColor(jb) : '';  // 2.47.3 (#1764), 2.59.0 (#1827): from the name
+  return `<div class="cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}" data-k="m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}" data-mid="a:${m.id}" ${ap ? `id="apv-${m.id}"` : ''}${jb ? ` style="--jcol:${jcol}"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class="cbub">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class="csoffer"><button type="button" class="btn sm" data-act="chat-save" data-mid="${m.id}">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${cpnMark(m)}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type="button" class="rx rxtog" data-act="chat-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`;
+}
+// ---- 2.380 F (#3381): coming back to a chat no longer jumps to the bottom. Per chat the last message seen and the scroll
+// position are kept (S.chs, LS chatSeen). A chat opened again (new box, back from another app / tab) opens at the first
+// agent message newer than the one seen, with the line "New messages" and "New message ↓"; nothing new: where it was
+// (at the bottom only when it was at the bottom). Sending goes to the bottom as before.
+const chs_get = aid => (S.chs ||= LS.get('chatSeen', {}) || {})[aid] || null;
+const chs_lineHtml = m => S.chat.unread === m.id ? `<div class="chunread" role="separator" data-k="unread"><span>${esc(tr('New messages'))}</span></div>` : '';
+let chs_t = 0;
+function chs_save(box, force) {
+  const aid = box?._aid;  // the chat the box was restored for (S.chat may already be the next one)
+  if (!box || !box._cs || !aid || (document.hidden && !force)) return;
+  // seen = the last message drawn (at the bottom) or the last one whose top is in view; from the box, not S.chat.msgs
+  // (a message just loaded is not drawn yet)
+  const bot = chatNear(box), was = chs_get(aid), rows = [...box.querySelectorAll('.cmsg[data-mid^="a:"]')];  // (chs_get fills S.chs)
+  let id = 0;
+  if (bot) id = rows.length ? +rows[rows.length - 1].dataset.mid.slice(2) || 0 : 0;
+  else { const lim = box.getBoundingClientRect().bottom; for (const el of rows) { if (el.getBoundingClientRect().top >= lim - 24) break;  /* a sliver at the bottom edge is not seen */ id = +el.dataset.mid.slice(2) || id; } }
+  const v = {id: Math.max(id, was?.id || 0), top: Math.round(box.scrollTop), bot};
+  if (was && was.id === v.id && was.top === v.top && was.bot === v.bot) return;
+  if (!rows.length) return;
+  delete S.chs[aid]; S.chs[aid] = v;  // newest last: only the 60 chats used last are kept
+  const ks = Object.keys(S.chs); for (const k of ks.slice(0, Math.max(0, ks.length - 60))) delete S.chs[k];
+  clearTimeout(chs_t); chs_t = setTimeout(() => LS.set('chatSeen', S.chs), 300);
+}
+let chs_st = 0;
+const chs_saveSoon = box => { clearTimeout(chs_st); chs_st = setTimeout(() => chs_save(box.isConnected ? box : null), 80); };
+// the first agent message after the one seen (null: nothing new, or the chat was never opened here)
+const chs_after = id => S.chat.msgs.find(m => m.id > id && m.from === 'agent' && m.kind !== 'notice') || null;
+function chs_first() { const sv = chs_get(S.chat.aid); return sv ? chs_after(sv.id) : null; }
+// scrolls the line "New messages" (or its message) to the top; false = not drawn (e.g. inside a job's card)
+function chs_toLine(box) {
+  const el = S.chat.unread && ($('.chunread', box) || box.querySelector(`[data-mid="a:${S.chat.unread}"]`)); if (!el) return false;
+  box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 4;
+  S.chat.pin = chatNear(box); chatNewPill(!S.chat.pin); return true;
+}
+function chs_restore(box) {
+  box._cs = 1; box._aid = S.chat.job ? 0 : S.chat.aid; S.chat.back = false;  // a job's history (jobchat.js) keeps no place
+  const sv = chs_get(S.chat.aid);
+  // messages that arrive in the first seconds after opening (the chat's own load comes after the first draw) still count as new
+  S.chat.openSeen = box._aid && sv ? sv.id : null; S.chat.openUntil = Date.now() + 15000;
+  if (chs_toLine(box)) return;
+  if (sv && !sv.bot && box._aid) box.scrollTop = sv.top;
+  else box.scrollTop = box.scrollHeight;
+  S.chat.pin = chatNear(box); chatNewPill(!!S.chat.unread && !S.chat.pin);  // the first new one may sit in a job's card
+}
+document.addEventListener('visibilitychange', () => {
+  const box = $('#chat-msgs');
+  if (document.hidden) { clearTimeout(chs_st); if (box) { chs_save(box, true); S.chat.back = true; } return; }  // the place as left
+  if (box && S.chat.back) chatPatch();
+});
 // 2.41.0 (#1206): a notice of the agent ("New session, summary taken over (22:10)"): one grey line in the middle, no bubble,
 // no menu or reactions; with a file (the summary) the line opens it like a file in the chat (text files in the viewer)
 function chatNoticeHtml(m) {
@@ -803,10 +857,10 @@ function chatViewHtml(aid) {
 }
 function chatDraw(o = {}) {
   const p = $('#achat');
-  if (typeof cw_frame === 'function' && cw_frame(p)) o = {bottom: true};  // 2.47.1 (#1720): several chats one above the other (chatwins.js)
+  if (typeof cw_frame === 'function' && cw_frame(p)) o = {};  // 2.47.1 (#1720): several chats one above the other (chatwins.js); 2.380 F (#3381): the new box restores its place
   if (p && !p.classList.contains('hidden') && !p.classList.contains('cwsplit') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || (p.dataset.jc || '') !== jc_key() || !$('#chat-msgs', p))) {  // 2.56.0 (#1793): jc = a job's history
     const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; p.dataset.jc = jc_key(); if (d !== undefined) $('#chat-in', p).value = d;
-    o = {bottom: true};
+    o = {};  // 2.380 F (#3381): was bottom; the new box restores its place (chs_restore)
   }
   chatPatch(o);  // 2.7.2 (#422) / 2.12.2 (#451): the open chat refreshes in place (the box keeps its focus, the keyboard stays)
   agentLive();
@@ -816,7 +870,16 @@ function chatDraw(o = {}) {
 // is and "New message ↓" shows up; older pages above keep the message in view (keep)
 function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
-  const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
+  const a = agentById(S.chat.aid), near = chatNear(box) && !document.hidden, top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
+  // 2.380 F (#3381): a new box or the way back restores the chat's place (chs_restore) instead of jumping to the bottom
+  const rs = (!box._cs || S.chat.back) && S.chat.msgs.length > 0 && !o.bottom && !o.keep && !document.hidden;
+  if (box._cs && !document.hidden && !rs) chs_save(box);  // the place before the new rows (not on the way back: that restores)
+  // a box swapped while the chat is in view (a redraw, not a way back) that was at the bottom stays there, without the line
+  const cont = rs && !S.chat.back && Date.now() - (S.chat.seenAt || 0) < 2000 && !!chs_get(S.chat.aid)?.bot;
+  if (rs) S.chat.unread = cont || S.chat.job ? 0 : chs_first()?.id || 0;
+  else if (o.bottom) { S.chat.unread = 0; S.chat.openSeen = null; box._cs = 1; box._aid = S.chat.job ? 0 : S.chat.aid; S.chat.back = false; }
+  const late = !rs && !o.bottom && !o.keep && !S.chat.unread && S.chat.openSeen != null && Date.now() < (S.chat.openUntil || 0) && !document.hidden && chs_after(S.chat.openSeen);
+  if (late) S.chat.unread = late.id;
   patchRows(box, chatRows());  // 2.220.0 B (#2813): unchanged rows keep their nodes
   cf_after(box, 'a:' + S.chat.aid, o.keep);  // 2.46.2 (#1660): new messages fade in (older pages and the first fill stay quiet)
   apvPinSync();  // 2.35.0 (#1103)
@@ -827,8 +890,10 @@ function chatPatch(o = {}) {
   const sl = $('#chat-steps'), slh = chatStepsLiveHtml(); if (sl && !wk_sameEl(sl, slh)) {  /* 2.119.1 D (#2310) */ sl.outerHTML = slh; const n = $('#chat-steps'); if (n) n._h = slh; }
   if (chatRO && !box._ro) { box._ro = 1; chatRO.observe(box); }
   const ms = S.chat.msgs, nl = ms.length ? ms[ms.length - 1].id : 0; box.dataset.last = nl;
-  if (o.keep) box.scrollTop = top + box.scrollHeight - h;
-  else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
+  if (rs) chs_restore(box);
+  else if (late && chs_toLine(box)) { /* the first new one, loaded right after opening */ }
+  else if (o.keep) box.scrollTop = top + box.scrollHeight - h;
+  else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; chs_save(box); }
   else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice')) chatNewPill(true); }
   const on = !!a?.enabled && !jc_ended(), ci = $('#chat-in'),  /* 2.56.0 (#1793): an ended job's history: box off */ sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
@@ -836,6 +901,7 @@ function chatPatch(o = {}) {
   jc_patch();  // 2.56.0 (#1793)
   jcd_patch();  // 2.96.0 C (#2015): the filter of the job cards
   chatAbortSync();  // 2.144.0 A (#2412)
+  if (!document.hidden && box._cs) S.chat.seenAt = Date.now();  // 2.380 F (#3381): the chat is in view with its messages (chs cont)
 }
 // 2.12.2 (#453 N4): the phone chat fills exactly what is visible (the visual viewport minus the header and, without a
 // keyboard, the tab bar); with the keyboard up (body.kb-open) the tab bar and the note go, and a chat that was at the
@@ -865,7 +931,7 @@ function chatKeepBottom() { const b = $('#chat-msgs'); if (b && S.chat.pin !== f
 const chatRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => chatKeepBottom()) : null;
 function chatNewPill(on) { const b = $('#chat-new'); if (b && b.classList.contains('hidden') === on) b.classList.toggle('hidden', !on); }
 function chatBottom() { const box = $('#chat-msgs'); if (box) box.scrollTop = box.scrollHeight; chatNewPill(false); }
-document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') return; S.chat.pin = chatNear(e.target); if (S.chat.pin) chatNewPill(false); }, true);
+document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') return; S.chat.pin = chatNear(e.target); if (S.chat.pin) chatNewPill(false); chs_saveSoon(e.target); }, true);  // 2.380 F (#3381): + the place
 async function chatOlder() {
   const aid = S.chat.aid, jk = jc_key(); if (!aid || !S.chat.msgs.length || S.chat.busy) return;
   S.chat.busy = true;

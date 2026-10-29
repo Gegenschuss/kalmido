@@ -964,7 +964,7 @@ function renderView0() {
   else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
   el.scrollTop = scroll;
-  if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
+  if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
   const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
