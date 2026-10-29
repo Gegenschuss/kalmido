@@ -140,6 +140,26 @@ async function setAfter(patch) {
   if ('member_view' in patch) { await mvAfter(); return; }  // 2.436.0 (#3620): the whole view follows (core.js)
   if (Object.keys(patch).some(k => SET_RENDER.includes(k))) render();
 }
+// 2.436.0 (#3620): the person has something "View as member" hides (only then Settings > Account offers it)
+const mvHas = () => !!(S.me?.real_admin || S.me?.is_admin || (S.me?.workspaces || []).some(w => (w.real_role || w.role) === 'admin'));
+// 2.436.0 (#3620): "View as member" (core.js mvResp): the view follows a change of the switch: the account at once, then the state again; an open Settings is drawn anew
+async function mvAfter() {
+  if (MV.me && MV.me.id === S.me?.id) { const raw = {...S.me, is_admin: MV.me.is_admin, workspaces: MV.me.workspaces}; delete raw.real_admin; S.me = mvOn() ? mvMe(raw) : raw; }
+  try { await load(); } catch { /* offline: the account above holds until the next load */ }
+  if (typeof OFC !== 'undefined') OFC.data = {};  // the office's lists follow its menu
+  render();
+  const md = $$('.smodal').pop();
+  if (md) { md._noflush = true; md.remove(); settingsModal(mvOn() || LS.get('settingsSec', 'account') === 'org' ? 'account' : LS.get('settingsSec', 'account')); }
+}
+// the way back (the entry under the settings' areas, the account menu): one click, no question
+async function mvSet(on) {
+  const v = on ? '1' : '0';
+  if ((S.settings?.member_view || '0') === v) return;
+  try { await api('PATCH', '/api/settings', {member_view: v}); } catch { return; }
+  S.settings.member_view = v;
+  await mvAfter();
+  toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
+}
 // local (per device) settings: appearance, tab bar
 function setLocal(label, get, set, to) {
   const from = get();

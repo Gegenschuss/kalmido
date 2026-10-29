@@ -611,7 +611,7 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620): mvResp
+  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -623,46 +623,18 @@ async function api(method, url, body) {
     throw e;
   }
 }
-// 2.436.0 (#3620): "View as member" (setting member_view, Settings > Account): the ONE place where the own admin marks turn
-// into a member's for the display -- S.me.is_admin (with it the server operator's parts) and the role admin of the
-// organisations (S.me.workspaces, GET /api/orgs). Only the answers change here; the server's rights stay as they are (a
-// direct link still opens what the person may do). Untouched: the private area, the own agents and the office's daily work
-// (the office hides only its settings and administration, areas.js ofm_ok). The real marks stay as real_admin / real_role.
-const MV = {me: null};  // the last account answer as the server sent it (mvAfter takes it when the state cannot be read)
+// 2.436.0 (#3620): "View as member": the one place the own admin marks read as a member's (display only; settings.js mvSet)
+const MV = {me: null};
 const mvOn = () => S.settings?.member_view === '1';
 const mvOrg = o => o?.role === 'admin' ? {...o, role: 'member', real_role: 'admin'} : o;
 const mvMe = me => me ? {...me, real_admin: !!me.is_admin, is_admin: false, ...(Array.isArray(me.workspaces) ? {workspaces: me.workspaces.map(mvOrg)} : {})} : me;
-// the person has something the switch hides (only then Settings > Account offers it)
-const mvHas = () => !!(S.me?.real_admin || S.me?.is_admin || (S.me?.workspaces || []).some(w => (w.real_role || w.role) === 'admin'));
 function mvResp(url, j) {
   if (!j || typeof j !== 'object') return j;
   const p = String(url).split('?')[0];
-  if (p === '/api/state') {  // the state brings the setting itself (the first load knows no S.settings yet)
-    if (j.me) MV.me = j.me;
-    return j.me && j.settings?.member_view === '1' ? {...j, me: mvMe(j.me)} : j;
-  }
+  if (p === '/api/state') { if (j.me) MV.me = j.me; return j.me && j.settings?.member_view === '1' ? {...j, me: mvMe(j.me)} : j; }
   if (!mvOn()) return j;
   if (p === '/api/me') return mvMe(j);
-  if (p === '/api/orgs' && Array.isArray(j.orgs)) return {...j, orgs: j.orgs.map(mvOrg)};
-  return j;
-}
-// the view follows a change of the switch: the account at once, then the state again; an open Settings is drawn anew
-async function mvAfter() {
-  if (MV.me && MV.me.id === S.me?.id) { const raw = {...S.me, is_admin: MV.me.is_admin, workspaces: MV.me.workspaces}; delete raw.real_admin; S.me = mvOn() ? mvMe(raw) : raw; }
-  try { await load(); } catch { /* offline: the account above holds until the next load */ }
-  if (typeof OFC !== 'undefined') OFC.data = {};  // the office's lists follow its menu
-  render();
-  const md = $$('.smodal').pop();
-  if (md && typeof settingsModal === 'function') { md._noflush = true; md.remove(); settingsModal(mvOn() || LS.get('settingsSec', 'account') === 'org' ? 'account' : LS.get('settingsSec', 'account')); }
-}
-// the way back (the entry under the settings' areas, the account menu): one click, no question
-async function mvSet(on) {
-  const v = on ? '1' : '0';
-  if ((S.settings?.member_view || '0') === v) return;
-  try { await api('PATCH', '/api/settings', {member_view: v}); } catch { return; }
-  S.settings.member_view = v;
-  await mvAfter();
-  toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
+  return p === '/api/orgs' && Array.isArray(j.orgs) ? {...j, orgs: j.orgs.map(mvOrg)} : j;
 }
 // 2.359.0 A (#3023): the address with a temporary id replaced: the real id once its create went out (this tab or another,
 // the service worker); null = its create still waits in the queue; false = no create waits for it (it failed)
