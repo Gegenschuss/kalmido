@@ -99,7 +99,7 @@ async function chatLoad() {
     mtg_load(aid);  // 2.70.0 A (#1354): the cards of ready meeting proposals (meetprop.js)
   }
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
-  chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) fl_viewSoon(true, 'agents');  // 2.46.2 (#1718): gathered
+  jv_keepField(() => { chatDraw(); renderTop(); }); if (S.route.mod === 'agents' && !S.route.agent) jv_viewSoon();  // 2.46.2 (#1718): gathered; 2.425.0 (#3575): the focus stays
 }
 // 2.47.3 (#1764): messages of a background job ("Job #163: …", "✅ Job #163 … fertig:", ⏰ / ⏹ / ⚠️) are marked in the job's colour:
 // a stripe at the left of the bubble and a tag "Job #163". The colour comes from the number (the palette of #1721); a part job
@@ -786,9 +786,31 @@ async function jobStepsLoad(jid) {
   jobStepsRedraw();
 }
 // 2.46.2 (#1718): a click redraws at once (now), steps that arrive are gathered (fl_viewSoon)
+// 2.425.0 (#3575): a step that arrives never moves the focus: the field it sits in (chat box, search, …) keeps it with
+// its text and selection; only the own click on History puts it on the row
 function jobStepsRedraw(now) {
-  if ($('#chat-msgs')) chatPatch({});
-  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) { if (now) renderView(); else fl_viewSoon(true, 'agents'); }
+  if (now) { if ($('#chat-msgs')) chatPatch({}); if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) renderView(); return; }
+  jv_keepField(() => { if ($('#chat-msgs')) chatPatch({}); });
+  if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) jv_viewSoon();
+}
+// the live redraw of the agents page, gathered like fl_viewSoon (at most one per 400 ms), the focus kept (#3575)
+let jv_redrawT = 0;
+function jv_viewSoon() {
+  if (jv_redrawT) return;
+  jv_redrawT = setTimeout(() => { jv_redrawT = 0; if (S.route.mod === 'agents' && !(S.route.agent && chatFull())) jv_keepField(renderView); }, Math.max(16, (FL.vlast || 0) + 400 - Date.now()));
+}
+function jv_keepField(fn) {
+  const a = document.activeElement;
+  if (!a || a === document.body || !a.matches?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return fn();
+  let s = null, e = null, d = null; try { s = a.selectionStart; e = a.selectionEnd; d = a.selectionDirection; } catch { /* no caret on this type */ }
+  const back = () => {
+    const n = a.isConnected ? a : a.id ? document.getElementById(a.id) : null;  // a rebuilt chat window: its new box
+    if (!n || document.activeElement === n) return;
+    const cur = document.activeElement;
+    if (cur && cur !== document.body && !$('#view')?.contains(cur)) return;  // the person went elsewhere meanwhile
+    n.focus({preventScroll: true}); try { if (s != null && n.setSelectionRange && n.value.length >= s) n.setSelectionRange(s, e ?? s, d || 'none'); } catch { /* type without a caret */ }
+  };
+  try { return fn(); } finally { back(); setTimeout(back, 0); }  // also a late focus() of the redraw
 }
 // the summary toggles through the state (a redraw keeps it): click, Enter, Space
 document.addEventListener('click', e => {

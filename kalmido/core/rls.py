@@ -37,6 +37,7 @@ TABLES = (
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "office_bank_balances",  # 2.124.0 D (#2342): balances of the imported statements
     "office_bank_rules", "office_bank_rule_nos",  # 2.299.0 B (#3191): bank rules, declined rule suggestions
+    "office_bank_vendors",  # 2.425.0 B (#3451): settings of the recurring providers of the bank bookings
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_dunning_marks",  # 2.147.1 B (#2054): suggested payment reminders
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them
@@ -58,6 +59,7 @@ TABLES = (
     "wiki_versions",  # 2.123.0 A (#2102): the history of knowledge pages (NULL = private, the app checks the page)
     "fs_nodes",  # 2.48.0 (#1207): the file store (org_id NULL = a person's own tree)
     "fs_upload_requests",  # 2.122.0 A (#2097): file requests of a folder (NULL = private, the app checks the folder)
+    "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): receipt fetchers (NULL = the person's own documents, the app checks user_id)
     "fs_area_roots",  # 2.199.0 C (#2742): an area's root folder in a workspace (NULL = a person's own tree, the app checks owner_id)
     "fs_locks",  # 2.353.0 A (#2758): locked folders of the file store (NULL = a person's own tree, the app checks the folder)
     "bg_jobs",  # 2.193.0 D (#2220): the queue of short background work (NULL = none / private; written and read as "system")

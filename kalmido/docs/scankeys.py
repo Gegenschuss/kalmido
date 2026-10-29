@@ -20,7 +20,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, uset, usetti
 from ..core.errors import BadInput, Denied, UnknownFields
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_active_for, oc_user_space
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx  # 2.425.0 C (#3453): system_ctx
 from ..accounts.orgroles import org_role_key, org_writes
 from ..accounts.session import _token_hash, me
 from ..api.common import v1_args, v1_view
@@ -241,6 +241,8 @@ def sk_revoke_all(c, uid):
     """2.237.0 C (#2865): a password reset / change revokes the person's scan inbox keys (like the app passwords, #2496);
     a folder watcher needs a new setup code then. Other API tokens stay."""
     c.execute("DELETE FROM api_tokens WHERE user_id=? AND token_hash ILIKE ?", (uid, _v1().UPLOAD_HASH_PREFIX + "%"))
+    with system_ctx(c):  # 2.425.0 C (#3453): the receipt fetchers' keys too (one of an organisation's place: also from a reset link)
+        c.execute("DELETE FROM doc_fetchers WHERE user_id=?", (uid,))
 
 
 @app.delete("/api/docs/scan-keys/<int:kid>")

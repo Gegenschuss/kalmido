@@ -87,7 +87,7 @@ function notifPatch(s, row, ch, on) {
 // 2.46.6 (#1710): adm = only the admins' rows (Settings > Administration > Agents); the own matrix leaves them out
 function notifMatrixHtml(s, hint, adm = false) {
   const m = notifMatrix(s), social = collab();
-  const rows = NOTIF_ROWS.filter(([r, , , f]) => adm ? f === 'admin' && !!S.me?.is_admin : (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? false : f === 'propose' ? propOn() : feat('agents'))));
+  const rows = NOTIF_ROWS.filter(([r, , , f]) => adm ? f === 'admin' && !!S.me?.is_admin : (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? false : f === 'propose' ? propOn() : f === 'office' ? feat('office') : feat('agents'))));
   if (!rows.length) return '';
   const hid = adm ? 's-newsadm-h' : 's-news-h';
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`

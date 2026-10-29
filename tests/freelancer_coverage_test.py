@@ -269,6 +269,10 @@ ROUTES = {
     # 2.207.0 A (#2763): scan inboxes of the own documents, the upload key, the mail note, the folder watcher downloads
     "GET /api/docs/scan-keys": "files", "POST /api/docs/scan-keys": "files", "DELETE /api/docs/scan-keys/{}": "files",
     "GET /api/v1/documents/upload-target": "files", "POST /api/docs/mail-notice": "files", "GET /api/docs/folder-watcher/{}": "files",
+    # 2.425.0 C (#3453): receipt fetchers of the personal office (p2425_c_api_test.py, freelancer-matrix: files)
+    "GET /api/docs/fetchers": "files", "POST /api/docs/fetchers": "files", "DELETE /api/docs/fetchers/{}": "files",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files", "PUT /api/v1/fetcher/status": "files",
+    "POST /api/v1/fetcher/documents": "files",
     "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
@@ -987,6 +991,8 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
+    "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }
 
 

@@ -347,6 +347,7 @@ ORDER = (
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task
+    "office.bankvend",  # 2.425.0 B (#3451): recurring providers of the bank bookings, their missing invoices
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.privacy",  # 2.154.0 C (#2192): data protection sheets of a client (DPA, information, consent): mail, ways back, status
@@ -420,6 +421,7 @@ ORDER = (
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.scankeys",  # 2.207.0 A (#2763): scan inboxes (upload-only keys) + the folder watcher downloads
+    "docs.fetcher",  # 2.425.0 C (#3453): receipt fetchers (own key kind: upload receipts + report the portals' state)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)

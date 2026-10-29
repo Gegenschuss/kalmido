@@ -74,6 +74,11 @@
 .dsc-note{display:flex;gap:.5rem;align-items:flex-start;margin:.5rem 0;padding:.6rem .75rem;border-left:.2rem solid var(--accent);border-radius:var(--r-s);background:var(--bg3)}
 .dsc-note p{margin:0 0 .4rem}
 .dsc-hint{font-size:var(--fs-xs)}
+/* 2.425.0 C (#3453): the receipt fetcher (docfetch.js) */
+.fx-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem}
+.fx-head small,.fx-portal small{display:block}
+.fx-portal.off b{opacity:.6;text-decoration:line-through}
+.fx-errtxt{display:flex;align-items:center;gap:.3rem;color:var(--danger)}
 @media (max-width:767px) {
   .dc-view{padding:0 .5rem 6rem}
   .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}

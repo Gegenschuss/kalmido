@@ -21,6 +21,7 @@ from ..files.store import fs_log_add, need_node
 from . import store as S
 from .web import doc_json, doc_query, doc_update
 from .scankeys import sk_upload
+from .fetcher import fx_spec  # 2.425.0 C (#3453)
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
 V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
@@ -270,3 +271,4 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
                     scope="files:write",
                     desc="Needs the role edit. An agent's values are marked as set by an agent; a feature the workspace leaves to an "
                          "agent lands as a suggestion in To review instead, for a person to accept.")}
+    fx_spec(paths, op, ok, errs, T)  # 2.425.0 C (#3453): the receipt fetcher's routes

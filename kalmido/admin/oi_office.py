@@ -548,6 +548,7 @@ SPECS = [
     OiT("office/bank_imports.json", "office_bank_imports", people=_P, private="office"),
     OiT("office/bank_rules.json", "office_bank_rules", people={"created_by": "null"}, private="office"),  # 2.299.0 B (#3191)
     OiT("office/bank_rule_nos.json", "office_bank_rule_nos", people={"created_by": "null"}, private="office", prep=_p_rule_no),
+    OiT("office/bank_vendors.json", "office_bank_vendors", people={"updated_by": "null"}, private="office"),  # 2.425.0 B (#3451)
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),

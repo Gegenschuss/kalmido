@@ -115,6 +115,7 @@ ODL_MORE_SKIP = frozenset((
     "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
     "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "wiki_versions", "tchat_files",
     "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
+    "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): a person's receipt fetchers (connections, not content)
 ))
 ODL_PRUNE = {"at": 0.0}
 

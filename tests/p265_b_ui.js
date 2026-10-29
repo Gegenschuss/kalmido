@@ -27,7 +27,7 @@ const get = async u => (await fetch(B + u)).text();
 // 2.235.0 (#2891 #2902 #2903): agentcontrol / agentlock / agentrules = the sections of the agent dialog, same group
 const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
-  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'abdocs'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
+  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs'],  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
   polls: ['polls'], formq: ['formq']};  // 2.102.0 C (#2208): scheduling polls and questionnaires load on demand
 

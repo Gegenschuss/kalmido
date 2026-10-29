@@ -31,6 +31,8 @@ D = "2030-03-04"
 ALLOW = {
     # 2.207.0 (#2763): only a scan inbox key reaches it (p2207_a_scan_keys_test.py calls it as the freelancer with one)
     "GET /api/v1/documents/upload-target": "a personal token has no docs:upload (only a scan inbox key has it)",
+    # 2.425.0 (#3453): only a receipt fetcher's own key reaches it (p2425_c_api_test.py calls it as the freelancer with one)
+    "GET /api/v1/fetcher": "a personal token is no receipt fetcher key",
 }
 
 
