@@ -6,6 +6,7 @@
 //   each (no tab row, no hidden part), "Applies to" with the workspace
 // - a field saves itself there (autosave, the same PUT as the office page)
 // - the office menu's point Settings opens Settings > Company & office (the page office/settings stays for old links)
+// - the settings search finds the moved office settings by their words (Nummernkreis, Bankverbindung, Mahnung)
 // - the workspace's mailbox (IMAP / SMTP) with Set up / Change in Company & office
 // - the same for a person without an organisation (their private office, they are its admin)
 const {execFileSync} = require('child_process');
@@ -60,6 +61,16 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
     const sp = JSON.parse(w.eval(`JSON.stringify((HMB.j?.spaces || []).find(x => x.ws === ofcWs()) || null)`) || 'null');
     if (sp?.manage) check(!!(await until(() => d.querySelector('#s-bizmail-h') && d.querySelector(`#s-bizmail [data-hmba="edit"]`), 40)), `${who}: E-mail with Set up / Change in Company & office`);
     else check(!d.querySelector('#s-bizmail [data-hmba="edit"]'), `${who}: no mailbox button without the right`);
+    // the settings search: the words of the moved office settings lead to Company & office
+    {
+      const sq = d.querySelector('#s-search');
+      for (const [q, lab] of [['nummernkreis', 'Documents & numbers'], ['bankverbindung', 'Company'], ['mahnung', 'payment reminders']]) {
+        sq.dispatchEvent(new w.FocusEvent('focus')); sq.value = q; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
+        const hs = [...d.querySelectorAll('#s-sres [data-hit]')].map(b => b.textContent);
+        check(hs.some(t => /Company & office ›/.test(t) && t.includes(lab)), `${who}: search "${q}" offers Company & office › ${lab} ` + JSON.stringify(hs));
+      }
+      sq.value = ''; sq.dispatchEvent(new w.Event('input', {bubbles: true}));
+    }
     // Company & office goes away with the office module
     d.querySelector('.smodal [data-m="close"]')?.click();
     await until(() => !d.querySelector('.smodal'));

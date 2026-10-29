@@ -1580,18 +1580,19 @@ const SS_AREA = [
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
     'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
-    secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
+    secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
       [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
-      [N_('Documents & numbers'), ['nummer', 'nummern', 'number', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice'], '', 'docs'],
-      [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
+      [N_('Documents & numbers'), ['nummer', 'nummern', 'nummernkreis', 'number', 'numbering', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice', 'zahlungsziel', 'payment terms', 'skonto'], '', 'docs'],
+      [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
       [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
       [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
-      [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
+      [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'steuerberater', 'tax advisor', 'skr03', 'skr04'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
-      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
+      [N_('E-mail'), ['imap', 'smtp', 'postfach', 'mailbox', 'absender', 'sender', 'mailserver'], '#s-bizmail-h', '']]},  // 2.365.2 (#2789): the workspace's mailbox
   {src: ['bkSettingsHtml'], area: N_('Office|area'), name: N_('Bookkeeping'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],
     on: () => modOn('office') && ss_ofm('books'), open: () => go('office/books'), root: '#bk-sh', secs: [[N_('Settings'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping'], '#bk-sh']]}];
 // the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
