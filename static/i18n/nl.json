@@ -14847,5 +14847,13 @@
   "Costs this month: {0} of {1}": "Kosten deze maand: {0} van {1}",
   "Share of its daily cost limit": "Aandeel van zijn dagelijkse kostenlimiet",
   "Share of its monthly cost limit": "Aandeel van zijn maandelijkse kostenlimiet",
-  "Agent working": "Agent aan het werk"
+  "Agent working": "Agent aan het werk",
+  "Invoice {0} {1} missing": "Factuur {0} {1} ontbreekt",
+  "The link must start with https://": "De link moet met https:// beginnen",
+  "Missing invoices of recurring providers": "Ontbrekende facturen van terugkerende aanbieders",
+  "Recurring providers": "Terugkerende aanbieders",
+  "Remind me of missing invoices": "Herinner mij aan ontbrekende facturen",
+  "No recurring providers found yet. A counterpart that takes money out regularly (monthly, yearly) shows up here.": "Nog geen terugkerende aanbieders gevonden. Wie regelmatig afschrijft (maandelijks, jaarlijks) verschijnt hier.",
+  "Invoice missing after": "Factuur ontbreekt na",
+  "Recurring provider changed": "Terugkerende aanbieder gewijzigd"
 }

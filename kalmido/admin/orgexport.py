@@ -299,6 +299,7 @@ OX_AREAS = (
     ("office/bank_tx.json", "office_bank_tx", "org_id=?"),
     ("office/bank_rules.json", "office_bank_rules", "org_id=?"),  # 2.299.0 B (#3191): bank rules, declined rule suggestions
     ("office/bank_rule_nos.json", "office_bank_rule_nos", "org_id=?"),
+    ("office/bank_vendors.json", "office_bank_vendors", "org_id=?"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
     ("office/doc_templates.json", "office_doc_templates", "org_id=?"),
     ("office/gen_docs.json", "office_gen_docs", "org_id=?"),
     ("office/privacy_sheets.json", "office_privacy_sheets", "org_id=?"),  # 2.154.0 C (#2192): data protection sheets of a client

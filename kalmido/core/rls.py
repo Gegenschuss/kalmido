@@ -37,6 +37,7 @@ TABLES = (
     "office_bank_imports", "office_bank_tx",  # 2.90.0 B (#1921): bank reconciliation
     "office_bank_balances",  # 2.124.0 D (#2342): balances of the imported statements
     "office_bank_rules", "office_bank_rule_nos",  # 2.299.0 B (#3191): bank rules, declined rule suggestions
+    "office_bank_vendors",  # 2.425.0 B (#3451): settings of the recurring providers of the bank bookings
     "office_inv_series", "office_sub_reminders",  # 2.91.0 A (#1923), B (#1924)
     "office_dunning_marks",  # 2.147.1 B (#2054): suggested payment reminders
     "office_doc_templates", "office_gen_docs",  # 2.93.0 A (#1927): document templates and the documents made from them

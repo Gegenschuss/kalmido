@@ -107,6 +107,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "tax_dates": {},
                      # 2.299.0 C (#3192): the reminder of the bank bookings without a receipt (set only by its own route, office/banknorc.py)
                      "bank_norc": {},
+                     # 2.425.0 B (#3451): the recurring providers of the bank bookings (set only by its own route, office/bankvend.py): days
+                     "bank_vendors": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",

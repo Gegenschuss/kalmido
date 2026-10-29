@@ -14847,5 +14847,13 @@
   "Costs this month: {0} of {1}": "Costi questo mese: {0} di {1}",
   "Share of its daily cost limit": "Quota del suo limite di costi giornaliero",
   "Share of its monthly cost limit": "Quota del suo limite di costi mensile",
-  "Agent working": "Agente al lavoro"
+  "Agent working": "Agente al lavoro",
+  "Invoice {0} {1} missing": "Manca la fattura {0} {1}",
+  "The link must start with https://": "Il link deve iniziare con https://",
+  "Missing invoices of recurring providers": "Fatture mancanti dei fornitori ricorrenti",
+  "Recurring providers": "Fornitori ricorrenti",
+  "Remind me of missing invoices": "Ricordami le fatture mancanti",
+  "No recurring providers found yet. A counterpart that takes money out regularly (monthly, yearly) shows up here.": "Ancora nessun fornitore ricorrente. Chi addebita regolarmente (ogni mese, ogni anno) compare qui.",
+  "Invoice missing after": "Fattura mancante dopo",
+  "Recurring provider changed": "Fornitore ricorrente modificato"
 }

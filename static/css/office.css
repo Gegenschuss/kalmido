@@ -428,6 +428,15 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnrbar select{min-height:2.75rem}
 .bnrcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(14rem,18rem);gap:1rem;align-items:start}
 .bnrrc{position:sticky;top:.5rem;max-height:80vh;overflow:auto}
+/* 2.425.0 B (#3451): missing invoices of recurring providers, the providers' list */
+.bnvmiss{margin:.25rem 0 .75rem}
+.bnvhint{border-color:var(--accent)}
+.bnvhint .bnkn b{white-space:normal;overflow:visible}
+.bnvmore{margin-top:.375rem}
+.bnvlist{margin-top:1rem}
+.bnvlist>summary{cursor:pointer;font-weight:600;padding:.375rem 0}
+.bnvportal{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.bnvportal input{flex:1 1 14rem;min-width:0}
 .bnrdrag{cursor:grab}
 [data-bnr-drop].on{border-color:var(--accent)}
 .bnrcnt{margin-bottom:.75rem}
