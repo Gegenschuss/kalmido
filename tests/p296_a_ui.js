@@ -25,7 +25,7 @@ const menuLabels = async (w, row) => {
   row.querySelector('[data-ab="menu"]').click();
   await until(() => w.document.querySelector('#pop [role="menuitem"]'));
   const out = [...w.document.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
-  w.document.querySelector('#pop')?.remove();
+  w.eval('closePop()');  // 2.428.0 (#3581): closed, not removed -- the selection bar's "More" opens a menu in the same window later
   return out;
 };
 // the shared dialog: wait for the dry run, then press "Move"
