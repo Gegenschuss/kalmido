@@ -1008,6 +1008,7 @@ EV_IN = {"cal_id": S_ID, "title": {"type": "string"}, "location": {"type": "stri
          "reminders": {"type": "array", "items": {"type": "integer"}, "description": "minutes before the start"},
          "status": {"type": "string", "enum": ["confirmed", "tentative", "cancelled"]}, "busy": {"type": "boolean"},
          "url": {"type": ["string", "null"]}, "task_id": {"type": ["integer", "null"]},
+         "guests_visible": {"type": "boolean", "description": "2.380: the invitation to external guests names all guests (default false)"},
          "attendees": {"type": "array", "items": {"type": "object", "properties": {"user_id": S_ID, "contact_id": S_ID, "email": {"type": "string"},
                                                                                  "name": {"type": "string"}}}}}
 EV_KEYS = tuple(EV_IN)
