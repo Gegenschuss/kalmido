@@ -845,8 +845,7 @@ def org_self_create():
     """2.422.0 (#2937): {name, icon?} -- the signed-in person creates a company and becomes its admin (201, like
     POST /api/admin/orgs). 403 for agents and kid accounts, 403 outside the mode workspaces, 409 for a taken name or when
     she already has ORG_SELF_MAX companies of her own."""
-    from ..agents.core import is_agent
-    if is_agent(g.user) or g.user["kid"]:
+    if (g.user["kind"] or "user") == "agent" or g.user["kid"]:
         raise Denied(403, tr("Only a person can create a company"))
     c, b, uid = db(), body(), me()
     with system_ctx(c):  # creating an organisation (instance structure) with the caller as its only member
