@@ -833,8 +833,9 @@ def bk_open(path, pw, work):
 
 
 def bk_check_zip(z, space=True):
-    """Validates the member list; returns the manifest (with files) or BackupError. space=False: no free space check
-    (the download of a format-3 backup writes nothing). 2.432.0 (#3584): format 3 = + the list "shared" (bkstore.py)."""
+    """Validates the member list; returns the manifest (with files) or BackupError. space=False: no free space and no
+    version check (the download of a format-3 backup writes and restores nothing). 2.432.0 (#3584): format 3 = + the
+    list "shared" (bkstore.py)."""
     infos = z.infolist()
     if len(infos) > BK_MAX_MEMBERS:
         raise BackupError("members")
@@ -870,10 +871,10 @@ def bk_check_zip(z, space=True):
     sv = man.get("schema_version")
     if isinstance(sv, bool) or not isinstance(sv, int):
         raise BackupError("format")
-    if sv > SCHEMA_VERSION:
+    if sv > SCHEMA_VERSION and space:
         raise BackupError("schema", sv)
     av = str(man.get("app_version") or "")[:20]
-    if appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
+    if space and appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
         raise BackupError("newer", av, APP_VERSION)
     listed = {}
     for f in man["files"]:

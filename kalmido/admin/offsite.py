@@ -438,6 +438,10 @@ class WebDAV:
     def names(self):
         return [n for n, ln in self._props("", "1").items() if n and ln is not None]
 
+    def sizes(self):
+        """2.432.0 (#3584): {name: size} (a PUT broken off can leave a short file under the name)."""
+        return {n: ln for n, ln in self._props("", "1").items() if n and ln is not None}
+
     def delete(self, name):
         st, _, _ = self.call("DELETE", name)
         if st not in (200, 204, 404):
@@ -573,9 +577,10 @@ def bko_target(c, conf=None, sec=None):
     return {"s3": S3, "webdav": WebDAV, "sftp": SFTP}[conf["type"]](x, sec)
 
 
-def bko_prune(tgt, keep, kept=None):
+def bko_prune(tgt, keep, kept=None, just=None):
     """The newest `keep` backups on the target stay; older ones of this app's name pattern go. -> deleted names.
-    2.432.0 (#3584): kept (a list) gets the names still there; then the shared files none of them refers to go."""
+    2.432.0 (#3584): kept (a list) gets the names still there; then the shared files none of them refers to go -- not
+    when the listing lacks `just` (the backup uploaded right now: the listing is incomplete, review M1)."""
     try:
         names = tgt.names()
     except OffsiteError:
@@ -589,8 +594,12 @@ def bko_prune(tgt, keep, kept=None):
         except OffsiteError:
             pass  # tried again after the next upload
     left = [n for n in mine if n not in gone]
+    if just and just not in left:
+        left.insert(0, just)
     if kept is not None:
         kept[:] = left
+    if just and just not in names:
+        return gone
     blobs = [n for n in names if bks.REMOTE_RE.fullmatch(n)]
     need = set()
     for n in left:
@@ -639,9 +648,10 @@ def bko_upload(force=False):
                 refs = bks.refs_read(BK_STORE, x["name"])
                 if refs is None or any(bks.remote_name(r) is None for r in refs):
                     raise OffsiteError("refs")
-                have = set(tgt.names())
-                try:
-                    todo = [(bks.remote_name(r), bks.find(BK_STORE, r)) for r in sorted(refs) if bks.remote_name(r) not in have]
+                have = tgt.sizes() if hasattr(tgt, "sizes") else dict.fromkeys(tgt.names())
+                try:  # (a size on the target that differs = a broken upload there: sent again, review M2)
+                    todo = [(bks.remote_name(r), f) for r, f in ((r, bks.find(BK_STORE, r)) for r in sorted(refs))
+                            if bks.remote_name(r) not in have or have[bks.remote_name(r)] not in (None, os.path.getsize(f))]
                 except bks.StoreError:  # a shared file is gone from the store (by hand): counted like a failed upload
                     raise OffsiteError("refs") from None
                 (tgt.put_many if hasattr(tgt, "put_many") else lambda items: put_many(tgt, items))(todo)
@@ -649,7 +659,7 @@ def bko_upload(force=False):
             if got != x["size"]:
                 raise OffsiteError("size", got, x["size"])
             kept = []
-            bko_prune(tgt, conf["keep"], kept)
+            bko_prune(tgt, conf["keep"], kept, just=x["name"])
             if kept:
                 gset(c, "bko_remote", json.dumps(kept))  # 2.432.0 (#3584): their reference files stay here
         except OffsiteError as e:

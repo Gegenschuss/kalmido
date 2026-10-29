@@ -89,7 +89,8 @@ class Key:
 def desc_ok(d):
     try:
         return (isinstance(d, dict) and KID_RE.fullmatch(str(d["kid"])) is not None and 2 ** 10 <= int(d["n"]) <= 2 ** 20
-                and 1 <= int(d["r"]) <= 16 and 1 <= int(d["p"]) <= 4 and len(b64u_dec(str(d["salt"]))) == 16)
+                and 1 <= int(d["r"]) <= 16 and 1 <= int(d["p"]) <= 4 and len(b64u_dec(str(d["salt"]))) == 16
+                and 128 * int(d["n"]) * int(d["r"]) <= 128 * 1024 * 1024)  # (review N3: scrypt memory of a foreign manifest)
     except (KeyError, ValueError, TypeError):
         return False
 
