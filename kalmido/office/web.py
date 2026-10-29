@@ -413,7 +413,7 @@ def pb_move_post():
             return err(tr("An organisation with this name exists"), 409)
         if own and org_self_made_n(c, uid) >= ORG_SELF_MAX:
             return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
-        if c.execute("UPDATE orgs SET name=?, personal_of=NULL, self_made=? WHERE id=? AND personal_of=?", (name, int(own), oid, uid)).rowcount != 1:
+        if c.execute("UPDATE orgs SET name=?, personal_of=NULL, self_made=? WHERE id=? AND personal_of=?", (name, uid if own else 0, oid, uid)).rowcount != 1:
             return err(tr("Only a personal office can move into an organisation"), 409)
         org_member_add(c, oid, uid, "admin")
         moved = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=?", (uid,))]

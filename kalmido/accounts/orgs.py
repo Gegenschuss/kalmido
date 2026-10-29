@@ -84,7 +84,8 @@ def instance_mode(c=None):
 
 def main_org(c):
     with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
-        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
+        # 2.422.0 (#2937 review): a company a person created herself is never the server's organisation
+        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
     return r[0] if r else None
 
 
@@ -262,7 +263,7 @@ def _visible_people(c, uid):
             full = [o for o in user_orgs_full(c, uid) if o in orgs]
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q}) AND (role='admin' OR org_id IN ({','.join(str(int(o)) for o in full) or 'NULL'}))", orgs)}
-        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
+        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 LIMIT 1").fetchone():  # 2.152.0 A; 2.422.0 (#2937 review): like om_has_orgs
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
@@ -828,14 +829,15 @@ def org_create():
 # 2.422.0 (#2937): a self-employed person creates a company of her own (work apart from her private
 # things) without the server's admin: mode workspaces, a person (no agent, no kid account), she becomes its admin. At most
 # ORG_SELF_MAX such companies per person. Marked self_made: only a server admin sets its e-mail domains (nobody joins it by
-# the domain of their address), and it does not count as the server's organisation for open registration (signup.py).
+# the domain of their address), and it does not count as the server's organisation for open registration (signup.py), its
+# main organisation (main_org) or the household rule "everyone sees everyone" (_visible_people). self_made holds the id of
+# the person who created it (0 = the server's admin), so leaving one never frees a place.
 ORG_SELF_MAX = 3
 
 
 def org_self_made_n(c, uid):
-    """The companies uid created herself and still administers (2.422.0, #2937)."""
-    return c.execute("SELECT COUNT(*) FROM orgs o JOIN org_members m ON m.org_id=o.id AND m.user_id=? AND m.role='admin' "
-                     "WHERE o.self_made=1 AND o.personal_of IS NULL AND o.retired_at IS NULL", (uid,)).fetchone()[0]
+    """The companies uid created herself (2.422.0, #2937; review: also the ones she left or handed over)."""
+    return c.execute("SELECT COUNT(*) FROM orgs WHERE self_made=? AND personal_of IS NULL AND retired_at IS NULL", (uid,)).fetchone()[0]
 
 
 @app.post("/api/orgs")
@@ -855,8 +857,8 @@ def org_self_create():
             return err(tr("An organisation with this name exists"), 409)
         if org_self_made_n(c, uid) >= ORG_SELF_MAX:
             return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
-        oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at,self_made) VALUES(?,?,?,?,1)",
-                        (name, _clean_icon(b.get("icon")), "", iso(now_utc())))
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at,self_made) VALUES(?,?,?,?,?)",
+                        (name, _clean_icon(b.get("icon")), "", iso(now_utc()), uid))
         org_member_add(c, oid, uid, "admin", keep_office=False)
         bump(c)
         c.commit()

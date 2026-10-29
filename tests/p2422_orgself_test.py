@@ -67,13 +67,17 @@ mine = Fr.get(B + "/api/orgs").json().get("orgs") or []
 o = next((x for x in mine if x["id"] == OID), {})
 check(o and o.get("role") == "admin" and [m["id"] for m in o.get("members", [])] == [FID],
       f"(a) she is its only member and its admin ({o})")
-check(sql("SELECT self_made FROM orgs WHERE id=?", (OID,)) == [(1,)], "(a) marked as a company of her own")
+check(sql("SELECT self_made FROM orgs WHERE id=?", (OID,)) == [(FID,)], "(a) marked as a company of her own (her id)")
 check(Fr.post(B + "/api/orgs", json={"name": "frida studio"}).status_code == 409, "(a) a taken name: 409")
 check(Fr.post(B + "/api/orgs", json={"name": " "}).status_code == 400, "(a) no name: 400")
 for n in ("Frida Two", "Frida Three"):
     check(Fr.post(B + "/api/orgs", json={"name": n}).status_code == 201, f"(a) {n}: 201")
 r = Fr.post(B + "/api/orgs", json={"name": "Frida Four"})
 check(r.status_code == 409, f"(a) the 4th company of her own: 409 ({r.status_code} {r.text[:120]})")
+# review: handing a company over (she steps down, somebody else is its admin) frees no place -- counted by who created it
+T3 = next(x["id"] for x in Fr.get(B + "/api/orgs").json()["orgs"] if x["name"] == "Frida Three")
+check(A.patch(B + f"/api/admin/orgs/{T3}", json={"members_add": [ALICE], "admins_add": [ALICE], "admins_remove": [FID]}).ok, "(a) setup: Frida Three handed to alice")
+check(Fr.post(B + "/api/orgs", json={"name": "Frida Five"}).status_code == 409, "(a) handed over: still no 4th company")
 
 # ---------------------------------------------------------------- (b) e-mail domains only by the server's admin
 r = Fr.patch(B + f"/api/orgs/{OID}", json={"domains": "example.org"})
@@ -91,7 +95,7 @@ check(st.get("personal") == 1 and st.get("can_move") == 1, f"(c) gina's personal
 r = Gr.post(B + "/api/office/move", json={"name": "Gina Works", "confirm": True})
 check(r.ok and r.json().get("org_id"), f"(c) gina moves her personal office into Gina Works ({r.status_code} {r.text[:160]})")
 GOID = r.json().get("org_id") if r.ok else None
-check(GOID and sql("SELECT self_made, personal_of FROM orgs WHERE id=?", (GOID,)) == [(1, None)], "(c) a company of her own, no personal office any more")
+check(GOID and sql("SELECT self_made, personal_of FROM orgs WHERE id=?", (GOID,)) == [(GID, None)], "(c) a company of her own, no personal office any more")
 
 # ---------------------------------------------------------------- (d) companies of their own: no organisation's server
 check(about().get("has_orgs") is False, f"(d) only companies people created themselves: has_orgs false ({about().get('has_orgs')})")

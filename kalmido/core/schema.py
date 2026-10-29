@@ -3842,7 +3842,8 @@ MIGRATIONS = [
     # 2.409.0 (#3490): the areas the organisation's admins switched off for its members (csv of area ids, accounts/wsareas.py;
     # '' = all on). Older versions ignore it (every area as the person's module switches say)
     ("orgs", "areas_off", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS areas_off TEXT NOT NULL DEFAULT ''"),
-    # 2.422.0 (#2937): a company a person created herself (POST /api/orgs, accounts/orgs.py): its e-mail domains are set only
+    # 2.422.0 (#2937): a company a person created herself (POST /api/orgs, accounts/orgs.py; the id of that person, 0 = the
+    # server's admin made it): its e-mail domains are set only
     # by an admin of the server, and it does not make the server an organisation's server for open registration. Older
     # versions ignore it (such a company then counts like one the server's admin created)
     ("orgs", "self_made", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS self_made BIGINT NOT NULL DEFAULT 0"),
