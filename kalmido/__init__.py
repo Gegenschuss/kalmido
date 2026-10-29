@@ -409,6 +409,7 @@ ORDER = (
     "docs.classify",  # 2.48.0 (#1111): the locally learning classifier (no routes)
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
+    "docs.maillink",  # 2.424.0 B (#3450): invoice download links of a mail to the document address (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
     "docs.unpack",  # 2.146.0 B (#2453): ZIP / winmail.dat of an upload or a mail -> its files (no routes)

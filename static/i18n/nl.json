@@ -14946,5 +14946,12 @@
   "{0} receipt image": ["{0} bonafbeelding", "{0} bonafbeeldingen"],
   "{0} row": ["{0} rij", "{0} rijen"],
   "lines: debit {0}, credit {1}": "regels: debet {0}, credit {1}",
-  "{0} receipt without image content left out": ["{0} bon zonder afbeeldingsinhoud overgeslagen", "{0} bonnen zonder afbeeldingsinhoud overgeslagen"]
+  "{0} receipt without image content left out": ["{0} bon zonder afbeeldingsinhoud overgeslagen", "{0} bonnen zonder afbeeldingsinhoud overgeslagen"],
+  "Receipt link needs a login": "Bonlink vraagt om inloggen",
+  "Receipts by e-mail": "Bonnen per e-mail",
+  "Forward invoices to this address: attached PDFs and download links that need no login become documents and receipt suggestions.": "Stuur facturen door naar dit adres: bijgevoegde pdf's en downloadlinks zonder inloggen worden documenten en bonvoorstellen.",
+  "Forward automatically from Gmail": "Automatisch doorsturen vanuit Gmail",
+  "In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.": "In Gmail: Instellingen > Alle instellingen bekijken > Doorsturen en POP/IMAP > Een doorstuuradres toevoegen. Vul dit adres in; de bevestigingscode komt hier binnen als document.",
+  "Search for your invoice mails, for example subject:(invoice OR Rechnung OR receipt), and choose “Create filter”.": "Zoek je factuurmails, bijvoorbeeld subject:(invoice OR Rechnung OR receipt), en kies 'Filter maken'.",
+  "Tick “Forward it to”, pick this address and create the filter.": "Vink 'Doorsturen naar' aan, kies dit adres en maak het filter."
 }

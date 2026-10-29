@@ -21,9 +21,10 @@ from ..files.store import fs_add_hooks, fs_on_delete, fs_put, fs_role
 from . import store as S
 from .unpack import doc_unpack
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
-from ..core.i18n import tr  # 2.353.0 (#2769)
+from ..core.i18n import lang, tr  # 2.353.0 (#2769)
 from ..office.lettermail import ltm_token_space  # 2.312.0 C (#3265)
 from ..files.fslock import fl_is_locked  # 2.353.0 (#2769)
+from .maillink import ML_TAG, ml_collect, ml_mail_name  # 2.424.0 B (#3450)
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -291,7 +292,7 @@ def docs_mail_import(c, msg, raw):
             return 0  # no longer a member: nothing goes in
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
         _text, files = mail_text(msg)
-        first, made = 0, []
+        first, made, cand = 0, [], False
         for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
             parts = doc_unpack(name, data, MAIL_UNPACKED)  # 2.146.0 B (#2453): a ZIP / winmail.dat -> its files
             if parts is not None:
@@ -305,6 +306,7 @@ def docs_mail_import(c, msg, raw):
                 parts = [(name, mime, data, f"mail:{mid}:{i}")]
             else:
                 continue
+            cand = True
             for pname, pmime, pdata, pext in parts:
                 try:
                     with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
@@ -313,6 +315,31 @@ def docs_mail_import(c, msg, raw):
                     made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:
                     print("docs: mail attachment refused", type(e).__name__, flush=True)
+        if not cand and letter is None:
+            # 2.424.0 B (#3450): no file attached -> the invoice download links of the mail (docs/maillink.py: https, SSRF
+            # guard, limits, PDF only); a link that gives no PDF (a login page) -> the mail itself, tagged "needs a login"; no
+            # link at all -> the mail itself too (an invoice in the mail text, a confirmation code of a mail filter)
+            links, got = ml_collect(msg)
+            for k, pname, pdata in got:
+                try:
+                    with c.savepoint():
+                        nid = docs_ingest(c, uid, org, pname, pdata, "application/pdf", "mail", {"ext_id": f"mail:{mid}:link:{k}"}, dedup=True)
+                    first = first or nid
+                    made.append(nid)
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("docs: receipt link refused", type(e).__name__, flush=True)
+            if not got:
+                tag = tr(ML_TAG, lg=lang(c, uid)) if links else ""
+                meta = {"ext_id": f"mail:{mid}:eml", "text": ((tag + "\n\n" if tag else "") + _text)[:200_000] or ml_mail_name(msg)}
+                if tag:
+                    meta["tags"] = [tag]
+                try:
+                    with c.savepoint():
+                        nid = docs_ingest(c, uid, org, ml_mail_name(msg), raw, "message/rfc822", "mail", meta, dedup=True)
+                    first = first or nid
+                    made.append(nid)
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("docs: mail document refused", type(e).__name__, flush=True)
         if made:  # 2.153.0 (#2029): the answer to a letter sent by e-mail (In-Reply-To / References) -> linked to it
             try:
                 from ..office.lettermail import ltm_link_replies

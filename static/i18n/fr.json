@@ -14946,5 +14946,12 @@
   "{0} receipt image": ["{0} image de justificatif", "{0} images de justificatifs"],
   "{0} row": ["{0} ligne", "{0} lignes"],
   "lines: debit {0}, credit {1}": "lignes : débit {0}, crédit {1}",
-  "{0} receipt without image content left out": ["{0} justificatif sans contenu d’image ignoré", "{0} justificatifs sans contenu d’image ignorés"]
+  "{0} receipt without image content left out": ["{0} justificatif sans contenu d’image ignoré", "{0} justificatifs sans contenu d’image ignorés"],
+  "Receipt link needs a login": "Le lien du justificatif demande une connexion",
+  "Receipts by e-mail": "Justificatifs par e-mail",
+  "Forward invoices to this address: attached PDFs and download links that need no login become documents and receipt suggestions.": "Transférez vos factures à cette adresse : les PDF joints et les liens de téléchargement sans connexion deviennent des documents et des propositions de justificatif.",
+  "Forward automatically from Gmail": "Transférer automatiquement depuis Gmail",
+  "In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.": "Dans Gmail : Paramètres > Voir tous les paramètres > Transfert et POP/IMAP > Ajouter une adresse de transfert. Saisissez cette adresse ; le code de confirmation arrive ici comme document.",
+  "Search for your invoice mails, for example subject:(invoice OR Rechnung OR receipt), and choose “Create filter”.": "Recherchez vos e-mails de facture, par exemple subject:(invoice OR Rechnung OR receipt), puis choisissez « Créer un filtre ».",
+  "Tick “Forward it to”, pick this address and create the filter.": "Cochez « Transférer à », choisissez cette adresse et créez le filtre."
 }
