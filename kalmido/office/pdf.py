@@ -69,7 +69,9 @@ PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
 PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
 PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the page breaks
 PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
-# 2.406.0 (#3491): look A of the quotation PDF (chosen 27.10.2026), only while a quotation is laid out (PDF_LOOK_A)
+# 2.406.0 (#3491): look A of the quotation PDF (chosen 27.10.2026), only while a quotation is laid out (PDF_LOOK_A);
+# 2.434.0 A (#3603): also invoices, credit notes and reminders (PDF_LOOK_A_KINDS), delivery notes keep the old look
+PDF_LOOK_A_KINDS = ("offer", "invoice", "credit", "reminder")
 PDF_FS_DELTA = -2.0       # every text of the quotation 2 pt smaller ...
 PDF_FS_MIN = 6.0          # ... but never below 6 pt (footer, small captions)
 PDF_SUM_FILL = 1.0        # share of the free room of the last main page put ABOVE the totals (1 = totals + closing sit at the bottom)
@@ -416,6 +418,8 @@ class _Page:
             x = x + (width or 0) - w if width else x - w
         elif align == "c":
             x = x + ((width or 0) - w) / 2
+        elif align == "cr":  # 2.434.0 A (#3603): centred, but a wider line ends at the box's right edge (the GiroCode label)
+            x = x + min(((width or 0) - w) / 2, (width or 0) - w)
         r, g, b = _rgb(color)
         self.ops.append(f"BT {r:.3f} {g:.3f} {b:.3f} rg /{'F2' if bold else 'F1'} {size:.2f} Tf {spacing:.2f} Tc "
                         f"{x:.2f} {self.H - y - size * 0.78:.2f} Td <{pdf_encode(s).hex()}> Tj ET")
@@ -1164,7 +1168,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         return pdf_paper_ns(m.get("paper")).office_pdf(model, logo_bytes, xml, meta)
     if BP is None and isinstance(m.get("letterhead"), dict):  # 2.120.0 E (#2091): own letterhead: the same layout with its margins
         return bp_layout(m["letterhead"], model, logo_bytes, xml, meta)
-    if (m.get("kind") or "offer") == "offer" and not PDF_LOOK_A.get():  # 2.406.0 (#3491): a quotation in look A
+    if (m.get("kind") or "offer") in PDF_LOOK_A_KINDS and not PDF_LOOK_A.get():  # 2.406.0 (#3491): a quotation in look A; 2.434.0 A (#3603): + invoices
         tok = PDF_LOOK_A.set(True)
         try:
             return office_pdf(model, logo_bytes, xml, meta)
@@ -1266,10 +1270,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # whole closing fits on one page; sq = points of its top gap that may be given up so that a group still fits on the page
     # 2.294.0 (#3154): air = (top, bottom, min_top) extra points around a block (totals, intro) that the layout gives up first --
     # down to min_top before the old gaps (sq), below it only so that the page count never grows
-    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0, air=None, air_kind="", pk=False):  # 2.47.0 (#1215): brk = starts a new page
+    # 2.434.0 A (#3603): foot = the block (with what follows it up to the next page break) sits at the bottom of its page
+    def block(h, fn, keep_next=False, keep_prev=False, table=False, brk=False, tail=False, sq=0, air=None, air_kind="", pk=False, foot=False):  # 2.47.0 (#1215): brk = starts a new page
         at, ab, am = air or (0.0, 0.0, 0.0)
         blocks.append({"h": h + at + ab, "draw": fn, "keep_next": keep_next, "keep_prev": keep_prev, "table": table, "brk": brk, "tail": tail, "sq": sq,
-                       "sq_used": 0.0, "air": at + ab, "air_top": at, "air_min": am, "air_cut": 0.0, "air_kind": air_kind, "pk": pk})
+                       "sq_used": 0.0, "air": at + ab, "air_top": at, "air_min": am, "air_cut": 0.0, "air_kind": air_kind, "pk": pk, "foot": foot})
 
     # 2.296.0 E (#3166): a paragraph as one block per line, so that one longer than the room of a page breaks between its lines
     # instead of running over the footer; its first two and last two lines stay together (no single line at a page end / start),
@@ -1622,39 +1627,42 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             sum_at.append(len(blocks))  # 2.406.0 (#3491): the totals block, see PDF_SUM_FILL in lay()
         block(sum_h, draw_sum, keep_prev=last_item_idx is not None, sq=4, air=sum_air, air_kind="sum")
 
-    # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals
+    # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals; 2.434.0 A (#3603): only
+    # the due text stays there (full width), the bank line and the GiroCode form a block of their own at the end, above the footer
     pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
+    pay_end = []  # (height, draw) of the bank line + GiroCode, placed after the closing (see below)
     if pay and (pay.get("text") or pay.get("iban")):
         iban = str(pay.get("iban") or "").replace(" ", "")
         bank = " · ".join(x for x in (str(pay.get("bank_name") or ""), ("IBAN " + " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))) if iban else "",
                                      ("BIC " + str(pay["bic"])) if pay.get("bic") else "") if x)
-        gcq = str(pay.get("girocode") or "")  # 2.147.1 B (#2054): the GiroCode right of the payment text (office/girocode.py)
+        gcq = str(pay.get("girocode") or "")  # 2.147.1 B (#2054): the GiroCode right of the bank line (office/girocode.py)
         if gcq:  # imported only then: this module also runs on its own (no package; tests/office_einvoice_test.py)
             from .girocode import GCQ_SIZE, gcq_block_h, gcq_draw
-        pw = PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW
-        pt_lines = pdf_wrap(str(pay.get("text") or ""), body, pw) if pay.get("text") else []
-        pb_lines = pdf_wrap(bank, 8.4, pw) if bank else []
-        pay_h = 6 + len(pt_lines) * lh + (len(pb_lines) * 8.4 * 1.42 + 2 if pb_lines else 0)
-        pay_h = max(pay_h, gcq_block_h() + 10) if gcq else pay_h
+        pt_lines = pdf_wrap(str(pay.get("text") or ""), body, PDF_CW) if pay.get("text") else []
+        pb_lines = pdf_wrap(bank, 8.4, PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW) if bank else []
+        pb_lh = pdf_fs(8.4) * 1.42
+        if pt_lines:
+            pay_h = 6 + len(pt_lines) * lh
 
-        def draw_pay(p, y, pt_lines=pt_lines, pb_lines=pb_lines):
-            if gcq:
-                gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 6, gcq, lang, C_INK, C_INK2)
-            yy = y + 4
-            for t_ in pt_lines:
-                p.text(PDF_L, yy, t_, body)
-                yy += lh
-            for t_ in pb_lines:
-                p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
-                yy += 8.4 * 1.42
-        if pay_h > p3s_cap:  # 2.296.0 E (#3166): a payment text higher than a page line by line (the GiroCode above it)
-            if gcq:
-                block(gcq_block_h() + 10, lambda p, y: gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 6, gcq, lang, C_INK, C_INK2), keep_prev=True, keep_next=True, tail=True)
-            para_blocks([(t_, body, C_INK) for t_ in pt_lines] + [(t_, 8.4, C_INK2) for t_ in pb_lines], [lh] * len(pt_lines) + [8.4 * 1.42] * len(pb_lines),
-                        4, 2 + (2 if pb_lines else 0), lambda p, y, r, q: p.text(PDF_L, y, r[0], r[1], False, r[2]), tail=True)
-            blocks[-len(pt_lines) - len(pb_lines)]["keep_prev"] = True
-        else:
-            block(pay_h, draw_pay, keep_prev=True, tail=True)
+            def draw_pay(p, y, pt_lines=pt_lines):
+                yy = y + 4
+                for t_ in pt_lines:
+                    p.text(PDF_L, yy, t_, body)
+                    yy += lh
+            if pay_h > p3s_cap:  # 2.296.0 E (#3166): a payment text higher than a page line by line
+                para_blocks([(t_, body, C_INK) for t_ in pt_lines], lh, 4, 2, lambda p, y, r, q: p.text(PDF_L, y, r[0], r[1], False, r[2]), tail=True)
+                blocks[-len(pt_lines)]["keep_prev"] = True
+            else:
+                block(pay_h, draw_pay, keep_prev=True, tail=True)
+        if pb_lines or gcq:
+            def draw_bank(p, y, pb_lines=pb_lines):
+                if gcq:
+                    gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 10, gcq, lang, C_INK, C_INK2)
+                yy = y + 10
+                for t_ in pb_lines:
+                    p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
+                    yy += pb_lh
+            pay_end.append((10 + max(len(pb_lines) * pb_lh + 2, gcq_block_h() if gcq else 0), draw_bank))
 
     # -- rights block (not torn); 2.114.1 C (#2258): printed as an appendix on its own last page, see below
     bfc_rights, bfc_seen = [], []
@@ -1821,6 +1829,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
         block(16 + 40 + acc_dy + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
+    for h_, fn_ in pay_end:  # 2.434.0 A (#3603): bank line + GiroCode at the end of the main pages, right above the footer
+        block(h_, fn_, tail=True, foot=True)
 
     # -- 2.47.0 (#1215): every printed part of a quotation on its own page(s): part title + number, its rows, its sums
     for part in m.get("parts") or []:
@@ -1999,6 +2009,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 free = bot - y - need(i, je, False)
                 if free > 0:
                     y += free * PDF_SUM_FILL
+            if b["foot"]:  # 2.434.0 A (#3603): down to the bottom of the page together with what follows up to the next page break
+                je = i
+                while je + 1 < n_blocks and not blocks[je + 1]["brk"]:
+                    je += 1
+                y = max(y, bot - need(i, je, first_on_page))
             if b["table"] and (first_on_page or not blocks[i - 1]["table"]):
                 if not dry:
                     draw_thead(page, y)
