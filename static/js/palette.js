@@ -739,9 +739,13 @@ function checkAt(p) {  // the big check: pops (overshoot) right after the arriva
   return {transform: `translate(-50%,-50%) scale(${celeLerp(s0, s1, t).toFixed(3)})`, opacity: +celeLerp(o0, o1, t).toFixed(3)};
 }
 // 2.380 E (#3331): with the undo message showing, the figure's line sits above it (its top edge minus a gap), else it stays at the bottom
-function celeStack(q) {
+function celeStackNow(q) {
   const t = $('#toast'), r = t && !t.classList.contains('hidden') && t.offsetWidth ? t.getBoundingClientRect() : null;
   q.style.bottom = r ? Math.round(innerHeight - r.top + 8) + 'px' : '';
+}
+function celeStack(q) {
+  celeStackNow(q);
+  for (const ms of [60, 400]) setTimeout(() => { if (q.isConnected) celeStackNow(q); }, ms);  // the message settles after its first paint
 }
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;

@@ -20,7 +20,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
   check(r.ok, 'setup');
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', modules: ['cal', 'comments', 'sheets']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,sheets'});
   const P = (await call('POST', '/api/lists', {name: 'Releases', kind: 'project'})).id;
   const fd = await call('POST', `/api/lists/${P}/fields`, {name: 'Package', type: 'text'});
   check(fd.http < 300, 'a field ' + fd.http);
@@ -56,7 +56,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     await nav(B + '#sheets/l/' + P);
     check(await ready(ev, `/Attached to Releases/.test(document.querySelector('.shvh')?.textContent || '')`), '#3465: heading "Attached to Releases"');
     check(await ev(`[...document.querySelectorAll('.shvtop a')].some(a => a.textContent === 'All tables' && a.getAttribute('href') === '#sheets')`), '#3465: link "All tables"');
-    check(await ev(`/Tables are independent/.test(document.querySelector('#view').textContent) && /Attach a new table/.test(document.querySelector('[data-shv="new"]').textContent)`), '#3465: empty state explains, button "Attach a new table"');
+    check(await ready(ev, `/Tables are independent/.test(document.querySelector('#view').textContent) && /Attach a new table/.test(document.querySelector('[data-shv="new"]')?.textContent || '')`), '#3465: empty state explains, button "Attach a new table" ' + await ev(`document.querySelector('#view').textContent.slice(0, 300)`));
 
     // ---- #3449: the keyboard switch (same setting as Settings > Chat)
     await nav(B + '#today');
@@ -77,7 +77,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     await ready(ev, `typeof celebrate === 'function' && typeof toast === 'function'`);
     await ev(`(() => { toast('Task with a rather long title that is undone', () => {}, 20000); celebrate('today', {force: true}); return 1; })()`);
     await sleep(900);
-    const rc = await ev(`(() => { const a = document.querySelector('#toast').getBoundingClientRect(), b = document.querySelector('.cele-quip').getBoundingClientRect(); return [a.top, a.bottom, b.top, b.bottom, b.left, b.right, innerWidth]; })()`);
+    const rc = await ev(`(() => { const a = document.querySelector('#toast').getBoundingClientRect(), b = document.querySelector('.cele-quip').getBoundingClientRect(); return [a.top, a.bottom, b.top, b.bottom, b.left, b.right, innerWidth, document.querySelector('.cele-quip').style.cssText, document.querySelector('.cele-quip').className]; })()`);
     check(rc[3] <= rc[0] + 0.5, '#3331: the figure line sits above the undo message ' + JSON.stringify(rc));
     check(rc[4] >= 0 && rc[5] <= rc[6], '#3331: inside the screen at 390 px');
     await shot('p2380r-e-toasts.png');
