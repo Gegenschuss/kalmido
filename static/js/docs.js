@@ -103,9 +103,9 @@ function viewDocs() {
   else if (!DC.docs) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!DC.docs.length) body = `<div class="empty nempty dc-empty">${ic('file')}<span>${DC.q || active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
   else body = `<ul class="dc-grid${DC.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted">${esc(tr('{0} of {1} shown, narrow the search', DC.docs.length, DC.total))}</p>` : ''}${dc_smvBar()}`;
-  // 2.430.0 (#3582): an open document stands in a pane right of the list (computer); filled by dc_mdDraw, a redraw of the
-  // list keeps its content (data-fl-fill)
-  const pane = DC.paneId && !isMobile() ? `<aside class="dc-md dc-pane" data-k="dcpane" data-fl-fill aria-labelledby="dc-h"></aside>` : '';
+  // 2.430.0 (#3582): an open document stands in a pane right of the list (computer; a window narrowed to phone width shows it
+  // as the whole page instead of closing it); filled by dc_mdDraw, a redraw of the list keeps its content (data-fl-fill)
+  const pane = DC.paneId ? `<aside class="dc-md dc-pane" data-k="dcpane" data-fl-fill aria-labelledby="dc-h"></aside>` : '';
   if (pane) setTimeout(dc_paneFill, 0);
   return `<div class="dc-wrap${pane ? ' dc-paneon' : ''}"><div class="dc-view">${typeof abd_navHtml === 'function' ? abd_navHtml() : ''}${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>${pane}</div>`;
 }

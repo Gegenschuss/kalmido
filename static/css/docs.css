@@ -58,6 +58,9 @@
   .dc-md .dc-back{display:inline-flex}
   .dc-md .dc-x{display:none}
   .dc-prev,.dc-prev img,.dc-prev canvas{max-height:60dvh}
+  .dc-wrap.dc-paneon{display:block}
+  .dc-paneon>.dc-view{display:none}
+  .dc-pane{position:static;max-height:none;margin:0;padding:.5rem 0;border:0;background:none}
 }
 .dc-acts{display:flex;flex-wrap:wrap;gap:.4rem}
 .dc-acts .btn{min-height:2.5rem}

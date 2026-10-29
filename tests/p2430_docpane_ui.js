@@ -150,6 +150,13 @@ async function upload(name, lines) {
     check(r && r.pl >= r.vr && r.pw >= 300 && r.cw > 100, 'Firefox: the pane stands right of the list, the cards stay visible ' + JSON.stringify(r));
     check(await wait(`!!document.querySelector('.dc-pane .dc-prev canvas') && document.querySelector('.dc-pane .dc-prev canvas').width > 300`, 80), 'Firefox: the first page of the PDF is drawn in the preview');
     await shot('p2430-docpane.png');
+    // the window narrowed to phone width and back: the document stays open (the pane closed itself, p2106_b_ui found it)
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    await sleep(400); await ev(`(dc_draw(), 1)`); await sleep(400);
+    check(await wait(`!!document.querySelector('.dc-pane #dc-sender') && document.querySelector('.dc-pane').getBoundingClientRect().width >= 360 && getComputedStyle(document.querySelector('.dc-pane .dc-back')).display !== 'none'`), 'Firefox: narrowed to phone width the document stays open as the page');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
+    await sleep(400); await ev(`(dc_draw(), 1)`);
+    check(await wait(`!!document.querySelector('.dc-pane #dc-sender') && !!document.querySelector('.dc-wrap.dc-paneon > .dc-view')`), '... and back at full width again beside the list');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#docs');
     check(await wait(`document.querySelectorAll('.dc-card').length === 3`), 'Firefox phone: the cards');
