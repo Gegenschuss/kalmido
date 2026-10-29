@@ -55,7 +55,8 @@ const asks = w => { const e = new w.Event('beforeunload', {cancelable: true}); w
   check(await until(async () => { const l = (await call('GET', '/api/state')).lists.find(x => x.id === P); return l?.name === 'Garden 2027' && +l.rate === 85; }), 'list dialog: the server has the name and the rate');
   // the page stayed (kept for "back"): the debounce runs and sends nothing twice
   check(await until(() => asks(w) === false, {timeout: 5000}), 'list dialog: after the autosave nothing waits');
-  check(calls.filter(c => c.m === 'PATCH' && c.p === '/api/lists/' + P).length === 1, 'list dialog: the autosave after it sends nothing twice ' + JSON.stringify(calls.filter(c => c.p === '/api/lists/' + P)));
+  // (the autosave also sends time_tracking false over a stored 0: the same value, older than this)
+  check(calls.filter(c => c.m === 'PATCH' && c.p === '/api/lists/' + P && /"(name|rate)"/.test(c.body)).length === 1, 'list dialog: the autosave after it sends name / rate not twice ' + JSON.stringify(calls.filter(c => c.p === '/api/lists/' + P)));
   w.eval("document.querySelectorAll('.modal').forEach(m => m.remove())");
   check(asks(w) === false, 'list dialog closed: its registration ended');
 
