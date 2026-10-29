@@ -143,7 +143,7 @@ const NOTIF_ROWS = [
   ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
-NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out')]);
+NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
