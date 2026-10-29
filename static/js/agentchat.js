@@ -1342,7 +1342,7 @@ function agCardHtml(a, adm) {
   }
   const u = (S.aiu.data?.agents || []).find(x => x.id === a.id), m = S.aiu.data?.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens';
   const off = !a.enabled, st = off ? 'paused' : agentOffline(a) ? 'offline' : a.limit_reached || a.usage?.reached ? 'error' : a.status || 'idle';
-  const facts = [off ? tr('paused') : agentSt(a), adm ? trn('{0} project', '{0} projects', (a.lists || []).length) : a.running || a.waiting ? [a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ') : ''].filter(Boolean);
+  const facts = [off ? tr('paused') : agentSt(a), adm ? trn('{0} project', '{0} projects', (a.lists || []).length) : a.running || a.waiting ? [a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ') : '', (pmk => pmk ? tr('Permissions: {0}', tr(AG_PMODES[pmk] || AG_PMODES[''])) : '')(a.permission_mode || a.runtime?.permission_mode)].filter(Boolean);  // 2.365.2 C (#2789): the mode, short (changed in Edit > Approvals)
   const more = [a.status_text, adm && a.webhook ? tr('webhook') : adm ? tr('polling only') : '', a.last_event_at ? tr('last event {0}', relTime(a.last_event_at)) : '', a.note].filter(Boolean).join(' · ');
   const wh = adm && a.webhook && (!a.webhook.enabled || (a.webhook.last && !a.webhook.last.ok)) ? `<small class="agwarn">${tr('webhook')} ${whState(a.webhook)}</small>` : '';
   const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';

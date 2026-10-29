@@ -14829,5 +14829,16 @@
   "Section not found: {0}": "Sezione non trovata: {0}",
   "Daily note": "Nota del giorno",
   "Go to day": "Vai al giorno",
-  "Embed a page": "Incorpora una pagina"
+  "Embed a page": "Incorpora una pagina",
+  "Change in Settings > Organisation": "Modifica in Impostazioni > Organizzazione",
+  "Signature for letters": "Firma per le lettere",
+  "Edit signature…": "Modifica firma…",
+  "Greeting, name and picture under your letters (the same dialog as in the Office, Letters).": "Saluto, nome e immagine sotto le tue lettere (lo stesso dialogo dell’ufficio, Lettere).",
+  "Absences and vacation": "Assenze e ferie",
+  "Change in Settings > General": "Modifica in Impostazioni > Generale",
+  "Public holidays of": "Festività di",
+  "Shows in your calendar and lowers your workload on these days.": "Compare nel tuo calendario e riduce il carico in quei giorni.",
+  "Vacation approval: in Settings > Organisation": "Approvazione ferie: in Impostazioni > Organizzazione",
+  "Steps in the chat": "Passaggi nella chat",
+  "The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.": "Le brevi note che un agente scrive tra i suoi passaggi restano sopra ogni risposta e nella cronologia di ogni lavoro. L’interruttore nella chat dell’agente fa lo stesso."
 }

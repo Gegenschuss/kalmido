@@ -51,6 +51,7 @@ async function wpDraw(md) {
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
+  biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
   data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
@@ -59,6 +60,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
   's-startpg': ['start_page', N_('Open the app on'), 'sel'],  // 2.364.0 B (#3031)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
+  's-agsteps': ['agent_steps_always', N_('Always show steps'), 'chk'],  // 2.365.2 C (#2789): same setting as the switch in the agent chat
   's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
@@ -327,7 +329,10 @@ function aiHtml(hint, want) {
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('How to set one up')}</button></div>
     ${acz_linkHtml(true)}${''/* 2.166.0 (#2633) */}
-    ${agDotsHtml(hint)}`)}
+    ${agDotsHtml(hint)}
+    <h4 id="s-agsteps-h">${tr('Steps in the chat')}</h4>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-agsteps" ${S.settings?.agent_steps_always === '1' ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Always show steps')}</span></label></div>
+    ${hint(tr('The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.'))}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which projects they see') : tr('Which projects it sees')}</h4>
     ${hint(tr('Share below or in the project’s Share dialog; taking a project out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
@@ -768,6 +773,9 @@ function settingsModal(focus) {
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the projects (dropping a subtask there = standalone task in that project).')}</div>`,
   };
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
+  // 2.365.2 (#2789): what was set inside a module: Company & office (the office's settings, following the workspace) and Documents
+  pane.biz = typeof biz_paneHtml === 'function' ? biz_paneHtml() : '';
+  pane.docs = typeof dcs_paneHtml === 'function' ? dcs_paneHtml() : '';
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
@@ -811,6 +819,9 @@ function settingsModal(focus) {
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
+    if (k === 'general' && typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789)
+    if (k === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+    if (k === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
     if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
     if (k === 'access') { acz_draw(md); const nb = $('.snav [data-sec="access"]', md); if (nb) nb.hidden = false; }  // 2.166.0 (#2633); 2.364.0 C (#3044): listed once opened
     if (k === 'notify') wpDraw(md);
@@ -956,6 +967,9 @@ function settingsModal(focus) {
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
   if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
+  if (cur === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+  if (cur === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
+  if (typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789): its box exists only in General
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
   asst_setWire(md);  // 2.75.0 (#1411)

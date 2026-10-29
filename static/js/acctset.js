@@ -120,6 +120,9 @@ function accountHtml() {
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
     ${tfaHtml()}
+    ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>
+    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button></div>
+    <div class="shint">${tr('Greeting, name and picture under your letters (the same dialog as in the Office, Letters).')}</div>` : ''}${''/* 2.365.2 C (#2789) */}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
@@ -281,7 +284,39 @@ async function orgModal(o, done) {
 }
 function wsPaneHtml(hint) {
   return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Every project belongs to one workspace; the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to it.'))}
-    <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+    <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    ${(S.me.workspaces || []).length ? `<h4 id="s-wsr-h">${tr('Absences and vacation')}</h4><div id="s-wsr"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}${''/* 2.365.2 C (#2789) */}`;
+}
+// 2.365.2 C (#2789): the rules of an organisation that the Absences tab used to hold: vacation needs an approval, the state
+// of the public holidays (same routes; only admins of the organisation write)
+async function wsr_draw(md, oid) {
+  const box = $('#s-wsr', md); if (!box) return;
+  const orgs = S.me.workspaces || [], c = wsCur();
+  oid = oid || (c.startsWith('org:') && orgs.some(w => 'org:' + w.id === c) ? +c.slice(4) : orgs[0]?.id);
+  if (!oid) { box.innerHTML = ''; return; }
+  let lv, ab; try { [lv, ab] = await Promise.all([api('GET', `/api/team/leave?org=${oid}`), api('GET', `/api/team/absences?org=${oid}`)]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  if (!md.isConnected) return;
+  const dis = lv.admin ? '' : 'disabled';
+  box.innerHTML = `${orgs.length > 1 ? `<div class="row"><label for="s-wsr-org">${tr('Organisation')}</label><select id="s-wsr-org">${orgs.map(w => `<option value="${w.id}" ${w.id === oid ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div>` : ''}
+    ${lv.personal ? '' : `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-wsr-appr" data-org="${oid}" ${lv.approval ? 'checked' : ''} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${tr('Vacation of members needs an approval')}</span></label></div>
+    <div class="shint">${tr('On: vacation a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering vacation for someone approve it at once.')}</div>`}
+    <div class="row"><label for="s-wsr-state">${tr('Public holidays')}</label><select id="s-wsr-state" data-org="${oid}" ${dis}><option value="">${tr('None')}</option>${Object.entries(ab.states).map(([k, v]) => `<option value="${esc(k)}" ${k === ab.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    ${lv.admin ? '' : `<div class="shint">${tr('Only admins of this workspace can change this')}</div>`}`;
+}
+function wsr_wire(md) {
+  md.addEventListener('change', async e => {
+    const t = /** @type {any} */ (e.target);
+    if (t.id === 's-wsr-org') { wsr_draw(md, +t.value); return; }
+    if (t.id !== 's-wsr-appr' && t.id !== 's-wsr-state') return;
+    const org = +t.dataset.org;
+    if (t.id === 's-wsr-appr') {
+      const to = t.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); };
+      try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.checked = !to; /* api() said it */ }
+    } else {
+      const from = t.dataset.was ?? [...t.options].find(o => o.defaultSelected)?.value ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
+      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.value = from; /* api() said it */ }
+    }
+  });
 }
 function accountWire(md) {
   let users = [];
@@ -305,6 +340,7 @@ function accountWire(md) {
   ua8_wire(md, us, drawUsers);
   drawUsers();
   orgsDraw(md);
+  if ($('#s-wsr', md)) { wsr_draw(md); wsr_wire(md); }  // 2.365.2 C (#2789)
   if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); } else wsp_paneWire(md);  // 2.28.0 (#935); 2.138.2 C (#2389): the colour of Private
   md.addEventListener('change', async e => {  // 2.22.0 (#752): whom people see
     if (e.target.id !== 'a-vis') return;
@@ -914,4 +950,13 @@ function ua8PurgeHtml(p) {
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
   rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
+}
+
+// 2.365.2 C (#2789): the letter signature dialog of the Office, opened from Settings > Account (the Office module loads first)
+async function ltSigSettings() {
+  try {
+    if (typeof ltProfileModal !== 'function') await loadModule('office');
+    const profile = await api('GET', '/api/office/letters/profile');
+    ltProfileModal({profile, done: () => toast(tr('Saved'))});
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
 }

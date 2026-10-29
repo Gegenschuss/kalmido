@@ -119,18 +119,14 @@ const SH = !!process.env.P2298A1_SHOTS;
       }
     }
     // ---- a toggle that saves itself (vacation approval of the organisation): the quiet tick, no toast
-    await call(CA, 'PATCH', '/api/settings', {workspace: `org:${org.id}`});
-    await nav(B + 'static/icon.svg'); await nav(B + '#workload');
-    await ready(ev, `!!document.querySelector('#view .ab2tabs')`, 60);
-    await ev(`(() => { WLV.tab = 'abs'; AB2.data = null; render(); return 1; })()`);
-    if (await ready(ev, `typeof LV === 'object' && !!(LV.data && LV.data.people) && !!document.querySelector('#view details.lvbox')`, 60)) {
-      await ev(`(() => { const b = document.querySelector('#view details.lvbox'); b.open = true; b.dispatchEvent(new Event('toggle')); return 1; })()`);
-      await sleep(200);
-      await ev(`(() => { const c = document.querySelector('#view #lv-approval'); c.click(); return 1; })()`);
-      check(await ready(ev, `(() => { const t = document.querySelector('#view .svtick'); return !!t && t.previousElementSibling?.contains(document.querySelector('#lv-approval')); })()`), 'vacation approval: the quiet tick at the switch');
+    // 2.365.2 C (#2789): the switch lives in Settings > Organisation now
+    await ev(`(() => { settingsModal('org'); return 1; })()`);
+    if (await ready(ev, `!!document.querySelector('.smodal #s-wsr-appr')`, 60)) {
+      await ev(`(() => { const c = document.querySelector('#s-wsr-appr'); c.click(); return 1; })()`);
+      check(await ready(ev, `(() => { const t = document.querySelector('.smodal .svtick'); return !!t && t.previousElementSibling?.contains(document.querySelector('#s-wsr-appr')); })()`), 'vacation approval: the quiet tick at the switch');
       check(await ev(`(() => { const t = document.querySelector('.svtick'); return !!t && /Gespeichert/.test(t.textContent) && !!t.querySelector('.sr'); })()`), 'vacation approval: "Gespeichert" for screen readers');
       check(!await ev(toastSaved), 'vacation approval: no toast "Gespeichert"');
-    } else check(false, 'the vacation accounts of the organisation');
+    } else check(false, 'the vacation approval switch in Settings > Organisation');
   });
   console.log(`p2298_a1_lesstext_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

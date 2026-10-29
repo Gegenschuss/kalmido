@@ -44,8 +44,9 @@ function ab2_view() {
     return `<li>${it.can_edit ? `<button type="button" class="ab2li" data-act="ab2-edit" data-id="${it.id}">${inner}${ic('edit', 's')}</button>` : `<div class="ab2li">${inner}</div>`}</li>`;
   }).join('');
   const hl = (d.holidays || []).map(h => `<li class="muted">${esc(fmtDayAbs(h.date))} · ${esc(h.name)}</li>`).join('');
-  const stSel = d.admin ? `<label class="ab2st"><span class="muted">${tr('Public holidays')}</span><select id="ab2-state" aria-label="${esc(tr('Public holidays'))}"><option value="">${tr('None')}</option>${Object.entries(d.states).map(([k, v]) => `<option value="${k}" ${k === d.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`
-    : d.state ? `<span class="muted ab2st">${esc(tr('Public holidays: {0}', d.states[d.state] || d.state))}</span>` : '';
+  const stLink = d.admin && d.org_id !== d.personal ? `<button type="button" class="linkbtn ab2st" data-act="mod-settings" data-sec="org">${tr('Public holidays: {0}', esc(d.states[d.state] || tr('None')))} · ${tr('Change in Settings > Organisation')}</button>` : '';  // 2.365.2 C (#2789): an organisation's state moved to Settings; the personal area keeps its picker
+  const stSel = stLink || (d.admin ? `<label class="ab2st"><span class="muted">${tr('Public holidays')}</span><select id="ab2-state" aria-label="${esc(tr('Public holidays'))}"><option value="">${tr('None')}</option>${Object.entries(d.states).map(([k, v]) => `<option value="${k}" ${k === d.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`
+    : d.state ? `<span class="muted ab2st">${esc(tr('Public holidays: {0}', d.states[d.state] || d.state))}</span>` : '');
   // 2.96.0 D (#1941): the own personal area next to the organisations (the workspace switch on "Private" opens it)
   const areas = [...(d.personal ? [{id: d.personal, name: tr('Private|workspace')}] : []), ...d.orgs];
   return `<div class="dash wload ab2">${ab2_tabs('abs')}<div class="clhead"><h3 class="ab2mon">${esc(mon)}</h3><span class="spacer"></span>

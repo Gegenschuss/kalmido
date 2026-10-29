@@ -14829,5 +14829,16 @@
   "Section not found: {0}": "Abschnitt nicht gefunden: {0}",
   "Daily note": "Tagesnotiz",
   "Go to day": "Zum Tag springen",
-  "Embed a page": "Seite einbetten"
+  "Embed a page": "Seite einbetten",
+  "Change in Settings > Organisation": "Ändern unter Einstellungen > Organisation",
+  "Signature for letters": "Signatur für Briefe",
+  "Edit signature…": "Signatur bearbeiten…",
+  "Greeting, name and picture under your letters (the same dialog as in the Office, Letters).": "Grußformel, Name und Bild unter deinen Briefen (derselbe Dialog wie im Büro unter Briefe).",
+  "Absences and vacation": "Abwesenheiten und Urlaub",
+  "Change in Settings > General": "Ändern unter Einstellungen > Allgemein",
+  "Public holidays of": "Feiertage von",
+  "Shows in your calendar and lowers your workload on these days.": "Erscheint in deinem Kalender und senkt an diesen Tagen deine Auslastung.",
+  "Vacation approval: in Settings > Organisation": "Urlaubsfreigabe: unter Einstellungen > Organisation",
+  "Steps in the chat": "Schritte im Chat",
+  "The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.": "Die kurzen Notizen, die ein Agent zwischen seinen Arbeitsschritten schreibt, bleiben über jeder Antwort und im Verlauf jedes Jobs sichtbar. Der Schalter im Agenten-Chat macht dasselbe."
 }

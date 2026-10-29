@@ -756,6 +756,8 @@ document.addEventListener('click', async e => {
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
+    case 'lt-sigset': ltSigSettings(); break;  // 2.365.2 C (#2789): from Settings > Account
+    case 'mod-settings': settingsModal(a.dataset.sec); break;  // 2.365.2 C (#2789): module -> its Settings area
     case 'tvg-add': entryModal(null, {task_id: id || null, date: a.dataset.d}); break;  // 2.34.0 (#269): a day without tracked time
     case 'tvg-x': tvgDismiss(); break;
   }
