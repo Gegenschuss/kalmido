@@ -48,7 +48,9 @@ const WS_VIEWS = {
   'static/js/life.js': 'draw',                // 2.173.0 A (#2680): trips + staying in touch of the shown workspace (rd_space), loads again when it changed (LF.sp)
   'static/js/agentchat.js': 'helper',         // the default workspace of a new agent
   'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
-  'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
+  'static/js/clients.js': 'helper',           // 2.361 (#2938): wsCur only picks the empty-state text for Private (no view keeping data)
+  'static/js/dispo.js': 'helper',             // 2.361 (#2938): wsCur only picks the empty-row text for Private (no view keeping data)
+  'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',

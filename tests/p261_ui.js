@@ -142,8 +142,10 @@ const HEAD = `(() => {
     && w.eval(`agentHst({enabled: true, contact_age: 1, status: 'idle'})`) === 'ready', 'states: error / limit = red, waiting = yellow, paused = grey, idle = green');
   check(w.eval(`hdotsHtml([1,2,3,4,5,6,7].map(i => ({id: i, enabled: true, contact_age: 1, status: 'idle', name: 'A' + i})))`).match(/class="hdot /g).length === 4 && /\+3/.test(w.eval(`hdotsHtml([1,2,3,4,5,6,7].map(i => ({id: i, enabled: true, contact_age: 1, status: 'idle', name: 'A' + i})))`)), 'many agents: 4 dots + "+3"');
   click(w, chip); await sleep(200);
-  const mi = [...d.querySelectorAll('#pop .menu-list button')];
-  check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi.map(x => x.textContent.trim()).join(' | '));
+  // 2.360 (#2786): "Agents and jobs" sits on top, then a divider, then every agent
+  const mi0 = [...d.querySelectorAll('#pop .menu-list button')];
+  const mi = mi0[0] && /Agents and jobs/.test(mi0[0].textContent) ? mi0.slice(1) : mi0;
+  check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi0.map(x => x.textContent.trim()).join(' | '));
   const choose = mi.find(x => /Choose the agents shown/.test(x.textContent));
   check(choose, 'menu: "Choose the agents shown…"');
   click(w, choose); await idle(w);
