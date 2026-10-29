@@ -4178,6 +4178,7 @@ USER_DEFAULTS = {
     # 2.32.0 (#1081): an agent's steps in the chat: live under the typing dots (1) and kept above every answer (always, 0)
     "agent_steps_live": "1", "agent_steps_always": "0",
     "agent_quota_show": "1",  # 2.407.0 B (#3493): the usage ring in the agent chat header (0 = only in the ⋯ menu)
+    "member_view": "0",  # 2.436.0 (#3620): "View as member" -- the app shows the own admin parts like a member (display only)
     "chat_read_receipts": "1",  # 2.139.0 A (#2129): others see when I read team chat messages (off: I see nobody's either)
     # 2.4.2 (#391): sharing with agents, per agent id (string): {"auto": [agent ids that get my new lists],
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare

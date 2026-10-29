@@ -14957,5 +14957,10 @@
   "Sorting": "Sortering",
   "Tap documents": "Tik op documenten",
   "Tap files": "Tik op bestanden",
-  "Tap pages": "Tik op pagina's"
+  "Tap pages": "Tik op pagina's",
+  "View as member": "Weergave als lid",
+  "Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.": "Kalmido ziet eruit zoals voor een lid: instellingen en beheer van je organisaties en van de server zijn verborgen; je privéruimte, je eigen agents en het dagelijkse kantoorwerk blijven. Alleen de weergave verandert, je rechten blijven gelijk. De weg terug staat onderaan de instellingen en in het accountmenu.",
+  "Show administration again": "Beheer weer tonen",
+  "You now see Kalmido like a member. Your rights stay the same.": "Je ziet Kalmido nu zoals een lid. Je rechten blijven gelijk.",
+  "Administration is shown again": "Beheer wordt weer getoond"
 }

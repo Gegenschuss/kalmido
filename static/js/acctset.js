@@ -121,6 +121,8 @@ function accountHtml() {
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
+    ${mvHas() ? `<h4 id="s-mview-h">${tr('View as member')}</h4><div class="row"><label class="chkl"><input type="checkbox" id="s-mview" ${mvOn() ? 'checked' : ''}> ${tr('View as member')}</label></div>
+    <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}

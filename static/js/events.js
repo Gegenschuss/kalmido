@@ -487,6 +487,7 @@ document.addEventListener('click', async e => {
       {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); mvSet(false); }}] : []),  // 2.436.0 (#3620): the way back from "View as member"
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)

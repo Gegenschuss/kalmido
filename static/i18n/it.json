@@ -14957,5 +14957,10 @@
   "Sorting": "Ordinamento",
   "Tap documents": "Tocca i documenti",
   "Tap files": "Tocca i file",
-  "Tap pages": "Tocca le pagine"
+  "Tap pages": "Tocca le pagine",
+  "View as member": "Vista come membro",
+  "Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.": "Kalmido appare come per un membro: impostazioni e amministrazione delle tue organizzazioni e del server sono nascoste; la tua area privata, i tuoi agenti e il lavoro quotidiano dell’ufficio restano. Cambia solo la vista, i tuoi diritti restano gli stessi. Il ritorno è in fondo alle impostazioni e nel menu dell’account.",
+  "Show administration again": "Mostra di nuovo l’amministrazione",
+  "You now see Kalmido like a member. Your rights stay the same.": "Ora vedi Kalmido come un membro. I tuoi diritti restano gli stessi.",
+  "Administration is shown again": "L’amministrazione è di nuovo visibile"
 }

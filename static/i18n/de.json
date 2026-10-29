@@ -14957,5 +14957,10 @@
   "Sorting": "Sortierung",
   "Tap documents": "Dokumente antippen",
   "Tap files": "Dateien antippen",
-  "Tap pages": "Seiten antippen"
+  "Tap pages": "Seiten antippen",
+  "View as member": "Ansicht als Mitglied",
+  "Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.": "Kalmido sieht aus wie für ein Mitglied: Einstellungen und Verwaltung deiner Organisationen und des Servers sind ausgeblendet; dein privater Bereich, deine eigenen Agenten und die tägliche Büro-Arbeit bleiben. Nur die Anzeige ändert sich, deine Rechte bleiben gleich. Der Rückweg steht unten in den Einstellungen und im Konto-Menü.",
+  "Show administration again": "Verwaltung wieder einblenden",
+  "You now see Kalmido like a member. Your rights stay the same.": "Du siehst Kalmido jetzt wie ein Mitglied. Deine Rechte bleiben gleich.",
+  "Administration is shown again": "Verwaltung wird wieder angezeigt"
 }

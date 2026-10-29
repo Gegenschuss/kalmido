@@ -195,3 +195,15 @@
 @media (pointer:coarse){.sesrow .btn,.oinvrow .btn{min-height:2.75rem}}
 /* 2.364.0 C (#3041): an info button at the right end of a wide switch row keeps its tap area inside the area (no sideways scroll) */
 .spane .featgrid label.wide>.ib:last-child{margin-right:.6875rem}
+/* 2.436.0 (#3620): "Show administration again" under the areas (View as member); the nav is a tab list, so it sits beside it */
+.snmv{position:absolute;left:.5rem;bottom:.625rem;width:11.5rem;display:flex;align-items:center;gap:.625rem;padding:.4375rem .625rem;border-radius:var(--radius);border:1px solid var(--line2);color:var(--text2);font-size:var(--fs-m);text-align:left}
+.snmv:hover{background:var(--bg3);color:var(--text)}
+.snmv svg{color:var(--accent)}
+.sbody:has(.snmv){position:relative}
+.sbody:has(.snmv) .snav{padding-bottom:3.75rem}
+@media (max-width:767px) {
+  .snmv{position:static;width:auto;margin:0 .75rem 1rem;min-height:3rem}
+  .sbody:has(.snmv) .snav{padding-bottom:2px}
+  .smodal.sidx .sbody:has(.snmv) .snav{padding-bottom:1rem}
+  .smodal:not(.sidx) .snmv{display:none}
+}
