@@ -12,8 +12,8 @@
 .dc-range{display:inline-flex;align-items:center;gap:.35rem;color:var(--muted)}
 .dc-wait{display:flex;align-items:center;gap:.35rem}
 .dc-grid{list-style:none;margin:.5rem 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.75rem}
-.dc-card>button{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:inherit;text-align:left;cursor:pointer;overflow:hidden}
-.dc-card>button:hover,.dc-card>button:focus-visible{border-color:var(--accent)}
+.dc-card>button:not(.dc-selmark){display:flex;flex-direction:column;width:100%;height:100%;padding:0;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.dc-card>button:not(.dc-selmark):hover,.dc-card>button:not(.dc-selmark):focus-visible{border-color:var(--accent)}
 .dc-th{display:block;height:12rem;background:var(--bg3);overflow:hidden}
 .dc-th img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
 .dc-ph{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:6rem;color:var(--faint)}
@@ -31,12 +31,34 @@
 .dc-drop span{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;border-radius:var(--radius);background:var(--accent);color:var(--accent-ink)}
 @media (prefers-reduced-motion:no-preference) {
   .dc-drop{transition:opacity .15s}
-  .dc-card>button{transition:border-color .15s}
+  .dc-card>button:not(.dc-selmark){transition:border-color .15s}
 }
 .dc-md .card{max-width:44rem;width:100%}
-.dc-top{display:flex;gap:.75rem;align-items:flex-start;margin:.25rem 0 .5rem}
-.dc-prev{flex:0 0 7rem;padding:0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overflow:hidden;cursor:zoom-in}
-.dc-prev img{display:block;width:100%}
+/* 2.430.0 (#3582): the preview on top (full width, the first page / the image), the actions below it */
+.dc-top{display:flex;flex-direction:column;gap:.5rem;margin:.25rem 0 .5rem}
+.dc-prev{display:flex;justify-content:center;box-sizing:border-box;width:100%;max-height:28rem;padding:0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overflow:hidden;cursor:zoom-in}
+.dc-prev img,.dc-prev canvas{display:block;max-width:100%;max-height:28rem;width:auto;height:auto;object-fit:contain;object-position:top}
+.dc-prev .dc-ph{min-height:10rem}
+/* 2.430.0 (#3582): the list left, the open document in a pane right of it (computer); the card of the open one marked */
+.dc-wrap.dc-paneon{display:flex;align-items:flex-start;gap:1rem;max-width:100rem;margin:0 auto}
+.dc-wrap.dc-paneon>.dc-view{flex:1 1 0;min-width:0;max-width:none;margin:0}
+.dc-pane{position:sticky;top:.5rem;flex:0 0 clamp(20rem,42%,36rem);max-height:calc(100dvh - 7rem);overflow-y:auto;margin-top:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-sizing:border-box;overscroll-behavior:contain}
+.dc-paneon .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
+.dc-paneon .dc-th{height:9rem}
+.dc-card.dc-cur>button:not(.dc-selmark){border-color:var(--accent);box-shadow:0 0 0 .125rem var(--accent)}
+.dc-pane .dc-prev,.dc-pane .dc-prev img,.dc-pane .dc-prev canvas{max-height:min(20rem,40dvh)}
+.dc-pane .dc-acts{gap:.3rem}
+.dc-pane .dc-acts .btn{min-height:2.25rem}
+.dc-back{display:none}
+@media (max-width:767px){
+  /* phones: the document as a whole page, the fields below the preview; the arrow leads back to the list */
+  .modal.dc-md{padding:0;align-items:stretch}
+  .modal.dc-md>.card{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding-top:calc(.75rem + var(--safe-t,0px))}
+  .modal.dc-md:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{background-image:none}  /* a page: no sheet grip */
+  .dc-md .dc-back{display:inline-flex}
+  .dc-md .dc-x{display:none}
+  .dc-prev,.dc-prev img,.dc-prev canvas{max-height:60dvh}
+}
 .dc-acts{display:flex;flex-wrap:wrap;gap:.4rem}
 .dc-acts .btn{min-height:2.5rem}
 .dc-state{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-s)}
@@ -50,7 +72,8 @@
 .dc-f input,.dc-f select{min-height:2.5rem}
 .dc-auto{margin-left:.35rem;padding:.1rem .45rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--muted);font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
 .dc-auto:hover,.dc-auto:focus-visible{border-color:var(--accent);color:var(--text)}
-.dc-amt{display:flex;gap:.35rem;flex:1}
+.dc-amt{display:flex;gap:.35rem;flex:1;min-width:0}
+.dc-amt>input{flex:1 1 4rem;min-width:0}  /* 2.430.0 (#3582): the archive number + its button fit a phone page (it scrolled sideways) */
 .dc-amt #dc-amount{flex:1;min-width:0}
 .dc-amt #dc-currency{flex:0 0 5rem;width:5rem}
 .dc-text pre{max-height:18rem;overflow:auto;white-space:pre-wrap;font-size:var(--fs-s);background:var(--bg3);padding:.5rem;border-radius:var(--r-s)}
@@ -88,8 +111,6 @@
   .dc-range{justify-content:space-between}
   .dc-range input,.dc-range .dpw{flex:1;min-width:0}
   .dc-th{height:9.5rem}
-  .dc-top{flex-direction:column}
-  .dc-prev{flex-basis:auto;width:9rem}
 }
 .pl-slot h4 { margin-top: 1.2rem; }
 .pl-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; }
@@ -135,8 +156,15 @@
 .rc-money input[data-rcs="amount"] { width: 7rem; }
 .rc-money input[data-rcs="currency"] { width: 4.5rem; text-transform: uppercase; }
 /* 2.96.0 A (#1941): choosing documents (to move them into the other workspace) */
-.dc-card>button{position:relative}
-.dc-card.dc-on>button{border-color:var(--accent);box-shadow:inset 0 0 0 .125rem var(--accent)}
+.dc-card>button:not(.dc-selmark){position:relative}
+/* 2.430.0 (#3582): the card's own button rules leave out the choosing box (:not(.dc-selmark)); the box is its own button on the card: shown on hover / focus, while choosing and when ticked;
+   touch screens: only while choosing (a long press starts it) */
+.dc-card{position:relative;-webkit-touch-callout:none}
+.dc-grid:not(.dc-selon) .dc-card:not(.dc-on) .dc-selmark{opacity:0}
+.dc-grid:not(.dc-selon) .dc-card:hover .dc-selmark,.dc-grid .dc-selmark:focus-visible{opacity:1}
+@media (hover:none){.dc-grid:not(.dc-selon) .dc-card:not(.dc-on) .dc-selmark{display:none}}
+.dc-selmark{padding:0;color:inherit;cursor:pointer}
+.dc-card.dc-on>button:not(.dc-selmark){border-color:var(--accent);box-shadow:inset 0 0 0 .125rem var(--accent)}
 .dc-selmark{position:absolute;top:.5rem;left:.5rem;z-index:1;display:flex;align-items:center;justify-content:center;width:1.75rem;height:1.75rem;border:.125rem solid var(--accent);border-radius:50%;background:var(--bg)}
 .dc-on .dc-selmark{background:var(--accent);color:var(--accent-ink)}
 .dc-selbar{position:sticky;bottom:.75rem;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.75rem;padding:.5rem .75rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:0 .25rem 1rem rgba(0,0,0,.12)}

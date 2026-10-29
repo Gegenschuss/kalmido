@@ -85,7 +85,8 @@ function viewDocs() {
   if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
   if (S.route.mod === 'docs' && !!DC.f.review !== !!S.route.review) { DC.f.review = !!S.route.review; if (!DC.loading) setTimeout(dc_load, 0); }  // 2.353.0 D (#2759): the saved filters Documents / To review of the file store
   const id = dc_hashId();
-  if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md')) setTimeout(() => dc_open(id), 0);
+  if (DC.paneId && id !== DC.paneId && DC.opening == null) { DC.paneId = null; DC.doc = null; }  // 2.430.0 (#3582): back from another route without the document
+  if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md:not(.dc-pane)') && DC.opening !== id) setTimeout(() => dc_open(id), 0);
   const active = dc_fEntries().length > 0;  // 2.122.0 B (#2294): the filters are drawn by dc_fltHtml / dc_fbarHtml
   const head = `
     <div class="dc-bar">
@@ -102,13 +103,19 @@ function viewDocs() {
   else if (!DC.docs) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!DC.docs.length) body = `<div class="empty nempty dc-empty">${ic('file')}<span>${DC.q || active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
   else body = `<ul class="dc-grid${DC.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted">${esc(tr('{0} of {1} shown, narrow the search', DC.docs.length, DC.total))}</p>` : ''}${dc_smvBar()}`;
-  return `<div class="dc-view">${typeof abd_navHtml === 'function' ? abd_navHtml() : ''}${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>`;
+  // 2.430.0 (#3582): an open document stands in a pane right of the list (computer); filled by dc_mdDraw, a redraw of the
+  // list keeps its content (data-fl-fill)
+  const pane = DC.paneId && !isMobile() ? `<aside class="dc-md dc-pane" data-k="dcpane" data-fl-fill aria-labelledby="dc-h"></aside>` : '';
+  if (pane) setTimeout(dc_paneFill, 0);
+  return `<div class="dc-wrap${pane ? ' dc-paneon' : ''}"><div class="dc-view">${typeof abd_navHtml === 'function' ? abd_navHtml() : ''}${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>${pane}</div>`;
 }
 function dc_card(d) {
   const thumb = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
-  return `<li class="dc-card${d.review ? ' rev' : ''}${DC.selOn && DC.sel.has(d.id) ? ' dc-on' : ''}"><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}"${DC.selOn ? ` aria-pressed="${DC.sel.has(d.id)}"` : ''}>${DC.selOn ? `<span class="dc-selmark" aria-hidden="true">${DC.sel.has(d.id) ? ic('check', 's') : ''}</span>` : ''}
+  // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
+  const on = DC.selOn && DC.sel.has(d.id), cur = DC.paneId === d.id;
+  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"><button type="button" class="dc-selmark" data-dcchk="${d.id}" role="checkbox" aria-checked="${on}" aria-label="${esc(tr('Select') + ': ' + d.name)}" tabindex="${DC.selOn ? 0 : -1}">${on ? ic('check', 's') : ''}</button><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}"${cur ? ' aria-current="true"' : ''}>
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.sender?.name || d.name)}</b>
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
@@ -144,11 +151,25 @@ async function dc_shareFiles(files) {  // the share sheet: "File as document"
 
 // ---- the document sheet
 async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from the file store's cards (its route stays)
+  // 2.430.0 (#3582): in the documents view of a computer the document opens in the pane beside the list; phones
+  // and the file store keep the sheet (phones: as a whole page). DC.opening = the document being fetched (a later one wins)
+  const pane = !o.keep && !isMobile() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)');
+  DC.opening = id;
   let d;
-  try { d = await api('GET', `/api/docs/${id}`); } catch { if (dc_hashId() === id) history.replaceState(null, '', '#docs'); return; }
+  try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(null, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
+  if (DC.opening !== id) return;
+  const ws = d.org_id ? 'org:' + d.org_id : 'private';
+  if (!DC.set || DC.set.ws !== ws) { const s = await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }
+  DC.opening = null;
   DC.doc = d;
-  if (!DC.set || DC.set.ws !== (d.org_id ? 'org:' + d.org_id : 'private')) DC.set = await api('GET', `/api/docs/settings?ws=${d.org_id ? 'org:' + d.org_id : 'private'}`).catch(() => null);
-  let md = $('.dc-md');
+  if (pane) {
+    DC.paneId = id;
+    if (dc_hashId() !== id) history.replaceState(null, '', `#docs/${id}`);
+    dc_draw();
+    const p = $('.dc-pane'); if (p) { dc_paneHook(p); dc_mdDraw(p); }
+    return;
+  }
+  let md = $('.dc-md:not(.dc-pane)');
   if (!md) {
     md = modal('<div class="dc-body"></div>');
     md.classList.add('dc-md');
@@ -159,6 +180,37 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   }
   dc_mdDraw(md);
 }
+// 2.430.0 (#3582): the pane. Its remove() closes it (the sheet's callers -- Close, Delete, a split, a workspace switch -- call
+// md.remove() on either); a redraw of the view that built it anew gets its content back here
+function dc_paneHook(p) { if (p && !p._dcRm) { p._dcRm = true; p.remove = () => dc_paneClose(p); } }
+function dc_paneFill() {
+  const p = $('.dc-pane'); if (!p) return;
+  dc_paneHook(p);
+  if (DC.doc && DC.doc.id === DC.paneId && !p.firstChild) dc_mdDraw(p);
+}
+function dc_paneClose(p) {
+  if (p?.isConnected) Element.prototype.remove.call(p);
+  if (!DC.paneId) return;
+  const was = DC.paneId, back = !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
+  DC.paneId = null; DC.doc = null; DC.opening = null;
+  if (dc_hashId()) history.replaceState(null, '', S.route.review ? '#docs/review' : '#docs');
+  setTimeout(() => { dc_draw(); const c = back && $(`.dc-view [data-dco="${was}"]`); if (c) c.focus({preventScroll: true}); }, 0);  // the focus back on its card
+}
+// the next / previous document of the list in the pane (arrow keys); the card comes into view and keeps the focus
+function dc_paneStep(dir) {
+  const ds = DC.docs || [], i = ds.findIndex(x => x.id === (DC.opening ?? DC.paneId)), n = ds[i + dir];
+  if (i < 0 || !n) return;
+  const f = document.activeElement?.closest?.('.dc-view [data-dco]');
+  dc_open(n.id).then(() => { const c = $(`.dc-view [data-dco="${n.id}"]`); if (!c) return; c.scrollIntoView?.({block: 'nearest'}); if (f) c.focus({preventScroll: true}); });
+}
+document.addEventListener('keydown', e => {
+  if (!DC.paneId || S.route.mod !== 'docs' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || $('.modal') || $('.lightbox') || $('#pop:not(.hidden)')) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); dc_paneStep(e.key === 'ArrowDown' ? 1 : -1); }
+  else if (e.key === 'Escape' && !DC.selOn) { e.preventDefault(); dc_paneClose($('.dc-pane')); }
+});
+document.addEventListener('click', e => { if (e.target.closest?.('.dc-pane')) dc_mdClick(e); });
+document.addEventListener('change', e => { if (e.target.closest?.('.dc-pane')) dc_mdChange(e); });
 function dc_auto(d, f) {
   const by = d.auto?.[f];
   return by ? `<button type="button" class="dc-auto" data-dc="edit:${esc(f)}" title="${esc(tr(DC_BY[by] || by))}">${tr('automatic')}</button>` : '';
@@ -183,9 +235,14 @@ function dc_mdDraw(md) {
   const due = typeof dsp_sheetHtml === 'function' && (d.task !== undefined || !d.task_id) ? dsp_sheetHtml(d, w) : d.due && !d.task_id && w ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
     : d.task_id ? `<div class="dc-due muted">${ic('done', 's')} <a href="#t/${d.task_id}">${tr('Task created')}</a></div>` : '';
   const ro = w ? '' : 'disabled';
-  $('.dc-body', md).innerHTML = `<div class="lhdr"><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+  // 2.430.0 (#3582): the preview on top (filled by dc_pvDraw, kept through redraws), the fields below; the same document is
+  // morphed (a field keeps its focus while the one before saves), another one drawn anew; phones: Back arrow to the list
+  let body = $('.dc-body', md);
+  if (!body) { body = document.createElement('div'); body.className = 'dc-body'; md.appendChild(body); }
+  if (body.dataset.id !== String(d.id)) { body.textContent = ''; body.dataset.id = String(d.id); }
+  fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="dc-top">
-      <button type="button" class="dc-prev" data-dc="view" aria-label="${esc(tr('Show {0}', d.name))}">${d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="">` : `<span class="dc-ph">${ic('file')}</span>`}</button>
+      <button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>
       <div class="dc-acts">
         <button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>
         ${d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` /* 2.146.0 A (#2451) */ : ''}
@@ -212,7 +269,39 @@ function dc_mdDraw(md) {
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
-    <details class="dc-text"><summary>${tr('Recognised text')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`;
+    <details class="dc-text"><summary>${tr('Recognised text')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`);
+  dc_pvDraw(md, d);
+}
+// 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp
+// to the width (pdf.js of the module pdf, nothing in the file runs); fails = the small picture stays. Once per document and file size.
+async function dc_pvDraw(md, d) {
+  const box = $('.dc-prev', md); if (!box) return;
+  const key = `${d.id}:${d.size}`;  // a field saved does not draw it again
+  if (box._pv === key && box.firstChild) return;
+  box._pv = key;
+  box.innerHTML = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
+  const live = () => box.isConnected && box._pv === key;
+  if (/^image\//.test(d.mime || '') && d.thumb) {
+    const im = new Image(); im.alt = ''; im.onload = () => { if (live()) box.replaceChildren(im); }; im.src = dc_fileUrl(d);
+    return;
+  }
+  if (!dc_isPdf(d) || d.size > 20e6 || typeof loadModule !== 'function') return;
+  try {
+    await loadModule('pdf');
+    const lib = typeof pv_load === 'function' ? await pv_load() : null; if (!lib || !live()) return;
+    const r = await fetch(dc_fileUrl(d), {credentials: 'same-origin'}); if (!r.ok || !live()) return;
+    const doc = await lib.getDocument({data: new Uint8Array(await r.arrayBuffer()), isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true}).promise;
+    try {
+      const page = await doc.getPage(1); if (!live()) return;
+      const vp0 = page.getViewport({scale: 1}), vp = page.getViewport({scale: Math.max(240, box.clientWidth || 320) / vp0.width});
+      const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(16e6 / (vp.width * vp.height)));
+      const cv = document.createElement('canvas');
+      cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
+      cv.setAttribute('aria-hidden', 'true');
+      await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
+      if (live()) box.replaceChildren(cv);
+    } finally { doc.destroy(); }
+  } catch { /* the small picture stays */ }
 }
 function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the document
   const id = `dc-cf${f.id}`, v = f.value ?? '', a = `data-dcf="${f.id}"`;
@@ -532,8 +621,12 @@ async function dc_sClick(e) {
 let dc_qTimer = null;
 document.addEventListener('click', e => {
   const v = e.target.closest('.dc-view'); if (!v) return;
+  // 2.430.0 (#3582): a plain click opens, also while choosing; the box, Ctrl/Cmd-click and Shift-click (ranges, 2.122.0 B #2295) choose
+  const k = e.target.closest('[data-dcchk]');
+  if (k) { if (e.shiftKey) dc_rsClick(e, +k.dataset.dcchk); else dc_selToggle(+k.dataset.dcchk); return; }
   const o = e.target.closest('[data-dco]');
-  if (o && (DC.selOn || (e.shiftKey && typeof dt_rsMouse === 'function' && dt_rsMouse(e)))) { dc_rsClick(e, +o.dataset.dco); return; }  // 2.96.0 A (#1941): choosing, not opening; 2.122.0 B (#2295): Shift ranges
+  if (o && e.shiftKey && (DC.selOn || (typeof dt_rsMouse === 'function' && dt_rsMouse(e)))) { dc_rsClick(e, +o.dataset.dco); return; }
+  if (o && (e.ctrlKey || e.metaKey)) { dc_selToggle(+o.dataset.dco); return; }
   if (o) { history.replaceState(null, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
@@ -573,6 +666,16 @@ DC.sel = new Map();  // id -> org_id of the chosen documents (also those beyond 
 DC.selOn = false;
 const DC_SMV_MAX = 2000;  // the server's limit per move (accounts/spacemove.py SMV_MAX)
 const dc_smvBtn = () => DC.docs?.length ? `<button type="button" class="btn sm ${DC.selOn ? 'on' : ''}" data-dcsel="mode" aria-pressed="${DC.selOn}">${ic('check', 's')} <span>${tr('Select')}</span></button>` : '';
+function dc_selToggle(id) {  // 2.430.0 (#3582): tick / untick one card; the first one turns choosing on
+  if (!DC.selOn) { DC.selOn = true; DC.sel = new Map(); if (typeof dt_rsReset === 'function') dt_rsReset(); }
+  if (typeof dt_rsAnchor === 'function') dt_rsAnchor('dc:' + dc_params(), id);  // a following Shift-click spans from here
+  dc_smvToggle(id);
+}
+// a long press on a card (phone) ticks it; the click that ends the press does not open it (multisel.js)
+if (typeof ms_longPress === 'function') {
+  const dc_lp = ms_longPress('.dc-view .dc-card [data-dco]', () => false, r => dc_selToggle(+r.dataset.dco));
+  window.addEventListener('click', e => { if (ms_lpRecent(dc_lp) && e.target.closest?.('.dc-view .dc-card')) { e.preventDefault(); e.stopPropagation(); } }, true);
+}
 function dc_smvToggle(id) {
   const d = (DC.docs || []).find(x => x.id === id); if (!d) return;
   if (DC.sel.has(id)) DC.sel.delete(id); else DC.sel.set(id, d.org_id || null);

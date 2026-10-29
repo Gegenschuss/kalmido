@@ -90,9 +90,10 @@ const confirmMove = async w => {
   const card = await until(() => vd.querySelector(`[data-dco="${DOC}"]`), 60);
   check(card, 'the document card');
   vd.querySelector('[data-dcsel="mode"]')?.click();
-  await until(() => vd.querySelector(`[data-dco="${DOC}"][aria-pressed]`));
-  vd.querySelector(`[data-dco="${DOC}"]`).click();
-  check(await until(() => vd.querySelector(`[data-dco="${DOC}"]`)?.getAttribute('aria-pressed') === 'true' && !vd.querySelector('.dc-md')), 'Select: a click chooses the card, nothing opens');
+  // 2.430.0 (#3582): a plain click on a card opens it even while choosing; the box on the card chooses
+  await until(() => vd.querySelector(`.dc-grid.dc-selon [data-dcchk="${DOC}"]`));
+  vd.querySelector(`[data-dcchk="${DOC}"]`).click();
+  check(await until(() => vd.querySelector(`[data-dcchk="${DOC}"]`)?.getAttribute('aria-checked') === 'true' && !vd.querySelector('.dc-md')), 'Select: the box chooses the card, nothing opens');
   const dbar = await until(() => /1 selected/.test(vd.querySelector('.dc-selbar')?.textContent || '') && vd.querySelector('.dc-selbar'));
   check(dbar && dbar.querySelector('[data-dcsel="space"]'), 'the bar of the documents: 1 selected, "Move to another workspace…"');
   dbar?.querySelector('[data-dcsel="space"]').click();
