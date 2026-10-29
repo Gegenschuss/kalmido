@@ -9,7 +9,7 @@ could drop the entry, the tab that sends it again, an agent's retry after a lost
 
 Never swallows an effect: only a stored 2xx answer is replayed. A row without an answer (the first request still running:
 waited for a moment; or it committed and then failed) lets the repeat run as before and the new 2xx answer is stored.
-Without the header nothing changes. Keys older than IDEM_DAYS go when the same person claims a new key.
+Without the header nothing changes. Keys older than IDEM_DAYS (14, 2.380 H #3387) go when the same person claims a new key.
 """
 import json
 import re
@@ -22,7 +22,7 @@ from .config import app
 from .db import connect, db, iso, now_utc
 
 IDEM_HEADER = "Idempotency-Key"
-IDEM_DAYS = 3
+IDEM_DAYS = 14  # 2.380 H (#3387): as long as the offline queue lives (a change sent after days is no false conflict)
 IDEM_MAX_BODY = 256 * 1024  # bytes of a stored answer; a larger one is replayed as {"ok": true}
 IDEM_WAIT = 3.0  # s: a repeat that arrives while the first request is still running waits this long for its answer
 _IDEM_KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")

@@ -127,12 +127,29 @@ const rejected = w => w.eval('S.conflicts').filter(c => c.field === 'rejected');
     await w.eval(`submitQuick(document.querySelector('#qinput'))`);
     check(await until(() => qf.size === 1), `${title}: the file is kept while offline (${qf.size})`);
     online(w);
-    check(await until(() => qf.size === 0 && w.eval('OUT.q.length') === 0, {timeout: 20000}), `${title}: sent, the kept file is gone (${qf.size})`);
+    // 2.380 H (#3387): a refused create keeps its file (for the Download in the conflicts dialog) until the conflict is dismissed
+    check(await until(() => w.eval('OUT.q.length') === 0 && (refuse ? rejected(w).some(c => c.qf) && qf.size === 1 : qf.size === 0), {timeout: 20000}), `${title}: sent, the kept file is gone (${qf.size})`);
     if (!refuse) {
       const t = (await call('GET', '/api/state')).tasks.find(x => x.title === title);
       const full = t && await call('GET', '/api/tasks/' + t.id);
       check(!!full && (full.attachments || []).some(a => a.name === 'shot.png'), `${title}: the file is attached to the new task ` + JSON.stringify((full || {}).attachments));
-    } else check(rejected(w).some(c => /refused\.png/.test(c.mine)), `${title}: the dialog names the file ` + JSON.stringify(rejected(w)));
+    } else {
+      check(rejected(w).some(c => /refused\.png/.test(c.mine)), `${title}: the dialog names the file ` + JSON.stringify(rejected(w)));
+      // 2.380 H (#3387): the dialog offers the refused file for download; dismissing the conflict forgets the file
+      check(await until(() => qf.size === 1 && [...qf.values()].every(r => r.rej)), '#3387: the kept file is marked refused (not sent again)');
+      w.eval('conflictModal()');
+      const dm = await until(() => [...w.document.querySelectorAll('.modal')].find(x => x.querySelector('[data-cf="dl"]')));
+      check(!!dm, '#3387: the conflicts dialog has a Download button for the refused image');
+      const dl = [];
+      w.URL.createObjectURL = () => 'blob:x'; w.URL.revokeObjectURL = () => {};
+      const oc = w.HTMLAnchorElement.prototype.click; w.HTMLAnchorElement.prototype.click = function () { dl.push(this.download); };
+      dm?.querySelector('[data-cf="dl"]')?.click();
+      check(await until(() => dl.includes('refused.png')), '#3387: Download saves the file under its name ' + JSON.stringify(dl));
+      w.HTMLAnchorElement.prototype.click = oc;
+      dm?.querySelector(`[data-cf="server"][data-i="${dm.querySelector('[data-cf="dl"]')?.dataset.i}"]`)?.click();
+      check(await until(() => qf.size === 0), '#3387: dismissing the conflict forgets the kept file');
+      dm?.remove();
+    }
   }
   w.eval("S.conflicts = []; LS.set('conflicts', [])");
   fake = null;

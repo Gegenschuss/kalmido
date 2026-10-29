@@ -798,7 +798,7 @@ async function outFlush() {
       }
       e.done = true;
     }
-    LS.set('idmap', Object.fromEntries(Object.entries(idmap).filter(([k]) => -k > Date.now() - 600000)));  // 2.126.0 D (#1989): another tab may still hold a new task's temporary id for a while
+    LS.set('idmap', Object.fromEntries(Object.entries(idmap).filter(([k]) => -k > Date.now() - 86400000)));  // 2.126.0 D (#1989): another tab may still hold a new task's temporary id for a while; 2.380 H (#3387): 24 h, not 10 min
     obxMeta('idmap', LS.get('idmap', {}));  // 2.143.0 C (#2153)
   } finally {
     OUT.flushing = false;
@@ -921,7 +921,7 @@ function conflictModal() {
   const draw = () => {
     $('#cf-list', md).innerHTML = S.conflicts.map((c, i) => c.field === 'rejected' ? `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(tr('Offline change not saved'))}</span></div>
       <div class="cfv"><div><span>${tr('reason')}</span>${esc(c.server)}</div><div><span>${tr('your version')}</span><span style="white-space:pre-wrap">${esc(c.mine)}</span></div></div>
-      <div class="cfb"><button class="btn sm" data-cf="server" data-i="${i}">${tr('Dismiss')}</button><button class="btn sm pri" data-cf="copy" data-i="${i}">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(histFieldName(c.field))}</span></div>
+      <div class="cfb"><button class="btn sm" data-cf="server" data-i="${i}">${tr('Dismiss')}</button>${c.qf ? `<button class="btn sm" data-cf="dl" data-i="${i}">${ic('download', 's')} ${tr('Download')}</button>` : '' /* 2.380 H (#3387) */}<button class="btn sm pri" data-cf="copy" data-i="${i}">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : `<div class="cfitem"><div class="cfh"><b>${esc(c.title)}</b><span class="muted">${esc(histFieldName(c.field))}</span></div>
       <div class="cfv"><div><span>${tr('saved')}</span>${esc(fmtVal(c.field, c.server))}</div><div><span>${tr('your version')}</span>${esc(fmtVal(c.field, c.mine))}</div></div>
       <div class="cfb"><button class="btn sm" data-cf="server" data-i="${i}">${tr('Keep saved')}</button><button class="btn sm pri" data-cf="mine" data-i="${i}">${tr('Use mine')}</button></div></div>`).join('') || `<div class="muted" style="padding:.625rem 0">${tr('No open conflicts.')}</div>`;
   };
@@ -929,10 +929,12 @@ function conflictModal() {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m === 'all-server') { S.conflicts = []; }
+    if (b.dataset.m === 'all-server') { if (typeof qfForget === 'function') qfForget(S.conflicts.map(c => c.qf)); S.conflicts = []; }
     if (b.dataset.cf) {
       const c = S.conflicts[+b.dataset.i];
       if (b.dataset.cf === 'copy') { try { await navigator.clipboard.writeText(c.mine); toast(tr('Copied')); } catch { toast(c.mine); } return; }  // 2.126.0 D (#1992 O8)
+      if (b.dataset.cf === 'dl') { if (typeof qfDownload === 'function') await qfDownload(c.qf); return; }  // 2.380 H (#3387)
+      if (c.qf && typeof qfForget === 'function') qfForget([c.qf]);
       if (b.dataset.cf === 'mine') {
         try { const t = await api('PATCH', '/api/tasks/' + c.tid, c.field.startsWith('field:') ? {fields: {[c.field.slice(6)]: c.mine}} : {[c.field]: c.mine}); putTask(t); } catch { return; }
       }

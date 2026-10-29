@@ -862,6 +862,16 @@ window.addEventListener('pagehide', () => {
   if (n.id < 0) delete patch.expect_updated_at;
   outKeep('PATCH', `/api/notes/${n.id}`, patch);
 });
+// 2.380 H (#3387): back from the back-forward cache the note's base (updated_at) is old - the change sent at pagehide moved it
+// on: the notes load again (changes still waiting drawn on top), so the next key press is no false conflict
+window.addEventListener('pageshow', e => {
+  const lid = S.nt.lid; if (!e.persisted || !lid || S.nt.dirty) return;
+  loadNotes(lid).then(() => {
+    if (S.nt.lid !== lid) return;
+    for (const o of OUT.q) if (NT_URL.test(o.url) && !o.done) ntLocal(o);
+    if (S.route.mod === 'notes' && !S.nt.dirty) renderView();
+  });
+});
 async function noteFlush() {
   clearTimeout(S.nt.saveT);
   const n = noteCur(); if (!n || !S.nt.dirty) return;
