@@ -7,6 +7,9 @@ check without an organisation. Static like tests/tenant_coverage_test.py: reads 
  2. every area is in KINDS: a matrix area names the suite that calls it as a person without an organisation, and that
     suite carries the marker "freelancer-matrix: <area>" and runs in tests/run_all.sh (so an area cannot be claimed without
     a test that runs); an n/a area carries its reason
+ 3. 2.421.0 A (#2936): every write route (POST / PUT / PATCH / DELETE) of a matrix area is called by a suite of its area
+    (write_proven: the path with its ids and the method on the line); the old ones without a call stand in WRITE_UNPROVEN,
+    which may only shrink
 A new route fails here until somebody decides which area it belongs to (and the freelancer suite of that area calls it:
 p287b_a_freelancer_api_test.py sweeps every GET of the matrix areas as a freelancer and fails on 403 / 5xx) or why it needs
 no check. The fixture "Selbstständige" for new suites: tests/freelancer_fixture.py.
@@ -77,9 +80,11 @@ KINDS = {
     # 2.102.0 (#1999)
     "clienterr": ("n/a", "the web app's own unexpected error (message cut of data, place in the code, version, area): written as "
                          "nobody into the one project list the server operator chose, nothing is read back or answered"),
-    "admin": ("n/a", "the server operator's administration (need_admin): no organisation involved -- a freelancer running the "
-                     "own server is its operator with exactly these pages (p2473_a_api_test.py sets up a server without any "
-                     "organisation)"),
+    # 2.421.0 A (#2936): judged apart for both kinds of server
+    "admin": ("n/a", "the server operator's administration (need_admin). Self-hosted: a freelancer running the own server is its "
+                     "operator with exactly these pages (p2473_a_api_test.py sets up a server without any organisation). Hosted: "
+                     "the operator's pages are not the freelancer's -- the own area is own / office / agents (p2421_a_api_test.py: "
+                     "a person on a server the admin only created the account on, without any admin switch)"),
     # 2.144.0 D (#797)
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
                         "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
@@ -986,6 +991,617 @@ ROUTES = {
 }
 
 
+# 2.421.0 A (#2936): the proof of a write route (POST / PUT / PATCH / DELETE of a matrix area): a suite with the marker of its
+# area (and in the run) calls the path -- "{}" = an f-string field, an id, or a "+ str(x) +" piece -- on a line naming the
+# method (or the line before). Constants of a suite (O = "/api/office", V = B + "/api/v1") are put into the paths first; an
+# /api/v1 route may stand without its prefix right after a quote (a client with the base /api/v1).
+WRITES = ("POST", "PUT", "PATCH", "DELETE")
+CONST_RE = re.compile(r"^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(?:\w+\s*\+\s*)?(?:([A-Z_][A-Z0-9_]*)\s*\+\s*)?f?[\"'](/[\w/{}.-]*)[\"']\s*(?:#.*)?$", re.M)
+HOLE = r"(?:\{[^{}\n]{1,80}\}|[\w.%-]{1,40}|[\"']\s*\+\s*[^\n+]{1,60}?\s*\+\s*f?[\"']|[\"']\s*\+\s*str\([^\n]{1,60}?\)(?=[\s,)]))"
+
+
+def expand_consts(src):
+    consts = {}
+    for n, base, v in CONST_RE.findall(src):
+        consts[n] = consts.get(base, "") + v if base else v
+    for n in sorted(consts, key=len, reverse=True):
+        v = consts[n]
+        src = re.sub(r"\b" + n + r"\s*\+\s*f?([\"'])", lambda m: m.group(1) + v, src)
+        src = src.replace("{" + n + "}", v)
+    return src
+
+
+def path_rx(path):
+    piece = lambda a: "".join(HOLE if x == "{}" else re.escape(x) for x in re.split(r"(\{\})", a))  # noqa: E731
+    body = piece(path)
+    if path.startswith("/api/v1/"):
+        body += r"|(?<=[\"'])" + piece(path[len("/api/v1"):])
+    return re.compile(r"(?:" + body + r")(?![\w/.-])")
+
+
+def write_proven(route, texts):
+    """route "METHOD /path": called in one of texts (expanded suite sources)?"""
+    m, path = route.split(" ", 1)
+    rx, mw = path_rx(path), re.compile(r"\b" + m + r"\b", re.I)
+    anchor = max((path[len("/api/v1"):] if path.startswith("/api/v1/") else path).split("{}"), key=len)  # cheap pre-filter
+    for t in texts:
+        i = t.find(anchor)
+        while i >= 0:
+            a, b = t.rfind("\n", 0, i) + 1, t.find("\n", i)
+            b = len(t) if b < 0 else b
+            if rx.search(t[a:b]) and (mw.search(t[a:b]) or mw.search(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a])):
+                return True
+            i = t.find(anchor, b + 1) if b < len(t) else -1
+    return False
+
+
+# 2.421.0 A (#2936): the write routes of matrix areas that no suite of their area called on 29.10.2026 (frozen: may only
+# shrink; a new write route needs its call, a route called now must leave the list)
+WRITE_UNPROVEN = set(x.strip() for x in """
+DELETE /api/account/export
+DELETE /api/agent-schedules/{}
+DELETE /api/books/{}/org
+DELETE /api/budget/cats/{}
+DELETE /api/budget/entries/{}
+DELETE /api/budget/files/{}
+DELETE /api/budget/recurring/{}
+DELETE /api/calendars/{}
+DELETE /api/calendars/{}/events
+DELETE /api/chat-files/{}
+DELETE /api/deps/{}/{}
+DELETE /api/disc/blocks/{}
+DELETE /api/disc/connections/{}
+DELETE /api/disc/requests/{}
+DELETE /api/docs/mail
+DELETE /api/e2e/keys
+DELETE /api/envs/{}
+DELETE /api/envs/{}/deploys/{}
+DELETE /api/family/contacts/{}
+DELETE /api/family/kids/{}/pin
+DELETE /api/family/rewards/{}
+DELETE /api/filters/{}
+DELETE /api/folders/agents
+DELETE /api/folders/groups/{}
+DELETE /api/forms/{}
+DELETE /api/habits/{}
+DELETE /api/hubmail/address
+DELETE /api/layouts/saved/{}
+DELETE /api/life/karakeep
+DELETE /api/list-checks/{}
+DELETE /api/lists/{}/favorite
+DELETE /api/lists/{}/groups/{}
+DELETE /api/lists/{}/icon
+DELETE /api/lists/{}/links/{}
+DELETE /api/lists/{}/milestones/{}
+DELETE /api/lists/{}/public-link
+DELETE /api/me/avatar
+DELETE /api/me/mail/token
+DELETE /api/me/wait-suggestions
+DELETE /api/me/webhooks/{}
+DELETE /api/my/agents/{}/machines/{}
+DELETE /api/newsletter
+DELETE /api/newsletter/segments/{}
+DELETE /api/notepads/{}
+DELETE /api/notes/{}
+DELETE /api/office/bank/rules/{}
+DELETE /api/office/cashflow/adjust/{}
+DELETE /api/office/cashflow/start
+DELETE /api/office/contracts/{}/files/{}
+DELETE /api/office/deals/{}
+DELETE /api/office/doc-templates/{}
+DELETE /api/office/docs/{}/parts/{}
+DELETE /api/office/docs/{}/payments/{}
+DELETE /api/office/gen-docs/{}
+DELETE /api/office/letter-blocks/{}
+DELETE /api/office/letters/{}
+DELETE /api/office/letters/{}/delivered
+DELETE /api/office/logo
+DELETE /api/office/meals/choices/{}
+DELETE /api/office/meals/{}/file/{}
+DELETE /api/office/packs/installed/{}/{}
+DELETE /api/office/privacy-sheets/{}
+DELETE /api/office/rights/groups/{}
+DELETE /api/office/series/{}
+DELETE /api/office/terms/{}
+DELETE /api/office/trash/{}
+DELETE /api/office/trips/purposes/{}
+DELETE /api/paperless
+DELETE /api/paperless/zip
+DELETE /api/push/subs/{}
+DELETE /api/repos/{}
+DELETE /api/rules/{}
+DELETE /api/sample
+DELETE /api/servers/{}
+DELETE /api/servers/{}/tasks/{}
+DELETE /api/supporter/{}
+DELETE /api/tasks/{}/contacts/{}
+DELETE /api/tasks/{}/enc-note
+DELETE /api/tasks/{}/links/{}
+DELETE /api/tasks/{}/note-lock
+DELETE /api/tasks/{}/waiting
+DELETE /api/templates/{}
+DELETE /api/v1/address-books/{}
+DELETE /api/v1/address-books/{}/members/{}
+DELETE /api/v1/attachments/{}
+DELETE /api/v1/chat-attachments/{}
+DELETE /api/v1/clients/{}
+DELETE /api/v1/comments/{}
+DELETE /api/v1/comments/{}/reactions/{}
+DELETE /api/v1/contacts/{}
+DELETE /api/v1/event-calendars/{}
+DELETE /api/v1/event-calendars/{}/members/{}
+DELETE /api/v1/events/{}
+DELETE /api/v1/family/rewards/{}
+DELETE /api/v1/fields/{}
+DELETE /api/v1/filters/{}
+DELETE /api/v1/forms/{}
+DELETE /api/v1/habits/{}
+DELETE /api/v1/lists/{}
+DELETE /api/v1/lists/{}/files/{}
+DELETE /api/v1/lists/{}/groups/{}
+DELETE /api/v1/lists/{}/links/{}
+DELETE /api/v1/lists/{}/members/{}
+DELETE /api/v1/lists/{}/milestones/{}
+DELETE /api/v1/lists/{}/tags/{}
+DELETE /api/v1/me/app-passwords/{}
+DELETE /api/v1/notepads/{}
+DELETE /api/v1/notes/{}
+DELETE /api/v1/sections/{}
+DELETE /api/v1/tasks/{}
+DELETE /api/v1/tasks/{}/contacts/{}
+DELETE /api/v1/tasks/{}/dependencies/{}
+DELETE /api/v1/tasks/{}/links/{}
+DELETE /api/v1/tasks/{}/waiting
+DELETE /api/v1/team/messages/{}
+DELETE /api/v1/templates/{}
+DELETE /api/v1/time/timer
+DELETE /api/v1/trash
+PATCH /api/agents/{}/chat/{}
+PATCH /api/books/{}/org
+PATCH /api/budget/recurring/{}
+PATCH /api/calendars/{}
+PATCH /api/calendars/{}/events
+PATCH /api/comments/{}
+PATCH /api/docs/labels/{}/{}
+PATCH /api/envs/{}
+PATCH /api/evcals/{}
+PATCH /api/family/rewards/{}
+PATCH /api/filters/{}
+PATCH /api/fsref/office_doc/{}
+PATCH /api/layouts/saved/{}
+PATCH /api/list-checks/{}
+PATCH /api/list-tags/{}
+PATCH /api/lists/{}/error-hook
+PATCH /api/lists/{}/links/{}
+PATCH /api/lists/{}/milestones/{}
+PATCH /api/me
+PATCH /api/me/tokens/{}
+PATCH /api/me/webhooks/{}
+PATCH /api/newsletter/segments/{}
+PATCH /api/notepads/{}
+PATCH /api/office/cashbooks/{}
+PATCH /api/office/cashflow/adjust/{}
+PATCH /api/office/contracts/{}/files/{}
+PATCH /api/office/doc-templates/{}
+PATCH /api/office/gen-docs/{}
+PATCH /api/office/letter-blocks/{}
+PATCH /api/office/meals/choices/{}
+PATCH /api/office/privacy-sheets/{}
+PATCH /api/office/series/{}
+PATCH /api/office/trips/purposes/{}
+PATCH /api/office/trips/{}/items/{}
+PATCH /api/office/vehicles/{}
+PATCH /api/sections/{}
+PATCH /api/servers/self
+PATCH /api/servers/{}
+PATCH /api/servers/{}/tasks/{}
+PATCH /api/supporter/nudge
+PATCH /api/tasks/{}/links/{}
+PATCH /api/tasks/{}/ticket
+PATCH /api/team/dispo/bookings/{}
+PATCH /api/templates/{}
+PATCH /api/v1/address-books/{}
+PATCH /api/v1/clients/{}
+PATCH /api/v1/comments/{}
+PATCH /api/v1/event-calendars/{}
+PATCH /api/v1/events/{}
+PATCH /api/v1/family/rewards/{}
+PATCH /api/v1/fields/{}
+PATCH /api/v1/filters/{}
+PATCH /api/v1/forms/{}
+PATCH /api/v1/lists/{}/error-hook
+PATCH /api/v1/lists/{}/links/{}
+PATCH /api/v1/lists/{}/milestones/{}
+PATCH /api/v1/lists/{}/tags/{}
+PATCH /api/v1/me/notifications
+PATCH /api/v1/notepads/{}
+PATCH /api/v1/office/leads/{}
+PATCH /api/v1/sections/{}
+PATCH /api/v1/team/messages/{}
+PATCH /api/v1/templates/{}
+POST /api/account/export/file
+POST /api/agents/{}/chat/{}/pin
+POST /api/agents/{}/chat/{}/reactions
+POST /api/agents/{}/meeting-images
+POST /api/agents/{}/share-all
+POST /api/agents/{}/wake
+POST /api/assistant/run
+POST /api/briefing/read
+POST /api/budget/entries/{}/files
+POST /api/budget/recurring/{}/book
+POST /api/budget/{}/cats
+POST /api/budget/{}/contracts
+POST /api/budget/{}/recurring
+POST /api/calendars
+POST /api/calendars/discover
+POST /api/calendars/{}/events
+POST /api/calendars/{}/events/restore
+POST /api/calendars/{}/refresh
+POST /api/calendars/{}/write
+POST /api/clients/merge
+POST /api/clients/merges/{}/undo
+POST /api/comments/{}/apply
+POST /api/comments/{}/choice
+POST /api/comments/{}/decide
+POST /api/comments/{}/reactions
+POST /api/contacts/merge
+POST /api/contacts/merges/{}/undo
+POST /api/deps
+POST /api/disc/blocks/{}
+POST /api/disc/check
+POST /api/disc/confirm
+POST /api/disc/connections/{}/restore
+POST /api/disc/find
+POST /api/disc/requests
+POST /api/disc/requests/{}/{}
+POST /api/docs/{}/accept
+POST /api/envs/{}/deploy
+POST /api/envs/{}/restore
+POST /api/events/{}/prep-task
+POST /api/events/{}/rsvp
+POST /api/family/deadlines
+POST /api/family/kids/{}/rewards
+POST /api/family/kids/{}/stars
+POST /api/family/occasions
+POST /api/family/packing
+POST /api/family/rewards/{}/decide
+POST /api/family/rewards/{}/request
+POST /api/favorites/suggestion
+POST /api/files/lock/folder
+POST /api/files/lock/move/{}
+POST /api/files/lock/rename/{}
+POST /api/files/lock/upload
+POST /api/files/lock/version/{}
+POST /api/files/lock/{}/convert/{}
+POST /api/files/lock/{}/keys
+POST /api/files/lock/{}/stop
+POST /api/files/nodes/{}/versions/{}/restore
+POST /api/filters
+POST /api/folders/delete
+POST /api/folders/owner
+POST /api/folders/playbook/restore
+POST /api/folders/rename
+POST /api/folders/repos
+POST /api/habits/{}/log
+POST /api/hubmail/mailbox/check
+POST /api/hubmail/mails/{}/assign
+POST /api/ical
+POST /api/imports/{}/undo
+POST /api/layouts/offers
+POST /api/layouts/offers/{}/accept
+POST /api/layouts/offers/{}/decline
+POST /api/layouts/saved
+POST /api/layouts/saved/standard
+POST /api/layouts/saved/{}/activate
+POST /api/life/contracts
+POST /api/life/karakeep/sync
+POST /api/life/upkeep
+POST /api/list-checks/{}/run
+POST /api/lists/reorder
+POST /api/lists/{}/checks
+POST /api/lists/{}/e2e/bulk
+POST /api/lists/{}/e2e/files/{}
+POST /api/lists/{}/e2e/finish
+POST /api/lists/{}/e2e/keys
+POST /api/lists/{}/e2e/rotate
+POST /api/lists/{}/e2e/start
+POST /api/lists/{}/e2e/stop
+POST /api/lists/{}/envs
+POST /api/lists/{}/folder-reset
+POST /api/lists/{}/header
+POST /api/lists/{}/icon
+POST /api/lists/{}/join
+POST /api/lists/{}/links
+POST /api/lists/{}/milestones
+POST /api/lists/{}/notepads
+POST /api/lists/{}/playbook/proposals/{}/apply
+POST /api/lists/{}/playbook/proposals/{}/discard
+POST /api/lists/{}/playbook/restore
+POST /api/lists/{}/public-link/regenerate
+POST /api/lists/{}/sections/order
+POST /api/lists/{}/shift
+POST /api/lists/{}/shop-areas
+POST /api/lists/{}/signoffs/{}/revoke
+POST /api/lists/{}/sprints
+POST /api/lists/{}/tags/promote
+POST /api/lists/{}/time/restore
+POST /api/me/avatar
+POST /api/me/drop-token
+POST /api/me/mail/token
+POST /api/me/pin/lock
+POST /api/me/pin/unlock
+POST /api/me/purpose
+POST /api/me/webhooks/{}/secret
+POST /api/me/webhooks/{}/test
+POST /api/my/agents/{}/setup-code
+POST /api/news/dismiss
+POST /api/news/read
+POST /api/newsletter/consent/import
+POST /api/newsletter/segments
+POST /api/newsletter/sync
+POST /api/notes/{}/restore
+POST /api/notify-templates/asked
+POST /api/ntfy/test
+POST /api/office/bank/rules
+POST /api/office/bank/rules/decline
+POST /api/office/bank/rules/{}/apply
+POST /api/office/bank/rules/{}/restore
+POST /api/office/bank/rules/{}/revert
+POST /api/office/cashbooks/{}/closing
+POST /api/office/cashflow/adjust
+POST /api/office/catalog/refresh
+POST /api/office/contracts/{}/files/{}/restore
+POST /api/office/datev/import
+POST /api/office/datev/import/check
+POST /api/office/datev/import/{}/undo
+POST /api/office/deals/{}/convert
+POST /api/office/deals/{}/project
+POST /api/office/deals/{}/restore
+POST /api/office/deals/{}/unconvert
+POST /api/office/doc-templates/{}/restore
+POST /api/office/docs/from-time
+POST /api/office/docs/tree/folders
+POST /api/office/docs/{}/delivery
+POST /api/office/docs/{}/fee
+POST /api/office/docs/{}/peppol
+POST /api/office/docs/{}/peppol/lookup
+POST /api/office/docs/{}/peppol/refresh
+POST /api/office/docs/{}/project
+POST /api/office/docs/{}/time-release
+POST /api/office/drives/{}/restore
+POST /api/office/drives/{}/trip
+POST /api/office/gen-docs/tree/folders
+POST /api/office/gen-docs/{}/restore
+POST /api/office/gen-docs/{}/signoff
+POST /api/office/import
+POST /api/office/legacy/archive/address
+POST /api/office/legacy/archive/parse
+POST /api/office/legacy/counter
+POST /api/office/legacy/runs/{}/tidy
+POST /api/office/legacy/split
+POST /api/office/letter-blocks/{}/restore
+POST /api/office/letterhead/restore
+POST /api/office/letters/tree/folders
+POST /api/office/letters/{}/delivered
+POST /api/office/letters/{}/restore
+POST /api/office/letters/{}/send-mail
+POST /api/office/letters/{}/template
+POST /api/office/logbook/close
+POST /api/office/meals/choices
+POST /api/office/meals/{}/file/{}/restore
+POST /api/office/meals/{}/restore
+POST /api/office/meals/{}/unlock
+POST /api/office/number-ranges/{}
+POST /api/office/packs/install
+POST /api/office/packs/installed/{}/{}/restore
+POST /api/office/packs/validate
+POST /api/office/privacy-sheets
+POST /api/office/privacy-sheets/{}/confirm
+POST /api/office/privacy-sheets/{}/restore
+POST /api/office/privacy-sheets/{}/send
+POST /api/office/privacy-sheets/{}/signed
+POST /api/office/receipts/bill
+POST /api/office/receipts/tree/folders
+POST /api/office/receipts/unbill
+POST /api/office/series/{}/restore
+POST /api/office/terms/{}/restore
+POST /api/office/trips/unbill
+POST /api/onboarding
+POST /api/orgs/{}/encryption/recovery/passkey
+POST /api/orgs/{}/export/file
+POST /api/paperless/import
+POST /api/paperless/stop
+POST /api/paperless/zip
+POST /api/paperless/zip/import
+POST /api/paperless/zip/part
+POST /api/paperless/zip/stop
+POST /api/pdf-text
+POST /api/pomo/start
+POST /api/pomo/{}/{}
+POST /api/push/handled
+POST /api/push/test
+POST /api/push/unsubscribe
+POST /api/rules/{}/restore
+POST /api/sample
+POST /api/servers
+POST /api/servers/code
+POST /api/servers/move
+POST /api/servers/{}/news/read
+POST /api/servers/{}/restore
+POST /api/servers/{}/tasks
+POST /api/servers/{}/tasks/{}/{}
+POST /api/sheets/{}/links/{}/redo
+POST /api/sheets/{}/links/{}/undo
+POST /api/sheets/{}/rows-from-list
+POST /api/sheets/{}/to-offer
+POST /api/sprints/{}/close
+POST /api/sprints/{}/start
+POST /api/supporter/{}/swap
+POST /api/tags/delete
+POST /api/tags/restore
+POST /api/tasks/purge-done
+POST /api/tasks/similar
+POST /api/tasks/{}/approval
+POST /api/tasks/{}/bell/undo
+POST /api/tasks/{}/chain/pull
+POST /api/tasks/{}/contacts
+POST /api/tasks/{}/editing
+POST /api/tasks/{}/enc-attachments
+POST /api/tasks/{}/git-undo
+POST /api/tasks/{}/list-attachments
+POST /api/tasks/{}/seen
+POST /api/tasks/{}/take
+POST /api/tasks/{}/to-shopping
+POST /api/tasks/{}/typing
+POST /api/tasks/{}/wake
+POST /api/team/absences/{}/restore
+POST /api/team/dispo/bookings/restore
+POST /api/team/messages/{}/pin
+POST /api/team/messages/{}/reactions
+POST /api/trash/lists/{}/export.zip
+POST /api/users/{}/approve
+POST /api/users/{}/invite
+POST /api/users/{}/signin-link
+POST /api/v1/address-books
+POST /api/v1/agent/chats/{}/messages/{}/pin
+POST /api/v1/agent/chats/{}/messages/{}/reactions
+POST /api/v1/agent/chats/{}/messages/{}/withdraw
+POST /api/v1/agents/{}/chat/{}/choice
+POST /api/v1/agents/{}/chat/{}/reactions
+POST /api/v1/clients
+POST /api/v1/clients/bulk
+POST /api/v1/comments/{}/choice
+POST /api/v1/comments/{}/reactions
+POST /api/v1/comments/{}/withdraw
+POST /api/v1/contacts/bulk
+POST /api/v1/event-calendars
+POST /api/v1/event-calendars/{}/import
+POST /api/v1/events/{}/prep-task
+POST /api/v1/events/{}/restore
+POST /api/v1/events/{}/rsvp
+POST /api/v1/family/deadlines
+POST /api/v1/family/kids/{}/rewards
+POST /api/v1/family/kids/{}/stars
+POST /api/v1/family/occasions
+POST /api/v1/family/packing
+POST /api/v1/family/rewards/{}/decide
+POST /api/v1/family/rewards/{}/request
+POST /api/v1/filters
+POST /api/v1/folders/delete
+POST /api/v1/folders/rename
+POST /api/v1/import/{}
+POST /api/v1/imports/{}/undo
+POST /api/v1/layouts/proposals
+POST /api/v1/life/contracts
+POST /api/v1/life/devices
+POST /api/v1/life/health
+POST /api/v1/life/karakeep/sync
+POST /api/v1/life/trips
+POST /api/v1/life/upkeep
+POST /api/v1/lists/{}/deployments
+POST /api/v1/lists/{}/duplicate
+POST /api/v1/lists/{}/fields
+POST /api/v1/lists/{}/files
+POST /api/v1/lists/{}/forms
+POST /api/v1/lists/{}/join
+POST /api/v1/lists/{}/links
+POST /api/v1/lists/{}/milestones
+POST /api/v1/lists/{}/notepads
+POST /api/v1/lists/{}/notes
+POST /api/v1/lists/{}/owner
+POST /api/v1/lists/{}/playbook/proposals
+POST /api/v1/lists/{}/sections
+POST /api/v1/lists/{}/shift
+POST /api/v1/lists/{}/shop-areas
+POST /api/v1/lists/{}/sprints/assign
+POST /api/v1/lists/{}/tags
+POST /api/v1/me/app-passwords
+POST /api/v1/me/purpose
+POST /api/v1/news/read
+POST /api/v1/notes/{}/restore
+POST /api/v1/office/leads
+POST /api/v1/tasks/{}/approval
+POST /api/v1/tasks/{}/attachments
+POST /api/v1/tasks/{}/attachments/text
+POST /api/v1/tasks/{}/contacts
+POST /api/v1/tasks/{}/dependencies
+POST /api/v1/tasks/{}/links
+POST /api/v1/tasks/{}/move
+POST /api/v1/tasks/{}/reopen
+POST /api/v1/tasks/{}/restore
+POST /api/v1/tasks/{}/review
+POST /api/v1/tasks/{}/skip
+POST /api/v1/tasks/{}/snippets
+POST /api/v1/tasks/{}/take
+POST /api/v1/tasks/{}/tidy
+POST /api/v1/tasks/{}/to-shopping
+POST /api/v1/tasks/{}/typing
+POST /api/v1/team/dm
+POST /api/v1/team/messages/{}/pin
+POST /api/v1/team/messages/{}/reactions
+POST /api/v1/team/rooms/{}/members
+POST /api/v1/templates
+POST /api/v1/templates/{}/apply
+POST /api/v1/time/timer
+POST /api/wiki/e2e/keys
+POST /api/wiki/e2e/stop
+POST /api/wiki/import/upload
+PUT /api/agents/{}/autoshare
+PUT /api/agents/{}/permission-mode
+PUT /api/assistant/lists
+PUT /api/disc
+PUT /api/family/kids/{}/pin
+PUT /api/folder-heads
+PUT /api/folders/agents
+PUT /api/folders/groups/{}
+PUT /api/folders/playbook
+PUT /api/folders/public-links
+PUT /api/fsref/office_doc/{}/items
+PUT /api/life/karakeep
+PUT /api/lists/{}/bell
+PUT /api/lists/{}/favorite
+PUT /api/lists/{}/folder-repo
+PUT /api/lists/{}/header
+PUT /api/lists/{}/icon
+PUT /api/lists/{}/in-mine
+PUT /api/lists/{}/layout
+PUT /api/lists/{}/links/order
+PUT /api/lists/{}/page-style
+PUT /api/lists/{}/playbook
+PUT /api/me/avatar
+PUT /api/newsletter
+PUT /api/newsletter/consent
+PUT /api/office/bank/noreceipt/reminder
+PUT /api/office/bank/rules/{}
+PUT /api/office/cashflow/actual
+PUT /api/office/cashflow/check
+PUT /api/office/cashflow/start
+PUT /api/office/letterhead
+PUT /api/office/logbook/settings
+PUT /api/office/tax-dates
+PUT /api/paperless
+PUT /api/supporter/{}
+PUT /api/tasks/{}/bell
+PUT /api/tasks/{}/enc-note
+PUT /api/tasks/{}/note-lock
+PUT /api/tasks/{}/waiting
+PUT /api/v1/address-books/{}/members/{}
+PUT /api/v1/contacts/{}/care
+PUT /api/v1/event-calendars/{}/members/{}
+PUT /api/v1/life/journal/{}
+PUT /api/v1/lists/{}/groups/{}
+PUT /api/v1/lists/{}/links/order
+PUT /api/v1/lists/{}/members/{}
+PUT /api/v1/lists/{}/review
+PUT /api/v1/lists/{}/sections/order
+PUT /api/v1/lists/{}/status
+PUT /api/v1/lists/{}/status-pad
+PUT /api/v1/tasks/{}/waiting
+PUT /api/wiki/style
+PUT /api/workload/capacity/{}
+""".strip().split("\n") if x.strip())
+
+
 def found_routes():
     # 2.182.0 (#2718): via the Python parser (routes_ast.py, shared with tenant_coverage_test.py, which fails on its problems)
     return app_routes(ROOT)[0]
@@ -1033,9 +1649,30 @@ def main():
                       f"area {k}: the suite {name} with its marker does not run (tests/suites.txt / kalmido-suite marker)")
         check(k in ROUTES.values(), f"area {k}: no route uses it (stale)")
 
+    # ---- 3. 2.421.0 A (#2936): every write route of a matrix area is called by a suite of its area (WRITE_UNPROVEN = the old rest)
+    runs = {name for name in tests if re.search(r"\s" + re.escape(name) + r"\b", run_all)}
+    texts = {}
+    n_w = 0
+    for r, k in sorted(ROUTES.items()):
+        if r.split(" ", 1)[0] not in WRITES or KINDS.get(k, ("",))[0] != "matrix":
+            check(r not in WRITE_UNPROVEN, f"WRITE_UNPROVEN names {r}, no write route of a matrix area: remove it")
+            continue
+        n_w += 1
+        if k not in texts:
+            texts[k] = [expand_consts(tests[n]) for n in sorted(marked.get(k, ())) if n in runs]
+        proven = write_proven(r, texts[k])
+        if r in WRITE_UNPROVEN:
+            check(not proven, f"{r}: a suite of the area {k} calls it now: take it out of WRITE_UNPROVEN")
+        else:
+            check(proven, f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
+                          f"with its ids): call it there as the person without an organisation")
+    for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
+        check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
+
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "
-          f"{len(found) - n_m} not relevant (with reason)")
+          f"{len(found) - n_m} not relevant (with reason); {n_w} write routes, {n_w - len(WRITE_UNPROVEN)} called by a suite of "
+          f"their area, {len(WRITE_UNPROVEN)} old ones without (WRITE_UNPROVEN, may only shrink)")
     return 1 if fails else 0
 
 
