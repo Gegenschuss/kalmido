@@ -999,6 +999,8 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .featgrid label span{display:flex;flex-direction:column}
 .featgrid label small{font-size:.75rem;line-height:1.4}
 @media (hover:none){ .cacts{opacity:1} }
+/* 2.421.0 (#3471): narrow phones - the comment buttons wrap into an own right-aligned row under name and time */
+@media (max-width:400px){.chead{flex-wrap:wrap;min-width:0}.cacts{flex-basis:100%;justify-content:flex-end}}
 
 /* ---------- News ("Neuigkeiten") ---------- */
 .iconbtn.bell,#tabs button,.rbtn{position:relative}
