@@ -62,7 +62,7 @@ def evf_build(c, cal):
     lines, tzs = [], set()
     for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id LIMIT ?", (cal["id"], EVF_MAX)).fetchall():
         try:
-            L, t = ev_lines(c, {**dict(r), "reminders": "", "extra": evf_extra(r["extra"])}, [])
+            L, t = ev_lines(c, {**dict(r), "reminders": "", "extra": evf_extra(r["extra"]), "guests_visible": 0}, [])  # 2.380 H (#3392): not in a feed
         except (ValueError, TypeError) as e:  # one broken row never breaks the whole feed
             print("evfeed: skipping event", r["id"], type(e).__name__, flush=True)
             continue

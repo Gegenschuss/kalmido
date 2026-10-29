@@ -555,7 +555,7 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 | `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: only people you may see, else `404`; an organisation's calendar only with its members and agents, a private one never with an organisation's agent, else `409`); stop sharing, or leave it yourself |
 | `POST /event-calendars/{id}/import` · `GET …/export` | `{ics, dry_run?}`: an .ics text (the same UID is updated, so importing twice adds nothing) -> `{created, updated, skipped, errors}`; the calendar as `{ics}` |
 | `GET /events?from=&to=&calendar_id=` | the occurrences in a range (at most 400 days): repeating events expanded, changed dates applied; `start` / `end` are UTC date-times (all day: dates); `occ` = the original start of a date |
-| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?}`; the event with `overrides` (changed dates) and `attendees` |
+| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?, guests_visible?}`; the event with `overrides` (changed dates) and `attendees` |
 | `PATCH /events/{id}` | change the series (`expect`: the `updated_at` you based it on -> `409` when it changed meanwhile); with `?occurrence=<occ>` only that date: `{title?, location?, description?, all_day?, start?, end?, status?}` |
 | `DELETE /events/{id}` · `POST …/restore` | to the trash for 30 days, then gone; with `?occurrence=<occ>` that date is left out |
 | `POST /events/{id}/rsvp` | `{partstat: accepted\|tentative\|declined\|needs-action}`: your answer to an invitation |
@@ -571,6 +571,8 @@ status changed, to all of them; default `false` (nothing is mailed). Removed or 
 cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md). 2.148.1: deleting or
 restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
+2.380: `guests_visible: true` (default `false`) lets the invitation to an external guest name all guests; off, the attached
+calendar names only its recipient. CalDAV / `.ics`: `X-KALMIDO-GUESTS-VISIBLE:TRUE|FALSE`; a client without the line keeps the value.
 
 ## Contacts
 

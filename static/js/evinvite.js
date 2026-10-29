@@ -5,8 +5,8 @@
 const evi_key = a => a.contact_id ? 'c' + a.contact_id : 'e' + String(a.email || '').toLowerCase();
 
 async function evi_init(md, ev, atts) {  // called once by evEditor after the attendees are drawn
-  const st = md._evi = {orig: new Set((ev?.attendees || []).filter(a => !a.user_id && a.email).map(evi_key)), info: null, touched: false, atts};
-  md.addEventListener('change', e => { if (/** @type {any} */ (e.target).id === 'ev-inv') st.touched = true; });
+  const st = md._evi = {orig: new Set((ev?.attendees || []).filter(a => !a.user_id && a.email).map(evi_key)), info: null, touched: false, atts, gv: !!ev?.guests_visible};
+  md.addEventListener('change', e => { const t = /** @type {any} */ (e.target); if (t.id === 'ev-inv') st.touched = true; if (t.id === 'ev-gv') st.gv = t.checked; });
   evi_draw(md, atts);
   try { st.info = await api('GET', '/api/evinvite' + (ev?.id && evWrite(evCal(ev.cal_id)) ? `?event_id=${ev.id}` : '')); } catch { st.info = null; }
   if (md.isConnected) evi_draw(md, st.atts);
@@ -18,6 +18,12 @@ function evi_draw(md, atts) {  // the row under "People": only while someone out
   let row = $('#ev-invrow', md);
   if (!row) { const at = $('.evatts', md); if (!at) return; at.insertAdjacentHTML('afterend', '<div class="row evinv" id="ev-invrow" hidden></div>'); row = $('#ev-invrow', md); }
   const ext = atts.filter(a => !a.user_id && a.email);
+  // 2.380 H (#3392): "Guest list visible to guests" - the invitation names all external guests instead of only the recipient
+  let gv = $('#ev-gvrow', md);
+  if (!gv) { row.insertAdjacentHTML('afterend', '<div class="row evinv" id="ev-gvrow" hidden></div>'); gv = $('#ev-gvrow', md); }
+  const gvOn = ext.length && !(st.info && !st.info.mail_ok);  // only where invitations go out
+  gv.hidden = !gvOn;
+  gv.innerHTML = gvOn ? `<label for="ev-gv">${esc(tr('Guest list visible to guests'))}</label><label class="swc"><input type="checkbox" id="ev-gv" ${st.gv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Guest list visible to guests'))}</span></label>` : '';
   if (!ext.length && !st.orig.size) { row.hidden = true; row.innerHTML = ''; return; }
   row.hidden = false;
   if (st.info && !st.info.mail_ok) {
@@ -28,6 +34,10 @@ function evi_draw(md, atts) {  // the row under "People": only while someone out
   const fresh = ext.some(a => !st.orig.has(evi_key(a))), invited = (st.info?.invited || []).length > 0;
   const on = cb && st.touched ? cb.checked : (fresh || invited);
   row.innerHTML = `<label for="ev-inv">${esc(tr('Send the invitation by e-mail'))}</label><label class="swc"><input type="checkbox" id="ev-inv" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Send the invitation by e-mail'))}</span></label>`;
+}
+
+function evi_gv(md) {  // 2.380 H (#3392): the body field guests_visible of the save (null: no external guest, left as it is)
+  const st = md._evi; return st && $('#ev-gvrow', md) && !$('#ev-gvrow', md).hidden ? !!st.gv : null;
 }
 
 function evi_on(md) {  // the body flag send_invites of the save
