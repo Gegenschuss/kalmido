@@ -4,7 +4,7 @@
 encryption on) with the SMTP stub (stub_mail.py). Invented companies, people and files only.
  - #3619: a quotation with the terms line carries the terms pages behind its own wherever its PDF goes out: download /
    preview (draft and finalised), the mail (no second terms file any more, the log still names the state), the approval
-   link (/s/q/<token>/pdf); the stored PDF stays as it was finalised (pdf_sha256 unchanged); invoices stay without them;
+   link (/s/q/<token>/pdf); joined on output only (the document's pdf_sha256 untouched); invoices stay without them;
    terms that pypdf cannot read: the PDF unchanged (no 500), the mail sends them as their own file as before
  - #3616: a ZUGFeRD invoice goes out by mail (and to the DATEV inbox) as the PDF alone - its XML is inside; an XRechnung
    (client with a buyer reference) still gets the XML as its own file; GET .../xml stays
@@ -153,7 +153,7 @@ sha = sql("SELECT pdf_sha256 FROM office_docs WHERE id=?", (Q,))[0][0]
 p = A.get(B + f"{D}/{Q}/pdf")
 check(p.ok and b"AGBSEITE-ZWEI" in p.content and pages(p.content) == own + 2, "#3619: the finalised quotation's download carries the frozen terms")
 sha2 = sql("SELECT pdf_sha256 FROM office_docs WHERE id=?", (Q,))[0][0]
-check(sha2 == sha and hashlib.sha256(p.content).hexdigest() != sha, f"#3619: joined on output - the stored PDF and its hash stay as finalised ({sha!r} {sha2!r})")
+check(sha2 == sha and hashlib.sha256(p.content).hexdigest() != sha, f"#3619: joined on output - the document's noted PDF hash is untouched ({sha!r} {sha2!r})")
 at = sent(A, Q)
 check(len(at) == 1 and len(at[0]) == 1 and not any(n.startswith("AGB-Stand") for n in at[0]), f"#3619: the mail has one file, no extra terms file {list(at[0]) if at else at}")
 pdf = next(iter(at[0].values())) if at and at[0] else b""
