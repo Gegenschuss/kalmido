@@ -1630,7 +1630,19 @@ async function ss_areaOpen(h) {
 // office.js biz_paint draws them (the office scripts load here when the area is opened)
 function biz_paneHtml() {
   if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
-  return `<div id="s-biz" class="sbiz"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<div id="s-biz" class="sbiz"><div class="muted mhint">${tr('Loading…')}</div></div><div id="s-bizmail"></div>`;
+}
+// the workspace's own mailbox (IMAP / SMTP, hubmailbox.js; also in Clients > E-mail filing): its state and Set up / Change
+async function biz_mailDraw(md) {
+  const box = $('#s-bizmail', md); if (!box) return;
+  try { await loadModule('hubmailbox'); await hmb_load(); } catch { box.innerHTML = ''; return; }
+  const ws = ofcWs(), x = (HMB.j?.spaces || []).find(y => y.ws === ws);
+  if (!box.isConnected) return;
+  if (!x || !(x.manage || x.set)) { box.innerHTML = ''; return; }
+  const what = !x.set ? tr('No mailbox yet') : [x.receive ? tr('receives') : '', x.send ? tr('sends') : ''].filter(Boolean).join(' · ') + (x.active ? '' : ' · ' + tr('paused'));
+  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its mails are filed here like forwarded ones, and replies go out from its address.')}</p>
+    <div class="row"><span class="muted">${x.address ? esc(x.address) + ' · ' : ''}${esc(what)}</span>${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</div>
+    ${x.error_text ? `<p class="hmberr" role="status">${ic('info', 's')} ${esc(x.error_text)}</p>` : ''}`;
 }
 async function biz_draw(md) {
   const box = $('#s-biz', md); if (!box) return;
@@ -1639,4 +1651,5 @@ async function biz_draw(md) {
   if (S.route.mod === 'office' && ofcTab() === 'settings' && !['import', 'rights'].includes(S.route.tab)) go('office/start');  // one settings form on the screen
   if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
   setTimeout(biz_paint, 0);
+  biz_mailDraw(md);
 }

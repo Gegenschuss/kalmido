@@ -6,6 +6,7 @@
 //   each (no tab row, no hidden part), "Applies to" with the workspace
 // - a field saves itself there (autosave, the same PUT as the office page)
 // - the office menu's point Settings opens Settings > Company & office (the page office/settings stays for old links)
+// - the workspace's mailbox (IMAP / SMTP) with Set up / Change in Company & office
 // - the same for a person without an organisation (their private office, they are its admin)
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -54,6 +55,11 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
         check(got, `${who}: payment terms saved from Settings`);
       }
     }
+    // the workspace's mailbox (IMAP / SMTP) sits in Company & office too, as far as the person may set it up
+    await until(() => w.eval(`typeof HMB !== 'undefined' && !!HMB.j`), 60);
+    const sp = JSON.parse(w.eval(`JSON.stringify((HMB.j?.spaces || []).find(x => x.ws === ofcWs()) || null)`) || 'null');
+    if (sp?.manage) check(!!(await until(() => d.querySelector('#s-bizmail-h') && d.querySelector(`#s-bizmail [data-hmba="edit"]`), 40)), `${who}: E-mail with Set up / Change in Company & office`);
+    else check(!d.querySelector('#s-bizmail [data-hmba="edit"]'), `${who}: no mailbox button without the right`);
     // Company & office goes away with the office module
     d.querySelector('.smodal [data-m="close"]')?.click();
     await until(() => !d.querySelector('.smodal'));
