@@ -166,14 +166,14 @@ def pd_auto(c, oid, L):
         t("Angebot -> Rechnung (oder Abschlags-/Schlussrechnung) -> Finalisieren -> Versand per Mail oder als PDF.",
           "Quotation -> invoice (or progress / final invoice) -> finalise -> sending by mail or as PDF."),
         t("Beim Finalisieren werden Nummer, Absender, Empfänger, Positionen und Steuersätze eingefroren; danach sind Kopf, Positionen, "
-          "Nummer und Löschen gesperrt. Korrekturen nur über eine Gutschrift bzw. Stornorechnung.",
+          "Nummer und Löschen gesperrt. Korrekturen nur über eine Rechnungskorrektur bzw. Stornorechnung.",
           "Finalising freezes number, sender, recipient, positions and tax rates; afterwards the head, the positions, the number and "
           "deleting are blocked. Corrections only by a credit note / cancellation invoice."),
         t("E-Rechnungsformat: ", "E-invoice format: ") + PD_EINV.get(s.get("einvoice_format") or "", s.get("einvoice_format") or "-") + "; "
         + t("Zahlungsziel: ", "Payment term: ") + str(s.get("payment_days") or 0) + t(" Tage", " days")])
     num = pack.get("numbering") or {}
     labels = (("offer", "Angebote", "Quotations", "offer_scheme"), ("invoice", "Rechnungen", "Invoices", "invoice_scheme"),
-              ("credit", "Gutschriften", "Credit notes", "credit_scheme"), ("reminder", "Mahnungen", "Reminders", "reminder_scheme"),
+              ("credit", "Rechnungskorrekturen", "Credit notes", "credit_scheme"), ("reminder", "Mahnungen", "Reminders", "reminder_scheme"),
               ("delivery", "Lieferscheine", "Delivery notes", "delivery_scheme"))
     out["numbers"] = "\n".join([f"- {t(de, en)}: {s.get(k) or num.get(kind) or '-'}" for kind, de, en, k in labels] + [
         t("Nummern werden fortlaufend je Nummernkreis vergeben und sind je Büro eindeutig.",
@@ -195,7 +195,7 @@ def pd_auto(c, oid, L):
         (t("Festgeschrieben bis einschließlich ", "Locked up to and including ") + pl_label(thr)) if thr
         else t("Noch kein Monat festgeschrieben.", "No month locked yet."),
         t("Festschreiben gilt pro Monat und lässt sich nicht zurücknehmen. In einem festgeschriebenen Monat lehnt Kalmido jede Änderung "
-          "mit Datum ab; Korrekturen werden in einem offenen Monat gebucht (z. B. Gutschrift mit heutigem Datum).",
+          "mit Datum ab; Korrekturen werden in einem offenen Monat gebucht (z. B. Rechnungskorrektur mit heutigem Datum).",
           "Locking works per month and cannot be taken back. In a locked month Kalmido refuses every change with a date in it; "
           "corrections are booked in an open month (e.g. a credit note dated today).")])
     dx = s.get("datev_extf") or {}
@@ -241,7 +241,7 @@ def pd_auto(c, oid, L):
               "(section 147 AO, section 257 HGB), each from the end of the calendar year.") if (s.get("pack") or "DE").upper() == "DE"
             else t("Aufbewahrungsfristen des Landes: ", "Retention periods of the country: ") + gap)
     out["retention"] = "\n".join([keep, t(
-        "Finalisierte Rechnungen und Gutschriften lassen sich in Kalmido nicht löschen; Kasseneinträge werden nie gelöscht; genehmigte "
+        "Finalisierte Rechnungen und Rechnungskorrekturen lassen sich in Kalmido nicht löschen; Kasseneinträge werden nie gelöscht; genehmigte "
         "Bewirtungsbelege bleiben 8 Jahre nach Ende ihres Jahres erhalten.",
         "Finalised invoices and credit notes cannot be deleted in Kalmido; cash entries are never deleted; approved entertainment "
         "receipts are kept for 8 years after the end of their year.")])

@@ -107,8 +107,8 @@
         "minute": "Min.",
         "flat": "pauschal"
       },
-      "credit": "Gutschrift",
-      "credit_no": "Gutschrift Nr.",
+      "credit": "Rechnungskorrektur",
+      "credit_no": "Rechnungskorrektur Nr.",
       "reminder_1": "Zahlungserinnerung",
       "reminder_2": "Mahnung",
       "reminder_3": "Letzte Mahnung",
@@ -123,7 +123,7 @@
       "subtotal": "Zwischensumme",
       "invoice_total": "Rechnungsbetrag",
       "reminder_total": "Gesamtbetrag",
-      "credit_total": "Gutschriftsbetrag",
+      "credit_total": "Korrekturbetrag",
       "paid": "Bereits bezahlt",
       "open": "Offener Betrag",
       "open_total": "Offener Betrag",
@@ -318,11 +318,11 @@
       "en": "Goods or services received in full and in good condition."
     },
     "credit_intro": {
-      "de": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
+      "de": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Rechnungskorrektur:",
       "en": "Regarding the invoice referenced above we issue the following credit note:"
     },
     "credit_closing": {
-      "de": "Den Gutschriftsbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
+      "de": "Den Korrekturbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
       "en": "We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions."
     },
     "reminder_intro": {

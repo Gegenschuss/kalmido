@@ -338,7 +338,7 @@ def office_settings(c, oid):
             out["lang"] = pack.get("lang") if pack.get("lang") in LANGS else SETTINGS_DEFAULTS["lang"]
         if not out.get("offer_scheme"):  # 2.368.0 (#2979): the default is empty, so QUO-… of the International pack applies
             out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or "KVA-{yyyy}-{seq:03}"
-        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089)
+        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "RK-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089); 2.431.0 B (#3595): RK- (was GS-)
             if not out.get(k + "_scheme"):
                 out[k + "_scheme"] = (pack.get("numbering") or {}).get(k) or dflt
     return out
