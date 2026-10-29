@@ -14978,5 +14978,11 @@
   "What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.": "Ciò che mostrano le attività di questo progetto. {0} nasconde ciò che non serve; qui riattivi le singole voci.",
   "Hidden is display only: nothing is deleted.": "Nascondere cambia solo la vista: non si elimina nulla.",
   "These properties are hidden then: {0}. Nothing is deleted; you can switch them back on under Properties.": "Queste proprietà vengono allora nascoste: {0}. Non si elimina nulla; puoi riattivarle in Proprietà.",
-  "{0} changed by hand": ["{0} cambiata a mano", "{0} cambiate a mano"]
+  "{0} changed by hand": ["{0} cambiata a mano", "{0} cambiate a mano"],
+  "Shared files of all backups: {0} in {1} (each file is kept only once).": "File condivisi di tutti i backup: {0} in {1} (ogni file è conservato una sola volta).",
+  "{0} shared": ["{0} condiviso", "{0} condivisi"],
+  "{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back.": "Mancano {0} file condivisi di questo backup nella cartella dei backup. Scarica il backup dal server che lo ha creato (un file completo) oppure rimetti a posto i file condivisi.",
+  "This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.": "Questo backup è stato cifrato con una passphrase precedente. Inserisci quella passphrase per verificarlo o ripristinarlo; il download richiede quella attuale.",
+  "The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.": "I file condivisi di questo backup non sono noti (manca il suo file di riferimenti); il prossimo backup verrà caricato di nuovo.",
+  "{0} newly stored": "{0} salvati di nuovo"
 }

@@ -14978,5 +14978,11 @@
   "What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.": "Ce que montrent les tâches de ce projet. {0} masque ce dont il n’a pas besoin ; réactive ici ce que tu veux.",
   "Hidden is display only: nothing is deleted.": "Masquer ne change que l’affichage : rien n’est supprimé.",
   "These properties are hidden then: {0}. Nothing is deleted; you can switch them back on under Properties.": "Ces propriétés seront alors masquées : {0}. Rien n’est supprimé ; tu peux les réactiver sous Propriétés.",
-  "{0} changed by hand": ["{0} modifiée à la main", "{0} modifiées à la main"]
+  "{0} changed by hand": ["{0} modifiée à la main", "{0} modifiées à la main"],
+  "Shared files of all backups: {0} in {1} (each file is kept only once).": "Fichiers partagés de toutes les sauvegardes : {0} dans {1} (chaque fichier n'est conservé qu'une fois).",
+  "{0} shared": ["{0} partagé", "{0} partagés"],
+  "{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back.": "{0} fichiers partagés de cette sauvegarde manquent dans le dossier des sauvegardes. Téléchargez la sauvegarde depuis le serveur qui l'a créée (un fichier complet) ou remettez les fichiers partagés en place.",
+  "This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.": "Cette sauvegarde a été chiffrée avec une ancienne phrase secrète. Saisissez cette phrase secrète pour la vérifier ou la restaurer ; le téléchargement nécessite la phrase actuelle.",
+  "The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.": "Les fichiers partagés de cette sauvegarde sont inconnus (son fichier de références manque) ; la prochaine sauvegarde sera de nouveau envoyée.",
+  "{0} newly stored": "{0} nouvellement stockés"
 }

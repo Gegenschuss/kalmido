@@ -127,6 +127,7 @@ ORDER = (
     "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
     "calendars.polls",  # 2.98.0 A (#1953): scheduling polls (vote through a link, the winning time becomes an event)
+    "admin.bkstore",  # 2.432.0 (#3584): the shared store of the backups (standard library only)
     "admin.backup",
     "admin.offsite",  # 2.143.0 B (#2152): the off-site target of the backups (S3, WebDAV, SFTP)
     "api.v1",
