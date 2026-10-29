@@ -64,7 +64,7 @@ for f in FILES:
             if not size_ok(sel, v, media):
                 bad_fs.append(f"{where}: font-size:{v}")
         for v in re.findall(r"(?<![-\w])font:\s*([^;]+)", body):
-            s = re.search(r"(?<![\w.(-])(\d*\.?\d+(?:rem|em|px))(?:/([\d.]+))?", v)
+            s = re.search(r"(?<![\w.(/-])(\d*\.?\d+(?:rem|em|px))(?:/([\d.]+))?", v)
             if s and not size_ok(sel, s.group(1), media):
                 bad_fs.append(f"{where}: font:{v}")
             if s and s.group(2) and 1.195 <= float(s.group(2)) <= 1.555:
