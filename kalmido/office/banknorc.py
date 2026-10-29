@@ -172,6 +172,16 @@ def _content(c, oid, person, today):
     return url, f"{tr(BNR_TASK_TEXT, lg=lg)}\n\n" + ("\n".join(lines) + "\n\n" if lines else "") + f"[{tr(BNR_TASK_HELP, lg=lg)}]({url})"
 
 
+def _own_text(c, person, text):
+    """The task's text is still one the reminder wrote: its opening line, then only hint lines, then the help link."""
+    lg = lang(c, person)
+    head, foot = tr(BNR_TASK_TEXT, lg=lg), f"[{tr(BNR_TASK_HELP, lg=lg)}](" + PUBLIC_URL.rstrip("/") + "/#office/bank/norc)"
+    if not isinstance(text, str) or not text.startswith(head + "\n\n") or not text.endswith(foot):
+        return text is None or text == ""
+    mid = text[len(head) + 2:len(text) - len(foot)].strip("\n")
+    return all(not x or x.startswith("- ") for x in mid.split("\n"))
+
+
 def _task_new(c, oid, person, n, today):
     lg = lang(c, person)
     url, content = _content(c, oid, person, today)
@@ -204,8 +214,11 @@ def bnr_apply(c, oid, s, today=None):
         else:
             t = _title(n, lang(c, person))
             body_ = _content(c, oid, person, today)[1]  # 2.425.0 B (#3451): the hints follow the bookings too
-            changed = c.execute("UPDATE tasks SET title=?, content=?, updated_at=? WHERE id=? AND (title<>? OR content IS DISTINCT FROM ?)",
-                                (t, body_, iso(now_utc()), cfg["task"], t, body_)).rowcount > 0
+            # 2.425.0 (#3451 review): only a text that is still the generated one is replaced - a note of the person stays
+            if not _own_text(c, person, (c.execute("SELECT content FROM tasks WHERE id=?", (cfg["task"],)).fetchone() or [None])[0]):
+                body_ = None
+            changed = c.execute("UPDATE tasks SET title=?, content=COALESCE(?, content), updated_at=? WHERE id=? AND (title<>? OR (? IS NOT NULL AND content IS DISTINCT FROM ?))",
+                                (t, body_, iso(now_utc()), cfg["task"], t, body_, body_)).rowcount > 0
     elif n and (not cfg["next"] or cfg["next"] <= today):
         cfg["task"], cfg["next"], changed = _task_new(c, oid, person, n, today), _next(today, cfg["every"]), True
     elif cfg["task"]:

@@ -200,6 +200,15 @@ check(f"Invoice {SOFT} {MON(d(6))} missing" in body and "(https://portal.example
       "the task lists the missing invoices with the portal link")
 check(FEE not in body, "no line for a provider that needs no receipt")
 check(rt and rt[0][1] == f"{A.get(B + NR + '/count').json()['out']} bookings without a receipt", f"title = count without the fee {rt}")
+# 2.425.0 (#3451 review): a note the person writes into the reminder's text stays through the next run (only the title follows)
+if rt:
+    A.patch(B + f"/api/tasks/{rt[0][0]}", json={"content": body + "\n\nNote: ask the accountant first"})
+    run = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core.pg import system_ctx\n"
+                          "from kalmido.office.banknorc import bnr_area\nc = connect()\nwith system_ctx(c):\n    bnr_area(c, %d)\nc.close()\n" % ORG],
+                         capture_output=True, text=True)
+    rt2 = sql("SELECT content FROM tasks WHERE id=?", (rt[0][0],))
+    check(rt2 and rt2[0][0].endswith("Note: ask the accountant first") and f"Invoice {SOFT}" in rt2[0][0],
+          f"the person's note in the reminder stays after a run {run.stderr[-300:]} {rt2}")
 
 # ---------------------------------------------------------------- the document that comes later
 WSO = f"org:{ORG}"
