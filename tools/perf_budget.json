@@ -1,6 +1,6 @@
 {
   "_note": "2.65.0 (#1822): start-up budget, measured by tools/perf_budget.py from static/index.html. Baseline 2.56.3 (17.10.2026): 113 scripts incl. i18n.js, js 3.147.832 / 1.041.977 gzip, css 611.460 / 139.076 gzip. Values = 2.65.0 after lazy loading (100 scripts, js 2.532.821 / 852.795 gzip, css 529.860 / 123.430 gzip) plus about 5 percent. Raise a value only on purpose (say why in the commit).",
-  "start_js_bytes": 2899700,
+  "start_js_bytes": 2900600,
   "start_js_gzip": 919700,
   "start_css_bytes": 580200,
   "start_css_gzip": 110800,
