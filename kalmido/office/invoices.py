@@ -27,7 +27,8 @@ from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_o
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
-from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
+from .model import num_kind, num_scheme, office_feature, office_gate, office_need_feature, office_org, office_role, office_scheme_period, office_settings, pb_cl_sql, trial_flag
+from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
 from .model import SCHEME_RE, scheme_variants  # 2.355.0 A (#2839)
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
@@ -127,7 +128,6 @@ def inv_manual_number(c, oid, r, s, num, reason=""):
     """2.38.0: a manual number of an invoice / credit note must follow the scheme and lie above the series' last value
     (no back-dating); the counter then continues from it. 2.39.1 (#1210 N2): more than one above the counter (a gap in
     the series) only with a reason (kept in the office log). The caller holds the number lock. BadInput otherwise."""
-    from .model import num_kind, num_scheme, office_scheme_period
     scheme = inv_scheme(s, r["kind"])
     kind = num_kind(s, r["kind"])  # 2.433.0 (#3597): a correction on the invoices' shared counter (its period) follows that one
     seq = inv_manual_seq(scheme, num)
@@ -1604,7 +1604,6 @@ def inv_recipients_get(did):
     """2.433.0 (#3599): the addresses the send dialog of document did starts with ({to, cc: [...]}, contacts_cl.fk_send_rcpts):
     invoices / corrections / reminders to the e-mail for invoices with the contact persons for invoices in copy,
     quotations to the default contact person with the e-mail for invoices in copy."""
-    from .contacts_cl import fk_send_rcpts
     from .docs import doc_row
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)

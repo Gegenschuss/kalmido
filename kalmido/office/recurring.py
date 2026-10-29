@@ -30,6 +30,7 @@ from ..core.orgcrypt import oc_item_store, oc_dec_fields
 from ..core.errors import BadInput
 from .calc import dec, dstr, fmt_money, money
 from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
+from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
 
 RIN_EVERY = ("monthly", "quarterly", "yearly")
 RIN_STEP = {"monthly": 1, "quarterly": 3, "yearly": 12}
@@ -313,7 +314,6 @@ def rin_send(c, oid, uid, did):
     to = rin_client_mail(c, oid, cid)
     if not to:
         return False, tr("The client has no e-mail address for invoices"), False, None
-    from .contacts_cl import fk_send_rcpts
     cc = ", ".join(fk_send_rcpts(c, cid, oid, "invoice")["cc"])  # 2.433.0 (#3599): the contact persons for invoices in copy
     try:
         with c.savepoint():

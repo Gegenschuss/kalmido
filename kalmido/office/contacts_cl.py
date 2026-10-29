@@ -15,6 +15,7 @@ from ..core.db import iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id, like_escape
 from ..core.errors import BadInput
+from .model import pb_cl_sql
 
 FK_MAX = {"name": 120, "role": 120, "email": 200, "phone": 60}
 FK_LIMIT = 50  # contact persons per client
@@ -54,7 +55,6 @@ def fk_send_rcpts(c, cid, oid, kind):
     ticked "gets invoices" (none ticked: the default contact person). Quotations: to = the default contact person (else the
     client's e-mail), copy = the e-mail for invoices. Delivery notes as before (the invoice address, no copy). An address
     only once, empty ones left out."""
-    from .model import pb_cl_sql
     cl = c.execute(f"SELECT email, email_invoice FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone() if cid else None
     if cl is None:
         return {"to": "", "cc": []}
