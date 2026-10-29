@@ -409,15 +409,16 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         slock = bks.lock(BK_STORE)  # 2.432.0 (#3584): no clean-up (any process) between the first store file and the refs
         key = bks.store_key(BK_STORE, pw) if encrypt else None
         seen, small, new = {}, 0, 0
-        for full, rel in bk_walk()[0]:
+        for full, rel in bk_walk()[0]:  # (only the larger files are hashed here; the small ones are read once, below)
             try:
                 st = os.stat(full)
+                if st.st_size < BK_SHARED_MIN:
+                    small += st.st_size
+                    continue
                 seen[full] = (st.st_size, st.st_mtime_ns, _sha256_file(full))
             except FileNotFoundError:
                 continue
-            if st.st_size < BK_SHARED_MIN:
-                small += st.st_size
-            elif not os.path.isfile(os.path.join(BK_STORE, bks.rel(key, seen[full][2]))):
+            if not os.path.isfile(os.path.join(BK_STORE, bks.rel(key, seen[full][2]))):
                 new += bks.stored_size(key, st.st_size)
         need = db_bytes * (3 if keep_dump else 2) + small * (2 if encrypt else 1) + (db_bytes if encrypt else 0) + new
         free = shutil.disk_usage(BK_DIR).free
@@ -443,6 +444,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                 try:
                     st = os.stat(full)
                     old = seen.get(full)
+                    # (a small file is hashed here first, as before 2.432: gone after the dump = FileNotFoundError, nothing written)
                     digest = old[2] if old and old[:2] == (st.st_size, st.st_mtime_ns) and not again else _sha256_file(full)
                     size = st.st_size
                     if size >= BK_SHARED_MIN:
