@@ -72,6 +72,7 @@ OX_SECRET_COLS = frozenset((
     "drop_token", "ical_token", "drop_token_hash", "ical_token_hash", "p256dh",  # 2.138.0 C (#1907): the hashes too
     "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
     "etags", "api_key", "access_token", "refresh_token",
+    "edit_hash", "ip_hash",  # 2.380 (#2398 review): a poll voter's edit key hash and address hash
     "hint"))  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
 
 _OX = {}  # org id -> the running thread

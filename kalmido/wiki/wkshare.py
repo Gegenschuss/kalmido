@@ -207,14 +207,18 @@ def wsh_images(v):
 # 2.380 H (#2356): a picture of the file store embedded in a shared page: ![label](/api/files/nodes/<id>/content)
 WSH_NODE_RE = re.compile(r"/api/files/nodes/(\d{1,15})/content$")
 WSH_NODE_IMG_RE = re.compile(r"!\[[^\[\]\n]*\]\(\s*<?/api/files/nodes/(\d{1,15})/content>?")
+# 2.380 (#2356 review): code shows as text -- a picture named in a fenced block or in `code` is not embedded
+WSH_CODE_RE = re.compile(r"^[ \t]*(```|~~~).*?(?:^[ \t]*\1[^\n]*$|\Z)|`[^`\n]*`", re.S | re.M)
 
 
-def wsh_img_nodes(c, shares, page, text):
+def wsh_img_nodes(c, shares, page, text, only=None):
     """2.380 H (#2356): {node id: (node, version)} of the file store pictures a share may show in a page -- only with the switch
     (images) of one of the shares, only pictures embedded in the page's text, of the page's own space (wem_visible), that
     the person who made that share may still see now, an image type, never in a locked (end-to-end encrypted) folder."""
     makers = sorted({s["created_by"] for s in shares if s["images"] and s["created_by"]})
-    ids = sorted({int(m.group(1)) for m in WSH_NODE_IMG_RE.finditer(text or "") if int(m.group(1)) < 2 ** 62})[:200]
+    ids = sorted({int(m.group(1)) for m in WSH_NODE_IMG_RE.finditer(WSH_CODE_RE.sub("", text or "")) if int(m.group(1)) < 2 ** 62})[:200]
+    if only is not None:  # one picture asked for: check just that one (review: not up to 200 nodes per fetch)
+        ids = [i for i in ids if i == only]
     out = {}
     if not makers or not ids:
         return out
@@ -532,7 +536,7 @@ def wsh_shared_img(pid, nid):
     r = next((x for x in wsh_reach(c, uid)[0] if x["id"] == pid), None)
     if not r:
         raise Denied(404)
-    got = wsh_img_nodes(c, wsh_person_shares(c, uid, pid), r, wiki_dict(r)["body"]).get(nid)
+    got = wsh_img_nodes(c, wsh_person_shares(c, uid, pid), r, wiki_dict(r)["body"], only=nid).get(nid)
     if not got:
         raise Denied(404)
     return wsh_img_send(c, *got, public=False)
@@ -718,7 +722,7 @@ def wsh_pub_img(token, pid, nid):
         return bad
     r = next((p for p in wsh_pub_pages(c, s) if p["id"] == pid), None)
     try:
-        got = r and wsh_img_nodes(c, [s], r, wiki_dict(r)["body"]).get(nid)
+        got = r and wsh_img_nodes(c, [s], r, wiki_dict(r)["body"], only=nid).get(nid)
     except WikiUnreadable:
         got = None
     if not got:

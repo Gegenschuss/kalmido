@@ -171,7 +171,7 @@ def _vote(c, run, src, d, ctx):
     except (TypeError, ValueError):
         a = {}
     m = {str(run.m("sched_poll_options", k)): v for k, v in (a.items() if isinstance(a, dict) else ()) if run.m("sched_poll_options", k)}
-    d.update(answers=json.dumps(m), ip_hash="", edit_hash=_txt(src.get("edit_hash"), 100) or _token_hash(secrets.token_urlsafe(18)))
+    d.update(answers=json.dumps(m), ip_hash="", edit_hash=_token_hash(secrets.token_urlsafe(18)))  # never the old hash (review)
     return d
 
 
