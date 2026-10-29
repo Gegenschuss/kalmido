@@ -3450,6 +3450,9 @@ MIGRATIONS = [
     # 2.99.0 D (#2188): name_extra = a second name line of a client (printed under the name, " - " joined in the e-invoice
     # buyer name BT-44); office_company.address_extra = the company's extra address line (BT-36). 2.97 never reads them
     ("clients", "name_extra", "ALTER TABLE clients ADD COLUMN name_extra TEXT NOT NULL DEFAULT ''"),
+    # 2.433.0 (#3604): a client's short code (2-6 capitals / digits, e.g. TNP) for the number block {kuerzel}; '' = the first
+    # three letters of the name. Older versions ignore it (the way back)
+    ("clients", "short_code", "ALTER TABLE clients ADD COLUMN IF NOT EXISTS short_code TEXT NOT NULL DEFAULT ''"),
     ("office_company", "address_extra", "ALTER TABLE office_company ADD COLUMN address_extra TEXT NOT NULL DEFAULT ''"),
     # 2.114.4 B (#2270): the order confirmation block of a quotation per document (NULL = the office setting accept_on,
     # 0 / 1 = off / on); a finalised document prints the value frozen in its sender snapshot. Older versions never read it

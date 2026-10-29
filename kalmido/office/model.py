@@ -8,6 +8,7 @@ accounts never get in (403 before any data is read). Org admins manage settings 
 master data and write documents (see docs.py); foreign ids are 404, never 403 with content."""
 import json
 import re
+import unicodedata
 from datetime import date
 
 from flask import g, has_request_context, request
@@ -36,7 +37,7 @@ INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in 
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate
+SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|kuerzel|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate; 2.433.0 (#3604): kuerzel
 NAME_MAX = 200
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
@@ -660,10 +661,10 @@ def office_scheme_clean(v, name=None, offer=True):
     if "{" in rest or "}" in rest:
         m = re.search(r"\{[^{}]*\}?", rest)
         if offer:  # 2.118.0 A (#2265): + {version}
-            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
-        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}"), m.group(0) if m else "{")
+            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
+        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials}"), m.group(0) if m else "{")
     if sum(m.group(1) in SCHEME_TEXT for m in SCHEME_RE.finditer(v)) > 4:  # 2.306.0 (#2875 review N8): onc_parse reads four text blocks at most
-        bad(N_("A number can hold four text building blocks at most (project, client, initials)"))
+        bad(N_("A number can hold four text building blocks at most (project, client, short code, initials)"))
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
         bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
     return v
@@ -675,7 +676,7 @@ def office_scheme_period(scheme, d=None):
     return str(d.year) if ("{yyyy}" in scheme or "{yy}" in scheme) else ""
 
 
-def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1):
+def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1, kuerzel=""):
     d = d or local_now().date()
 
     def rep(m):
@@ -691,6 +692,8 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
             return _slug(project)
         if t == "client":
             return _slug(client)
+        if t == "kuerzel":  # 2.433.0 (#3604): the client's short code (client_short_code)
+            return kuerzel if CLIENT_CODE_RE.fullmatch(kuerzel or "") else ""
         if t == "date":
             return d.strftime("%Y%m%d")
         if t == "isodate":  # 2.138.2 A (#2391): the date with hyphens, 2026-04-15
@@ -707,7 +710,7 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
 # 2.144.9 (#2575): a block without a value (no project / client / initials) is left out together with one separator next to
 # it: "{project}-KV{seq:2}-{initials}" without a project gives "KV02-M", not "-KV02-M"; no double or trailing separators.
 # Numbers already given stay as they are (nothing is renumbered).
-SCHEME_TEXT = ("project", "client", "initials")
+SCHEME_TEXT = ("project", "client", "kuerzel", "initials")  # 2.433.0 (#3604): kuerzel
 SCHEME_KEYS = ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme", "delivery_scheme")
 ONC_LONG = N_("Number schemes with more than four text building blocks: {0}. Numbering no longer continues from the numbers given under them; shorten them in Office > Settings ({1}).")
 
@@ -765,6 +768,21 @@ def scheme_variants(scheme):
             if x not in out and x not in old and x != scheme:
                 into.append(x)
     return out + [scheme] + old
+
+
+# 2.433.0 (#3604): a client's short code (clients.short_code, 2-6 capitals / digits, e.g. TNP) for the block {kuerzel};
+# without one the first three letters of the client's name in capitals, umlauts written out (Müller -> MUE)
+CLIENT_CODE_RE = re.compile(r"[A-Z0-9]{1,6}")
+_CODE_UML = str.maketrans({"Ä": "AE", "Ö": "OE", "Ü": "UE", "ä": "AE", "ö": "OE", "ü": "UE", "ß": "SS"})
+
+
+def client_short_code(code="", name=""):
+    """The text of {kuerzel}: the client's own code, else the first three letters of its name ('' without a name)."""
+    code = (code or "").strip().upper()
+    if re.fullmatch(r"[A-Z0-9]{2,6}", code):
+        return code
+    letters = re.sub(r"[^A-Z]", "", unicodedata.normalize("NFKD", (name or "").translate(_CODE_UML)).upper())
+    return letters[:3]
 
 
 def _slug(s):
@@ -859,7 +877,7 @@ def onc_parse(scheme, num):
                 pat += r"(\d+)"
                 names.append("version" if t == "version" else "seq")
             else:
-                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".{1,40}?")
+                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}", "kuerzel": r"[A-Z0-9]{1,6}"}.get(t, r".{1,40}?")
             pos = m.end()
         pat += re.escape(sv[pos:])
         m = re.fullmatch(pat, num or "")

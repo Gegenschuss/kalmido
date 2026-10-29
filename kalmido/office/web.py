@@ -212,9 +212,9 @@ def office_number_preview():
         return jsonify(preview="", valid=False, error=str(e))
     if kind == "offer":  # 2.118.0 A (#2265): ?counter=org|client|project (the choice on the page), example client / project from 1
         cnt = request.args.get("counter")
-        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB")
+        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")
     else:
-        pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
+        pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")[0]
     return jsonify(preview=pv, valid=True, yearly=bool(office_scheme_period(scheme)))
 
 

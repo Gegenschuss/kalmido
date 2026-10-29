@@ -9249,8 +9249,6 @@
   "{0} page skipped: {1} (not readable)": ["{0} pagina saltata: {1} (non leggibile)", "{0} pagine saltate: {1} (non leggibili)"],
   "{0} for you": "{0} per te",
   "Also new": "Anche nuovo",
-  "Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}": "Elemento sconosciuto {0}. Possibili: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}",
-  "Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}": "Elemento sconosciuto {0}. Possibili: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}",
   "Number schemes with more than four text building blocks: {0}. Numbering no longer continues from the numbers given under them; shorten them in Office > Settings ({1}).": "Schemi di numerazione con più di quattro blocchi di testo: {0}. La numerazione non prosegue più dai numeri già assegnati; accorciali in Ufficio > Impostazioni ({1}).",
   "Date with hyphens": "Data con trattini",
   "This document is not finalised yet": "Questo documento non è ancora finalizzato",
@@ -14149,7 +14147,6 @@
   "Read receipts are on by default.": "Le conferme di lettura sono attive per impostazione predefinita.",
   "Messages and comments of this person stay with their text, without the name.": "I messaggi e i commenti di questa persona restano con il loro testo, senza il nome.",
   "This project stays private: it never gets a public link.": "Questo progetto resta privato: non riceve mai un link pubblico.",
-  "A number can hold four text building blocks at most (project, client, initials)": "Un numero può contenere al massimo quattro blocchi di testo (progetto, cliente, iniziali)",
   "App bar": "Barra delle app",
   "Show labels in the app bar": "Mostra le etichette nella barra delle app",
   "Off: only the icons, the bar gets narrower. The name shows when you point at an icon.": "Disattivato: solo le icone, la barra diventa più stretta. Il nome compare quando punti un'icona.",
@@ -15144,5 +15141,12 @@
   "Only the first {0} files are shown.": "Sono mostrati solo i primi {0} file.",
   "Files of tables, read only. Delete them in the table itself.": "File delle tabelle, sola lettura. Si eliminano nella tabella stessa.",
   "Template - copy it to adjust": "Modello - copialo per adattarlo",
-  "Template - cannot be changed": "Modello - non si può modificare"
+  "Template - cannot be changed": "Modello - non si può modificare",
+  "Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials} {version}": "Elemento sconosciuto {0}. Possibili: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials} {version}",
+  "Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials}": "Elemento sconosciuto {0}. Possibili: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials}",
+  "A number can hold four text building blocks at most (project, client, short code, initials)": "Un numero può contenere al massimo quattro blocchi di testo (progetto, cliente, sigla del cliente, iniziali)",
+  "Short code": "Sigla",
+  "In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.": "Nei numeri come {kuerzel}, ad es. 673_TNP_R. Vuoto = le prime tre lettere del nome.",
+  "Short code of the client": "Sigla del cliente",
+  "The short code needs 2 to 6 letters or digits (e.g. TNP)": "La sigla richiede da 2 a 6 lettere o cifre (ad es. TNP)"
 }

@@ -28,9 +28,9 @@ from ..core.numtext import server_num
 # see, so two people of one organisation may see different sums. The amount uses the list's hourly rate, else the
 # client's. Budget: hours and / or an amount; 80 % turns the bar amber, 100 % red. The timesheet is the time report
 # filtered to the client's lists (CSV, printable page).
-CLIENT_FIELDS = ("name", "name_extra", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
+CLIENT_FIELDS = ("name", "name_extra", "display_name", "short_code", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
                  "org_id", "archived")
-CLIENT_TEXT_MAX = {"name": 80, "name_extra": 120, "display_name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
+CLIENT_TEXT_MAX = {"name": 80, "name_extra": 120, "display_name": 80, "short_code": 6, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
 # 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
 CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days",
                   "peppol_id")  # 2.154.0 B (#1960): the Peppol id "<scheme>:<id>" of e-invoices over Peppol
@@ -139,6 +139,10 @@ def clean_client(c, uid, b, new=False):
             v = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()  # 2.39.0 (#1209 audit M2): no control characters (invoice XML)
             if k != "address" and k != "note":
                 v = re.sub(r"\s+", " ", v)
+            if k == "short_code":  # 2.433.0 (#3604): 2-6 capitals / digits for the number block {kuerzel}
+                v = v.upper()
+                if v and not re.fullmatch(r"[A-Z0-9]{2,6}", v):
+                    raise BadInput(tr("The short code needs 2 to 6 letters or digits (e.g. TNP)"))
             v = v[:CLIENT_TEXT_MAX[k]]
             if k == "color" and v and not COLOR_RE.fullmatch(v):
                 raise BadInput(tr("Invalid value: {0}", k))
@@ -247,7 +251,7 @@ def client_public(c, uid, r, stats=False, month=None):
     lids = client_lists(c, uid, r["id"])
     org = c.execute("SELECT name FROM orgs WHERE id=?", (r["org_id"],)).fetchone() if r["org_id"] else None
     u = _user(c, uid)
-    d = {k: r[k] for k in ("id", "name", "name_extra", "display_name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
+    d = {k: r[k] for k in ("id", "name", "name_extra", "display_name", "short_code", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h",
                            "budget_amount", "org_id", "created_by", "created_at", "updated_at")}
     d.update(archived=bool(r["archived"]), org_name=org[0] if org else "", lists=lids,
              can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)), label=cdn_label(c, uid, r))
@@ -543,7 +547,7 @@ def cl_hold_sql(t="clients"):
 CL_LIVE_READERS = (("office_docs", "x.locked_at IS NOT NULL AND x.trial=0 AND COALESCE(x.recipient_snapshot, '') IN ('', '{}')"),
                    ("office_drives", "1=1"), ("office_trips", CL_HOLD_WHERE["office_trips"]))
 # the columns anonymising empties (the customer number stays: DATEV books older invoices under it; no contact data)
-CL_ANON_COLS = ("display_name", "name_extra", "contact", "email", "phone", "address", "street", "zip", "city", "country", "address_extra",
+CL_ANON_COLS = ("display_name", "name_extra", "short_code", "contact", "email", "phone", "address", "street", "zip", "city", "country", "address_extra",
                 "note", "vat_id", "buyer_reference", "email_invoice", "peppol_id", "icon")
 
 

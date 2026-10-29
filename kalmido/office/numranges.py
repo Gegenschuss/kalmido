@@ -34,7 +34,7 @@ def onum_range(c, oid, s, kind):
     r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
     last = int(r["last"]) if r else 0
     return {"kind": kind, "scheme": scheme, "period": period, "yearly": bool(period), "last": last, "next": last + 1, "min_next": last + 1,
-            "preview": office_number_format(scheme, last + 1, project=tr("Project"), client=tr("Client"), initials="AB"),
+            "preview": office_number_format(scheme, last + 1, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC"),
             "reason_needed": kind in ONUM_REASON_KINDS}
 
 

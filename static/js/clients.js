@@ -118,6 +118,9 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 }
 
 // ---- the client dialog
+// 2.433.0 (#3604): the automatic short code of a name, as the server's client_short_code: the first three letters in capitals, umlauts written out
+const CL_UML = {'Ä': 'AE', 'Ö': 'OE', 'Ü': 'UE', 'ß': 'SS'};
+const cl_autoCode = n => String(n || '').toUpperCase().replace(/[ÄÖÜß]/g, m => CL_UML[m]).normalize('NFKD').replace(/[^A-Z]/g, '').slice(0, 3);
 function cl_iconPickHtml(cur) {
   const old = cur && !cur.startsWith('ic:') ? `<button type="button" class="avopt on" data-clico="${esc(cur)}" aria-pressed="true" aria-label="${esc(cur)}"><span class="semo" aria-hidden="true">${esc(cur)}</span></button>` : '';
   return `<input type="hidden" id="cl-icon" value="${esc(cur)}"><div class="lipick clico" role="group" aria-labelledby="cl-icon-l"><button type="button" class="avopt none ${cur ? '' : 'on'}" data-clico="" aria-pressed="${!cur}" title="${esc(tr('No icon'))}" aria-label="${esc(tr('No icon'))}">${ic('ban', 's')}</button>${old}${CL_ICONS.map(k => `<button type="button" class="avopt ${cur === 'ic:' + k ? 'on' : ''}" data-clico="ic:${k}" aria-pressed="${cur === 'ic:' + k}" aria-label="${k}">${ic(k)}</button>`).join('')}</div>`;
@@ -134,6 +137,9 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   const addr = short ? `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k) && k !== 'city').map(cdn_fieldHtml(bb)).join('')}</div>` : cdn_addrHtml(bb);
   const dn = `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
     <div class="shint lhint" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`;
+  // 2.433.0 (#3604): the short code for the number block {kuerzel} (with the office); empty = the first three letters of the name
+  const sc = typeof officeOn === 'function' && officeOn() ? `<div class="row"><label for="cl-sc">${tr('Short code')}</label><input id="cl-sc" maxlength="6" value="${esc(c?.short_code || '')}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(cl_autoCode(c?.name || ''))}" aria-describedby="cl-sc-h"></div>
+    <div class="shint lhint" id="cl-sc-h">${tr('In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.')}</div>` : '';
   const ico = `<div class="row"><label id="cl-icon-l">${tr('Symbol')}</label>${cl_iconPickHtml(c?.icon || '')}</div>`;
   const rest = `${ico}
     <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
@@ -147,12 +153,14 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`;
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     ${nm}
-    ${o.quick ? `${nx}${addr}` : short ? `${em}${city}<details class="clmore" id="cl-more"><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${nx}${dn}${rest}</details>` : `${nx}${dn}${rest}`}
+    ${o.quick ? `${nx}${addr}` : short ? `${em}${city}<details class="clmore" id="cl-more"><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${nx}${dn}${sc}${rest}</details>` : `${nx}${dn}${sc}${rest}`}
     <div class="aerr" role="alert"></div>
     <div class="foot ${short ? 'clfoot' : ''}">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
   if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
+  const scIn = $('#cl-sc', md), nmIn = $('#cl-name', md);  // 2.433.0 (#3604): capitals while typing, the automatic code as placeholder
+  if (scIn) { scIn.addEventListener('input', () => { scIn.value = scIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }); nmIn?.addEventListener('input', () => { scIn.placeholder = cl_autoCode(nmIn.value); }); }
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
   const num = numBody;  // 2.263.0 (#2976)
   md.addEventListener('click', async e => {
@@ -183,6 +191,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
       const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
         phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
+      if ($('#cl-sc', md)) body.short_code = v('#cl-sc').trim().toUpperCase();  // 2.433.0 (#3604)
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if (c?.updated_at) body.expect_updated_at = c.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
       if (!o.quick && md._clkRm?.length) body.contacts_removed = md._clkRm.slice();  // only these are deleted (missing ones stay)
