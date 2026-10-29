@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgdelnotice', 'orggone']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgdelnotice', 'orggone', 'whorgcut']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -251,6 +251,7 @@ function newsText(it, U) {
     // 2.361.0 (#2920): the server admin deletes my organisation on a day / took that back / deleted it (with what of mine was in it)
     case 'orgdelnotice': return d.day ? tr('The organisation {0} will be deleted on {1}. Save what you want to keep before that day.', q(d.name || ''), esc(fmtDayAbs(d.day)))
       + (olvText(d.own) ? ' ' + esc(tr('Yours in it: {0}.', olvText(d.own))) : '') : tr('The deletion of the organisation {0} was called off.', q(d.name || ''));
+    case 'whorgcut': return tr('Your webhook {0} no longer delivers events of the organisation {1}. An admin of it can set it up as an organisation webhook.', q(d.webhook || ''), q(d.org || ''));  // 2.380 G (#3391)
     case 'orggone': return tr('The organisation {0} was deleted.', q(d.name || '')) + (olvText(d.own) ? ' ' + esc(tr('Yours that went with it: {0}.', olvText(d.own))) : '');
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
     case 'connok': return tr('{0} accepted your connection request', who);
@@ -288,6 +289,7 @@ function newsText(it, U) {
 const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
 /** @type {any} */ (NEWS_ICON).orgdelnotice = /** @type {any} */ (NEWS_ICON).orggone = 'alert';  // 2.361.0 (#2920)
+/** @type {any} */ (NEWS_ICON).whorgcut = 'alert';  // 2.380 G (#3391)
 // 2.361.0 (#2920 / #2922): what of a person is in an organisation (accounts/orgleave.py OLV_STAYS, the same words)
 const OLV_WORDS = {files: n => trn('{0} file', '{0} files', n), wiki_pages: n => trn('{0} knowledge page', '{0} knowledge pages', n),
   tables: n => trn('{0} table', '{0} tables', n), bookmarks: n => trn('{0} bookmark', '{0} bookmarks', n), polls: n => trn('{0} poll', '{0} polls', n),
@@ -470,6 +472,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
   if (it.kind === 'signoff') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
+  if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
   if (!taskById(it.task_id)) {  // e.g. completed long ago: not in the state
@@ -483,7 +486,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);
