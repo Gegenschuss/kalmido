@@ -139,12 +139,20 @@ before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret
 
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
-and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
-by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
+and an instance admin creates further ones under *Settings > Administration > Organisations*. Since 2.422 a person creates a
+company of her own too (the workspace menu > *Add an organisation*, `POST /api/orgs {name}`): she becomes its admin, at most
+3 such companies per person; their e-mail domains are set only by an instance admin, and they do not count as the server's
+organisations for open registration. Nobody joins an organisation by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
 with a confirmed address: without e-mail sending an admin adds the person after the approval), and an
 organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
 once there is one, people see the members of their organisations and the people they share something with; private projects
 reach anybody else by e-mail address.
+
+**Private accounts without an invitation (2.422).** A server with an organisation allows open registration ("Anyone with a
+confirmed e-mail address") only with the switch *Private accounts register without an invitation* (*Settings > Users >
+Registration on the login page*, `PATCH /api/admin/settings {signup_private}`, off by default, switching it on asks for the
+password). Such a registration is a private account: it never joins an organisation, not even by its e-mail domain; a
+company's admin invites the person. Switched off again, the mode falls back to off.
 
 **Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
 organisation, the members, the date of the last sign-in, the storage used, and the numbers of projects and tasks, plus a row

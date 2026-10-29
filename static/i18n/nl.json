@@ -15056,5 +15056,13 @@
   "Check removed": "Controle verwijderd",
   "{0} receipt marked as checked": ["{0} bon als gecontroleerd gemarkeerd", "{0} bonnen als gecontroleerd gemarkeerd"],
   "Check removed from {0} receipt": ["Controle van {0} bon verwijderd", "Controle van {0} bonnen verwijderd"],
-  "You may only file documents into a folder you may edit": "Je kunt documenten alleen opslaan in een map die je mag bewerken"
+  "You may only file documents into a folder you may edit": "Je kunt documenten alleen opslaan in een map die je mag bewerken",
+  "Private accounts register without an invitation": "Privéaccounts registreren zich zonder uitnodiging",
+  "Then “Anyone with a confirmed e-mail address” works here too: such an account stays private and never joins an organisation by its address; a company’s admin invites the person. Off by default.": "Dan werkt „Iedereen met een bevestigd e-mailadres” hier ook: zo’n account blijft privé en wordt nooit via zijn adres lid van een organisatie; de beheerder van een bedrijf nodigt de persoon uit. Standaard uit.",
+  "Name of the new company": "Naam van het nieuwe bedrijf",
+  "Keeps your work apart from your private things. You become its admin and can invite people by e-mail.": "Houdt je werk gescheiden van je privézaken. Je wordt de beheerder en kunt mensen per e-mail uitnodigen.",
+  "The company “{0}” is set up": "Het bedrijf „{0}” is aangemaakt",
+  "Only a person can create a company": "Alleen een persoon kan een bedrijf aanmaken",
+  "You already have {0} companies of your own": "Je hebt al {0} eigen bedrijven",
+  "Only an admin of this server sets the e-mail domains of this company": "Alleen een beheerder van deze server stelt de e-maildomeinen van dit bedrijf in"
 }

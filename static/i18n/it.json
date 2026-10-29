@@ -15056,5 +15056,13 @@
   "Check removed": "Verifica rimossa",
   "{0} receipt marked as checked": ["{0} ricevuta segnata come verificata", "{0} ricevute segnate come verificate"],
   "Check removed from {0} receipt": ["Verifica rimossa da {0} ricevuta", "Verifica rimossa da {0} ricevute"],
-  "You may only file documents into a folder you may edit": "Puoi archiviare documenti solo in una cartella che puoi modificare"
+  "You may only file documents into a folder you may edit": "Puoi archiviare documenti solo in una cartella che puoi modificare",
+  "Private accounts register without an invitation": "Gli account privati si registrano senza invito",
+  "Then “Anyone with a confirmed e-mail address” works here too: such an account stays private and never joins an organisation by its address; a company’s admin invites the person. Off by default.": "Allora «Chiunque con un indirizzo e-mail confermato» funziona anche qui: un tale account resta privato e non entra mai in un’organizzazione tramite il suo indirizzo; l’admin di un’azienda invita la persona. Disattivato per impostazione predefinita.",
+  "Name of the new company": "Nome della nuova azienda",
+  "Keeps your work apart from your private things. You become its admin and can invite people by e-mail.": "Tiene il tuo lavoro separato dalle tue cose private. Ne diventi l’admin e puoi invitare persone via e-mail.",
+  "The company “{0}” is set up": "L’azienda «{0}» è stata creata",
+  "Only a person can create a company": "Solo una persona può creare un’azienda",
+  "You already have {0} companies of your own": "Hai già {0} aziende tue",
+  "Only an admin of this server sets the e-mail domains of this company": "Solo un admin di questo server imposta i domini e-mail di questa azienda"
 }

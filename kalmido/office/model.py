@@ -302,7 +302,8 @@ def pb_info(c, uid, oid):
     from ..accounts.orgs import instance_mode, user_orgs
     orgs = user_orgs(c, uid)
     u = getattr(g, "user", None) if has_request_context() else None
-    move = {"can_move": 1 if u is not None and u["is_admin"] and instance_mode(c) == "workspaces" else 0}  # POST /api/office/move
+    # POST /api/office/move; 2.422.0 (#2937): the owner herself too (a company of her own), no kid account
+    move = {"can_move": 1 if u is not None and not u["kid"] and instance_mode(c) == "workspaces" else 0}
     # 2.137.0 D (#1981): the organisations the person is an admin of (POST /api/office/move/org takes the office into one)
     from ..accounts.orgs import org_role
     adm = [o for o in orgs if org_role(c, uid, o) == "admin"]

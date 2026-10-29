@@ -55,7 +55,8 @@ button to the organisation's office.
 **Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
 settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
-Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
+Only where organisations can be created (not in the mode `shared`); since 2.422 the owner herself too: it becomes a
+company of her own (at most 3, its e-mail domains only by an instance admin). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
 **Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,

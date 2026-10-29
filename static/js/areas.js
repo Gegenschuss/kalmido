@@ -478,11 +478,21 @@ function sbb_wsMenu(anchor) {
     if (x) x.outerHTML = `<span class="kbwsic">${orgIconHtml(o, `<span class="kbini" aria-hidden="true">${esc(String(o?.name || '?').trim().charAt(0).toUpperCase())}</span>`)}</span>`;
   });
 }
-// "Add a company": an admin of the server creates one (the dialog of Administration); anybody else learns how to get one
+// "Add a company": an admin of the server creates one (the dialog of Administration); 2.422.0 (#2937): anybody else creates
+// a company of her own by its name (POST /api/orgs, she becomes its admin) and lands in it; where the server does not allow
+// that (not the mode workspaces, the limit reached) the answer says why
 async function sbb_orgAdd() {
   if (S.me?.is_admin && typeof orgModal !== 'function') await loadModule('settings').catch(() => {});  // 2.152.3: orgModal lives in the lazy settings module
   if (S.me?.is_admin && typeof orgModal === 'function') { orgModal(null, () => load().then(render).catch(() => {})); return; }
-  await askConfirm(tr('Add an organisation'), tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.'), {ok: tr('OK')});
+  const name = ((await askPrompt(tr('Name of the new company'), '', {body: tr('Keeps your work apart from your private things. You become its admin and can invite people by e-mail.'), ok: tr('Create'), input: {max: 60}})) || '').trim();
+  if (!name) return;
+  let o; try { o = await api('POST', '/api/orgs', {name}); } catch (x) {
+    await askConfirm(tr('Add an organisation'), x.status === 403 ? tr('A company is set up by the admin of this server. A company’s admin can then invite you by e-mail.') : (x.message || tr('unknown')), {ok: tr('OK')});
+    return;
+  }
+  await load().catch(() => {});
+  if (typeof wsSet === 'function') wsSet('org:' + o.id); else render();
+  toast(tr('The company “{0}” is set up', o.name));
 }
 // the panel's head: the area's name, "Fold all" / "Unfold all" (only a panel with groups that fold: Tasks, or a panel whose
 // html has sbb_head groups or a tree marked data-sbbfold) and "Hide the panel". pan = the panel's html (not Tasks)

@@ -390,9 +390,10 @@ def pb_move_post():
     """Body {name, confirm: true}: the owner of the personal office shown turns it into a new organisation named name, with
     themselves as its admin -- the same area id, so numbers, keys, files and the log stay as they are (no duplicate
     numbers); the owner's private clients move with it. One way, no undo. Only where organisations can be created: the
-    mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet."""
+    mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet.
+    2.422.0 (#2937): the owner herself too (the rule of POST /api/orgs: a company of her own, at most ORG_SELF_MAX)."""
     from flask import g
-    from ..accounts.orgs import ORG_NAME_MAX, instance_mode, org_member_add
+    from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n
     from .model import pb_owner
     from .pbtransfer import pb_letter_detach
     c, uid, oid = _ctx(admin=True)
@@ -401,15 +402,18 @@ def pb_move_post():
         return err(tr("Only a personal office can move into an organisation"), 409)
     if not isinstance(b, dict) or b.get("confirm") is not True:
         return err(tr("Please confirm the move"))
-    if instance_mode(c) != "workspaces" or not g.user["is_admin"]:
+    if instance_mode(c) != "workspaces":
         raise Denied(403, tr("Only an admin of this server can create an organisation"))
+    own = not g.user["is_admin"]  # 2.422.0 (#2937): a company of her own (self_made: its e-mail domains only by a server admin)
     name = " ".join(str(b.get("name") or "").split())[:ORG_NAME_MAX]
     if not name:
         return err(tr("Name missing"))
     with system_ctx(c):  # creating an organisation (instance structure) out of the caller's own area
         if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
-        if c.execute("UPDATE orgs SET name=?, personal_of=NULL WHERE id=? AND personal_of=?", (name, oid, uid)).rowcount != 1:
+        if own and org_self_made_n(c, uid) >= ORG_SELF_MAX:
+            return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
+        if c.execute("UPDATE orgs SET name=?, personal_of=NULL, self_made=? WHERE id=? AND personal_of=?", (name, int(own), oid, uid)).rowcount != 1:
             return err(tr("Only a personal office can move into an organisation"), 409)
         org_member_add(c, oid, uid, "admin")
         moved = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=?", (uid,))]

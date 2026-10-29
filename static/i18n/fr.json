@@ -15056,5 +15056,13 @@
   "Check removed": "Vérification retirée",
   "{0} receipt marked as checked": ["{0} justificatif marqué comme vérifié", "{0} justificatifs marqués comme vérifiés"],
   "Check removed from {0} receipt": ["Vérification retirée de {0} justificatif", "Vérification retirée de {0} justificatifs"],
-  "You may only file documents into a folder you may edit": "Tu ne peux classer des documents que dans un dossier que tu peux modifier"
+  "You may only file documents into a folder you may edit": "Tu ne peux classer des documents que dans un dossier que tu peux modifier",
+  "Private accounts register without an invitation": "Les comptes privés s’inscrivent sans invitation",
+  "Then “Anyone with a confirmed e-mail address” works here too: such an account stays private and never joins an organisation by its address; a company’s admin invites the person. Off by default.": "Alors « Toute personne avec une adresse e-mail confirmée » fonctionne aussi ici : un tel compte reste privé et ne rejoint jamais une organisation par son adresse ; l’admin d’une entreprise invite la personne. Désactivé par défaut.",
+  "Name of the new company": "Nom de la nouvelle entreprise",
+  "Keeps your work apart from your private things. You become its admin and can invite people by e-mail.": "Sépare ton travail de tes affaires privées. Tu en deviens l’admin et peux inviter des personnes par e-mail.",
+  "The company “{0}” is set up": "L’entreprise « {0} » est créée",
+  "Only a person can create a company": "Seule une personne peut créer une entreprise",
+  "You already have {0} companies of your own": "Tu as déjà {0} entreprises à toi",
+  "Only an admin of this server sets the e-mail domains of this company": "Seul un admin de ce serveur définit les domaines e-mail de cette entreprise"
 }
