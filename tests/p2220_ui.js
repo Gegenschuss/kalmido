@@ -107,9 +107,10 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(/Rome/.test(d.querySelector('#view .lifebar')?.textContent || '') && d.querySelector('#view [data-act="life-tripedit"]'), 'trip: its list opens with the trip bar');
   // Karakeep dialog
   w.location.hash = '#life'; await until(() => d.querySelector('#view .lc-reading'));
-  await w.eval('kkModal()'); await sleep(300); md = d.querySelector('.modal.lifedlg');
-  check(md && md.querySelector('#kk-url') && md.querySelector('#kk-tok').type === 'password', 'Karakeep: address + API key (password field)');
-  md.remove();
+  // 2.365.2 B (#2789): Karakeep is set up in Settings > Integrations, the module opens it there
+  await w.eval('kkModal()'); md = await until(() => d.querySelector('.smodal #s-kk #kk-url') && d.querySelector('.smodal'));
+  check(md && md.querySelector('#kk-tok').type === 'password' && !md.querySelector('[data-pane="integr"]').classList.contains('hidden'), 'Karakeep: address + API key (password field) in Settings > Integrations');
+  md?.remove();
   // health list bar
   const HL = st.lists.find(l => l.life === 'health').id;
   w.location.hash = '#l/' + HL; await until(() => d.querySelector('#view .lifebar'));

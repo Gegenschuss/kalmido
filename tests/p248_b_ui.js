@@ -108,9 +108,13 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   await until(() => d.querySelectorAll('.dc-card').length === 2);
 
   // ================= settings: rename a type (one undo step)
+  // 2.365.2 B (#2789): the levels are in Settings > Documents, the lists keep their dialog in the module
+  await w.eval(`settingsModal('docs')`);
+  check(await until(() => d.querySelectorAll('#s-dcs [data-dcl]').length === 4), 'settings: a level per feature (Settings > Documents)');
+  d.querySelectorAll('.modal').forEach(m => m.remove());
   await w.eval(`dc_settings()`);
   await until(() => d.querySelector('.dc-smd .dc-lbls'));
-  check(d.querySelectorAll('.dc-smd [data-dcl]').length === 4, 'settings: a level per feature');
+  check(!d.querySelector('.modal.dc-smd [data-dcl]'), 'the lists dialog has no levels (no second copy)');
   const tid = (await call('GET', `/api/docs/${D2}`)).type?.id;
   w.prompt = () => 'Monthly payment';
   d.querySelector(`.dc-smd [data-dcs="lren:type:${tid}"]`)?.click();

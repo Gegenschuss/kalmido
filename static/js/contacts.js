@@ -331,7 +331,7 @@ document.addEventListener('click', async e => {
       {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
       ...(S.books || []).map(x => ({label: tr('Export {0} (CSV)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.csv`; }})),
-      {label: tr('On the phone…'), icon: 'phone', fn: davGuide},
+      {label: tr('On the phone…'), icon: 'phone', fn: () => settingsModal('caldav')},  // 2.365.2 B (#2789)
       CT.groups.length && {label: tr('Manage groups…'), icon: 'tag', fn: ctx_groupsModal},  // 2.119.1 A (#2085)
       typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open},  // 2.55.0 (#1455)
       typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
@@ -815,7 +815,7 @@ async function ctBooksModal() {
     }
     const k = e.target.closest('[data-cb]')?.dataset.cb; if (!k) return;
     if (k === 'close') md.remove();
-    if (k === 'phone') { md.remove(); davGuide(); }
+    if (k === 'phone') { md.remove(); settingsModal('caldav'); }
     if (k === 'new') {
       const n = await wsAskNew(tr('New address book'));  // 2.30.0 (#1036): with its workspace
       if (!n) return;

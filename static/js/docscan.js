@@ -3,17 +3,12 @@
 // the scan inboxes of this workspace, a new inbox shows its setup code once) and the forwarding address with a copy button and
 // the note, shown big once per person, that mail is not end-to-end encrypted.
 const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null)};  // the setup code just made: only while this settings dialog is open
-// 2.353.0 B (#2773): the folder watcher lives in Settings > Integrations (dsc_integrDraw); the document settings keep a short
-// pointer plus the forwarding address, so the download is maintained in one place only
-function dsc_slot(s) {
-  const sc = s.scan || {api: false, downloads: [], keys: [], encrypted: false, mail_notice: true};
-  return `<h4>${tr('Scans from your computer')}</h4><div class="dsc-way"><h5>${ic('folder', 's')} ${tr('Folder watcher')}</h5>
-    <p class="muted">${tr('The program that uploads new scans from a folder of your Mac or Windows PC, its download and the scan inboxes are in Settings > Integrations.')}${sc.keys.length ? ' ' + esc(trn('{0} scan inbox set up', '{0} scan inboxes set up', sc.keys.length)) : ''}</p>
-    <button type="button" class="btn sm" data-dsc="tointegr">${ic('gear', 's')} ${tr('Open Integrations')}</button></div>${dsc_mailHtml(s, sc)}`;
-}
+// 2.353.0 B (#2773): the folder watcher lives in Settings > Integrations (dsc_integrDraw)
+// 2.365.2 B (#2789): the whole block "Documents: inboxes" is there now (the folder of the file store, the folder watcher with
+// the scan inboxes, the forwarding address); the document settings only point to it
 // Settings > Integrations: the whole part (download, set-up code, inboxes with their last use) for the shown workspace
 function dsc_integrHtml() {
-  return `<h4 id="s-scan-h">${tr('Scans from your computer')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h4 id="s-scan-h">${tr('Documents: inboxes')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
 async function dsc_integrDraw(md) {
   const box = md.querySelector('#s-scan'); if (!box) return;
@@ -24,7 +19,10 @@ async function dsc_integrDraw(md) {
 }
 function dsc_embedDraw(box) {
   const s = DSCN.es; if (!s || !box) return;
-  box.innerHTML = `<p class="muted">${esc(typeof dc_wsName === 'function' ? dc_wsName(s.ws) : s.ws)}</p>${dsc_watcherHtml(s, box)}`;
+  const dis = s.can_manage ? '' : 'disabled', sc = s.scan || {api: false, downloads: [], keys: [], encrypted: false, mail_notice: true};
+  box.innerHTML = `<p class="muted">${esc(typeof dc_wsName === 'function' ? dc_wsName(s.ws) : s.ws)}</p>
+    <div class="dsc-way"><h5>${ic('folder', 's')} ${tr('Folder in the file store')}</h5><label class="chkl"><input type="checkbox" data-dsc="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${esc(tr('Recognise files put into the folder “{0}” of the file store', s.inbox_path || tr('Documents|folder') + '/' + tr('Inbox|folder')))}</label></div>
+    ${dsc_watcherHtml(s, box)}${dsc_mailHtml(s, sc)}`;
 }
 function dsc_watcherHtml(s, host) {
   const sc = s.scan || {api: false, downloads: [], keys: [], encrypted: false, mail_notice: true};
@@ -64,32 +62,43 @@ function dsc_mailHtml(s, sc) {
   return `<div class="dsc-way"><h5>${ic('mail', 's')} ${tr('By e-mail')}</h5>
     <p class="muted">${tr('PDFs and images attached to mails sent to this address become documents here.')}</p>
     ${m.address ? `<div class="dsc-row dc-mail"><code>${esc(m.address)}</code><button type="button" class="btn sm" data-dsc="mailcopy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <p><button type="button" class="linkbtn" data-dcs="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dcs="maildel">${tr('Turn off')}</button></p>
+      <p><button type="button" class="linkbtn" data-dsc="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dsc="maildel">${tr('Turn off')}</button></p>
       <p class="muted">${tr('ScanSnap: in a profile choose “Send by e-mail” and send to this address.')}</p>`
-      : `<button type="button" class="btn sm" data-dcs="mailnew">${tr('Create address')}</button>`}
+      : `<button type="button" class="btn sm" data-dsc="mailnew">${tr('Create address')}</button>`}
     ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
       <button type="button" class="btn sm" data-dsc="notice">${tr('Got it')}</button></div></div>`
       : `<p class="muted dsc-hint">${tr('Mail is not end-to-end encrypted; confidential papers better via the folder watcher.')}</p>`}
     ${sc.encrypted ? `<p class="muted">${tr('Mails into this encrypted area were unencrypted on their way before they were filed.')}</p>` : ''}</div>`;
 }
 async function dsc_reload(md) {
-  const em = md.classList.contains('dsc-embed'), s = em ? DSCN.es : DC.set; if (!s) return;
+  const s = DSCN.es; if (!s) return;
   try { s.scan = await api('GET', `/api/docs/scan-keys?ws=${encodeURIComponent(s.ws)}`); } catch { return; }
-  if (em) dsc_embedDraw(md); else dc_sDraw(md);
+  dsc_embedDraw(md);
 }
 async function dsc_copy(text) {
   try { await navigator.clipboard.writeText(text); toast(tr('Copied')); } catch { toast(tr('Copy failed, select the text by hand')); }
 }
 document.addEventListener('click', async e => {
-  const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('.dc-smd [data-dsc], .dsc-embed [data-dsc]')); if (!b) return;
-  const md = /** @type {HTMLElement} */ (b.closest('.dsc-embed, .dc-smd')), a = b.dataset.dsc || '', s = md.classList.contains('dsc-embed') ? DSCN.es : DC.set;
-  if (a === 'tointegr') { const dm = b.closest('.dc-smd'); if (dm) modalClose(dm); settingsModal('scans'); return; }
+  const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('.dsc-embed [data-dsc]')); if (!b || b.matches('input')) return;
+  const md = /** @type {HTMLElement} */ (b.closest('.dsc-embed')), a = b.dataset.dsc || '', s = DSCN.es;
   if (!s) return;
   if (a === 'copy') { dsc_copy(DSCN.code); return; }
   if (a === 'mailcopy') { dsc_copy(s.mail?.address || ''); return; }
   if (a === 'notice') {
     try { await api('POST', '/api/docs/mail-notice', {}); } catch { return; }
-    if (s.scan) s.scan.mail_notice = true; dc_sDraw(md);
+    if (s.scan) s.scan.mail_notice = true; dsc_embedDraw(md);
+    return;
+  }
+  if (a === 'mailnew') {  // 2.365.2 B (#2789): from the document settings (docs.js), the only place of the address now
+    if (s.mail.address && !await askConfirm(tr('New address?'), tr('The old address stops working.'), {ok: tr('New address')})) return;
+    const j = await api('POST', '/api/docs/mail', {ws: s.ws}).catch(() => null); if (!j) return;
+    s.mail.address = j.address; dsc_embedDraw(md);
+    return;
+  }
+  if (a === 'maildel') {
+    if (!await askConfirm(tr('Turn off the address?'), tr('Mails to it no longer arrive.'), {ok: tr('Turn off'), danger: true})) return;
+    await api('DELETE', `/api/docs/mail?ws=${encodeURIComponent(s.ws)}`).catch(() => null);
+    s.mail.address = ''; dsc_embedDraw(md);
     return;
   }
   if (a === 'new') {
@@ -109,4 +118,12 @@ document.addEventListener('click', async e => {
     toast(tr('Revoked: {0}', k.name));
     await dsc_reload(md);
   }
+});
+document.addEventListener('change', async e => {  // 2.365.2 B (#2789): the folder of the file store (was in the document settings)
+  const el = /** @type {HTMLInputElement} */ (e.target); if (!el.matches?.('.dsc-embed [data-dsc="inbox"]')) return;
+  const s = DSCN.es; if (!s) return;
+  const put = v => async () => { const j = await api('PUT', '/api/docs/settings', {ws: s.ws, inbox: v}); s.inbox = j.inbox; const b = document.querySelector('.dsc-embed'); if (b) dsc_embedDraw(b); return {}; };
+  try { await put(el.checked)(); } catch { el.checked = !el.checked; return; }
+  const l = tr('Changed setting: {0}', tr('Folder in the file store'));
+  histToast(l, histAdd({label: l, sett: true, undo: put(!el.checked), redo: put(el.checked)}));
 });

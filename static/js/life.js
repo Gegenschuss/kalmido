@@ -313,36 +313,8 @@ function lifeBar(l) {
   const b = {contracts: ['life-contract', 'file', N_('Contract')], home: ['life-device', 'tool', N_('Device')], health: ['life-health', 'heart', N_('Health entry')], reading: ['', 'book', '']}[l.life];
   return `<div class="fambar lifebar">${b[0] ? `<button type="button" class="btn" data-act="${b[0]}">${ic(b[1], 's')}<span>${tr(b[2])}</span></button>` : ''}${l.life === 'health' ? `<span class="muted">${ic('lock', 's')} ${tr('Private: never visible to agents')}</span>` : ''}<span class="spacer"></span>${l.life === 'reading' ? `<a class="btn" href="#reading">${ic('book', 's')}<span>${tr('Read later')}</span></a>` : `<a class="btn" href="#life">${ic('home', 's')}<span>${tr('Home & life')}</span></a>`}</div>`;  // 2.172.0 B (#2679): a read-later project -> its view
 }
-// Karakeep: connect, choose the list, fetch
-async function kkModal() {
-  let cur = {connected: false};
-  try { cur = await api('GET', '/api/life/karakeep'); } catch { return; }
-  const rl = S.lists.filter(l => l.life === 'reading' && !l.archived && canEditList(l.id));
-  const md = lifeModal(`<h3>${ic('book', 's')} ${tr('Karakeep')}</h3>
-    <p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” project; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
-    <div class="row"><label for="kk-url">${tr('Address')}</label><input id="kk-url" type="url" inputmode="url" autocomplete="off" value="${esc(cur.url || '')}" placeholder="https://karakeep.example.com"></div>
-    <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
-    ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('Project')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
-    <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
-    ${cur.error ? `<p class="aerr">${esc(cur.error)}</p>` : ''}
-    <div class="aerr" role="alert"></div>
-    <div class="foot">${cur.connected ? `<button class="btn danger" data-m="kk-del">${tr('Disconnect')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${cur.connected ? tr('Save') : tr('Connect')}</button></div>`, async md => {
-    const v = id => $(id, md)?.value?.trim() ?? '';
-    const b = {url: v('#kk-url'), archive: !!$('#kk-arch', md).checked, ...(v('#kk-tok') ? {token: v('#kk-tok')} : {}), ...(v('#kk-list') ? {list_id: +v('#kk-list')} : {})};
-    if (!b.url) { $('#kk-url', md).focus(); throw new Error(tr('Please enter the address')); }
-    if (!cur.token_set && !b.token) { $('#kk-tok', md).focus(); throw new Error(tr('Please enter the API key')); }
-    await rawFetch('PUT', '/api/life/karakeep', b);
-    const j = await rawFetch('POST', '/api/life/karakeep/sync', {});
-    md.remove(); await load(); lifeReload(); toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added));
-  }, '#kk-url');
-  md.addEventListener('click', async e => {
-    if (e.target.closest('[data-m="kk-del"]')) {
-      if (!await askConfirm(tr('Disconnect Karakeep?'), tr('The API key is removed; the tasks stay.'), {ok: tr('Disconnect'), danger: true})) return;
-      try { await api('DELETE', '/api/life/karakeep'); } catch { return; }
-      md.remove(); lifeReload();
-    }
-  });
-}
+// Karakeep: 2.365.2 B (#2789): connect, project and fetch are in Settings > Integrations (integrations.js kks_html)
+function kkModal() { settingsModal('karakeep'); }
 
 // ---- a task of Home & life in the task panel
 function lifeDetailHtml(t, l, ro) {

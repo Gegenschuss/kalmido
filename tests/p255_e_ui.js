@@ -44,8 +44,13 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   const it = await until(() => menuItems(d).find(b => /Newsletter/.test(b.textContent)));
   check(it, 'Contacts > More has "Newsletter…"');
   it?.click();
-  const md = await until(() => d.querySelector('.nwl-md #nwl-url') && d.querySelector('.nwl-md'));
-  check(md && /sends no newsletters/.test(md.textContent), 'the sheet says why Kalmido sends nothing itself');  // 2.298.0 A2 (#3186): shorter
+  // 2.365.2 B (#2789): the connection lives in Settings > Integrations; the sheet without one points there
+  const go = await until(() => d.querySelector('.modal.nwl-md [data-nwl="go-set"]'));
+  check(go && !d.querySelector('.modal.nwl-md #nwl-url'), 'the sheet without a connection: no form, the way to Settings > Integrations');
+  go?.click();
+  const md = await until(() => d.querySelector('.smodal .nwl-set #nwl-url') && d.querySelector('.smodal .nwl-set'));
+  check(md && !d.querySelector('.smodal [data-pane="integr"]').classList.contains('hidden'), 'Settings > Integrations shows the newsletter service');
+  check(md && /sends no newsletters/.test(md.textContent), 'the block says why Kalmido sends nothing itself');  // 2.298.0 A2 (#3186): shorter
   check(md && md.querySelector('#nwl-kind') && md.querySelector('#nwl-user') && md.querySelector('#nwl-tok'), 'the form: service, user, token');
   check([...(md?.querySelectorAll('#nwl-kind option') || [])].some(o => /Brevo.*Preview/.test(o.textContent)), 'Brevo is marked as a preview');
   d.querySelector('#nwl-url').value = 'http://127.0.0.1:8086';
@@ -56,9 +61,14 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   check(/refused the access data/.test(d.querySelector('.nwl-md .nwl-err')?.textContent || ''), 'wrong access data: the reason in place');
   d.querySelector('#nwl-tok').value = TOKEN;
   d.querySelector('[data-nwl="connect"]').click();
-  await until(() => d.querySelector('.nwl-md [data-nwl="seg-new"]'));
-  const body = () => d.querySelector('.nwl-md .nwl-body');
-  check(/listmonk/.test(body()?.textContent || '') && /…1234/.test(body()?.textContent || '') && !body().innerHTML.includes(TOKEN), 'connected: the service and the hint, never the token');
+  const od = await until(() => d.querySelector('.nwl-set [data-nwl="open-dlg"]'));
+  const sbody = () => d.querySelector('.nwl-set .nwl-body');
+  check(/listmonk/.test(sbody()?.textContent || '') && /…1234/.test(sbody()?.textContent || '') && !sbody().innerHTML.includes(TOKEN), 'connected: the service and the hint, never the token');
+  check(!!d.querySelector('.nwl-set [data-nwlc="auto"]') && !d.querySelector('.nwl-set [data-nwl="seg-new"]'), 'the settings: daily sync there, the segments not');
+  od?.click();
+  await until(() => d.querySelector('.modal.nwl-md [data-nwl="seg-new"]'));
+  const body = () => d.querySelector('.modal.nwl-md .nwl-body');
+  check(!d.querySelector('.smodal') && !body()?.querySelector('[data-nwlc="auto"]') && body()?.querySelector('[data-nwl="go-set"]'), 'the sheet: segments, a link to the settings of the service');
   check(d.querySelector('[data-nwl="sync"]')?.disabled, 'Sync now is off without segments');
 
   // ================= a segment, then a sync
