@@ -15142,5 +15142,7 @@
   "Files of projects, read only. Delete them in the project itself.": "Archivos de proyectos, solo lectura. Se eliminan en el propio proyecto.",
   "Files of this area, read only.": "Archivos de esta área, solo lectura.",
   "Only the first {0} files are shown.": "Solo se muestran los primeros {0} archivos.",
-  "Files of tables, read only. Delete them in the table itself.": "Archivos de tablas, solo lectura. Se eliminan en la propia tabla."
+  "Files of tables, read only. Delete them in the table itself.": "Archivos de tablas, solo lectura. Se eliminan en la propia tabla.",
+  "Template - copy it to adjust": "Plantilla - cópiala para ajustarla",
+  "Template - cannot be changed": "Plantilla - no se puede cambiar"
 }
