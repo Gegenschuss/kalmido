@@ -1583,6 +1583,40 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
 `{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
 
+## Receipt fetcher
+
+*Since 2.425.0.*
+
+A receipt fetcher is a helper program on the person's own computer that fetches invoices from web portals (an online shop, a
+phone company) and hands them to Kalmido. The person signs in to the portals only in the helper: Kalmido never stores
+passwords, cookies or logins, has no fields for them and refuses every field it does not know (`400`, nothing stored). People
+with the office (also the own office of a person without an organisation) connect one in Settings > Integrations > *Receipt
+fetcher* with a setup code (web session only, never an agent); without the office the routes answer `403`.
+
+Its key (`kbh_…`) is a kind of its own: stored only as a hash in its own table, never an API token (it is not listed under API
+tokens and no other route knows it: every other API route answers `403` "This key may only upload receipts and report the state
+of its portals", the web app `401`). Ordinary tokens and scan inbox keys reach none of the three routes (`403`). A password
+reset or change disconnects every receipt fetcher of the person; disconnecting it in the settings stops the key at once
+(`401`). At most 10 per person, 120 requests per minute.
+
+| Route | Answer |
+|---|---|
+| `GET /fetcher` | `{name, target, max_mb, portals: [{key, name, enabled}]}`: the place the receipts go (the person's own documents or an organisation's) and which portals the person switched on |
+| `PUT /fetcher/status` | body `{portals: [{key, name?, last_run?, new?, error?}]}` (`key`: `a-z 0-9 _ . -`, up to 40; `last_run` ISO time; `new` the new receipts of the last run; `error` empty = fine, e.g. `Please sign in again`; at most 50 portals) -> `{portals: [{key, name, enabled}]}`. A portal new here starts switched on; a report never switches one on or off. An error that was not there before tells the person once (News + push of the event `fetcher`, switchable in the notification settings) |
+| `POST /fetcher/documents` | multipart: `file` (a PDF, checked by its first bytes `%PDF-`; size limit as any upload), `portal` (a reported key), `order` (the order number, optional, up to 100 characters) -> `201 {id, name, duplicate: false}`. The same file, or the same order of the same portal, again answers `200` with the document that is there and `duplicate: true` |
+
+Errors: `401` key unknown or disconnected (or the person deactivated), `403` no office any more / the place is no longer open to
+the person (left the organisation, read-only role), `409` the portal is switched off in Kalmido, `413` too large / no space
+left, `400` not a PDF, unknown field or portal, `429` slow down. The documents arrive with the source `abholer` and
+`abholer:<portal>:<order>` as their external id and are recognised like an upload (date, amount, sender, sorting).
+
+Web routes of the settings: `GET /api/docs/fetchers?ws=private|org:<id>` -> `{api, fetchers: [{id, name, prefix, target, ok,
+created_at, last_seen_at, portals: [{key, name, enabled, last_run, new, error, error_at, updated_at}]}]}` (one's own only);
+`POST /api/docs/fetchers {ws, name}` -> `201 {id, name, target, code}` (`409` while the API is off); `PATCH
+/api/docs/fetchers/{id}/portals/{key} {enabled: true|false}`; `DELETE /api/docs/fetchers/{id}` (the documents stay). The setup
+code is shown once: `kalmido-fetch:1:` + base64url without padding of `{"url": "https://example.com", "key": "kbh_…", "name":
+"My computer"}`.
+
 ## Arrangements of views for agents
 
 *Since 2.55.0.*
