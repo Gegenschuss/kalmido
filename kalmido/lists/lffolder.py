@@ -50,7 +50,7 @@ from flask import has_app_context, jsonify
 from ..core.config import app
 from ..core.access import Denied, acx_of, reading_ids, reading_sql
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx
 from ..accounts.orgroles import FULL_WRITE, org_role_key, org_writes
 from ..accounts.orgs import user_orgs, ws_member_problem
@@ -132,7 +132,9 @@ def lf_root(c, uid, org_id, create=True):
     """The "Projects" root of workspace org_id (None: uid's own tree); None when it cannot be made (Denied)."""
     try:
         with system_ctx(c):
-            return fs_area_root(c, uid, org_id, LF_AREA, tr("Projects"), create=create)
+            # 2.409.0 (#3506): the language read on c - tr() alone opens a second connection outside a request, which waits
+            # forever for the start's own transaction (the first start on an old database placing its lists hung there)
+            return fs_area_root(c, uid, org_id, LF_AREA, tr("Projects", lg=lang(c, uid)), create=create)
     except Denied:
         return None
 

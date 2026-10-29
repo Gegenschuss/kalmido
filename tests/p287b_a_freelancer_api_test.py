@@ -193,7 +193,7 @@ IDS["budget"] = bu.get("list_id")
 ok(F.post(B + "/api/life/health", json={"type": "appointment", "title": "Checkup", "who": "Kim", "date": "2030-01-10", "time": "09:30"}),
    "personal: Home & life", (200, 201))
 # freelancer-matrix: own
-ok(F.patch(B + "/api/settings", json={"week_start": 1}), "own: settings")
+ok(F.patch(B + "/api/settings", json={"week_start": "mon"}), "own: settings")
 ok(F.post(B + "/api/account/export", json={}), "own: an account export", (200, 201, 202))
 tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in ("read", "write", "comments", "structure", "delete",
                                                                                   "attachments:read", "attachments:write", "time", "export",

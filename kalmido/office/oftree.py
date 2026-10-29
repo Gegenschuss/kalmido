@@ -30,7 +30,7 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, insert_id
 from ..core.errors import BadInput, Denied
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields
 from ..accounts.orgroles import org_writes
 from ..files.fsref import fs_ref_role
@@ -63,7 +63,7 @@ def oft_space(c, oid):
 
 def oft_root(c, uid, oid, area, create=False):
     org, _owner = oft_space(c, oid)
-    return fs_area_root(c, uid, org, "of_" + area, tr(OFT_AREAS[area][2]), create=create)
+    return fs_area_root(c, uid, org, "of_" + area, tr(OFT_AREAS[area][2], lg=lang(c, uid)), create=create)
 
 
 def _below(c, root):

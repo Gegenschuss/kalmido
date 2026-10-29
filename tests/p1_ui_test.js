@@ -177,8 +177,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const lt2 = (await call('GET', '/api/templates')).templates.find(x => x.id === lt.id);
   check(lt2.data.sections.join() === 'Later' && lt2.data.tasks.some(n => n.title === 'New idea' && n.section === 0 && n.children[0].title === 'step one'), 'outline edit: section + subtask');
   check(lt2.data.tasks.find(n => n.title === 'Weekly review')?.repeat === 'FREQ=WEEKLY', 'outline edit keeps attributes of unchanged lines');
-  w.prompt = () => 'From kit';
-  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(700);
+  // 2.352.0 B (#2752): every list template is relative - using it opens the project dialog (name, start)
+  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(400);
+  const tum = d.querySelector('.tumodal');
+  if (tum) { tum.querySelector('#tu-name').value = 'From kit'; tum.querySelector('[data-m="ok"]').click(); await sleep(700); }
   check(/^#l\/\d+/.test(w.location.hash) && w.eval('routeList()?.name') === 'From kit', 'new list from template opened');
   // settings > data lists templates
   w.eval(`settingsModal('templates')`);  // CI 2.376.2: the list comes from GET /api/templates - wait for it, not a fixed 500 ms

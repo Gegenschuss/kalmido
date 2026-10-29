@@ -196,8 +196,16 @@ def compare(z1, z2):
     diffs = []
     for n in sorted(set(r1) | set(r2)):
         a, b = r1.get(n, collections.Counter()), r2.get(n, collections.Counter())
+        if n == "store/history.json":  # 2.352.0 A (#2748): the import files every new project into the tree (one "create" line each)
+            mk = json.dumps({"action": "create", "agent": 0, "detail": ""}, sort_keys=True)
+            mk = next((k for k in b if json.loads(k) == json.loads(mk)), mk)
+            nl = sum(1 for x in json.loads(z2.read("store/nodes.json").decode("utf-8")) if x.get("ref_kind") == "list") \
+                if "store/nodes.json" in z2.namelist() else 0
+            b = b.copy()
+            b[mk] -= min(nl, max(0, b[mk] - a[mk]))
+            b += collections.Counter()  # drops zero counts
         if sum(a.values()) != sum(b.values()):
-            diffs.append((n, f"rows {sum(a.values())} -> {sum(b.values())}"))
+            diffs.append((n, f"rows {sum(a.values())} -> {sum(b.values())}" + (f" new {list((b - a).elements())[:2]}" if sum(b.values()) > sum(a.values()) else "")))
         elif a != b:
             lost = list((a - b).elements())[:1]
             new = list((b - a).elements())[:1]

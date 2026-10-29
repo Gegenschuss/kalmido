@@ -32,6 +32,7 @@ async function seed() {
   const shop = await L('Shopping', {kind: 'checklist'}), team = await L('Team', {kind: 'project', time_tracking: true}); // 2.41.0 (#1471): time tracking is a switch of the list
   const board = await L('Board', {view: 'kanban'}), plan = await L('Plan', {view: 'timeline'});
   await call('PUT', `/api/lists/${team}/members`, {user_id: BOB, role: 'edit'});
+  for (const id of [team, plan]) await call('POST', `/api/lists/${id}/status`, {status: 'on_track', note: ''});  // 2.352.0 B (#2752): the project status lists tracked projects (with a status) only
   const T = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
   // the user's "Tomorrow": a few tasks, one with subtasks, a pinned daily one with time and duration, a project task,
   // completed ones due tomorrow ("Completed" group) -- a little longer than the visible part of the screen
@@ -126,9 +127,10 @@ async function seed() {
       const cover = hit ? hit.closest('#tabs, #fab, .modal, #detail, #side, .toast, .mbar') || hit : null;
       const over = r.bottom - (cover ? cover.getBoundingClientRect().top : Math.min(vr.bottom, innerHeight));
       if (!worst || over > worst.over) worst = {over: Math.round(over), el: e.tagName + (e.id ? '#' + e.id : '') + '.' + [...e.classList].join('.'), text: (e.textContent || '').trim().slice(0, 30),
-        by: cover ? (cover.id ? '#' + cover.id : cover.tagName + '.' + [...cover.classList].join('.')) : 'off screen'};
+        by: cover ? (cover.id ? '#' + cover.id : cover.tagName + '.' + [...cover.classList].join('.')) + (cover === hit ? ' in ' + [1, 2, 3].reduce((a, _) => a && a.parentElement, hit)?.className + ' "' + (hit.textContent || '').trim().slice(0, 20) + '"' : '') : 'off screen',
+        box: Math.round(r.top) + '-' + Math.round(r.bottom) + ' / ' + Math.round(vr.top) + '-' + Math.round(vr.bottom)};
     }
-    if (worst) probs.push('cannot scroll into view (' + worst.over + 'px under ' + worst.by + '): ' + worst.el + ' "' + worst.text + '"');
+    if (worst) probs.push('cannot scroll into view (' + worst.over + 'px under ' + worst.by + '): ' + worst.el + ' "' + worst.text + '" ' + worst.box);
     // a vertical finger drag on the middle of the box must not be cancelled (the browser scrolls it)
     let prevented = null;
     if (typeof Touch === 'function' && typeof TouchEvent === 'function') {

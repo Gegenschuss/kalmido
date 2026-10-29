@@ -29,7 +29,7 @@ from ..core.config import app
 from ..core.access import collab_all, need_feat
 from ..core.db import body, bump, db, insert_id
 from ..core.errors import BadInput, Denied
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
@@ -198,7 +198,7 @@ def ctf_dropped(c, kind, rid):
 
 # ---------------------------------------------------------------- the tree of the address book
 def ctf_root(c, uid, org_id, create=False):
-    return fs_area_root(c, uid, org_id, CTF_AREA, tr("Address book"), create=create)
+    return fs_area_root(c, uid, org_id, CTF_AREA, tr("Address book", lg=lang(c, uid)), create=create)
 
 
 def _spaces(c, uid):
