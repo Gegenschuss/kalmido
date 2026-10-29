@@ -152,8 +152,8 @@ check(r.ok, "the quotation is finalised " + r.text[:160])
 sha = sql("SELECT pdf_sha256 FROM office_docs WHERE id=?", (Q,))[0][0]
 p = A.get(B + f"{D}/{Q}/pdf")
 check(p.ok and b"AGBSEITE-ZWEI" in p.content and pages(p.content) == own + 2, "#3619: the finalised quotation's download carries the frozen terms")
-check(sha and hashlib.sha256(p.content).hexdigest() != sha and sql("SELECT pdf_sha256 FROM office_docs WHERE id=?", (Q,))[0][0] == sha,
-      "#3619: joined on output - the stored PDF and its hash stay as finalised")
+sha2 = sql("SELECT pdf_sha256 FROM office_docs WHERE id=?", (Q,))[0][0]
+check(sha2 == sha and hashlib.sha256(p.content).hexdigest() != sha, f"#3619: joined on output - the stored PDF and its hash stay as finalised ({sha!r} {sha2!r})")
 at = sent(A, Q)
 check(len(at) == 1 and len(at[0]) == 1 and not any(n.startswith("AGB-Stand") for n in at[0]), f"#3619: the mail has one file, no extra terms file {list(at[0]) if at else at}")
 pdf = next(iter(at[0].values())) if at and at[0] else b""
@@ -197,6 +197,7 @@ check(upload(A, "de", fake_pdf("kaputt"), "2026-10-20").ok, "setup: terms with o
 Q2 = A.post(B + D, json={"kind": "offer", "client_id": CL, "items": [{"title": "Ton", "qty": 1, "rate": 300}]}).json()["id"]
 p = A.get(B + f"{D}/{Q2}/pdf")
 check(p.status_code == 200 and p.content[:5] == b"%PDF-" and b"invented terms kaputt" not in p.content, f"#3619: unreadable terms - the PDF without them, no 500 ({p.status_code})")
+check(A.post(B + f"{D}/{Q2}/finalize").ok, "setup: the second quotation finalised")
 at = sent(A, Q2)
 check(len(at) == 1 and any(n.startswith("AGB-Stand-2026-10-20") for n in at[0]), f"#3619: ... and the mail sends them as their own file {list(at[0]) if at else at}")
 
