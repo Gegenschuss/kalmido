@@ -749,7 +749,7 @@ function wk_dayBar(p) {
   const d = m[1], ds = wk_pages(p.space).map(x => WK_DAY.exec(x.path)?.[1]).filter(Boolean).sort();
   const prev = ds.filter(x => x < d).pop(), next = ds.find(x => x > d), t = today();
   const b = (x, icn, lb) => `<button type="button" class="iconbtn" ${x ? `data-wkday="${x}"` : 'disabled'} title="${esc(lb)}" aria-label="${esc(lb)}">${ic(icn)}</button>`;
-  return `<div class="wkday" role="group" aria-label="${esc(tr('Daily note'))}">${b(prev, 'left', tr('Previous day'))}<input type="date" data-wk-day value="${d}" aria-label="${esc(tr('Go to day'))}">${b(next, 'right', tr('Next day'))}${d !== t ? `<button type="button" class="btn sm" data-wkday="${t}">${esc(tr('Today'))}</button>` : ''}</div>`;
+  return `<div class="wkday" role="group" aria-label="${esc(tr('Daily note'))}">${b(prev, 'left', tr('Previous day'))}${dateIn('wk-day', d, {label: tr('Go to day'), clear: false, attrs: 'data-wk-day'})}${b(next, 'right', tr('Next day'))}${d !== t ? `<button type="button" class="btn sm" data-wkday="${t}">${esc(tr('Today'))}</button>` : ''}</div>`;
 }
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-wkday]'); if (!b || !$('#view')?.contains(b) || !WK.pg) return;
