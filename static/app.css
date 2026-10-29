@@ -4611,6 +4611,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctfb .fcar{width:.75rem;height:.75rem;transition:transform .15s;transform:rotate(-90deg)}
 .ctfw.on .ctfb .fcar{transform:none}
 .ctfn{font-weight:400}
+@media (pointer:coarse){ .ctfb{min-height:2.75rem} }
 .ctfw>.ctsec>h4:first-child,.ctfw>.stcard>.sthead:first-child{display:none}
 .ctfw>.stcard{margin-top:.25rem}
 .ctlinks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
