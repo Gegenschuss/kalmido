@@ -687,6 +687,7 @@ document.addEventListener('click', e => {
   menu(b, [...chatStopItem(agentById(S.chat.aid)), ...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
     {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
+    ...kbd_item('agent'),  // 2.380 E (#3449)
     {label: tr('Chat settings'), icon: 'cog', fn: () => acset_open()},  // 2.233.0 A (#2848)
     ...S.chat.job ? [] : ['-', {label: tr('Delete history'), icon: 'trash', fn: () => acdDeleteAll()}]]);
 });

@@ -1302,7 +1302,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             info.append((L["ref"], str(m["project_ref"])))
     # 2.144.9 (#2575): the number's label of this document (the head row that carries the number: "Rechnung Nr." on an
     # invoice) for the part pages and the rights appendix -- not the quotation's label; own fields do not count
-    num_l = next((k for k, v in info if number and v == number), L["number"])
+    # 2.380 E (#3417): the number row is always the head's first row (docs / invoices build it so); its label, not a match on the
+    # value (a draft / sample number carries a suffix there)
+    _m0 = (m.get("meta") or [None])[0]
+    num_l = str(_m0[0]) if isinstance(_m0, (list, tuple)) and len(_m0) >= 2 and str(_m0[0]).strip() else L["number"]
     for f in m.get("fields") or []:
         if isinstance(f, dict) and str(f.get("name") or "").strip():
             info.append((str(f["name"]), str(f.get("value") or "")))

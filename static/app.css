@@ -1255,7 +1255,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .fcols .fcell a.lnk{color:var(--muted);text-decoration:none}
 .fcols .fcell a.lnk:hover{color:var(--accent)}
 .fcols .t-number,.fcolhead .t-number{text-align:right;font-variant-numeric:tabular-nums}
-.fcolhead{display:flex;gap:.5rem;padding:0 .5rem .25rem;border-bottom:1px solid var(--line);margin-bottom:2px}
+.fcolhead{display:flex;gap:.5rem;padding:0 .5rem .25rem;border-bottom:1px solid var(--line);margin-bottom:2px;position:sticky;top:0;z-index:4;background:var(--bg)}  /* 2.380 E (#3416): stays while the rows scroll (#top, the list title, lies outside the scroll box #view) */
 .fcolhead .fcell{font-size:var(--fs-s);font-weight:500}
 @media (max-width:599px){ .fcols,.fcolhead{display:none} }  /* 2.40.0 (#1191): from 600 px on */
 /* list header: progress + status */
@@ -1476,7 +1476,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
   background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translate(-50%,.5rem);transition:opacity .25s,transform .25s}
 .cele-quip.on,.cele-quip.calm{opacity:1;transform:translate(-50%,0)}
 .cele-quip div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.cele-quip b{font-size:var(--fs-s);font-weight:500;color:var(--accent);font-family:var(--mono)}
+.cele-quip b{font-size:var(--fs-s);font-weight:500;color:var(--accent);font-family:var(--mono);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}  /* 2.380 E (#3331): two lines, not cut to one */
 .cele-quip span{font-size:var(--fs-b);color:var(--text)}
 .cele-quip .bot{width:2.5rem;height:2.5rem}
 .cele-quip.calm{transition:none}

@@ -738,6 +738,11 @@ function checkAt(p) {  // the big check: pops (overshoot) right after the arriva
   const [p0, s0, o0] = k[i], [p1, s1, o1] = k[i + 1], t = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 1;
   return {transform: `translate(-50%,-50%) scale(${celeLerp(s0, s1, t).toFixed(3)})`, opacity: +celeLerp(o0, o1, t).toFixed(3)};
 }
+// 2.380 E (#3331): with the undo message showing, the figure's line sits above it (its top edge minus a gap), else it stays at the bottom
+function celeStack(q) {
+  const t = $('#toast'), r = t && !t.classList.contains('hidden') && t.offsetWidth ? t.getBoundingClientRect() : null;
+  q.style.bottom = r ? Math.round(innerHeight - r.top + 8) + 'px' : '';
+}
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
   celeEnd();
@@ -750,7 +755,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   try { if (frame === null && navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(tier.vib); } catch { /* not allowed */ }
   if (reducedMotion()) {  // calm variant: the small still figure + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
-    document.body.appendChild(q);
+    document.body.appendChild(q); celeStack(q);
     if (frame === null) CELE.timers.push(setTimeout(() => q.remove(), 4200));
     q.addEventListener('pointerdown', celeEnd);
     return q;
@@ -759,7 +764,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = `<div class="cbot">${botFig('erledigt', 'cbotfig')}</div><div class="ccheck">${CHECK_SVG}</div>`;
-  document.body.appendChild(el); document.body.appendChild(q);
+  document.body.appendChild(el); document.body.appendChild(q); celeStack(q);
   const fig = $('.cbot', el), chk = $('.ccheck', el);
   fig.style.width = bw + 'px';
   const cy = vh * 0.4;

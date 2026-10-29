@@ -156,11 +156,11 @@ function shvOverview(lid) {
   if (!lid && ws && ws !== 'all') items = items.filter(x => x.space === ws || x.shared_in);  // 2.124.0 C (#2113): shared with me: in every workspace
   const hooks = SHV_HOOKS.overview.length;
   const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('Project'))}</a>` : ''}
-    ${lid ? `<h2 class="shvh">${esc(tr('Tables of {0}', l ? lname(l) : ''))}</h2>` : ''}<span class="spacer"></span>
+    ${lid ? `<h2 class="shvh">${esc(tr('Attached to {0}', l ? lname(l) : ''))}</h2><a class="btn sm" href="#sheets">${esc(tr('All tables'))}</a>` : ''}<span class="spacer"></span>
     ${hooks ? `<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
-    ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${tr('New table')}</button>` : ''}</div>`;
+    ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${lid ? tr('Attach a new table') : tr('New table')}</button>` : ''}</div>`;
   if (!d?.items) return `<div class="shvwrap shvov">${head}<p class="muted lempty" role="status">${d?.err ? esc(d.err) : tr('Loading…')}</p></div>`;
-  if (!items.length && (lid || !shf_data().folders.length)) return `<div class="shvwrap shvov">${head}${symEmpty('sheet', lid ? tr('No tables attached yet.') : tr('No tables yet.'), tr('Lists and calculations; every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
+  if (!items.length && (lid || !shf_data().folders.length)) return `<div class="shvwrap shvov">${head}${symEmpty('sheet', lid ? tr('No tables attached yet.') : tr('No tables yet.'), lid ? tr('Tables are independent. The ones you attached to this project appear here.') : tr('Lists and calculations; every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
   const card = x => shvCardHtml(x, lid);
   // 2.199.0 C (#2742): the folders of a workspace as cards first, its tables in a folder only there (sheetfold.js)
   const fold = sp => !lid && sp !== 'shared' ? shf_cardsHtml(sp, null) : '';
@@ -198,7 +198,7 @@ function shvSheetHtml(sh) {
   const filt = shvFilt(sh), nf = Object.keys(filt).length;
   const pres = shvPresHtml(sh);
   SHV.rset = shvRangeSet();
-  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Tables of {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
+  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Attached to {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read only')}</span>`}<span class="spacer"></span>
     ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}

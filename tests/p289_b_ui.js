@@ -189,7 +189,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
 
   // ---- attached to a list: the list menu, the list's tables, new = attached
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  check(w.eval(`listMenuItems(${L}).some(x => x.label === 'Tables')`), 'list menu: "Tables"');
+  check(w.eval(`listMenuItems(${L}).some(x => x.label === 'Attached tables')`), 'list menu: "Attached tables" (2.380 #3465)');
   w.eval(`go('sheets/l/${L}')`);
   check(await until(() => /No tables attached yet/.test(d.querySelector('#view').textContent)), "the list's tables: empty");  // 2.308.0 (#3260): wait for the list's tables instead of a fixed time
   w.prompt = () => 'Budget';

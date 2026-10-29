@@ -7973,7 +7973,6 @@
   "According to the bank on {0}": "Volgens de bank op {0}",
   "Use as real balance": "Overnemen als werkelijk saldo",
   "Tables are only available online.": "Tabellen zijn alleen online beschikbaar.",
-  "Tables of {0}": "Tabellen van {0}",
   "Take back the changes of this agent call?": "De wijzigingen van deze agent-aanroep terugdraaien?",
   "Taken back": "Teruggedraaid",
   "The cells get the values from before; a table the agent created goes to the trash.": "De cellen krijgen de waarden van ervoor terug; een tabel die de agent maakte gaat naar de prullenbak.",
@@ -14829,5 +14828,11 @@
   "Section not found: {0}": "Sectie niet gevonden: {0}",
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
-  "Embed a page": "Pagina insluiten"
+  "Embed a page": "Pagina insluiten",
+  "Attached tables": "Gekoppelde tabellen",
+  "Attach a new table": "Nieuwe tabel koppelen",
+  "Tables are independent. The ones you attached to this project appear here.": "Tabellen zijn zelfstandig. Hier staan de tabellen die je aan dit project hebt gekoppeld.",
+  "Close the keyboard after sending": "Toetsenbord sluiten na verzenden",
+  "The keyboard closes after sending": "Het toetsenbord sluit na het verzenden",
+  "The keyboard stays open after sending": "Het toetsenbord blijft open na het verzenden"
 }

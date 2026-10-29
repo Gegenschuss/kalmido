@@ -7953,7 +7953,6 @@
   "According to the bank on {0}": "Laut Bank vom {0}",
   "Use as real balance": "Als Ist-Stand übernehmen",
   "Tables are only available online.": "Tabellen gibt es nur online.",
-  "Tables of {0}": "Tabellen von {0}",
   "Take back the changes of this agent call?": "Die Änderungen dieses Agenten-Aufrufs zurücknehmen?",
   "Taken back": "Zurückgenommen",
   "The cells get the values from before; a table the agent created goes to the trash.": "Die Zellen bekommen die Werte von vorher; eine vom Agenten angelegte Tabelle kommt in den Papierkorb.",
@@ -14829,5 +14828,11 @@
   "Section not found: {0}": "Abschnitt nicht gefunden: {0}",
   "Daily note": "Tagesnotiz",
   "Go to day": "Zum Tag springen",
-  "Embed a page": "Seite einbetten"
+  "Embed a page": "Seite einbetten",
+  "Attached tables": "Angehängte Tabellen",
+  "Attach a new table": "Neue Tabelle anhängen",
+  "Tables are independent. The ones you attached to this project appear here.": "Tabellen sind eigenständig. Hier erscheinen die, die du an diese Liste angehängt hast.",
+  "Close the keyboard after sending": "Tastatur nach dem Senden schließen",
+  "The keyboard closes after sending": "Die Tastatur schließt sich nach dem Senden",
+  "The keyboard stays open after sending": "Die Tastatur bleibt nach dem Senden offen"
 }
