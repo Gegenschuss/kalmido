@@ -416,7 +416,7 @@ function rk_vmaDlgWire(md, t) {
     const r = await rk_vmaRates(year); if (!md.isConnected || year !== from.slice(0, 4)) return;
     const sel = $('#rk-cty', md), cur = sel.value;
     sel.innerHTML = rk_vmaCtyOpts(r, cur);
-    const h = $('.rkv-dh', md); h.hidden = !(r && r.hint); h.textContent = r?.hint ? tr('No per diem rates for {0}', r.hint.year) : '';
+    const h = $('.rkv-dh', md); h.hidden = !(r && r.hint); h.textContent = r?.hint ? rk_vmaHint(r.hint) : '';  // 2.428.0 (#3522): also "older"
     place();
   };
   const place = () => rk_vmaRates(year).then(r => {
@@ -442,6 +442,7 @@ function rk_vmaHint(h) {
   if (h.key === 'times') return tr('Start and end time missing');
   if (h.key === 'short') return tr('8 hours or less: no per diem');
   if (h.key === 'year') return tr('No per diem rates for {0}', h.year);
+  if (h.key === 'older') return tr('Rates of {0} used, the BMF letter for {1} is not entered yet', h.used, h.year);  // 2.428.0 (#3522)
   if (h.key === 'alias' || h.key === 'lu') return tr('Rate of {0} used for {1}', rk_vmaCty(h.used), rk_vmaCty(h.country));
   return h.key || '';
 }

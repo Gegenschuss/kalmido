@@ -697,15 +697,26 @@ def vma_country_name(code, lg="de"):
     return n[0] if lg == "de" else n[1]
 
 
-def vma_rate(year, code, place=""):
-    """(full, partial, code used, place used, how) for a day in country code (ISO) / place in year, or None when the year has
-    no table. how: '' = the country's own rate, 'alias' = the rate of the mother country / the letter's extension,
-    'lu' = not named in the letter -> Luxembourg."""
+def vma_table_year(year):
+    """The year whose table counts for year: its own, or for a later year the newest table (2.428.0 #3522: the BMF letter
+    for a new year comes in December; until it is entered the last rates stand, vma_trip says so with hint "older").
+    None for a year before the first table or not a year."""
     try:
         year = int(year)
     except (TypeError, ValueError):
         return None
-    if year not in VMA_TABLES:
+    if year in VMA_TABLES:
+        return year
+    last = max(VMA_TABLES)
+    return last if year > last else None
+
+
+def vma_rate(year, code, place=""):
+    """(full, partial, code used, place used, how) for a day in country code (ISO) / place in year, or None when the year has
+    no table (vma_table_year). how: '' = the country's own rate, 'alias' = the rate of the mother country / the letter's
+    extension, 'lu' = not named in the letter -> Luxembourg."""
+    year = vma_table_year(year)
+    if year is None:
         return None
     code = (code or "DE").upper()
     place = place or ""
@@ -730,11 +741,8 @@ def vma_rate(year, code, place=""):
 
 
 def vma_places(year):
-    """{code: [place, ...]} of the year's table ('' first = the whole country / "im Uebrigen"); None without a table."""
-    try:
-        tab = VMA_TABLES.get(int(year))
-    except (TypeError, ValueError):
-        return None
+    """{code: [place, ...]} of the year's table ('' first = the whole country / "im Uebrigen", vma_table_year); None without a table."""
+    tab = VMA_TABLES.get(vma_table_year(year))
     if tab is None:
         return None
     return {c: sorted(p, key=lambda x: (x != "", x.lower())) for c, p in tab.items()}
@@ -766,7 +774,8 @@ def vma_trip(trip):
     {amount: "372.00" | None, cut: "0.00", lines: [{country, place, kind full|partial, n, rate, sum, how}],
      days: [{date, country, place, kind full|partial|none, rate, cut, amount}], hints: [{key, year?}], source: [...]}.
     hints: off (no per diem for this trip), dates, times (a single day without start / end), short (8 hours or less),
-    year (no table for that year -> amount None), alias / lu (the rate of another country was used)."""
+    year (no table for that year -> amount None), older (a later year without its table yet: the newest table's rates,
+    {year, used}), alias / lu (the rate of another country was used)."""
     out = {"amount": None, "cut": "0.00", "lines": [], "days": [], "hints": [], "source": []}
     if trip.get("vma_off"):
         out["hints"].append({"key": "off"})
@@ -802,17 +811,18 @@ def vma_trip(trip):
     if all(k == "none" for k in kinds):
         out["hints"].append({"key": "short"})
     years = sorted({int(d[:4]) for d, k in zip(ds, kinds) if k != "none"})  # a day without a rate needs no table (review)
-    missing = [y for y in years if y not in VMA_TABLES]
+    missing = [y for y in years if vma_table_year(y) is None]
     if missing:
         out["hints"] += [{"key": "year", "year": y} for y in missing]
         return out
+    out["hints"] += [{"key": "older", "year": y, "used": vma_table_year(y)} for y in years if y not in VMA_TABLES]
     total, cut_total = Decimal(0), Decimal(0)
     lines = {}
     seen_how = set()
     for d, k in zip(ds, kinds):
         o = over.get(d) or {}
         code = (o.get("country") or base).upper()
-        if k == "none" and int(d[:4]) not in VMA_TABLES:
+        if k == "none" and vma_table_year(d[:4]) is None:
             out["days"].append({"date": d, "country": code, "rate_country": code, "place": "", "kind": k, "rate": "0.00",
                                 "cut": "0.00", "amount": "0.00", "meals": []})
             continue
@@ -843,7 +853,7 @@ def vma_trip(trip):
         out["hints"].append({"key": how, "country": code, "used": used})
     out["amount"] = dstr(money(total))
     out["cut"] = dstr(money(cut_total))
-    out["source"] = [VMA_YEARS[y] for y in years]
+    out["source"] = [VMA_YEARS[y] for y in sorted({vma_table_year(y) for y in years})]
     return out
 
 
