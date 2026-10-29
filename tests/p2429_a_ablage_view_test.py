@@ -14,11 +14,12 @@ import base64
 from freelancer_fixture import FEATURES, freelancer, login
 from kt import B, check, done, fresh, setup
 
+FEAT = FEATURES + ",sheets"  # the tables are not among the fixture's modules
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
 
 fresh(prefix="P2429A")
 A = setup()
-A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES})
+A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Nordwind", "admin_id": ALICE})
 assert r.status_code == 201, r.text
@@ -27,8 +28,8 @@ r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "pa
 assert r.ok, r.text
 BOB = r.json()["id"]
 Bo = login(B, "bob")
-Bo.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES})
-FID, Fr = freelancer(B, A)
+Bo.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT})
+FID, Fr = freelancer(B, A, features=FEAT)
 
 
 def top(s, space="private"):
@@ -132,4 +133,4 @@ sh = [x["id"] for x in top(Bo, "shared").get("items", [])]
 check(PLAIN in sh and TT not in sh, f"#3580: 'Shared with me' shows the file store's folder, not the tables' one {sh}")
 check(not ({"Tables"} & set(names(top(A, f"org:{ORG}")))), "#3580: the organisation's top shows no root of the tables")
 check(Bo.get(B + "/api/files", params={"parent": TT}).ok, "#3580: bob still opens the shared folder by its id (the tables' panel)")
-done()
+done("p2429_a_ablage_view")
