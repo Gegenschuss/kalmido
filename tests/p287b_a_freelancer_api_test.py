@@ -13,6 +13,8 @@ import os
 import re
 import subprocess
 import sys
+import time
+from urllib.parse import urlencode
 
 import requests
 
@@ -32,6 +34,34 @@ ALLOW = {
     # 2.207.0 (#2763): only a scan inbox key reaches it (p2207_a_scan_keys_test.py calls it as the freelancer with one)
     "GET /api/v1/documents/upload-target": "a personal token has no docs:upload (only a scan inbox key has it)",
 }
+# 2.421.0 A (#2936): route -> (status, why) of a 4xx other than 401 / 403 that is right for the freelancer, too (every other
+# 4xx of the sweep fails like a 403; an exception whose status does not come any more fails as stale)
+EXPECT_4XX = {
+    "GET /api/assistant": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
+    "GET /api/assistant/log": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
+    "GET /api/attachments/{}/preview": (415, "the own attachment is a text file: no preview (the same for every person)"),
+    "GET /api/files/nodes/{}/preview": (415, "the own file is a text file: no server preview (the same for every person)"),
+    "GET /api/bookmarks/{}/image": (404, "the test server fetches no preview picture of the bookmarked page"),
+    "GET /api/docs/{}/einvoice": (404, "the own document is a plain text receipt, no e-invoice"),
+    "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
+    "GET /api/docs/{}/thumb": (404, "the own document is a text receipt: no thumbnail"),
+    "GET /api/hubmail/targets": (404, "no filed mail on the test server (?mail= names one)"),
+    "GET /api/life/karakeep/lists": (400, "Karakeep (an outside service) is not connected"),
+    "GET /api/newsletter/lists": (404, "no newsletter connection (an outside service)"),
+    "GET /api/paperless/preview": (404, "no Paperless connection (an outside service)"),
+    "GET /api/paperless/zip/preview": (404, "no Paperless ZIP uploaded"),
+    "GET /api/lists/{}/e2e/todo": (409, "no encryption change is running for the private list"),
+    "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private space"),
+    "GET /api/office/docs/{}/timesheet.pdf": (400, "no time entries of the client in the period (the own entries are on a list without a client)"),
+    "GET /api/office/logo": (404, "no logo uploaded in the personal office"),
+    "GET /api/office/move/check": (404, "the freelancer has no organisation to move the personal office into"),
+    "GET /api/tasks/{}/enc-note": (404, "no encrypted note on the own task"),
+    "GET /api/tasks/{}/note-lock": (404, "the note of the own task is not locked"),
+    "GET /api/trash/lists/{}/export.zip": (404, "the own list is not in the trash"),
+    "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
+}
+# 2.421.0 A (#2936): GET routes of the matrix areas the sweep cannot fill (no id of an own object): may only shrink
+MAX_SKIPPED = 88  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires
 
 
 def ok(r, what, codes=(200, 201, 204)):
@@ -72,7 +102,7 @@ ok(F.patch(B + f"/api/tasks/{IDS['task']}", json={"title": "Cut the trailer v2",
 c = ok(F.post(B + f"/api/tasks/{IDS['task']}/comments", json={"body": "note to self"}), "tasks: a comment", (200, 201))
 IDS["comment"] = c.get("id")
 a = ok(F.post(B + f"/api/tasks/{IDS['task']}/attachments", files={"file": ("brief.txt", b"brief", "text/plain")}), "tasks: an attachment", (200, 201))
-IDS["attachment"] = a.get("id") or ((a.get("attachments") or [{}])[0]).get("id")
+IDS["attachment"] = ((a.get("attachments") or [{}])[-1]).get("id")  # 2.421.0 A (#2936): the upload answers the task, not the file
 s = ok(F.post(B + "/api/sections", json={"list_id": IDS["list"], "name": "Now"}), "lists: a section", (200, 201))
 IDS["section"] = s.get("id")
 n = ok(F.post(B + f"/api/lists/{IDS['list']}/notes", json={"title": "Ideas", "body": "x"}), "lists: a note", (200, 201))
@@ -203,9 +233,39 @@ tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in 
         "own: a personal API token", (200, 201))
 PT = {"Authorization": "Bearer " + tk.get("token", "")}
 
+# ================================================================== 2.421.0 A (#2936): more own objects, so the sweep fills more routes
+def _id(x):
+    return x.get("id") or next((v.get("id") for v in x.values() if isinstance(v, dict) and v.get("id")), None)
+
+
+IDS["sheet"] = _id(ok(F.post(B + "/api/sheets", json={"title": "Rates", "space": "private"}), "sweep setup: a table", (200, 201)))
+IDS["poll"] = _id(ok(F.post(B + "/api/polls", json={"title": "Shoot date", "duration": 60, "tz": "Europe/Berlin",
+                                                     "options": [{"start": "2031-03-10T10:00"}, {"start": "2031-03-11T14:30"}]}),
+                     "sweep setup: a scheduling poll", (200, 201)))
+IDS["bookmark"] = _id(ok(F.post(B + "/api/bookmarks", json={"url": "https://example.com/kit"}), "sweep setup: a bookmark", (200, 201)))
+IDS["letter"] = _id(ok(F.post(B + "/api/office/letters", json={"subject": "Follow-up"}), "sweep setup: a letter", (200, 201)))
+IDS["agreement"] = _id(ok(F.post(B + "/api/office/agreements", json={"kind": "insurance", "name": "Equipment insurance", "task": 0}),
+                          "sweep setup: a contract", (200, 201)))
+IDS["form"] = _id(ok(F.post(B + f"/api/lists/{IDS['list']}/forms", json={"title": "Brief", "access": "public"}),
+                     "sweep setup: a questionnaire", (200, 201)))
+IDS["milestone"] = _id(ok(F.post(B + "/api/tasks", json={"list_id": IDS["list"], "title": "Delivery", "ms": 1}),
+                          "sweep setup: a milestone", (200, 201)))
+IDS["invoice"], IDS["pack"] = inv.get("id"), "xx"
+ok(F.patch(B + f"/api/lists/{IDS['list']}", json={"folder": "Work"}), "sweep setup: the private list in a folder")
+ok(F.put(B + "/api/office/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345"}}), "sweep setup: DATEV numbers")
+for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
+    if F.get(B + "/api/account/export").json().get("state") != "running":
+        break
+    time.sleep(0.25)
+
 # ================================================================== the sweep: every GET of the matrix areas
 # the placeholders: the path up to "{}" -> the id of the freelancer's own object (first match wins)
 SUBST = [
+    # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
+    (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
+    (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
+    (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
+    (r"/lists/\d+/files/$", None),
     (r"/office/docs/$", "doc"), (r"/office/services/$", "service"), (r"/api(/v1)?/office/$", "officekind"),
     (r"/files/nodes/$", "node"), (r"/e2e/pub/$", "me"), (r"/api/docs/$", "docnode"), (r"/documents/$", "docnode"), (r"/clients/$", "client"),
     (r"/lists/$", "list"), (r"/list-files/$", None), (r"/tasks/$", "task"), (r"/comments/$", "comment"),
@@ -218,26 +278,56 @@ SUBST = [
 IDS["me"] = FID
 
 
-def fill(path):
+# 2.421.0 A (#2936): route -> {placeholder key: the id to take instead} where the first own object is the wrong kind
+USE = {"GET /api/files/nodes/{}/requests": {"node": "folder"}, "GET /api/office/docs/{}/peppol": {"doc": "invoice"},
+       "GET /api/office/docs/{}/ubl": {"doc": "invoice"}, "GET /api/office/docs/{}/xml": {"doc": "invoice"},
+       "GET /api/office/docs/{}/timesheet.pdf": {"doc": "invoice"}, "GET /api/tasks/{}/milestone": {"task": "milestone"},
+       "GET /api/v1/tasks/{}/milestone": {"task": "milestone"}}
+# 2.421.0 A (#2936): route -> the query a GET needs ({key} = an id of IDS), so it answers with data instead of a 400
+FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
+QUERY = {
+    "GET /api/calendars/events": FROM_TO, "GET /api/events": FROM_TO, "GET /api/occurrences": FROM_TO, "GET /api/v1/events": FROM_TO,
+    "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
+    "GET /api/files/search": {"q": "plan"}, "GET /api/v1/files/search": {"q": "plan"}, "GET /api/files/tagged": {"tag": "1"},
+    "GET /api/files/zip": {"ids": "{node}"}, "GET /api/folders/agents": {"folder": "Work"},
+    "GET /api/folders/notify-template": {"folder": "Work"}, "GET /api/folders/people/diff": {"folder": "Work", "role": "edit", "user_id": "{agent}"},
+    "GET /api/folders/playbook": {"folder": "Work"}, "GET /api/folders/playbook/versions": {"folder": "Work"},
+    "GET /api/folders/props": {"folder": "Work"}, "GET /api/folders/public-links": {"folder": "Work"}, "GET /api/folders/repos": {"folder": "Work"},
+    "GET /api/hubmail/compose": {"client_id": "{client}"}, "GET /api/hubmail/mails": {"client_id": "{client}"},
+    "GET /api/hubmail/links": {"task_id": "{task}"}, "GET /api/office/books/ustva": {"year": "2026", "period": "q3"},
+    "GET /api/office/datev/extf": {"from": "2026-01-01", "to": "2026-12-31"}, "GET /api/office/datev/zip": {"from": "2026-01-01", "to": "2026-12-31"},
+    "GET /api/office/letters/threads": {"client_id": "{client}"}, "GET /api/office/pack-switch": {"code": "XX"},
+    "GET /api/office/time-open": {"from": "2026-09-01", "to": "2026-09-30"}, "GET /api/search": {"q": "trailer"},
+    "GET /api/search/messages": {"q": "trailer"}, "GET /api/v1/search": {"q": "trailer"}, "GET /api/tags/count": {"tag": "film"},
+    "GET /api/team/absences/check": {"user": "{me}", "date": D}, "GET /api/team/dispo/free": {"date": D},
+    "GET /api/v1/dispo/free": {"date": D}, "GET /api/videos": {"task_id": "{task}"}, "GET /api/v1/videos": {"task_id": "{task}"},
+    "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"}, "GET /api/wiki/refs": {"file": "{node}"},
+}
+
+
+def fill(path, route=""):
     out = ""
     for part in path.split("{}")[:-1]:
         out += part
         key = next((k for rx, k in SUBST if re.search(rx, out)), None)
+        key = USE.get(route, {}).get(key, key)
         if not key or not IDS.get(key):
             return None
         out += str(IDS[key])
     return out + path.split("{}")[-1]
 
 
-swept, skipped, bad = 0, [], []
+swept, skipped, bad, expected = 0, [], [], set()
 for route, kind in sorted(cov.ROUTES.items()):
     m, path = route.split(" ", 1)
     if m != "GET" or cov.KINDS[kind][0] != "matrix":
         continue
-    url = fill(path)
+    url = fill(path, route)
     if url is None:
         skipped.append(route)
         continue
+    if route in QUERY:
+        url += "?" + urlencode({k: v.format(**IDS) for k, v in QUERY[route].items()})
     if path.startswith("/api/v1/agent"):
         r = requests.get(B + url, headers=AT)
     elif path.startswith("/api/v1/"):
@@ -251,16 +341,26 @@ for route, kind in sorted(cov.ROUTES.items()):
     swept += 1
     if r.status_code in (401, 403) and route in ALLOW:
         continue
-    if r.status_code in (401, 403) or r.status_code >= 500:
-        bad.append(route)
+    if route in EXPECT_4XX:  # 2.421.0 A (#2936): the listed answer, nothing else
+        expected.add(route)
+        check(r.status_code == EXPECT_4XX[route][0], f"sweep: {route} -> {r.status_code}, EXPECT_4XX says {EXPECT_4XX[route][0]} "
+                                                     f"(fixed? then remove the exception) {r.text[:120]}")
+        continue
+    if r.status_code >= 400:  # 2.421.0 A (#2936): a 400 / 404 / 409 is a failure, too (was a note)
+        bad.append(f"{route} -> {r.status_code}")
         check(False, f"sweep: {route} as the freelancer -> {r.status_code} {r.text[:160]}")
-    elif r.status_code >= 400:
-        print(f"note: {route} -> {r.status_code} {r.text[:100]}")
 for route in ALLOW:
     check(route in cov.ROUTES, f"ALLOW names {route}, which is no route of the coverage list")
+for route, (st, why) in EXPECT_4XX.items():
+    check(400 <= st < 500 and st not in (401, 403) and len(why) > 15, f"EXPECT_4XX {route}: a 4xx other than 401 / 403 and its reason")
+    check(route in expected, f"EXPECT_4XX names {route}, which the sweep did not call (no GET of a matrix area, or skipped)")
 print(f"sweep: {swept} GET routes as the freelancer, {len(bad)} refused / broken, {len(skipped)} without a known id: "
-      + ", ".join(skipped[:60]))
+      + ", ".join(skipped))
+if bad:
+    print("sweep: refused / broken: " + "; ".join(bad))
 check(swept >= 300, f"sweep: {swept} GET routes called")
+check(len(skipped) <= MAX_SKIPPED, f"sweep: {len(skipped)} GET routes without a known id, at most {MAX_SKIPPED}: create their "
+                                   f"objects in the setup (SUBST / IDS) instead of raising the threshold")
 
 print(f"p287b_a_freelancer_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
