@@ -14829,5 +14829,12 @@
   "Section not found: {0}": "Sectie niet gevonden: {0}",
   "Daily note": "Dagnotitie",
   "Go to day": "Naar dag gaan",
-  "Embed a page": "Pagina insluiten"
+  "Embed a page": "Pagina insluiten",
+  "Company & office": "Bedrijf & kantoor",
+  "Documents|settings": "Documenten",
+  "Company, documents and numbers, invoices, taxes": "Bedrijf, documenten en nummers, facturen, belastingen",
+  "Sorting automatically, archive numbers, rules": "Automatisch sorteren, archiefnummers, regels",
+  "Applies to": "Geldt voor",
+  "Who may see and change which part of the office.": "Wie welk deel van het kantoor mag zien en wijzigen.",
+  "Rights in the office": "Rechten in het kantoor"
 }

@@ -102,7 +102,7 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = false;
   ofcDraw();
 }
-function ofcDraw() { if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
+function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
 // 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
 // is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
 // A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
@@ -758,10 +758,33 @@ function ost_subsHtml() {
 const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" role="tabpanel" aria-labelledby="osts-${k}" ${ost_cur() === k ? '' : 'hidden'} ${dis || ''}>`;
 function ost_show(want, save) {
   const k = ost_cur(want); if (save) LS.set('ofcSetSub', k);
+  if ($('#s-biz #ofc-set')) { $('#s-biz-' + k)?.scrollIntoView?.({block: 'start'}); return; }  // 2.365.2 (#2789): Settings shows the areas one below the other
   $$('#ofc-set [data-ostsub]').forEach(b => { const on = b.dataset.ostsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   $$('#ofc-set [data-ostp]').forEach(p => { p.hidden = p.dataset.ostp !== k; });
   const b = $(`#ofc-set [data-ostsub="${k}"]`);
   if (typeof segReveal === 'function') segReveal(b); else b?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});  // (settings.js loads lazily)
+}
+// ---- 2.365.2 (#2789): the settings live in Settings > Company & office (settings.js biz_draw): the same form #ofc-set with its
+// autosave for the current workspace (private = the person's own office), the areas one below the other with a heading each
+// (no tab row) and the office's rights as a link; the workspace badge switches the workspace like in the office
+function biz_paint() {
+  const box = $('#s-biz'); if (!box) return;
+  pb_wsFollow();
+  if (OFC.infoErr) { box.innerHTML = `<p class="muted">${esc(OFC.infoErr)}</p>`; return; }
+  if (!OFC.info) { if (!OFC.infoLoading && !OFC.pbWait) setTimeout(ofcInfo, 0); box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
+  const rights = typeof orr_html === 'function' && OFC.info.role === 'admin' && OFC.info.rights;
+  keepFocus(box, () => {
+    box.innerHTML = `<div class="sbizws"><span class="muted">${esc(tr('Applies to'))}</span> ${ofcAreaHtml()}</div>${ofcSettingsHtml()}
+      ${rights ? `<h4 id="s-biz-rights">${esc(tr('Rights|office'))}</h4><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
+    const form = $('#ofc-set', box); if (!form) return;
+    $('.ostsub', form)?.remove();
+    for (const [k, , n] of OST_SUBS) {
+      const fs = $$(`[data-ostp="${k}"]`, form).filter(f => f.children.length); if (!fs.length) continue;
+      const h = document.createElement('h4'); h.id = 's-biz-' + k; h.textContent = tr(n);
+      form.append(h, ...fs);
+      fs.forEach(f => { f.hidden = false; f.removeAttribute('role'); f.setAttribute('aria-labelledby', h.id); });
+    }
+  });
 }
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
 // a group the server keeps together goes as one (the DATEV booking export)

@@ -14829,5 +14829,12 @@
   "Section not found: {0}": "Abschnitt nicht gefunden: {0}",
   "Daily note": "Tagesnotiz",
   "Go to day": "Zum Tag springen",
-  "Embed a page": "Seite einbetten"
+  "Embed a page": "Seite einbetten",
+  "Company & office": "Firma & Büro",
+  "Documents|settings": "Dokumente",
+  "Company, documents and numbers, invoices, taxes": "Firma, Dokumente und Nummern, Rechnungen, Steuern",
+  "Sorting automatically, archive numbers, rules": "Automatisch sortieren, Archivnummern, Regeln",
+  "Applies to": "Gilt für",
+  "Who may see and change which part of the office.": "Wer welchen Teil des Büros sehen und ändern darf.",
+  "Rights in the office": "Rechte im Büro"
 }

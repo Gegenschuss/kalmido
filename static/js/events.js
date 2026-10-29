@@ -326,6 +326,8 @@ document.addEventListener('click', async e => {
     // back preview already shows it; route() used to close it right away = a short flash)
     if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
     S.viaDrawer = g.closest('#side') ? g.dataset.go : null;  // 2.354.0 C (#3013): an area opened from the drawer does not light up "More"
+    // 2.365.2 (#2789): the office menu's Settings open Settings > Company & office (a person without the settings keeps the page "My rights")
+    if (g.dataset.ofm === 'settings' && !(typeof ofr_grp === 'function' && ofr_grp() && ofr_lvOf('settings') === 'none')) { if ($('#side.open')) closeSide(); settingsModal('biz'); return; }
     go(g.dataset.go); return;
   }
   const qc = e.target.closest('.qchip:not([data-act])');  // 2.36.2 (#1138): a chip with its own action (the list of "Tasks of X") is no parser chip

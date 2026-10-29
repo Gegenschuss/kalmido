@@ -93,6 +93,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
     // Settings: General | Templates (services and text blocks; their old routes lead there)
     await click(ev, '#side [data-ofm="settings"]');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    // 2.365.2 (#2789): the menu point opens Settings > Company & office; the page office/settings stays for old links
+    check(await ready(ev, `!!document.querySelector('.smodal .snav [data-sec="biz"][aria-selected="true"]') && !!document.querySelector('.smodal #s-biz #ofc-set')`, 60), '#2789: the menu point Settings opens Settings > Company & office');
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); location.hash = '#office/settings'; return 1; })()`);
     check(await ready(ev, `location.hash === '#office/settings' && !!document.querySelector('.office .ofrseg [data-go="office/settings"][aria-selected="true"]') && !!document.querySelector('#ofc-set')`, 60), '#2180: Settings opens on General');
     check(await ev(`!document.querySelector('#side [data-ofm="services"],#side [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     await click(ev, '.office .ofrseg [aria-selected="false"]');

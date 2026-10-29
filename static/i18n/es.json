@@ -14829,5 +14829,12 @@
   "Section not found: {0}": "Sección no encontrada: {0}",
   "Daily note": "Nota diaria",
   "Go to day": "Ir al día",
-  "Embed a page": "Insertar una página"
+  "Embed a page": "Insertar una página",
+  "Company & office": "Empresa y oficina",
+  "Documents|settings": "Documentos",
+  "Company, documents and numbers, invoices, taxes": "Empresa, documentos y números, facturas, impuestos",
+  "Sorting automatically, archive numbers, rules": "Ordenar automáticamente, números de archivo, reglas",
+  "Applies to": "Se aplica a",
+  "Who may see and change which part of the office.": "Quién puede ver y cambiar qué parte de la oficina.",
+  "Rights in the office": "Derechos en la oficina"
 }

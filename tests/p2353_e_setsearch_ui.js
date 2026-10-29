@@ -3,7 +3,7 @@
 // invented data only. freelancer-matrix: settings
 // - "Scanner" and "Download" find the folder watcher (Settings > Integrations > Scans from your computer, #2773); the jump
 //   marks it (class sflash)
-// - a hit from an area window ("Sorting automatically" of the documents, "Letterhead" of the office settings) names the area,
+// - a hit from an area window ("Sorting automatically" of the documents, "Letterhead" of Settings > Company & office) names the area,
 //   opens the area + its window and marks the section
 // - only windows whose module is on: documents off = no hit from the documents window
 // - a phone: the search field is in the head of the settings overview (not hidden), a hit works from there
@@ -68,17 +68,18 @@ const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until((
       check(w.eval('S.route.mod') === 'docs', `${who}: the area of the window is open (docs) ` + w.eval('S.route.mod'));
       d.querySelector('.dc-smd [data-dcs="close"]')?.click(); d.querySelector('.dc-smd')?.remove();
     }
-    // ---- a hit from the office settings: route office/settings, the pane switched, the section marked
+    // ---- a hit from the office settings: Settings > Company & office, the section marked
+    // 2.365.2 (#2789): the office settings live in Settings > Company & office (was the page office/settings)
     await openSettings(w, d);
     type(w, d, 'letterhead');
-    hb = hits(d).find(b => /Office ›/.test(b.textContent) && /Letterhead/.test(b.textContent));
-    check(!!hb, `${who}: "letterhead" offers Office › Settings › Letterhead ` + JSON.stringify(hits(d).map(b => b.textContent)));
+    hb = hits(d).find(b => /Company & office ›/.test(b.textContent) && /Letterhead/.test(b.textContent));
+    check(!!hb, `${who}: "letterhead" offers Settings › Company & office › Letterhead ` + JSON.stringify(hits(d).map(b => b.textContent)));
     if (hb) {
       click(w, hb);
-      check(!!(await until(() => d.querySelector('#ofc-set'))), `${who}: the office settings open`);
+      check(!!(await until(() => d.querySelector('.smodal #s-biz #ofc-set'))), `${who}: the office settings open in Settings`);
       const fl = await until(() => d.querySelector('#ofc-set .sflash'));
       check(!!fl && !fl.closest('[hidden]'), `${who}: the letterhead is marked and its pane is shown ` + (fl ? fl.outerHTML.slice(0, 80) : w.eval(`JSON.stringify({bp: !!$('#bp-h'), hid: !!$('#bp-h')?.closest('[hidden]'), panes: $$('#ofc-set [data-ostp]').map(p => p.dataset.ostp + (p.hidden ? '-' : '+')), dash: !!$('#ofc-set')?.closest('.modal, .card, .dash'), ost: typeof ost_show})`)));
-      check(w.eval(`location.hash`) === '#office/settings', `${who}: the route is office/settings ` + w.eval('location.hash'));
+      check(d.querySelector('.smodal .snav [data-sec="biz"]')?.getAttribute('aria-selected') === 'true', `${who}: the area Company & office is shown`);
     }
     await until(() => !d.querySelector('.sflash'));  // the ring is over (its observer stopped) before the window goes
     w.close();

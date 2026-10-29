@@ -51,6 +51,7 @@ async function wpDraw(md) {
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
+  biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
   data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
@@ -768,6 +769,9 @@ function settingsModal(focus) {
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the projects (dropping a subtask there = standalone task in that project).')}</div>`,
   };
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
+  // 2.365.2 (#2789): what was set inside a module: Company & office (the office's settings, following the workspace) and Documents
+  pane.biz = typeof biz_paneHtml === 'function' ? biz_paneHtml() : '';
+  pane.docs = typeof dcs_paneHtml === 'function' ? dcs_paneHtml() : '';
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
@@ -811,6 +815,8 @@ function settingsModal(focus) {
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
+    if (k === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+    if (k === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
     if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
     if (k === 'access') { acz_draw(md); const nb = $('.snav [data-sec="access"]', md); if (nb) nb.hidden = false; }  // 2.166.0 (#2633); 2.364.0 C (#3044): listed once opened
     if (k === 'notify') wpDraw(md);
@@ -956,6 +962,8 @@ function settingsModal(focus) {
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
   if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
+  if (cur === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+  if (cur === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
   asst_setWire(md);  // 2.75.0 (#1411)
@@ -1564,8 +1572,8 @@ const SS_AREA = [
       [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
       [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
-    on: () => modOn('office') && ss_ofm('settings'), open: () => go('office/settings'), root: '#ofc-set',
+    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
       [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
       [N_('Documents & numbers'), ['nummer', 'nummern', 'number', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice'], '', 'docs'],
@@ -1617,4 +1625,18 @@ async function ss_areaOpen(h) {
   const mo = new MutationObserver(() => { if (!r.isConnected || !r.classList.contains('sflash')) { const n = mark(); if (n && n !== r) { r = n; r.scrollIntoView?.({block: 'center'}); } } });  // (a morphing redraw keeps the element, drops the class)
   mo.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']});
   setTimeout(() => { mo.disconnect(); r.classList.remove('sflash'); }, 1600);
+}
+// ---- 2.365.2 (#2789): Settings > Company & office: the office's settings (were the page Office > Settings) for the current workspace;
+// office.js biz_paint draws them (the office scripts load here when the area is opened)
+function biz_paneHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<div id="s-biz" class="sbiz"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+async function biz_draw(md) {
+  const box = $('#s-biz', md); if (!box) return;
+  try { await loadModule('office'); } catch { box.innerHTML = `<p class="muted">${esc(tr('Could not be loaded'))}</p>`; return; }
+  if (!box.isConnected) return;
+  if (S.route.mod === 'office' && ofcTab() === 'settings' && !['import', 'rights'].includes(S.route.tab)) go('office/start');  // one settings form on the screen
+  if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
+  setTimeout(biz_paint, 0);
 }
