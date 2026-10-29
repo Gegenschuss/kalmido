@@ -14,6 +14,8 @@ import io
 import os
 import sys
 
+import requests
+
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
@@ -127,5 +129,23 @@ for who, S in (("org admin", A), ("freelancer", F)):
 # ---- #3605 another office's document: not found (the organisation's doc for the freelancer and back)
 check(F.get(B + f"{D}/{DOCS['org admin']}/number-preview").status_code in (403, 404), "#3605: the freelancer cannot preview the organisation's document")
 check(A.get(B + f"{D}/{DOCS['freelancer']}/number-preview").status_code in (403, 404), "#3605: the organisation cannot preview the freelancer's document")
+
+# ---- 2.431.0 review (#3594): an agent's subject with CR LF is stored with LF like the form's (the agent ways normalise too)
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = F.post(B + "/api/my/agents", json={"username": "p2431bot", "display_name": "P2431 Bot", "scopes": ["read", "office"]})
+check(r.status_code == 201, "setup: the freelancer's own agent " + r.text[:200])
+if r.status_code == 201:
+    FAG, FH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+    check(F.patch(B + f"{O}/agents/{FAG}", json={"office_drafts": True}).ok and F.put(B + O + "/settings", json={"agents_read": 1}).ok,
+          "setup: both office switches of the personal office")
+    r = requests.post(B + "/api/v1/office/offers", headers=FH, json={"title": "Zeile eins\r\nZeile zwei\rZeile drei", "items": [{"title": "Schnitt", "qty": 1, "rate": 300}]})
+    check(r.status_code == 201, "#3594: the agent's quotation draft " + r.text[:200])
+    did = (r.json().get("doc") or {}).get("id") if r.status_code == 201 else None
+    pt = F.get(B + f"{D}/{did}").json().get("project_title") if did else None
+    check(pt == "Zeile eins\nZeile zwei\nZeile drei", f"#3594: the agent's subject keeps its breaks as LF {pt!r}")
+    if did:
+        r = requests.patch(B + f"/api/v1/office/offers/{did}", headers=FH, json={"title": "Neu eins\r\nNeu zwei"})
+        pt = F.get(B + f"{D}/{did}").json().get("project_title")
+        check(r.ok and pt == "Neu eins\nNeu zwei", f"#3594: the agent's change of the subject too {r.status_code} {pt!r}")
 
 sys.exit(done("p2431_b_api"))

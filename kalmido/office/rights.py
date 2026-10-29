@@ -92,7 +92,8 @@ MANAGE_READ = frozenset({"/api/office/log", "/api/office/export"})
 # "METHOD rule" -> the special a group needs for it (on top of the area's level). 2.187.0 B (#2476)
 SPECIAL_ROUTES = {
     # release: finalise, take back, send (mail, e-invoice network, the DATEV inbox counts as export), make a series' invoice now
-    "POST /api/office/docs/<int:did>/finalize": "release", "POST /api/office/docs/<int:did>/unlock": "release",
+    "POST /api/office/docs/<int:did>/finalize": "release", "GET /api/office/docs/<int:did>/number-preview": "release",  # 2.431.0 (#3605 review): who may finalise sees the number
+    "POST /api/office/docs/<int:did>/unlock": "release",
     "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
     "POST /api/office/series/<int:sid>/run": "release",
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books

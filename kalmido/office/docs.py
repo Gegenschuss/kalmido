@@ -87,6 +87,11 @@ def _text(v, name, mx=TEXT_MAX):
     return CTRL_RE.sub("", v).strip()[:mx]  # 2.39.0 (#1209 audit M2): control characters break the e-invoice XML / PDF/A
 
 
+def pt_text(v, name="project_title"):
+    """2.431.0 (#3594 review): the multi-line subject - CRLF / CR become LF on every way in (form, agents), then _text."""
+    return _text(v.replace("\r\n", "\n").replace("\r", "\n") if isinstance(v, str) else v, name, PT_MAX)
+
+
 def _num(v, name, lo=None, hi=None):
     if v in (None, ""):
         return None
@@ -693,7 +698,7 @@ def clean_doc(c, oid, b, cur, admin):
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
     for k, mx in (("project_title", PT_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
-            f[k] = _text(b.get(k).replace("\r\n", "\n").replace("\r", "\n") if k == "project_title" and isinstance(b.get(k), str) else b.get(k), k, mx)  # 2.431.0 B (#3594)
+            f[k] = pt_text(b.get(k), k) if k == "project_title" else _text(b.get(k), k, mx)  # 2.431.0 B (#3594)
     for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
             f[k] = _date(b.get(k), k)
