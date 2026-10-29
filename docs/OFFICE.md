@@ -2077,7 +2077,7 @@ out with. This applies to organisation offices and to the personal office alike.
   no attachment). Replacing the terms later does not change a finalised quotation, its line or its attachment.
 - **In the quotation PDF** (2.434, #3619): a quotation that prints the line carries the terms pages behind its own pages
   wherever its PDF goes out - download, preview, mail, approval link, customer portal, the agent API's draft preview.
-  They are joined on output; the stored PDF of a finalised quotation stays exactly as it was finalised. Terms that
+  They are joined on output from the frozen print model; nothing stored changes. Terms that
   cannot be read as a PDF leave the quotation PDF unchanged (a log line, no error).
 - **Sending**: finalised quotations can be mailed too (status `sent`). A quotation goes out as ONE PDF with the terms
   inside (the send dialog says so instead of offering a tick); only when the terms cannot be joined they go along as their
