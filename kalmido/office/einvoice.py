@@ -308,7 +308,7 @@ def ein_build(model, fmt="zugferd"):
     _e(doc, "ram:TypeCode", "381" if kind == "credit" else (m.get("type_code") or "380"))  # 2.120.0 A (#2087): 326 progress invoice
     _date_el(doc, "ram:IssueDateTime", m.get("date"))
     notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
-             tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
+             tr(EIN_WORDS["project"], " ".join(str(m["project_title"]).split()), lg=lang)) if x and str(x).strip()]  # 2.431.0 B (#3594): the subject on one line
     if novat and not m.get("vat_note_text"):
         notes.insert(0, _exempt(m, lang))
     for n in notes[:4] + ([abs_note] if abs_note else []):
@@ -759,7 +759,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(root, "cbc:DueDate", _udate(m.get("due_date")))
     _u(root, "cbc:CreditNoteTypeCode" if credit else "cbc:InvoiceTypeCode", "381" if credit else (m.get("type_code") or "380"))
     notes = [str(x) for x in (m.get("vat_note_text") or (tot.get("vat_note") if novat else ""), m.get("project_title") and
-             tr(EIN_WORDS["project"], str(m["project_title"]), lg=lang)) if x and str(x).strip()]
+             tr(EIN_WORDS["project"], " ".join(str(m["project_title"]).split()), lg=lang)) if x and str(x).strip()]  # 2.431.0 B (#3594): the subject on one line
     if novat and not m.get("vat_note_text"):
         notes.insert(0, extext)
     if notes or abs_note:  # PEPPOL-EN16931-R002: one note on document level

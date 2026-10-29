@@ -38,6 +38,7 @@ TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closi
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate
 NAME_MAX = 200
+PT_MAX = 1000  # 2.431.0 B (#3594): the subject (project_title) of a document may have several lines
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
 OFX_NAME_LINES = 3

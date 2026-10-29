@@ -310,7 +310,7 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
             v["offer.gross"] = v["offer.total"]  # 2.296.0 C (#3165)
             v["offer.net"] = fmt_money(t["net"], lang, r["currency"] or "EUR") if t.get("net") is not None else ""
             if not list_id:
-                v["project.title"] = r["project_title"] or ""
+                v["project.title"] = " ".join((r["project_title"] or "").split())  # 2.431.0 B (#3594): the subject on one line
     if list_id:
         v["project.title"] = dt_list_ok(c, oid, list_id)["name"] or ""
     # a value never brings variables of its own (no second round of replacing) nor markup: "# ", "- ", "* " at its start

@@ -25,7 +25,7 @@ from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
-from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
+from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -691,9 +691,9 @@ def clean_doc(c, oid, b, cur, admin):
             f["recipient"] = json.dumps(rec, ensure_ascii=False)
     elif "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
-    for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
+    for k, mx in (("project_title", PT_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
-            f[k] = _text(b.get(k), k, mx)
+            f[k] = _text(b.get(k).replace("\r\n", "\n").replace("\r", "\n") if k == "project_title" and isinstance(b.get(k), str) else b.get(k), k, mx)  # 2.431.0 B (#3594)
     for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
             f[k] = _date(b.get(k), k)

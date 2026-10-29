@@ -931,8 +931,9 @@ document.addEventListener('focusout', e => { if (e.target.closest?.('#ofc-set'))
 document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
 // 2.138.2 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {
-  ta.rows = 1;
-  const n = Math.max(1, String(ta.value).split('\n').length);
+  const lo = Math.max(1, +ta.dataset.growMin || 1);  // 2.431.0 B (#3594): a field may start with more than one row
+  ta.rows = lo;
+  const n = Math.max(lo, String(ta.value).split('\n').length);
   ta.rows = Math.min(max, n);
   while (ta.rows < max && ta.scrollHeight > ta.clientHeight + 1) ta.rows++;
 }

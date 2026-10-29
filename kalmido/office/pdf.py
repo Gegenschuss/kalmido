@@ -1366,7 +1366,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     t_step = 18 if look_a else 20  # 2.406.0 (#3491): look A a little tighter
     block((30 if look_a else 34) + (len(t_lines) - 1) * t_step, draw_title, keep_next=True)
     if m.get("project_title"):
-        pt = str(m["project_title"])
+        pt = str(m["project_title"]).replace("\r", "")  # 2.431.0 B (#3594): its line breaks stay (pdf_wrap splits them)
         n = len(pdf_wrap(pt, 10.4, PDF_CW, True))
         block(n * 10.4 * 1.42 + 8, lambda p, y, t=pt: p.para(PDF_L, y + 2, t, 10.4, PDF_CW, True), keep_next=True)
     if m.get("intro"):
@@ -1827,7 +1827,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if not isinstance(part, dict):
             continue
         ptitle = str(part.get("title") or "")
-        psub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        psub = " · ".join(x for x in (f"{num_l} {number}" if number else "", " ".join(str(m.get("project_title") or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
 
         # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
         # the title wraps over the full width, the accent line under its last line
@@ -1873,7 +1873,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     rh_at = []
     if bfc_rights:
         rtitle = str(rights.get("title") or L["rights"])
-        rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", " ".join(str(m.get("project_title") or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
 
         # 2.296.0 E (#3170): a long number / project line wraps right of the heading, below the accent line when no room is left
         rs_w = PDF_CW - pdf_text_width(rtitle.upper(), 14, True, 0.8) - 6 * MM
