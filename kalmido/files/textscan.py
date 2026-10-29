@@ -554,6 +554,8 @@ def files_search():
     raw = ts_query()
     space = (request.args.get("space") or "").strip()
     rows, hit = ts_files_find(c, uid, raw, space)
+    from .fsviews import fsv_drop
+    rows = fsv_drop(c, rows)  # 2.429.0 (#3580): no folder / knowledge page / table of another area (the global search finds those)
     items = [x for x in _items(c, rows) if not x.get("no_access")]  # a link to an original the asker may not open
     parents = {r["id"]: r["parent_id"] for r in rows}
     pids = sorted({p for p in parents.values() if p})

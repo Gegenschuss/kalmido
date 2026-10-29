@@ -15132,5 +15132,15 @@
   "Nothing hidden": "Niets verborgen",
   "Menu order changed": "Menuvolgorde gewijzigd",
   "Menu points in this organisation": "Menupunten in deze organisatie",
-  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Uitgeschakeld staat een punt in deze organisatie bij niemand in het menu, ook niet onder Verborgen; de rest ordent elk lid zelf."
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Uitgeschakeld staat een punt in deze organisatie bij niemand in het menu, ook niet onder Verborgen; de rest ordent elk lid zelf.",
+  "From Knowledge": "Uit Kennis",
+  "From Tables": "Uit Tabellen",
+  "From Office": "Uit Kantoor",
+  "From Projects": "Uit Projecten",
+  "From Address book": "Uit Adresboek",
+  "Files of knowledge pages, read only. Delete them on the page itself.": "Bestanden van kennispagina’s, alleen lezen. Verwijderen kan op de pagina zelf.",
+  "Files of projects, read only. Delete them in the project itself.": "Bestanden van projecten, alleen lezen. Verwijderen kan in het project zelf.",
+  "Files of this area, read only.": "Bestanden van dit onderdeel, alleen lezen.",
+  "Only the first {0} files are shown.": "Alleen de eerste {0} bestanden worden getoond.",
+  "Files of tables, read only. Delete them in the table itself.": "Bestanden van tabellen, alleen lezen. Verwijderen kan in de tabel zelf."
 }

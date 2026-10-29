@@ -24,6 +24,7 @@ from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_n
 from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742, review G1)
 from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
+from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -188,10 +189,12 @@ def files_list():
             rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id")
                     if r["owner_id"] != uid and (r["parent_id"] not in vis) and not (r["parent_id"] is None and r["org_id"])]
         role = None
+    rows = fsv_drop(c, rows)  # 2.429.0 (#3580): no root folder / shared folder of another area (knowledge, tables, office, ...)
     items = _items(c, rows, role if role == "owner" else None)
     from ..docs.recog import rc_list_extra
     rc_list_extra(c, None, None, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759)
-    return jsonify(items=items, node=None, crumbs=[], space=request.args.get("space") or "private", role=role)
+    coll = fsv_collections(c, uid, oid) if space in ("private", "org") else []  # 2.429.0 (#3580): "From <area>", read-only
+    return jsonify(items=items, node=None, crumbs=[], space=request.args.get("space") or "private", role=role, collections=coll)
 
 
 def _trash(c, uid):
@@ -934,7 +937,8 @@ def files_ref_get(kind, rid):
 
 @app.get("/api/files/folders")
 def files_folders():
-    """Every folder the asker may add to ({id, name, path, org_id}) -- the target list of "Move to…"."""
+    """Every folder the asker may add to ({id, name, path, org_id}) -- the target list of "Move to…" (?ablage=1: only the file
+    store's own folders, 2.429.0 #3580)."""
     c = db()
     uid = me()
     vis = fs_visible_ids(c, uid)
@@ -942,6 +946,9 @@ def files_folders():
         return jsonify(folders=[])
     q = ",".join(str(int(x)) for x in vis)
     rows = {r["id"]: r for r in c.execute(f"SELECT id, parent_id, name, org_id, owner_id FROM fs_nodes WHERE id IN ({q}) AND kind='folder'")}
+    if request.args.get("ablage") == "1":  # 2.429.0 (#3580): the file store's own "Move to…" -- not into another area's folders
+        hide = fsv_hidden(c, rows)
+        rows = {k: v for k, v in rows.items() if k not in hide}
     out = []
     for r in rows.values():
         if ROLE_RANK[fs_role(c, r["id"], uid)] < ROLE_RANK["edit"]:

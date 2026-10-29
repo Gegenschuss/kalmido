@@ -15132,5 +15132,15 @@
   "Nothing hidden": "Niente di nascosto",
   "Menu order changed": "Ordine del menu cambiato",
   "Menu points in this organisation": "Voci di menu in questa organizzazione",
-  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Disattivata, una voce non è nel menu di nessun membro in questa organizzazione, nemmeno tra le nascoste; ogni membro ordina le altre."
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Disattivata, una voce non è nel menu di nessun membro in questa organizzazione, nemmeno tra le nascoste; ogni membro ordina le altre.",
+  "From Knowledge": "Da Conoscenza",
+  "From Tables": "Da Tabelle",
+  "From Office": "Da Ufficio",
+  "From Projects": "Da Progetti",
+  "From Address book": "Da Rubrica",
+  "Files of knowledge pages, read only. Delete them on the page itself.": "File delle pagine di conoscenza, sola lettura. Si eliminano nella pagina stessa.",
+  "Files of projects, read only. Delete them in the project itself.": "File dei progetti, sola lettura. Si eliminano nel progetto stesso.",
+  "Files of this area, read only.": "File di quest’area, sola lettura.",
+  "Only the first {0} files are shown.": "Sono mostrati solo i primi {0} file.",
+  "Files of tables, read only. Delete them in the table itself.": "File delle tabelle, sola lettura. Si eliminano nella tabella stessa."
 }

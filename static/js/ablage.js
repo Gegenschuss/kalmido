@@ -27,9 +27,15 @@ const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n
 const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
 
 // ---- loading
+const ab_key = r => r.nid ? 'n:' + r.nid : r.aus ? 'c:' + r.aus + ':' + ab_curSpace() : 's:' + ab_curSpace();  // 2.429.0 (#3580): + a collection
 async function ab_load() {
-  const r = S.route, key = r.nid ? 'n:' + r.nid : 's:' + ab_curSpace(), seq = ++AB.seq;
+  const r = S.route, key = ab_key(r), seq = ++AB.seq;
   AB.key = key; AB.loading = true;
+  if (r.aus) {  // 2.429.0 (#3580): a collection "From <area>" (read-only, grouped by its object)
+    try { const j = await api('GET', `/api/files/collections/${encodeURIComponent(r.aus)}?space=${encodeURIComponent(ab_curSpace())}`); if (seq !== AB.seq) return; AB.data = {...j, items: [], coll: true}; AB.dkey = key; AB.err = ''; }
+    catch (x) { if (seq !== AB.seq) return; AB.data = null; AB.dkey = ''; AB.err = x.message || tr('unknown'); }
+    AB.loading = false; ab_draw(); return;
+  }
   const dq = typeof abd_cardsOn === 'function' && abd_cardsOn(key) ? '&docs=1' : '';  // 2.353.0 D (#2759): the cards need the documents' fields
   try {
     const j = await api('GET', (r.nid ? `/api/files?parent=${r.nid}` : `/api/files?space=${encodeURIComponent(ab_curSpace())}`) + dq);
@@ -37,7 +43,7 @@ async function ab_load() {
     if (typeof fsl_prep === 'function') await fsl_prep(j);  // 2.353.0 A (#2758): names of a locked folder decrypted here
     if (seq !== AB.seq) return;
     AB.data = j; AB.dkey = key; AB.err = ''; AB.dq = dq;  // 2.353.0 D (#2759): dq = loaded with the documents' fields
-    if (AB.pt[key] && !AB.pt[key].busy) Object.assign(AB.pt[key], {items: (j.items || []).filter(n => n.kind === 'folder'), stale: false});  // 2.152.3 B (#2621): the panel's copy follows
+    if (AB.pt[key] && !AB.pt[key].busy) Object.assign(AB.pt[key], {items: (j.items || []).filter(n => n.kind === 'folder'), coll: j.collections || [], stale: false});  // 2.152.3 B (#2621): the panel's copy follows
   } catch (x) {
     if (seq !== AB.seq) return;
     if (r.nid) {  // a file: open its folder and the file's details
@@ -58,7 +64,7 @@ function viewAblage() {
   if (!ab_on()) return `<div class="empty">${tr('The file store is off (Settings > Modules)')}</div>`;
   if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   if (typeof abd_cardsHtml !== 'function' && feat('docs') && typeof ld_later === 'function') ld_later('docs');  // 2.353.0 D (#2759): cards, recognition (abdocs.js)
-  const r = S.route, key = r.nid ? 'n:' + r.nid : 's:' + ab_curSpace();
+  const r = S.route, key = ab_key(r);
   if (AB.key !== key && !AB.loading) setTimeout(ab_load, 0);
   const d = AB.dkey === key ? AB.data : null, sp = r.nid ? (d?.space || '') : ab_curSpace();
   // the tree: the spaces; below the open one the path down to the open folder and its subfolders (desktop; phones: the path on top)
@@ -66,16 +72,18 @@ function viewAblage() {
     ...d.items.filter(n => n.kind === 'folder').map(n => ({id: n.id, name: n.name, lvl: (d.crumbs || []).length + 1, sub: true}))] : [];
   const treeHtml = tree.map(t => `<button type="button" class="abspace abtree ${t.on ? 'on' : ''}" style="--ablvl:${Math.min(t.lvl, 6)}" data-go="ablage/${t.id}" data-abdrop="${t.id}" ${t.on ? 'aria-current="page"' : ''}>${ic('folder', 's')}<span>${esc(t.name)}</span></button>`).join('');
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${typeof abd_navHtml === 'function' ? abd_navHtml(true) : ''}</nav>`;  // 2.353.0 D (#2759): + the saved filters
+  const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
   const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
   AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
+  if (r.aus) return `<div class="abview ${desk ? 'abdesk' : ''}">${desk ? '' : spaces}<div class="abmain">${ab_collHtml(d, sp)}</div></div>`;  // 2.429.0 (#3580)
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
-  else if (!d.items.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span>${!r.nid && sp.startsWith('org:') && !ab_orgAdmin(sp) ? `<span class="muted abemptyhint">${tr('You see the organisation’s folders once an admin opens them to everyone or shares them with you.')}</span>` : ''}</div>`;
-  else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}</div>`;
+  else if (!d.items.length && !d.collections?.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span>${!r.nid && sp.startsWith('org:') && !ab_orgAdmin(sp) ? `<span class="muted abemptyhint">${tr('You see the organisation’s folders once an admin opens them to everyone or shares them with you.')}</span>` : ''}</div>`;
+  else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}${(d.collections || []).map(ab_collRow).join('')}</div>`;  // 2.429.0 (#3580): + "From <area>" after the folders and files
   if (d?.items.length && !trash && typeof abd_cardsOn === 'function' && abd_cardsOn(key)) body = abd_cardsHtml(d, key);  // 2.353.0 D (#2759): the folder as cards
   if (d?.node?.locked && typeof fsl_bannerHtml === 'function') body = fsl_bannerHtml(d) + body;  // 2.353.0 A (#2758)
   if (d && typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) body = dt_abBody(sp || d.space);  // 2.122.0 B (#2099): the tag filter of the space
@@ -83,7 +91,6 @@ function viewAblage() {
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
-  const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
 }
 // 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
@@ -95,7 +102,7 @@ AB.pt = {};
 async function ab_ptLoad(key) {
   const e = AB.pt[key] || (AB.pt[key] = {}); if (e.busy) return;
   e.busy = true;
-  try { const j = await rawFetch('GET', key.startsWith('n:') ? `/api/files?parent=${+key.slice(2)}` : `/api/files?space=${encodeURIComponent(key.slice(2))}`); if (typeof fsl_prep === 'function') await fsl_prep(j); e.items = (j.items || []).filter(n => n.kind === 'folder'); e.err = ''; }
+  try { const j = await rawFetch('GET', key.startsWith('n:') ? `/api/files?parent=${+key.slice(2)}` : `/api/files?space=${encodeURIComponent(key.slice(2))}`); if (typeof fsl_prep === 'function') await fsl_prep(j); e.items = (j.items || []).filter(n => n.kind === 'folder'); e.coll = j.collections || []; e.err = ''; }  // 2.429.0 (#3580): + the collections
   catch (x) { e.items = e.items || []; e.err = x.message; }
   finally { e.busy = false; e.stale = false; }
   if (typeof sbb_sync === 'function') sbb_sync('ablage');
@@ -103,18 +110,21 @@ async function ab_ptLoad(key) {
 const ab_ptGet = key => { const e = AB.pt[key]; if (!e || e.stale) ab_ptLoad(key); return e?.items || null; };
 function ab_ptStale() { for (const e of Object.values(AB.pt)) e.stale = true; if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 function ab_panelHtml() {
-  const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid ? ab_curSpace() : '';
+  const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid && !r.aus ? ab_curSpace() : '';
   const real = ab_spaces().filter(s => s === 'private' || s.startsWith('org:'));
   const path = on && r.nid && AB.dkey === 'n:' + r.nid ? (AB.data?.crumbs || []).map(c => c.id) : [];  // the open folder's path stays open
   // 2.199.0 A (#2742): dragged to move / sort, a menu (sbb_treeReg('ab') below)
   const node = n => ({k: 'ab:' + n.id, name: n.name, go: 'ablage/' + n.id, on: on && r.nid === n.id, icon: n.agent_id ? 'bot' : 'folder', attrs: `data-abdrop="${n.id}"`,
     ns: 'ab', id: n.id, par: n.parent_id ? 'n:' + n.parent_id : 'top:' + (n.org_id || 'p'), drag: ab_canWrite(n.role), drop: ab_canWrite(n.role), menu: true,
     kids: AB.pt['n:' + n.id]?.items?.length !== 0, open: path.includes(n.id) && n.id !== r.nid, sub: () => (it => it && it.map(node))(ab_ptGet('n:' + n.id))});
+  // 2.429.0 (#3580): a space's collections "From <area>" after its folders (read-only: no drag, no drop, no menu)
+  const collNodes = s => (AB.pt['s:' + s]?.coll || []).map(x => ({k: 'ab:c:' + s + ':' + x.key, name: x.name, go: 'ablage/aus-' + x.key, on: on && r.aus === x.key && ab_curSpace() === s, icon: AB_COLL_ICON[x.key] || 'folder', battrs: `data-absp="${esc(s)}"`, kids: false}));
+  const withColl = (s, it) => it && [...it.map(node), ...collNodes(s)];
   const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: 'ablage', on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
-    kids: real.includes(s) && AB.pt['s:' + s]?.items?.length !== 0, open: !!path.length && AB.data?.space === s, sub: () => (it => it && it.map(node))(ab_ptGet('s:' + s))});
+    kids: real.includes(s) && (AB.pt['s:' + s]?.items?.length !== 0 || !!AB.pt['s:' + s]?.coll?.length), open: !!path.length && AB.data?.space === s, sub: () => withColl(s, ab_ptGet('s:' + s))});
   const files = () => {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
-    const tree = (one ? (top ? sbb_treeHtml(top.map(node), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1))
+    const tree = (one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1))
       + sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
     return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
   };
@@ -144,6 +154,31 @@ sbb_treeReg('ab', {
   menu: id => { const n = ab_ptItem(id); return n ? ab_menuItems(n, true) : []; }});
 // a space in the panel: picked before the click's data-go opens #ablage (capture: ahead of the router's click)
 document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { AB.space = b.dataset.absp; LS.set('abSpace', AB.space); AB.key = ''; } }, true);
+// 2.429.0 (#3580): the file store shows only its own folders; what hangs on the other areas' objects (files of knowledge
+// pages, project files, files left in an area's folders) is a read-only collection "From <area>" at the top of the space,
+// grouped by its object (route ablage/aus-<key>, the space shown: AB.space). Open / download only; deleting stays on the
+// page / in the project. Knowledge pages themselves: the global search.
+const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'proj', contacts: 'user'};
+const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read only'))}">${ic('lock', 's')}</span></span></div>`;
+function ab_collHtml(d, sp) {
+  const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span><span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
+  if (AB.err && !d) return crumbs + `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button></div>`;
+  if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
+  const note = `<p class="muted abhint abcollnote">${esc(d.key === 'wiki' ? tr('Files of knowledge pages, read only. Delete them on the page itself.') : d.key === 'lists' ? tr('Files of projects, read only. Delete them in the project itself.') : d.key === 'sheets' ? tr('Files of tables, read only. Delete them in the table itself.') : tr('Files of this area, read only.'))}</p>`;
+  if (!d.groups?.length) return crumbs + note + `<div class="empty abempty">${ic('folder')}<span>${tr('This folder is empty')}</span></div>`;
+  const row = (f, gi) => `<div class="abrow" role="listitem"><button type="button" class="abopen" data-abc="open" data-g="${gi}" data-id="${f.id}">${ab_icon({kind: 'file', mime: f.mime})}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span></span></button><span class="abmeta muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span><a class="iconbtn" href="${esc(f.dl)}" download="${esc(f.name)}" aria-label="${esc(tr('Download') + ' ' + f.name)}" title="${esc(tr('Download'))}">${ic('download')}</a></div>`;
+  const grp = (g, gi) => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(g.open)}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${g.items.map(f => row(f, gi)).join('')}</div></section>`;
+  return crumbs + note + d.groups.map(grp).join('') + (d.more ? `<p class="muted abhint">${tr('Only the first {0} files are shown.', 500)}</p>` : '');
+}
+function ab_collOpen(f) {  // like a search hit of a project file (filetext.js ftxtOpenLf): PDF viewer, picture in a new tab, else download
+  if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url: f.url, name: f.name, size: f.size, dlUrl: f.dl}); return; }
+  if (/^image\//.test(f.mime || '')) { window.open(f.url, '_blank', 'noopener'); return; }
+  const a = document.createElement('a'); a.href = f.dl; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-abc="open"]'); if (!b || !b.closest('.abview')) return;
+  const f = AB.data?.groups?.[+b.dataset.g]?.items.find(x => x.id === +b.dataset.id); if (f) ab_collOpen(f);
+});
 function ab_rowHtml(n, trash) {
   const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
   const badges = (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '')
@@ -242,7 +277,7 @@ async function ab_move(n, target) {
   offerUndo(tr('“{0}” moved', n.name), histAdd({label: tr('Move “{0}”', n.name), undo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: was}), redo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: target || null})}));
 }
 async function ab_moveDlg(n) {
-  let fs; try { fs = (await api('GET', '/api/files/folders')).folders; } catch { return; }
+  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }
   // the same space and tree only (the server refuses the rest, and a folder into itself)
   const ok = fs.filter(f => (f.org_id || null) === (n.org_id || null) && f.owner_id === n.owner_id && f.id !== n.id && f.id !== n.parent_id);
   const items = [...(n.parent_id ? [{label: tr('Top level'), icon: 'up', fn: () => ab_move(n, null)}] : []), ...ok.map(f => ({label: f.path, icon: 'folder', fn: () => ab_move(n, f.id)}))];
@@ -362,7 +397,7 @@ const ab_share = (id, opts) => fs_shareDialog(id, opts);
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-ab]'); if (!b || !b.closest('.abview, #pop')) return;
   const n = ab_item(b.dataset.id), a = b.dataset.ab;
-  if (a === 'space') { AB.space = b.dataset.sp; LS.set('abSpace', AB.space); AB.key = ''; if (S.route.nid) go('ablage'); else ab_load(); return; }
+  if (a === 'space') { AB.space = b.dataset.sp; LS.set('abSpace', AB.space); AB.key = ''; if (S.route.nid || S.route.aus) go('ablage'); else ab_load(); return; }  // 2.429.0 (#3580): + from a collection
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
@@ -448,7 +483,7 @@ const ab_smvMore = (b, ns) => menu(b, [{label: tr('Move to another workspace…'
 const ab_smvEnd = () => { AB.sel.clear(); AB.selOn = false; };
 // several rows into one folder of the same space (the server refuses another tree / a folder into itself)
 async function ab_smvMoveDlg(ns) {
-  let fs; try { fs = (await api('GET', '/api/files/folders')).folders; } catch { return; }
+  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }
   const n0 = ns[0], ids = new Set(ns.map(n => n.id));
   const ok = fs.filter(f => (f.org_id || null) === (n0.org_id || null) && f.owner_id === n0.owner_id && !ids.has(f.id));
   const go2 = async target => {
@@ -466,7 +501,7 @@ async function ab_smvMoveDlg(ns) {
   menu($('[data-absel="move"]') || document.body, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
 }
 async function ab_smvPlaces(to) {
-  const fs = (await api('GET', '/api/files/folders')).folders || [];
+  const fs = (await api('GET', '/api/files/folders?ablage=1')).folders || [];
   return fs.filter(f => (f.org_id || null) === (to || null) && (to || f.owner_id === S.me?.id)).map(f => ({id: f.id, label: f.path}));
 }
 async function ab_smvDry(b) {  // the dry run: an error of the server is the dialog's block (no toast)

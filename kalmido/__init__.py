@@ -227,6 +227,7 @@ ORDER = (
     "wiki.wkstyle",  # 2.371.3 (#3152): the reading style of a knowledge space (PUT /api/wiki/style)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
+    "files.fsviews",  # 2.429.0 (#3580): the file store shows only its own folders; "From <area>" collections (read-only)
     "files.fslock",  # 2.353.0 A (#2758): locked folders (names and contents encrypted in the browser)
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.fstags",  # 2.122.0 B (#2099): tags of files and folders (the documents' tag set of the workspace)
