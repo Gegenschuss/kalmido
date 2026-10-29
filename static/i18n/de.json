@@ -14745,7 +14745,6 @@
   "Diagram": "Diagramm",
   "The diagram could not be drawn": "Das Diagramm ließ sich nicht zeichnen",
   "The formula could not be drawn": "Die Formel ließ sich nicht setzen",
-  "{0} table stays in the tables' trash": ["{0} Tabelle bleibt im Papierkorb der Tabellen", "{0} Tabellen bleiben im Papierkorb der Tabellen"],
   "Logo size": "Logo-Größe",
   "Logo position": "Logo-Position",
   "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Für alle ab jetzt erzeugten Büro-Dokumente. Ohne Wirkung, wenn dein eigenes Briefpapier unseren Briefkopf ausblendet.",
@@ -14955,7 +14954,8 @@
   "Tick “Forward it to”, pick this address and create the filter.": "„Weiterleiten an“ ankreuzen, diese Adresse wählen und den Filter erstellen.",
   "The old address stops working. The documents address and the reply address of letters of this area change with it.": "Die alte Adresse funktioniert dann nicht mehr. Auch die Dokument-Adresse und die Antwortadresse für Briefe dieses Bereichs wechseln damit.",
   "Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.": "Nach den Mails deiner Rechnungsabsender suchen, zum Beispiel from:(stripe.com OR paddle.com OR apple.com), und „Filter erstellen“ wählen.",
-  "The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.": "Die E-Mail-Adresse des Belegeingangs, die dir deine Steuerberatung gibt (DATEV Unternehmen online). Festgeschriebene Rechnungen gehen als PDF dorthin (ZUGFeRD mit den Rechnungsdaten darin, XRechnung zusätzlich als XML) und landen von selbst in der Buchhaltung.",
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "Die AGB (Stand {0}) sind die letzten Seiten des PDFs.",
-  "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Lieferscheine und Leistungsnachweise: Reiter, Knöpfe an Angebot und Rechnung, Nummernkreis und Schlusstexte. Bereits angelegte bleiben les- und druckbar"
+  "The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.": "Die E-Mail-Adresse des Belegeingangs, die dir deine Steuerberatung gibt (DATEV Unternehmen online). Festgeschriebene Rechnungen gehen als PDF dorthin (ZUGFeRD mit den Rechnungsdaten darin, XRechnung zusätzlich als XML) und landen von selbst in der Buchhaltung.",
+  "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Lieferscheine und Leistungsnachweise: Reiter, Knöpfe an Angebot und Rechnung, Nummernkreis und Schlusstexte. Bereits angelegte bleiben les- und druckbar",
+  "{0} table stays in the tables' trash": ["{0} Tabelle bleibt im Papierkorb der Tabellen", "{0} Tabellen bleiben im Papierkorb der Tabellen"]
 }

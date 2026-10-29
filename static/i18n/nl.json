@@ -14745,7 +14745,6 @@
   "Diagram": "Diagram",
   "The diagram could not be drawn": "Het diagram kon niet worden getekend",
   "The formula could not be drawn": "De formule kon niet worden gezet",
-  "{0} table stays in the tables' trash": ["{0} tabel blijft in de prullenbak van de tabellen", "{0} tabellen blijven in de prullenbak van de tabellen"],
   "Logo size": "Logogrootte",
   "Logo position": "Logopositie",
   "For all office documents created from now on. No effect when your own letterhead leaves out our head.": "Voor alle kantoordocumenten die vanaf nu worden gemaakt. Geen effect als je eigen briefpapier onze kop weglaat.",
@@ -14955,7 +14954,8 @@
   "Tick “Forward it to”, pick this address and create the filter.": "Vink 'Doorsturen naar' aan, kies dit adres en maak het filter.",
   "The old address stops working. The documents address and the reply address of letters of this area change with it.": "Het oude adres werkt dan niet meer. Ook het documentadres en het antwoordadres voor brieven van deze omgeving veranderen mee.",
   "Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.": "Zoek de mails van je factuurafzenders, bijvoorbeeld from:(stripe.com OR paddle.com OR apple.com), en kies 'Filter maken'.",
-  "The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.": "Het e-mailadres van de documentinbox die je belastingadviseur je geeft (DATEV Unternehmen online). Vastgelegde facturen gaan daarheen als PDF (ZUGFeRD met de factuurgegevens erin, XRechnung ook als XML) en komen vanzelf in de boekhouding.",
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "De algemene voorwaarden (stand {0}) zijn de laatste pagina's van de pdf.",
-  "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Pakbonnen en prestatiebewijzen: tabblad, knoppen bij offertes en facturen, nummerreeks en slotteksten. Bestaande blijven leesbaar"
+  "The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.": "Het e-mailadres van de documentinbox die je belastingadviseur je geeft (DATEV Unternehmen online). Vastgelegde facturen gaan daarheen als PDF (ZUGFeRD met de factuurgegevens erin, XRechnung ook als XML) en komen vanzelf in de boekhouding.",
+  "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Pakbonnen en prestatiebewijzen: tabblad, knoppen bij offertes en facturen, nummerreeks en slotteksten. Bestaande blijven leesbaar",
+  "{0} table stays in the tables' trash": ["{0} tabel blijft in de prullenbak van de tabellen", "{0} tabellen blijven in de prullenbak van de tabellen"]
 }
