@@ -14957,5 +14957,6 @@
   "The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.": "L'indirizzo e-mail della casella documenti che ti dà il tuo consulente fiscale (DATEV Unternehmen online). Le fatture chiuse vanno lì come PDF (ZUGFeRD con i dati della fattura all'interno, XRechnung anche come XML) e arrivano da sole in contabilità.",
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "Le condizioni generali (versione del {0}) sono le ultime pagine del PDF.",
   "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Bolle di consegna e attestati di prestazione: scheda, pulsanti su preventivi e fatture, serie numerica e testi finali. Quelli già creati restano leggibili",
-  "Rates of {0} used, the BMF letter for {1} is not entered yet": "Tariffe del {0} usate, la circolare BMF per il {1} non è ancora inserita"
+  "Rates of {0} used, the BMF letter for {1} is not entered yet": "Tariffe del {0} usate, la circolare BMF per il {1} non è ancora inserita",
+  "Sorting": "Ordinamento"
 }

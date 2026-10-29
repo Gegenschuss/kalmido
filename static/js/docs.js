@@ -25,6 +25,33 @@ const dc_day = d => d ? dayLabel(d, true) : '';
 const dc_isPdf = d => d && (d.mime === 'application/pdf' || /\.pdf$/i.test(d.name));
 const dc_fileUrl = (d, dl) => `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' : ''}`;
 
+// ---- 2.428.0 (#3579): the sort of the list, sorted by the server (the pages stay right), remembered per device
+const DC_SORTS = [['date', N_('Document date')], ['added', N_('Date of arrival')], ['sender', N_('Sender')], ['amount', N_('Amount')], ['due', N_('Due date')], ['title', N_('Title')]];
+const dc_sortDir0 = k => (k === 'title' || k === 'sender' ? 'asc' : 'desc');
+function dc_sort() {
+  const s = LS.get('dc.sort', null) || {}, k = DC_SORTS.some(x => x[0] === s.k) ? s.k : 'date';
+  return {k, d: s.d === 'asc' || s.d === 'desc' ? s.d : dc_sortDir0(k)};
+}
+function dc_sortSet(k, d) {
+  if (k === 'date' && d === 'desc') LS.del('dc.sort'); else LS.set('dc.sort', {k, d});
+  DC.at = 0; dc_load(); dc_draw();
+}
+const dc_sortPick = k => { const s = dc_sort(); dc_sortSet(k, s.k === k ? (s.d === 'asc' ? 'desc' : 'asc') : dc_sortDir0(k)); };  // the chosen one again: the other direction
+function dc_sortBtn() {
+  const s = dc_sort(), name = tr(DC_SORTS.find(x => x[0] === s.k)[1]), dir = s.d === 'asc' ? tr('ascending|sort') : tr('descending|sort');
+  return `<button type="button" class="btn sm dc-sortb ${s.k !== 'date' || s.d !== 'desc' ? 'on' : ''}" data-dc="sort" aria-haspopup="menu" title="${esc(tr('Sorting') + ': ' + name + ', ' + dir)}" aria-label="${esc(tr('Sorting') + ': ' + name + ', ' + dir)}">${ic('sort', 's')} <span>${esc(name)}</span> ${s.d === 'asc' ? '↑' : '↓'}</button>`;
+}
+function dc_sortMenu(anchor) {
+  const s = dc_sort();
+  menu(anchor, [...DC_SORTS.map(([k, n]) => ({label: tr(n), on: s.k === k, cls: 'dc-sorti', title: s.k === k ? tr('Click again to reverse the direction') : '', fn: () => dc_sortPick(k)})), '-',
+    {label: tr('ascending|sort'), on: s.d === 'asc', fn: () => dc_sortSet(s.k, 'asc')}, {label: tr('descending|sort'), on: s.d === 'desc', fn: () => dc_sortSet(s.k, 'desc')}]);
+}
+function dc_sortHtml() {  // phones: the sort at the top of the filter sheet
+  const s = dc_sort();
+  return `<h4>${tr('Sorting')}</h4><div class="tsgrp">${DC_SORTS.map(([k, n]) => `<button type="button" class="tsp ${s.k === k ? 'tsp-in' : ''}" data-dcsort="${k}" aria-pressed="${s.k === k}">${esc(tr(n))}</button>`).join('')}</div>
+    <div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Sorting'))}">${['asc', 'desc'].map(d => `<button type="button" role="radio" data-dcsortd="${d}" aria-checked="${s.d === d}">${d === 'asc' ? tr('ascending|sort') : tr('descending|sort')}</button>`).join('')}</div></div>`;
+}
+
 // ---- loading
 function dc_params() {
   const p = new URLSearchParams({ws: dc_ws(), limit: '200'});
@@ -33,6 +60,7 @@ function dc_params() {
   dc_fParams(p);  // 2.122.0 B (#2294): several values, more filters
   if (DC.f.review) p.set('review', '1');
   if (DC.under) p.set('under', DC.under);  // 2.199.0 B (#2742): a folder of the panel's tree (with its subfolders)
+  const so = dc_sort(); if (so.k !== 'date' || so.d !== 'desc') { p.set('sort', so.k); p.set('dir', so.d); }  // 2.428.0 (#3579)
   return p;
 }
 async function dc_load() {
@@ -92,7 +120,7 @@ function viewDocs() {
     <div class="dc-bar">
       <input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(tr('Search in the documents…'))}" aria-label="${esc(tr('Search in the documents'))}" autocomplete="off">
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
@@ -633,6 +661,7 @@ document.addEventListener('click', e => {
   if (a === 'scan') { abm_scanOpen({docs: true}); return; }  // 2.112.1 A (#2058): photographed pages -> one PDF -> a document
   if (a === 'settings') dc_settings();
   else if (a === 'all' || a === 'review') { const rv = a === 'review'; if (S.route.mod === 'docs' && !!S.route.review !== rv) { go(rv ? 'docs/review' : 'docs'); return; } DC.f.review = rv; dc_load(); dc_draw(); }  // 2.353.0 D (#2759): the route = the saved filter (viewDocs takes it over and loads)
+  else if (a === 'sort') dc_sortMenu(b);  // 2.428.0 (#3579)
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
   else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
@@ -791,7 +820,7 @@ function dc_fltHtml() {  // the filters (desktop: below the bar; phones: the she
   const two = (k, list) => dt_pills(list, st(list, ids => dc_arr(f[k]).includes(ids) ? 'in' : ''), 'dcf' + k, false);
   const sec = (title, inner) => inner ? `<h4>${esc(tr(title))}</h4><div class="tsgrp">${inner}</div>` : '';
   const pick = typeof dt_pills === 'function';
-  return `<div class="tsflt">
+  return `<div class="tsflt">${isMobile() ? dc_sortHtml() : ''}
     ${pick ? sec(N_('Tags'), dt_pills(fc.tags, tagSt, 'dcftg')) : ''}${pick && on > 1 ? `<div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Several tags'))}">${['any', 'all'].map(m => `<button type="button" role="radio" data-dcfm="${m}" aria-checked="${(f.tmode || 'any') === m}">${m === 'all' ? tr('every one') : tr('one of them')}</button>`).join('')}</div></div>` : ''}
     ${pick ? sec(N_('Sender'), two('sender', fc.senders)) + sec(N_('Document type'), two('type', fc.types)) + sec(N_('Folder'), two('folder', fc.folders)) : ''}
     <h4>${tr('File type')}</h4><div class="tsgrp">${DC_FTYPES.map(([k, l]) => `<button type="button" class="tsp ${dc_arr(f.ftype).includes(k) ? 'tsp-in' : ''}" data-dcfft="${k}" aria-pressed="${dc_arr(f.ftype).includes(k)}">${esc(tr(l))}</button>`).join('')}</div>
@@ -827,6 +856,8 @@ document.addEventListener('click', e => {
     dc_fChanged(); return;
   }
   const box = e.target.closest?.('.dc-flt'); if (!box) return;
+  const so = e.target.closest('[data-dcsort], [data-dcsortd]');  // 2.428.0 (#3579): the sort in the phone's sheet
+  if (so) { if (so.dataset.dcsort) dc_sortPick(so.dataset.dcsort); else dc_sortSet(dc_sort().k, so.dataset.dcsortd); return; }
   const f = DC.f, fc = DC.facets || {};
   const b = e.target.closest('[data-dcftg], [data-dcfsender], [data-dcftype], [data-dcffolder], [data-dcfft], [data-dcfm]'); if (!b) return;
   const ids = (list, name) => (list || []).find(x => x.name === name)?.ids.join(',');

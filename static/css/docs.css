@@ -5,7 +5,8 @@
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
 .dc-bar #dc-q{flex:1 1 14rem;min-height:2.75rem}
-.dc-seg button{min-height:2.75rem}  /* 2.138.4 A (#2362): 44 px */
+.dc-seg button{min-height:2.75rem}
+.dc-sortb{min-height:2.75rem}  /* 2.428.0 (#3579) */  /* 2.138.4 A (#2362): 44 px */
 .dc-count{display:inline-block;min-width:1.25rem;padding:0 .35rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);text-align:center}
 .dc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.25rem 0 .5rem}
 .dc-filters select,.dc-filters input{min-height:2.75rem}
@@ -108,7 +109,7 @@
 @media (max-width:767px) {
   .dc-view{padding:0 .5rem 6rem}
   .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}
-  .dc-up span,.dc-acts2 [data-dc="scan"] span{display:none}
+  .dc-up span,.dc-acts2 [data-dc="scan"] span,.dc-sortb span{display:none}  /* 2.428.0 (#3579): the sort as icon + arrow */
   .dc-filters{display:grid;grid-template-columns:1fr 1fr}
   .dc-filters select{width:100%}
   .dc-range{justify-content:space-between}
