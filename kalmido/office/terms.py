@@ -22,6 +22,8 @@ office_docs.terms (JSON {lang, date, sha256, file, name}) BEFORE anything is ren
 state (PDF line, mail attachment, approval link, decision record); a draft uses the current state. A quotation finalised
 without a frozen state (older ones) never gets a line or an attachment (no wrong state). Invoices / credit notes / reminders
 may attach the terms on request (unticked by default): their frozen state, else the current one (they print no line).
+2.434.0 (#3619): a quotation with the line carries the terms as the last pages of its PDF wherever it goes out (download,
+preview, mail, approval link, portal; agb_offer_pdf), joined on output -- the stored PDF stays as it was finalised.
 Documents made from templates (doctpl.py, kinds contract / confirmation) freeze the state when they are finished
 (office_gen_docs.terms) and offer it on their approval link. Only the document's language counts: terms in the other
 language only = no line, no attachment. 2.185.0 C (#2520): a document in another app language (nl, fr, es, it) takes the
@@ -31,6 +33,9 @@ import hashlib
 import json
 import os
 import re
+import struct
+import subprocess
+import sys
 import urllib.parse
 
 from flask import jsonify, request
@@ -54,6 +59,34 @@ AGB_GEN_KINDS = ("contract", "confirmation")  # documents from templates that ca
 # printed in the document's language (like the other print words of office/pdf.py)
 AGB_LINE = N_("Our terms and conditions (as of {0}) apply, see attachment.|terms")  # 2.185.0 C (#2520): was a de / en table
 AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
+# 2.434.0 (#3619): the quotation PDF + the terms pages behind it, joined by pypdf in a limited child process (like
+# docs/split.py): stdin = 8 bytes length + the quotation + the terms, stdout = the joined PDF
+AGB_JOIN_WORKER = r"""
+import io, resource, struct, sys
+for k, v in ((resource.RLIMIT_AS, 1024 << 20), (resource.RLIMIT_CPU, 60), (resource.RLIMIT_FSIZE, 0), (resource.RLIMIT_CORE, 0)):
+    try:
+        resource.setrlimit(k, (v, v))
+    except (ValueError, OSError):
+        pass
+import logging, warnings
+logging.disable(logging.CRITICAL)
+warnings.simplefilter("ignore")
+from pypdf import PdfReader, PdfWriter
+src = sys.stdin.buffer.read()
+n = struct.unpack(">Q", src[:8])[0]
+w = PdfWriter()
+for part in (src[8:8 + n], src[8 + n:]):
+    r = PdfReader(io.BytesIO(part))
+    if r.is_encrypted and not r.decrypt(""):
+        sys.exit(3)
+    for pg in r.pages:
+        w.add_page(pg)
+b = io.BytesIO()
+w.write(b)
+if len(b.getvalue()) > 2 * len(src) + (16 << 20):
+    sys.exit(4)
+sys.stdout.buffer.write(b.getvalue())
+"""
 
 
 # ---------------------------------------------------------------- helpers
@@ -173,9 +206,52 @@ def agb_attachment(c, oid, t):
     return (AGB_ATTACH[agb_lang(t.get("lang"))].format(t.get("date") or "undated"), oc_read_file(c, p), "application/pdf")
 
 
+def agb_join(pdf, terms):
+    """The bytes of PDF pdf with the pages of PDF terms behind it; ValueError when pypdf cannot read / join them."""
+    p = subprocess.run([sys.executable, "-I", "-c", AGB_JOIN_WORKER], input=struct.pack(">Q", len(pdf)) + pdf + terms,
+                       capture_output=True, timeout=90, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    if p.returncode != 0 or not p.stdout.startswith(b"%PDF-"):
+        raise ValueError("unreadable")
+    return p.stdout
+
+
+def agb_offer_pdf(c, oid, r, pdf):
+    """2.434.0 (#3619): the PDF of document row r as it goes out (download, preview, mail, approval link, portal): a
+    quotation that prints the terms line ("see attachment", agb_print_line: its frozen state, a draft the current one) gets
+    the terms pages behind its own; the stored document PDF stays as it is. Other kinds, no terms, or terms that cannot be
+    read / joined: pdf unchanged (a log line, never a 500)."""
+    if r["kind"] != "offer":
+        return pdf
+    t = agb_doc_terms(c, oid, r)
+    if not t:
+        return pdf
+    try:
+        a = agb_attachment(c, oid, t)
+        if not a:
+            raise OSError("terms file gone")
+        return agb_join(pdf, a[1])
+    except (OSError, ValueError, Denied, subprocess.SubprocessError) as e:
+        print("office: terms not appended to the quotation", r["id"], type(e).__name__, flush=True)
+        return pdf
+
+
 def agb_mail_files(c, oid, r, b, files):
     """invoices.inv_send: (files + the terms, terms ref | None). b["terms"]: true / false; missing = on for quotations only.
-    413 when the mail would get too large."""
+    413 when the mail would get too large. 2.434.0 (#3619): a quotation carries its terms as the last pages of its PDF
+    (agb_offer_pdf) -- no second file, the ref still goes into the log; only when the pages cannot be joined (a terms file
+    pypdf cannot read) they go along as their own file as before."""
+    if r["kind"] == "offer":
+        out, joined = list(files), False
+        for i, f in enumerate(out):
+            if f[2] == "application/pdf":
+                j = agb_offer_pdf(c, oid, r, f[1])
+                joined = j is not f[1]
+                out[i] = (f[0], j, f[2])
+                break
+        if joined:
+            if sum(len(f[1]) for f in out) > AGB_MAIL_MAX_MB * 1024 * 1024:
+                raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+            return out, agb_doc_terms(c, oid, r)
     want = b.get("terms")
     want = r["kind"] == "offer" if want is None else want in (1, True, "1", "true")
     t = agb_doc_terms(c, oid, r) if want else None
@@ -495,4 +571,6 @@ def agb_doc_get(did):
         if not t:
             raise Denied(404)
         return agb_file_response(c, oid, t, AGB_ATTACH[agb_lang(t["lang"])].format(t["date"] or "undated"))
-    return jsonify(terms={k: t[k] for k in ("lang", "date", "sha256", "name")} if t else None, default=r["kind"] == "offer")
+    # 2.434.0 (#3619): in_pdf = a quotation carries them as the last pages of its PDF (no checkbox in the send dialog)
+    return jsonify(terms={k: t[k] for k in ("lang", "date", "sha256", "name")} if t else None, default=r["kind"] == "offer",
+                   in_pdf=r["kind"] == "offer")

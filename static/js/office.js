@@ -632,7 +632,7 @@ const OFC_II = {
   paydays: N_('Payment terms: the days a client has to pay an invoice, printed as the due date (e.g. 14 days). A client\'s own payment terms win.'),
   rmdays: N_('Payment deadline: the new, shorter period a reminder gives, counted from its date (e.g. 10 days).'),
   einv: N_('ZUGFeRD is a normal PDF with the invoice data inside, fine for most clients. XRechnung is pure XML, required by public authorities (they give you a routing ID, the Leitweg-ID).'),
-  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF + XML and land in the accounting by themselves.'),  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
+  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.'),  // 2.434.0 (#3616): ZUGFeRD as PDF alone  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
   pq: N_('Example: 6 production days with quotient 3 make 2 producing days, charged at the producing rate. A markup for organising the production.'),
   rf: N_('Example: positions with raw data add up to 2,000 €; factor 0.25 makes a raw data surcharge of 500 €, as an option or included (set per quotation).'),
   pack: N_('A country pack brings the VAT rates, the formats and the printed words and legal texts of one country.'),

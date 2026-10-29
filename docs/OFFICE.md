@@ -1914,8 +1914,10 @@ PDF (the JSON print model stays at `/render` for the API). In the Android app's 
 the PDF button downloads as before. Archive PDFs of the legacy import open inline, `?download=1` downloads them.
 
 DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
-body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF + XML of an invoice or credit note
-there (`datev_sent_at`). No credentials; the booking batch export follows below. Every send is
+body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF of an invoice or credit note
+there (`datev_sent_at`). 2.434 (#3616): like the mail to the client, a ZUGFeRD invoice goes as the PDF alone (its XML is
+embedded as `factur-x.xml`); an XRechnung gets its XML as its own file next to the PDF. `GET /api/office/docs/<id>/xml`
+and the books ZIP keep the XML for both. No credentials; the booking batch export follows below. Every send is
 in the office log (`send`, `datev`), payments as `payment` / `payment_delete`.
 
 DATEV booking batch (2.47.3, #1460): `GET /api/office/datev/extf?from=YYYY-MM-DD&to=YYYY-MM-DD` (admin; default the
@@ -2072,11 +2074,16 @@ out with. This applies to organisation offices and to the personal office alike.
   quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
   apply, see attachment." - only when terms exist in the document's language (terms in the other language only: no line,
   no attachment). Replacing the terms later does not change a finalised quotation, its line or its attachment.
-- **Sending**: finalised quotations can be mailed too (status `sent`). The send dialog has the tick *Attach terms and
-  conditions* - ticked for quotations, unticked for invoices, credit notes and reminders - when the document's language
-  has terms. The file goes along as `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send" names the state
-  (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The DATEV copy never
-  carries them.
+- **In the quotation PDF** (2.434, #3619): a quotation that prints the line carries the terms pages behind its own pages
+  wherever its PDF goes out - download, preview, mail, approval link, customer portal, the agent API's draft preview.
+  They are joined on output; the stored PDF of a finalised quotation stays exactly as it was finalised. Terms that
+  cannot be read as a PDF leave the quotation PDF unchanged (a log line, no error).
+- **Sending**: finalised quotations can be mailed too (status `sent`). A quotation goes out as ONE PDF with the terms
+  inside (the send dialog says so instead of offering a tick); only when the terms cannot be joined they go along as their
+  own file as before. Invoices, credit notes and reminders have the tick *Attach terms and conditions* (unticked) when the
+  document's language has terms. The own file is named `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send"
+  names the state (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The
+  DATEV copy never carries them.
 - **Approval link**: the customer page of a quotation offers the terms for download next to the PDF
   (`/s/q/<token>/terms`, the same rules as the PDF); the decision record (`signoff_accepted` / `signoff_declined`) names
   the state and the confirmation page says "Terms and conditions as of ...". Contracts and order confirmations made from
