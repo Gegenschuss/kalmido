@@ -1309,7 +1309,8 @@ change its job (title, state, log: `409`). At most 20 requests wait per agent.
 #1512. A project can switch on a review step (project settings > *Review step*, or `set_list_review`): a default reviewer, the
 review section (default: the section named *Review*) and *Done only after approval*. Every task can have a reviewer
 (`reviewer_id`, a person or an agent with access to the project) and a review state (`review`: `pending`, `approved`,
-`changes`).
+`changes`). 2.390.0 (#3355): both stand on every task of the API (with `sprint_id`); `create_task` / `update_task` set
+`reviewer_id` with the same checks, `list_tasks` `reviewer: me, review: pending` lists what waits for your review.
 
 - Moving a task into the review section (board, detail, API) or `review_task` action `request` asks for the review: the
   default reviewer when the task has none, state `pending`. A person gets a News item + push (notification row *Reviews*,
@@ -1407,6 +1408,25 @@ A job object: `{id, agent_id, task_id, user_id, title, state, log, action, actio
 characters, no digits or colons, no plain words such as `Release` or `Fix` (else 400). Keep the log short: it is a summary, not a build log.
 2.306.0 (#2875): with `task_id`, `user_id` must be a person who sees the task and may address the agent in its list (else 400);
 `task_title` / `list_id` of a job are only filled for a viewer who sees the task.
+
+2.407.0 (#3513): **"Agent is working" at a task.** While you work on a task, people see a pulsing dot with your name (or
+the job's `name`), the time of your last update and your last progress line at the task: in the list row, on the board
+card and in the task detail (e.g. `Holston · 11:04 · Column added`), live in every open window.
+
+```
+POST   /api/v1/tasks/{id}/working   {"text": "Column added", "title": "…" (start only), "name": "Holston" (start only)}
+PATCH  /api/v1/tasks/{id}/working   {"text": "next line"}          -> 404 when you do not work on the task
+DELETE /api/v1/tasks/{id}/working?state=done | failed | stopped    -> the dot disappears at once
+GET    /api/v1/tasks/{id}/working                                 -> {working, job}
+```
+
+The first `POST` starts it (201), every further `POST` adds the next progress line (200); MCP `set_working` / `end_working`.
+It is your running job of that task (`GET /agent/jobs`): a job you already run with `task_id` (`POST /agent/jobs`) shows the
+same way. Without an update for 15 minutes the dot fades on its own (send a line at least that often, or `PATCH` without
+`text` to say "still working"). Needs the scope `tasks:write` and write access to the task's list (a task you cannot see:
+404, one you only read: 403). `text` is one line of prose: the server folds it and replaces recognisable secrets; the
+rows show up to 200 characters. `working` in the answer (and on the task in the app) is `{agent_id, agent, name, text, at,
+ttl}` or `null`.
 
 **Chat.** Every person has their own conversation with an agent, stored in Kalmido. Each message a person sends is a `chat` event.
 
@@ -3126,8 +3146,9 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
-yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. 2.407.0 (#3493): the ring is always shown (2.350.0
+showed it only from yellow on); every window also sits in the chat header's "…" menu ("Usage: …"). Each person can hide the
+ring with *Show usage* (the "…" menu or *Chat settings*, for all their chats); the "…" menu keeps the numbers. Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 
@@ -3148,6 +3169,13 @@ read earlier, e.g. from a file a status line wrote: the ring greys out 24 h afte
 report replaces the previous one: send all windows each time. Report after
 every run or job (more often is fine; people's apps reload only when something visible changes). `GET /api/v1/agent`
 and the agents list carry the same object as `quota`. MCP: `report_plan_usage`, `get_plan_usage`, `clear_plan_usage`.
+
+**Agents with an API key instead of a plan (2.407.0, #3493).** An agent that reports no plan quota but costs
+(`cost_usd` in `POST /api/v1/agent/usage`) fills the ring with its costs against its own cost limit in Kalmido (the usage
+limits with metric `cost`, monthly or daily; the hard limit, else the soft one) -- same colours. Without a cost limit there
+is no ring; the "…" menu reads *Costs this month: $x* (and today). An agent that reports both: the plan quota fills the
+ring, the costs are added to its list. The agents list people get carries `cost`: `null`, or `{period, pct}` (`pct` null
+without a cost limit) and, for the owner of a personal agent and instance admins only, `today`, `month` and `limit` in USD.
 
 **Claude Code.** Its status line command gets the session data as JSON on stdin; for Pro / Max plans (and behind a
 gateway with spend limits) it contains `rate_limits` after the first answer of the session:
@@ -3307,6 +3335,12 @@ Kalmido's part:
   with `approval: null`: they are not a go.
 - While the agent reports `working` with the task (`set_status` with `task_id`), the task shows *<agent> is working on it*.
 - `fixes #<id>` in the merged pull request completes the task (once; *Undo* in the history).
+- Ticket keys (2.390.0): a project can have a key (*Ticket key* in the project dialog, e.g. `APP`); its tasks then carry
+  `key` (`APP-12`) next to `id`. `APP-12` in a commit, pull request title / text or a branch name (`app-12-login`,
+  `feature/APP-12`) links like `#12`, `fixes APP-12` completes. `GET /api/v1/tasks/APP-12` (MCP `get_task` with `key`)
+  reads the task, also by an old key (moved, key changed). In a project with a key, `#<id>` counts only while the
+  repository's switch *Also read #number* is on (on for repositories connected before 2.390.0, off for new ones: no
+  clash with the Git server's issue numbers).
 
 What Kalmido never does: it never gets write access to a repository (a read-only token is enough), never merges, never
 hands the repository token to anyone (agents cannot read or set it and cannot connect repositories). The agent pushes and
@@ -3351,7 +3385,7 @@ You are the coding agent of the Kalmido project "<project>". You work through th
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
@@ -3421,7 +3455,9 @@ with the scope it needs). The tools:
   `set_list_columns`, `list_members`, `share_list`, `unshare_list`, `list_groups`, `get_group`, `list_list_groups`,
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
-- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
+- tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
+  filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
+  `q` and `sort`, see *Task filters* in docs/API.md),
   `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
@@ -3457,7 +3493,7 @@ with the scope it needs). The tools:
   `preview`
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `create_job`, `get_job`, `update_job`, `set_working` / `end_working` (2.407.0), `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
@@ -3481,7 +3517,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
@@ -3503,7 +3539,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
-`set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
+`set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,

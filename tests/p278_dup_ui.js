@@ -78,7 +78,8 @@ const FEAT = 'comments,collab,progress';
     check(await until(`!!document.querySelector('#view .trow')`, 60), 'phone: list rendered');
     await ev(`(() => { listModal(${L}); return 1; })()`);
     check(await until(`!!document.querySelector('.modal [data-m="dup"]')`), 'list dialog: the Duplicate button');
-    const foot = await ev(`(() => { const f = document.querySelector('.modal [data-m="dup"]').closest('.foot'); return {sw: f.scrollWidth, cw: f.clientWidth, tpl: !!f.querySelector('[data-m="tpl"]')}; })()`);
+    // 2.352.0 (#2751): "Save as template" and "Duplicate" sit in the project dialog's part Actions (was the foot)
+    const foot = await ev(`(() => { const f = document.querySelector('.modal [data-m="dup"]').closest('.foot, .lacts'); return {sw: f.scrollWidth, cw: f.clientWidth, tpl: !!f.querySelector('[data-m="tpl"]')}; })()`);
     check(foot.tpl && foot.sw <= foot.cw + 1, 'phone: the foot with "Save as template" and "Duplicate" fits ' + JSON.stringify(foot));
     await sleep(600); await shot('p278-listdialog-phone.png');
     await ev(`(() => { document.querySelector('.modal [data-m="dup"]').click(); return 1; })()`);

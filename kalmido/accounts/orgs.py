@@ -15,7 +15,7 @@ from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
-from .orgretain import odl_former  # 2.186.0 A (#2599)
+from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -492,14 +492,12 @@ def list_org_set(c, lid, v):
                                AND grole IS NULL) ORDER BY user_id""", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    # 2.361.0 (#2922): who brought it in from the private space (it goes back there when that person leaves, org_leave)
+    c.execute("UPDATE lists SET brought_by=? WHERE id=?", (me() if oid and not lr["org_id"] else None, lid))
     from ..lists.groups import grp_sync
     grp_sync(c, [lid])  # 2.352.0 A (#2748): its node into the new workspace's projects tree, the old folders' roles end
-    # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
-    from ..team.clients import _org_boundary
-    list_space_follow(c, lid, lr["org_id"], _org_boundary(c))  # 2.401.0 (#2924): its customer reports and bells go along
-    if _org_boundary(c):
-        c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
-                  " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
+    boundary = ol_client_fit(c, lid, oid)  # 2.86.0 (N11): a client of another workspace does not travel along (as list_client_set refuses it)
+    list_space_follow(c, lid, lr["org_id"], boundary)  # 2.401.0 (#2924): its customer reports and bells go along
     from ..admin.orgcrypt_cli import oc_settle_kick
     # 2.42.0 (#828): the list's files get the organisation's key now; 2.64.0 (#1864): out of it the owner's account key
     # (only this list's files, after the request)
@@ -912,10 +910,14 @@ def org_delete(oid):
         if info["kept_until"] and info["kept_until"] >= iso(now_utc())[:10]:
             return err(tr("This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that", info["kept_until"]), 409)
         confirm = request.args.get("confirm") == "1"
+        from .orgleave import olv_early, olv_gone_news
+        if olv_early(c, oid):  # 2.361.0 (#2920): the members were told a day: it waits until then (or the notice is taken back)
+            return err(tr("The members were told that this organisation is deleted on {0}: it can be deleted from that day on", olv_early(c, oid)), 409)
         if info["retain_until"] and not info["kept_until"]:
             if not confirm:
                 return jsonify(error=tr("This organisation keeps {0} by law until {1}: it is retired instead of deleted. Export it first, then confirm.",
                                         odl_text(info["kept"]), info["retain_until"]), **info), 409
+            olv_gone_news(c, oid, (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0])  # 2.361.0 (#2920)
             odl_retire(c, oid, info["retain_until"])  # review F6: the acting admin may keep the files
             bump(c)
             c.commit()
@@ -933,6 +935,7 @@ def org_delete(oid):
         oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
         from ..admin.hosting import hosted
         from ..office.olock import OLK_BYPASS
+        olv_gone_news(c, oid, oname)  # 2.361.0 (#2920): every member learns it, with what of theirs goes along
         tok = OLK_BYPASS.set(hosted())  # 2.152.0 (#2167, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
         try:
             todo = odl_dismantle(c, oid)  # 2.152.0 A: the steps shared with the account deletion and the retention run
@@ -959,7 +962,9 @@ def odl_delete_info(c, oid):
         kept = max(kept, odl_retention(c, oid)["until"] or "")
     from ..files.store import fs_org_live
     more = odl_more(c, oid)  # 2.272.0 D (#3029): the rest that goes along (catalogue), for the dialog only
-    return {"content": odl_content(c, oid), "more": more, "more_text": odl_more_text(more), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
+    from .orgleave import olv_members, olv_notice
+    return {"members": olv_members(c, oid), "notice": olv_notice(c, oid),  # 2.361.0 (#2920): what is whose, the day the members were told
+            "content": odl_content(c, oid), "more": more, "more_text": odl_more_text(more), "kept": ret["counts"], "retain_until": ret["until"], "kept_until": kept or None,
             "retired": kept is not None, "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0],
             "files": fs_org_live(c, oid), "can_export": odl_admin_export(c, oid) or org_role(c, me(), oid) == "admin",
             "can_retention": kept is not None and odl_admin_export(c, oid, retention=True)}  # 2.239.0 C (#2943): the retention export only
@@ -978,7 +983,8 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "open_receipts": ("{0} receipt", "{0} receipts"), "einvoices": ("{0} invoice", "{0} invoices"),
              "payments": ("{0} payment", "{0} payments"), "signoffs": ("{0} confirmed sign-off", "{0} confirmed sign-offs"),
              "procdocs": ("{0} version of the procedure documentation", "{0} versions of the procedure documentation"),
-             "assets": ("{0} device", "{0} devices")}  # 2.355.0 B (#2845): the asset register
+             "assets": ("{0} device", "{0} devices"),  # 2.355.0 B (#2845): the asset register
+             "bookarch": Nn_("{0} archived booking", "{0} archived bookings")}  # 2.414.0 (#3502): the booking archive
 
 
 def odl_text(counts):
@@ -1245,14 +1251,58 @@ def _admins(c, oid):
     return c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0", (oid,)).fetchone()[0]
 
 
-def org_leave(c, oid, uid, heir):
+def ol_client_fit(c, lid, oid):
+    """2.86.0 (N11): list lid now in workspace oid (None = private) loses a client of another workspace. Returns the boundary
+    (team/clients.py _org_boundary) for list_space_follow."""
+    from ..team.clients import _org_boundary
+    boundary = _org_boundary(c)
+    if boundary:
+        c.execute("UPDATE lists SET client_id=NULL WHERE id=? AND client_id IS NOT NULL AND client_id NOT IN"
+                  " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, oid))
+    return boundary
+
+
+def ol_private(c, lid, uid):
+    """2.361.0 (#2922): list lid of uid leaves its organisation into uid's private space (the caller checked why): its client
+    of the organisation stays behind, the organisation's agents leave it (uid's own agents follow uid), its files get the
+    owner's account key after the request."""
+    old = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    c.execute("UPDATE lists SET org_id=NULL, brought_by=NULL WHERE id=?", (lid,))
+    c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lid,))  # 2.172.1 (#2689)
+    # 2.86.0 (N11) + 2.401.0 (#2924): as list_org_set, its customer reports and bells go along
+    list_space_follow(c, lid, old, ol_client_fit(c, lid, None))
+    for (aid,) in c.execute("SELECT m.user_id FROM list_members m JOIN agents a ON a.user_id=m.user_id WHERE m.list_id=? "
+                            "AND a.owner_id IS DISTINCT FROM ? AND a.org_id IS NOT NULL", (lid, uid)).fetchall():
+        c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, aid))
+        c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, aid))
+    from ..admin.orgcrypt_cli import oc_settle_kick
+    oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
+
+
+def ol_back_log(c, oid, lr):
+    """2.361.0 (#2922, review): a brought-in list that went back private is in the admins' history (as org_out's moves out)
+    and told to the organisation's admins (News orglist moveout)."""
+    from .orgout import oo_note
+    with system_ctx(c):
+        real = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
+    oo_note(c, oid, real, "list", lr["name"], lr["id"], back=True)
+
+
+def org_leave(c, oid, uid, heir, back=None):
     """uid leaves organisation oid: their lists of that workspace go to heir (an organisation admin), uid leaves every list
     of the organisation (members and the agents it owns there stay with the lists), their personal agents of that workspace
-    become private. The caller commits. Returns the number of lists transferred."""
+    become private. 2.361.0 (#2922): a list uid brought in from the private space (lists.brought_by) goes back there instead
+    (its id appended to back). The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
-        if heir and heir != uid:
+        if lr["brought_by"] == uid and not lr["deleted_at"]:
+            ol_private(c, lr["id"], uid)
+            priv.append(lr["id"])
+            ol_back_log(c, oid, lr)
+            if back is not None:
+                back.append(lr["id"])
+        elif heir and heir != uid:
             owner_transfer(c, lr, heir, force=True)  # 2.64.1 (#1817): a list with the lock too (the heir waits for its key)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lr["id"], uid))
             from .orglists import _ol_log
@@ -1261,11 +1311,8 @@ def org_leave(c, oid, uid, heir):
         elif lr["deleted_at"]:  # 2.102.0 A (#1988): a list in the trash stays the organisation's (never the leaver's private one)
             continue
         else:
-            c.execute("UPDATE lists SET org_id=NULL WHERE id=?", (lr["id"],))
+            ol_private(c, lr["id"], uid)
             priv.append(lr["id"])
-            c.execute("DELETE FROM reading_orgs WHERE list_id=?", (lr["id"],))  # 2.172.1 (#2689)
-            from ..admin.orgcrypt_cli import oc_settle_kick
-            oc_settle_kick([lr["id"]])  # 2.64.0 (#1864): its files get the owner's account key
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
@@ -1301,6 +1348,7 @@ def org_leave(c, oid, uid, heir):
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     with system_ctx(c):  # 2.223.2 B (#2860): their office rights groups go too (coming back = no old groups)
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
+        c.execute("DELETE FROM doc_fetchers WHERE org_id=? AND user_id=?", (oid, uid))  # 2.425.0 (#3453 review): their receipt fetchers end (coming back = no old key)
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     # 2.351.0 D (#3214): their read marks in the organisation's channels and list conversations go too (tchat_sig_q
     # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible); 2.373.0 (#3337):
@@ -1353,7 +1401,8 @@ def org_member_remove(oid, uid):
         acx_drop()
         heir = operator
     oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]  # 2.37.0 (#1150): before leaving it (then invisible)
-    n = org_leave(c, oid, uid, heir)
+    back = []
+    n = org_leave(c, oid, uid, heir, back=back)  # 2.361.0 (#2922): what the person brought in goes back to their private space
     if operator:
         from ..collab.news import news_add
         news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n}, actor=uid)
@@ -1362,8 +1411,9 @@ def org_member_remove(oid, uid):
         from ..collab.news import news_add
         from ..collab.comments import user_names
         # 2.148.1 A (#2480): the person learns that their lists of the organisation stayed with it (and with whom)
-        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {})})
+        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {}),
+                                                        **({"back": len(back)} if back else {})})  # 2.361.0 (#2922)
     bump(c)
     c.commit()
     print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", login_log_who(g.user), "lists transferred:", n, flush=True)
-    return jsonify(ok=True, transferred=n)
+    return jsonify(ok=True, transferred=n, back=len(back))

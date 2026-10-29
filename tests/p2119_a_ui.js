@@ -64,6 +64,14 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`document.querySelector('.modal #bw-host').value === 'u${me.id}'`), 'the host is me');
     check(await ev(`[...document.querySelector('.modal #bw-place').options].some(o => o.textContent === 'Bistro Beispiel') && [...document.querySelectorAll('.modal [data-bwg]')].some(x => /Otto Beispiel/.test(x.closest('label').textContent))`),
       'the place and the guest of the approved receipt are in the choices');
+    // 2.408.0 (#3521): a new receipt: food at 7 % (since 2026), drinks at 19 %; the date moves an untouched default, a hand-picked rate stays
+    const rates = () => ev(`[...document.querySelectorAll('.modal [data-bwl="rate"]')].map(r => r.value).join(',')`);
+    check(await rates() === '7,19', 'new receipt: food 7 %, drinks 19 % ' + await rates());
+    await ev(`(() => { const i = document.querySelector('.modal #bw-date'); dpSet(i, '2025-12-31'); return 1; })()`);
+    check(await ready(ev, `[...document.querySelectorAll('.modal [data-bwl="rate"]')].map(r => r.value).join(',') === '19,19'`), 'a date in 2025: food at 19 % ' + await rates());
+    await ev(`(() => { const r = document.querySelectorAll('.modal [data-bwl="rate"]')[0]; r.value = '0'; r.dispatchEvent(new Event('change', {bubbles: true})); dpSet(document.querySelector('.modal #bw-date'), today()); return 1; })()`);
+    check(await ready(ev, `document.querySelector('.modal #bw-date').value === today()`) && await rates() === '0,19', 'a rate chosen by hand stays when the date changes ' + await rates());
+    await ev(`(() => { const r = document.querySelectorAll('.modal [data-bwl="rate"]')[0]; r.value = '7'; r.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     await ev(setv('.modal #bw-place', '__new'));
     check(await ready(ev, `!document.querySelector('.modal .bwpnew').hidden`), 'New place… opens name and address');
     await ev(setv('.modal #bw-pname', 'Osteria Muster'));

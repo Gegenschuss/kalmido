@@ -49,6 +49,8 @@ NEWS_KINDS += ("tsheet",)  # 2.125.0 B (#2119): a member closed a month / an adm
 NEWS_KINDS += ("wiki_shared",)  # 2.126.2 B (#2355): someone shared knowledge pages with me (row "share", wiki/wkshare.py)
 NEWS_KINDS += ("orgjoin",)  # 2.148.1 A (#2480): an organisation invites me to join (always, no push; accounts/orginvite.py)
 NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined through a link (row "signoff", office/signoff.py)
+NEWS_KINDS += ("orgdelnotice", "orggone")  # 2.361.0 (#2920): my organisation is deleted on a day / was deleted (always, no push; accounts/orgleave.py)
+NEWS_KINDS += ("fetcherr",)  # 2.425.0 C (#3453): a portal of my receipt fetcher reports a new error (row "fetcher", docs/fetcher.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -67,11 +69,12 @@ NEWS_FOR_ME += ("tsheet",)  # 2.125.0 B (#2119)
 NEWS_FOR_ME += ("wiki_shared",)  # 2.126.2 B (#2355)
 NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
 NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
+NEWS_FOR_ME += ("orgdelnotice", "orggone")  # 2.361.0 (#2920)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind == "approval":  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -154,6 +157,7 @@ NOTIF_ROWS += ("filereq",)  # 2.122.0 A (#2097): files arrived through my file r
 NOTIF_ROWS += ("leave",)  # 2.125.0 A (#2117): vacation requests (admins) and the decision on my own (News + push on by default)
 NOTIF_ROWS += ("timesheet",)  # 2.125.0 B (#2119): timesheets: a member's closed month (admins), the decision on mine (News + push on by default)
 NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link (sign-off, video review; News + push on by default, was "approval")
+NOTIF_ROWS += ("fetcher",)  # 2.425.0 C (#3453): a portal of my receipt fetcher has a new error (News + push on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -163,6 +167,7 @@ NOTIF_NEWS_NEW["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_NEWS_NEW["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_NEWS_NEW["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
+NOTIF_NEWS_NEW["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -171,6 +176,7 @@ NOTIF_PUSH_DEFAULT["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_PUSH_DEFAULT["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_PUSH_DEFAULT["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
+NOTIF_PUSH_DEFAULT["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -190,6 +196,7 @@ KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
 KIND_ROW["signoff"] = "signoff"  # 2.266.0 (#2965)
+KIND_ROW["fetcherr"] = "fetcher"  # 2.425.0 C (#3453)
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -533,6 +540,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 jo = 0
             if not jo or not ojn_open(c, jo, uid):
                 continue
+        elif kind == "orgdelnotice":  # 2.361.0 (#2920): while I am in that organisation and the notice stands
+            from ..accounts.orgleave import olv_news_live
+            if not olv_news_live(c, uid, r["data"]):
+                continue
+        elif kind == "orggone":  # 2.361.0 (#2920): the organisation is gone (name + my numbers in data)
+            pass
+        elif kind == "fetcherr":  # 2.425.0 C (#3453): my receipt fetcher's portal error (no task, no list)
+            pass
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

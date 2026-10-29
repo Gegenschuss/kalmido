@@ -198,16 +198,27 @@ def _cal_connector(allow):
     return create
 
 
+_CAL_WATCH = threading.local()  # 2.424.0 B2 (#3450): the connections of a cal_http call with `until` (its watchdog)
+
+
+def _cal_watch(conn):
+    w = getattr(_CAL_WATCH, "conns", None)
+    if w is not None:
+        w.append(conn)
+
+
 class _CalHTTPConnection(http.client.HTTPConnection):
     def __init__(self, *a, cal_allow=frozenset(), **k):
         super().__init__(*a, **k)
         self._create_connection = _cal_connector(cal_allow)
+        _cal_watch(self)
 
 
 class _CalHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *a, cal_allow=frozenset(), **k):
         super().__init__(*a, **k)
         self._create_connection = _cal_connector(cal_allow)  # then TLS with server_hostname = the host name
+        _cal_watch(self)
 
 
 class _CalHTTPHandler(urllib.request.HTTPHandler):
@@ -276,13 +287,51 @@ _CAL_CRED_HEADERS = {"authorization", "proxy-authorization", "cookie", "x-api-ke
 
 
 def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozenset(), cross_redirects=False,
-             max_bytes=None, timeout=None, deadline=None):
+             max_bytes=None, timeout=None, deadline=None, until=None):
     """One request, redirects followed by hand (at most 5; never https -> http). Returns (status, headers, body,
     final url). auth = (user, password): Basic auth, only ever sent to the host of `url`; a redirect to another
-    host is only followed without credentials (cross_redirects, https only). Every hop runs through the SSRF guard."""
+    host is only followed without credentials (cross_redirects, https only). Every hop runs through the SSRF guard.
+    until (2.424.0 B2, #3450): a time.monotonic() point the whole call ends at, also in the connect and header phase (a
+    server sending its headers drop by drop): each hop's socket timeout is at most the time left and a watchdog shuts
+    the open connections down then (CalError timeout). Without it (the calendar subscriptions) nothing changes."""
+    if until is None:
+        return _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, None)
+    _CAL_WATCH.conns = conns = []
+    cut = threading.Event()
+    dog = threading.Timer(max(0.0, until - time.monotonic()), _cal_cut, (conns, cut))
+    dog.daemon = True
+    dog.start()
+    try:
+        res = _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until)
+    except CalError:
+        if cut.is_set() or time.monotonic() >= until:
+            raise CalError("timeout") from None
+        raise
+    finally:
+        dog.cancel()
+        _CAL_WATCH.conns = None
+    if cut.is_set():  # a body cut off by the watchdog reads like its end
+        raise CalError("timeout")
+    return res
+
+
+def _cal_cut(conns, cut):
+    """The watchdog of cal_http(until=...): shuts the sockets of its connections down (a blocked read returns)."""
+    cut.set()
+    for conn in list(conns):
+        try:
+            if conn.sock is not None:
+                conn.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
+def _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until):
     first = (urllib.parse.urlsplit(url).hostname or "").lower()
     op = _cal_opener(allow)
     deadline = time.monotonic() + (deadline or CAL_DEADLINE)  # 2.47.3 (#1738): max_bytes / timeout / deadline for small fetches (contact photos)
+    if until is not None:
+        deadline = min(deadline, until)
     max_bytes = max_bytes or CAL_MAX_BYTES
     for _hop in range(6):
         p = urllib.parse.urlsplit(url)
@@ -293,7 +342,10 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
             hd["Authorization"] = "Basic " + base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
         req = urllib.request.Request(url, data=body, method=method, headers=hd)
         try:
-            r = op.open(req, timeout=timeout or CAL_TIMEOUT)
+            left = deadline - time.monotonic() if until is not None else None
+            if left is not None and left <= 0:
+                raise CalError("timeout")
+            r = op.open(req, timeout=min(timeout or CAL_TIMEOUT, left) if left is not None else timeout or CAL_TIMEOUT)
         except urllib.error.HTTPError as e:
             loc, code = (e.headers.get("Location") if e.headers else None), e.code
             hdrs = e.headers

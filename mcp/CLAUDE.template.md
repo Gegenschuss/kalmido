@@ -168,6 +168,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short
   progress lines (`update_job` with `append_log`); set it to done / failed at the end, or waiting when you need a
   person. The last log line is the result in plain words.
+- **Working on a task** (2.407.0): when you start work on a task, mark it with `set_working` (`task_id`, a short first
+  line); people see a pulsing dot with your name, the time and that line at the task. Send the next short progress line
+  with `set_working` as you go (at least every 15 minutes, else the mark fades) and end it with `end_working` when you are
+  done or stop. Prose only, no secrets.
 - A chat answer should come within minutes. Longer work runs as a background job: answer at once with what you started;
   the result follows in the chat.
 - When work is superseded (a newer version, a changed request), stop your own jobs and sub-agents for it and set them
@@ -269,7 +273,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id = the project) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
@@ -325,9 +329,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   retrying with another date. Client and price data go to your model: read only what the order needs. Pass `requested_by` = the person you
   work for -- only somebody who asked you (chat, mention, assignment, job, letter request; else 403, 2.223.2); `notify: true` puts a card with the sum, the PDF preview and *Open in the office* into their chat. A payment
   suggestion above the invoice's open amount is `409` (2.149.0), like a person's payment.
-  2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.einvoice`,
+  2.147: `get_office` also names the area's `country_pack` and its `features` (`books.datev`, `docs.delivery`, `docs.einvoice`,
   `books.vat_return`, `books.tax_dates`, `books.export_csv`: true / false). Leave out what is off - no DATEV hints, no
-  XRechnung, no VAT return figures in an office that does not use them.
+  XRechnung, no VAT return figures, no delivery notes (creating one answers `404`) in an office that does not use them.
   Letters (2.153.0) the same way: after the event `letter_draft_requested` ONE `create_letter_draft` (`answers` = the
   document); a person checks, signs and sends it.
   2.144.10: documents carry `trial` (a trial document: TEST number, SAMPLE on the PDF, never real business; no
@@ -472,6 +476,12 @@ In projects with story points on (`points_on`) a task can carry `points` (1, 2, 
 when the project's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
 for the kanban column, moving stays allowed. `get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person.
+
+### Finding tasks (2.390.0)
+Ask `list_tasks` precisely instead of reading whole projects: `priority` / `priority_min`, `section_id`, `sprint_id`
+(`current` = the running sprint, `none` = backlog), `created_by`, `reviewer` + `review` (`reviewer: me, review: pending` = what
+waits for your review), `field_values` (custom fields), `q` (words in title or notes) and `sort` (`-priority`, `due`, ...).
+Tasks carry `sprint_id`, `reviewer_id` and `review`; `create_task` / `update_task` set `sprint_id` and `reviewer_id`.
 
 ### Reminders at a fixed time (2.138.1)
 "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in

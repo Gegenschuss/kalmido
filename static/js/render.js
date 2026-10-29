@@ -57,7 +57,7 @@ async function quotaDialog(j) {
   const html = `<p>${esc(tr('Your storage is full: {0} of {1}. New files cannot be uploaded until there is space again. Nothing has been deleted.', fmtSize(q.used || 0), fmtSize(q.limit || 0)))}</p>
     <p class="muted">${esc(tr('Delete files you no longer need (attachments in tasks, comments and projects) or ask for more space.'))}</p>`;
   const ok = await askDialog({title: tr('Storage full'), html, ok: tr('Contact support'), cancel: tr('Close')});
-  if (ok) { if (q.support) location.href = quotaMail(q); else toast(tr('No support address is set on this server: ask your admin.')); }
+  if (ok) { if (q.support) location.href = quotaMail(q); else toast(tr('No support address is set on this server.')); }
 }
 // 2.13.3: the + button follows rotations / folding too (not only a full render): hidden where the add bar or the header's
 // "New task" is there (tablets, an unfolded Fold in portrait)
@@ -313,12 +313,14 @@ function renderSide0() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const sbb = sbb_on(), sbm = !sbb && sbm_on(), sbbArea = sbb || sbm ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area; 2.196.0 A (#2737): sbm = the phone's drawer like it
   const row = (key, icon, name, n, extra = '', after = '') =>
-    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
+    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}"${n?.tip && rsy_sideCnt() ? ` title="${esc(n.tip)}" aria-label="${esc(n.tip)}"` : ''}>${(rsy_sideCnt() || (key === 'today' && c.over)) && (n?.v ?? n) || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  // 2.407.0 (#3518): a list / folder shows open/total (5/12) once something in it is done; the hint names both, the open number stays first
+  const sideOD = (open, done) => done ? {v: `${open || 0}/${(open || 0) + done}`, tip: tr('{0} open · {1} done', open || 0, done)} : open;
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
@@ -337,7 +339,7 @@ function renderSide0() {
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
     if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
-    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
+    return row('l:' + l.id, sw, nmOf(l), sideOD(c.lists[l.id], l.progress?.done), `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.352.0 E (#2748): a tree of any depth on the sidebar tree (areas.js sbb_treeHtml): a folder's head, then its body (its own
@@ -350,10 +352,11 @@ function renderSide0() {
   const fnode = f => {
     const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
+    const nd = fl.reduce((a, l) => a + (l.progress?.done || 0), 0);  // 2.407.0 (#3518): the folder sums its lists' done tasks too
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the arrow folds
     const mir = fl.some(l => l.mirrored);  // 2.27.0 (#988): the owner arranges a shared folder
-    const after = (S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>`)
+    const after = (S.listReorder ? '' : `<span class="c" ${nd && rsy_sideCnt() ? `title="${esc(tr('{0} open · {1} done', n, nd))}" aria-label="${esc(tr('{0} open · {1} done', n, nd))}"` : n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && (nd ? `${n}/${n + nd}` : n) || ''}</span>`)
       + (rsy_sideShr() ? folderShrHtml(f) : '')  // 2.41.0 (#1428); 2.56.1 (#1799): can be off
       + `<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>`
       + (S.listReorder ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
@@ -980,6 +983,26 @@ function renderView0() {
 }
 
 // ------------------------------------------------------------------ render: task rows
+// 2.407.0 A (#3513): an agent works on the task (its running job, t.working from the server): a pulsing dot with the name,
+// the time of its last update and its last progress line, in the row / board card and the detail. It fades ttl seconds
+// after that update here as on the server: agwArm redraws once the next one is due (no reload)
+let agwT = 0, agwAt = 0;
+function agwArm(end) {
+  if (agwT && agwAt <= end) return;
+  clearTimeout(agwT); agwAt = end;
+  agwT = setTimeout(() => { agwT = 0; viewSafeRender(); if (S.sel && !$('#detail')?.contains(document.activeElement)) renderDetail(); },
+    Math.min(Math.max(end - Date.now(), 0) + 1000, 2 ** 31 - 1));
+}
+function agwOf(t) {
+  const w = t?.working, at = w ? Date.parse(w.at) : NaN, end = at + (w?.ttl || 900) * 1000;
+  if (!w || !(end > Date.now())) return null;
+  agwArm(end);
+  return [w.name || w.agent || tr('Agent'), fmtTimeLoc(fmtHM(new Date(at))), w.text].filter(Boolean).join(' · ');
+}
+function agwChip(t) {
+  const line = agwOf(t);
+  return line ? `<span class="agw" title="${esc(line)}"><i class="agwd" aria-hidden="true"></i><span class="sr">${esc(tr('Agent working'))}: </span><span class="agwt">${esc(line)}</span></span>` : '';
+}
 function taskRow(t, opts = {}) {
   const kids = S.tasks.size ? children(t.id) : [];
   const openKids = kids.filter(k => k.status === 0).length;
@@ -995,6 +1018,7 @@ function taskRow(t, opts = {}) {
   const lst = opts.showList && listById(t.list_id) ? lname(listById(t.list_id)) : '';
   let time = null, who = '';
   const rs = opts.trash ? () => true : rsy_on;  // 2.56.1 (#1799): the row's symbol level (rowsym.js RSY_SYMS); the trash shows all
+  if (t.ticket_no && !opts.trash) { const kc = tkChip(t); if (kc) meta.push(kc); }  // 2.390.0 (#3353): the ticket key APP-12
   if (t.ttype && !opts.trash && ticketsOn(t.list_id) && rs('ttype')) meta.push(ttChip(t));  // 2.4.0 (#340)
   if (t.points && !opts.trash && spt_on(t.list_id)) meta.push(spt_chip(t));  // 2.60.0 (#1511): story points (own switch per list, not part of the row's symbol level)
   if (isMs(t)) { if (rs('ms')) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`); }  // 2.18.0 (#430)
@@ -1011,6 +1035,7 @@ function taskRow(t, opts = {}) {
   if (t.waiting_at && t.status === 0 && !opts.trash && rs('wait')) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
+  if (!opts.trash && t.working) { const w = agwChip(t); if (w) meta.push(w); }  // 2.407.0 A (#3513)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list') && !(rsyProjToday() && !opts.trash)) { /* 2.56.1 (#1799): the list is switched off */ }
@@ -1065,7 +1090,7 @@ function taskRow(t, opts = {}) {
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
-  const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
+  const work = t.status === 0 && t.id > 0 && ((S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id) || !!agwOf(t));  // 2.407.0 A (#3513): + a working job
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
@@ -1849,7 +1874,7 @@ async function doSearch(q) {
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = one ? {tasks: []} : await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q) + (typeof rt9_semQ === 'function' ? rt9_semQ() : ''));  // 2.59.0 B (#1375): + semantic=1
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
-    const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+    const nm = q.trim().match(/^#?(\d{1,9})$/), hit = (nm && taskById(+nm[1])) || tkFind(q);  // 2.390.0 (#3353): + "APP-12"
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
     if (one && !hit) { if (S.searchQ === q) { S.searchRes = null; $('#sresults').innerHTML = ''; } return; }
     if (!one && typeof le2eSearch === 'function') j.tasks = le2eSearch(q, j.tasks);  // 2.64.1 (#1817): locked lists, searched here (the server cannot)
@@ -1862,7 +1887,7 @@ async function doSearch(q) {
 // typed may still be on their way: then it opens once they are there)
 function searchEnterOpen(q) {
   const nm = q.trim().match(/^#?(\d{1,9})$/), r = S.searchResQ === q ? S.searchRes || [] : [];
-  const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : r.length === 1 ? r[0] : null;
+  const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : tkFind(q) || (r.length === 1 ? r[0] : null);  // 2.390.0 (#3353): + "APP-12"
   if (!t) return false;
   if (isMobile()) $('#searchq')?.blur();
   openDetail(t.id); return true;

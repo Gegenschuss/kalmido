@@ -18,6 +18,7 @@ from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers b
 from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
+from .maillink import ml_token_new  # 2.424.0 B (#3450)
 from .ocr import ocr_available
 from ..core.pages import new_inbox_task  # 2.149.0 G (#2517): pulled up from functions
 
@@ -54,7 +55,7 @@ def ws_param(c, raw, uid, manage=False):
     if manage:
         from ..accounts.orgs import is_org_admin
         if not is_org_admin(c, uid, oid):
-            raise Denied(403, tr("Only admins of the organisation can change this"))
+            raise Denied(403, tr("Only admins of this workspace can change this"))
     return oid, S.doc_ws(oid, uid)
 
 
@@ -889,7 +890,6 @@ def docs_label_restore(kind):
 @app.post("/api/docs/mail")
 def docs_mail_new():
     """{ws} -- a new forwarding address for documents (the old one stops working)."""
-    import secrets
     from ..integrations.mail import MAIL_IN_ON, mail_addr
     c = db()
     _no_agent()
@@ -897,9 +897,7 @@ def docs_mail_new():
     if not MAIL_IN_ON:
         return err(tr("E-mail to tasks is not set up on this server"), 409)
     org, _ws = ws_param(c, body().get("ws"), uid)
-    tok = "d" + secrets.token_urlsafe(14).replace("-", "x").replace("_", "y")
-    c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, org))
-    c.execute("INSERT INTO doc_mail(token, user_id, org_id, created_at) VALUES(?,?,?,?)", (tok, uid, org, _now()))
+    tok = ml_token_new(c, uid, org)  # 2.424.0 B (#3450): shared with the office settings
     c.commit()
     return jsonify(address=mail_addr(tok))
 

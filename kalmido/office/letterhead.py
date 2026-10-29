@@ -390,6 +390,7 @@ def bp_sample(c, oid):
     co["sender_line"] = ofx_sender_line(co)
     lp = os.path.join(_dir(oid), os.path.basename(s.get("logo") or ""))
     co["logo_path"] = lp if s.get("logo") and os.path.isfile(lp) else None
+    co["logo_size"], co["logo_pos"] = s.get("logo_size") or "m", s.get("logo_pos") or "r"  # 2.406.0 (#3501)
     co["color"] = s.get("color") or ""
     lines = [{"kind": "item", "pos": str(i), "title": tr("Sample position {0}", i, lg=lang), "qty": 1, "unit": "",
               "qty_text": "1", "rate": 100, "tax_pct": 19, "total": 100} for i in range(1, 31)]

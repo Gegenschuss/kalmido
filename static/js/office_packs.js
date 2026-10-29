@@ -196,6 +196,7 @@ document.addEventListener('keydown', e => { if (e.target.id === 'pkc-q' && e.key
 // Keys with an area prefix so later functions sit next to them (2.148: receipt images, period lock, procedure documentation)
 const OCF_FEATS = [
   ['books.datev', 'upload', N_('DATEV'), N_('Booking batch, document inbox and accounts for a tax advisor working with DATEV')],
+  ['docs.delivery', 'file', N_('Delivery notes'), N_('Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable')],
   ['docs.einvoice', 'file', N_('E-invoices'), N_('The XML of every finalised invoice and credit note (ZUGFeRD / Factur-X, XRechnung where the pack offers it)')],
   ['books.vat_return', 'chart', N_('VAT return figures'), N_('The figures of the advance VAT return in the bookkeeping; filing stays with your tax software')],
   ['books.tax_dates', 'cal', N_('Tax dates'), N_('Deadlines of the VAT return and tax prepayments as recurring tasks')],

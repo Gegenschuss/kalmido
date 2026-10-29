@@ -213,6 +213,7 @@ ORDER = (
     "wiki.wikiatt",  # 2.99.0 A (#2182): files of knowledge pages (upload, ZIP import / export)
     "wiki.wkshare",  # 2.123.0 B (#2104): read-only shares of pages / folders (people, public link)
     "wiki.wkhist", "wiki.wksearch",  # 2.123.0 A (#2105, #2102, #2106): texts sealed at rest, page history, word index
+    "wiki.wktags",  # 2.371 (#3150): tags of pages (hashes in the word index) and the ```abfrage block
     "files.store",  # 2.48.0 (#1207): the file store (Ablage): tree, roles, versions (no routes; the interface of docs / import)
     "files.fsref",  # 2.199.0 A (#2742): reference nodes -- office documents / sheets filed in folders (no routes; the register)
     "files.fsroots",  # 2.199.0 C (#2742): an area's root folder in a workspace's tree (fs_area_roots; no routes)
@@ -239,6 +240,7 @@ ORDER = (
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail
+    "accounts.orgleave",  # 2.361.0 (#2920 / #2922): what leaving / deleting an organisation means for its members
     "family.family",
     "family.web",
     "family.pin",  # 2.49.0 B (#1551)
@@ -338,6 +340,7 @@ ORDER = (
     "office.datevzip",  # 2.148.0 B (#2470): DATEV batch + receipt images (document.xml) as one ZIP
     "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
     "office.datevimp",  # 2.148.0 D (#2458): DATEV import (debtors / creditors, opening balances of a booking batch)
+    "office.bookarch",  # 2.414.0 (#3502): the booking archive of past DATEV years (read-only)
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
     "office.catacct",  # 2.121.0 (#2093): receipt categories with an SKR03 / SKR04 account (no routes; shown by office.books)
@@ -346,6 +349,7 @@ ORDER = (
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task
+    "office.bankvend",  # 2.425.0 B (#3451): recurring providers of the bank bookings, their missing invoices
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.privacy",  # 2.154.0 C (#2192): data protection sheets of a client (DPA, information, consent): mail, ways back, status
@@ -369,6 +373,7 @@ ORDER = (
     "files.officeprev",  # 2.92.0 C (#1926): preview + text of .docx / .xlsx (limited worker), who can summarise a file
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
+    "tasks.ticketkey",  # 2.390.0 (#3353): ticket keys APP-123 (no routes)
     "team.forms",
     "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal
@@ -404,6 +409,7 @@ ORDER = (
     "docs.classify",  # 2.48.0 (#1111): the locally learning classifier (no routes)
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
+    "docs.maillink",  # 2.424.0 B (#3450): invoice download links of a mail to the document address (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
     "docs.unpack",  # 2.146.0 B (#2453): ZIP / winmail.dat of an upload or a mail -> its files (no routes)
@@ -418,6 +424,7 @@ ORDER = (
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.scankeys",  # 2.207.0 A (#2763): scan inboxes (upload-only keys) + the folder watcher downloads
+    "docs.fetcher",  # 2.425.0 C (#3453): receipt fetchers (own key kind: upload receipts + report the portals' state)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)

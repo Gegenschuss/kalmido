@@ -142,6 +142,8 @@ const NOTIF_ROWS = [
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
   ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
+// 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
+NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
@@ -281,13 +283,25 @@ function wsPaneWire(md) {
       if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(S.me?.is_admin ? (r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')) : tr('Invitation sent. With an account, the person accepts it in their News.')); }  // 2.148.1 A (#2480)
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;  // 2.273.0 B (#3042): + what ends
+        const li = await api('GET', `/api/orgs/${oid}/leave-info${self ? '' : '?uid=' + uid}`).catch(() => null);  // 2.361.0 (#2922): what goes where
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
         await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
       }
       await load(); render();
     } catch { /* api() showed it */ }
     wsPaneDraw(md);
   });
+}
+// 2.361.0 (#2922): the leave / remove dialog lists every area: back to the private space, to an admin, stays, ends
+function olvLeaveHtml(j, self) {
+  const rows = [], th = j.to_heir || {};
+  if ((j.back || []).length) rows.push([false, (self ? tr('Back to your private space (you brought them in): {0}', j.back.join(', ')) : tr('Back to the person’s private space (brought in by them): {0}', j.back.join(', ')))]);
+  const given = [th.lists ? trn('{0} project', '{0} projects', th.lists) : '', th.calendars ? trn('{0} calendar', '{0} calendars', th.calendars) : '', th.books ? trn('{0} address book', '{0} address books', th.books) : ''].filter(Boolean).join(', ');
+  if (given) rows.push([false, tr('Goes to {0}: {1}', j.heir || tr('an admin'), given)]);
+  if (j.stays_text) rows.push([true, (self ? tr('Stays in the organisation, you no longer see it: {0}', j.stays_text) : tr('Stays in the organisation, the person no longer sees it: {0}', j.stays_text))]);
+  if (j.assigned) rows.push([false, trn('{0} task of the organisation assigned to them is unassigned.', '{0} tasks of the organisation assigned to them are unassigned.', j.assigned)]);
+  rows.push([false, (self ? tr('You leave every project of the organisation; joining again does not bring that back.') : tr('The person leaves every project of the organisation; joining again does not bring that back.'))]);
+  return rows.map(([w, t]) => `<div class="shint keep olvrow${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }
 // 2.87.9 (#1913): an organisation admin sets an own picture as its symbol (cropped square like a list icon) or removes it;
 // 2.161.0 (#2594): after = what to redraw instead of the workspaces pane (the admin dialog "Edit organisation")
@@ -321,7 +335,7 @@ function oadmRow(x) {
 }
 // 2.361.2 (#2923): what a member asks back (they brought it in or made it): release = they may move it into their private space
 const OOR_KIND = {list: N_('Project'), sheet: N_('Table'), file: N_('File or folder'), wiki: N_('Knowledge page'), clients: N_('Client'),
-  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft')};  // 2.361.2 B (#2923): + drafts
+  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft'), letters: N_('Letter')};  // 2.361.2 B (#2923): + drafts; 2.356.1 (#3344): + letters
 const oor_kind = k => OOR_KIND[k] ? tr(OOR_KIND[k]) : k;
 function oorHtml(rs) {
   const open = (rs || []).filter(r => r.state === 'open');

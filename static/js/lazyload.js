@@ -11,7 +11,7 @@ const LD_MODS = {
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
   office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree
-    'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp
+    'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_bookarch', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp; 2.414.0 A (#3502): office_bookarch
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
@@ -29,12 +29,12 @@ const LD_MODS = {
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
   diagram: ['diagram'],  // 2.382.0 (#3153): formulas / Mermaid diagrams of knowledge pages, only when a page has one (wiki.js wk_dgNeed)
-  wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wiki', 'wkimport'],  // wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
+  wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wktags', 'wiki', 'wkimport'],  // 2.371 (#3150): wktags.js = tags + the abfrage block; wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
   calabs: ['calabs'],  // 2.155.0 B (#2076, #2077): holidays / absences in the "Calendars" window, the availability bar
-  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'abdocs'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
+  docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
   life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
    // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
   integrations: ['integrations'],

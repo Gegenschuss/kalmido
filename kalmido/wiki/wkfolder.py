@@ -75,7 +75,7 @@ from ..core.config import app
 from ..core.access import Denied, acx_of, collab_all
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.pg import IntegrityError, system_ctx, write_lock
 from ..accounts.orgroles import org_sees_all, org_writes
 from ..accounts.orgs import user_orgs  # 2.200.0 B (#2747)
@@ -230,7 +230,7 @@ fs_ref_register(WKF_KIND, label=N_("Page"), open_url=lambda rid: f"wiki/{int(rid
 # ---------------------------------------------------------------- the tree
 def wkf_root(c, uid, oid, create=False):
     """The "Knowledge" root of space oid (None: uid's private one); an organisation's opens to its members (org_access)."""
-    return fs_area_root(c, uid, oid, WKF_AREA, tr("Knowledge|area"), create=create, org_access="edit")
+    return fs_area_root(c, uid, oid, WKF_AREA, tr("Knowledge|area", lg=lang(c, uid)), create=create, org_access="edit")
 
 
 def _subtree(c, root):

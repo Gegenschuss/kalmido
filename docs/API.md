@@ -205,18 +205,18 @@ had been made in the app. Webhooks fire too.
 | `POST /me/app-passwords` | account | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. 2.79.0: only a token for all lists that also has `calendar` and `contacts` (an app password opens CalDAV / CardDAV without limits), else `403`. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
 | `DELETE /me/app-passwords/{id}` | account | 2.9.0: revoke it; the calendar app using it stops at once |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, (2.0.8) its sections `[{id, name}]` and (2.41.0) `time_tracking` (boolean: time tracking on for this list) and (2.144.0) `sort_mode` / `group_field` (the list's shared sort and grouping by a custom field, see `PATCH /lists/{id}`) and (2.83.0) `header_style` (the list's header strip in the app: `""` = none, `gradient`, `dots`, `lines`, `grid`, `image`; read only, set in the app) |
-| `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?, time_tracking?}` (2.41.0: `time_tracking` boolean, default `false`) (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`) |
+| `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?, time_tracking?}` (2.41.0: `time_tracking` boolean, default `false`) (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`). 2.411.0: without `project_type` a list in a folder gets the folder's project type (the folder default *Project type*, else the type its projects share) with its standard sections; `project_type: null` / `""` = no type |
 | `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`); 2.39.0: `playbook` = the list's effective Playbook (null = none) |
 | `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook) |
 | `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
 | `PATCH /lists/{id}` | structure | 2.144.0: `sort_mode` (the list's sort, the same for every member: `""` = default, `prio`, `prio_asc`, `custom`, `date`, `date_desc`, `title`, `creator`, `flow`, `created`, `created_asc`, `cf:<field id>[_desc]`, `col:who|tags|time|progress|deps[_desc]`) and `group_field` (the list view grouped by a custom field for every member: `"cf:<field id>"` or the id of a **text or select** field of this list: one group per value, select fields in the order of their options, *No value* last; `""` / `null` = by sections again, the sections themselves never change), owner / list admins (others `403`, an unknown value or a field of another list `400`); lists carry both. 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`; 2.83.0: then they can also be the `assignee_id` of its tasks without joining, the assignment goes when `org_edit` is switched off), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-listens-in)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
-| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
+| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list (2.390.0: + `hash_ids`, see [Ticket keys](#ticket-keys)): `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
 | `GET /lists/{id}/build-status` | read | 2.151.0 (#2558): the build state of a list with a repository: `data` = the OPEN tasks that need a look, each `{id, title, build}` (`build.stale` = open although its package or code is released, or work only on a branch not in the default branch), `latest` (the highest version tag), `repos`, `checked_at`. A version tag is a tag of digits with dots (optional `v`); per new tag Kalmido compares it with the version before it, so the first version that holds a commit is known (an existing connection: the newest 10 tags once). Once the newest version tag or the default branch moved, one compare newest tag...default branch tells which untagged default-branch commits are in an earlier version (`version: null`). Only the tasks the caller sees (not a participant's context tasks); branch names carry `origin: "git"`, `untrusted: true` |
 | `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
 | `POST /tasks` | tasks:write | Create a task (default list: the user's inbox) |
-| `GET /tasks/{id}` | read | One task |
+| `GET /tasks/{id}` | read | One task. 2.390.0: `{id}` may also be a ticket key like `APP-12` (a current or an old one, see [Ticket keys](#ticket-keys)) |
 | `PATCH /tasks/{id}` | tasks:write | Change the fields you send |
 | `DELETE /tasks/{id}` | delete | Move the task with its subtasks to the trash (204); restorable in the app |
 | `POST /tasks/{id}/complete` | tasks:write | Complete; recurring tasks move to their next date (`next_due`) |
@@ -269,6 +269,7 @@ had been made in the app. Webhooks fire too.
 | (app) `POST /api/agents/{id}/abort` · `POST /agent/aborted` | session · agent (no scope) | 2.144.0 (#2412): **Stop** in the agent chat `{job_id?}`: the agent gets the event `abort` (whoever may write the agent; with `job_id` only who may stop that job, ended 409, 30 per 10 minutes); the agent confirms with `POST /api/v1/agent/aborted {seq?, job_id?}` (agent tokens only; without `job_id` the status goes back to idle), see [AGENTS.md](AGENTS.md#stopping-a-running-answer) |
 | (app) `POST /api/agents/{id}/chat {job_id}` · `GET /api/agents/{id}/chat?job=` | session | 2.153.0 (#1962): a chat of its own per job: `job_id` (a job of this agent I may see, else 400; only who may stop it, else 403, ended jobs too; also as a form field with files) stores my message with that job and the agent gets the usual `chat` event with `message.job_id` and `job`; `?job=` also returns `progress: [{text, at}]` (the job's progress lines, only for the person it is for, the newest 300). A job created for a person starts with a notice in that person's chat (`kind` notice, `job_msg` start, the title as text). |
 | `POST /tasks/{id}/tidy` | tasks:write | **Agent tokens only**: tidy a task (a project in tidy mode *auto*), see [AGENTS.md](AGENTS.md) |
+| `POST` · `PATCH` · `DELETE` · `GET /tasks/{id}/working` | tasks:write (GET: read) | 2.407.0 (#3513): **Agent tokens only**: "agent is working" at a task. `POST {text?, title?, name?}` starts it or adds the next progress line, `PATCH {text?}` only while working (else 404), `DELETE ?state=done\|failed\|stopped[&job_id=]` ends it (with `job_id` only that job, else all of the agent's running jobs on the task); a line through `PATCH /agent/jobs/{id}` `append_log` shows there too, but only with the next refresh - live only through this route; answer `{working: {agent_id, agent, name, text, at, ttl} \| null, job}`. People see a pulsing dot with name, time and the last line in the list, on the board card and in the detail; it fades 15 minutes after the last update. Needs write access to the task's list (403; 404 when the task is not visible); it is the agent's running job of the task, see [AGENTS.md](AGENTS.md) *Jobs* |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` | agent (no scope) | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); `POST /agent/jobs/{id}/proposal` answers a `job_request` (2.39.0: kind `cleanup` = tidy up a list, see AGENTS.md *Tidy up a list*; 2.51.0: kinds `inquiry` and `setup`, also as the agent's own proposal `POST /agent/proposals {kind, user_id, proposal}`, see AGENTS.md *An inquiry becomes a project, the setup assistant*; 2.70.0: kind `merge` = groups of duplicate contacts `{groups: [{target_id, ids, reason}]}`, see AGENTS.md *Tidy up contacts*; 2.126.1: kinds `office_text` `{field, text}`, `doc_summary` `{text}` and `report` `{text}` = texts a person asked for, see AGENTS.md *Texts worded by an agent*; the contact routes stay refused for agent tokens); the status may name the task it works on (`task_id`, shows "… is writing" there); 2.37.0: a chat message with `offer_save: true` offers the person "Save as task" (saving itself is a click in the app, never an API call of an agent); 2.41.0: `kind: "notice"` on `POST /agent/chats/{user_id}` = a small grey line in the chat (e.g. a new session of the agent), no push, never unread, see AGENTS.md *Notices in the chat*; 2.44.0: `host` in `PUT /agent/status` names the computer (kept on the token in use, see AGENTS.md *Set up on a computer with one command*); 2.47.3: `job_parent` (with `job_id`) on `POST /agent/chats/{user_id}` = the leading job of a part job, the chat colours a message `Job #N: …` by its job (AGENTS.md *Chat*); 2.58.0: `name` on `POST /agent/jobs` = the job's own short name (AGENTS.md *Jobs*); 2.82.0: `GET /agent/chats?user_id=` also returns the conversation's `pins` |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values. 2.59.0 (#1375): `&semantic=1` adds, after the text hits, tasks of similar meaning (each with `"similar": true`; only on servers with the embedding service, otherwise nothing is added; at most 6 such queries per account in 10 seconds, more add nothing). 2.81.0: a task found only through the recognised text of one of its files carries `file_hit` (the file name). 2.138.1 (#2065): `&fulltext=1` = ranked full-text search (Postgres, word beginnings; case, accents and ä/ae do not matter): title hits before note hits, then tasks found by a comment, a custom field or a file text; each task once with `match: {where, snippet: {text, marks}, comment_id}` (plain text, never HTML), completed tasks included, the trash and lists with the lock never; at most 50 per page (`cursor`) |
@@ -329,6 +330,16 @@ had been made in the app. Webhooks fire too.
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
 `tag` (one of your tags or a project tag, without `#`), `list_tag` (only project tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
 `parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `pinned=true|false` (2.16.0, the *Pinned* view), `limit`, `cursor`.
+2.390.0 (#3355): `priority` (`none`, `low`, `medium`, `high`; several comma separated or repeated), `priority_min`, `section_id`
+(an id or `none`), `sprint_id` (an id, `current` = the active sprint of the task's project, `none` = backlog), `created_by`
+(`me` or a user id), `reviewer` (`me`, `none` or a user id), `review` (`pending`, `approved`, `changes`, `none`),
+`field_<id>=value` (a custom field of a project you see, only its tasks: `select` = option id or name, `text` = contains,
+`number`, `checkbox` `true` / `false`, other types the stored value), `q` (all words in title or notes, each as a word start),
+`key` (a ticket key `APP-12`, current or old, see [Ticket keys](#ticket-keys)) and `sort` (`priority`, `due`, `created`, `updated`, `title`, `manual`; a leading `-` = descending, tasks without a due date
+stay last; ties by id). A `next_cursor` of a sorted page carries the sort value and the id, so pages stay stable with equal
+values; it only works with the same `sort`. Tasks carry `sprint_id`, `reviewer_id` and `review` (`null` = none);
+`POST` / `PATCH /tasks` take `sprint_id` (an open sprint of the same project) and `reviewer_id` (the checks of the review step,
+`400` when the person or agent has no access; not in `POST /tasks/batch`).
 
 **Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
 `status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large project
@@ -426,6 +437,23 @@ commit on the default branch completes the task once, and **only tasks of the li
 `#<id>` of a task in another project is neither linked nor completed. Use the keyword only for work that is fully done;
 for a partial delivery write just `#<id>` (the commit is linked, the task stays open). *Undo* in the task history
 reopens a task that was closed by mistake.
+
+## Ticket keys
+
+2.390.0 (#3353): a project can have a **ticket key** (2 to 6 capitals or digits, a letter first, unique per workspace, e.g.
+`APP`): `PATCH /lists/{id}` with `ticket_key` (owner / project admins; `null` / `""` removes it), lists carry it. Its tasks
+then get running numbers: the tasks there before in the order they were made, every new task and every task moved in the
+next one. A task carries `key` (`"APP-12"`, `null` without a key) next to its `id`; `#12` (the id) stays valid everywhere.
+
+- `GET /tasks/APP-12` reads the task (also by an old key: a task that moved to another project or whose project's key
+  changed keeps its old keys as aliases).
+- Repositories: `APP-12` in a commit message, pull request title / text or a branch name (`app-12-login`, `feature/APP-12`)
+  links like `#12`; `fixes APP-12` in a merged pull request or a commit on the default branch completes the task. In a
+  project with a key, `#12` and branch names `12-...` count only while the repository's switch *Also read #number* is on
+  (`hash_ids` of a repository; on for repositories connected before 2.390.0, off for new ones), so the Git server's own
+  issue numbers do not complete tasks by accident.
+- The app shows the key in the task row, in the task's menu (*Copy link*), finds `APP-12` in the search and makes
+  `APP-12` in comments a link to the task.
 
 ## Notes and team chat
 
@@ -1059,7 +1087,9 @@ or the partners): documents print it as its own line under the name, the e-invoi
 (`recipient.name_extra`, older finalised documents without it stay as they are). The buyer e-mail (BT-49) is the client's
 `email_invoice`, else its `email`. Office settings: `company_fields.name` may have up to three lines (`\n`; more = `400`),
 the letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one
-line; `company_fields.address_extra` is the company's extra address line (BT-36). While street, postcode and city of the
+line; `company_fields.address_extra` is the company's extra address line (BT-36). `company_fields.website` (2.408, up to 200 characters, stored
+as entered) is printed in the contact block under the e-mail, without `https://` and the closing slash; finalised documents
+keep their sender snapshot. While street, postcode and city of the
 company are empty, a plain free address (`company.lines`: street, postcode + city, maybe a country) is read into them in
 the answer; saving the settings keeps them, the free lines stay.
 A project's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its projects:
@@ -1552,6 +1582,40 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `kalmido-folder-watcher-linux-arm64`, `SHA256SUMS` from `KALMIDO_FOLDERWATCH_DIR` (default `/app/folderwatch`, built by the image;
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
 `{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
+
+## Receipt fetcher
+
+*Since 2.425.0.*
+
+A receipt fetcher is a helper program on the person's own computer that fetches invoices from web portals (an online shop, a
+phone company) and hands them to Kalmido. The person signs in to the portals only in the helper: Kalmido never stores
+passwords, cookies or logins, has no fields for them and refuses every field it does not know (`400`, nothing stored). People
+with the office (also the own office of a person without an organisation) connect one in Settings > Integrations > *Receipt
+fetcher* with a setup code (web session only, never an agent); without the office the routes answer `403`.
+
+Its key (`kbh_…`) is a kind of its own: stored only as a hash in its own table, never an API token (it is not listed under API
+tokens and no other route knows it: every other API route answers `403` "This key may only upload receipts and report the state
+of its portals", the web app `401`). Ordinary tokens and scan inbox keys reach none of the three routes (`403`). A password
+reset or change disconnects every receipt fetcher of the person; disconnecting it in the settings stops the key at once
+(`401`). At most 10 per person, 120 requests per minute.
+
+| Route | Answer |
+|---|---|
+| `GET /fetcher` | `{name, target, max_mb, portals: [{key, name, enabled}]}`: the place the receipts go (the person's own documents or an organisation's) and which portals the person switched on |
+| `PUT /fetcher/status` | body `{portals: [{key, name?, last_run?, new?, error?}]}` (`key`: `a-z 0-9 _ . -`, up to 40; `last_run` ISO time; `new` the new receipts of the last run; `error` empty = fine, e.g. `Please sign in again`; at most 50 portals) -> `{portals: [{key, name, enabled}]}`. A portal new here starts switched on; a report never switches one on or off. An error that was not there before tells the person once (News + push of the event `fetcher`, switchable in the notification settings) |
+| `POST /fetcher/documents` | multipart: `file` (a PDF, checked by its first bytes `%PDF-`; size limit as any upload), `portal` (a reported key), `order` (the order number, optional, up to 100 characters) -> `201 {id, name, duplicate: false}`. The same file, or the same order of the same portal, again answers `200` with the document that is there and `duplicate: true` |
+
+Errors: `401` key unknown or disconnected (or the person deactivated), `403` no office any more / the place is no longer open to
+the person (left the organisation, read-only role), `409` the portal is switched off in Kalmido, `413` too large / no space
+left, `400` not a PDF, unknown field or portal, `429` slow down. The documents arrive with the source `abholer` and
+`abholer:<portal>:<order>` as their external id and are recognised like an upload (date, amount, sender, sorting).
+
+Web routes of the settings: `GET /api/docs/fetchers?ws=private|org:<id>` -> `{api, fetchers: [{id, name, prefix, target, ok,
+created_at, last_seen_at, portals: [{key, name, enabled, last_run, new, error, error_at, updated_at}]}]}` (one's own only);
+`POST /api/docs/fetchers {ws, name}` -> `201 {id, name, target, code}` (`409` while the API is off); `PATCH
+/api/docs/fetchers/{id}/portals/{key} {enabled: true|false}`; `DELETE /api/docs/fetchers/{id}` (the documents stay). The setup
+code is shown once: `kalmido-fetch:1:` + base64url without padding of `{"url": "https://example.com", "key": "kbh_…", "name":
+"My computer"}`.
 
 ## Arrangements of views for agents
 

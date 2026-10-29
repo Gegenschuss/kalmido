@@ -83,9 +83,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     // 2.308.0 (#3273): the panel draws again when its folders arrive (later, by a timer): the focused point keeps the focus
     check(await ev(`(() => { renderSide(); return document.activeElement?.dataset?.ofm || document.activeElement?.tagName; })()`) === 'pipeline', '#2180: a redraw of the panel keeps the focus on the point');
-    // 2.351.0 (#3312): Quotes & invoices is a tree node: its arrow comes first, then its name
-    check(await key(ev, 'ArrowDown') === '' && await ev(`document.activeElement?.dataset?.k === 'of:a:offers'`) && await key(ev, 'ArrowDown') === 'offers', '#2180: ArrowDown = the next point');
-    check(await key(ev, 'ArrowUp') === '' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
+    // 2.351.0 (#3312): Quotes & invoices is a tree node; 2.406.0 (#3492): its name comes first, then its arrow (at the row's end)
+    check(await key(ev, 'ArrowDown') === 'offers' && await key(ev, 'ArrowDown') === '' && await ev(`document.activeElement?.dataset?.k === 'of:a:offers'`), '#2180: ArrowDown = the next point');
+    check(await key(ev, 'ArrowUp') === 'offers' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
     // 2.351.0 (#3312): no group "Folders" any more (the document areas are trees): End = the last point of the panel
     check(await key(ev, 'End') === 'settings', '#2180: End = the panel\'s last button (the last point)');
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);

@@ -53,7 +53,7 @@ OFFICE_AREAS = (
     ("kpi", N_("Figures"), "money", ("kpi",), False, "admin"),
     ("bank", N_("Bank"), "money", ("bank", "pay-props"), False, "admin"),
     ("books", N_("Bookkeeping"), "money", ("books", "datev", "periods", "gobd", "procdoc"), False, "admin"),
-    ("receipts", N_("Receipts"), "money", ("books/receipts", "receipts"), True, "admin"),
+    ("receipts", N_("Receipts"), "money", ("books/receipts", "receipts", "receipt-mail"), True, "admin"),  # 2.424.0 B (#3450): receipt-mail
     ("subs", N_("Subscriptions & tools"), "money", ("subs",), False, "admin"),
     ("travel", N_("Travel expenses"), "money", ("trips",), True, "admin"),
     ("logbook", N_("Logbook"), "money", ("drives", "vehicles", "logbook"), True, "admin"),
@@ -131,6 +131,8 @@ OWN_ROUTES = {
     "GET /api/office/trips/report", "GET /api/office/trips/vma", "GET /api/office/meals/report", "GET /api/office/logbook/report",
     # 2.356.0 D (#3129): hand in a receipt and see the own ones handed in (office/rcsubmit.py filters by the person)
     "POST /api/office/receipts/submit", "GET /api/office/receipts/mine",
+    # 2.424.0 B2 (#3450, review): the person's own forwarding address for receipts (office/lettermail.py, always the caller's)
+    "GET /api/office/receipt-mail",
 }
 
 TPL_LEGACY = "legacy"
@@ -726,7 +728,7 @@ def ofr_person_put(pid):
     if len(refs) > 1 and f"tpl:{TPL_NONE}" in refs:
         refs = [r for r in refs if r != f"tpl:{TPL_NONE}"]
     if f"tpl:{TPL_LEGACY}" in refs and mg != "admin":  # 2.223.2 B (#2860): previous access carries the role's old specials (release, export)
-        raise Denied(403, tr(N_("Only an admin of this organisation can do this")))
+        raise Denied(403, tr(N_("Only an admin of this workspace can do this")))
     prole = org_role(c, pid, oid) or ""
     for ref in refs:
         d = _ref_def(c, oid, ref, prole)

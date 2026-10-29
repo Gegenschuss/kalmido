@@ -16,6 +16,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let ok = 0; const fails = [];
 const check = (c, what) => { if (c) ok++; else { fails.push(what); console.log('FAIL:', what); } };
 
+// #3506: tests/.demo belongs to this suite - a run stopped half-way leaves a tree build_demo.py refuses to replace
+if (fs.existsSync(OUT) && !fs.existsSync(path.join(OUT, 'static', 'shim.js'))) fs.rmSync(OUT, {recursive: true, force: true});
 const build = execFileSync(process.env.PYTHON || 'python3', [path.join(ROOT, 'tools', 'build_demo.py'), OUT], {encoding: 'utf-8'});
 check(/build_demo: .* languages: en de es fr it nl/.test(build), 'demo build: ' + build.trim());
 const html = fs.readFileSync(path.join(OUT, 'index.html'), 'utf-8');

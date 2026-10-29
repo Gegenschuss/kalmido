@@ -237,6 +237,7 @@ function integrCardsHtml() {
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
     ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
     ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Scans from your computer'), N_('Folder watcher program for Mac and Windows, scan inboxes'), '#s-scan-h']] : []),  // 2.353.0 B (#2773)
+    ...(feat('docs') && feat('office') && typeof fx_html === 'function' ? [['file', N_('Receipt fetcher'), N_('Invoices from portals like Amazon straight into your office'), '#s-fetch-h']] : []),  // 2.425.0 C (#3453): docfetch.js
     ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
@@ -801,6 +802,7 @@ function settingsModal(focus) {
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
+  if (focus === 'fetcher') setTimeout(() => $('#s-fetch-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.425.0 C (#3453)
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
@@ -1564,7 +1566,7 @@ const SS_AREA = [
       [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
       [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => go('office/settings'), root: '#ofc-set',
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
       [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
@@ -1575,6 +1577,7 @@ const SS_AREA = [
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
       [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
+      [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
       [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},

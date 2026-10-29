@@ -29,7 +29,7 @@ from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, Denied
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
 from ..accounts.session import me
@@ -182,7 +182,7 @@ def shf_folder_may(c, uid, r, write=False):
 
 def shf_root(c, uid, org_id, create=False):
     """The tables' root folder of workspace org_id (None: uid's own tree); create: make it (needs the right to add at the top)."""
-    return fs_area_root(c, uid, org_id, SHF_AREA, tr("Tables"), create=create)
+    return fs_area_root(c, uid, org_id, SHF_AREA, tr("Tables", lg=lang(c, uid)), create=create)
 
 
 def shf_reached_ids(c, uid):

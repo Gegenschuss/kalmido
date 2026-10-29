@@ -1839,6 +1839,9 @@ stay blocked until you allow them.
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
   older version; go back to 2.148 or newer first.
+- **Back to 2.413 or older after using the booking archive (2.414.0, #3502).** 2.414 adds new tables only
+  (`office_bookarch*`); older versions ignore them and the archive files (`bka-*` in the office folder). Their import page
+  lists an archive run but cannot undo it - undo it on 2.414 or newer.
 
 ## Run by a hoster: the operator interface
 

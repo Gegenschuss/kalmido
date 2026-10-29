@@ -106,7 +106,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   const lockOrg = `wkeIndex = async (sp, j) => { if (sp === '${OS}') { WKE.st[sp] = {mode: 'on', gen: 1, mine: true}; j.pages = []; } return j; };`;
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
   w.eval(lockOrg); w.eval(`for (const s of wk_spaces()) delete WK.idx[s]; renderView(); renderSide();`);
-  check(await until(() => root(d, OS)?.querySelector('.sbbtn')?.innerHTML.includes(icHtml(w, `ic('lock', 's')`)) && !root(d, OS).querySelector('[data-act="sbb-tree"]')), 'the locked space: the lock, no folders');
+  check(await until(() => root(d, OS)?.querySelector('.sbbtn')?.innerHTML.includes(icHtml(w, `ic('lock')`)) && !root(d, OS).querySelector('[data-act="sbb-tree"]')), 'the locked space: the lock, no folders');  // 2.406.0 (#3492): tree rows draw the full-size symbol
   check(await until(() => d.querySelector(`#view .wkspaces [data-wksp="${OS}"] .wkemark`)), 'the overview: the entry with the lock');
   root(d, OS).querySelector('.sbbtn').click();
   check(await until(() => d.querySelector('#view .wkelock [data-wke="unlock"]')), 'a click on it: its page offers "Unlock"');

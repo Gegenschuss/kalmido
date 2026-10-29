@@ -26,6 +26,7 @@ from ..core.i18n import N_, lang, tr, trn
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act
 from .bank import BNK_LIST_MAX, BNK_KINDS, _ctx, _home, _receipts, _shift, _tx_dec
+from .bankvend import bv_key, bv_missing, bv_noreceipt_keys, bv_task_lines  # 2.425.0 B (#3451)
 from .books import bk_ws
 from .calc import dec, dstr, money
 from .cfbank import cfb_balances
@@ -61,10 +62,11 @@ def bnr_open(c, oid, direction="out", month=None, account=None):
         q += " AND day>=? AND day<=?"
         args += [month + "-01", month + "-31"]
     accts = _acct_by_import(c, oid)
+    nr = bv_noreceipt_keys(c, oid)  # 2.425.0 B (#3451): providers that need no receipt leave the list
     out = []
     for r in c.execute(q + " ORDER BY day DESC, id DESC", args).fetchall():
         t = _tx_dec(c, oid, r)
-        if (t["amount"] < 0) != (direction == "out") or t["amount"] == 0:
+        if (t["amount"] < 0) != (direction == "out") or t["amount"] == 0 or (nr and t["amount"] < 0 and bv_key(t) in nr):
             continue
         t["account"] = accts.get(t["import_id"], "")
         if account and t["account"] != account:
@@ -78,9 +80,11 @@ def bnr_open(c, oid, direction="out", month=None, account=None):
 def bnr_counts(c, oid):
     """{out, in}: how many open bookings each direction has (all months, all accounts)."""
     n = {"out": 0, "in": 0}
+    nr = bv_noreceipt_keys(c, oid)  # 2.425.0 B (#3451)
     for r in c.execute("SELECT * FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind IS NULL", (oid,)).fetchall():
-        a = _tx_dec(c, oid, r)["amount"]
-        if a:
+        t = _tx_dec(c, oid, r)
+        a = t["amount"]
+        if a and not (nr and a < 0 and bv_key(t) in nr):
             n["out" if a < 0 else "in"] += 1
     return n
 
@@ -96,7 +100,8 @@ def bnr_list():
     """?dir=out|in (default out)&month=YYYY-MM&account= -> {items: [{id, day, amount, currency, counterpart, purpose, iban, account,
     locked}], counts: {out, in}, months (with open bookings of the direction), accounts (cfbank's, when more than one),
     receipts (not matched, without payment day, around the shown bookings: for dragging one onto a row), currency, upload_ws
-    (the documents space for POST /api/docs), kinds (the match kinds this server knows)}."""
+    (the documents space for POST /api/docs), kinds (the match kinds this server knows)}.
+    2.425.0 B (#3451): + missing (dir out: the "invoice missing" hints of the recurring providers, bankvend.bv_missing)."""
     c, uid, oid = _ctx()
     d = request.args.get("dir") or "out"
     if d not in BNR_DIRS:
@@ -119,7 +124,8 @@ def bnr_list():
         receipts = receipts[-BNR_RECEIPTS_MAX:][::-1]
     ws = bk_ws(c, oid)
     return jsonify(items=[_row(c, oid, t) for t in rows], counts=bnr_counts(c, oid), months=months, accounts=accounts if len(accounts) > 1 else [],
-                   receipts=receipts, currency=_home(c, oid), upload_ws="private" if ws[0] == "u" else f"org:{oid}", kinds=list(BNK_KINDS))
+                   receipts=receipts, currency=_home(c, oid), upload_ws="private" if ws[0] == "u" else f"org:{oid}", kinds=list(BNK_KINDS),
+                   missing=bv_missing(c, oid, lang(c, uid)) if d == "out" else [])
 
 
 @app.get("/api/office/bank/noreceipt/count")
@@ -159,10 +165,26 @@ def _title(n, lg):
     return trn("{0} booking without a receipt", "{0} bookings without a receipt", n, lg=lg)
 
 
-def _task_new(c, person, n, today):
+def _content(c, oid, person, today):
     lg = lang(c, person)
     url = PUBLIC_URL.rstrip("/") + "/#office/bank/norc"
-    content = f"{tr(BNR_TASK_TEXT, lg=lg)}\n\n[{tr(BNR_TASK_HELP, lg=lg)}]({url})"
+    lines = bv_task_lines(c, oid, person, today)  # 2.425.0 B (#3451): the missing invoices of recurring providers, in this one task
+    return url, f"{tr(BNR_TASK_TEXT, lg=lg)}\n\n" + ("\n".join(lines) + "\n\n" if lines else "") + f"[{tr(BNR_TASK_HELP, lg=lg)}]({url})"
+
+
+def _own_text(c, person, text):
+    """The task's text is still one the reminder wrote: its opening line, then only hint lines, then the help link."""
+    lg = lang(c, person)
+    head, foot = tr(BNR_TASK_TEXT, lg=lg), f"[{tr(BNR_TASK_HELP, lg=lg)}](" + PUBLIC_URL.rstrip("/") + "/#office/bank/norc)"
+    if not isinstance(text, str) or not text.startswith(head + "\n\n") or not text.endswith(foot):
+        return text is None or text == ""
+    mid = text[len(head) + 2:len(text) - len(foot)].strip("\n")
+    return all(not x or x.startswith("- ") for x in mid.split("\n"))
+
+
+def _task_new(c, oid, person, n, today):
+    lg = lang(c, person)
+    url, content = _content(c, oid, person, today)
     lid = my_inbox(c, person)
     ts = iso(now_utc())
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
@@ -191,9 +213,14 @@ def bnr_apply(c, oid, s, today=None):
             cfg["task"], changed = None, True
         else:
             t = _title(n, lang(c, person))
-            changed = c.execute("UPDATE tasks SET title=?, updated_at=? WHERE id=? AND title<>?", (t, iso(now_utc()), cfg["task"], t)).rowcount > 0
+            body_ = _content(c, oid, person, today)[1]  # 2.425.0 B (#3451): the hints follow the bookings too
+            # 2.425.0 (#3451 review): only a text that is still the generated one is replaced - a note of the person stays
+            if not _own_text(c, person, (c.execute("SELECT content FROM tasks WHERE id=?", (cfg["task"],)).fetchone() or [None])[0]):
+                body_ = None
+            changed = c.execute("UPDATE tasks SET title=?, content=COALESCE(?, content), updated_at=? WHERE id=? AND (title<>? OR (? IS NOT NULL AND content IS DISTINCT FROM ?))",
+                                (t, body_, iso(now_utc()), cfg["task"], t, body_, body_)).rowcount > 0
     elif n and (not cfg["next"] or cfg["next"] <= today):
-        cfg["task"], cfg["next"], changed = _task_new(c, person, n, today), _next(today, cfg["every"]), True
+        cfg["task"], cfg["next"], changed = _task_new(c, oid, person, n, today), _next(today, cfg["every"]), True
     elif cfg["task"]:
         cfg["task"], changed = None, True  # done / deleted by the person: the next one at the next date
     if changed:

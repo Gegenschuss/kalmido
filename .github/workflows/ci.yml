@@ -260,6 +260,7 @@ jobs:
           python tests/p2357_l_einvoice_test.py  # 2.357.0 (#3217, #3218): zero rated Z, O with the tax number as seller id
           python tests/p2357_a_paper_pdf_test.py  # 2.357.0 A (#3156): US-Letter invoice with e-invoice, on a letterhead, draft
           python tests/p2355_c_einvoice_test.py  # 2.355.0 C (#2844): categories K (goods to the EU, deliver-to address) and G (export)
+          python tests/p2408_a_einvoice_test.py  # 2.408.0 A (#3520): final invoice after the BMF letter of 15.10.2026 (BT-113 + BT-22), CII + UBL
       - name: veraPDF + KoSIT
         run: tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
       - name: Reports on failure

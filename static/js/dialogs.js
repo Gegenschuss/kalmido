@@ -612,7 +612,7 @@ function shareModal(id, opt = {}) {
       shWsFill($('#sh-ws', md), cur.org_id || null, own && !cur.is_inbox ? () => $('[data-m="list-edit"]', md)?.click() : null);
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
         (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${shWsOptions(cand, cur.org_id || null)}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
-          : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
+          : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : noPeopleTxt()}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
           : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and project admins rename and archive this project and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
     }
     const aw = $('#sh-agwrap', md);
@@ -958,6 +958,7 @@ function listModal(id, folder = '', o = {}) {
     ${id ? ptypeRowHtml(l) : ''}
     ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
+    ${tk_listRow(l)}${''/* 2.390.0 (#3353): ticket key (git.js) */}
     ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
     ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
@@ -1152,6 +1153,7 @@ function listModal(id, folder = '', o = {}) {
     if (b.dataset.m === 'share-open') { await autosave(); if (o.back) { md.remove(); return; } modalSub(md, () => shareModal(id, {back: true})); return; }  // 2.6.0 (K12); 2.46.0 (#1604): back, no stack
     if (b.dataset.m === 'tt-tpl') { await autosave(); ticketTplModal(id); return; }
     if (b.dataset.pt !== undefined) {  // 2.4.0 (#243 / #328): what the new project starts from
+      md._ptUser = 1;  // 2.411.0 (#3516): chosen by hand, a folder change keeps it
       $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
       const tp = b.dataset.pt.startsWith('tpl:');
       $('.ptdates', md).hidden = !tp;
@@ -1214,7 +1216,8 @@ function listModal(id, folder = '', o = {}) {
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }
       } else {
-        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : b0); } catch { return; }
+        // 2.411.0 (#3516): no type in a folder that has one = chosen so (ptype ""), the server would give it the folder's type
+        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : own && folderPtype(b0.folder) ? {...b0, ptype: ''} : b0); } catch { return; }
       }
       if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
       if ($('#l-ws', md)) LS.set('wsLastProj', $('#l-ws', md).value ? 'org:' + $('#l-ws', md).value : 'private');  // 2.364.0 D (#3033): the next one starts there
@@ -1246,8 +1249,20 @@ function listModal(id, folder = '', o = {}) {
     const m = e.target.value.match(EMO_RE);
     if (m) { emo = m[1]; $('#l-emo', md).innerHTML = emo; $$('#l-emogrid button', md).forEach(x => x.classList.remove('on')); if (id) later(e.target); }
   });
+  if (!id && !o.ptype && !o.kind) lmFolderPtype(md, folder);  // 2.411.0 (#3516)
   if (!isTouch()) setTimeout(() => $('#l-name', md).focus(), 50);  // 2.13.0: touch: no keyboard popping up on open
   return md;
+}
+// 2.411.0 (#3516): a new project in a folder with a project type (folderPtype) starts as that type with its standard sections,
+// chosen in the dialog (the person can pick another one; once picked by hand a folder change keeps it)
+function lmFolderPtype(md, folder) {
+  if (!md || $('.lhdr', md) || md._ptUser || !$('.ptcards', md)) return;
+  const t = folderPtype(folder), card = $(`.ptcard[data-pt="${t}"]`, md);
+  if (!card) return;
+  $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === card); x.setAttribute('aria-checked', x === card); });
+  $('.ptsecs', md).hidden = !PTYPE_SECS[t]; $('#l-ptsecsl', md).textContent = ptSecsLine(t);
+  if ($('#l-ptsecs', md)) $('#l-ptsecs', md).checked = !!t;
+  if ($('#l-tickets', md)) { $('#l-tickets', md).checked = t === 'software'; $('#l-tickets', md).closest('.row').hidden = !!t; }
 }
 // 2.1.2 (#349): hand a list to another person. j = GET /api/lists/{id}/owner (mode owner | takeover, candidates: active
 // people, members first with their role). Two steps: pick the person, then confirm.

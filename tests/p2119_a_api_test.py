@@ -93,6 +93,13 @@ r = A.post(B + f"{M}/{m0['id']}/approve")
 check(r.status_code == 400 and "concrete" in r.text, "a vague occasion is refused " + r.text[:200])
 for bad in ({"amounts": [{"kind": "wine", "gross": 1}]}, {"host": {"id": 999999}}, {"guests": "x"}, {"date": "2025-13-01"}, {"tip": -1}):
     check(A.patch(B + f"{M}/{m0['id']}", json=bad).status_code == 400, f"refused: {bad}")
+# 2.408.0 (#3521): a line without a rate: food from 01.01.2026 at 7 %, drinks and older meals at 19 %
+for day, want in (("2026-01-01", ["7", "19"]), ("2025-12-31", ["19", "19"])):
+    r = A.patch(B + f"{M}/{m0['id']}", json={"date": day, "amounts": [{"kind": "food", "gross": "10.70"}, {"kind": "drinks", "gross": "11.90"}]})
+    check(r.ok and [x["rate"] for x in r.json()["calc"]["lines"]] == want, f"the default rate of {day}: {want} {r.text[:300]}")
+r = A.patch(B + f"{M}/{m0['id']}", json={"amounts": [{"kind": "food", "gross": "10.70"}]})  # only the amounts: the stored date counts
+check(r.ok and r.json()["calc"]["lines"][0]["rate"] == "19", "the default rate follows the stored date " + r.text[:300])
+check(A.patch(B + f"{M}/{m0['id']}", json=full(occasion="Geschäftsessen")).ok, "date and amounts back")
 d2 = meal(A, place_name="Imbiss", occasion="Kick-off of the website project")
 r = A.post(B + f"{M}/{d2['id']}/approve")
 check(r.status_code == 400 and "address" in r.text and "guest" in r.text and "Amounts" in r.text, "the missing fields are named " + r.text[:300])

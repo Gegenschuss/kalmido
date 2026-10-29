@@ -135,7 +135,9 @@ function bw_guestPool(m) {  // key -> {id} | {name, extra}: the people of the of
 }
 const bw_guestHtml = (k, p, on) => `<label class="chkl bwg"><input type="checkbox" data-bwg="${esc(k)}" ${on ? 'checked' : ''}> <span>${esc(p.name)}${p.extra ? ` <small class="muted">${esc(p.extra)}</small>` : ''}</span></label>`;
 const BW_KINDS = [['food', N_('Food')], ['drinks', N_('Drinks')]];
-const bw_lineHtml = (l = {}) => `<li class="bwln"><select data-bwl="kind" aria-label="${esc(tr('Kind'))}">${BW_KINDS.map(([k, n]) => bw_opt(k, tr(n), l.kind || 'food')).join('')}</select>
+// 2.408.0 (#3521): food in restaurants is at 7 % since 01.01.2026 (drinks stay at 19 %) - the default rate of a line, as bw_default_rate on the server
+const bw_rate = (kind, date) => kind === 'food' && String(date || '') >= '2026-01-01' ? '7' : '19';
+const bw_lineHtml = (l = {}) => `<li class="bwln"${l.def ? ' data-bwdef="1"' : ''}><select data-bwl="kind" aria-label="${esc(tr('Kind'))}">${BW_KINDS.map(([k, n]) => bw_opt(k, tr(n), l.kind || 'food')).join('')}</select>
   <select data-bwl="rate" aria-label="${esc(tr('VAT rate'))}">${[...new Set(['19', '7', '0', String(l.rate ?? '19')])].map(r => bw_opt(r, `${fmtNum(+r, +r % 1 ? 1 : 0)} %`, String(l.rate ?? '19'))).join('')}</select>
   <input data-bwl="gross" inputmode="decimal" class="numin" value="${l.gross != null ? esc(fmtNum(+l.gross, 2)) : ''}" placeholder="${esc(tr('Gross'))}" aria-label="${esc(tr('Gross amount'))}">
   <button type="button" class="iconbtn" data-bwm="rmline" aria-label="${esc(tr('Remove line'))}" title="${esc(tr('Remove line'))}">${ic('trash', 's')}</button></li>`;
@@ -152,7 +154,7 @@ function bw_modal(m0) {
   let m = m0, pend = null;
   const ro = !!m?.locked || !!m?.own_ro, hostOk = !!m?.own_ro && !m.locked && !!m.own_host;  // 2.187.1 B (#2735): somebody else's: read, the host approves
   const pool = bw_guestPool(m), on = new Set((m?.guests || []).map(rk_pkey));
-  const lines = m?.amounts?.length ? m.amounts : [{kind: 'food', rate: '19'}, {kind: 'drinks', rate: '19'}];
+  const d0 = m?.date || today(), lines = m?.amounts?.length ? m.amounts : [{kind: 'food', rate: bw_rate('food', d0), def: 1}, {kind: 'drinks', rate: bw_rate('drinks', d0), def: 1}];
   const md = /** @type {any} */ (modal(`<h3>${m ? (ro ? tr('Entertainment receipt') : tr('Edit entertainment receipt')) : tr('New entertainment receipt')}</h3>
     ${m?.locked ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('Approved by {0} on {1}: locked.', m.approved_name || '–', bw_when(m.approved_at)))}</span></p>`
     : ro ? `<p class="bwlocked">${ic('lock', 's')}<span>${esc(tr('This entertainment receipt was entered by somebody else: you can read it, but not change it.'))}</span></p>` : ''}
@@ -226,6 +228,10 @@ function bw_modal(m0) {
     const t = /** @type {any} */ (e.target);
     if (t.id === 'bw-place') place();
     else if (t.id === 'bw-host') host();
+    else if (t.dataset?.bwl === 'rate') delete t.closest('.bwln').dataset.bwdef;  // 2.408.0 (#3521): a rate chosen by hand stays
+    if (t.id === 'bw-date' || t.dataset?.bwl === 'kind') {  // a default rate follows the date and the kind
+      for (const li of $$('.bwln[data-bwdef]', md)) /** @type {any} */ ($('[data-bwl="rate"]', li)).value = bw_rate(/** @type {any} */ ($('[data-bwl="kind"]', li)).value, val('#bw-date'));
+    }
     sum();
   });
   md.addEventListener('input', e => { if (/** @type {any} */ (e.target).id === 'bw-pname') $('.bwpnew', md).dataset.typed = '1'; sum(); });
@@ -234,7 +240,7 @@ function bw_modal(m0) {
     const b = /** @type {any} */ (e.target).closest('[data-bwm]'); if (!b) return;
     const a = b.dataset.bwm;
     if (a === 'close') { close(); return; }
-    if (a === 'addline') { $('.bwlines', md).insertAdjacentHTML('beforeend', bw_lineHtml({kind: 'food', rate: '19'})); /** @type {any} */ ($('.bwln:last-child [data-bwl="gross"]', md))?.focus(); return; }
+    if (a === 'addline') { $('.bwlines', md).insertAdjacentHTML('beforeend', bw_lineHtml({kind: 'food', rate: bw_rate('food', val('#bw-date')), def: 1})); /** @type {any} */ ($('.bwln:last-child [data-bwl="gross"]', md))?.focus(); return; }
     if (a === 'rmline') { b.closest('.bwln')?.remove(); sum(); return; }
     if (a === 'addguest') {
       const name = val('#bw-gname').trim(), extra = val('#bw-gextra').trim(); if (!name) { /** @type {any} */ ($('#bw-gname', md)).focus(); return; }

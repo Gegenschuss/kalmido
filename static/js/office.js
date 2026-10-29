@@ -339,14 +339,14 @@ function ofcModal(kind, r) {
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
   if (kind === 'contracts' && typeof dmaLoad === 'function') dmaLoad(md);  // 2.117.0 B (#2285)
   // 2.119.1 C (#2298): a contract (with its PDF files) into another workspace, admins of the office (officemove.py)
-  if (['contracts', 'services', 'equipment', 'texts'].includes(kind) && r && adm && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);
+  if (['contracts', 'services', 'equipment', 'texts', 'sets'].includes(kind) && r && adm && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     const m = b.dataset.m;
     if (m === 'close') { close(); return; }
     if (m === 'add-item') { const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]); $('#of-items', md).insertAdjacentHTML('beforeend', ofcSetItemHtml(eq, {equipment_id: eq[0]?.[0], qty: 1})); return; }
     if (m === 'rm-item') { b.closest('.ofcitem').remove(); return; }
-    if (m === 'move') { md.remove(); ofm_move({what: kind, ids: [r.id], from: ofm_officeFrom(), label: qn(r.name || r.name_de || r.key || r.text_de || ''), after: async () => ofcReload(kind)}); return; }  // 2.119.1 C (#2298); 2.356.0 A (#2926): + services, equipment, text blocks
+    if (m === 'move') { md.remove(); ofm_move({what: kind, ids: [r.id], from: ofm_officeFrom(), label: qn(r.name || r.name_de || r.key || r.text_de || ''), after: async () => { if (kind === 'sets') delete OFC.data.equipment; ofcReload(kind); }}); return; }  // 2.119.1 C (#2298); 2.356.0 A (#2926): + services, equipment, text blocks; 2.356.1 (#3345): + sets (with their devices)
     try {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
@@ -414,6 +414,8 @@ function ofcSettingsHtml() {
     ${ta('os-register', tr('Register lines'), co.register_lines, tr('legal form, register, managing director'))}
     ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><div class="shint keep">${tr('PNG, JPEG or WebP, at least 600 px wide, up to 4 MB')}</div></div>
+    ${ofcRowF('os-logo-size', tr('Logo size'), ofcSel('os-logo-size', ['s', 'l'].includes(s.logo_size) ? s.logo_size : 'm', [['s', tr('Small')], ['m', tr('Medium')], ['l', tr('Large')]]))}${/* 2.406.0 (#3501) */ ''}
+    ${ofcRowF('os-logo-pos', tr('Logo position'), ofcSel('os-logo-pos', s.logo_pos === 'l' ? 'l' : 'r', [['l', tr('Left')], ['r', tr('Right')]]), tr('For all office documents created from now on. No effect when your own letterhead leaves out our head.'))}
     ${typeof agbSettingsHtml === 'function' ? agbSettingsHtml() : ''}${/* 2.113.2 (#2253): the terms and conditions (PDF) */ ''}
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
@@ -435,7 +437,7 @@ function ofcSettingsHtml() {
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
     ${ofcSchemeHtml('os-cr-scheme', 'credit', tr('Credit note numbers'), s.credit_scheme, dis)}
     ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
-    ${ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis)}
+    ${ofcFeat('docs.delivery') ? ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis) : ''}
     ${typeof onumHtml === 'function' ? onumHtml() : ''}
     ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('paydays')}
     ${ofcRowF('os-skonto', tr('Cash discount'), `<span class="lacts"><input id="os-skonto" value="${esc(+s.skonto_pct ? fmtNum(s.skonto_pct, 2) : '')}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span><input id="os-skonto-days" aria-label="${esc(tr('days'))}" value="${esc(+s.skonto_days ? String(s.skonto_days) : '')}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('default for new invoices; empty = none'))}
@@ -453,11 +455,12 @@ function ofcSettingsHtml() {
     ${typeof dx_settingsHtml === 'function' && ofcFeat('books.datev') ? dx_settingsHtml(s, dis) : ''}
     ${typeof brl_settingsHtml === 'function' ? brl_settingsHtml() : '' /* 2.299.0 B (#3191): bank rules */}
     ${typeof bnr_settingsHtml === 'function' ? bnr_settingsHtml(dis) : '' /* 2.299.0 C (#3192): the reminder of the bank bookings without a receipt */}
+    ${typeof rcm_settingsHtml === 'function' ? rcm_settingsHtml() : '' /* 2.424.0 B (#3450): receipts by e-mail */}
     </fieldset>${ost_p('docs', dis)}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
     ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
-    ${ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`)}
-    ${ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`)}
+    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`) : ''}
+    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`) : ''}
     ${ofcRowF('os-rm-text-de', tr('Reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
     ${ofcRowF('os-rm-text-en', tr('Reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
     <h3>${tr('Calculation rules')}</h3>
@@ -574,11 +577,11 @@ function ofc_orgOut() {
 }
 // 2.36.2 (#1021 P4): the company as single fields (print lines are made from them; the free lines stay the fallback)
 const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],  // 2.99.0 D (#2188): + BT-36
-  ['email', N_('E-mail'), 200], ['phone', N_('Phone'), 60], ['tax_number', N_('Tax number'), 40], ['vat_id', N_('VAT ID'), 20], ['bank_name', N_('Bank'), 120],
+  ['email', N_('E-mail'), 200], ['website', N_('Website'), 200], ['phone', N_('Phone'), 60], ['tax_number', N_('Tax number'), 40], ['vat_id', N_('VAT ID'), 20], ['bank_name', N_('Bank'), 120],  // 2.408.0 (#3494): + website
   ['iban', N_('IBAN'), 42], ['bic', N_('BIC'), 11], ['register_court', N_('Register court'), 120], ['register_no', N_('Register number'), 60],
   ['managing_directors', N_('Managing directors'), 300]];
 function ofcCompanyFieldsHtml(cf, dis) {
-  return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}</div>`;
+  return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''}${k === 'website' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="www.example.com"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}</div>`;
 }
 // 2.40.0 (#1377): the word printed before the management's names (Geschäftsführung, Gesellschafter, ...); the options show the
 // German and English print word, the document's language picks one; '' = Geschäftsführung as before
@@ -629,7 +632,7 @@ const OFC_II = {
   paydays: N_('Payment terms: the days a client has to pay an invoice, printed as the due date (e.g. 14 days). A client\'s own payment terms win.'),
   rmdays: N_('Payment deadline: the new, shorter period a reminder gives, counted from its date (e.g. 10 days).'),
   einv: N_('ZUGFeRD is a normal PDF with the invoice data inside, fine for most clients. XRechnung is pure XML, required by public authorities (they give you a routing ID, the Leitweg-ID).'),
-  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF + XML and land in the accounting by themselves.'),  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
+  datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.'),  // 2.434.0 (#3616): ZUGFeRD as PDF alone  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
   pq: N_('Example: 6 production days with quotient 3 make 2 producing days, charged at the producing rate. A markup for organising the production.'),
   rf: N_('Example: positions with raw data add up to 2,000 €; factor 0.25 makes a raw data surcharge of 500 €, as an option or included (set per quotation).'),
   pack: N_('A country pack brings the VAT rates, the formats and the printed words and legal texts of one country.'),
@@ -716,18 +719,21 @@ function ofcSettingsBody(form) {
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     ...($('#os-counter', form) ? {offer_counter: v('#os-counter') || 'org'} : {}),  // 2.118.0 A (#2265)
-    color: v('#os-color').trim(), ...($('#os-paper', form) ? {paper: v('#os-paper')} : {}), lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),
+    color: v('#os-color').trim(), ...($('#os-paper', form) ? {paper: v('#os-paper')} : {}),
+    ...($('#os-logo-size', form) ? {logo_size: v('#os-logo-size'), logo_pos: v('#os-logo-pos')} : {}),  // 2.406.0 (#3501)
+    lang: v('#os-lang'), currency: v('#os-currency'), ...($('#os-fx', form) ? ost_fxBody(OFC.info.settings || {}, ofcNum(v('#os-fx'), true)) : {}),  // 2.424.0 A (#3572): out of the comment again
     ...($('select#os-home', form) ? {home_currency: v('#os-home')} : {}), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
+    ...($('#os-ls-scheme', form) ? {delivery_scheme: v('#os-ls-scheme'), delivery_closing_de: v('#os-dl-close-de'), delivery_closing_en: v('#os-dl-close-en')} : {}),  // 2.434.0 B (#3608): hidden while delivery notes are off
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-sign-offers', form) ? {sign_offers: $('#os-sign-offers', form).checked ? 1 : 0} : {}),  // 2.357.0 C (#3158)
     ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)
     industry_packs: typeof pkc_indBody === 'function' ? pkc_indBody(form) : $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216), 2.76.0 (#1023): every os-ind-*
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
-    invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), delivery_scheme: v('#os-ls-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
+    invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
     ...($('#os-skonto', form) ? {skonto_pct: ofcNum(v('#os-skonto')) || 0, skonto_days: ofcNum(v('#os-skonto-days')) || 0} : {}),  // 2.120.0 A (#2087)
     ...($('#os-exempt', form) ? {exempt_reason: v('#os-exempt').trim()} : {}),  // 2.296.0 B (#3169)
     reminder_deadline_days: ofcNum(v('#os-rmdays')), small_business: $('#os-small', form)?.checked ? 1 : 0,
@@ -736,7 +742,7 @@ function ofcSettingsBody(form) {
     ...($('#os-datev', form) ? {datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0} : {}),
     ...($('#os-tax-std', form) ? {tax_rates: Object.fromEntries([['standard', ofcNum(v('#os-tax-std'))], ['reduced', ofcNum(v('#os-tax-red'))]].filter(x => x[1] != null))} : {}),
     ...($('#os-ret', form) ? {retention_years: ofcNum(v('#os-ret'))} : {}),
-    invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), delivery_closing_de: v('#os-dl-close-de'), delivery_closing_en: v('#os-dl-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
+    invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   if (typeof dun_settingsBody === 'function') Object.assign(body, dun_settingsBody(form));  // 2.147.1 B (#2054)
   if (typeof dx_settingsBody === 'function' && $('.dxset', form)) Object.assign(body, dx_settingsBody(form));  // 2.47.3 (#1460); 2.147.0 (#2460): only while DATEV is on
@@ -769,6 +775,7 @@ const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'curren
   'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
   'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
   'os-paper': 'paper',  // 2.357.0 A (#3156)
+  'os-logo-size': 'logo_size', 'os-logo-pos': 'logo_pos',  // 2.406.0 (#3501)
   'os-dun-on': 'dunning_suggest', 'os-dun-days': 'dunning_grace_days', 'os-girocode': 'girocode',  // 2.147.1 B (#2054): each saves alone
   'os-dun-int': 'dunning_interest', 'os-dun-flat': 'dunning_flat_fee', 'os-dun-base': 'base_rate', 'os-dun-kind': 'dunning_client_kind',  // 2.355.0 D (#2846)
   'os-sf': 'share_factor', 'os-sr': 'share_rate',  // 2.113.1 (#2251): producing by amount (film pack option)

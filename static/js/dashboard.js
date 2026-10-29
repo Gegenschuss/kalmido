@@ -33,7 +33,7 @@ function newsSummaryLine(g) {
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
-    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions')};  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
+    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
 function newsGroupHtml(g, pop) {
@@ -512,7 +512,7 @@ function mailHtml(j) {
     <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
     <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
     ${S.me?.is_admin ? `<div class="row"><label>${tr('Mailbox')}</label><button type="button" class="btn sm" data-mail="poll" id="s-mailpoll">${ic('sync', 's')} ${tr('Fetch mails now')}</button><span class="muted" id="s-mailpoll-r" role="status" aria-live="polite"></span></div>` : ''}`
-    : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. Ask your admin.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
+    : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. The operator of this server can set it up.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
   if (!j) return '';

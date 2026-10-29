@@ -125,6 +125,10 @@ ROUTES = {
     "PUT /api/v1/lists/{}/sections/order": "change", "PUT /api/v1/lists/{}/status": "change",
     "PUT /api/v1/lists/{}/status-pad": "change", "PUT /api/v1/sheets/{}/cells": "change",
     "PUT /api/v1/tasks/{}/waiting": "change",
+    # 2.407.0 (#3513): the agent marks a task it works on -- its own status channel like typing, no approval card
+    "POST /api/v1/tasks/{}/working": "meta", "PATCH /api/v1/tasks/{}/working": "meta", "DELETE /api/v1/tasks/{}/working": "meta",
+    # 2.425.0 (#3453): only a receipt fetcher's own key reaches these (an agent token gets 403); the default class stays
+    "POST /api/v1/fetcher/documents": "change", "PUT /api/v1/fetcher/status": "change",
 }
 
 FOUND, PROBLEMS = app_routes(ROOT)

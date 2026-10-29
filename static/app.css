@@ -2213,7 +2213,6 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp > .btn.pri{flex:none;width:2.75rem;height:2.75rem;min-width:0;padding:0;border-radius:50%}
   .chcomp > .btn.pri > span{display:none}
   .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
-  .chcomp .chstop{width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
   /* 2.290.0 B (#3146): Stop sits at the left edge, Send stays where it is (no swap of the two any more) */
 }
 /* 2.350.0 A (#2793): the desktop composer: tools, box, Stop and Send on one line with one height (2.75rem, the touch size) and one rounding;
@@ -2223,7 +2222,7 @@ button.tvr-task:hover{color:var(--accent)}
 @media (min-width:900px){
   .chcomp{gap:.375rem;padding:.5rem .75rem;align-items:flex-end}
   .chcomp textarea{min-height:2.75rem;padding:.6875rem .75rem;border-radius:var(--radius)}
-  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chstop,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
+  .chcomp > .chtools > .iconbtn,.chcomp > .iconbtn:is(.chclip,.mtgbtn,.rfins,.tvcmic,.chplus){flex:none;width:2.75rem;height:2.75rem;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:var(--radius)}
   .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
   .chcomp > .btn.pri svg{width:1.125rem;height:1.125rem}
 }
@@ -2807,10 +2806,15 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .hdot{display:inline-block;width:.5625rem;height:.5625rem;border-radius:50%;flex:none;box-sizing:border-box;background:var(--faint)}
 .hdot.hs-ready{background:var(--ok)}
 .hdot.hs-working{background:var(--p1);animation:adot 1.6s ease-in-out infinite}
+/* 2.407.0 A (#3513): an agent works on the task: pulsing dot + "Name · 11:04 · line" (row, card, detail) */
+.agw{display:inline-flex;align-items:center;gap:.3125rem;min-width:0;max-width:20rem}
+.agwt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agwd{width:.5rem;height:.5rem;border-radius:50%;flex:none;background:var(--accent);animation:adot 1.6s ease-in-out infinite}
+.dagw{margin:.25rem 0 .5rem}.dagw .agw{max-width:100%}.dagw .agwt{white-space:normal}
 .hdot.hs-waiting{background:var(--p3)}
 .hdot.hs-error{background:var(--danger)}
 .hdot.hs-offline{background:transparent;border:2px solid var(--faint)}
-@media (prefers-reduced-motion:reduce){.hdot.hs-working{animation:none}}
+@media (prefers-reduced-motion:reduce){.hdot.hs-working,.agwd{animation:none}}
 .hdm{font:600 .6875rem/1 var(--mono);color:var(--text2);margin-left:.0625rem}
 .achip:has(>.hdots)::before,.achip:has(>.hdots)::after{content:none}
 .achip.calm{background:color-mix(in srgb,var(--accent) 6%,transparent);padding:.25rem .5rem;gap:.25rem}
@@ -5106,6 +5110,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .hdot.hs-paused{background:var(--p3)}
 .gate .gev summary{cursor:pointer;min-height:1.75rem;display:flex;align-items:center}
 @media (pointer:coarse){.gate .gev summary{min-height:2.75rem}}
+@media (pointer:coarse),(max-width:767px){details.sdet>summary{min-height:2.75rem}}  /* 2.409.0 (#3506 main red, p260_ui): a folded hint in the settings is a 44 px touch target too */
 .gate .gev pre{white-space:pre-wrap;word-break:break-word;font-size:var(--fs-xs);max-height:16rem;overflow:auto}
 .gate .gchk ul{margin:.25rem 0 0;padding-left:1.25rem}
 .gate .gref code,.gate .gint code{word-break:break-all}
@@ -6659,7 +6664,7 @@ button.lnph:hover{border-color:var(--accent)}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:.9em}
 .abhint{font-size:.85rem;margin-top:.75rem}
 /* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
-.fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:8px;font-size:.85rem;color:var(--muted)}
+.fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:.5rem;font-size:.85rem;color:var(--muted)}
 .fslbar>span{flex:1 1 14rem}
 .fslbar .fslq{flex:0 1 14rem;min-width:8rem}
 .abpath{margin:-.25rem 0 .5rem;font-size:.85rem}
@@ -7036,7 +7041,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .rfpvr{display:flex;align-items:center;gap:.375rem;color:var(--text2);font-size:var(--fs-s);margin-top:.125rem}
 .rfpvr .i{flex:none;color:var(--faint)}
 .rfpvr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rfpvd{margin-top:.375rem;color:var(--muted);font-size:var(--fs-s);display:-webkit-box;-webkit-line-clamp:6;line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}  /* 2.408.0 (#3503): twice as much of the description (3 -> 6 lines) */
 @media (prefers-reduced-motion:reduce){.rfpv{transition:none;transform:none}}
 /* 2.53.0 E (#1451 #446) agent tone for comments / News / chat bubbles (own variables, never --accent) + the tags overview */
 :root{--agent-bg:#1d1d27;--agent-ink:#c4c1e4}
@@ -7371,6 +7376,8 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .sptvel .sptavg{stroke:var(--text2);stroke-width:1;stroke-dasharray:4 3}
 .sptvel .sptavgt{margin:0;color:var(--text2);font-size:var(--fs-s)}
 @media (forced-colors:active){.meta .sptm{border:1px solid ButtonText}}
+/* 2.390.0 (#3353): the ticket key APP-12 in the task row (small, muted, monospace) */
+.meta .tkey{font:500 var(--fs-xs) var(--mono);color:var(--muted);letter-spacing:.01em;white-space:nowrap}
 /* 2.60.0 A (#343): sprints -- the sprint header above a list / Kanban (filter, progress, burndown), the sprint in the task
    row, the review dialog and the list of sprints. One accent; the header folds away on the phone */
 .sprh{margin:.25rem 0 .75rem;padding:.5rem .75rem;border:1px solid var(--line2);border-radius:.75rem;background:var(--bg2);font-size:.8125rem;color:var(--muted)}
@@ -8380,6 +8387,33 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.lfh .sbbtn{flex:0 1 auto}  /* the number right after the name (#1607), the rest of the row folds */
 .abshdlg.lfshdlg #ab-shl .mrow .n{white-space:normal;overflow-wrap:anywhere}  /* a long name wraps, not cut (#1044) */
 #side .sbbtl{margin:0;padding:.25rem .5rem .25rem calc(1.75rem + var(--sbbl,0)*.875rem);font-size:var(--fs-s)}
+/* 2.406.0 A (#3492): ONE row rule for the sidebar: a tree row (sbb_treeHtml) and a folder head look like a plain #side .srow
+   -- the same font size, a 1 rem symbol at the same left edge, no extra gap above; the fold arrow sits small and grey at the
+   row's end and turns with .closed; each level steps in by one symbol + gap (1.5 rem), so a child's symbol stands under its
+   parent's name */
+#side .fhead.sbbt{margin:0;padding:0 .25rem 0 calc(.5rem + var(--sbbl,0)*1.5rem);gap:.25rem;font-size:var(--fs-b)}
+#side .sbbtar{color:var(--faint)}
+#side .sbbtar .fcar{width:.75rem;height:.75rem;margin:0}
+#side .sbbtl{padding-left:calc(.5rem + var(--sbbl,0)*1.5rem)}
+#side .sbbt .sbbtn .n,#side .fhead:not(.sbbt) .n{font-size:inherit;font-weight:400;color:inherit;letter-spacing:normal}
+#side .fhead.on .n,#side .sbbt.on .n{font-weight:600}
+#side .fhead:not(.sbbt){font-size:var(--fs-b);color:var(--text2)}
+#side .fhead .sic svg,#side .sbbtn>svg.i,#side .sbbtn>.orgic{width:1rem;height:1rem}  /* also a small symbol put in by a module (the wiki's space) */
+#side .fhead:not(.sbbt) .c{order:1;margin-right:0}
+#side .fhead:not(.sbbt) .fcar{order:2;width:.75rem;height:.75rem;margin:0 0 0 auto;color:var(--faint)}
+#side .fhead:not(.sbbt)>:not(.sgrip,.sic,.n,.c,.fcar,.fmenu){order:3}
+#side .fhead:not(.sbbt) .fmenu{order:4}
+/* a project folder head drawn by the tree (2.352.0 E, .lfh): the same order -- number after the name, the arrow at the row's
+   end, then the share mark and the "..." -- and the lists' right edge, so the share marks stand in one column */
+#side .fhead.sbbt.lfh{padding-right:.5rem;gap:.5rem}  /* as #side .srow */
+#side .sbbt.lfh>.c{order:1;margin-right:0}
+#side .sbbt.lfh>.sbbtar{order:2;margin-left:auto}
+#side .sbbt.lfh>:not(.sbbtn,.c,.sbbtar,.fmenu){order:3}
+#side .sbbt.lfh>.fmenu{order:4}
+@media (min-width:900px) and (hover:hover){ #side .fhead:not(.sbbt):not(:has(.sbc-sl)){padding-right:2rem} }  /* no share column: room for the "…" shown on hover */
+#side .fbody .srow,#side .fhead.fsub{padding-left:calc(1.125rem - 1px)}
+#side .fsubw .fbody .srow{padding-left:calc(1.75rem - 2px)}
+@media (min-width:900px) and (pointer:coarse){ #side .fhead.sbbt,#side .fhead:not(.sbbt),#side .sbbtn{font-size:var(--fs-m)} }  /* as #side .srow there */
 .abview.abdesk{grid-template-columns:minmax(0,1fr)}
 /* 2.152.3 Teil A (#2619): direction 4 (sketch of 22.10.): ONE low head bar over the bar of the areas, the panel and the page
    on a computer (#kbar, areas.js sbb_barHtml): brand + workspace switch left, the search, the bell, the dot and the account

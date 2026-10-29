@@ -208,7 +208,8 @@ r = Fr.post(B + f"{D}/{PG}/finalize")
 check(r.ok, "progress invoice finalised " + r.text[:200])
 r = Fr.post(B + f"{D}/{Q}/invoice", json={"inv_type": "final"})
 check(r.status_code == 201, "final invoice " + r.text[:160])
-ded = [ln.get("title") or "" for ln in render(r.json()["id"]).get("lines") or [] if (ln.get("title") or "").startswith("Less progress invoice no.")]
+# 2.408.0 (#3520): the deductions stand below the total now (abs_prepaid), no more among the lines
+ded = [x.get("title") or "" for x in render(r.json()["id"]).get("abs_prepaid") or [] if (x.get("title") or "").startswith("Less progress invoice no.")]
 check(ded and re.search(r" of \d{1,2} [A-Z][a-z]+ \d{4}$", ded[0]) is not None, f"F #3175: deduction dated in English: {ded}")
 
 # 2.357.0 (#3217): an office with a true zero rate (standard 0 %, e.g. UK) finalises without an exemption reason, the XML says Z

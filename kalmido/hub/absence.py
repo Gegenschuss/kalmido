@@ -350,7 +350,7 @@ def abs_create():
     oid = abs_org(c, uid, want)
     if who != uid:
         if not abs_admin(c, uid, oid):
-            raise Denied(403, tr("Only admins of the organisation can enter absences for other people"))
+            raise Denied(403, tr("Only admins of this workspace can enter absences for other people"))
         if who not in {p["id"] for p in abs_people(c, oid)}:
             raise Denied(404, tr("unknown user"))
     v = abs_clean(b)
@@ -421,7 +421,7 @@ def abs_set_state():
         raise BadInput(tr("Invalid data")) from None
     oid = abs_org(c, uid, want)
     if not abs_admin(c, uid, oid):
-        raise Denied(403, tr("Only admins of the organisation can change this"))
+        raise Denied(403, tr("Only admins of this workspace can change this"))
     st = b.get("state") or ""
     if st and st not in ABS_STATES:
         raise BadInput(tr("Invalid value: {0}", "state"))

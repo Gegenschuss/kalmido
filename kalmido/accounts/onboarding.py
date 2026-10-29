@@ -174,9 +174,10 @@ def sample_create(c, uid):
     track = lambda kind, iid: c.execute("INSERT INTO sample_items(user_id,kind,item_id) VALUES(?,?,?) ON CONFLICT DO NOTHING",  # noqa: E731
                                         (uid, kind, iid))
     srt = my_max_sort(c, uid)
-    lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
+    # 2.352.0 B (#2752): priority is every list's default sort now - the sample keeps Flow as its own sort (it shows the chain)
+    lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,sort_mode) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tr("Example: Image film for client Muster", lg=lg), "#8b5cf6", "", srt + 1, "list", ts, uid, 0,
-                     "project" if project else "list"))
+                     "project" if project else "list", "flow" if "deps" in feats else ""))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     track("list", lid)
