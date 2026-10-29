@@ -7,7 +7,6 @@
   "{0} deleted the account {1}.": "{0} ha eliminado la cuenta {1}.",
   "Add {0} person to “{1}”?": ["¿Añadir {0} persona a «{1}»?", "¿Añadir {0} personas a «{1}»?"],
   "Add to an organisation": "Añadir a una organización",
-  "Add to an organisation …": "Añadir a una organización …",
   "Admins": "Administradores",
   "Delete account": "Eliminar cuenta",
   "Delete the account of {0}": "Eliminar la cuenta de {0}",
@@ -5676,7 +5675,6 @@
   "moved to another workspace": "movió a otro espacio de trabajo",
   "{0} item": ["{0} elemento", "{0} elementos"],
   "{0} item moved": ["{0} elemento movido", "{0} elementos movidos"],
-  "Select all {0}": "Seleccionar los {0}",
   "waiting": "en espera",
   "finished": "terminado",
   "Only me and {0}": "Solo yo y {0}",
@@ -8227,7 +8225,6 @@
   "All years": "Todos los años",
   "A receipt has already been billed": "Un recibo ya se ha facturado",
   "A receipt is shared equally between the participants of its trip.": "Un recibo se reparte a partes iguales entre los participantes de su viaje.",
-  "Bill {0} receipt on": ["Facturar {0} recibo", "Facturar {0} recibos"],
   "Billed on {0}": "Facturado en {0}",
   "Bill on": "Facturar",
   "Bill receipts on": "Facturar recibos",
@@ -9482,7 +9479,6 @@
   "Too much for one ZIP: at most {0} files and {1} MB. Please choose fewer.": "Demasiado para un ZIP: como máximo {0} archivos y {1} MB. Elige menos, por favor.",
   "Without sender": "Sin remitente",
   "Without tag": "Sin etiqueta",
-  "ZIP": "ZIP",
   "File name": "Nombre del archivo",
   "No more unread news": "No hay más novedades sin leer",
   "Text recognition is missing: {0}": "Falta para el reconocimiento de texto: {0}",
@@ -14958,5 +14954,8 @@
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "Las condiciones generales (versión del {0}) son las últimas páginas del PDF.",
   "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Albaranes y justificantes de servicio: pestaña, botones en presupuestos y facturas, serie de numeración y textos finales. Los ya creados siguen siendo legibles",
   "Rates of {0} used, the BMF letter for {1} is not entered yet": "Tarifas de {0} usadas, la circular BMF de {1} aún no está registrada",
-  "Sorting": "Orden"
+  "Sorting": "Orden",
+  "Tap documents": "Toca documentos",
+  "Tap files": "Toca archivos",
+  "Tap pages": "Toca páginas"
 }

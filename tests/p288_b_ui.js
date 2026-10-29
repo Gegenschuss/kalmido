@@ -62,7 +62,7 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
   const bar = md.querySelector('#a-usel');
   check(!bar.hidden && /1 selected/.test(bar.textContent) && bar.querySelector('[data-ubulk="disable"]') && bar.querySelector('[data-ubulk="enable"]'), 'a selection shows the bar ' + bar.textContent);
-  bar.querySelector('[data-ubulk="clear"]').click();
+  bar.querySelector('[data-ubulk="close"]').click();  // 2.428.0 (#3581): the shared bar's X
   check(bar.hidden && !cb.checked, 'clear selection');
 
   // ---- the delete dialog

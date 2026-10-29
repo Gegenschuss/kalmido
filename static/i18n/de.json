@@ -7,7 +7,6 @@
   "{0} deleted the account {1}.": "{0} hat das Konto {1} gelöscht.",
   "Add {0} person to “{1}”?": ["{0} Person zu „{1}“ hinzufügen?", "{0} Personen zu „{1}“ hinzufügen?"],
   "Add to an organisation": "Zu einer Organisation hinzufügen",
-  "Add to an organisation …": "Zu einer Organisation hinzufügen…",
   "Admins": "Admins",
   "Delete account": "Konto löschen",
   "Delete the account of {0}": "Konto von {0} löschen",
@@ -5657,7 +5656,6 @@
   "moved to another workspace": "hat in einen anderen Arbeitsbereich verschoben",
   "{0} item": ["{0} Eintrag", "{0} Einträge"],
   "{0} item moved": ["{0} Eintrag verschoben", "{0} Einträge verschoben"],
-  "Select all {0}": "Alle {0} auswählen",
   "waiting": "wartet",
   "finished": "fertig",
   "Only me and {0}": "Nur ich und {0}",
@@ -8206,7 +8204,6 @@
   "All years": "Alle Jahre",
   "A receipt has already been billed": "Ein Beleg ist schon weiterberechnet",
   "A receipt is shared equally between the participants of its trip.": "Ein Beleg wird zu gleichen Teilen auf die Teilnehmenden seiner Reise verteilt.",
-  "Bill {0} receipt on": ["{0} Beleg weiterberechnen", "{0} Belege weiterberechnen"],
   "Billed on {0}": "Weiterberechnet in {0}",
   "Bill on": "Weiterberechnen",
   "Bill receipts on": "Belege weiterberechnen",
@@ -9460,7 +9457,6 @@
   "Too much for one ZIP: at most {0} files and {1} MB. Please choose fewer.": "Zu viel für eine ZIP-Datei: höchstens {0} Dateien und {1} MB. Bitte weniger auswählen.",
   "Without sender": "Ohne Absender",
   "Without tag": "Ohne Tag",
-  "ZIP": "ZIP",
   "File name": "Dateiname",
   "No more unread news": "Keine weiteren ungelesenen Neuigkeiten",
   "Text recognition is missing: {0}": "Für die Texterkennung fehlt: {0}",
@@ -14958,5 +14954,8 @@
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "Die AGB (Stand {0}) sind die letzten Seiten des PDFs.",
   "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Lieferscheine und Leistungsnachweise: Reiter, Knöpfe an Angebot und Rechnung, Nummernkreis und Schlusstexte. Bereits angelegte bleiben les- und druckbar",
   "Rates of {0} used, the BMF letter for {1} is not entered yet": "Sätze von {0}, BMF-Schreiben {1} noch nicht eingetragen",
-  "Sorting": "Sortierung"
+  "Sorting": "Sortierung",
+  "Tap documents": "Dokumente antippen",
+  "Tap files": "Dateien antippen",
+  "Tap pages": "Seiten antippen"
 }

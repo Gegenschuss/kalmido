@@ -45,8 +45,8 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => d.querySelector('[data-dcsel="mode"]'));
   d.querySelector('[data-dcsel="mode"]').click(); await sleep(300);
-  const btn = () => d.querySelector('[data-dcsel="csv"]');
-  check(btn() && btn().disabled && /Export as CSV/.test(btn().textContent), 'the CSV button waits for a choice');
+  const btn = () => d.querySelector('#dc-sbar [data-dcsel="more"]');  // 2.428.0 (#3581): "Export as CSV" sits under "More" of the shared bar
+  check(btn() && btn().disabled, 'More (with the CSV export) waits for a choice');
   const dl = []; const calls = [];
   w.HTMLAnchorElement.prototype.click = function () { dl.push({name: this.download, href: this.href}); };
   w.URL.createObjectURL = () => 'blob:csv'; w.URL.revokeObjectURL = () => {};
@@ -55,8 +55,11 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   check(ids.length === 2, 'two documents listed');
   for (const id of ids) w.eval(`dc_smvToggle(${id})`);
   await sleep(300);
-  check(!btn().disabled, 'the CSV button is on with a choice');
+  check(!btn().disabled, 'More is on with a choice');
   btn().click();
+  const csv = await until(() => d.querySelector('#pop .menu-list .msm-csv'));
+  check(csv && /Export as CSV/.test(csv.textContent), 'More offers "Export as CSV"');
+  csv?.click();
   await until(() => dl.length);
   check(calls.length === 1 && calls[0].method === 'POST' && JSON.parse(calls[0].body).ids.length === 2, 'the chosen ids are posted ' + JSON.stringify(calls[0] || {}).slice(0, 120));
   check(dl.length === 1 && dl[0].name === 'documents.csv' && dl[0].href === 'blob:csv', 'a download of documents.csv starts');

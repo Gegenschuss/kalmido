@@ -152,8 +152,8 @@
 .ua8bar{display:flex;gap:.5rem;margin:.25rem 0 .5rem}
 .ua8bar input{flex:1;min-width:0}
 .ua8bar select{flex:0 1 auto;max-width:42%}
-.ua8sel{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem;margin-bottom:.5rem;border-radius:.5rem;background:var(--accent-soft)}
-.ua8sel .n{font-weight:600;margin-right:auto}
+/* 2.428.0 A (#3581): the selection bar is the shared floating one (app.css .mselbar); room below the list for it */
+#a-usel:not([hidden])~.ua8pg{padding-bottom:5rem}
 /* 2.88.0 (#1980): the label around the tick box is the touch target (44 x 44 on touch) */
 .ua8hit{display:inline-flex;align-items:center;justify-content:center;flex:none;margin:0 .25rem 0 0;cursor:pointer}
 .ua8chk{width:1.125rem;height:1.125rem;flex:none;margin:0;accent-color:var(--accent)}
@@ -188,10 +188,6 @@
   .ua8chk{width:1.5rem;height:1.5rem}
   .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
   .ogchk input{width:1.5rem;height:1.5rem}
-}
-/* 2.92.0 D (#2010): on the phone the selection bar is fixed above the tab bar, so the first tick no longer pushes the list down */
-@media (max-width:767px) {
-  .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
 }
 /* 2.115.0 B (#2062): active sessions + open organisation invitations: two lines per row (name, details), large buttons */
 .sesrow .n,.oinvrow .n{white-space:normal}

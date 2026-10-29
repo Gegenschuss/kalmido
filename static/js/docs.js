@@ -710,16 +710,19 @@ function dc_smvToggle(id) {
   if (DC.sel.has(id)) DC.sel.delete(id); else DC.sel.set(id, d.org_id || null);
   dc_draw();
 }
+// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Edit, Download (ZIP) on it, the rare ones under "More"
 function dc_smvBar() {
   if (!DC.selOn) return '';
-  const n = DC.sel.size, orgs = new Set(DC.sel.values()), from = orgs.size === 1 ? [...orgs][0] : null;
-  return `<div class="dc-selbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="dc-seln" aria-live="polite">${esc(tr('{0} selected', n))}</span>
-    ${n < DC.total ? `<button type="button" class="linkbtn" data-dcsel="all">${esc(tr('Select all {0}', DC.total))}</button>` : `<button type="button" class="linkbtn" data-dcsel="none">${tr('Select none')}</button>`}<span class="spacer"></span>
-    <button type="button" class="btn sm" data-dcsel="csv" ${n ? '' : 'disabled'}>${tr('Export as CSV')}</button>
-    ${orgs.size <= 1 && smv_can(from) ? `<button type="button" class="btn sm" data-dcsel="space" ${n ? '' : 'disabled'}>${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
-    <button type="button" class="btn sm" data-dcsel="edit" aria-haspopup="menu" ${n ? '' : 'disabled'}>${ic('edit', 's')} ${tr('Edit')}</button><button type="button" class="btn sm" data-dcsel="zip" ${n ? '' : 'disabled'}>${ic('download', 's')} ${tr('ZIP')}</button>
-    <button type="button" class="iconbtn" data-dcsel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
+  const n = DC.sel.size;
+  return ms_barHtml('dc-sbar', 'dcsel', n, tr('Tick the boxes'), [['all', 'all', n && n >= DC.total ? tr('Select none') : tr('All')],
+    ['edit', 'edit', tr('Edit')], ['zip', 'download', tr('Download')], ['more', 'dots', tr('More')]]);
 }
+function dc_smvMore(anchor) {
+  const orgs = new Set(DC.sel.values()), from = orgs.size === 1 ? [...orgs][0] : null;
+  menu(anchor, [{label: tr('Export as CSV'), icon: 'download', cls: 'msm-csv', fn: dcx_csv},
+    orgs.size <= 1 && smv_can(from) ? {label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size))} : null].filter(Boolean), null, null, tr('Selection'));
+}
+const dc_selEnd = () => { DC.selOn = false; DC.sel = new Map(); dc_draw(); };
 async function dc_smvAll() {  // every document the search and the filters find (page by page, at most DC_SMV_MAX)
   const p = dc_params(), out = new Map();
   p.set('facets', '0'); p.set('limit', '200');
@@ -752,14 +755,17 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-dcsel]'); if (!b || !b.closest('.dc-view')) return;
   const a = b.dataset.dcsel;
   if (a === 'mode') { DC.selOn = !DC.selOn; DC.sel = new Map(); dc_draw(); }
-  else if (a === 'off') { DC.selOn = false; DC.sel = new Map(); dc_draw(); }
-  else if (a === 'all') dc_smvAll();
+  else if (a === 'off' || a === 'close') dc_selEnd();
+  else if (a === 'all') { if (DC.sel.size && DC.sel.size >= DC.total) { DC.sel = new Map(); dc_draw(); } else dc_smvAll(); }
   else if (a === 'none') { DC.sel = new Map(); dc_draw(); }
   else if (a === 'csv') dcx_csv();  // 2.122.0 (#2100)
   else if (a === 'space') dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size));
   else if (a === 'edit') dc_bulkMenu(b);  // 2.122.0 B (#2294)
   else if (a === 'zip') dc_zip();
+  else if (a === 'more') dc_smvMore(b);
 });
+// 2.428.0 A (#3581): Esc ends the selection (the long press: dc_selToggle above, 2.430.0 #3582)
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && DC.selOn && $('#view .dc-view') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); dc_selEnd(); } });
 
 // 2.122.0 (#2100): the chosen documents as a CSV file (the server leaves out what the person may not see)
 async function dcx_csv() {

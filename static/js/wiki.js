@@ -126,7 +126,7 @@ function wk_treeHtml(n, cur, many, depth = 0, sp = wk_cur(), kept = new Set(LS.g
       : `<span class="wkitem wkdir">${ic('folder', 's')}<span>${esc(k.name)}</span></span>`;
     const more = wk_rowMore(sp, k.fid && !k.page ? k.fid : k.page?.node_id, k.page && !k.fid ? k.page.updated_at : '');  // 2.200.0 A (#2747): the row's "…"
     const box = wk_selBox(sp, wk_isDir(k) ? k.fid : k.page?.node_id, k.name);  // 2.353.0 C (#2829)
-    return wk_isDir(k) ? `<li class="wkrow${box ? ' wkselrow' : ''}">${box}<details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary><span class="wktog" aria-hidden="true">${ic('chev', 's')}</span>${name}${more}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li class="wkrow${box ? ' wkselrow' : ''}">${box}${name}${more}</li>`;
+    return wk_isDir(k) ? `<li class="wkrow${box && WK.selOn ? ' wkselrow' : ''}">${box}<details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary><span class="wktog" aria-hidden="true">${ic('chev', 's')}</span>${name}${more}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li class="wkrow${box && WK.selOn ? ' wkselrow' : ''}">${box}${name}${more}</li>`;
   }).join('')}</ul>`;
 }
 document.addEventListener('click', e => {
@@ -293,23 +293,29 @@ function wk_moveTo(nid, anchor) {  // "Move to …": the folders of the space (n
 const wk_selOk = sp => WK.selOn && WK.selSp === sp && wk_canFolder(sp);
 function wk_selBtn(sp, any) {
   if (WK.selOn && WK.selSp !== sp) wk_selEnd();
-  WK.selVis = [];
+  WK.selVis = []; WK.selHere = any ? sp : null;  // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too
   return any ? `<button type="button" class="btn sm ${WK.selOn ? 'on' : ''}" data-wksel="mode" data-wsp="${esc(sp)}" aria-pressed="${!!WK.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
 }
 function wk_selBox(sp, nid, name) {
-  if (!nid || !wk_selOk(sp)) return '';
+  if (!nid || !(wk_selOk(sp) || !WK.selOn && WK.selHere === sp && wk_canFolder(sp))) return '';
   WK.selVis.push(nid);
   return `<label class="absel" title="${esc(tr('Select {0}', name))}"><input type="checkbox" data-wksel="one" data-id="${nid}" ${WK.sel.has(nid) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', name))}"></label>`;
 }
+// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Move, Delete (trash)
 function wk_selBar(sp) {
   if (!wk_selOk(sp)) return '';
   const ns = [...WK.sel].filter(x => WK.selVis.includes(x)), n = ns.length, all = n > 0 && n === new Set(WK.selVis).size;
-  return `<div class="abselbar wkselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="absn" aria-live="polite">${esc(tr('{0} selected', n))}</span>
-    <button type="button" class="linkbtn" data-wksel="all">${all ? tr('Select none') : tr('Select all')}</button><span class="spacer"></span>
-    <button type="button" class="btn sm" data-wksel="trash" ${n ? '' : 'disabled'} aria-label="${esc(tr('Move to the trash'))}" title="${esc(tr('Move to the trash'))}">${ic('trash', 's')} <span class="abselt">${tr('Move to the trash')}</span></button>
-    <button type="button" class="btn sm" data-wksel="move" ${n ? '' : 'disabled'} aria-label="${esc(tr('Move to…'))}" title="${esc(tr('Move to…'))}">${ic('arrow', 's')} <span class="abselt">${tr('Move to…')}</span></button>
-    <button type="button" class="iconbtn" data-wksel="off" aria-label="${esc(tr('Cancel'))}" title="${esc(tr('Cancel'))}">${ic('x')}</button></div>`;
+  return ms_barHtml('wk-sbar', 'wksel', n, tr('Tap pages'), [['all', 'all', all ? tr('Select none') : tr('All')], ['move', 'arrow', tr('Move')], ['trash', 'trash', tr('Delete'), 'danger']]);
 }
+// a box ticked on hover, Ctrl / Cmd / Shift + click on a row (computer), a long press (phone): choosing starts; while on, a tap chooses
+function wk_selPick(nid, shift) {
+  const sp = WK.selOn ? WK.selSp : WK.selHere; if (!nid || !sp || !wk_canFolder(sp)) return;
+  if (!WK.selOn) { WK.selOn = true; WK.selSp = sp; WK.sel.clear(); WK.selLast = null; }
+  const ids = shift && WK.selLast != null ? ms_range([...new Set(WK.selVis)], WK.selLast, nid) : [nid], on = !WK.sel.has(nid);
+  for (const x of ids) if (on) WK.sel.add(x); else WK.sel.delete(x);
+  WK.selLast = nid; renderView();
+}
+const wk_rowNid = r => +(r?.querySelector(':scope > .absel input[data-wksel="one"]')?.dataset.id || 0);
 function wk_selEnd() { WK.sel.clear(); WK.selOn = false; WK.selSp = null; }
 function wk_selNodes() {  // the chosen nodes of the open space, without one that lies in a chosen folder (it goes with that one)
   const xs = [...WK.sel].map(id => ({id, ...wk_nodeInfo(id)})).filter(x => x.sp === WK.selSp);
@@ -359,16 +365,24 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-wksel]'); if (!b || b.dataset.wksel === 'one' || !$('#view')?.contains(b)) return;
   const a = b.dataset.wksel;
   if (a === 'mode') { const on = !WK.selOn; wk_selEnd(); if (on) { WK.selOn = true; WK.selSp = b.dataset.wsp; } renderView(); }
-  else if (a === 'off') { wk_selEnd(); renderView(); }
+  else if (a === 'off' || a === 'close') { wk_selEnd(); renderView(); }
   else if (a === 'all') { const vis = new Set(WK.selVis), all = vis.size && [...vis].every(x => WK.sel.has(x)); WK.sel = new Set(all ? [] : vis); renderView(); }
   else if (a === 'move') wk_selMove(b);
   else if (a === 'trash') wk_selTrash();
 });
 document.addEventListener('change', e => {
   const b = e.target.closest?.('[data-wksel="one"]'); if (!b) return;
-  const id = +b.dataset.id; if (b.checked) WK.sel.add(id); else WK.sel.delete(id);
-  renderView();
+  const id = +b.dataset.id;
+  if (!WK.selOn && WK.selHere && wk_canFolder(WK.selHere)) { WK.selOn = true; WK.selSp = WK.selHere; WK.sel.clear(); }  // 2.428.0 A (#3581): ticked on hover
+  if (b.checked) WK.sel.add(id); else WK.sel.delete(id);
+  WK.selLast = id; renderView();
 });
+document.addEventListener('click', e => {  // 2.428.0 A (#3581): Ctrl / Cmd / Shift + click on a row chooses it (computer), a tap while choosing too
+  const a = e.target.closest?.('#view .wkrow .wkitem'); if (!a || e.target.closest('.absel, .wkmore, .wktog')) return;
+  const r = a.closest('.wkrow'), nid = wk_rowNid(r); if (!nid || ms_lpRecent(wk_lpS)) { if (nid) e.preventDefault(); return; }
+  if (WK.selOn || (ms_modClick(e) && !isMobile())) { e.preventDefault(); e.stopPropagation(); wk_selPick(nid, e.shiftKey); }
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && WK.selOn && S.route.mod === 'wiki' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); wk_selEnd(); renderView(); } });
 function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row's "…", the tree's right-click / long press)
   const x = wk_nodeInfo(nid); if (!x) return [];
   // 2.200.0 F (#2747, review 11): Share… (the one dialog, wkshare.js; an encrypted space gets its hint there)
@@ -1218,7 +1232,7 @@ window.addEventListener('online', () => setTimeout(wko_syncAll, 3000));
 document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_flush(true); });
 window.addEventListener('pagehide', () => { if (WK.dirty) wk_flush(true); });
 // 2.210 B (#2757): a right click / long press on a row of the folder list = its "…" menu (2.200.0 #2747, wk_nodeItems)
-cm_bind('#view .wkrow', r => {
+const wk_lpS = cm_bind('#view .wkrow', r => {
   const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (!a) return false;
   menu(a, wk_nodeItems(+a.dataset.nid, a)); return true;
-});
+}, r => { const nid = wk_rowNid(r); if (nid) wk_selPick(nid); else { const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (a) menu(a, wk_nodeItems(+a.dataset.nid, a)); } });  // 2.428.0 A (#3581): a long press selects

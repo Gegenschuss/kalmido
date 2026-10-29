@@ -86,9 +86,10 @@ function rk_tripHtml(t) {
     ${rk_dv() && !ro ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
   const nsel = t.items.filter(i => RK.sel.has(i.id) && !i.billed).length;
   return head + rk_vmaCard(t) + `<div class="ofcbar"><b>${tr('Receipts')}</b><span class="muted">${ofcMoney(t.total)}</span><span class="spacer"></span>
-    ${nsel ? `<button class="btn sm" data-rk="bill">${ic('receipt', 's')}<span>${esc(trn('Bill {0} receipt on', 'Bill {0} receipts on', nsel))}</span></button>` : ''}
     ${ro ? '' : `<button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button>`}</div>`
-    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<div class="shint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</div>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`);
+    + (rows ? `<ul class="ofclist rkits" role="list">${rows}</ul>${rk_dv() ? `<div class="shint">${tr('Receipts themselves stay in DATEV; tick them here once they are uploaded there.')}</div>` : ''}` : `<div class="empty nempty">${tr('No receipts yet.')}</div>`)
+    // 2.428.0 A (#3581): the chosen receipts in the shared floating bar (multisel.js ms_barHtml): Bill on, All, X / Esc
+    + (nsel ? ms_barHtml('rk-sbar', 'rk', nsel, '', [['all', 'all', nsel === t.items.filter(i => !i.billed).length ? tr('Select none') : tr('All')], ['bill', 'receipt', tr('Bill on')]]) : '');
 }
 function rk_reportHtml() {
   const q = `by=${RK.by}` + (RK.year ? `&from=${RK.year}-01-01&to=${RK.year}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
@@ -350,12 +351,15 @@ document.addEventListener('click', e => {
   else if (a === 'add' && t) rk_itemModal(t, null);
   else if (a === 'item' && t) { const i = t.items.find(x => x.id === +b.dataset.id); if (i) rk_itemModal(t, i); }
   else if (a === 'bill' && t) rk_billModal(t);
+  else if (a === 'close') { RK.sel.clear(); ofcDraw(); }  // 2.428.0 A (#3581)
+  else if (a === 'all' && t) { const op = t.items.filter(i => !i.billed), on = op.every(i => RK.sel.has(i.id)); RK.sel.clear(); if (!on) op.forEach(i => RK.sel.add(i.id)); ofcDraw(); }
   else if (a === 'filter') { RK.filter = b.dataset.v; ofcDraw(); }
   else if (a === 'view') { RK.view = b.dataset.v; RK.open = null; ofcDraw(); }
   else if (a === 'by') { RK.by = b.dataset.v; ofcDraw(); }
   else return;
   e.preventDefault();
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && RK.sel.size && $('#rk-sbar') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); RK.sel.clear(); ofcDraw(); } });  // 2.428.0 A (#3581)
 document.addEventListener('change', async e => {
   const x = e.target;
   if (x.id === 'rk-year') { RK.year = x.value; RK.open = null; rk_reload(); return; }

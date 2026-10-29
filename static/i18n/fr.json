@@ -7,7 +7,6 @@
   "{0} deleted the account {1}.": "{0} a supprimé le compte {1}.",
   "Add {0} person to “{1}”?": ["Ajouter {0} personne à « {1} » ?", "Ajouter {0} personnes à « {1} » ?"],
   "Add to an organisation": "Ajouter à une organisation",
-  "Add to an organisation …": "Ajouter à une organisation …",
   "Admins": "Administrateurs",
   "Delete account": "Supprimer le compte",
   "Delete the account of {0}": "Supprimer le compte de {0}",
@@ -5676,7 +5675,6 @@
   "moved to another workspace": "a déplacé vers un autre espace de travail",
   "{0} item": ["{0} élément", "{0} éléments"],
   "{0} item moved": ["{0} élément déplacé", "{0} éléments déplacés"],
-  "Select all {0}": "Tout sélectionner ({0})",
   "waiting": "en attente",
   "finished": "terminé",
   "Only me and {0}": "Seulement moi et {0}",
@@ -8227,7 +8225,6 @@
   "All years": "Toutes les années",
   "A receipt has already been billed": "Un justificatif a déjà été refacturé",
   "A receipt is shared equally between the participants of its trip.": "Un justificatif est réparti à parts égales entre les participants de son déplacement.",
-  "Bill {0} receipt on": ["Refacturer {0} justificatif", "Refacturer {0} justificatifs"],
   "Billed on {0}": "Refacturé dans {0}",
   "Bill on": "Refacturer",
   "Bill receipts on": "Refacturer des justificatifs",
@@ -9482,7 +9479,6 @@
   "Too much for one ZIP: at most {0} files and {1} MB. Please choose fewer.": "Trop pour un seul ZIP : au maximum {0} fichiers et {1} Mo. Veuillez en choisir moins.",
   "Without sender": "Sans expéditeur",
   "Without tag": "Sans tag",
-  "ZIP": "ZIP",
   "File name": "Nom du fichier",
   "No more unread news": "Plus aucune actualité non lue",
   "Text recognition is missing: {0}": "Manque pour la reconnaissance de texte : {0}",
@@ -14958,5 +14954,8 @@
   "The terms and conditions (as of {0}) are the last pages of the PDF.": "Les conditions générales (version du {0}) sont les dernières pages du PDF.",
   "Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable": "Bons de livraison et justificatifs de prestation : onglet, boutons sur devis et factures, série de numéros et textes de fin. Ceux déjà créés restent lisibles",
   "Rates of {0} used, the BMF letter for {1} is not entered yet": "Taux de {0} utilisés, la circulaire BMF pour {1} n'est pas encore saisie",
-  "Sorting": "Tri"
+  "Sorting": "Tri",
+  "Tap documents": "Touchez des documents",
+  "Tap files": "Touchez des fichiers",
+  "Tap pages": "Touchez des pages"
 }

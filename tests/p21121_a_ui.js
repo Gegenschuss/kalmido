@@ -50,15 +50,15 @@ const png = (w, h, rgb) => {
   d.querySelector('[data-absel="mode"]').click();
   await until(() => d.querySelector('.absel input'));
   for (const id of [A1, A2]) { const b = d.querySelector(`[data-absel="one"][data-id="${id}"]`); b.checked = true; b.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  const bar = await until(() => /2 selected/.test(d.querySelector('.abselbar')?.textContent || '') && d.querySelector('.abselbar'));
+  const bar = await until(() => /2 selected/.test(d.querySelector('#ab-sbar')?.textContent || '') && d.querySelector('#ab-sbar'));  // 2.428.0 (#3581): the shared bar
   check(bar && bar.querySelector('[data-absel="dl"]') && !bar.querySelector('[data-absel="dl"]').disabled, 'the bar offers Download ' + (bar?.textContent || '').replace(/\s+/g, ' '));
   check(bar && bar.querySelector('[data-absel="trash"]') && !bar.querySelector('[data-absel="trash"]').disabled, 'the bar offers "Move to the trash"');
-  check(bar && bar.querySelector('[data-absel="more"]'), 'the bar has its "…" menu (phones)');
+  check(bar && bar.querySelector('[data-absel="move"]'), 'the bar offers Move');  // 2.428.0 (#3581): Move is on the bar, "More" only for another workspace
   const h0 = w.eval('HIST.undo.length');
   bar?.querySelector('[data-absel="trash"]').click();
   check(await until(async () => await isDeleted(A1) && await isDeleted(A2), 60), 'both files are in the trash');
   check(await until(() => w.eval(`HIST.undo.length === ${h0 + 1} && /trash/.test(HIST.undo[HIST.undo.length - 1].label)`)), 'ONE undo step for both');
-  check(await until(() => !d.querySelector(`.abrow[data-abid="${A1}"]`) && !d.querySelector('.abselbar')), 'the rows are gone, the selection ends');
+  check(await until(() => !d.querySelector(`.abrow[data-abid="${A1}"]`) && !d.querySelector('#ab-sbar')), 'the rows are gone, the selection ends');
   await w.eval(`histStep('undo')`);
   check(await until(async () => !(await isDeleted(A1)) && !(await isDeleted(A2)), 60), 'Undo brings both back');
 
