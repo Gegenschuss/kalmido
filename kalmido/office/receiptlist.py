@@ -26,14 +26,17 @@ from flask import Response, jsonify, request
 
 from ..core.access import Denied, list_role
 from ..core.config import app
-from ..core.db import local_now
+from ..core.db import body, local_now, now_iso
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError
+from ..files.store import fs_chain, fs_deleted, fs_role
 from ..personal.timetrack import BadInput
 from .homecur import hc_code
+from .ledger import ofx_log
 from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
+from .periodlock import pl_receipt_need_open
 from .rights import ofr_own_only
 from .rcsubmit import rsb_who  # 2.356.0 D (#3129)
 
@@ -92,7 +95,6 @@ def rcl_all(c, oid, f, uid, own=False):
     net, vat, amount (Decimal, office currency), currency, orig_amount, orig_currency, mime, size, file, einvoice,
     number, vat_id}]. 2.187.0 B (#2476): own=True only the receipts uid uploaded (office groups, level "own")."""
     from ..docs.store import doc_open, label_name, meta_json
-    from ..files.store import fs_chain, fs_deleted, fs_role
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     home = _home(s)
@@ -294,9 +296,6 @@ def rcl_set_checked(c, oid, uid, ids, on):
     check mark of DATEV) -> the ids whose state changed. All or nothing: 404 when one is no receipt of this area the person
     sees (or in the trash), 403 when the person may only read one, 409 when one lies in a locked month (office/periodlock.py).
     Only people: the office routes refuse agent tokens (model.office_gate). The automatic check (receipts/rchecks.py) is apart."""
-    from ..files.store import fs_chain, fs_deleted, fs_role
-    from ..core.db import now_iso
-    from .periodlock import pl_receipt_need_open
     q = ",".join("?" * len(ids))
     found = {r["node_id"]: r for r in c.execute(
         f"SELECT r.node_id, r.checked_at FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
@@ -322,8 +321,6 @@ def rcl_checked_post():
     """2.420.0 C (#3448): {node_ids: [ids] (one or up to 500, the multiple choice of the list), checked: true|false} -> {changed:
     [ids whose state changed], rows: [{node_id, checked_at, checked_by}]}. A person of the bookkeeping (the rights of the
     receipts list, POST = edit); agents 403."""
-    from ..core.db import body
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = body()
     extra = sorted(set(b) - {"node_ids", "checked"})
@@ -356,7 +353,6 @@ def _rcl_export_ctx():
 @app.get("/api/office/books/receipts.csv")
 def rcl_csv():
     """The same filters -> the filtered receipts as CSV for the tax adviser (oldest first)."""
-    from .ledger import ofx_log
     c, uid, oid = _rcl_export_ctx()
     f, rows, hit = _rcl_load(c, oid, uid)
     data = rcl_csv_text(c, oid, hit)
@@ -371,7 +367,6 @@ def rcl_zip():
     """The same filters -> a ZIP: belege.csv + belege/ with the original files (as uploaded, no conversion). The limits
     of the files ZIP (files/bulk.py, 413 before anything is sent), built in a temporary file like bkexport.bx_zip."""
     from ..files.bulk import abm_send_zip
-    from .ledger import ofx_log
     c, uid, oid = _rcl_export_ctx()
     f, rows, hit = _rcl_load(c, oid, uid)
     path, put, missing = rcl_zip_file(c, oid, hit)
