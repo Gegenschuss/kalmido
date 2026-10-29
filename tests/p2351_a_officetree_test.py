@@ -21,6 +21,8 @@
  (f2) the lists of Documents / Correspondence show what another office (a personal office's folder) shares with the person
  (g) folder rules (docs/store.py): a rule files only into a folder the uploading person may edit -- the accounting person's
      upload stays where it lands without the rule (rollback test: without the fix it went into the folder)
+ (g2) 2.422.0 (#3557): by hand (PATCH folder by id or name, the accept of a suggestion goes the same way) only into a
+     folder the person may edit: read only = 403
 usage: p2351_a_officetree_test.py <datadir>
 freelancer-matrix: office  tenant-matrix: office"""
 import os
@@ -300,6 +302,15 @@ for _ in range(120):
     time.sleep(0.25)
 check(done[1] == got[1] and (done[0] is None or int(done[0]) != SB),
       f"(g) carl (accounting, reads the documents folder only) uploads the same: the rule does not file it into Secret box ({done})")
+# 2.422.0 (#3557): by hand neither -- carl files his own document into Secret box (read only for him) by id or by its name:
+# refused (403, rollback test: before the fix both went through), the document stays where it was; edit on the folder: he may
+r = Ca.patch(B + f"/api/docs/{DC}", json={"folder": SB})
+check(r.status_code == 403 and folder_of(Ca, DC)[0] == done[0], f"(g2) carl files his document into a folder he only reads (id): 403 ({r.status_code} {r.text[:120]})")
+r = Ca.patch(B + f"/api/docs/{DC}", json={"folder": "Secret box"})
+check(r.status_code == 403 and folder_of(Ca, DC)[0] == done[0], f"(g2) ... by the folder's name: 403 ({r.status_code} {r.text[:120]})")
+share(A, SB, user_id=USERS["carl"], role="edit")
+r = Ca.patch(B + f"/api/docs/{DC}", json={"folder": SB})
+check(r.ok and int(folder_of(Ca, DC)[0] or 0) == SB, f"(g2) shared to edit with carl: now he files it there ({r.status_code} {r.text[:120]})")
 
 # ---------------------------------------------------------------- (h) another organisation
 r = A.post(B + "/api/users", json={"username": "olga", "display_name": "Olga Other", "password": "password123", "email": "olga@example.com"})

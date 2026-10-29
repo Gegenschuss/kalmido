@@ -15055,5 +15055,6 @@
   "Receipt marked as checked": "Bon als gecontroleerd gemarkeerd",
   "Check removed": "Controle verwijderd",
   "{0} receipt marked as checked": ["{0} bon als gecontroleerd gemarkeerd", "{0} bonnen als gecontroleerd gemarkeerd"],
-  "Check removed from {0} receipt": ["Controle van {0} bon verwijderd", "Controle van {0} bonnen verwijderd"]
+  "Check removed from {0} receipt": ["Controle van {0} bon verwijderd", "Controle van {0} bonnen verwijderd"],
+  "You may only file documents into a folder you may edit": "Je kunt documenten alleen opslaan in een map die je mag bewerken"
 }

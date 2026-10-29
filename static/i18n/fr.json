@@ -15055,5 +15055,6 @@
   "Receipt marked as checked": "Justificatif marqué comme vérifié",
   "Check removed": "Vérification retirée",
   "{0} receipt marked as checked": ["{0} justificatif marqué comme vérifié", "{0} justificatifs marqués comme vérifiés"],
-  "Check removed from {0} receipt": ["Vérification retirée de {0} justificatif", "Vérification retirée de {0} justificatifs"]
+  "Check removed from {0} receipt": ["Vérification retirée de {0} justificatif", "Vérification retirée de {0} justificatifs"],
+  "You may only file documents into a folder you may edit": "Tu ne peux classer des documents que dans un dossier que tu peux modifier"
 }

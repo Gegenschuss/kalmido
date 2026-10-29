@@ -15055,5 +15055,6 @@
   "Receipt marked as checked": "Recibo marcado como revisado",
   "Check removed": "Revisión quitada",
   "{0} receipt marked as checked": ["{0} recibo marcado como revisado", "{0} recibos marcados como revisados"],
-  "Check removed from {0} receipt": ["Revisión quitada de {0} recibo", "Revisión quitada de {0} recibos"]
+  "Check removed from {0} receipt": ["Revisión quitada de {0} recibo", "Revisión quitada de {0} recibos"],
+  "You may only file documents into a folder you may edit": "Solo puedes guardar documentos en una carpeta que puedas editar"
 }

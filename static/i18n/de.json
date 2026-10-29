@@ -15055,5 +15055,6 @@
   "Receipt marked as checked": "Beleg als geprüft markiert",
   "Check removed": "Prüfung entfernt",
   "{0} receipt marked as checked": ["{0} Beleg als geprüft markiert", "{0} Belege als geprüft markiert"],
-  "Check removed from {0} receipt": ["Prüfung von {0} Beleg entfernt", "Prüfung von {0} Belegen entfernt"]
+  "Check removed from {0} receipt": ["Prüfung von {0} Beleg entfernt", "Prüfung von {0} Belegen entfernt"],
+  "You may only file documents into a folder you may edit": "Du kannst Dokumente nur in einen Ordner legen, den du bearbeiten darfst"
 }

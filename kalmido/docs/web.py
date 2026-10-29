@@ -380,13 +380,18 @@ def _feature_value(c, ws, node, f, v, uid):
             return ""
         if isinstance(v, int) and not isinstance(v, bool):
             # 2.48.0 review: only a folder the person sees (a member of an organisation: shared folders)
-            return str(v) if S.folder_ok(c, node, v) and fs_role(c, v, uid) else None
-        root = S.docs_root(c, node)
-        # 2.199.0 B (#2742): "Kunde A / 2026" = a subfolder; G (review): each step checked (sees it / edits where a folder is
-        # made: a folder shared to edit takes new subfolders, the documents folder itself only with edit there)
-        fid = S.folder_by_name(c, node, uid, str(v), create=bool(root), path=True, check=True)
-        fid = fid if fid and fs_role(c, fid, uid) else None
-        return str(fid) if fid else None
+            fid = v if S.folder_ok(c, node, v) else None
+        else:
+            root = S.docs_root(c, node)
+            # 2.199.0 B (#2742): "Kunde A / 2026" = a subfolder; G (review): each step checked (sees it / edits where a folder
+            # is made: a folder shared to edit takes new subfolders, the documents folder itself only with edit there)
+            fid = S.folder_by_name(c, node, uid, str(v), create=bool(root), path=True, check=True)
+        fr = fs_role(c, fid, uid) if fid else None
+        if not fr:
+            return None
+        # 2.422.0 (#3557): filed only into a folder the person may edit, like a rule and a learned choice (store.py); a
+        # folder shared to read only is refused (False), an old suggestion for one too when it is accepted
+        return str(fid) if fr in ("owner", "edit") else False
     return None
 
 
@@ -500,6 +505,8 @@ def doc_update(c, nid, d, uid, by=None):
     vals = {}
     for f in changed:
         v = _feature_value(c, ws, node, f, d[f], uid)
+        if v is False:
+            return err(tr("You may only file documents into a folder you may edit"), 403)
         if v is None and f == "folder":
             return err(tr("Invalid value: {0}", f))
         vals[f] = v
