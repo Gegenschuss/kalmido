@@ -5106,6 +5106,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .hdot.hs-paused{background:var(--p3)}
 .gate .gev summary{cursor:pointer;min-height:1.75rem;display:flex;align-items:center}
 @media (pointer:coarse){.gate .gev summary{min-height:2.75rem}}
+@media (pointer:coarse),(max-width:767px){details.sdet>summary{min-height:2.75rem}}  /* 2.409.0 (#3506 main red, p260_ui): a folded hint in the settings is a 44 px touch target too */
 .gate .gev pre{white-space:pre-wrap;word-break:break-word;font-size:var(--fs-xs);max-height:16rem;overflow:auto}
 .gate .gchk ul{margin:.25rem 0 0;padding-left:1.25rem}
 .gate .gref code,.gate .gint code{word-break:break-all}
@@ -6659,7 +6660,7 @@ button.lnph:hover{border-color:var(--accent)}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:.9em}
 .abhint{font-size:.85rem;margin-top:.75rem}
 /* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
-.fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:8px;font-size:.85rem;color:var(--muted)}
+.fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:.5rem;font-size:.85rem;color:var(--muted)}
 .fslbar>span{flex:1 1 14rem}
 .fslbar .fslq{flex:0 1 14rem;min-width:8rem}
 .abpath{margin:-.25rem 0 .5rem;font-size:.85rem}

@@ -87,7 +87,7 @@ start(["-e KALMIDO_API=0"])
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-check(A.get(B + "/api/state").json()["api"] == {"enabled": False}, "API off: state says disabled")
+check(A.get(B + "/api/state").json()["api"] == {"enabled": False, "mine": False}, "API off: state says disabled")
 check(A.post(B + "/api/me/tokens", json={"name": "x"}).status_code == 409, "API off: no new tokens")
 dbx("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,created_at) VALUES(1,'old',?,'abk_x','read,write','2026-01-01')",
     (hashlib.sha256(b"abk_" + b"a" * 43).hexdigest(),))
@@ -104,7 +104,7 @@ for u in ("bob", "carol", "dave"):
     assert A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok, u
 A.patch(B + "/api/users/1", json={"ntfy_topic": "admintopic"})
 Bo, Ca = sess("bob"), sess("carol")
-check(A.get(B + "/api/state").json()["api"] == {"enabled": True}, "state: API on")
+check(A.get(B + "/api/state").json()["api"]["enabled"] is True, "state: API on")  # 2.364.0 C (#3044): + mine
 
 # ---- token creation
 j = tok(A, "cli", ("read", "write"))
@@ -427,6 +427,9 @@ for ln in routes:
 # 2.143.0: a second int id in a route is documented under its own name (e.g. /team/rooms/{id}/members/{uid}, a spec
 # path may not repeat {id}): compare with every placeholder after the first {id} as {id}
 _one = lambda p: p if "{id}" not in p else p[:p.index("{id}") + 4] + re.sub(r"\{\w+\}", "{id}", p[p.index("{id}") + 4:])
+# 2.390.0 (#3353): GET /tasks/<key> (a ticket key like APP-12) is documented under /tasks/{id} - OpenAPI treats two
+# templated paths of the same shape as one
+v1r.setdefault("/tasks/{id}", set()).update(v1r.pop("/tasks/{key}", set()))
 v1r = {_one(p): ms for p, ms in v1r.items()}
 sp = {_one(p): ms for p, ms in spec["paths"].items()}
 missing = [(p, m) for p, ms in v1r.items() for m in ms if m not in sp.get(p, {})]

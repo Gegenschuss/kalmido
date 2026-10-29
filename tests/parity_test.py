@@ -376,11 +376,13 @@ APP_ONLY = [
      "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
      "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
      "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
-     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app",
+     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app; 2.371 (#3150): the tag list "
+     "and the ```abfrage block are views of the panel / a page like search",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
-      "=POST /api/outline/parse", "=PUT /api/wiki/style")),
+      "=POST /api/outline/parse", "=PUT /api/wiki/style", "=GET /api/wiki/tags",
+      "=GET /api/wiki/query")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
@@ -768,6 +770,8 @@ for name, _, schema, fn in mcp.TOOLS:
         base["base64"] = "eA=="
     if name == "send_chat":
         base["body"] = "x"
+    if name == "get_task":  # 2.390.0 (#3353): task_id or key - neither is required alone
+        base["task_id"] = 1
     for extra in [{}] + TOOL_VARIANTS.get(name, []):
         rec.tool = name
         try:

@@ -58,7 +58,7 @@ const CSV = 'Name;Company;E-mail\\nErika Beispiel;Beispiel Studio;erika@example.
     check(await ready(ev, `!!${row(f0.id)} && !!${row(f19.id)}`, 80), tag + ': the fixed costs');
     check(await ev(`(() => { const b = ${row(f0.id)}, s = b.querySelector('.fcisum'); return /without VAT/.test(b.textContent) && !/VAT 0 %/.test(b.textContent) && !/\\bnet\\b|gross/.test(s.textContent) && /900\\.00/.test(s.textContent) && s.children.length === 1; })()`),
       tag + ': 0 % = one amount, "without VAT" ' + await ev(`${row(f0.id)}.textContent`));
-    check(await ev(`(() => { const b = ${row(f19.id)}; return /100\\.00/.test(b.textContent) && /119\\.00/.test(b.textContent) && /€ net/.test(b.textContent) && /€ gross/.test(b.textContent) && /VAT 19 %/.test(b.textContent); })()`), tag + ': 19 % = net and gross ' + await ev(`${row(f19.id)}.textContent`));
+    check(await ev(`(() => { const b = ${row(f19.id)}; return /100\\.00/.test(b.textContent) && /119\\.00/.test(b.textContent) && /€ ?100\\.00 net|100\\.00 € net/.test(b.textContent) && /€ ?119\\.00 gross|119\\.00 € gross/.test(b.textContent) && /VAT 19 %/.test(b.textContent); })()`), tag + ': 19 % = net and gross ' + await ev(`${row(f19.id)}.textContent`));
     // ---- #2335: no import buttons in the bar, a quiet link at the end
     check(await ev(`!document.querySelector('.fcibar [data-rkf="fimp"]') && !document.querySelector('.fcibar a[href*="import/template"]') && !!document.querySelector('.fcibar [data-rkf="fnew"]')`), tag + ': the bar keeps only "New fixed cost"');
     check(await ev(`(() => { const a = document.querySelector('.oimlink:not(.e) a[href="#office/import/fixed"]'); return !!a && /Import…/.test(a.textContent); })()`), tag + ': "Import…" at the end of the fixed costs');
