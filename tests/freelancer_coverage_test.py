@@ -1003,6 +1003,16 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/<int:cid>": "office", "DELETE /api/office/cards/<int:cid>": "office",
+    "POST /api/office/cards/<int:cid>/restore": "office", "GET /api/office/cards/<int:cid>/statements": "office", "POST /api/office/cards/<int:cid>/statements": "office",
+    "GET /api/office/cards/statements/<int:sid>": "office", "GET /api/office/cards/statements/<int:sid>/file": "office", "PATCH /api/office/cards/statements/<int:sid>": "office",
+    "DELETE /api/office/cards/statements/<int:sid>": "office", "POST /api/office/cards/statements/<int:sid>/restore": "office",
+    "POST /api/office/cards/statements/<int:sid>/confirm": "office", "POST /api/office/cards/statements/<int:sid>/reopen": "office",
+    "GET /api/office/cards/statements/<int:sid>/bank": "office", "POST /api/office/cards/statements/<int:sid>/lines": "office",
+    "PATCH /api/office/cards/lines/<int:lid>": "office", "DELETE /api/office/cards/lines/<int:lid>": "office", "GET /api/office/cards/lines/<int:lid>/candidates": "office",
+    "POST /api/office/cards/lines/<int:lid>/match": "office", "POST /api/office/cards/lines/<int:lid>/unmatch": "office", "POST /api/office/cards/lines/<int:lid>/upload": "office",
+    "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }

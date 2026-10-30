@@ -579,6 +579,12 @@ SPECS = [
     OiT("office/bank_rules.json", "office_bank_rules", people={"created_by": "null"}, private="office"),  # 2.299.0 B (#3191)
     OiT("office/bank_rule_nos.json", "office_bank_rule_nos", people={"created_by": "null"}, private="office", prep=_p_rule_no),
     OiT("office/bank_vendors.json", "office_bank_vendors", people={"updated_by": "null"}, private="office"),  # 2.425.0 B (#3451)
+    # 2.444.0 (#3447): credit card statements; holder_id of a person who did not come along: nobody (the name stays empty, the card is the admin's to fix)
+    OiT("office/cc_cards.json", "office_cc_cards", people={"created_by": "null", "holder_id": "null"}, private="office"),
+    OiT("office/cc_statements.json", "office_cc_statements", refs={"card_id": "office_cc_cards"}, need=("card_id",), late={"node_id": "fs_nodes"},
+        people={"created_by": "null", "confirmed_by": "null"}, private="office"),
+    OiT("office/cc_lines.json", "office_cc_lines", refs={"statement_id": "office_cc_statements"}, need=("statement_id",), late={"node_id": "fs_nodes"},
+        people={"matched_by": "null"}, private="office"),
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),
@@ -642,9 +648,9 @@ def _f_bank(c, run, uid, data, who):
     """The matches of the bank bookings: an invoice (document) or a receipt (file store); without its partner none."""
     for src in (data.get("oi") or {}).get("office/bank_tx.json") or []:
         nid, kind = run.m("office_bank_tx", src.get("id")), src.get("match_kind")
-        if not nid or kind not in ("invoice", "receipt"):
+        if not nid or kind not in ("invoice", "receipt", "card"):  # 2.444.0 (#3447): + card
             continue
-        mid = run.m("office_docs" if kind == "invoice" else "fs_nodes", src.get("match_id"))
+        mid = run.m({"invoice": "office_docs", "card": "office_cc_statements"}.get(kind, "fs_nodes"), src.get("match_id"))
         if mid:
             c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, matched_at=? WHERE id=?", (kind, mid, src.get("matched_at"), nid))
         else:

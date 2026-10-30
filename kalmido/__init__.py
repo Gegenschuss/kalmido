@@ -354,6 +354,8 @@ ORDER = (
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task
     "office.bankvend",  # 2.425.0 B (#3451): recurring providers of the bank bookings, their missing invoices
+    "office.cards",  # 2.444.0 (#3447): credit card statements: cards, PDF positions (+ office.cardlines: their receipts)
+    "office.cardnorc",  # 2.444.0 (#3447): the reminder of the positions without a receipt, the rows of the exports
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.privacy",  # 2.154.0 C (#2192): data protection sheets of a client (DPA, information, consent): mail, ways back, status

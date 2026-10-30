@@ -408,6 +408,15 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnksn small{font-size:var(--fs-s)}
 .bnkacts{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .bnkacts .btn{min-height:2.75rem}  /* 2.114.1 A (#2017): 44 px targets */
+/* 2.444.0 (#3447): credit cards */
+.ccopen{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ccopen .bnkn{flex:1;min-width:0}
+.ccfacts{display:flex;flex-wrap:wrap;gap:.375rem 1.5rem;margin:0 0 .5rem}
+.ccfacts dt{font-size:var(--fs-s);color:var(--muted)}
+.ccfacts dd{margin:0;font-variant-numeric:tabular-nums}
+.ccdiff{color:var(--danger)}
+.ccsug small{flex:1 1 8rem;min-width:0}
+.ccl{margin-top:.5rem}
 .bnkm{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bnkmiss{margin:0;font-size:var(--fs-s)}
 .bnkother{display:flex;flex-direction:column;gap:.375rem}

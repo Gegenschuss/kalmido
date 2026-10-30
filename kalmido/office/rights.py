@@ -52,6 +52,7 @@ OFFICE_AREAS = (
     ("cashflow", N_("Cash flow"), "money", ("cashflow", "fixed-costs", "tax-dates"), False, "admin"),
     ("kpi", N_("Figures"), "money", ("kpi",), False, "admin"),
     ("bank", N_("Bank"), "money", ("bank", "pay-props"), False, "admin"),
+    ("cards", N_("Credit cards"), "money", ("cards",), True, "admin"),  # 2.444.0 (#3447): own = the cards the person holds (office/cards.py)
     ("books", N_("Bookkeeping"), "money", ("books", "datev", "periods", "gobd", "procdoc"), False, "admin"),
     ("receipts", N_("Receipts"), "money", ("books/receipts", "receipts", "receipt-mail"), True, "admin"),  # 2.424.0 B (#3450): receipt-mail
     ("subs", N_("Subscriptions & tools"), "money", ("subs",), False, "admin"),
@@ -86,6 +87,7 @@ MANAGE_ROUTES = frozenset({
     "/api/office/trips/purposes/<int:pid>", "/api/office/letters/profile/image", "/api/office/vehicles",
     "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol",
     "/api/office/peppol/check", "/api/office/tax-dates", "/api/office/procdoc",
+    "/api/office/cards/reminder",  # 2.444.0 (#3447)
 })
 # routes whose reading needs "manage" too: the whole office log (every area's before / after) and the master data export
 MANAGE_READ = frozenset({"/api/office/log", "/api/office/export"})
@@ -134,6 +136,14 @@ OWN_ROUTES = {
     "POST /api/office/receipts/submit", "GET /api/office/receipts/mine",
     # 2.424.0 B2 (#3450, review): the person's own forwarding address for receipts (office/lettermail.py, always the caller's)
     "GET /api/office/receipt-mail",
+    # 2.444.0 (#3447): the holder's own cards (office/cards.py cc_card / cc_stmt narrow to them, 404 for anybody else's)
+    "GET /api/office/cards", "GET /api/office/cards/<int:cid>/statements", "POST /api/office/cards/<int:cid>/statements",
+    "GET /api/office/cards/statements/<int:sid>", "GET /api/office/cards/statements/<int:sid>/file", "PATCH /api/office/cards/statements/<int:sid>",
+    "POST /api/office/cards/statements/<int:sid>/confirm", "POST /api/office/cards/statements/<int:sid>/reopen",
+    "DELETE /api/office/cards/statements/<int:sid>", "POST /api/office/cards/statements/<int:sid>/restore",
+    "POST /api/office/cards/statements/<int:sid>/lines", "PATCH /api/office/cards/lines/<int:lid>", "DELETE /api/office/cards/lines/<int:lid>",
+    "GET /api/office/cards/lines/<int:lid>/candidates", "POST /api/office/cards/lines/<int:lid>/match",
+    "POST /api/office/cards/lines/<int:lid>/unmatch", "POST /api/office/cards/lines/<int:lid>/upload",
 }
 
 TPL_LEGACY = "legacy"
