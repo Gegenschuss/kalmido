@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.430.1] - 2026-10-30
+
+### Fixed
+- CI of 2.430.0: the e-invoice validators rejected the test file of final invoices (tests/p2408_a_einvoice_test.py built a Peppol invoice without Peppol ids, its e-mail fallback EM is not in the Peppol scheme list); the test now uses Peppol ids like a real send. App unchanged.
+
 ## [2.430.0] - 2026-10-30
 
 Package 2.390 (Teil 1/3: Software-Tickets: Kennungen, Status-Spalten, Filter, Ansichten, Delegation; Büro-Kleinkram).
@@ -9366,7 +9371,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.430.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.430.1...HEAD
+[2.430.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.1
 [2.430.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.0
 [2.409.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.409.0
 [2.401.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.401.1
