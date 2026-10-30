@@ -70,7 +70,7 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     await openMenu(ev);
     let it = await ev(items);
     check(it.some(x => /^Search in this chat/.test(x)) && it.some(x => /^Filter: All/.test(x)) && it.some(x => /^Fold long messages/.test(x)) && it.some(x => /^Always show steps/.test(x)) && it.some(x => /^Delete history/.test(x)), label + ': the menu has Filter / Fold / Steps / Delete ' + JSON.stringify(it));
-    check(!it.some(x => /\[on\]/.test(x) && !/^Show usage/.test(x)), label + ': nothing is switched on yet (Show usage is on by default, 2.407.0 #3493) ' + JSON.stringify(it));
+    check(!it.some(x => /\[on\]/.test(x) && !/^(Show usage|Close the keyboard)/.test(x)), label + ': nothing is switched on yet (Show usage #3493 and the keyboard switch #3449 are on by default) ' + JSON.stringify(it));
     // the filter: submenu with the three choices
     await pickItem(ev, '/^Filter/');
     check(await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'Jobs')`), label + ': the filter entry opens the three choices');
