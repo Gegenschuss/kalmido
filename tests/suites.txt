@@ -2228,3 +2228,5 @@ fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2437_l_start "$PY" p2437_l_start_test.py "$KALMIDO_TEST_DATA"
 # 2.431.0 A (#3593): the task header keeps every icon whole; its words fall away step by step
 fresh; run p2431_a_ui node p2431_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.360.2 (#2561 #2912 #2913): Server-Timing only for instance admins, pinned actions, third-party notices; freelancer-matrix: public
+fresh; run p23602_a_api "$PY" p23602_a_api_test.py "$KALMIDO_TEST_DATA"
