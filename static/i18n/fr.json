@@ -15242,5 +15242,9 @@
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Téléversez les justificatifs de ces positions de carte ou indiquez qu’ils ne sont pas nécessaires. La tâche se termine d’elle-même lorsque chaque position a son justificatif.",
   "Waiting for confirmation": "En attente de confirmation",
   "Enter the total of the statement first": "Saisissez d’abord le total du relevé",
-  "Statement read, but its total was not found: please enter it": "Relevé lu, mais total introuvable : saisissez-le"
+  "Statement read, but its total was not found: please enter it": "Relevé lu, mais total introuvable : saisissez-le",
+  "Hide on Today": "Masquer dans Aujourd'hui",
+  "Show on Today": "Afficher dans Aujourd'hui",
+  "“{0}” is hidden on Today": "« {0} » est masqué dans Aujourd'hui",
+  "“{0}” is shown on Today": "« {0} » est affiché dans Aujourd'hui"
 }

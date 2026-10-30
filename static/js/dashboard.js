@@ -294,7 +294,8 @@ document.addEventListener('drop', e => {
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
 LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
-  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']]};
+  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']],
+  blockItems: k => { const c = k === 'events' ? cvxTodayItems() : []; return c.length ? [{head: tr('Calendars on Today')}, ...c] : []; }};  // 2.443.0 (#3740): the block's "…" is the one the phone shows
 LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
   ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By project and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
 // the Agents overview (status, usage, jobs; not the settings) and the projects overview ("Where is it stuck?")

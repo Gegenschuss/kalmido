@@ -15242,5 +15242,9 @@
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Sube los justificantes de estos movimientos de tarjeta o márcalos como no necesarios. La tarea se completa sola cuando cada movimiento tenga el suyo.",
   "Waiting for confirmation": "Pendiente de confirmación",
   "Enter the total of the statement first": "Introduce primero el total del extracto",
-  "Statement read, but its total was not found: please enter it": "Extracto leído, pero sin encontrar el total: introdúcelo"
+  "Statement read, but its total was not found: please enter it": "Extracto leído, pero sin encontrar el total: introdúcelo",
+  "Hide on Today": "Ocultar en Hoy",
+  "Show on Today": "Mostrar en Hoy",
+  "“{0}” is hidden on Today": "«{0}» está oculto en Hoy",
+  "“{0}” is shown on Today": "«{0}» se muestra en Hoy"
 }

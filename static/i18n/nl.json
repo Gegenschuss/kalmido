@@ -15242,5 +15242,9 @@
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Upload de bonnen van deze kaartposten of markeer ze als niet nodig. De taak rondt zichzelf af zodra elke post zijn bon heeft.",
   "Waiting for confirmation": "Wacht op bevestiging",
   "Enter the total of the statement first": "Voer eerst het totaal van het overzicht in",
-  "Statement read, but its total was not found: please enter it": "Overzicht gelezen, maar totaal niet gevonden: voer het in"
+  "Statement read, but its total was not found: please enter it": "Overzicht gelezen, maar totaal niet gevonden: voer het in",
+  "Hide on Today": "Verbergen in Vandaag",
+  "Show on Today": "Tonen in Vandaag",
+  "“{0}” is hidden on Today": "\"{0}\" is verborgen in Vandaag",
+  "“{0}” is shown on Today": "\"{0}\" wordt getoond in Vandaag"
 }

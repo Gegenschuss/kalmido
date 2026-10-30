@@ -1580,6 +1580,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cevh .cevdot{width:.625rem;height:.625rem;transform:translateY(-1px)}
 .cevm{display:flex;align-items:flex-start;gap:.5rem;font-size:var(--fs-s);color:var(--text2);overflow-wrap:anywhere}
 .cevm svg{flex:0 0 auto;color:var(--muted);margin-top:1px}
+.cevm .cvxthide{flex:none;margin-left:auto}  /* 2.443.0 (#3740) */
 .cevdesc{font-size:var(--fs-s);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow-y:auto;border-top:1px solid var(--line);padding-top:.4375rem}
 .cevdesc a{color:var(--accent)}
 .cevact{display:flex;justify-content:flex-end;padding-top:.125rem}

@@ -363,7 +363,8 @@ CAL_LIST_MAX = 500
 
 
 def clean_cal_list(k, v):
-    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>".
+    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>"
+    (today_cals_hidden also "x:hol" | "x:abs" | "x:team").
     -> stored json; BadInput if malformed. Ids of calendars / lists that no longer exist are harmless (never matched)."""
     bad = BadInput(tr("Invalid value: {0}", k))
     if v is None or (isinstance(v, str) and not v.strip()):
@@ -378,7 +379,9 @@ def clean_cal_list(k, v):
         if not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 10 ** 12 for x in arr):
             raise bad
         return json.dumps(sorted(set(arr)))
-    if not all(isinstance(x, str) and re.fullmatch(r"[es]:[1-9][0-9]{0,11}", x) for x in arr):
+    # 2.443.0 (#3740): Today also switches holidays and absences off (x:hol | x:abs | x:team, cvxKey in calendar.js)
+    pat = r"[es]:[1-9][0-9]{0,11}|x:(hol|abs|team)" if k == "today_cals_hidden" else r"[es]:[1-9][0-9]{0,11}"
+    if not all(isinstance(x, str) and re.fullmatch(pat, x) for x in arr):
         raise bad
     return json.dumps(sorted(set(arr)))
 

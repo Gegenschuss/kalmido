@@ -1853,6 +1853,7 @@ expect files there.
 |---|---|---|
 | The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
+| 2.443.0: by tag (every node has `tags: [{id, name}]`; `tag=1,7;3` = ids, `;` separates tags, `tag_mode=all` = every one, `not_tag=`; with `parent_id` its children, without: all you see at any depth, at most 500) | `GET /api/v1/files?tag=<ids>` | `list_files` with `tag` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
 | Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |

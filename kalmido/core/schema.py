@@ -4362,7 +4362,7 @@ USER_DEFAULTS = {
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)
     "cal_lists_hidden": "[]",   # 2.36.1 (#1127): json list of list ids whose tasks the calendar views leave out
-    "today_cals_hidden": "[]",  # 2.36.1 (#1127): json list of calendar keys ("e:<evcal id>" | "s:<subscription id>") left out of "Events today"
+    "today_cals_hidden": "[]",  # 2.36.1 (#1127): json list of calendar keys ("e:<evcal id>" | "s:<subscription id>" | 2.443.0 (#3740): "x:hol" | "x:abs" | "x:team") left out of "Events today"
     "plan_cals_off": "[]",      # 2.36.1 (#956): json list of calendar keys whose events do not count as busy when planning the day
     # 2.155.0 B (#2076): public holidays / my absences / the colleagues' absences in the calendar views; my holiday state
     # ('' = the one of my area, hub/absence.py ABS_STATES)
