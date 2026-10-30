@@ -2068,8 +2068,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         base = lay(True, {})[0]
         res = [(t, lay(True, t)) for t in tries]
         # 2.380.0 A (#3415): the totals' air never goes below its minimum (a break instead); the first try without an extra page,
-        # else the one with the fewest pages (the full air, then less intro air)
-        ns = [(t, lay(True, t)[0]) for t in tries[:4]]
+        # else the one with the fewest pages (the full air, then less intro air); the totals at their minimum gap last, as the
+        # appendix decision above counts with it (else the order confirmation slides onto a page of its own, p2406_lead_pdf)
+        ns = [(t, lay(True, t)[0]) for t in tries[:4] + [air_min]]
         tries = [next((t for t, n in ns if n <= base), None) or min(ns, key=lambda x: x[1])[0]]
     lay(False, tries[0])
     total = len(pages)
