@@ -20,12 +20,13 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
-from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
+from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.db import appver_newer_minor
+from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
@@ -1519,12 +1520,9 @@ def bkr_purged_drop(c, tbl, rid):
 def bkr_purged_after(c, rows):
     """After the accounts (own commits): the list back, then what the backup brought back goes one row at a time.
     -> (deleted again, kept as deleted recently, could not be deleted)."""
-    from ..core.pg import system_ctx
-    from ..core.schema import PURGED_TABLES
-    from ..core.serializers import unlink_files
     gone, recent, stuck, files = 0, 0, 0, []
     cut = iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
-    with system_ctx(c):  # entries of every organisation; numbers only
+    with _pg.system_ctx(c):  # entries of every organisation; numbers only
         bkr_purged_note(c, rows)
         c.commit()
         for tbl in PURGED_TABLES:  # the big ones first: what goes with them needs no step of its own
@@ -1565,7 +1563,6 @@ def bkr_after_restore(c, rows):
     #2602: counted apart). The caller commits nothing: this function does."""
     from ..accounts.users import user_purge
     from ..core.pg import system_ctx
-    from ..core.serializers import unlink_files
     with system_ctx(c):  # the journal and the accounts of every organisation; nothing is shown to a person
         c.execute("DELETE FROM deleted_accounts")
         for r in rows:

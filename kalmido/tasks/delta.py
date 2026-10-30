@@ -20,7 +20,7 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app, APP_VERSION
-from ..core.db import db, gset, gsetting, iso, now_utc, usettings
+from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
@@ -149,7 +149,6 @@ def dl_floor_check(c, sig):
     """Deltas from before now answer full when the triggers' signature changed.
     2.360.4 (#3248): a step back (this image is older than the newest that ran here, core/db.py appver_stamp): what
     the versions in between recorded is not known and the signature is not kept, so the next upgrade answers full as well."""
-    from ..core.db import appver_parse
     r = c.execute("SELECT value FROM kalmido_meta WHERE key='app_version'").fetchone()
     have, mine = appver_parse(r[0]) if r else None, appver_parse(APP_VERSION)
     back = bool(have and mine and have > mine)
