@@ -114,7 +114,6 @@ def _fv2_ws(c, uid, org_id, owner_id):
 
 def _fv2_ref(c, uid, kind, rid):
     """The public form of an object the person may read now, else None (gone, in the trash, no right, area locked)."""
-    from ..accounts.wsareas import wsa_org_off
     from ..files.fsref import FSR, fs_ref_role
     reg = FSR.get(kind)
     if reg is None or kind not in FV2_REF_KINDS:
@@ -124,12 +123,18 @@ def _fv2_ref(c, uid, kind, rid):
     if fs_ref_role(c, uid, kind, rid) is None:
         return None
     sp = reg["space"](c, rid)
-    if sp is None or (sp[0] and FV2_AREA[kind] in wsa_org_off(c, sp[0])):
+    if sp is None or _fv2_off(c, sp[0], kind):
         return None
     if reg.get("content_gate"):
         reg["content_gate"](c, uid, rid)
     return {"name": _fv2_name(reg["title"](c, rid) if reg.get("title") else "", reg["label"]), "label": tr(reg["label"]),
             "to": reg["open_url"](rid), "ws": _fv2_ws(c, uid, sp[0], sp[1])}
+
+
+def _fv2_off(c, org_id, kind):
+    """Has the organisation's admins' switch taken the object's area away?"""
+    from ..accounts.wsareas import wsa_org_off
+    return bool(org_id) and FV2_AREA[kind] in wsa_org_off(c, org_id)
 
 
 def _fv2_name(name, label):
@@ -139,12 +144,11 @@ def _fv2_name(name, label):
 
 def _fv2_locked_page(c, uid, rid, reg):
     """A page of a locked space has no reference (a folder opens nothing there): the area's own role alone, never a title."""
-    from ..accounts.wsareas import wsa_org_off
     from ..wiki.wkfolder import wkf_base, wkf_locked
     r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (rid,)).fetchone()
     if not r or r["deleted_at"] or not wkf_locked(c, r) or wkf_base(c, uid, r) is None:
         return None
-    if r["org_id"] and "wiki" in wsa_org_off(c, r["org_id"]):
+    if _fv2_off(c, r["org_id"], "wiki"):
         return None
     return {"name": tr(reg["label"]), "label": tr(reg["label"]), "to": reg["open_url"](rid), "ws": _fv2_ws(c, uid, r["org_id"], r["owner_id"])}
 
