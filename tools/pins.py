@@ -123,7 +123,7 @@ def main():
         try:
             out += osv_check()
         except (OSError, urllib.error.URLError, ValueError) as e:
-            print(f"pins: OSV not reachable, pdf.js unchecked: {type(e).__name__}")
+            print(f"::warning::pins: OSV not reachable, pdf.js unchecked: {type(e).__name__}")
     for p in out:
         print("pins:", p)
     print(f"pins: {len(out)} problem(s)")

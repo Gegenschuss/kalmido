@@ -233,11 +233,12 @@ jobs:
           pip-audit --strict --disable-pip --require-hashes -r tools/requirements.lock
           pip-audit --strict --disable-pip --require-hashes -r embed/requirements.lock
       # 2.360.3 (#2915): nothing of tests/ ships, so a finding there is reported without stopping the build
-      - name: Audit of the test tools (informational)
+      - name: pip-audit of the test tools (informational)
         continue-on-error: true
-        run: |
-          pip-audit --strict -r tests/requirements.txt
-          npm audit --omit=optional --prefix tests
+        run: pip-audit --strict -r tests/requirements.txt
+      - name: npm audit of the test tools (informational)
+        continue-on-error: true
+        run: npm audit --omit=optional --prefix tests
 
   einvoice:
     # 2.38.0 (#1021 P5): the e-invoice files Kalmido writes pass the real validators -- veraPDF (PDF/A-3b) and the KoSIT
