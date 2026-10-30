@@ -87,7 +87,7 @@ const today = TC.today();
     await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     check(await ready(ev, `${money} === 'true'`, 20), 'Money opens by hand');
     const pts = await ev(side);
-    check(pts === 'receipts,bank,books,cashbook' && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3039: Receipts first, points used later wait under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);
+    check(pts === 'receipts,bank,cards,books,cashbook' && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3039: Receipts first, points used later wait under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);
     await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true'`, 80), '#3039: the hand\'s choice stays after reloading');
     await ev(`(() => { localStorage.removeItem('tasks.sbbUnfold'); return 1; })()`);
