@@ -111,7 +111,7 @@ r = A.post(B + K, json={"holder_id": BOB, "last4": "4711", "account": "DE0212030
 check(r.status_code == 201 and r.json()["holder"] == "Bob Member", f"a card of a person of the area {r.text[:200]}")
 CARD = r.json()["id"]
 r = A.post(B + K, json={"holder_name": "Fremder Name", "last4": "9999"})
-check(r.status_code == 201 and r.json()["holder"] == "Fremder Name", "a card with a free name, no account")
+check(r.status_code == 201 and r.json()["holder"] == "Fremder Name", f"a card with a free name, no account {r.text[:200]}")
 CARD2 = r.json()["id"]
 check(A.post(B + K, json={"holder_name": "X", "last4": "12"}).status_code == 400, "four digits or 400")
 check(A.post(B + K, json={"last4": "1234"}).status_code == 400, "a holder or 400")
