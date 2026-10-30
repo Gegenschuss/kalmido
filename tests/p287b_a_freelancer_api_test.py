@@ -58,6 +58,7 @@ EXPECT_4XX = {
     "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private space"),
     "GET /api/office/docs/{}/timesheet.pdf": (400, "no time entries of the client in the period (the own entries are on a list without a client)"),
     "GET /api/office/logo": (404, "no logo uploaded in the personal office"),
+    "GET /api/office/books/archive/files/{}": (404, "no past DATEV year imported into the personal office, the id is a file of the file store"),
     "GET /api/office/move/check": (404, "the freelancer has no organisation to move the personal office into"),
     "GET /api/tasks/{}/enc-note": (404, "no encrypted note on the own task"),
     "GET /api/tasks/{}/note-lock": (404, "the note of the own task is not locked"),
@@ -255,6 +256,8 @@ IDS["form"] = _id(ok(F.post(B + f"/api/lists/{IDS['list']}/forms", json={"title"
 IDS["milestone"] = _id(ok(F.post(B + "/api/tasks", json={"list_id": IDS["list"], "title": "Delivery", "ms": 1}),
                           "sweep setup: a milestone", (200, 201)))
 IDS["invoice"], IDS["pack"] = inv.get("id"), "xx"
+IDS["cashbook"] = _id(ok(F.post(B + "/api/office/cashbooks", json={"name": "Till", "opening": "100.00", "opening_day": "2026-03-01"}),
+                       "sweep setup: a cash book", (200, 201)))
 ok(F.patch(B + f"/api/lists/{IDS['list']}", json={"folder": "Work"}), "sweep setup: the private list in a folder")
 ok(F.put(B + "/api/office/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345"}}), "sweep setup: DATEV numbers")
 for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
@@ -268,6 +271,7 @@ SUBST = [
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
+    (r"/office/cashbooks/$", "cashbook"),
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
     (r"/lists/\d+/files/$", None),
     (r"/office/docs/$", "doc"), (r"/office/services/$", "service"), (r"/api(/v1)?/office/$", "officekind"),
@@ -305,7 +309,8 @@ QUERY = {
     "GET /api/search/messages": {"q": "trailer"}, "GET /api/v1/search": {"q": "trailer"}, "GET /api/tags/count": {"tag": "film"},
     "GET /api/team/absences/check": {"user": "{me}", "date": D}, "GET /api/team/dispo/free": {"date": D},
     "GET /api/v1/dispo/free": {"date": D}, "GET /api/videos": {"task_id": "{task}"}, "GET /api/v1/videos": {"task_id": "{task}"},
-    "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"}, "GET /api/wiki/refs": {"file": "{node}"},
+    "GET /api/office/books/archive/accounts": {"year": "2026"}, "GET /api/office/books/archive/bookings": {"year": "2026"},
+    "GET /api/wiki/query": {"page": "{wiki}", "q": "zeige: seiten"}, "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"}, "GET /api/wiki/refs": {"file": "{node}"},
 }
 
 

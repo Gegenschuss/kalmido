@@ -282,8 +282,10 @@ imp(Fr, camt("DE12500105170648489890", d(1), [ntry("9.99", d(68), "P-1", "Speich
 j = Fr.get(B + V).json()
 check([v["name"] for v in j["items"]] == ["Speicher Beispiel"] and len(Fr.get(B + NR).json()["missing"]) == 3, f"freelancer: own provider and hints {j}")
 fv = j["items"][0] if j["items"] else {}
-check(Fr.put(B + V, json={"kind": fv.get("kind"), "match": fv.get("match"), "noreceipt": True}).ok and Fr.get(B + NR + "/count").json()["out"] == 0,
+check(Fr.put(B + "/api/office/bank/vendors", json={"kind": fv.get("kind"), "match": fv.get("match"), "noreceipt": True}).ok and Fr.get(B + NR + "/count").json()["out"] == 0,
       "freelancer: no receipt needed")
+r = Fr.put(B + V + "/settings", json={"days": 9})
+check(r.ok and r.json()["days"] == 9 and Fr.get(B + V).json()["days"] == 9, "freelancer: its own days until an invoice counts as missing " + r.text[:200])
 check(SOFT in [v["name"] for v in A.get(B + V).json()["items"]] and "Speicher Beispiel" not in [v["name"] for v in A.get(B + V).json()["items"]],
       "the freelancer's providers never reach the organisation")
 

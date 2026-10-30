@@ -1015,7 +1015,7 @@ ROUTES = {
 # method (or the line before). Constants of a suite (O = "/api/office", V = B + "/api/v1") are put into the paths first; an
 # /api/v1 route may stand without its prefix right after a quote (a client with the base /api/v1).
 WRITES = ("POST", "PUT", "PATCH", "DELETE")
-CONST_RE = re.compile(r"^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(?:\w+\s*\+\s*)?(?:([A-Z_][A-Z0-9_]*)\s*\+\s*)?f?[\"'](/[\w/{}.-]*)[\"']\s*(?:#.*)?$", re.M)
+CONST_RE = re.compile(r"^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(?:(?:B|\w*[a-z]\w*)\s*\+\s*)?(?:([A-Z_][A-Z0-9_]*)\s*\+\s*)?f?[\"'](/[\w/{}.-]*)[\"']\s*(?:#.*)?$", re.M)
 HOLE = r"(?:\{[^{}\n]{1,80}\}|[\w.%-]{1,40}|[\"']\s*\+\s*[^\n+]{1,60}?\s*\+\s*f?[\"']|[\"']\s*\+\s*str\([^\n]{1,60}?\)(?=[\s,)]))"
 
 
@@ -1102,26 +1102,13 @@ DELETE /api/newsletter
 DELETE /api/newsletter/segments/{}
 DELETE /api/notepads/{}
 DELETE /api/notes/{}
-DELETE /api/office/bank/rules/{}
 DELETE /api/office/cashflow/adjust/{}
 DELETE /api/office/cashflow/start
-DELETE /api/office/contracts/{}/files/{}
-DELETE /api/office/deals/{}
-DELETE /api/office/doc-templates/{}
 DELETE /api/office/docs/{}/parts/{}
-DELETE /api/office/docs/{}/payments/{}
-DELETE /api/office/gen-docs/{}
-DELETE /api/office/letter-blocks/{}
-DELETE /api/office/letters/{}
-DELETE /api/office/letters/{}/delivered
 DELETE /api/office/logo
 DELETE /api/office/meals/choices/{}
 DELETE /api/office/meals/{}/file/{}
 DELETE /api/office/packs/installed/{}/{}
-DELETE /api/office/privacy-sheets/{}
-DELETE /api/office/rights/groups/{}
-DELETE /api/office/series/{}
-DELETE /api/office/terms/{}
 DELETE /api/office/trash/{}
 DELETE /api/office/trips/purposes/{}
 DELETE /api/paperless
@@ -1198,15 +1185,8 @@ PATCH /api/me/tokens/{}
 PATCH /api/me/webhooks/{}
 PATCH /api/newsletter/segments/{}
 PATCH /api/notepads/{}
-PATCH /api/office/cashbooks/{}
 PATCH /api/office/cashflow/adjust/{}
-PATCH /api/office/contracts/{}/files/{}
-PATCH /api/office/doc-templates/{}
-PATCH /api/office/gen-docs/{}
-PATCH /api/office/letter-blocks/{}
 PATCH /api/office/meals/choices/{}
-PATCH /api/office/privacy-sheets/{}
-PATCH /api/office/series/{}
 PATCH /api/office/trips/purposes/{}
 PATCH /api/office/trips/{}/items/{}
 PATCH /api/office/vehicles/{}
@@ -1362,68 +1342,32 @@ POST /api/notes/{}/restore
 POST /api/notify-templates/asked
 POST /api/ntfy/test
 POST /api/office/bank/rules
-POST /api/office/bank/rules/decline
-POST /api/office/bank/rules/{}/apply
-POST /api/office/bank/rules/{}/restore
-POST /api/office/bank/rules/{}/revert
-POST /api/office/cashbooks/{}/closing
 POST /api/office/cashflow/adjust
 POST /api/office/catalog/refresh
-POST /api/office/contracts/{}/files/{}/restore
 POST /api/office/datev/import
 POST /api/office/datev/import/check
-POST /api/office/datev/import/{}/undo
-POST /api/office/deals/{}/convert
 POST /api/office/deals/{}/project
 POST /api/office/deals/{}/restore
-POST /api/office/deals/{}/unconvert
-POST /api/office/doc-templates/{}/restore
-POST /api/office/docs/from-time
 POST /api/office/docs/tree/folders
-POST /api/office/docs/{}/delivery
-POST /api/office/docs/{}/fee
-POST /api/office/docs/{}/peppol
-POST /api/office/docs/{}/peppol/lookup
-POST /api/office/docs/{}/peppol/refresh
 POST /api/office/docs/{}/project
-POST /api/office/docs/{}/time-release
 POST /api/office/drives/{}/restore
 POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders
-POST /api/office/gen-docs/{}/restore
-POST /api/office/gen-docs/{}/signoff
 POST /api/office/import
 POST /api/office/legacy/archive/address
 POST /api/office/legacy/archive/parse
 POST /api/office/legacy/counter
 POST /api/office/legacy/runs/{}/tidy
 POST /api/office/legacy/split
-POST /api/office/letter-blocks/{}/restore
-POST /api/office/letterhead/restore
 POST /api/office/letters/tree/folders
-POST /api/office/letters/{}/delivered
-POST /api/office/letters/{}/restore
-POST /api/office/letters/{}/send-mail
-POST /api/office/letters/{}/template
 POST /api/office/logbook/close
 POST /api/office/meals/choices
 POST /api/office/meals/{}/file/{}/restore
 POST /api/office/meals/{}/restore
-POST /api/office/meals/{}/unlock
-POST /api/office/number-ranges/{}
 POST /api/office/packs/install
 POST /api/office/packs/installed/{}/{}/restore
 POST /api/office/packs/validate
-POST /api/office/privacy-sheets
-POST /api/office/privacy-sheets/{}/confirm
-POST /api/office/privacy-sheets/{}/restore
-POST /api/office/privacy-sheets/{}/send
-POST /api/office/privacy-sheets/{}/signed
-POST /api/office/receipts/bill
 POST /api/office/receipts/tree/folders
-POST /api/office/receipts/unbill
-POST /api/office/series/{}/restore
-POST /api/office/terms/{}/restore
 POST /api/office/trips/unbill
 POST /api/onboarding
 POST /api/orgs/{}/encryption/recovery/passkey
@@ -1590,8 +1534,6 @@ PUT /api/lists/{}/playbook
 PUT /api/me/avatar
 PUT /api/newsletter
 PUT /api/newsletter/consent
-PUT /api/office/bank/noreceipt/reminder
-PUT /api/office/bank/rules/{}
 PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/cashflow/start
