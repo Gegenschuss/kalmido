@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`!document.querySelector('.ocf-choose')`), '#2462: an office with saved settings is not asked for its country');
 
     // ================= #2460 the area Functions
-    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).join(',')`) === 'company,docs,packs,functions,data,access', '#2460: six areas, Functions after Packs');
+    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).filter(k => k !== 'tax').join(',')`) === 'company,docs,packs,functions,data,access', '#2460: the areas, Functions after Packs (Bank & taxes of #2789 left out: main has it, the train not yet)');
     await ev(tab('functions'));
     check(await ev(shown) === 'functions', '#2460: the area Functions shown alone');
     const feats = await ev(`[...document.querySelectorAll('#ofc-set [data-feat]')].map(x => x.dataset.feat + ':' + (x.checked ? 1 : 0) + (x.disabled ? 'd' : '')).join(',')`);
