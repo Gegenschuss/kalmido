@@ -32,7 +32,7 @@ KINDS = {
     # ---- covered by the matrix (the suites carry "tenant-matrix: <kind>")
     "aggregate": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: state, search, trash, tags, roadmap, day plan, occurrences"),
     "task": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a task by id (read, change, complete, comment, subtasks, dependencies)"),
-    "favtarget": ("matrix", "p2441_favs_ui.js: the favourites of a person resolved to objects of any area (2.441.0, #3592)"),
+    "favtarget": ("matrix", "p2441_favs_api_test.py, p2441_favs_ui.js: the favourites of a person resolved to objects of any area (2.441.0, #3592)"),
     "comment": ("matrix", "p2300_tenant_test.py: a comment by id (change, delete, react)"),
     "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id"),
     "chatfile": ("matrix", "p2300_tenant_test.py: a file of an agent chat by id"),

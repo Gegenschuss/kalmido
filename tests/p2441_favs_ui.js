@@ -58,7 +58,7 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
   check(T1.items?.[`r:wiki:${PG}`]?.name === 'Shoot day checklist' && T1.items[`r:wiki:${PG}`].to === `wiki/${PG}` && T1.items[`r:wiki:${PG}`].ws === 'private', 'a page: name, route, workspace');
   check(T1.items?.[`r:office_doc:${OF}`]?.ws === 'private', 'her own office counts as Private (P4)');
   check(T1.items?.[`file:${FD}`]?.folder === true && T1.items[`file:${FD}`].to === `ablage/${FD}`, 'a folder of the file store');
-  // somebody else's keys: nothing of the target leaves (tenant-matrix: favtarget)
+  // somebody else's keys: nothing of the target leaves
   await call(CB, 'PATCH', '/api/settings', {fav_items: KEYS});
   const T2 = await call(CB, 'GET', '/api/favorites/targets');
   check(!Object.keys(T2.items || {}).length && T2.gone.length === 5 && !/Shoot|Budget|Petra|Image|Kiste/.test(JSON.stringify(T2)), 'bert gets nothing of frida\'s targets ' + JSON.stringify(T2).slice(0, 200));
