@@ -302,7 +302,8 @@ for meth, path in routes:
     elif 200 <= r.status_code < 300:
         bad.append(f"{meth} {path} -> {r.status_code} (answer to a person outside) {r.text[:60]!r}")
 # refused before any lookup, without content: agent-only endpoint (role check) and token scope checks
-SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/attachments/<int:aid>", "GET /api/v1/attachments/<int:aid>/text",
+SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/tasks/<int:tid>/working",  # 2.407.0 (#3513): agents only
+               "GET /api/v1/attachments/<int:aid>", "GET /api/v1/attachments/<int:aid>/text",
                "GET /api/v1/lists/<int:lid>/files/<file_id>",
                # 2.51.0 (#1348): the office draft routes check the token's "Office" permission before any lookup
                "GET /api/v1/office/docs/<int:did>", "GET /api/v1/office/docs/<int:did>/pdf",

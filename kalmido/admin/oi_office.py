@@ -356,6 +356,16 @@ def _p_opening(c, run, src, d, ctx):
     return False
 
 
+def _p_bka_file(c, run, src, d, ctx):
+    """2.414.0 (#3502): an original file / receipt image of the booking archive under a new name below the target's office folder."""
+    m = re.fullmatch(r"bka-[0-9a-f]{16}(\.[a-z]{3})", str(src.get("file") or ""))
+    new = _oi_put(ctx, src["file"], f"bka-{uuid.uuid4().hex[:16]}{m.group(1)}", mime=d.get("mime") or "") if m else None
+    if not new:
+        return None
+    d["file"] = new
+    return d
+
+
 def _p_datev_guid(c, run, src, d, ctx):
     """2.188.0 A (#2498): the kept GUID of a document that came along (receipt files: node_id late, _f_datev_guids)."""
     if src.get("doc_id") is not None and not d.get("doc_id"):
@@ -440,6 +450,16 @@ def _p_letter(c, run, src, d, ctx):
     return d
 
 
+def _p_drive_closed(c, run, src, d, ctx):
+    """2.362.0 (#3096): a closed month of the logbook (a vehicle that did not come along: nothing to close)."""
+    if src.get("vehicle_id") and not d.get("vehicle_id"):
+        return False
+    if c.execute("SELECT 1 FROM office_drive_closed WHERE org_id=? AND COALESCE(vehicle_id, 0)=? AND month=?",
+                 (ctx.space, d.get("vehicle_id") or 0, d.get("month"))).fetchone():
+        return False
+    return d
+
+
 def _p_letter_profile(c, run, src, d, ctx):
     """2.184.0 A (#2579): the signature of a person in the target office stays theirs (one per person and office)."""
     if c.execute("SELECT 1 FROM office_letter_profiles WHERE org_id=? AND user_id=?", (ctx.space, d["user_id"])).fetchone():
@@ -504,6 +524,9 @@ SPECS = [
         people={**_P, "user_id": "null"}, private="office"),
     OiT("office/drive_log.json", "office_drive_log", refs={"drive_id": "office_drives"}, need=("drive_id",), people={"by_user": "null"},
         private="office"),
+    # 2.362.0 (#3096): the closed months of the logbook stay closed (one already closed in the target is left as it is)
+    OiT("office/drive_closed.json", "office_drive_closed", refs={"vehicle_id": "office_vehicles"}, people={"closed_by": "null"},
+        private="office", label=N_("Logbook"), prep=_p_drive_closed),
     OiT("office/cashbooks.json", "office_cashbooks", people=_P, private="office"),
     OiT("office/cash_entries.json", "office_cash_entries", refs={"book_id": "office_cashbooks", "invoice_id": "office_docs"}, need=("book_id",),
         late={"storno_of": "office_cash_entries", "node_id": "fs_nodes"}, people=_P, private="office"),
@@ -520,6 +543,13 @@ SPECS = [
     OiT("office/suppliers.json", "office_suppliers", refs={"import_run_id": "office_import_runs"}, private="office"),  # 2.148.0 D (#2458)
     OiT("office/opening_balances.json", "office_opening_balances", refs={"import_run_id": "office_import_runs"}, private="office",
         prep=_p_opening),  # 2.188.0 A (#2498): no double on a second import
+    # 2.414.0 (#3502): the booking archive (rows of a run that did not come along stay out)
+    OiT("office/bookarch_files.json", "office_bookarch_files", refs={"run_id": "office_import_runs"}, need=("run_id",), people=_P,
+        private="office", prep=_p_bka_file),
+    OiT("office/bookarch.json", "office_bookarch", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office"),
+    OiT("office/bookarch_accts.json", "office_bookarch_accts", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office"),
+    OiT("office/bookarch_docs.json", "office_bookarch_docs", refs={"run_id": "office_import_runs"}, need=("run_id",), private="office",
+        prep=_p_bka_file),
     OiT("office/datev_guids.json", "office_datev_guids", refs={"doc_id": "office_docs"}, late={"node_id": "fs_nodes"}, private="office",
         prep=_p_datev_guid),  # 2.188.0 A (#2498): the receipt images keep their GUID in DATEV (no double after a move)
     # 2.187.0 C (#2476): the office rights' own groups and their log come along (an organisation only: the private space has
@@ -548,6 +578,7 @@ SPECS = [
     OiT("office/bank_imports.json", "office_bank_imports", people=_P, private="office"),
     OiT("office/bank_rules.json", "office_bank_rules", people={"created_by": "null"}, private="office"),  # 2.299.0 B (#3191)
     OiT("office/bank_rule_nos.json", "office_bank_rule_nos", people={"created_by": "null"}, private="office", prep=_p_rule_no),
+    OiT("office/bank_vendors.json", "office_bank_vendors", people={"updated_by": "null"}, private="office"),  # 2.425.0 B (#3451)
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),
@@ -599,6 +630,8 @@ def _f_runs(c, run, uid, data, who):
         for key, tbl in (("filled_clients", "clients"), ("filled_suppliers", "office_suppliers")):  # 2.148.0 D (#2458): DATEV runs
             if isinstance(det.get(key), dict):
                 det[key] = {str(n): v for n, v in ((run.m(tbl, k), v) for k, v in det[key].items()) if n}
+        if isinstance(det.get("master_runs"), list):  # 2.414.0 (#3502): the DATEV runs of a booking archive run
+            det["master_runs"] = [n for n in (run.m("office_import_runs", x) for x in det["master_runs"]) if n]
         if isinstance(det.get("replaced"), list):
             det["replaced"] = [dict(x, import_run_id=run.m("office_import_runs", x.get("import_run_id")) if x.get("import_run_id") else None)
                                for x in det["replaced"] if isinstance(x, dict)]

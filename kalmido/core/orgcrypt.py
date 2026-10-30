@@ -86,12 +86,15 @@ FIELDS = {
     "office_bank_tx": ("amount", "counterpart", "purpose", "iban"),  # 2.90.0 B (#1921): imported bank bookings
     "office_bank_balances": ("amount", "account"),  # 2.124.0 D (#2342): balances of the imported statements
     "office_bank_rules": ("name", "counterpart", "iban", "purpose", "amount_min", "amount_max", "category"),  # 2.299.0 B (#3191): bank rules
+    "office_bank_vendors": ("match", "name", "portal"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose", "correct_note"),  # 2.93.0 B (#1928): the logbook; 2.152.0 C (#2169): + reason
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
     "office_procdocs": ("data",),  # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot)
     "office_suppliers": ("name", "street", "zip", "city", "vat_id", "iban"),  # 2.148.0 D (#2458): creditors of the DATEV import
+    "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
+    "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
     "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
     "office_letter_blocks": ("body",), "office_letter_profiles": ("image",),  # 2.153.0 (#2030, #2028): text blocks, signature picture
     "office_deals": ("value", "contact", "note", "lost_reason",
@@ -133,11 +136,14 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_bank_tx": N_("Bank statements"),  # 2.90.0 B (#1921)
                  "office_bank_balances": N_("Bank statements"),  # 2.124.0 D (#2342)
                  "office_bank_rules": N_("Bank statements"),  # 2.299.0 B (#3191)
+                 "office_bank_vendors": N_("Bank statements"),  # 2.425.0 B (#3451)
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
                  "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472)
                  "office_suppliers": N_("Suppliers of the DATEV import"),  # 2.148.0 D (#2458)
+                 "office_bookarch": N_("Booking archive"), "office_bookarch_accts": N_("Booking archive"),  # 2.414.0 (#3502)
+                 "office_bookarch_docs": N_("Booking archive"), "office_bookarch_files": N_("Booking archive"),
                  "office_letters": N_("Letters"), "office_letter_blocks": N_("Letters"), "office_letter_profiles": N_("Letters"),  # 2.153.0 (#2028)
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)

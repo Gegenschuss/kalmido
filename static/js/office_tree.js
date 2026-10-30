@@ -15,13 +15,15 @@ const OFT = {d: {}, busy: {}};
 // 2.380.0 B (#3409): [2] = the query of the area (quotations / invoices share the documents' route)
 const OFT_AREAS = {offers: ['docs', 'file'], invoices: ['docs', 'receipt', '?sec=invoices'], gendocs: ['gen-docs', 'file'], letters: ['letters', 'mail'], receipts: ['receipts', 'ticket']};
 const oft_key = () => `${S.me?.id || ''}:${typeof wsCur === 'function' ? wsCur() : 'all'}`;
-async function oft_load(area) {
-  if (OFT.busy[area]) return;
-  OFT.busy[area] = true;
+// 2.373.0 (#3337): OFT.busy[area] = the running load; a second call gets it to wait on (ltSentModal's folders). The fetch
+// starts only after busy is set (a call while it starts, e.g. a drawing, must not start another one)
+function oft_load(area) {
+  return OFT.busy[area] || (OFT.busy[area] = Promise.resolve().then(() => oft_fetch(area)).finally(() => { OFT.busy[area] = null; }));
+}
+async function oft_fetch(area) {
   const key = oft_key();
   try { OFT.d[area] = {...(await rawFetch('GET', `/api/office/${OFT_AREAS[area][0]}/tree${OFT_AREAS[area][2] || ''}`)), key, v: S.v, at: Date.now()}; }
-  catch (e) { if (e.message === 'auth') { OFT.busy[area] = false; return; } OFT.d[area] = {key, v: S.v, at: Date.now(), folders: [], docs: [], err: e.message}; }
-  OFT.busy[area] = false;
+  catch (e) { if (e.message === 'auth') return; OFT.d[area] = {key, v: S.v, at: Date.now(), folders: [], docs: [], err: e.message}; }
   if (typeof sbb_officeSync === 'function') sbb_officeSync();
   if ((area === 'gendocs' || area === 'letters') && OFT.d[area]?.shared?.length && S.route.mod === 'office' && S.route.tab === area && !S.route.id && typeof ofcDraw === 'function') ofcDraw();
 }

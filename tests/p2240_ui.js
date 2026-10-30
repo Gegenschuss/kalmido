@@ -27,7 +27,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const closeAll = w => [...w.document.querySelectorAll('.modal')].forEach(m => m.remove());
@@ -164,7 +164,8 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(!d.querySelector('#side .sborg') || d.querySelector('#side .sborg').textContent.toLowerCase() !== 'kalmido', 'UX-06: the organisation only when it is not the app name');
   // UX-36: the default tab bar
   check(JSON.stringify(w.eval('tabIds()')) === JSON.stringify(['s:inbox', 's:today', 'search', 'lists']), 'UX-36: default bar Inbox · Today · Search · Lists');
-  check(w.eval(`tabItem('lists').act`) === 'side', 'UX-36: "Lists" opens the drawer');
+  // 2.417.0 (#3559): "Projects" opens the page kept in Projects in full view (was: the drawer)
+  check(!w.eval(`tabItem('lists').act`) && !!w.eval(`tabItem('lists').go`), 'UX-36: "Projects" opens a page (#3559)');
   // ================= #906: direct messages
   w.eval(`go('who/${BOB}')`); await sleep(300);
   check(d.querySelector(`#top [data-act="dm"][data-uid="${BOB}"]`), '#906: "Message" on "Tasks of Bob"');

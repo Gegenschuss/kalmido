@@ -164,6 +164,7 @@ ROUTES = {
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -269,6 +270,10 @@ ROUTES = {
     # 2.207.0 A (#2763): scan inboxes of the own documents, the upload key, the mail note, the folder watcher downloads
     "GET /api/docs/scan-keys": "files", "POST /api/docs/scan-keys": "files", "DELETE /api/docs/scan-keys/{}": "files",
     "GET /api/v1/documents/upload-target": "files", "POST /api/docs/mail-notice": "files", "GET /api/docs/folder-watcher/{}": "files",
+    # 2.425.0 C (#3453): receipt fetchers of the personal office (p2425_c_api_test.py, freelancer-matrix: files)
+    "GET /api/docs/fetchers": "files", "POST /api/docs/fetchers": "files", "DELETE /api/docs/fetchers/{}": "files",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files", "PUT /api/v1/fetcher/status": "files",
+    "POST /api/v1/fetcher/documents": "files",
     "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
@@ -421,6 +426,9 @@ ROUTES = {
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
     "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
     "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",  # 2.148.0 D (#2458)
+    "GET /api/office/books/archive": "office", "GET /api/office/books/archive/bookings": "office", "GET /api/office/books/archive/bookings/{}": "office",  # 2.414.0 (#3502)
+    "GET /api/office/books/archive/accounts": "office", "GET /api/office/books/archive/docs/{}": "office", "GET /api/office/books/archive/files/{}": "office",
+    "POST /api/office/books/archive/check": "office", "POST /api/office/books/archive/import": "office", "POST /api/office/books/archive/runs/{}/undo": "office",
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
@@ -537,7 +545,8 @@ ROUTES = {
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
     "GET /api/me/app-passwords": "own", "GET /api/me/mail": "own", "GET /api/me/share/httpshortcuts.zip": "own",
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",
-    "GET /api/me/webhooks": "own", "GET /api/me/webhooks/{}/log": "own", "GET /api/orgs": "own", "GET /api/push/subs": "own",
+    "GET /api/me/webhooks": "own", "GET /api/me/webhooks/{}/log": "own", "GET /api/orgs": "own", "POST /api/orgs": "own",  # 2.422.0 (#2937): p2422_orgself_test.py (a)
+    "GET /api/push/subs": "own",
     "GET /api/push/vapid": "own", "GET /api/v1/me": "own", "GET /api/v1/me/app-passwords": "own",
     "GET /api/v1/me/storage": "own", "PATCH /api/me": "own", "PATCH /api/me/tokens/{}": "own",
     "PATCH /api/me/webhooks/{}": "own", "PATCH /api/settings": "own", "PATCH /api/v1/me/notifications": "own",
@@ -826,7 +835,8 @@ ROUTES = {
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
     # 2.115.0 A (#2061): inbound webhooks of a list (p2115_a_api_test.py calls them as a person without an organisation);
     # the hook URL itself is a secret token; the webhooks of an organisation are managed by its admins
-    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "lists", "POST /api/lists/{}/hooks-in": "lists",
+    "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "lists",  # 2.380 G (#2289): header variant
+    "POST /api/lists/{}/hooks-in": "lists",
     "PATCH /api/hooks-in/{}": "lists", "DELETE /api/hooks-in/{}": "lists", "POST /api/hooks-in/{}/rotate": "lists",
     "POST /api/hooks-in/{}/restore": "lists",
     "GET /api/orgs/{}/webhooks": "orgadmin", "POST /api/orgs/{}/webhooks": "orgadmin", "PATCH /api/orgs/{}/webhooks/{}": "orgadmin",
@@ -846,6 +856,7 @@ ROUTES = {
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
+    "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
     # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private space)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
@@ -869,7 +880,9 @@ ROUTES = {
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
+    "GET /api/wiki/shared/pages/{}/img/{}": "wiki",  # 2.380 H (#2356): p2380r_h_api_test.py (a person without an organisation)
     "GET /s/w/{}": "link", "GET /s/w/{}/p/{}": "link", "GET /s/w/{}/file/{}": "link",
+    "GET /s/w/{}/img/{}/{}": "link",  # 2.380 H (#2356)
     # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private space)
     "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
     "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
@@ -883,6 +896,7 @@ ROUTES = {
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
+    "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py
     "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
     "GET /api/office/equipment/policies": "office", "GET /api/office/equipment/receipts": "office",
     "GET /api/office/equipment/receipts/{}": "office", "GET /api/office/equipment/value": "office",
@@ -970,6 +984,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area, admin; a person without an organisation is their own admin (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): the count for the test mode section of the settings
     # 2.148.0 C (#2472): the procedure documentation (GoBD) of the office (p2148_c_api_test.py as a person without an organisation)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
@@ -986,6 +1001,8 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
+    "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }
 
 

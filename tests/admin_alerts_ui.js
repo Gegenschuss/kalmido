@@ -1,6 +1,7 @@
 // Admin alerts UI (jsdom): Settings > Users > Whole server > Admin alerts -- form, save, test alert, recent list,
 // clear, German labels, nothing for non-admins. Runs after admin_alerts_test.py on its last container
 // (KALMIDO_ADMIN_TOPIC=env-admins; alice + carol (German) are admins, bob is not).
+// stages-needs: admin_alerts  (its accounts + container; ONLY admin_alerts_ui alone = "login alice 401", main red 29.10. #3506)
 const fs = require('fs');
 const path = require('path');
 const {boot, errs, sleep} = require('./boot');

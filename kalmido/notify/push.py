@@ -632,6 +632,8 @@ def _watchdog_tick(c):
     _wd_section(c, "agent chat days", ckd_tick)  # 2.186.0 C (#2602): daily; KALMIDO_CHAT_KEEP_DAYS also without a new message (switch "chat")
     from ..files.trashpurge import tp_tick
     _wd_section(c, "trash periods", tp_tick)  # 2.152.0 B (#2165): the other trashes after KALMIDO_TRASH_DAYS (switch: ret_on)
+    from ..office.bookarch import ba_retention_tick
+    _wd_section(c, "booking archive", ba_retention_tick)  # 2.414.0 (#3502): archived years after 10 years (switch "trash")
     from ..accounts.orgretain import odl_retired_prune
     _wd_section(c, "retired organisations", odl_retired_prune)  # 2.152.0 A (#2167): after the legal period, only with ret_on("trash")
     from ..admin.acctexport import umz_cleanup

@@ -11,6 +11,9 @@
 #   - restarts it (fresh session) when the model / auto-compact settings change, when an admin presses "Reset now"
 #     (reset_seq goes up; the agent also gets the event `reset`), once a night at nightly_reset (HH:MM in runtime.timezone),
 #     and whenever the command exits by itself (after KALMIDO_RESTART_DELAY seconds)
+#   - git author (2.396.0, #3386): GIT_AUTHOR_NAME / _EMAIL and GIT_COMMITTER_NAME / _EMAIL from runtime.git_author (a
+#     project with a repository may name its own: data.repo.git_author of a task), KALMIDO_GIT_COAUTHOR=1 when the agent
+#     should append a Co-Authored-By line; an older server without git_author: nothing is set
 #   - interim summary (2.233.0, #3189: rotate_size / rotate_runs / rotate_idle_min, sent as rotate_tokens etc.): applied per chat
 #     conversation by mcp/agent_run.py in --events mode; without --events the command runs one session (not applicable)
 # It polls GET /api/v1/agent every KALMIDO_POLL seconds (default 60): one small request, no events are consumed.
@@ -110,27 +113,30 @@ RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
 log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
 
 # GET /api/v1/agent -> one tab-separated line: model autocompact pct nightly reset_seq timezone enabled working resumes_at
-# (2.236.0: the work window of the work style, 1 = inside or none set). A paused agent's token is refused (403): that prints
-# "- - - - - - 0 1 -" (stop the agent). The token goes to curl on stdin, never on its
+# git_name git_mail coauthor (2.236.0: the work window of the work style, 1 = inside or none set; 2.396.0 #3386: the git author,
+# "-" = not sent). A paused agent's token is refused (403): that prints
+# "- - - - - - 0 1 - - - -" (stop the agent). The token goes to curl on stdin, never on its
 # command line. Exit 1: Kalmido not reachable (or another error); exit 2 (2.157.0, #1517): the token is revoked (401).
 fetch() {
   local out code
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
         curl -sS --max-time 20 --config - -w '\n%{http_code}' "${KALMIDO_URL%/}/api/v1/agent") || return 1
   code=${out##*$'\n'}
-  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\n' "${SEQ:-0}"; return 0; fi
+  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\t-\t-\t-\n' "${SEQ:-0}"; return 0; fi
   [[ "$code" == 401 ]] && return 2
   [[ "$code" == 200 ]] || { log "GET /api/v1/agent: HTTP $code"; return 1; }
   printf '%s' "${out%$'\n'*}" | python3 -c '
-import json, sys
+import json, re, sys
 a = json.load(sys.stdin)
 r = a.get("runtime") or {}
 w = (a.get("work_style") or {}).get("state") or {}
 pct = r.get("autocompact_pct")
+ga = re.fullmatch(r"([^<>\t\n]+) <([^<>\s]+)>", str(r.get("git_author") or ""))
 print("\t".join(str(x) for x in (r.get("model") or "-", "1" if r.get("autocompact", True) else "0", pct if pct else "-",
                                   r.get("nightly_reset") or "-", int(r.get("reset_seq") or 0), r.get("timezone") or "UTC",
                                   "1" if a.get("enabled", True) else "0", "0" if w.get("working") is False else "1",
-                                  w.get("work_resumes_at") or "-")))'
+                                  w.get("work_resumes_at") or "-", ga.group(1).strip() if ga else "-", ga.group(2) if ga else "-",
+                                  "1" if r.get("git_coauthor") else "0")))'
 }
 
 PID=""
@@ -140,12 +146,16 @@ start() {  # start the command with the current settings (its own process group,
   [[ "$MODEL" != "-" ]] && args+=(--model "$MODEL")
   if [[ "$AC" == "0" ]]; then envs+=(DISABLE_AUTO_COMPACT=1)
   elif [[ "$PCT" != "-" ]]; then envs+=(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="$PCT"); fi
+  # kalmido-capability: git_author (2.396.0, #3386): the agent's commits carry the git author set in Kalmido
+  if [[ -n "$GNAME" && "$GNAME" != "-" && -n "$GMAIL" && "$GMAIL" != "-" ]]; then
+    envs+=(GIT_AUTHOR_NAME="$GNAME" GIT_AUTHOR_EMAIL="$GMAIL" GIT_COMMITTER_NAME="$GNAME" GIT_COMMITTER_EMAIL="$GMAIL" KALMIDO_GIT_COAUTHOR="$GCO")
+  fi
   if [[ $ONCE == 1 ]]; then echo "env ${envs[*]:-} ${args[*]}"; return; fi
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
   log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
   # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
   # 2.157.0 (#1517): KALMIDO_LAUNCHER_PID -- the event runner ends when this launcher was killed hard (no orphan left behind)
-  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE KALMIDO_LAUNCHER_PID=$$ ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
+  env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE -u KALMIDO_GIT_COAUTHOR KALMIDO_LAUNCHER_PID=$$ ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &
   PID=$!
   STARTED=$(date +%s)
 }
@@ -196,9 +206,9 @@ while true; do
   sleep "$POLL" & wait $!
 done
 REVOKED=""
-IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED WORKING RESUMES <<< "$line"
+IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
-SIG="$MODEL|$AC|$PCT"
+SIG="$MODEL|$AC|$PCT|$GNAME|$GMAIL|$GCO"
 DONE_DAY=""  # the day whose nightly restart is done (a start after that time counts)
 nightly_due() {
   [[ "$NIGHTLY" != "-" ]] || return 1
@@ -234,12 +244,12 @@ while true; do
   if [[ $rc == 2 ]]; then revoked; stop; continue; fi
   if [[ $rc != 0 ]]; then log "Kalmido not reachable; keeping the agent as it is"; continue; fi
   REVOKED=""
-  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED WORKING RESUMES <<< "$line"
+  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO <<< "$line"
   why=""
   [[ "$NSEQ" != "$SEQ" ]] && why="reset now ($SEQ -> $NSEQ)"
-  [[ -z "$why" && "$MODEL|$AC|$PCT" != "$SIG" ]] && why="runtime settings changed"
+  [[ -z "$why" && "$MODEL|$AC|$PCT|$GNAME|$GMAIL|$GCO" != "$SIG" ]] && why="runtime settings changed"
   [[ -z "$why" ]] && nightly_due && why="nightly fresh restart ($NIGHTLY $TZNAME)"
-  SEQ=$NSEQ; SIG="$MODEL|$AC|$PCT"
+  SEQ=$NSEQ; SIG="$MODEL|$AC|$PCT|$GNAME|$GMAIL|$GCO"
   if [[ "$ENABLED" != 1 ]]; then
     [[ -n "$PID" ]] && { log "paused in Kalmido: stopping"; stop; }
     continue

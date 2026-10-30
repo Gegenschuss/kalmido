@@ -11,12 +11,9 @@ Own container (start.sh), invented companies and people only (@example.com / .ex
  - references: an open approval link goes with the quotation, a pipeline deal loses its offer_id (no dead link), the
    version chain (version_of) of a deleted first quotation stays readable
  - a person without an organisation (freelancer-matrix: office) does the same in the personal office
- - 2.144.8 (#2573), test phase (docs.OFFER_DELETE_TESTPHASE, #2574: off before the launch): sent / accepted / declined /
-   mailed / signed quotations CAN be deleted (the confirmation flag delete_sent), "undo finalising" stays 409; one an
-   invoice was made from stays 409; the office log keeps its entries; with the switch off (set inside the container) the
-   old rule of 2.114.2 holds again
+ - 2.417.0 C (#2604, #2574): the test phase of 2.144.8 (#2573) is gone - sent / accepted / declined / mailed / signed
+   quotations stay again (delete and "undo finalising" 409, no delete_sent); the delete rule equals the unlock rule
 usage: p21142_a_api_test.py <datadir>      (a fresh container; P21142A_NOSTART=1 = the server already runs)"""
-import json
 import os
 import subprocess
 import sys
@@ -140,16 +137,16 @@ r = A.post(B + f"{D}/{Q2}/finalize")
 check(r.ok and r.json()["locked"] is True and r.json()["number"] == NUM2, "finalised again: the same number " + r.text[:200])
 
 # ================================================================== sent / accepted / declined / mailed / signed
-# unlock: 409 as before; 2.144.8 (#2573) test phase: delete works (the confirmation is told: delete_sent)
+# 2.417.0 C (#2604, #2574): delete and unlock 409 again (the test phase rule of 2.144.8 is gone)
 def gone_ok(x, what):
     q = A.get(B + f"{D}/{x}").json()
-    check(q["can_delete"] is True and q["can_unlock"] is False and q.get("delete_sent") is True, f"{what}: delete yes, unlock no {q.get('can_delete')} {q.get('can_unlock')} {q.get('delete_sent')}")
+    check(q["can_delete"] is False and q["can_unlock"] is False and "delete_sent" not in q, f"{what}: no delete, no unlock {q.get('can_delete')} {q.get('can_unlock')} {q.get('delete_sent')}")
     row = next((y for y in A.get(B + f"{D}?kind=offer").json()["docs"] if y["id"] == x), {})
-    check(row.get("can_delete") is True and not row.get("can_unlock") and row.get("delete_sent") is True, f"{what}: the list row too {row}")
+    check(not row.get("can_delete") and not row.get("can_unlock") and "delete_sent" not in row, f"{what}: the list row too {row}")
     check(A.post(B + f"{D}/{x}/unlock").status_code == 409, f"{what}: unlock 409")
     r = A.delete(B + f"{D}/{x}")
-    check(r.ok, f"{what}: deleted (test phase) " + r.text[:200])
-    check(A.get(B + f"{D}/{x}").status_code == 404, f"{what}: gone")
+    check(r.status_code == 409, f"{what}: delete 409 " + r.text[:200])
+    check(A.get(B + f"{D}/{x}").ok, f"{what}: still there")
 
 
 for st in ("sent", "accepted", "declined"):
@@ -162,16 +159,15 @@ gone_ok(x, "sent_at set (mailed, still draft)")
 x = offer(A, CL, "Logged send")
 dbx("INSERT INTO office_doc_log(org_id, doc_id, at, action, detail) VALUES(?, ?, '2030-01-02T00:00:00Z', 'send', '{}')", (ORG, x))
 gone_ok(x, "a logged send")
-check(dbx("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='send'", (x,)), "the office log keeps the send entry of the deleted quotation")
-check(dbx("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='delete'", (x,)), "and has the delete entry")
+check(not dbx("SELECT 1 FROM office_doc_log WHERE doc_id=? AND action='delete'", (x,)), "no delete entry in the office log")
 x = offer(A, CL, "Signed")
 dbx("INSERT INTO office_signoffs(org_id, kind, doc_id, title, token_hash, token, state, created_at) "
     "VALUES(?, 'offer', ?, 'x', 'p21142a-signed', 'x', 'accepted', '2030-01-01T00:00:00Z')", (ORG, x))
 gone_ok(x, "signed by the customer")
-check(not dbx("SELECT 1 FROM office_signoffs WHERE token_hash='p21142a-signed'"), "the signed approval went with it (cascade)")
+check(dbx("SELECT 1 FROM office_signoffs WHERE token_hash='p21142a-signed'"), "the signed approval stays")
 x = offer(A, CL, "Sent, not finalised", final=False)
 check(A.post(B + f"{D}/{x}/status", json={"status": "sent"}).ok, "a sent quotation that was never finalised")
-check(A.delete(B + f"{D}/{x}").ok, "sent, never finalised: deleted (test phase)")
+check(A.delete(B + f"{D}/{x}").status_code == 409, "sent, never finalised: delete 409 (2.417.0, #2604)")
 
 # ================================================================== an invoice from it; invoices and credit notes stay strict
 QI = offer(A, CL, "Invoiced")
@@ -182,11 +178,11 @@ r = A.delete(B + f"{D}/{QI}")
 check(r.status_code == 409 and "invoice" in r.text, "an invoice was made from it: delete 409 " + r.text[:200])
 check(A.post(B + f"{D}/{QI}/unlock").status_code == 409, "an invoice was made from it: unlock 409")
 check(A.post(B + f"{D}/{QI}/status", json={"status": "accepted"}).ok, "the invoiced quotation accepted")
-check(A.get(B + f"{D}/{QI}").json()["can_delete"] is False, "an invoice was made from it: can_delete false (test phase too)")
+check(A.get(B + f"{D}/{QI}").json()["can_delete"] is False, "an invoice was made from it: can_delete false")
 row = next((y for y in A.get(B + f"{D}?kind=offer").json()["docs"] if y["id"] == QI), {})
-check(row.get("can_delete") is False, f"an invoice was made from it: the list row too {row}")
+check(not row.get("can_delete"), f"an invoice was made from it: the list row too {row}")
 r = A.delete(B + f"{D}/{QI}")
-check(r.status_code == 409 and "invoice" in r.text, "accepted + invoiced: delete 409 " + r.text[:200])
+check(r.status_code == 409, "accepted + invoiced: delete 409 " + r.text[:200])  # 2.417.0 (#2604): the first reason (accepted) as in 2.114.2
 r = A.post(B + f"{D}/{INV}/finalize")
 check(r.ok and r.json()["locked"] is True, "the invoice finalised " + r.text[:300])
 check(A.get(B + f"{D}/{INV}").json()["can_unlock"] is False, "invoice: can_unlock false")
@@ -239,31 +235,21 @@ check(F.delete(B + f"{D}/{FQ}").ok, "freelancer: deletes the finalised, never se
 FS = offer(F, FCL, "Solo sent")
 F.post(B + f"{D}/{FS}/status", json={"status": "sent"})
 check(F.post(B + f"{D}/{FS}/unlock").status_code == 409, "freelancer: sent, unlock 409")
-check(F.delete(B + f"{D}/{FS}").ok, "freelancer: sent, deleted (test phase)")
+check(F.delete(B + f"{D}/{FS}").status_code == 409, "freelancer: sent, delete 409 (2.417.0, #2604)")
 
-# ================================================================== 2.144.8 (#2573): switch off = the rule of 2.114.2
-# set inside the container (a fresh process: the running server keeps the test phase)
-def rule_off(ids):
-    code = ("import json, app\nimport kalmido.office.docs as m\nm.OFFER_DELETE_TESTPHASE = False\nc = app.connect()\nout = {}\n"
-            "try:\n    for oid, did in %s:\n        r = c.execute('SELECT * FROM office_docs WHERE id=?', (did,)).fetchone()\n"
-            "        out[str(did)] = [m.bga_offer_delete_block(c, oid, r), m.bga_offer_block(c, oid, r)]\n"
-            "finally:\n    c.close()\nprint('RULE' + json.dumps(out))") % json.dumps(ids)
-    p = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
-    line = next((x for x in p.stdout.splitlines() if x.startswith("RULE")), None)
-    check(line, "switch off: the check ran " + (p.stdout + p.stderr)[-400:])
-    return json.loads(line[4:]) if line else {}
-
-
+# ================================================================== 2.417.0 C (#2604, #2574): the rule of 2.114.2 again
+# (before: a switch set inside the container; now the running server)
 OS, OA, OK = offer(A, CL, "Off sent"), offer(A, CL, "Off signed"), offer(A, CL, "Off never sent")
 A.post(B + f"{D}/{OS}/status", json={"status": "sent"})
 dbx("INSERT INTO office_signoffs(org_id, kind, doc_id, title, token_hash, token, state, created_at) "
     "VALUES(?, 'offer', ?, 'x', 'p21442a-off', 'x', 'accepted', '2030-01-01T00:00:00Z')", (ORG, OA))
-res = rule_off([[ORG, OS], [ORG, OA], [ORG, OK], [ORG, QI]])
-check(res.get(str(OS), [None])[0], f"switch off: a sent quotation stays (2.114.2) {res.get(str(OS))}")
-check(res.get(str(OA), [None])[0], f"switch off: a signed quotation stays {res.get(str(OA))}")
-check(res.get(str(OK), [1])[0] is None, f"switch off: a never sent one may go {res.get(str(OK))}")
-check(res.get(str(QI), [None])[0], f"switch off: an invoiced one stays {res.get(str(QI))}")
-check(all(v[0] == v[1] for v in res.values()), f"switch off: delete rule == undo-finalising rule (2.114.2) {res}")
+for x, what in ((OS, "sent"), (OA, "signed"), (QI, "invoiced")):
+    q = A.get(B + f"{D}/{x}").json()
+    check(q["can_delete"] is False and q["can_unlock"] is False, f"{what}: delete rule == undo-finalising rule (2.114.2) {q.get('can_delete')} {q.get('can_unlock')}")
+    check(A.delete(B + f"{D}/{x}").status_code == 409, f"{what}: stays (409)")
+q = A.get(B + f"{D}/{OK}").json()
+check(q["can_delete"] is True and q["can_unlock"] is True, "a never sent one: delete + unlock")
+check(A.delete(B + f"{D}/{OK}").ok, "a never sent one may go")
 
 print(f"p21142_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

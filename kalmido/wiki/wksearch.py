@@ -60,7 +60,9 @@ def wks_index(c, pid, oid, owner, text, at, unreadable=None):
         return
     if le2e_is_cipher(text):
         return
-    hs = sorted(word_hashes(c, wks_ws(oid, owner), index_words(text or ""))) + ["u:" + str(at)]
+    from .wktags import wkt_hashes  # 2.371 (#3150): the tags as hashes too; 'tv:1' = indexed with its tags
+    ws = wks_ws(oid, owner)
+    hs = sorted(word_hashes(c, ws, index_words(text or "")) | wkt_hashes(c, ws, text)) + ["u:" + str(at), "tv:1"]
     for i in range(0, len(hs), 500):
         part = hs[i:i + 500]
         c.execute("INSERT INTO wiki_words(page_id, h) VALUES " + ",".join(["(?,?)"] * len(part)) + " ON CONFLICT DO NOTHING",
@@ -84,10 +86,12 @@ def wks_catch_up(c, w, a, limit=WKS_CATCH_UP, oid=None, owner=None):
 
 def wks_unindexed(c, w, a, ks, limit=WKS_CATCH_UP):
     """2.280.0 C (#3114): the pages of a space (w / a on wiki_pages p) whose word index is missing or older than the page
-    (or that could not be read under an earlier key state ks) -- the rows wks_catch_up indexes."""
+    (or that could not be read under an earlier key state ks) -- the rows wks_catch_up indexes. 2.371 (#3150): an index
+    without the row 'tv:1' (made before the tags) counts as missing: those pages are indexed once more, with their tags."""
     return c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.body, p.updated_at FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} "
                      "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM wiki_words x WHERE x.page_id=p.id AND "
-                     "x.h IN ('u:' || p.updated_at, 'x:' || p.updated_at || ':' || CAST(? AS text))) "
+                     "(x.h='x:' || p.updated_at || ':' || CAST(? AS text) OR x.h='u:' || p.updated_at AND EXISTS "
+                     "(SELECT 1 FROM wiki_words y WHERE y.page_id=p.id AND y.h='tv:1'))) "  # 2.371 (#3150): older ones lack the tags
                      f"ORDER BY p.id LIMIT {int(limit)}", [*a, ks]).fetchall()
 
 

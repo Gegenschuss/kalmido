@@ -448,10 +448,25 @@ func TestPageGuards(t *testing.T) {
 	if w := doReq(p, "POST", host, base+"retry", form, map[string]string{"Origin": "http://127.0.0.1:47807", "Sec-Fetch-Site": "same-origin"}); w.Code != 303 {
 		t.Fatalf("own POST: %d", w.Code)
 	}
+	// 2.427.0 (#3576): a form POST from a page with a no-referrer policy carries "Origin: null"
+	if w := doReq(p, "POST", host, base+"retry", form, map[string]string{"Origin": "null", "Sec-Fetch-Site": "cross-site"}); w.Code != 403 {
+		t.Fatalf("Origin null from another site: %d", w.Code)
+	}
+	if w := doReq(p, "POST", host, base+"retry", form, map[string]string{"Origin": "null"}); w.Code != 403 {
+		t.Fatalf("Origin null without Sec-Fetch-Site: %d", w.Code)
+	}
+	if w := doReq(p, "POST", host, base+"retry", form, map[string]string{"Origin": "null", "Sec-Fetch-Site": "same-origin"}); w.Code != 303 {
+		t.Fatalf("own POST with Origin null: %d", w.Code)
+	}
+	form.Del("t")
+	if w := doReq(p, "POST", host, base+"retry", form, map[string]string{"Origin": "null", "Sec-Fetch-Site": "same-origin"}); w.Code != 403 {
+		t.Fatalf("Origin null without the secret field: %d", w.Code)
+	}
+	form.Set("t", p.secret)
 	if w := doReq(p, "GET", host, base+"ping", nil, nil); w.Code != 200 || !strings.HasPrefix(w.Body.String(), "kalmido-folder-watcher") {
 		t.Fatal("ping")
 	}
-	if h := doReq(p, "GET", host, base, nil, nil).Header(); !strings.Contains(h.Get("Content-Security-Policy"), "frame-ancestors 'none'") || h.Get("Referrer-Policy") != "no-referrer" {
+	if h := doReq(p, "GET", host, base, nil, nil).Header(); !strings.Contains(h.Get("Content-Security-Policy"), "frame-ancestors 'none'") || h.Get("Referrer-Policy") != "same-origin" {
 		t.Fatal("security headers missing")
 	}
 }

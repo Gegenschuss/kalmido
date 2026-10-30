@@ -6,6 +6,10 @@ newest backup (automatic or manual, never the safety copies of a restore), check
 Content-MD5 and the signed SHA-256 of the body), keeps the newest N backups there and deletes older ones of this app's own
 name pattern (nothing else in the folder is touched). A failed upload is tried again a few times with a growing pause,
 then the admin gets an alert; the next backup or "Upload now" starts again.
+2.432.0 (#3584): a backup with shared files (format 3, bkstore.py) goes up with the shared files the target does not hold
+yet (flat, kalmido-blob-<kid>-<name>: encrypted, the name shows no content hash), BEFORE the backup itself; after the
+clean-up of the old backups the shared files no kept backup refers to go too (bko_remote = the kept names, so their
+reference files stay on this server). A kept backup without a reference file here stops that clean-up (nothing goes).
 
 No new library: S3 with Signature V4 over http.client + hmac, WebDAV with PUT / PROPFIND / DELETE, SFTP through the sftp
 program (openssh-client) with a key pair this app makes (ed25519; the admin puts the public key on the target). The SFTP
@@ -55,7 +59,8 @@ from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
 from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
 from .hosting import hosted
 from ..notify.alerts import _env_int, aa_now
-from .backup import BK_DIR, BK_NAME_RE, bk_list, bk_passphrase, need_backups
+from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_list, bk_passphrase, need_backups
+from . import bkstore as bks  # 2.432.0 (#3584)
 
 BKO_TYPES = ("s3", "webdav", "sftp")
 BKO_TIMEOUT = _env_int("KALMIDO_OFFSITE_TIMEOUT", 120)    # s per network step (connect / read); SFTP: per run x 30
@@ -72,7 +77,9 @@ BKO_ERR = {"conn": N_("The target could not be reached ({0})."),
            "not_encrypted": N_("Only encrypted backups are uploaded: switch on “Encrypt backups” with a passphrase."),
            "incomplete": N_("The target is not set up completely."),
            "sftp": N_("SFTP failed ({0})."),
-           "blocked": N_("This server may only reach public addresses over https.")}  # 2.223.2 C (#2871): hosted
+           "blocked": N_("This server may only reach public addresses over https."),  # 2.223.2 C (#2871): hosted
+           # 2.432.0 (#3584): a backup with shared files whose reference list is gone (the folder was changed by hand)
+           "refs": N_("The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.")}
 _BKO = {"running": "", "for": "", "tries": 0, "next": 0.0}
 _BKO_LOCK = threading.Lock()
 
@@ -312,6 +319,15 @@ def s3_sign(method, cpath, qs, h, sha, kid, sk, region, amz):
     return f"AWS4-HMAC-SHA256 Credential={kid}/{scope}, SignedHeaders={signed}, Signature={sig}"
 
 
+def put_many(tgt, items):
+    """2.432.0 (#3584): several files [(name, path)], each confirmed by its size on the target."""
+    for name, path in items:
+        size = os.path.getsize(path)
+        got = tgt.put(name, path, size)
+        if got != size:
+            raise OffsiteError("size", got, size)
+
+
 class S3:
     def __init__(self, conf, sec):
         self.x, self.kid, self.sk = conf, sec.get("s3_key", ""), sec.get("s3_secret", "")
@@ -351,7 +367,7 @@ class S3:
 
     def names(self):
         out, token = [], None
-        for _ in range(50):
+        for _ in range(1000):  # 2.432.0 (#3584): the shared files sit in the same folder (1000 names per page)
             q = [("delimiter", "/"), ("list-type", "2"), ("prefix", self.key(""))] + ([("continuation-token", token)] if token else [])
             st, _, raw = self.call("GET", "", query=q)
             if st != 200:
@@ -421,6 +437,10 @@ class WebDAV:
 
     def names(self):
         return [n for n, ln in self._props("", "1").items() if n and ln is not None]
+
+    def sizes(self):
+        """2.432.0 (#3584): {name: size} (a PUT broken off can leave a short file under the name)."""
+        return {n: ln for n, ln in self._props("", "1").items() if n and ln is not None}
 
     def delete(self, name):
         st, _, _ = self.call("DELETE", name)
@@ -507,6 +527,20 @@ class SFTP:
             out, _ = self.run([f'-rm "{rp}"', f'rename "{rp}.part" "{rp}"', f'ls -l "{rp}"'])
         return self._size(out, name)
 
+    def put_many(self, items):
+        """2.432.0 (#3584): many (small) files in one sftp run per 100, each as .part + rename (a name on the target is
+        always a complete file), every size confirmed."""
+        for i in range(0, len(items), 100):
+            part, lines = items[i:i + 100], []
+            for name, path in part:
+                rp = self.rp(name)
+                lines += [f'-rm "{rp}.part"', f'put "{path}" "{rp}.part"', f'rename "{rp}.part" "{rp}"', f'ls -l "{rp}"']
+            out, _ = self.run(lines)
+            for name, path in part:
+                got, size = self._size(out, name), os.path.getsize(path)
+                if got != size:
+                    raise OffsiteError("size", got, size)
+
     def names(self):
         out, _ = self.run([f'ls -1 "{self.dir or "."}"'])
         return [ln.strip().rsplit("/", 1)[-1] for ln in out.splitlines() if ln.strip() and not ln.startswith("sftp>")]
@@ -543,8 +577,10 @@ def bko_target(c, conf=None, sec=None):
     return {"s3": S3, "webdav": WebDAV, "sftp": SFTP}[conf["type"]](x, sec)
 
 
-def bko_prune(tgt, keep):
-    """The newest `keep` backups on the target stay; older ones of this app's name pattern go. -> deleted names."""
+def bko_prune(tgt, keep, kept=None, just=None):
+    """The newest `keep` backups on the target stay; older ones of this app's name pattern go. -> deleted names.
+    2.432.0 (#3584): kept (a list) gets the names still there; then the shared files none of them refers to go -- not
+    when the listing lacks `just` (the backup uploaded right now: the listing is incomplete, review M1)."""
     try:
         names = tgt.names()
     except OffsiteError:
@@ -557,6 +593,26 @@ def bko_prune(tgt, keep):
             gone.append(n)
         except OffsiteError:
             pass  # tried again after the next upload
+    left = [n for n in mine if n not in gone]
+    if just and just not in left:
+        left.insert(0, just)
+    if kept is not None:
+        kept[:] = left
+    if just and just not in names:
+        return gone
+    blobs = [n for n in names if bks.REMOTE_RE.fullmatch(n)]
+    need = set()
+    for n in left:
+        r = bks.refs_read(BK_STORE, n)
+        if r is None:  # (a backup of before 2.432 refers to nothing, but that cannot be told apart here: nothing goes)
+            return gone
+        need |= {bks.remote_name(x) for x in r}
+    for n in blobs:
+        if n not in need:
+            try:
+                tgt.delete(n)
+            except OffsiteError:
+                pass
     return gone
 
 
@@ -588,10 +644,24 @@ def bko_upload(force=False):
                 raise OffsiteError("not_encrypted")
             tgt = bko_target(c, conf)
             c.rollback()  # no open transaction while the (long) upload runs: a restore must not wait for it
+            if (x["meta"] or {}).get("format_version") == 3:  # 2.432.0 (#3584): first the shared files the target lacks
+                refs = bks.refs_read(BK_STORE, x["name"])
+                if refs is None or any(bks.remote_name(r) is None for r in refs):
+                    raise OffsiteError("refs")
+                have = tgt.sizes() if hasattr(tgt, "sizes") else dict.fromkeys(tgt.names())
+                try:  # (a size on the target that differs = a broken upload there: sent again, review M2)
+                    todo = [(bks.remote_name(r), f) for r, f in ((r, bks.find(BK_STORE, r)) for r in sorted(refs))
+                            if bks.remote_name(r) not in have or have[bks.remote_name(r)] not in (None, os.path.getsize(f))]
+                except bks.StoreError:  # a shared file is gone from the store (by hand): counted like a failed upload
+                    raise OffsiteError("refs") from None
+                (tgt.put_many if hasattr(tgt, "put_many") else lambda items: put_many(tgt, items))(todo)
             got = tgt.put(x["name"], os.path.join(BK_DIR, x["name"]), x["size"])
             if got != x["size"]:
                 raise OffsiteError("size", got, x["size"])
-            bko_prune(tgt, conf["keep"])
+            kept = []
+            bko_prune(tgt, conf["keep"], kept, just=x["name"])
+            if kept:
+                gset(c, "bko_remote", json.dumps(kept))  # 2.432.0 (#3584): their reference files stay here
         except OffsiteError as e:
             _BKO["tries"] += 1
             _BKO["next"] = time.time() + BKO_PAUSE * 2 ** (_BKO["tries"] - 1)

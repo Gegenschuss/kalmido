@@ -131,7 +131,12 @@ def gap(data):  # #3154: from the last position's line to the totals label
     return round(find(p, "Net total")[0]["y"] - find(p, "Service number 4")[-1]["y"], 1)
 
 
-check(gap(let) == gap(a4), f"#3154: the same totals gap in Letter as in A4 for a short document ({gap(let)} / {gap(a4)})")
+# 2.434.0 (#3603): an invoice prints in look A now (totals at the bottom of the page, the papers differ in height): the #3154
+# gap compared without that fill
+fill, pdf.PDF_SUM_FILL = pdf.PDF_SUM_FILL, 0.0
+g_let, g_a4 = gap(pdf.office_pdf(model(paper="letter"), meta=WHEN)), gap(pdf.office_pdf(model(), meta=WHEN))
+pdf.PDF_SUM_FILL = fill
+check(g_let == g_a4, f"#3154: the same totals gap in Letter as in A4 for a short document ({g_let} / {g_a4})")
 
 dr = pdf.office_pdf(model(3, paper="letter", draft_mark="DRAFT"), meta=WHEN)
 raw = PdfReader(io.BytesIO(dr)).pages[0].get_contents().get_data()

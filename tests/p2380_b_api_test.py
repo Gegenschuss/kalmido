@@ -272,9 +272,19 @@ NAME = items_b[0]["name"]
 with zipfile.ZipFile(os.path.join(DATA, "backups", NAME)) as z:
     names = z.namelist()
     man = json.loads(z.read("manifest.json"))
-    check(f"office/{ORG}/doc{INV}-invoice-{NUM}.pdf" in names and f"office/{ORG}/doc{INV}-invoice-{NUM}.xml" in names, f"the stored PDF + XML are members of the backup zip: {[n for n in names if n.startswith('office/')]}")
-    check(any(f_[0] == f"office/{ORG}/doc{INV}-invoice-{NUM}.xml" and f_[2] == XSHA for f_ in man["files"]), "... listed in the manifest with the same SHA-256")
-    check(z.read(f"office/{ORG}/doc{INV}-invoice-{NUM}.pdf") == stored_pdf, "... the PDF in the zip is the stored file")
+    # 2.432.0 (#3584): a file from 64 KiB on lies once in the shared store of the backups (backups/.store, plain here),
+    # the manifest lists it under "shared"; a smaller one stays a member of the zip
+    shared = {f_[0]: f_ for f_ in man.get("shared", [])}
+
+    def bk_file(n):
+        if n in names:
+            return z.read(n)
+        f_ = shared.get(n)
+        return open(os.path.join(DATA, "backups", ".store", "plain", f_[2][:2], f_[2]), "rb").read() if f_ else None
+    PDFN, XMLN = f"office/{ORG}/doc{INV}-invoice-{NUM}.pdf", f"office/{ORG}/doc{INV}-invoice-{NUM}.xml"
+    check(bk_file(PDFN) is not None and bk_file(XMLN) is not None, f"the stored PDF + XML are in the backup (zip or shared store): {[n for n in list(names) + list(shared) if n.startswith('office/')]}")
+    check(any(f_[0] == XMLN and f_[2] == XSHA for f_ in man["files"] + man.get("shared", [])), "... listed in the manifest with the same SHA-256")
+    check(bk_file(PDFN) == stored_pdf, "... the PDF in the backup is the stored file")
 
 # ---------------------------------------------------------------- 8. a stored file that has gone (2.38.0 review)
 # the reminder's stored PDF is no longer where its row points (number changed underneath): 409 + store_missing, no new rendering

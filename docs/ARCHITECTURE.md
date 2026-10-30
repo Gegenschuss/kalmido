@@ -133,6 +133,7 @@ The most used helpers:
 | `core/csvimport.py` | 2.140.0 (#2134): the statement reader of the household budget and the office's bank reconciliation: CSV (delimiter, header row, guess, known bank layouts, mapping, rows), CAMT.052 / .053 (no DOCTYPE / ENTITY), the duplicate count. |
 | `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
 | `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
+| `core/mailframe.py` | 2.420.0 (#3499): the one HTML frame of every mail (mail_html: table layout, 560 px card, petrol button, escaped texts); the text parts stay with their callers. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
 | `lists/lists.py` | Lists: create, change, share (people + agents), members, sidebar order. |
@@ -172,6 +173,7 @@ The most used helpers:
 | `calendars/subscriptions.py` | External calendars (read-only subscriptions): SSRF guard, ICS / CalDAV sync, API. |
 | `calendars/polls.py` | 2.98.0: scheduling polls -- proposed times, the public vote page `/s/v/<token>`, the chosen time becomes an event. |
 | `admin/backup.py` | Backups and restore (admins). |
+| `admin/bkstore.py` | 2.432.0 (#3584): the shared file store of the backups (larger files kept once, by content; encrypted with a store key of the passphrase), the download assembler, and a command line assembler for copies (standard library + cryptography only). |
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
 | `tasks/dayplan.py` | Day planning ("Plan my day") and the evening review. |
 | `api/openapi.py` | The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once). |

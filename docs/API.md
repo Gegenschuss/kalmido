@@ -210,7 +210,7 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook) |
 | `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
 | `PATCH /lists/{id}` | structure | 2.144.0: `sort_mode` (the list's sort, the same for every member: `""` = default, `prio`, `prio_asc`, `custom`, `date`, `date_desc`, `title`, `creator`, `flow`, `created`, `created_asc`, `cf:<field id>[_desc]`, `col:who|tags|time|progress|deps[_desc]`) and `group_field` (the list view grouped by a custom field for every member: `"cf:<field id>"` or the id of a **text or select** field of this list: one group per value, select fields in the order of their options, *No value* last; `""` / `null` = by sections again, the sections themselves never change), owner / list admins (others `403`, an unknown value or a field of another list `400`); lists carry both. 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`; 2.83.0: then they can also be the `assignee_id` of its tasks without joining, the assignment goes when `org_edit` is switched off), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-listens-in)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
-| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list (2.390.0: + `hash_ids`, see [Ticket keys](#ticket-keys)): `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
+| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list (2.390.0: + `hash_ids`, see [Ticket keys](#ticket-keys)): `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`, `author_name` / `author_email` (2.396.0: the git author for AI commits set at the repository, `""` = the agent's own; set in the app with `PATCH /api/repos/{id}`, 400 for an invalid e-mail address). Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
 | `GET /lists/{id}/build-status` | read | 2.151.0 (#2558): the build state of a list with a repository: `data` = the OPEN tasks that need a look, each `{id, title, build}` (`build.stale` = open although its package or code is released, or work only on a branch not in the default branch), `latest` (the highest version tag), `repos`, `checked_at`. A version tag is a tag of digits with dots (optional `v`); per new tag Kalmido compares it with the version before it, so the first version that holds a commit is known (an existing connection: the newest 10 tags once). Once the newest version tag or the default branch moved, one compare newest tag...default branch tells which untagged default-branch commits are in an earlier version (`version: null`). Only the tasks the caller sees (not a participant's context tasks); branch names carry `origin: "git"`, `untrusted: true` |
 | `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
@@ -300,7 +300,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
 | `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (project lists, no cycles), remove |
 | `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (2.39.1: any list, owner / list admins; switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it: `["fields"]` or `[]`). Values: the task's `fields` |
-| Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields |
+| Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields. 2.410.0 A (#3514): a `select` with `options.stages: 1` is ordered and shows as a stage bar; an option with `special: "red"` / `"orange"` is a special state (no stage of its own, shown in its signal colour), any other `special` value is `400`; a change that leaves out `stages` / an option's `special` keeps the stored ones |
 | `PATCH /fields/{id}` · `DELETE …` | structure · delete | 2.15.0: change `{name?, options?, pinned?, sort?}` (the type stays); delete with its values (agents: approval) |
 | Formula fields | structure | 2.43.0 (#1328): `type: "formula"` with `formula` (create / change): `+ - * /`, brackets, numbers, `{Field name}` of number, formula or checkbox fields and `round(x, n)` (n 0-6). Stored with field ids (`options.expr`, `{#12}`), shown with today's names (`options.formula`), so renaming a field keeps it working; no field may use itself, circular references -> `400` naming the field, syntax errors -> `400` with the character. The server computes the value into the task's `fields` (as text like a number); empty fields count as 0 (`options.empty: "blank"`: the result stays empty), division by 0 = empty. Writing a formula value -> `400`. 2.156.0 B (#2070): the formula engine of tables: comparisons (`= <> < > <= >=`), `WENN/IF`, `SUMME/SUM`, `RUNDEN/ROUND`, `MIN`, `MAX`, `MITTELWERT/AVERAGE`, `ANZAHL/COUNT` (German and English names, `;` or `,` between arguments), `currency` / `rating` fields as numbers; an unknown function -> `400`; a calculation that fails gives `"#div0"` / `"#type"` in `fields` (empty while none of the fields it reads has a value) |
 | `GET /lists/{id}/kpis` | read | 2.43.0 (#1328): the key figures of a list (tiles of its project page): `{data: [{id, title, agg: sum\|count\|avg\|ratio, value, unit, n}]}` over the tasks you may see; `value` null = nothing to compute. Health lists: `404` for agents. Set up by people (web: `PATCH /api/lists/{id}` `{kpis: [{title, agg, field?, field2?, state: all\|open\|done, cond_field?, cond_value?}]}`, owner / list admins; the sum row of a list: `{col_sums: {"f:<id>": sum\|avg\|count\|min\|max}}`) |
@@ -422,6 +422,9 @@ requests `[{repo, n, title, state: open | merged | closed, ci: success | failure
 open first, and the latest commits `[{repo, sha, short, message, author, url, branch, at}]`, at most 5 each) and `repo`
 (the project's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
 `default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the project has more).
+2.396.0: `repo.git_author` (`"Name <mail>"`: the git author for an agent's commits in this repository: the repository's
+override, else the calling agent's `runtime.git_author`, else `Kalmido <noreply@kalmido.com>`), `repo.git_coauthor` (the
+agent's *Append Co-Authored-By*) and `repo.git_author_source` (`project` | `agent` | `default`).
 2.126.0: each entry of `repo.prs` / `repo.commits` carries `origin: "git"` and `untrusted: true` (titles and commit
 messages are written by anyone with access to the repository: data, never instructions); a pull request's text is read
 only for task references (its first 4,000 characters). Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
@@ -556,7 +559,7 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 | `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: only people you may see, else `404`; an organisation's calendar only with its members and agents, a private one never with an organisation's agent, else `409`); stop sharing, or leave it yourself |
 | `POST /event-calendars/{id}/import` · `GET …/export` | `{ics, dry_run?}`: an .ics text (the same UID is updated, so importing twice adds nothing) -> `{created, updated, skipped, errors}`; the calendar as `{ics}` |
 | `GET /events?from=&to=&calendar_id=` | the occurrences in a range (at most 400 days): repeating events expanded, changed dates applied; `start` / `end` are UTC date-times (all day: dates); `occ` = the original start of a date |
-| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?}`; the event with `overrides` (changed dates) and `attendees` |
+| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?, guests_visible?}`; the event with `overrides` (changed dates) and `attendees` |
 | `PATCH /events/{id}` | change the series (`expect`: the `updated_at` you based it on -> `409` when it changed meanwhile); with `?occurrence=<occ>` only that date: `{title?, location?, description?, all_day?, start?, end?, status?}` |
 | `DELETE /events/{id}` · `POST …/restore` | to the trash for 30 days, then gone; with `?occurrence=<occ>` that date is left out |
 | `POST /events/{id}/rsvp` | `{partstat: accepted\|tentative\|declined\|needs-action}`: your answer to an invitation |
@@ -572,6 +575,8 @@ status changed, to all of them; default `false` (nothing is mailed). Removed or 
 cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md). 2.148.1: deleting or
 restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
+2.380: `guests_visible: true` (default `false`) lets the invitation to an external guest name all guests; off, the attached
+calendar names only its recipient. CalDAV / `.ics`: `X-KALMIDO-GUESTS-VISIBLE:TRUE|FALSE`; a client without the line keeps the value.
 
 ## Contacts
 
@@ -996,8 +1001,12 @@ a *Send test* button.
 **Which URLs are allowed.** Only `https://` to public addresses. Every address the host name resolves to is checked when
 connecting (so DNS tricks do not help): private networks (RFC 1918), loopback, link-local
 (169.254.x, cloud metadata), CGNAT (100.64.0.0/10, e.g. VPN overlays), IPv6 unique-local and similar are refused. Servers in your
-own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts* (the same
-project as for calendar subscriptions) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`.
+own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts*, line
+*Webhooks* (since 2.380 one line per service: a host allowed for calendars does not open webhooks; the update copied the
+former single list into every line) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`. The admin
+API: `PATCH /api/admin/settings {"allow_hosts_by_purpose": {"webhooks": "host, host:port"}}` (purposes `calendar`, `carddav`,
+`webhooks`, `mail`, `git`, `newsletter`, `ntfy`, `peppol`, `feeds`, `oidc`, `paperless`, `karakeep`, `servers`; only the
+ones named change; the older `cal_allow_hosts` sets all of them).
 Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 ## Behind a reverse proxy
@@ -1054,7 +1063,7 @@ Requests to `/api/v1/` without a token then still get the login page of your pro
 Modules `clients`, `workload`, `forms` (per person, 409 while off); everything within the token user's organisation.
 `GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
 `month_seconds`, `month_amount`, `estimate_min`) and `budget` (`pct_h`, `pct_amount`, `level`: ok / warn / over);
-`GET /clients/{id}` adds `per_list` (estimate vs. actual). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`; 2.152.0: `DELETE` archives a client used in quotations, invoices or contracts instead and answers `archived: true`).
+`GET /clients/{id}` adds `per_list` (estimate vs. actual). 2.435.0 (#3600): and `blocks_off`, the blocks of the client card the client's office switched off (office setting `client_blocks_off` of `PUT /office/settings`, office admins: a list of `persons`, `invoices`, `month`, `lists`, `note`, `tickets`, `gendocs`, `letters`, `privacy`; a private client: its owner's own office). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`; 2.152.0: `DELETE` archives a client used in quotations, invoices or contracts instead and answers `archived: true`).
 2.47.3 (#1733): `POST /clients/bulk` `{ids, action: delete|archive|unarchive|set|restore}` several clients at once (up to 1000;
 one id you do not see: `404`, nothing changes). `delete`: a client used in quotations, invoices or framework contracts is archived
 instead, only its creator or an admin deletes (the others: `skipped`); `set`: `rate`, `budget_h`, `budget_amount`, `color` (`null`
@@ -1501,7 +1510,7 @@ a token sees only the documents whose file it may see (an agent: shared with it)
 | Call | Scope | What it does |
 |---|---|---|
 | `GET /documents` | files:read | `?q=` words of the text (whole words; words of 4+ letters also as a prefix), `review=1`, `state=wait\|run\|done\|failed`, `from` / `to` (document date), `limit`, `cursor` -> `{data: [Document], next_cursor}`, newest document date first. 2.122.0: `q` takes a search syntax (`tag:Name` - several = every one, `sender:` / `absender:`, `type:` / `typ:`, `date:` / `datum:` `2025` \| `2025-03` \| `2025-01..2025-06` \| `>2025-01-01`, `added:` / `eingang:` = date of arrival, `"exact phrase"`, `-word`, `-tag:Name`; names without regard to case, the whole name first, else a part); filters by id: `tag` (`1,7;3` = two tags, each with its ids in several workspaces), `tag_mode=all\|any`, `not_tag`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag=1`, `no_sender=1`, `no_type=1`, `ftype=pdf,image,office,text,other` |
-| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app); 2.210 (#2761): `shared` (true when the file is shared with someone or open to the whole organisation; no names) |
+| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app); 2.210 (#2761): `shared` (true when the file is shared with someone or open to the whole organisation; no names); 2.420.0 (#3448): `receipt_checked` (`{at, by}`: a person of the bookkeeping ticked the receipt as checked, or null; read only, agents never tick it) |
 | `POST /documents` | files:write | 2.122.0 (#2098): a new document, recognised like an upload. JSON `{name, content_base64, mime?}` or multipart (`file`), plus optional `title`, `parent_id` (a folder you may edit), `ws` (`private` \| `org:<id>`, people without `parent_id` only), `sender`, `type`, `tags` (names), `date`, `due`, `amount`, `currency` (taken as given; an agent's `sender`/`type`/`tags` follow the levels like `PATCH`: on level *agent* they wait as suggestions in *To review*). An agent without `parent_id` writes into its own result folder. -> `201` the document |
 | `PATCH /documents/{id}` | files:write | Role *edit*: `{date?, due?, amount?, currency?, sender?, type?, tags?: [names], text?, custom_fields?}` (`text` only while none was recognised; 2.153.0 `custom_fields` = `{field id or name: value \| null}`, only fields of the document's workspace, select by option id or name, money `"12.50 EUR"`, checkbox `true`; the single document lists them as `custom_fields: [{id, name, type, options?, value, label}]`). An agent's values are marked `agent`; a feature the workspace leaves to an agent becomes a suggestion in *To review*. Unknown fields: `400` |
 | `POST /documents/{id}/receipt-suggestion` | files:read | 2.48.0 (#1356), agents only, the document shared with you: `{project_id?, category?, amount?, currency?, vat_pct?, note?}` (at least one of project, category, amount, vat_pct; 2.121.0 (#2096): `amount` = gross, more than 0, at most two decimals, `currency` = 3 letters, `vat_pct` = `"19"`, `"7"` or `"0"`; `project_id` = a project you can see in the document's workspace) -> `201` ReceiptSuggestion `{id, document_id, agent, state, project, category, amount, currency, vat_pct, note, created_at, decided_at}`. A person accepts or rejects it in the app; your open suggestion of the same document is replaced; 2.360.0: an agent with a row in the office groups of the document's organisation needs at least *view* in its receipts area (`403`), like people |
@@ -1582,6 +1591,40 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `kalmido-folder-watcher-linux-arm64`, `SHA256SUMS` from `KALMIDO_FOLDERWATCH_DIR` (default `/app/folderwatch`, built by the image;
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
 `{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
+
+## Receipt fetcher
+
+*Since 2.425.0.*
+
+A receipt fetcher is a helper program on the person's own computer that fetches invoices from web portals (an online shop, a
+phone company) and hands them to Kalmido. The person signs in to the portals only in the helper: Kalmido never stores
+passwords, cookies or logins, has no fields for them and refuses every field it does not know (`400`, nothing stored). People
+with the office (also the own office of a person without an organisation) connect one in Settings > Integrations > *Receipt
+fetcher* with a setup code (web session only, never an agent); without the office the routes answer `403`.
+
+Its key (`kbh_…`) is a kind of its own: stored only as a hash in its own table, never an API token (it is not listed under API
+tokens and no other route knows it: every other API route answers `403` "This key may only upload receipts and report the state
+of its portals", the web app `401`). Ordinary tokens and scan inbox keys reach none of the three routes (`403`). A password
+reset or change disconnects every receipt fetcher of the person; disconnecting it in the settings stops the key at once
+(`401`). At most 10 per person, 120 requests per minute.
+
+| Route | Answer |
+|---|---|
+| `GET /fetcher` | `{name, target, max_mb, portals: [{key, name, enabled}]}`: the place the receipts go (the person's own documents or an organisation's) and which portals the person switched on |
+| `PUT /fetcher/status` | body `{portals: [{key, name?, last_run?, new?, error?}]}` (`key`: `a-z 0-9 _ . -`, up to 40; `last_run` ISO time; `new` the new receipts of the last run; `error` empty = fine, e.g. `Please sign in again`; at most 50 portals) -> `{portals: [{key, name, enabled}]}`. A portal new here starts switched on; a report never switches one on or off. An error that was not there before tells the person once (News + push of the event `fetcher`, switchable in the notification settings) |
+| `POST /fetcher/documents` | multipart: `file` (a PDF, checked by its first bytes `%PDF-`; size limit as any upload), `portal` (a reported key), `order` (the order number, optional, up to 100 characters) -> `201 {id, name, duplicate: false}`. The same file, or the same order of the same portal, again answers `200` with the document that is there and `duplicate: true` |
+
+Errors: `401` key unknown or disconnected (or the person deactivated), `403` no office any more / the place is no longer open to
+the person (left the organisation, read-only role), `409` the portal is switched off in Kalmido, `413` too large / no space
+left, `400` not a PDF, unknown field or portal, `429` slow down. The documents arrive with the source `abholer` and
+`abholer:<portal>:<order>` as their external id and are recognised like an upload (date, amount, sender, sorting).
+
+Web routes of the settings: `GET /api/docs/fetchers?ws=private|org:<id>` -> `{api, fetchers: [{id, name, prefix, target, ok,
+created_at, last_seen_at, portals: [{key, name, enabled, last_run, new, error, error_at, updated_at}]}]}` (one's own only);
+`POST /api/docs/fetchers {ws, name}` -> `201 {id, name, target, code}` (`409` while the API is off); `PATCH
+/api/docs/fetchers/{id}/portals/{key} {enabled: true|false}`; `DELETE /api/docs/fetchers/{id}` (the documents stay). The setup
+code is shown once: `kalmido-fetch:1:` + base64url without padding of `{"url": "https://example.com", "key": "kbh_…", "name":
+"My computer"}`.
 
 ## Arrangements of views for agents
 
@@ -1923,8 +1966,12 @@ themselves and have their own proposals API); child accounts get `403`.
 
 Tools like n8n, Make, Zapier or Home Assistant create tasks through a secret URL, without a login. The owner or an
 admin of a list adds one under **List settings > Inbound webhook** (up to 10 per list; not in the basket, health,
-budget or locked lists). The URL `https://kalmido.example.com/api/hooks/in/<token>` is shown **once** (Kalmido stores
-only its SHA-256); *New URL* stops the old one at once, *Delete* too (undo brings the same URL back for 30 days).
+budget or locked lists). The token is shown **once** (Kalmido stores only its SHA-256); *New URL* stops the old one at
+once, *Delete* too (undo brings the same URL back for 30 days).
+
+*Since 2.380:* send the token as the header `X-Kalmido-Hook-Token: <token>` to `POST /api/hooks/in` (recommended: the
+token stays out of reverse-proxy logs). The older form with the token in the path, `POST /api/hooks/in/<token>`, keeps
+working for tools that cannot set headers.
 
 Each `POST` creates **one task in exactly this list**, through the normal way of creating a task (history line "via
 webhook", pushes, agent events, outgoing webhooks, list rules), with the rights of the person who set the webhook up.
@@ -1945,9 +1992,9 @@ fields of other lists are **ignored** (never created) and named in `ignored`, so
 changes.
 
 ```bash
-curl -X POST -H 'Content-Type: application/json' \
+curl -X POST -H 'X-Kalmido-Hook-Token: khi_...' -H 'Content-Type: application/json' \
   -d '{"title": "Washing machine done", "due": "2026-11-02", "priority": "high", "tags": ["Home"]}' \
-  'https://kalmido.example.com/api/hooks/in/khi_...'
+  'https://kalmido.example.com/api/hooks/in'
 ```
 
 Home Assistant (`configuration.yaml`):
@@ -1955,20 +2002,22 @@ Home Assistant (`configuration.yaml`):
 ```yaml
 rest_command:
   kalmido_task:
-    url: "https://kalmido.example.com/api/hooks/in/khi_..."
+    url: "https://kalmido.example.com/api/hooks/in"
     method: POST
+    headers:
+      X-Kalmido-Hook-Token: "khi_..."
     content_type: "application/json"
     payload: '{"title": "{{ title }}"}'
 ```
 
-n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and the other keys). Behind a login proxy
+n8n: an *HTTP Request* node, method POST, the URL, the header `X-Kalmido-Hook-Token`, body JSON with `title` (and the other keys). Behind a login proxy
 (forward auth, single sign-on) the path `/api/hooks/` must bypass the proxy login, like the other inbound hooks.
 
 ## Settings: single entries and parallel saves (2.269.0)
 
 `PATCH /api/settings` takes the whole value of a setting as before. A list setting can also change by single entries:
 `{"set_delta": {"<key>": {"add": [...], "remove": [...]}}}` for `agents_hidden`, `features`, `fav_lists`, `hide_progress`,
-`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`, `ab_cards` (2.353.0: the file store's folders shown as cards)
+`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`, `ab_cards` (2.353.0: the file store's folders shown as cards), `trial_mode` (2.417.0: the offices whose test mode the person switched on, `["<office id>"]`)
 (json lists). The server applies it to the stored value under the account's lock, so two devices that add or remove an
 entry at the same time both keep their change; the result is checked like a whole value (`400`, nothing stored). The
 notification matrix takes a partial `{"notify": {"<event>": {"news"?: 0|1, "push"?: 0|1}}}` the same way.

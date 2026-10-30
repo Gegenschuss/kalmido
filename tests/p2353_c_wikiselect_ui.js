@@ -24,7 +24,7 @@ const idx = async () => call('GET', '/api/wiki?space=private');
 const pathOf = async id => (await call('GET', '/api/wiki/pages/' + id)).path;
 const boxOf = (d, txt) => [...d.querySelectorAll('#view .wkrow')].find(r => r.querySelector(':scope > .wkitem, :scope > details > summary > .wkitem')?.textContent.trim() === txt)?.querySelector(':scope > .absel input[data-wksel="one"]');
 const tick = (w, el) => { el.checked = true; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const barText = d => d.querySelector('#view .abselbar .absn')?.textContent || '';
+const barText = d => d.querySelector('#view #wk-sbar .mcount')?.textContent || '';  // 2.428.0 (#3581): the shared bar
 
 (async () => {
   await sleep(600);
@@ -43,22 +43,22 @@ const barText = d => d.querySelector('#view .abselbar .absn')?.textContent || ''
   let w = await boot({user: 'alice', hash: 'wiki'}), d = w.document;
   const sb = await until(() => d.querySelector('#view [data-wksel="mode"]'));
   check(!!sb && sb.previousElementSibling?.dataset.wk === 'newfolder' && /Select/.test(sb.textContent), '"Select" stands next to "New folder"');
-  check(!d.querySelector('#view .absel'), 'no boxes before Select');
+  check(!d.querySelector('#view .wkselrow'), 'no shown boxes before Select');  // 2.428.0 (#3581): they wait hidden for the hover
   sb?.click();
   check(await until(() => boxOf(d, 'Alpha') && boxOf(d, 'Loose') && boxOf(d, 'Target')), 'Select: a box per folder and page row');
-  check(/0 selected/.test(barText(d)) && d.querySelector('#view .abselbar [data-wksel="move"]')?.disabled, 'the bar: nothing chosen, Move to… off');
+  check(/Tap pages/.test(barText(d)) && d.querySelector('#view #wk-sbar [data-wksel="move"]')?.disabled, 'the bar: nothing chosen, Move off');
   tick(w, boxOf(d, 'Loose'));
   await until(() => /1 selected/.test(barText(d)));
   tick(w, boxOf(d, 'Alpha'));
-  check(await until(() => /2 selected/.test(barText(d)) && !d.querySelector('#view .abselbar [data-wksel="move"]').disabled), 'two chosen, Move to… on');
+  check(await until(() => /2 selected/.test(barText(d)) && !d.querySelector('#view #wk-sbar [data-wksel="move"]').disabled), 'two chosen, Move to… on');
   check(boxOf(d, 'Loose')?.checked && boxOf(d, 'Alpha')?.checked, 'the boxes stay ticked after the redraw');
-  d.querySelector('#view .abselbar [data-wksel="move"]').click();
+  d.querySelector('#view #wk-sbar [data-wksel="move"]').click();
   let mi = await until(() => menuItems(d).length && menuItems(d));
   const names = (mi || []).map(x => x.textContent.trim());
   check(names.some(x => /Target/.test(x)) && !names.some(x => /^Alpha$/.test(x)), 'Move to… offers the folders, not a chosen one ' + JSON.stringify(names));
   (mi || []).find(x => /Target/.test(x.textContent))?.click();
   check(await until(async () => (await pathOf(id.loose)) === 'Target/Loose' && (await pathOf(id.one)) === 'Target/Alpha/One', 60), 'the page and the folder (with its page) lie in Target');
-  check(await until(() => !d.querySelector('#view .abselbar') && !d.querySelector('#view .absel')), 'the selection ends after moving');
+  check(await until(() => !d.querySelector('#view #wk-sbar') && !d.querySelector('#view .wkselrow')), 'the selection ends after moving');
   check(w.eval(`/Move to/.test(HIST.undo[HIST.undo.length - 1]?.label || '')`), 'moving = one undo step');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await pathOf(id.loose)) === 'Loose' && (await pathOf(id.one)) === 'Alpha/One', 60), 'Undo brings both back');
@@ -70,7 +70,7 @@ const barText = d => d.querySelector('#view .abselbar .absn')?.textContent || ''
   tick(w, boxOf(d, 'Bin'));
   await until(() => /2 selected/.test(barText(d)));
   const n0 = w.eval('HIST.undo.length');
-  d.querySelector('#view .abselbar [data-wksel="trash"]').click();
+  d.querySelector('#view #wk-sbar [data-wksel="trash"]').click();
   check(await until(async () => { const p = (await idx()).pages || []; return !p.some(x => x.id === id.g1 || x.id === id.g2) && p.some(x => x.id === id.loose); }, 60),
     'the page and the folder (with its page) are in the trash, the others stay');
   check(await until(() => w.eval('HIST.undo.length') === n0 + 1), 'the trash = one undo step');
@@ -78,11 +78,11 @@ const barText = d => d.querySelector('#view .abselbar .absn')?.textContent || ''
   check(await until(async () => { const p = (await idx()).pages || []; return p.some(x => x.id === id.g1) && p.some(x => x.id === id.g2); }, 60), 'Undo restores the page and the folder with its page');
   // "Select all" ticks every row of the list
   (await until(() => d.querySelector('#view [data-wksel="mode"]')))?.click();
-  (await until(() => d.querySelector('#view .abselbar [data-wksel="all"]')))?.click();
+  (await until(() => d.querySelector('#view #wk-sbar [data-wksel="all"]')))?.click();
   check(await until(() => [...d.querySelectorAll('#view [data-wksel="one"]')].every(x => x.checked) && /Select none/.test(d.querySelector('#view [data-wksel="all"]')?.textContent || '')),
     'Select all ticks every row');
-  d.querySelector('#view .abselbar [data-wksel="off"]').click();
-  check(await until(() => !d.querySelector('#view .absel')), 'Cancel ends the selection');
+  d.querySelector('#view #wk-sbar [data-wksel="close"]').click();
+  check(await until(() => !d.querySelector('#view .wkselrow')), 'X ends the selection');
   w.close();
 
   // ================= a phone: the tree list
@@ -91,7 +91,7 @@ const barText = d => d.querySelector('#view .abselbar .absn')?.textContent || ''
   check(await until(() => boxOf(d, 'Phone page') && boxOf(d, 'Target')), 'a phone: Select shows the boxes in the list');
   tick(w, boxOf(d, 'Phone page'));
   await until(() => /1 selected/.test(barText(d)));
-  d.querySelector('#view .abselbar [data-wksel="move"]').click();
+  d.querySelector('#view #wk-sbar [data-wksel="move"]').click();
   mi = await until(() => menuItems(d).length && menuItems(d));
   (mi || []).find(x => /Target/.test(x.textContent))?.click();
   check(await until(async () => (await pathOf(id.ph)) === 'Target/Phone page', 60), 'a phone: the page moved into the folder');

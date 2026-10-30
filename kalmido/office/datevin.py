@@ -168,9 +168,13 @@ def _eur(amount, s):
     return money(amount)
 
 
-def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
+def _line(amount, konto, gegen, bu, day, beleg, text, node=None, checked=None):
     from .datev import dx_beleg, _amt, _ddmm
-    return {"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
+    # 2.420.0 C (#3448): a receipt a person ticked as checked carries it as additional information (Art "Geprueft", Inhalt =
+    # DD.MM.YYYY of the tick): the booking batch has no field of its own for it
+    extra = ({"Zusatzinformation - Art 1": "Geprueft", "Zusatzinformation - Inhalt 1": f"{checked[8:10]}.{checked[5:7]}.{checked[:4]}"}
+             if checked and len(checked) >= 10 else {})
+    return {**extra, "Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
             "Belegfeld 1": dx_beleg(beleg), "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
             "_date": day, "_kind": "in", **({"_node": node} if node else {})}  # 2.148.0 B (#2470): _node = the receipt's file
@@ -262,7 +266,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
         rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
-                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"]))
+                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"],
+                          checked=rc.get("checked_at")))
     hints = []
     na = _no_amount(c, oid, d_from, d_to)
     if na:

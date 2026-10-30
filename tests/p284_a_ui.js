@@ -31,7 +31,7 @@ const mail = (to, from, subject, text, att) => {
     : head + `Content-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n`;
   fs.writeFileSync(path.join(DATA, 'mail', 'in', `${NO}.eml`), raw);
 };
-const until = async (fn, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { const x = await fn(); if (x) return x; await sleep(400); } return fn(); };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 20000, step: 400});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'collab,comments,clients,contacts';
 
 (async () => {

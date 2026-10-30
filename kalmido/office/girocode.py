@@ -97,7 +97,7 @@ def gcq_model(r, m, s, snd=None):
     return m
 
 
-GCQ_SIZE = 76.0  # about 2.7 cm: the code itself (EPC: at least 2 x 2 cm read well with banking apps)
+GCQ_SIZE = 57.0  # 2.434.0 A (#3603): 2 x 2 cm (56.7 pt), the EPC minimum that banking apps read well (was 76 pt, about 2.7 cm)
 GCQ_LABELS = ("GiroCode", N_("Scan with banking app|girocode"))  # 2.185.0 C (#2520): through tr() in the document's language
 
 
@@ -123,6 +123,6 @@ def gcq_draw(p, x, y, payload, lang, color="#000000", color2="#4b515c"):
                 k += 1
             p.rect(x + j * mod, y + i * mod, (k - j) * mod + 0.02, mod + 0.02, color)  # +0.02: no hairline gaps between rows
             j = k
-    t1, t2 = GCQ_LABELS[0], tr(GCQ_LABELS[1], lg=lang)  # lang: pdf.pdf_lang
-    p.text(x, y + GCQ_SIZE + 4, t1, 7, True, color2, align="c", width=GCQ_SIZE)
-    p.text(x, y + GCQ_SIZE + 12.5, t2, 6.2, False, color2, align="c", width=GCQ_SIZE)
+    t1, t2 = GCQ_LABELS[0], tr(GCQ_LABELS[1], lg=lang)  # lang: pdf.pdf_lang; 2.434.0 A (#3603): "cr" = a label wider than the smaller code ends at its right edge
+    p.text(x, y + GCQ_SIZE + 4, t1, 7, True, color2, align="cr", width=GCQ_SIZE)
+    p.text(x, y + GCQ_SIZE + 12.5, t2, 6.2, False, color2, align="cr", width=GCQ_SIZE)

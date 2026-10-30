@@ -46,7 +46,7 @@ def ni_scheme_ok(c, url):
         port = p.port or 80
     except ValueError:
         return False
-    return cal_host_allowed(cal_allow(c), p.hostname or "", port)
+    return cal_host_allowed(cal_allow(c, "ntfy"), p.hostname or "", port)
 
 
 def ni_row(c, uid):
@@ -144,7 +144,7 @@ def ni_poll_one(c, r):
     uid = r["user_id"]
     base = ni_base(r)
     token = unseal(c, f"ntfyin:{uid}", r["token"]) if r["token"] else ""
-    allow = cal_allow(c)
+    allow = cal_allow(c, "ntfy")  # 2.380 G (#3389)
     since = r["since"] or str(int(time.time()))
     url = f"{base}/{urllib.parse.quote(r['topic'], safe='')}/json?poll=1&since={urllib.parse.quote(since, safe='')}"
     _st, _h, data, _u = cal_http(url, headers={"Authorization": f"Bearer {token}"} if token else {}, allow=allow,

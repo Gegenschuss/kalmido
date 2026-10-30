@@ -20,6 +20,9 @@ V1_CODES = {400: "invalid", 401: "unauthorized", 403: "forbidden", 404: "not_fou
 
 
 _HITS, _HITS_LOCK = {}, threading.Lock()
+# 2.425.0 C (#3453): bearer keys of their own kind (not api_tokens rows), by prefix -> f(c, key, bad address counters):
+# an error response, or None after it set g.user (docs/fetcher.py registers the receipt fetchers' keys)
+V1_KEY_KINDS = {}
 
 
 RATE_WINDOW_S = test_seconds("KALMIDO_TEST_RATE_WINDOW_S", 60)  # 2.149.0 E (#2513): the minute of hit_limit (tests only)

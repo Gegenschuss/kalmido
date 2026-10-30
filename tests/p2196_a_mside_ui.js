@@ -139,7 +139,8 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     // 2.353.0 (#2776, audit): the tab "Projects" opens the drawer at the head of the project list (not scrolled down)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 375, height: 600}});
     await nav(B + '#today'); await ready(ev, `!!document.querySelector('#top .menu') && !!S.booted`, 80);
-    const tabHit = await ev(`(() => { const t = document.querySelector('#tabs [data-act="side"]'); if (t) t.click(); return !!t; })()`);
+    // 2.417.0 (#3559): the tab opens the Projects page now; the drawer at Lists stays (sideOpenDrawer)
+    const tabHit = await ev(`(() => { sideOpenDrawer(); return true; })()`);
     await ready(ev, `!!document.querySelector('#side.open')`, 20); await sleep(500);
     const top0 = await ev(`document.querySelector('#side').scrollTop`);
     check(tabHit && top0 === 0, 'tab Projects: the drawer starts at the top (head of the project list) ' + top0);

@@ -417,6 +417,9 @@
     "books.datev": {
       "status": "ready"
     },
+    "docs.delivery": {
+      "status": "ready"
+    },
     "docs.einvoice": {
       "status": "ready"
     },

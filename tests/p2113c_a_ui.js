@@ -14,7 +14,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2113BA_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'cal,comments,collab,office,clients';
 
 (async () => {
@@ -67,9 +67,10 @@ const FEAT = 'cal,comments,collab,office,clients';
   await until(() => d.querySelector('[data-ofd="send"]'), 60);
   check(!!d.querySelector('[data-ofd="send"]'), 'a finalised quotation has "Send"');
   d.querySelector('[data-ofd="send"]').click();
-  await until(() => d.querySelector('#ofd-s-terms'), 40);
-  const tk = d.querySelector('#ofd-s-terms');
-  check(tk && tk.checked && /Attach terms and conditions/.test(tk.closest('label')?.textContent || ''), 'quotation: "Attach terms and conditions" ticked');
+  // 2.434.0 (#3619): a quotation carries its terms as the last pages of its PDF - a note instead of the tick
+  await until(() => d.querySelector('#ofd-s-terms-in'), 40);
+  const tk = d.querySelector('#ofd-s-terms-in');
+  check(tk && !d.querySelector('#ofd-s-terms') && /last pages of the PDF/.test(tk.textContent || ''), 'quotation: the note "terms are the last pages of the PDF", no tick');
   w.close();
   w = await boot({hash: 'office/offers/' + inv.id}); d = w.document;
   await until(() => d.querySelector('[data-ofd="send"]'), 60);

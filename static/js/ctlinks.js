@@ -13,8 +13,9 @@ function ctAv(c, cls = 'avatar ctav') {
 function linksDetailHtml(t, ro) {
   if (!t || t.id <= 0 || t.context) return '';
   const cts = ctOn() ? (S.tcontacts || {})[t.id] || [] : [];
+  const ctShow = pz_show(t, 'client', cts.length);  // 2.412.0 (#3552): the project's property Client and contacts
   const kinds = Object.fromEntries(CT_LINK);
-  const ctHtml = ctOn() ? `<div class="lkgrp"><span class="lklab">${tr('Contacts')}</span><div class="lkitems">${cts.map(x => `<span class="lkchip ctlk"><button type="button" class="linkbtn" data-ctgo="${x.contact_id}">${ic('user', 's')}<span>${esc(x.fn)}</span></button><span class="muted">${esc(tr(kinds[x.kind] || 'About'))}</span>${ro ? '' : `<button type="button" class="iconbtn" data-ctunlink="${x.contact_id}" aria-label="${esc(tr('Remove the link to {0}', x.fn))}">${ic('x', 's')}</button>`}</span>`).join('')}
+  const ctHtml = ctOn() && ctShow ? `<div class="lkgrp"><span class="lklab">${tr('Contacts')}</span><div class="lkitems">${cts.map(x => `<span class="lkchip ctlk"><button type="button" class="linkbtn" data-ctgo="${x.contact_id}">${ic('user', 's')}<span>${esc(x.fn)}</span></button><span class="muted">${esc(tr(kinds[x.kind] || 'About'))}</span>${ro ? '' : `<button type="button" class="iconbtn" data-ctunlink="${x.contact_id}" aria-label="${esc(tr('Remove the link to {0}', x.fn))}">${ic('x', 's')}</button>`}</span>`).join('')}
     ${ro ? '' : `<button type="button" class="attadd" data-act="ct-link">${ic('plus', 's')}<span>${tr('Link a contact')}</span></button>`}</div></div>` : '';
   const evHtml = typeof evTaskHtml === 'function' ? evTaskHtml(t, ro) : '';
   return ctHtml || evHtml ? `<div class="dsec lksec"><h5>${tr('People and dates')}</h5>${ctHtml}${evHtml}</div>` : '';

@@ -9,7 +9,7 @@
 # Installs (or updates) Kalmido from GitHub and starts it with Docker Compose. Release versions use
 # the prebuilt image ghcr.io/gegenschuss/kalmido:<version>; if that cannot be pulled, it is built locally.
 # To update later: run update.ps1 in the install folder (or this command again). Your .env, data\ and
-# secret\ are kept, and an SQLite database (before 2.37) is backed up to data\backups\ first; 2.37+ keeps its own in-app backups.
+# secret\ are kept, and the database is backed up to data\backups\ first (2.359.2: also PostgreSQL, 2.37+).
 #
 # Options (environment variables, set before running):
 #   $env:KALMIDO_DIR      install folder                        (default: $env:USERPROFILE\kalmido)
@@ -126,6 +126,7 @@
 
   # --- backup before an update: SQLite backup inside the running container, else a plain copy ---
   $db = Join-Path $Dir 'data\tasks.db'
+  $script:DbCopy = ''  # 2.359.2 (#2897): named at the end
   if ($Update -and (Test-Path $db)) {
     Step 'Backing up your database'
     $bdir = Join-Path $Dir 'data\backups'
@@ -145,6 +146,37 @@
     }
     Get-ChildItem -Path $bdir -Filter 'tasks-*.db' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 |
       ForEach-Object { Remove-Item -Force $_.FullName, "$($_.FullName)-wal" -ErrorAction SilentlyContinue }
+    $script:DbCopy = "data\backups\$name"
+  } elseif ($Update) {
+    # 2.359.2 (#2897): 2.37+ (PostgreSQL in the db service): pg_dump into data\backups\ first, like update.sh. The dump is
+    # written inside the container and copied out (a binary pipe through PowerShell 5.1 would change its bytes).
+    Push-Location $Dir
+    try {
+      $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+      $dbid = if ($ComposeV2) { (& docker compose ps -q db 2>$null | Out-String).Trim() } else { (& docker-compose ps -q db 2>$null | Out-String).Trim() }
+      $ErrorActionPreference = $old
+    } finally { Pop-Location }
+    if ($dbid) {
+      Step 'Backing up your database'
+      $bdir = Join-Path $Dir 'data\backups'
+      New-Item -ItemType Directory -Force -Path $bdir | Out-Null
+      $name = 'kalmido-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump'
+      $target = Join-Path $bdir $name
+      $inner = "/tmp/$name"
+      $dump = 'PGOPTIONS=''-c app.role=system'' pg_dump -Fc --enable-row-security -U $POSTGRES_USER -d $POSTGRES_DB -f ' + $inner
+      $ok = (Quiet 'docker' @('exec', $dbid, 'sh', '-c', $dump)) -and (Quiet 'docker' @('cp', "${dbid}:$inner", $target))
+      Quiet 'docker' @('exec', $dbid, 'rm', '-f', $inner) | Out-Null
+      if (-not $ok -or -not (Test-Path $target) -or (Get-Item $target).Length -eq 0) {
+        Remove-Item -Force $target -ErrorAction SilentlyContinue
+        Fail 'Could not back up the database. Nothing was changed.'
+      }
+      Say "Saved data\backups\$name"
+      Get-ChildItem -Path $bdir -Filter 'kalmido-*.dump' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 |
+        ForEach-Object { Remove-Item -Force $_.FullName -ErrorAction SilentlyContinue }
+      $script:DbCopy = "data\backups\$name"
+    } else {
+      Warn 'No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. Back up your database yourself before you continue.'
+    }
   }
 
   # --- download ---
@@ -189,7 +221,10 @@
     } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
     $Rev = "$Version (zip)"
   }
-  Set-Content -Path (Join-Path $Dir '.kalmido-version') -Value $Version -Encoding ASCII
+  $verFile = Join-Path $Dir '.kalmido-version'
+  # 2.359.2 (#2897): the version of before, for the way back (kept when a second run follows a failed update)
+  if ((Test-Path $verFile) -and ("$(Get-Content $verFile -TotalCount 1)".Trim() -ne $Version)) { Copy-Item $verFile "$verFile.prev" -Force }
+  Set-Content -Path $verFile -Value $Version -Encoding ASCII
   New-Item -ItemType Directory -Force -Path (Join-Path $Dir 'data') | Out-Null
   New-Item -ItemType Directory -Force -Path (Join-Path $Dir 'secret') | Out-Null   # the server key (secret\kalmido.key), apart from data\
 
@@ -367,6 +402,13 @@
   Say 'Backups:    daily into data\backups\ (Settings > Users > Whole server > Backups); copy them to another disk too'
   if ($script:Image) { Say "Image:      $($script:Image) (prebuilt)" } else { Say 'Image:      kalmido:local (built on this computer)' }
   Say "Update:     powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"  (backs up the database first; admins also see new versions in Settings > Help)"
+  $prevFile = Join-Path $Dir '.kalmido-version.prev'
+  if ($Update -and (Test-Path $prevFile)) {  # 2.359.2 (#2897)
+    $prev = "$(Get-Content $prevFile -TotalCount 1)".Trim()
+    if ($prev -and $prev -ne $Version) {
+      Say "Previous:   $prev  (back to it: `$env:KALMIDO_VERSION = '$prev'; then update.ps1 again$(if ($script:DbCopy) { "; the database of before: $($script:DbCopy)" }))"
+    }
+  }
   Say 'Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs\SELF-HOSTING.md'  # 2.61.0
   Say "Stop:       cd `"$Dir`"; docker compose down"
   $img = if ($script:Image) { $script:Image } else { 'kalmido:local' }

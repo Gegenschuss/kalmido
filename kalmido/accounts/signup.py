@@ -24,6 +24,10 @@ from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from fun
 #   domain    only addresses of the listed e-mail domains (and of the organisations' domains); needs e-mail (SMTP)
 #   approval  anyone, but an admin approves the account first (News + push to the admins); works without SMTP
 #   open      anyone with a confirmed address (a hosted instance); needs e-mail (SMTP)
+# 2.422.0 (#2937): on a server with an organisation "open" needs the switch signup_private ("Private
+# accounts register without an invitation", default off): such a registration is a private account only -- it never joins
+# an organisation by its address (an organisation's admin invites the person); companies people created themselves
+# (orgs.self_made) do not make a server an organisation's server.
 # Flow with e-mail: name + address -> a one-time link (#697, kind "signup") -> confirm + choose a password -> signed in
 # (approval: waits for an admin). Without e-mail (only "approval"): name + address + password -> waits for an admin.
 # Never says whether an address already has an account (the same answer, no mail); the user name is made from the
@@ -46,7 +50,13 @@ def om_has_orgs(c):
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # instance structure, also before a login
-        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone())  # 2.47.3 (#1360)
+        # 2.422.0 (#2937): a company a person created herself is no organisation of the server
+        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 LIMIT 1").fetchone())  # 2.47.3 (#1360)
+
+
+def signup_private(c):
+    """2.422.0 (#2937): the switch "private accounts register without an invitation" of a server with an organisation."""
+    return gsetting(c, "signup_private") == "1"
 
 
 def signup_mode(c):
@@ -57,7 +67,7 @@ def signup_mode(c):
         return "off"
     if m in ("domain", "open") and not _mail_on():
         return "off"
-    if m == "open" and om_has_orgs(c):  # 2.23.0 (#799) / 2.46.0 (#1592): with an organisation only its domains or with approval
+    if m == "open" and om_has_orgs(c) and not signup_private(c):  # 2.23.0 (#799) / 2.46.0 (#1592): with an organisation only its domains or with approval
         return "off"
     return m
 
@@ -179,6 +189,8 @@ def auth_signup():
     # 2.360.0 A (#2496): without e-mail the address is never confirmed: no organisation by its domain (an admin adds the
     # person after the approval)
     oid = org_for_email(c, email) if mail else None
+    if m == "open" and om_has_orgs(c):  # 2.422.0 (#2937): open next to an organisation = a private account, never a member
+        oid = None
     if oid:
         from ..core.pg import system_ctx
         with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in
@@ -224,9 +236,16 @@ def signup_settings(c, b):
             return err(tr("Invalid value: {0}", "signup_mode"))
         if b["signup_mode"] in ("domain", "open") and not _mail_on():
             return err(tr("This mode needs e-mail sending (SMTP); without it only “with approval by an admin” works"), 409)
-        if b["signup_mode"] == "open" and om_has_orgs(c):  # 2.46.0 (#1592): any instance with an organisation
+        priv = b["signup_private"] is True if isinstance(b.get("signup_private"), bool) else signup_private(c)  # 2.422.0 (#2937)
+        if b["signup_mode"] == "open" and om_has_orgs(c) and not priv:  # 2.46.0 (#1592): any instance with an organisation
             return err(tr("An organisation's server allows registrations only for its e-mail domains or with approval by an admin"), 409)
         gset(c, "signup_mode", b["signup_mode"])
+    if "signup_private" in b:  # 2.422.0 (#2937): private accounts register without an invitation (a server with an organisation)
+        if not isinstance(b["signup_private"], bool):
+            return err(tr("Invalid value: {0}", "signup_private"))
+        gset(c, "signup_private", "1" if b["signup_private"] else "0")
+        if not b["signup_private"] and gsetting(c, "signup_mode") == "open" and om_has_orgs(c) and b.get("signup_mode") in (None, "open"):
+            gset(c, "signup_mode", "off")  # switched off: the stored mode says what is in effect (off)
     if "signup_domains" in b:
         if not isinstance(b["signup_domains"], str):
             return err(tr("Invalid value: {0}", "signup_domains"))
@@ -243,7 +262,8 @@ def signup_admin(c):
     from ..accounts.orgs import ORG_NAME_ENV
     return {"instance_mode": instance_mode(c), "org_name_env": bool(ORG_NAME_ENV), "has_orgs": om_has_orgs(c), "signup_mode": gsetting(c, "signup_mode") if gsetting(c, "signup_mode") in SIGNUP_MODES else "off",
             "signup_domains": gsetting(c, "signup_domains"), "signup_effective": signup_mode(c), "mail_out": _mail_on(),
-            "org_invites": gsetting(c, "org_invites") != "0"}  # 2.115.0 B (#2062)
+            "org_invites": gsetting(c, "org_invites") != "0",  # 2.115.0 B (#2062)
+            "signup_private": signup_private(c)}  # 2.422.0 (#2937)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#444): sign-in link / QR code

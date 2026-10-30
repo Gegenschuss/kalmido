@@ -14,7 +14,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2106C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
-const until = async (fn, n = 150) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 30000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 // 2.206.0 B (#2513): waits 30 s (CI load), the search result is waited for (it may draw after the input event)
 

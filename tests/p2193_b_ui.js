@@ -22,7 +22,7 @@ const call = async (method, url, body, ck = CK) => {
     return r.json().catch(() => ({}));
   }
 };
-const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const ptr = (w, el, type, x = 0, extra = {}) => {  // jsdom has no PointerEvent: a MouseEvent with pointerType / pointerId
   const e = new w.MouseEvent(type, {bubbles: true, cancelable: true, button: 0, clientX: x, clientY: 10, ...extra});

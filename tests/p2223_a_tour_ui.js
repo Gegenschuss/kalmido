@@ -12,7 +12,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, KALMIDO_ONBOARDING: '1'}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
-const until = async (f, ms = 4000) => { for (let t = 0; t < ms; t += 100) { if (f()) return true; await sleep(100); } return !!f(); };
+const until = (f, ms) => require('./boot').until(f, {timeout: ms || 15000, step: 100}).then(x => !!x);  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit ms keeps its window
 const hashTo = async (w, h) => { w.location.hash = h; await sleep(500); };
 
 (async () => {

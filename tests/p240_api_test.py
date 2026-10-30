@@ -251,7 +251,7 @@ AG = A.post(B + "/api/lists", json={"name": "Kunde X", "ptype": "agency", "secti
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == AG["id"]]
 check(secs == ["Anfrage", "Konzept", "Umsetzung", "Abnahme", "Abrechnung"], f"agency sections in German: {secs}")
 fl = [(f["name"], f["type"]) for f in st(A)["fields"] if f["list_id"] == AG["id"]]
-check(fl == [("Kunde", "text"), ("Budget h", "number")], f"agency fields: {fl}")
+check(fl == [("Budget h", "number")], f"agency fields: {fl}")  # 2.380 (#3438): no field "Kunde" / "Client" any more
 PR = A.post(B + "/api/lists", json={"name": "Umzug", "ptype": "private", "sections": True}).json()
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == PR["id"]]
 check(secs == ["Ideen", "Planung", "Zu erledigen"] and not [f for f in st(A)["fields"] if f["list_id"] == PR["id"]], f"private: {secs}")

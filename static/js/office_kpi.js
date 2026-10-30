@@ -4,7 +4,7 @@
 // the cash flow of the next three months (from the cash flow tab, not computed twice) and per client hours against budget,
 // invoiced, costs and margin. The server computes everything (GET /api/office/kpi); this only shows it.
 const KPS = {data: null, err: null, oid: null, year: 0, q: ''};
-OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['kpi', 'chart', N_('Figures'), 1, () => kp_html()]);  // admins only
+OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['kpi', 'chart', N_('Figures'), 1, () => kp_html(), 'money', 'money.kpi']);  // admins only; 2.380 F (#3411): [6] the switch
 
 async function kp_load() {
   const q = KPS.year ? `?year=${KPS.year}` : ''; KPS.q = q;
@@ -65,6 +65,7 @@ function kp_html() {
 // the start page block "Figures" (dashboard.js): only for the admins of the office (a 403 hides it), loaded once per visit
 const KPT = {data: undefined, loading: false, at: 0};
 function kp_tile(card) {
+  if (typeof ofcFeat === 'function' && !ofcFeat('money.kpi')) return '';  // 2.380 F (#3411): Figures switched off
   if (KPT.data === undefined || (KPT.data && Date.now() - KPT.at > 60000 && !KPT.loading)) {  // fresh after a minute
     if (!KPT.loading) {
       KPT.loading = true;

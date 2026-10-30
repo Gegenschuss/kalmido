@@ -142,6 +142,8 @@ const NOTIF_ROWS = [
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
   ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
+// 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
+NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
@@ -333,7 +335,7 @@ function oadmRow(x) {
 }
 // 2.361.2 (#2923): what a member asks back (they brought it in or made it): release = they may move it into their private space
 const OOR_KIND = {list: N_('Project'), sheet: N_('Table'), file: N_('File or folder'), wiki: N_('Knowledge page'), clients: N_('Client'),
-  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft')};  // 2.361.2 B (#2923): + drafts
+  poll: N_('Poll'), video: N_('Video sign-off'), bookmark: N_('Bookmark'), drafts: N_('Draft'), letters: N_('Letter')};  // 2.361.2 B (#2923): + drafts; 2.356.1 (#3344): + letters
 const oor_kind = k => OOR_KIND[k] ? tr(OOR_KIND[k]) : k;
 function oorHtml(rs) {
   const open = (rs || []).filter(r => r.state === 'open');
@@ -517,6 +519,7 @@ async function inviteScreen(tok) {
   } else {
     el.innerHTML = `<div class="card">${logo}
       <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
+      ${info.kind === 'invite' && (info.invited_by || info.org_name) ? `<p class="invby">${esc(info.invited_by ? tr('{0} invites you to {1}.', info.invited_by, info.org_name || APP_NAME) : tr('You are invited to {0}.', info.org_name))}</p>` : ''}${''/* 2.365.0 (#2802): who invites, into which organisation */}
       <p class="muted">${esc(info.kind === 'reset' ? tr('Choose a new password for “{0}”.', info.username) : tr('Choose your own password to finish your account.'))}</p>
       <form id="inv-form" autocomplete="on">
         <label class="aulab" for="inv-user">${tr('Username')}</label><input id="inv-user" name="username" autocomplete="username" readonly value="${esc(info.username)}">
@@ -781,28 +784,35 @@ async function authPasskey(errEl, remember) {
 const SIGNUP_UI = [['off', N_('Off: only admins add people')], ['domain', N_('Only addresses of certain e-mail domains')], ['approval', N_('Anyone, after an admin approves')], ['open', N_('Anyone with a confirmed e-mail address')]];
 function signupAdminHtml(a) {
   const mode = a.signup_mode || 'off', org = !!a.has_orgs;  // 2.46.0 (#1592): any server with an organisation
-  const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org ? 'disabled' : '';
+  const priv = !!a.signup_private;  // 2.422.0 (#2937): private accounts register without an invitation (a server with an organisation)
+  const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org && !priv ? 'disabled' : '';
   return `<h4 id="s-signup-h">${tr('Registration on the login page')}</h4>
     <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
     <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
     <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to projects: share projects with them. Never an admin or a child account.'),
-      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
+      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org && !priv ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
+    ${org ? `<label class="wide"><input type="checkbox" id="s-spriv" ${priv ? 'checked' : ''}><span>${tr('Private accounts register without an invitation')}<small class="muted">${tr('Then “Anyone with a confirmed e-mail address” works here too: such an account stays private and never joins an organisation by its address; a company’s admin invites the person. Off by default.')}</small></span></label>` : ''}
     <label class="wide"><input type="checkbox" id="s-oinv" ${a.org_invites !== false ? 'checked' : ''}><span>${tr('Organisation admins may invite new people by e-mail')}<small class="muted">${tr('They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.')}</small></span></label>`;  // 2.115.0 B (#2062)
 }
 document.addEventListener('change', async e => {
-  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv') return;
+  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv' && id !== 's-spriv') return;
   try {
-    const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv
-    let j; try { j = await (id === 's-signup' ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
-      if (!x.data?.password_needed) { if (id === 's-signup') toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+    const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : id === 's-spriv' ? {signup_private: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv; 2.422.0 (#2937): + s-spriv
+    const ask = id === 's-signup' || id === 's-spriv';
+    let j; try { j = await (ask ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
+      if (!x.data?.password_needed) { if (ask) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
       j = await api('PATCH', '/api/admin/settings', {...b, password: p.password});
     }
     if (j && j.version) S.about = j;
     const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
     if (id === 's-sdom') e.target.value = S.about?.signup_domains || '';
+    if (id === 's-spriv') { const o = $('#s-signup option[value="open"]'); if (o && S.about?.mail_out) o.disabled = !S.about?.signup_private; }  // 2.422.0 (#2937)
     toast(tr('Saved'));
-  } catch { if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off'; }
+  } catch {
+    if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off';
+    if (id === 's-spriv') e.target.checked = !!S.about?.signup_private;
+  }
 });
 // the form "Create account" on the login page (#711)
 // 2.49.0 (#1531): "Forgot your password?": e-mail address or user name -> a one-time link by mail (the answer is always the same)
@@ -1015,11 +1025,14 @@ async function bkDraw(md, j) {
   const st = [j.running ? (j.running === 'restore' ? tr('A restore is running…') : tr('Backup running…')) : j.last_ok ? tr('Last backup: {0}.', esc(aaWhen(j.last_ok))) : tr('No backup yet.'),
     tr('Backups use {0}, {1} free on the disk.', fmtBytes(j.total_bytes), j.free_bytes ? fmtBytes(j.free_bytes) : '?')];
   h += hint(st.join(' '));
+  // 2.432.0 (#3584): larger files are kept once for all backups (the sizes below are without them)
+  if (j.store_files) h += `<div class="shint bkstore">${tr('Shared files of all backups: {0} in {1} (each file is kept only once).', fmtBytes(j.store_bytes), trn('{0} file', '{0} files', j.store_files))}</div>`;
   // 2.209.0 E (#1627): little room left for further backups (less than three of the newest one's size)
-  if (j.free_bytes && j.items.length && j.free_bytes < 3 * j.items[0].size) h += `<div class="shint cnote bkspace">${tr('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(j.items[0].size))}</div>`;
+  const each = j.items.length ? j.items[0].size + (j.items[0].store_new_bytes || 0) : 0;  // 2.432.0 (#3584): + its new shared files
+  if (j.free_bytes && j.items.length && j.free_bytes < 3 * each) h += `<div class="shint cnote bkspace">${tr('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(each))}</div>`;
   if (j.last_error) h += `<div class="shint cnote">${tr('The last backup failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
   h += j.items.length ? `<div class="members bklist">${j.items.map(x => `<div class="mrow bkrow" data-bkn="${esc(x.name)}"><span class="n"><b>${esc(aaWhen(x.created_at))}</b> · ${tr(BK_KIND[x.kind] || x.kind)} · ${fmtBytes(x.size)}${x.encrypted ? ` · ${ic('lock', 's')} ${tr('encrypted')}` : ''}${x.legacy ? ` · ${tr('old (SQLite), moved over when restored')}` : ''}
-      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
+      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}${x.shared_files ? ` (${esc(trn('{0} shared', '{0} shared', x.shared_files))}${x.store_new_bytes ? ', ' + esc(tr('{0} newly stored', fmtBytes(x.store_new_bytes))) : ''})` : ''}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
       <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" data-sudl title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
   h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings dialog only */}</div>
@@ -1166,7 +1179,7 @@ async function setupChoices(el, logo) {
   const suPriv = () => modPrivHtml(['a:life', 'a:review'].filter(x => picked.has(x)).flatMap(x => MG_SU_AREA[x]));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
-      <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
+      ${''/* 2.365.0 (#2802): the language as a small menu top right (it took half a phone screen; the browser's language is preselected) */}<details class="sulang" id="su-lang"><summary title="${esc(tr('Language'))}">${ic('globe', 's')}<span>${langName(langs.find(L => L.code === lang) || {code: lang, name: lang})}</span></summary><div class="sulangs">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}" aria-pressed="${L.code === lang}">${langName(L)}</button>`).join('')}</div></details>
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${isOn(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${isOn(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b> <small class="muted">${tr(p.desc)}</small>${SU_ADDS[k] ? ` <small class="suadds">${esc(tr('Adds: {0}', SU_ADDS[k]().join(', ')))}</small>` : ''}</button>`).join('')}</div>
@@ -1219,6 +1232,7 @@ function sectionMenu(anchor, sid) {
     {label: tr('Move left / up'), icon: 'left', fn: () => moveSection(sid, -1)},
     {label: tr('Move right / down'), icon: 'right', fn: () => moveSection(sid, 1)},
     wip_menuItem(sid),  // 2.60.0 (#1510)
+    dw_menuItem(sid),  // 2.410.0 B (#3515)
     '-',
     {label: tr('Delete section (tasks stay)'), icon: 'trash', cls: 'flag-5', fn: () => sectionDelete(sid)},
   ]);

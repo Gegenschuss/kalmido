@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
 const FEAT = 'cal,matrix,habits,stats,comments,collab';
@@ -132,14 +132,18 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   w = await boot({user: 'alice', hash: 'assigned'}); d = w.document;
   const groups = () => [...d.querySelectorAll('#view .group')];
   // 2.152.2 (#2624): project instead of list
-  const mine = groups().find(g => /From your projects, without a date/.test(g.querySelector('.ghead')?.textContent || ''));
+  // 2.365.0 (#3010): "Unassigned in your projects", folded until opened - open it for the content checks
+  let mine = groups().find(g => /Unassigned in your projects/.test(g.querySelector('.ghead')?.textContent || ''));
+  check(mine?.querySelector('.ghead.closed') && !/Prune the roses/.test(mine.textContent), '#3010: the group starts folded');
+  click(w, mine.querySelector('.ghead')); await sleep(150);
+  mine = groups().find(g => /Unassigned in your projects/.test(g.querySelector('.ghead')?.textContent || ''));
   check(!!mine && groups().at(-1) === mine || (mine && groups().indexOf(mine) >= groups().length - 2), '#1219: the group "From your lists, without a date" at the bottom');
   const mtx = mine?.textContent || '';
   check(/Prune the roses/.test(mtx) && !/Rake leaves/.test(mtx) && !/Team chore/.test(mtx) && !/Fix the gate/.test(mtx), '#1219: only unassigned, undated tasks of lists only I use ' + mtx.slice(0, 200));
   check(!/Team chore/.test(d.querySelector('#view').textContent), '#1219: the shared list: only what is assigned');
   check(/Mine in team/.test(d.querySelector('#view').textContent) && /Mine at home/.test(d.querySelector('#view').textContent), '#1219: the assigned tasks stay');
   click(w, mine.querySelector('.ghead')); await sleep(150);
-  check(w.eval('S.collapsed.has("kb:mine")') && !/Prune the roses/.test(d.querySelector('#view').textContent), '#1219: the group folds (stored like the others)');
+  check(!w.eval('S.collapsed.has("kb:mine")') && !/Prune the roses/.test(d.querySelector('#view').textContent), '#1219: the group folds again (stored like the others; 2.365.0 #3010: folded = not in S.collapsed)');
   click(w, d.querySelector('#view .ghead[data-key="kb:mine"]')); await sleep(150);
   // #1221 the breadcrumb
   const gg = groups().find(g => g.dataset.kbg === 'l:' + SOLO);

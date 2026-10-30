@@ -171,7 +171,10 @@ def scenario(S, who):
     check(S.patch(B + f"{D}/{q3}", json={"accept_on": 0}).ok, f"{who}: order confirmation off for one quotation")
     pgo = pdf(S, q3, f"{who}-3pos-off" if who == "org" else "")
     check(not any(ACC in squash(t).upper() for t in pgo), f"{who} off: no block, no line")
-    check(squash("Rechteübertragung siehe Anhang") in squash(pgo[0]), f"{who} off: the rights line stays")
+    # 2.424.0 (#3572): look A (#3491, 2.406) drops the reference line when the rights appendix fits on page 1 - then the
+    # appendix itself is on page 1; otherwise the line stays
+    ref_o, app_o = squash("Rechteübertragung siehe Anhang") in squash(pgo[0]), squash(RIGHTS["territory"]) in squash(pgo[0])  # the appendix text
+    check(ref_o != app_o, f"{who} off: the rights line stays, or the appendix is on page 1 ({ref_o} {app_o})")
     check(S.patch(B + f"{D}/{q3}", json={"accept_on": None}).ok, f"{who}: back to like the setting")
     # switched off in the setting
     check(S.put(B + O + "/settings", json={"accept_on": 0}).ok, f"{who}: setting off")
