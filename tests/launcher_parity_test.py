@@ -144,9 +144,12 @@ check(r2.mode_args(["claude"]) == ["claude"] and r2.pmode == "ask", "Host defaul
 r2.agent = {"runtime": {"permission_mode": "ask"}}
 check("--permission-mode" in r2.run_args(["claude"]), "run_args carries the flag")
 os.environ["KALMIDO_PERMISSION_MODE"] = "auto"
-check(r2.mode_args(["claude"]) == ["claude"] and r2.pmode == "auto" and r2.mode_fixed(), "KALMIDO_PERMISSION_MODE fixes it too")
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"] and r2.pmode == "auto" and r2.mode_fixed(), "KALMIDO_PERMISSION_MODE fixes it and applies")
 del os.environ["KALMIDO_PERMISSION_MODE"]
 check(ar.permission_fixed(["claude", "--dangerously-skip-permissions"]), "skipping all permissions is a fixed mode")
+check(ar.permission_modes(["claude", "--dangerously-skip-permissions"])[0] == "auto", "and it never reads as ask")
+r2.refresh_due, r2.refresh_agent = True, lambda: (setattr(r2, "agent", {"runtime": {"permission_mode": "auto"}}), setattr(r2, "refresh_due", False))
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"], "a change before the run is read first (task runs too)")
 r3 = ar.Runner(["codex"], os.path.join(os.getcwd(), "state3"))
 r3.agent = {"runtime": {"permission_mode": "ask"}}
 check(r3.mode_args(["codex"]) == ["codex"] and r3.mode_fixed(), "another command takes no flag and counts as fixed")

@@ -46,7 +46,7 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
                                 rotate_idle_min, set in the agent's runtime section "Interim summary"; a new day starts at
                                 runtime nightly_reset)
   KALMIDO_RUN_TIMEOUT           seconds per run (default 3600, 0 = none); KALMIDO_APPROVAL_REMIND / KALMIDO_APPROVAL_TTL
-  KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode; set, the mode counts as
+  KALMIDO_PERMISSION_MODE       the permission mode of a Claude Code COMMAND without --permission-mode; set, the mode counts as
                                 fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
@@ -541,6 +541,8 @@ def permission_modes(cmd, runtime=""):
             run = cmd[i + 1]
         elif a.startswith("--permission-mode="):
             run = a.split("=", 1)[1]
+        elif a == "--dangerously-skip-permissions":  # 2.437.0 (#2931): no question at all, never shown as "Ask first"
+            run = "bypassPermissions"
     run = run or os.environ.get("KALMIDO_PERMISSION_MODE") or PERM_FLAG.get(runtime) or host or "default"
     return label(run), label(host or "default")
 
@@ -1509,10 +1511,15 @@ class Runner:
     def mode_args(self, args):
         """2.437.0 (#2931): the switch in the chat header (runtime permission_mode) on this run, unless this computer fixed
         the mode; "Host default" = no flag. Read per run: runtime_changed makes the next run read the runtime again."""
+        if self.refresh_due:
+            self.refresh_agent()
         rt = ((self.agent or {}).get("runtime") or {}).get("permission_mode") or ""
         if self.mode_fixed():
             rt = ""
         self.pmode, self.host_pmode = permission_modes(self.cmd, rt)
+        env = os.environ.get("KALMIDO_PERMISSION_MODE") or ""
+        if env and self.is_claude() and not any(a.startswith("--permission-mode") or a == "--dangerously-skip-permissions" for a in self.cmd):
+            return args + ["--permission-mode", PERM_FLAG.get(env, env)]  # what is reported is what runs
         return args + ["--permission-mode", PERM_FLAG[rt]] if rt in PERM_FLAG else args
 
     def mode_fixed(self):
@@ -1677,6 +1684,7 @@ class Runner:
         if self.extras:  # 2.44.0 B (#1443): a fresh outbox folder for a chat run
             self.extras.begin_run(uid, not uid)
         tid = None if uid else task.get("id")
+        self.mode_args([])  # 2.437.0 (#2931): the status names the mode of this run
         self.api.status("working", what, task_id=tid, host=self.host())
         key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
         if not self.agent:  # 2.46.6 (#1715): the rules block names the owner and the language (--once-event: not read yet)
