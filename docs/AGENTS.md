@@ -186,7 +186,7 @@ the threat model is [AGENT-SECURITY.md](AGENT-SECURITY.md).
 
 The quickest way to run a **project agent** on a Mac, a Windows PC or a Linux computer: *Settings > Agents >* (agent) *>
 Set up on a computer* (the download button in the agent's row; admins: in the agent's dialog). Pick Mac / Windows / Linux
-and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token:
+and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token (redeeming it revokes the token made with the agent if it was never used, 2.442):
 
 ```sh
 curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... bash -s -- --url https://tasks.example.com --dir ~/projects/site

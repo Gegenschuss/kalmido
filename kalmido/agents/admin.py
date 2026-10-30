@@ -74,13 +74,17 @@ def need_agent_admin(c, aid):
     return a
 
 
-def agent_token_new(c, aid, days=None):
-    """2.15.0 (#479): the token gets the agent's scopes + address restriction; days = expiry (None = never)."""
+AGENT_TOKEN_CREATED = "Agent (created)"
+
+
+def agent_token_new(c, aid, days=None, name="Agent"):
+    """2.15.0 (#479): the token gets the agent's scopes + address restriction; days = expiry (None = never).
+    2.442.0 (#1762): name = AGENT_TOKEN_CREATED marks the token made along with a new agent (ains_redeem revokes it unused)."""
     a = agent_row(c, aid)
     exp = iso(now_utc() + timedelta(days=as_int(days, tr("Expiry"), 1, 3650))) if days not in (None, "", 0) else None
     tok = "abk_" + secrets.token_urlsafe(32)
     c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids) VALUES(?,?,?,?,?,?,?,?,?)",
-              (aid, "Agent", _token_hash(tok), tok[:12], (a["scopes"] if a and a["scopes"] else ",".join(SCOPES_AGENT_DEFAULT)), exp,
+              (aid, name, _token_hash(tok), tok[:12], (a["scopes"] if a and a["scopes"] else ",".join(SCOPES_AGENT_DEFAULT)), exp,
                iso(now_utc()), (a["allowed_ips"] if a else "") or "", (a["list_ids"] if a and "list_ids" in a.keys() else "") or ""))
     return tok
 
@@ -219,7 +223,7 @@ def admin_agent_create():
         except (BadInput, Denied):
             c.rollback()
             raise
-        tok = agent_token_new(c, uid)
+        tok = agent_token_new(c, uid, name=AGENT_TOKEN_CREATED)
         ac_assign(c, [uid])  # 2.47.1 (#1721): its fixed colour (the least used one of its organisation)
         bump(c)
         c.commit()
@@ -703,7 +707,7 @@ def my_agent_create():
         raise
     uset(c, uid, "lang", usettings(c, me())["lang"])
     ensure_inbox(c, uid)
-    tok = agent_token_new(c, uid)
+    tok = agent_token_new(c, uid, name=AGENT_TOKEN_CREATED)
     ac_assign(c, [uid])  # 2.47.1 (#1721)
     bump(c)
     c.commit()
