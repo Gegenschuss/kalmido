@@ -305,7 +305,7 @@ def ua8_delete_info(uid):
     from .orgretain import upg_info
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
     if by != "instance":  # an organisation admin: nothing about the person's private office (privat bleibt privat)
-        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "agents", "dms")}
+        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms")}
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
                    username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
                    retention=ret,

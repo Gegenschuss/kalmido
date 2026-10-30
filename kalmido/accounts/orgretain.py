@@ -330,6 +330,7 @@ def odl_dismantle(c, oid):
         # SET NULL would make them that person's private clients); one kept by another workspace's records moves there
         from ..team.clients import cl_org_purge
         cl_org_purge(c, oid)
+        c.execute("DELETE FROM time_sheets WHERE org_id=? AND user_id IS NULL", (oid,))  # 2.360.2 D (#2561): a deleted person's months end here
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 
     def after():
@@ -510,6 +511,11 @@ def upg_rest(c, uid):
             if heir:
                 c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (xid, heir))
                 c.execute("UPDATE ev_cals SET owner_id=? WHERE id=?", (heir, xid))
+        from ..personal.timesheet import tsl_user_gone
+        tsl_user_gone(c, uid)  # 2.360.2 D (#2561): before the entries lose the person (its hours are noted on the month)
+        # 2.360.2 D (#2561): private approval records have nobody else: the left-overs of deleted reviews, those of its own reviews (cascade below)
+        c.execute("""DELETE FROM office_signoffs WHERE kind='video' AND org_id IS NULL AND ((video_id IS NULL AND created_by=?)
+                     OR video_id IN (SELECT id FROM video_reviews WHERE owner_id=? AND org_id IS NULL))""", (uid, uid))
         c.execute("UPDATE time_entries SET user_id=NULL WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE org_id IS NOT NULL)", (uid,))
         # 2.152.0 review F4: a direct room whose partner is gone already (or a note to oneself) goes with its messages
         c.execute("DELETE FROM tchat_rooms WHERE kind='dm' AND ((a=? AND (b IS NULL OR b=?)) OR (b=? AND a IS NULL))", (uid, uid, uid))
@@ -576,7 +582,8 @@ def upg_info(c, uid):
         one = lambda sql: c.execute(sql, (int(uid),)).fetchone()[0]  # noqa: E731
         info = {"agents": one("SELECT COUNT(*) FROM agents WHERE owner_id=?"),
                 "calendars": one("SELECT COUNT(*) FROM ev_cals WHERE owner_id=? AND org_id IS NOT NULL"),
-                "time_kept": one("SELECT COUNT(*) FROM time_entries t JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NOT NULL")}
+                "time_kept": one("SELECT COUNT(*) FROM time_entries t JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NOT NULL"),
+                "sheets_kept": one("SELECT COUNT(*) FROM time_sheets t JOIN orgs o ON o.id=t.org_id WHERE t.user_id=? AND o.personal_of IS NULL")}  # 2.360.2 D (#2561)
         info["dms"] = c.execute("SELECT COUNT(*) FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND a IS NOT NULL AND b IS NOT NULL "
                                 "AND a!=b AND last_at IS NOT NULL", (int(uid), int(uid))).fetchone()[0]
     content = odl_content(c, poid) if poid else {}
@@ -586,13 +593,15 @@ def upg_info(c, uid):
 
 
 # ---------------------------------------------------------------- one-shot: foreign keys that must not cascade any more
-UPG_FK = (("time_entries", "user_id", "SET NULL"), ("tchat_rooms", "a", "SET NULL"), ("tchat_rooms", "b", "SET NULL"))
+UPG_FK = (("time_entries", "user_id", "SET NULL"), ("tchat_rooms", "a", "SET NULL"), ("tchat_rooms", "b", "SET NULL"),
+          ("time_sheets", "user_id", "SET NULL"))  # 2.360.2 D (#2561)
 
 
 def upg_fk_once(c):
     """2.152.0 A (#2164): at the start (core/db.py init, idempotent): an account's deletion keeps the time entries of
     organisation projects (time_entries.user_id may be NULL now) and the direct messages for the partner (tchat_rooms
-    a / b ON DELETE SET NULL instead of CASCADE). 2.102 runs on with it (it never writes NULL there)."""
+    a / b ON DELETE SET NULL instead of CASCADE). 2.102 runs on with it (it never writes NULL there). 2.360.2 D (#2561): the
+    organisations' monthly timesheets too (flag migr_upg2360; an older program skips those rows in its review)."""
     n = 0
     for table, col, rule in UPG_FK:
         rows = c.execute("SELECT con.conname, con.confdeltype FROM pg_constraint con JOIN pg_class t ON t.oid=con.conrelid "  # pg-ok: catalog oid (Postgres only)
@@ -601,7 +610,7 @@ def upg_fk_once(c):
                          (table, col)).fetchall()
         if any(r[1] == "n" for r in rows):
             continue
-        if table == "time_entries":
+        if table in ("time_entries", "time_sheets"):
             c.execute(f"ALTER TABLE {table} ALTER COLUMN {col} DROP NOT NULL")
         for r in rows:
             c.execute(f'ALTER TABLE {table} DROP CONSTRAINT "{r[0]}"')

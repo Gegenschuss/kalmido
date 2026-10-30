@@ -135,6 +135,8 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
     (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
     (N_("Assistant"), ("assistant_access", "assistant_log")),
+    (N_("Booking page"), ("appt_pages", "appt_types", "appt_bookings")), (N_("Polls"), ("polls", "poll_options", "poll_votes")),  # 2.360.2 D (#2561)
+    (N_("Forms"), ("forms", "form_entries")), (N_("Holiday allowance"), ("leave_quota",)),
     (N_("Log"), ("agent_steps",)), (N_("Log"), ("org_list_actions",)), (N_("Log"), ("merge_runs",)),
     (N_("API tokens"), ("api_tokens",)), (N_("Webhooks"), ("webhooks",)), (N_("Calendar subscriptions"), ("calendar_subscriptions",)),
     (N_("Karakeep connection"), ("karakeep",)), (N_("Newsletter connection"), ("newsletter_connection",)),

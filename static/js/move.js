@@ -6,6 +6,7 @@ const UMZ = {timer: 0, up: null};
 const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h4>
   ${hint(tr('One file with everything that is yours: projects, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
+  <div id="s-umz-sig"></div>
   <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
   <div id="s-umz-imp" aria-live="polite"></div>
   <details class="umzhow"><summary>${tr('Move to your own server')}</summary><ol class="umzsteps">
@@ -19,6 +20,12 @@ function umzExpHtml(j) {
   if (j.state === 'done') return `<div class="row umzdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
     <div class="row"><a class="btn sm pri" href="/api/account/export/file" download data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
   return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Export everything'))}</div>`;
+}
+// 2.360.2 D (#2561): approval records of deleted video reviews: shown here only when there are some
+async function umzSigLoad(md) {
+  const box = $('#s-umz-sig', md); if (!box) return;
+  const rows = (await api('GET', '/api/videos/signoffs/orphaned').catch(() => ({}))).signoffs || [];
+  box.innerHTML = rows.length ? `<h4>${tr('Approvals of deleted videos')}</h4><ul class="sglist" role="list">${rows.map(x => `<li class="sgrow"><div class="sghead"><b>${esc(x.title || '?')}</b><small class="muted"> · ${esc(fmtWhen(x.signed_at || x.created_at))}${x.signer_name ? ' · ' + esc(x.signer_name) : ''}</small></div>${x.kept_until ? `<small class="muted">${esc(tr('This record is kept until {0} by law', fmtDate(x.kept_until)))}</small>` : `<button type="button" class="btn sm danger" data-umz="sigdel" data-id="${+x.id}">${tr('Delete')}</button>`}</li>`).join('')}</ul>` : '';
 }
 async function umzExpLoad(md) {
   const box = $('#s-umz-exp', md); if (!box) return;
@@ -128,6 +135,7 @@ async function umzUpload(md, file) {
 function umzInit(md) {
   if (!$('#s-umz-exp', md)) return;
   umzExpLoad(md);
+  umzSigLoad(md);
   api('GET', '/api/account/import').then(j => { if (j.current && j.current.state !== 'upload') umzImpDraw(md, j.current); }).catch(() => {});
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
   md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
@@ -144,6 +152,7 @@ function umzInit(md) {
     const b = e.target.closest('[data-umz]'); if (!b) return;
     const a = b.dataset.umz;
     try {
+      if (a === 'sigdel') { await api('DELETE', `/api/videos/signoffs/orphaned/${+b.dataset.id}`); toast(tr('Deleted')); return umzSigLoad(md); }
       if (a === 'exp') { b.disabled = true; await api('POST', '/api/account/export'); return umzExpLoad(md); }
       if (a === 'exp-del') {
         if (!await askConfirm(tr('Delete the export now?'), tr('The file is removed from the server. You can create a new one at any time.'), {ok: tr('Delete'), danger: true})) return;
