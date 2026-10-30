@@ -15042,6 +15042,8 @@
   "Notifications are not available in the iPhone app yet.": "Benachrichtigungen gibt es in der iPhone-App noch nicht.",
   "Client card": "Kundenkarte",
   "The blocks switched on here show at every client of the office. Each person can still hide or fold them for themselves.": "Die hier eingeschalteten Blöcke erscheinen bei jedem Kunden des Büros. Jede Person kann sie für sich trotzdem ausblenden oder zuklappen.",
+  "Menu points": "Menüpunkte",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Ein hier abgeschalteter Punkt verschwindet für alle in diesem Büro. Gelöscht wird nichts: Wieder einschalten bringt alles zurück.",
   "A finalised invoice is kept (GoBD); correct it with “Credit note / cancel”": "Eine festgeschriebene Rechnung bleibt erhalten (GoBD); korrigiere sie über „Gutschrift / Storno“",
   "Test mode - documents get a TEST number and the watermark MUSTER": "Testmodus - Belege bekommen eine TEST-Nummer und das Wasserzeichen MUSTER",
   "New documents get a TEST number and the watermark MUSTER, no e-invoice and no bookkeeping. Only for you; colleagues do not see it.": "Neue Belege bekommen eine TEST-Nummer und das Wasserzeichen MUSTER, keine E-Rechnung und keine Buchhaltung. Nur für dich; Kollegen merken nichts davon.",

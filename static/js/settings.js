@@ -1620,7 +1620,7 @@ function ss_hits(md, q, shown, SYN) {
 // per window: src = the functions that draw it (tests/p2353_e_setsearch_guard_test.py: every area settings window has an
 // entry here), on = its module is on and the person may open it, open = its area + the window, root = the window once drawn,
 // secs = its sections [label, words people type (German + English), the element (else the heading with that label), office pane, gate]
-const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
+const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i) && !ofm_menuOff(k); };  // 2.440.0 (#3609)
 const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
 const SS_AREA = [
   // 2.365.2 B (#2789): Settings > Documents (docs.js dcs_paneHtml, drawn by dc_sDraw); the lists and fields open from there in the module
@@ -1645,7 +1645,7 @@ const SS_AREA = [
       [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
-      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Menu points'), ['menüpunkt', 'menu point', 'menü', 'ausblenden', 'abschalten'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
       [N_('E-mail'), ['imap', 'smtp', 'postfach', 'mailbox', 'absender', 'sender', 'mailserver'], '#s-bizmail-h', '']]},  // 2.365.2 (#2789): the workspace's mailbox
   {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
     on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];

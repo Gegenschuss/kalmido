@@ -109,13 +109,14 @@ function ofm_adm() {
     OFM_ASKED.add(ws);
     rawFetch('GET', '/api/office/settings').then(j => {
       if (!j || ofm_ws() !== ws) return;
-      const was = ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()); ofm_admSeen(j.role === 'admin', j.rights, j.used);
-      if (was !== ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()) && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
+      const seen = () => ofm_adm() + JSON.stringify([ofm_lv(), ofm_used(), ofm_offList()]), was = seen(); ofm_admSeen(j.role === 'admin', j.rights, j.used, j.settings?.menu_off);
+      if (was !== seen() && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
     }, () => {});
   }
   return !!(LS.get('ofmAdm', {}) || {})[ws];
 }
-function ofm_admSeen(adm, rights, used) {
+function ofm_admSeen(adm, rights, used, menuOff = []) {
+  const f = LS.get('ofmOff', {}) || {}; if (JSON.stringify(f[ofm_ws()] || []) !== JSON.stringify(menuOff)) { f[ofm_ws()] = menuOff; LS.set('ofmOff', f); }  // 2.440.0 (#3609)
   const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws()] !== adm) { o[ofm_ws()] = adm; LS.set('ofmAdm', o); }
   const u = LS.get('ofmUsed', {}) || {}; if (used && JSON.stringify(u[ofm_ws()] || null) !== JSON.stringify(used)) { u[ofm_ws()] = used; LS.set('ofmUsed', u); }  // 2.276.0 A (#3039)
   // 2.187.0 A (#2476): + the levels of a person ruled by office groups (null = as before), so #clients / #contacts show the right menu
@@ -199,9 +200,13 @@ const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'cont
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
+// 2.440.0 (#3609): points the office switched off for everybody (office setting menu_off, Settings > Functions > Menu points):
+// not in the menu, the tiles or the search, a link opens the start page (office.js ofcTab); per workspace like the role (LS ofmOff)
+const ofm_offList = () => (typeof OFC !== 'undefined' && OFC.info ? OFC.info.settings?.menu_off : (LS.get('ofmOff', {}) || {})[ofm_ws()]) || [];
+const ofm_menuOff = k => ofm_offList().includes(k);
 // 2.418.0 (#3560): every point that may show (switched on, the country pack, the rights, not off in the organisation), in
 // the person's order; ofm_items = those in the menu, ofm_hidden = those under "Hidden" of the editor
-const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
+const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key) && !ofm_menuOff(i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
 const ofm_items = () => ofm_avail().filter(i => !nav_hid('office', i.key) || nav_open('office', i.key));
 const ofm_hidden = () => ofm_avail().filter(i => nav_hid('office', i.key) && !nav_open('office', i.key));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
@@ -289,7 +294,7 @@ function ofm_startHtml() {
   if (NAV.edit === 'office') return `<div class="ofmstart">${nav_editSlot('office')}</div>`;
   const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
-  const norc = typeof bnr_startHtml === 'function' && ofm_adm() ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
+  const norc = typeof bnr_startHtml === 'function' && ofm_adm() && !ofm_menuOff('bank') ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
   return `<div class="ofmstart">${nav_penHtml('office')}${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,

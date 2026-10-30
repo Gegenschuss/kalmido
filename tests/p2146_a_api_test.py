@@ -12,6 +12,8 @@ freelancer-matrix: files  tenant-matrix: document
    DOCTYPE and an ordinary XML stay ordinary documents (no e-invoice); "Recognise again" keeps it an e-invoice
  - mail: an .xml e-invoice attached to a mail to the forwarding address becomes a document, an ordinary .xml does not
  - rights: another person 404 on the document and its readable view
+ - 2.440.0 (#2243): an agent with a share reads the fixed fields in GET /api/v1/documents/{id} (einvoice), auto says einvoice,
+   the duplicate hint only for an older document the agent sees too; no einvoice on an ordinary document; not shared: 404
 usage: p2146_a_api_test.py <datadir>   (P2146A_NOSTART=1 / KMT_NOSTART=1: the container runs already;
 KALMIDO_SRC=<dir with kalmido/> for the unit part)"""
 import email.message
@@ -349,6 +351,38 @@ if r.ok:
     if got:
         dm = done(Fr, got[0][0])
         check(dm and dm["method"] == "e-invoice" and dm["amount"] == "378.40", f"the mailed e-invoice is read {dm and (dm['method'], dm['amount'])}")
+
+# ---- 2.440.0 (#2243): an agent with a share reads the fixed fields of the e-invoice
+r = A.post(B + "/api/admin/agents", json={"username": "fridabot", "display_name": "Fridabot"})
+assert r.status_code == 201, r.text
+AG = r.json()["id"]
+AGS = requests.Session()
+AGS.headers.update({"Authorization": "Bearer " + (r.json().get("token") or "")})
+dbx("DELETE FROM org_members WHERE user_id=?", (AG,), write=True)
+dbx("UPDATE agents SET org_id=NULL, owner_id=? WHERE user_id=?", (FID, AG), write=True)
+check(AGS.get(B + f"/api/v1/documents/{n1}").status_code == 404, "#2243: not shared: 404 for the agent")
+n9 = upload(Fr, "rechnung-2.xml", UBL.replace("Thank you for your order", "Second copy").encode(), "application/xml")
+check(done(Fr, n9) is not None, "#2243: the second copy of the invoice is read")
+check(until(lambda: Fr.get(B + f"/api/docs/{n9}").json().get("duplicate_of"), 20), "#2243: a person sees the duplicate warning")
+check(Fr.post(B + f"/api/files/nodes/{n9}/shares", json={"agent_id": AG, "role": "view"}).ok, "#2243: setup: the copy shared with the agent")
+e9 = AGS.get(B + f"/api/v1/documents/{n9}").json().get("einvoice") or {}
+check(e9.get("number") == "UBL-2026-0042" and e9.get("duplicate") is False, f"#2243: the older document is not shared: no duplicate hint {e9}")
+check(Fr.post(B + f"/api/files/nodes/{n1}/shares", json={"agent_id": AG, "role": "view"}).ok, "#2243: setup: the older one shared too")
+j9 = AGS.get(B + f"/api/v1/documents/{n9}").json()
+e9 = j9.get("einvoice") or {}
+check(e9.get("duplicate") is True and "duplicate_of" not in j9, f"#2243: the hint, without name or id {e9}")
+check((e9.get("format"), e9.get("kind"), e9.get("source"), e9.get("date"), e9.get("due"), e9.get("currency")) == ("ubl", "invoice", "xml", "2026-10-05", "2026-10-19", "EUR"),
+      f"#2243: format, kind, source, dates, currency {e9}")
+check((e9.get("supplier"), e9.get("vat_id")) == ("Beispiel Druckerei GmbH", "DE123456789"), f"#2243: supplier and VAT ID {e9}")
+check((e9.get("net"), e9.get("vat"), e9.get("gross")) == ("200.00", "38.00", "238.00") and e9.get("credit_note") is False, f"#2243: net, VAT, gross, no credit note {e9}")
+check(e9.get("vat_rates") == [{"pct": "19", "net": "200.00", "vat": "38.00"}], f"#2243: the VAT rates {e9}")
+check(j9["auto"].get("amount") == "einvoice" and "e-invoice" not in j9["auto"].values(), f"#2243: auto says einvoice {j9['auto']}")
+check(Fr.get(B + f"/api/docs/{n9}").json()["auto"].get("amount") == "e-invoice", "#2243: the app's own view stays as it was")
+nt = upload(Fr, "notiz.txt", b"Nur eine Notiz ohne Rechnung", "text/plain")
+done(Fr, nt)
+check(Fr.post(B + f"/api/files/nodes/{nt}/shares", json={"agent_id": AG, "role": "view"}).ok, "#2243: setup: an ordinary document shared")
+check("einvoice" not in AGS.get(B + f"/api/v1/documents/{nt}").json(), "#2243: an ordinary document has no einvoice")
+check("einvoice" not in (AGS.get(B + "/api/v1/documents").json()["data"][0]), "#2243: single document only")
 
 print(f"p2146_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
