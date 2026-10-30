@@ -15156,5 +15156,9 @@
   "Gets invoices": "Bekommt Rechnungen",
   "several: separated by commas": "mehrere: mit Komma getrennt",
   "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Rechnungskorrekturen zählen in der Rechnungsreihe mit: Beide Schemata brauchen ein Jahr oder keines",
-  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Rechnungskorrekturen zählen in der Rechnungsreihe mit: Ihr Schema muss sich vom Rechnungsschema unterscheiden (z. B. _RK)"
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Rechnungskorrekturen zählen in der Rechnungsreihe mit: Ihr Schema muss sich vom Rechnungsschema unterscheiden (z. B. _RK)",
+  "Overview|pdf": "Übersicht",
+  "Part|pdf": "Teil",
+  "Page {0}|pdf": "Seite {0}",
+  "The individual items of each part start on page {0}.|pdf": "Die Einzelpositionen je Teil stehen ab Seite {0}."
 }

@@ -15156,5 +15156,9 @@
   "Gets invoices": "Krijgt facturen",
   "several: separated by commas": "meerdere: gescheiden door komma's",
   "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Correcties tellen mee in de factuurreeks: beide schema's hebben een jaar nodig, of geen van beide",
-  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Correcties tellen mee in de factuurreeks: hun schema moet verschillen van het factuurschema (bijv. _RK)"
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Correcties tellen mee in de factuurreeks: hun schema moet verschillen van het factuurschema (bijv. _RK)",
+  "Overview|pdf": "Overzicht",
+  "Part|pdf": "Deel",
+  "Page {0}|pdf": "Pagina {0}",
+  "The individual items of each part start on page {0}.|pdf": "De afzonderlijke posten per deel staan vanaf pagina {0}."
 }

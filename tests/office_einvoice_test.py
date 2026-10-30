@@ -163,6 +163,13 @@ with open(os.path.join(OUT, "invoice-RE-2026-663.xml"), "wb") as fh:
 data = pdf.office_pdf(m, xml=xml, meta={"xml_profile": "EN 16931"})
 with open(os.path.join(OUT, "invoice-RE-2026-663.pdf"), "wb") as fh:
     fh.write(data)
+# 2.438.0 B (#3622): a long invoice with the overview of its parts: the internal links go through veraPDF too
+pos = [x for x in m["lines"] if x.get("kind") == "item"][0]
+long_lines = [ln for t in ("Teil A", "Teil B") for ln in [{"kind": "heading", "title": t}] + [pos] * 25]
+overview = pdf.office_pdf(dict(m, lines=long_lines, totals=dict(m["totals"], net=str(sum(float(x.get("total") or 0) for x in long_lines)))), xml=xml, meta={"xml_profile": "EN 16931"})
+with open(os.path.join(OUT, "invoice-overview-RE-2026-663.pdf"), "wb") as fh:
+    fh.write(overview)
+check(b"/Subtype /Link /F 4" in overview and b"/Dest [" in overview, "the overview's links: print flag, a destination, no action")
 check(data.startswith(b"%PDF-1.7"), "PDF 1.7")
 check(b"<pdfaid:part>3</pdfaid:part>" in data and b"<pdfaid:conformance>B</pdfaid:conformance>" in data, "XMP pdfaid 3 / B")
 check(b"<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>" in data and b"<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>" in data
@@ -177,7 +184,9 @@ check(got == xml, "pypdf reads factur-x.xml back byte for byte")
 txt = "\n".join(p.extract_text() or "" for p in r.pages)
 check("RE-2026-663" in txt and "Beispielkunde AG" in txt and "40.963,25" in txt and "Filmherstellung" in txt, "the printed invoice carries number, client, total")
 check("Interaktiver Film" in txt and "Zahlbar bis 22.05.2026" in txt and "IBAN DE02 1203 0000 0000 2020 51" in txt, "project title, payment text and bank line printed")
-check(txt.count("40.963,25") == 1 and txt.count("6.540,35") == 1, "the totals rows of the model are printed once (no doubled tax line)")
+# 2.438.0 (#3622): two pages with two parts: page 1 carries the overview with the totals as well, so per page
+check(all((p.extract_text() or "").count("40.963,25") <= 1 and (p.extract_text() or "").count("6.540,35") <= 1 for p in r.pages) and txt.count("40.963,25") == 2,
+      "the totals rows of the model are printed once per page (no doubled tax line)")
 
 # ---------------------------------------------------------------- 3. credit note
 mc = fixture("credit")

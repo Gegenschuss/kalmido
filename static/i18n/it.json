@@ -15156,5 +15156,9 @@
   "Gets invoices": "Riceve le fatture",
   "several: separated by commas": "più indirizzi: separati da virgole",
   "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Le rettifiche contano nella serie delle fatture: entrambi gli schemi hanno bisogno di un anno, o nessuno",
-  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Le rettifiche contano nella serie delle fatture: il loro schema deve essere diverso da quello delle fatture (ad es. _RK)"
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Le rettifiche contano nella serie delle fatture: il loro schema deve essere diverso da quello delle fatture (ad es. _RK)",
+  "Overview|pdf": "Riepilogo",
+  "Part|pdf": "Parte",
+  "Page {0}|pdf": "Pagina {0}",
+  "The individual items of each part start on page {0}.|pdf": "Il dettaglio di ogni parte si trova a partire da pagina {0}."
 }

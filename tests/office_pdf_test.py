@@ -160,7 +160,8 @@ check(all(squash(f"Seite {i + 1} von {n}") in squash(t) for i, t in enumerate(T)
 check(all("Studio Nordlicht GmbH" in t and "Hafenstraße 12" in t and "Beispielbank" in t for t in T), "the footer columns on every page")
 check(squash("RECHTEÜBERTRAGUNG") in squash(all_t) and squash("AUFTRAGSERTEILUNG") in squash(all_t), "section headings (umlauts in the bold font)")
 # 2.114.5 (#2300): every position carries 19 % -> no VAT column
-check(squash("POS.LEISTUNGMENGEPREISGESAMT") in squash(T[0]), "the table head on page 1 (one rate: no VAT column)")
+# 2.438.0 B (#3622): this quotation has parts and several pages: page 1 is the overview, the table starts on page 2
+check(squash("POS.LEISTUNGMENGEPREISGESAMT") in squash(T[1]), "the table head on page 2 (one rate: no VAT column)")
 check("3750" not in all_t and "16630" not in all_t and "16.630" not in all_t, "internal costs / margin are never printed")
 check(not has_image(r.pages[0]) and "Studio Nordlicht GmbH" in T[0].split("\n")[0], "without a logo: the company name in the letterhead, no image")
 check(r.metadata.title == "Kostenvoranschlag KVA-2026-031" and r.metadata.author == "Studio Nordlicht GmbH", f"document info: {r.metadata}")
@@ -237,7 +238,7 @@ for want in ("QUOTATION", "Quotation No.", "Valid until", "Net Total", "includin
     check(squash(want) in squash(all_en), f"EN: text layer has {want!r}")
 # 2.114.4 (#2282): the page count only from two pages on
 check((squash("Page 1 of " + str(len(ren.pages))) in squash(Ten[0])) == (len(ren.pages) >= 2), "EN: 'Page 1 of n' (from two pages on)")
-check(squash("NO.TITLEXUNITPRICETOTAL") in squash(Ten[0]), "EN: the pack's column labels")  # 2.114.5 (#2300): one rate, no VAT column
+check(squash("NO.TITLEXUNITPRICETOTAL") in squash(Ten[1]), "EN: the pack's column labels")  # 2.114.5 (#2300): one rate, no VAT column
 dinc = office_pdf(fixture(raw="included"))
 _, Tinc = texts(dinc)
 check("Bereitstellung der Rohdaten" in "\n".join(Tinc) and "ohne Rohdaten" in "\n".join(Tinc) and "Optional" not in "\n".join(Tinc),

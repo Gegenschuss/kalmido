@@ -15156,5 +15156,9 @@
   "Gets invoices": "Reçoit les factures",
   "several: separated by commas": "plusieurs : séparées par des virgules",
   "Invoice corrections count in the invoice series: both schemes need a year, or neither": "Les rectifications comptent dans la série des factures : les deux schémas ont besoin d'une année, ou aucun",
-  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Les rectifications comptent dans la série des factures : leur schéma doit différer de celui des factures (p. ex. _RK)"
+  "Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)": "Les rectifications comptent dans la série des factures : leur schéma doit différer de celui des factures (p. ex. _RK)",
+  "Overview|pdf": "Aperçu",
+  "Part|pdf": "Partie",
+  "Page {0}|pdf": "Page {0}",
+  "The individual items of each part start on page {0}.|pdf": "Le détail de chaque partie figure à partir de la page {0}."
 }
