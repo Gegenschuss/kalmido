@@ -208,8 +208,9 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 740, height: 170}});
     check(await ready(ev, `document.body.classList.contains('kb-open')`), L + ': the keyboard sets kb-open in the team chat');
     check(!await ev(shown('#tabs')) && !await ev(shown('.cwsw')), L + ': keyboard: no tab bar, no row of open chats');
-    const m = await ev(`(() => { const b = document.querySelector('#tc-msgs'), l = [...b.querySelectorAll('.cmsg')].pop(), c = document.querySelector('.tccomp').getBoundingClientRect(); return {h: Math.round(b.getBoundingClientRect().height), gap: Math.round(l.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom), comp: Math.round(c.bottom), vh: innerHeight}; })()`);
-    check(m.h >= 30 && m.gap <= 2 && m.comp <= m.vh, L + ': messages stay visible, the newest in view, the box on screen ' + JSON.stringify(m));
+    // measured against the box, not the list's own bottom: the list may run on behind it
+    const m = await ev(`(() => { const b = document.querySelector('#tc-msgs').getBoundingClientRect(), l = [...document.querySelectorAll('#tc-msgs .cmsg')].pop().getBoundingClientRect(), c = document.querySelector('.tccomp').getBoundingClientRect(); return {h: Math.round(b.height), over: Math.round(b.bottom - c.top), gap: Math.round(l.bottom - c.top), comp: Math.round(c.bottom), vh: innerHeight}; })()`);
+    check(m.h >= 30 && m.over <= 1 && m.gap <= 2 && m.comp <= m.vh, L + ': messages stay visible, the newest above the box, the box on screen ' + JSON.stringify(m));
     await shot('p2350a-team-kb.png');
     await ev(`document.activeElement.blur()`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 740, height: 360}});

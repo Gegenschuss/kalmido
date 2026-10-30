@@ -4155,6 +4155,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 @media (max-width:767px){
   body.in-team #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));display:flex;flex-direction:column;overscroll-behavior:none}
   body.in-team.kb-open #view{padding-bottom:0}
+  body.in-team.kb-open .tcview{min-height:0}  /* 2.446.0 (#3334): the 20rem ran on behind the box in landscape */
   .tcview{grid-template-columns:minmax(0,1fr);flex:1;height:auto;border:0;border-radius:0;margin:0 -.75rem}
   .tcview.inroom .tclist{display:none}
   .tcview:not(.inroom) .tcroom{display:none}
