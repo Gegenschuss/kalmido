@@ -171,7 +171,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
       - name: Python syntax
         run: python -m py_compile app.py $(find kalmido -name '*.py') tools/*.py tests/*.py mcp/*.py
       - name: JavaScript syntax
@@ -292,7 +292,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
           cache: npm
           cache-dependency-path: tests/package-lock.json
       - name: Test dependencies
@@ -349,7 +349,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
           cache: npm
           cache-dependency-path: tests/package-lock.json
       - name: Test dependencies

@@ -14,6 +14,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 // a restarted container: wait until the proxy port answers too (start.sh only waits for the app port)
 const fresh = async (env = {}) => {
   execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore', env: {...process.env, ...env}});
+  require('./boot').dropConnections();  // 2.360.3 (#2916)
   for (let i = 0; i < 60; i++) { try { if ((await fetch(B + 'api/health')).ok) break; } catch { /* not up yet */ } await sleep(500); }
   await sleep(500);
 };

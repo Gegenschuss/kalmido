@@ -11,7 +11,7 @@ const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY
 const F = []; let ok = 0; const errs = [];
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const fresh = () => execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore'});
+const fresh = () => { execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore'}); require('./boot').dropConnections(); };  // 2.360.3 (#2916)
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 
 async function open(jar) {  // the app with a cookie jar of its own (the setup response logs the admin in)

@@ -1,5 +1,5 @@
 // jsdom boot with the built-in login (cookie) against the test container (proxy port, see start.sh).
-const {JSDOM, VirtualConsole, ResourceLoader} = require('jsdom');
+const {JSDOM, VirtualConsole, requestInterceptor} = require('jsdom');
 // 2.192.0 A (#2512): the test clock for the JS side. KALMIDO_TEST_NOW (ISO instant; without an offset it is Berlin time, like
 // testclock.py) + KALMIDO_TEST_NOW_AT (Unix seconds; default: when this file loads) - run_all.sh `now <when>; fresh` sets both -
 // shift Date by the same offset as the server (core/db.py) and the Python suites (testclock.py): in Node (the suite) as soon as
@@ -50,20 +50,19 @@ if (clockOffset) {
 // resource and never closes it, so a few windows reach the server's connection limit (waitress: 100) and the scripts of
 // the next window stall. Browsers share a few connections per host; this loader does the same for the page's scripts and
 // stylesheets: Node's fetch (one pooled agent, idle connections are reused), at most 6 requests at a time.
-class PooledLoader extends ResourceLoader {
-  fetch(url, opts = {}) {
-    if (!opts.element || !/^https?:\/\//.test(url)) return super.fetch(url, opts);
-    const ac = new AbortController();
-    const p = PooledLoader.slot().then(async done => {
-      try {
-        const r = await fetch(url, {signal: ac.signal, headers: {'Accept-Language': 'en'}});
-        p.response = {statusCode: r.status, headers: Object.fromEntries(r.headers)};
-        if (r.status < 200 || r.status > 299) throw new Error(`Resource was not loaded. Status: ${r.status}`);
-        return Buffer.from(await r.arrayBuffer());
-      } finally { done(); }
-    });
-    p.abort = () => ac.abort(); p.href = url; p.getHeader = () => undefined;
-    return p;
+// 2.360.3 (#2916): jsdom 30 has no ResourceLoader class any more: an object with interceptors as option "resources"; the answer
+// of Node's fetch is already unpacked, so its content-encoding / length headers do not go along
+class PooledLoader {
+  constructor() {
+    this.interceptors = [requestInterceptor((req, {element}) => element && /^https?:\/\//.test(req.url) ? this.fetch(req.url) : undefined)];
+  }
+  async fetch(url) {
+    const done = await PooledLoader.slot();
+    try {
+      const r = await fetch(url, {headers: {'Accept-Language': 'en'}});
+      const headers = new Headers(r.headers); headers.delete('content-encoding'); headers.delete('content-length');
+      return new Response(await r.arrayBuffer(), {status: r.status, headers});
+    } finally { done(); }
   }
   static slot() {  // a tiny semaphore: resolves with a release function
     return new Promise(res => { const go = () => { PooledLoader.busy++; res(() => { PooledLoader.busy--; const n = PooledLoader.wait.shift(); if (n) n(); }); }; if (PooledLoader.busy < 6) go(); else PooledLoader.wait.push(go); });
@@ -71,6 +70,8 @@ class PooledLoader extends ResourceLoader {
 }
 PooledLoader.busy = 0; PooledLoader.wait = [];
 exports.PooledLoader = PooledLoader;
+// 2.360.3 (#2916): after a restart of the container in the middle of a suite: jsdom 30 keeps its connections to the old server
+exports.dropConnections = () => { const {Agent, setGlobalDispatcher} = require('undici'); setGlobalDispatcher(new Agent()); };
 const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY_PORT || 3041}/`;
 exports.B = B; exports.errs = [];
 // 2.65.0 (#1824): the app's whole CSS = app.css + the module stylesheets (static/css/, LAZY_CSS of sw.js, in that order: they
