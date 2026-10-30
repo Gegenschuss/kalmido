@@ -349,7 +349,7 @@ document.addEventListener('click', async e => {
       typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
-    menu(b, [w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
+    menu(b, [...fv2_menuRow('r:contact:' + c.id) /* 2.441.0 (#3592): opened beside the list a contact has no address of its own */, w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
       // 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links)
       if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }

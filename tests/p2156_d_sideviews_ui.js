@@ -67,7 +67,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   const tiles = () => [...d.querySelectorAll('#side .sv-tile')];
   check(tiles().length === 2 && tiles()[0].dataset.svid === '' && tiles()[1].dataset.svid === V?.id, 'the tiles: "Everything" first, then the view');
   check(side('.sv-tile.on')?.dataset.svid === V?.id && side('.sv-tile.on').getAttribute('aria-pressed') === 'true', 'the active tile is marked');
-  check(side('.sg-favs .sv-row') && side('.sg-favs .fv2-grid') && !side('.sv-row .fv2-tile'), 'the view tiles sit apart from the favourite tiles');
+  check(side('.sv-row') && d.querySelector('.fv2bar .fv2-tile') && !side('.sv-row .fv2-tile'), 'the view tiles sit apart from the favourite tiles');  // 2.441.0 (#3592): those are in the head bar
   // ================= "Others (N)"
   const more = side('.sg-svmore');
   check(more && /Others \(2\)/.test(more.textContent), 'hidden: "Others (2)" at the end ' + (more ? more.querySelector('.sgt').textContent : 'none'));
