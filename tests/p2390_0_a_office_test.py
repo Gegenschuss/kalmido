@@ -90,6 +90,7 @@ for fn in ("doctpl.py", "letters.py"):
 LONG = "Bestellung 2026-10-4711 der Einkauf Nord, Kostenstelle 4711"
 for paper, right in (("a4", 20 * MM), ("letter", 72.0)):
     m = model(paper=paper, meta=[["Invoice No.", "INV-2026-357"], ["Date", "10/26/2026"], ["Your reference", LONG]])
+    m["kind"] = "delivery"  # 2.434.0 (#3603): an invoice prints 2 pt smaller in look A now; the info block is the same on a delivery note
     data = pdf.office_pdf(m, meta=WHEN)
     page = pdfcheck.layout(data)[0]
     pw = page["w"]

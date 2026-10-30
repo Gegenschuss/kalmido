@@ -208,6 +208,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_BACKUP_MAX_MB` | `4096` | Size in MB of a backup that can be restored (upload and unpacked). |
 | `KALMIDO_BACKUP_PASSPHRASE` | `(empty)` | Passphrase that encrypts the backups. |
 | `KALMIDO_BACKUP_PG_TIMEOUT` | `21600` | Seconds one pg_dump / pg_restore run may take. |
+| `KALMIDO_BACKUP_SHARED_MIN` | `65536` | Bytes from which a file is kept once in the shared store of the backups (backups/.store) instead of in every backup (2.432). |
 | `KALMIDO_BACKUP_TICK` | `60` | Seconds between two looks at the backup schedule. |
 | `KALMIDO_OFFSITE_RETRY_S` | `300` | Seconds before a failed off-site copy is tried again. |
 | `KALMIDO_OFFSITE_TIMEOUT` | `120` | Seconds per network step of the off-site copy. |

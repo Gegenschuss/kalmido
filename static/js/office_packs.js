@@ -196,6 +196,7 @@ document.addEventListener('keydown', e => { if (e.target.id === 'pkc-q' && e.key
 // Keys with an area prefix so later functions sit next to them (2.148: receipt images, period lock, procedure documentation)
 const OCF_FEATS = [
   ['books.datev', 'upload', N_('DATEV'), N_('Booking batch, document inbox and accounts for a tax advisor working with DATEV')],
+  ['docs.delivery', 'file', N_('Delivery notes'), N_('Delivery notes and proofs of service: tab, buttons on quotations and invoices, number series and closing texts. Existing ones stay readable')],
   ['docs.einvoice', 'file', N_('E-invoices'), N_('The XML of every finalised invoice and credit note (ZUGFeRD / Factur-X, XRechnung where the pack offers it)')],
   ['books.vat_return', 'chart', N_('VAT return figures'), N_('The figures of the advance VAT return in the bookkeeping; filing stays with your tax software')],
   ['books.tax_dates', 'cal', N_('Tax dates'), N_('Deadlines of the VAT return and tax prepayments as recurring tasks')],
@@ -224,8 +225,16 @@ function ocf_settingsHtml(dis) {
       return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ocf-${esc(k.replace('.', '-'))}" data-feat="${esc(k)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label><span class="muted ofchint">${esc(tr(d))}</span></div>`;
     }).join('')}</div>
     ${not.length ? `<p class="muted ofchint">${esc(tr('Not part of this country pack: {0}', not.map(f => tr(f[2])).join(', ')))}</p>` : ''}
-    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>`;
+    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>${ccb_settingsHtml(dis)}`;
 }
+// 2.435.0 A (#3600): the blocks of the client card for the whole office (off = nobody of the office sees it at a client;
+// each person shows / hides and folds the others for themselves at the card; the details always show)
+function ccb_settingsHtml(dis) {
+  const off = OFC.info.settings?.client_blocks_off || [];
+  return `<h3>${tr('Client card')}</h3><p class="muted ofchint">${esc(tr('The blocks switched on here show at every client of the office. Each person can still hide or fold them for themselves.'))}</p>
+    <div class="ocf-list">${LY_CL_BLOCKS.filter(b => b[0] !== 'details').map(([k, n, i]) => `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ccb-${k}" data-ccb="${k}" ${off.includes(k) ? '' : 'checked'} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label></div>`).join('')}</div>`;
+}
+const ccb_off = (k, off) => { if (typeof CLV !== 'undefined') CLV.data = null; const l = (OFC.info.settings?.client_blocks_off || []).filter(x => x !== k); return off ? [...l, k] : l; };
 // the new list of switched off functions when one switch changes (office.js ost_part)
 const ocf_off = (k, off) => { const l = (OFC.info.settings?.features_off || []).filter(x => x !== k); return off ? [...l, k].sort() : l; };
 // ---- the country of a NEW office (no saved settings, no documents): asked once, on top of the office (admins only)

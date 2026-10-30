@@ -35,6 +35,8 @@ def lmv_notes(c, lid, lr, to):
     from ..team.clients import _org_boundary
     from ..accounts.orgout import oo_into_note
     notes = []
+    if to and lr["family"]:  # 2.396.0 (#3385): the list dialog clears the private list kind before the move (orgs.py list_org_set)
+        notes.append(tr("It stops being a shopping list (Undo brings it back)"))
     if lr["client_id"] and _org_boundary(c) and not c.execute(
             "SELECT 1 FROM clients WHERE id=? AND org_id IS NOT DISTINCT FROM ?", (lr["client_id"], to)).fetchone():
         notes.append(tr("The client of the project is taken off (Undo brings it back)"))
@@ -95,7 +97,7 @@ def list_move_space(lid):
     from ..accounts.orgout import oo_denied, org_out_ok
     if lr["is_inbox"] and to:
         return jsonify(smv_answer([], tr("The basket is always private"), count=1))
-    if to and (lr["family"] or (lr["life"] and lr["life"] != "travel")):
+    if to and lr["life"] and lr["life"] != "travel":
         return jsonify(smv_answer([], tr(WS_MSG_PRIVATE_ONLY), count=1))
     if not org_out_ok(c, lr["org_id"], to, "list", lid):  # 2.148.1 B (#2483): out of an organisation only by its admin
         raise oo_denied(c, lr["org_id"], to, "list", lid)

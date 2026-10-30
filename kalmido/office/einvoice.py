@@ -222,6 +222,16 @@ def fd_split_address(lines):
     return out
 
 
+def _address(a, f, home):
+    """A postal address in the schema order. 2.424.0 C (#3524): empty parts are left out (ZUGFeRD 2.4+ deprecates empty
+    elements); the country (BT-40 / BT-55 / BT-80) is always there."""
+    for k, tg in (("zip", "ram:PostcodeCode"), ("street", "ram:LineOne"), ("line2", "ram:LineTwo"), ("line3", "ram:LineThree"), ("city", "ram:CityName")):
+        v = str(f.get(k) or "").strip()  # 2.40.0 (#1368): + extra free address lines
+        if v:
+            _e(a, tg, v)
+    _e(a, "ram:CountryID", _country(f.get("country"), home))
+
+
 def _party(parent, tag, name, fields, lang, home, contact=False, email=None, legal_id=None, person=None, party_id=""):
     """A trade party (seller / buyer) in the schema order: ID (BT-29, 2.357.0 #3218), Name, legal organisation, contact,
     address, URI, tax ids."""
@@ -246,14 +256,7 @@ def _party(parent, tag, name, fields, lang, home, contact=False, email=None, leg
             _e(_e(ct, "ram:TelephoneUniversalCommunication"), "ram:CompleteNumber", person["phone"])
         if person.get("email"):
             _e(_e(ct, "ram:EmailURIUniversalCommunication"), "ram:URIID", person["email"])
-    a = _e(p, "ram:PostalTradeAddress")
-    _e(a, "ram:PostcodeCode", f.get("zip") or "")
-    _e(a, "ram:LineOne", f.get("street") or "")
-    for k, tg in (("line2", "ram:LineTwo"), ("line3", "ram:LineThree")):  # 2.40.0 (#1368): extra free address lines
-        if f.get(k):
-            _e(a, tg, f[k])
-    _e(a, "ram:CityName", f.get("city") or "")
-    _e(a, "ram:CountryID", _country(f.get("country"), home))
+    _address(_e(p, "ram:PostalTradeAddress"), f, home)
     if email:
         _e(_e(p, "ram:URIUniversalCommunication"), "ram:URIID", email, schemeID="EM")
     if f.get("tax_number") and tag.startswith("ram:Seller"):
@@ -375,11 +378,7 @@ def ein_build(model, fmt="zugferd"):
         _e(_e(ag, "ram:BuyerOrderReferencedDocument"), "ram:IssuerAssignedID", m["order_ref"])
     dl = _e(tx, "ram:ApplicableHeaderTradeDelivery")  # BG-13: the period of service stands in BillingSpecifiedPeriod below
     if cat == "K":  # 2.355.0 C (#2844): BR-IC-12 the deliver-to address (BG-15, BT-80; XRechnung BR-DE-10/11 city + postcode) = the client's
-        sa = _e(_e(dl, "ram:ShipToTradeParty"), "ram:PostalTradeAddress")
-        _e(sa, "ram:PostcodeCode", rfields.get("zip") or "")
-        _e(sa, "ram:LineOne", rfields.get("street") or "")
-        _e(sa, "ram:CityName", rfields.get("city") or "")
-        _e(sa, "ram:CountryID", _country(rfields.get("country"), home))
+        _address(_e(_e(dl, "ram:ShipToTradeParty"), "ram:PostalTradeAddress"), {k: rfields.get(k) for k in ("zip", "street", "city", "country")}, home)
     se = _e(tx, "ram:ApplicableHeaderTradeSettlement")
     if cur != hcur:
         _e(se, "ram:TaxCurrencyCode", hcur)
@@ -506,6 +505,10 @@ def ein_check(xml_bytes):
     for d in root.iterfind(".//udt:DateTimeString", NS):
         if not re.fullmatch(r"\d{8}", d.text or "") or d.get("format") != "102":
             out.append(f"date not YYYYMMDD / format 102: {d.text}")
+    dlv = f"{{{NS['ram']}}}ApplicableHeaderTradeDelivery"  # BG-13 is a mandatory group, empty without a deliver-to party
+    for el in root.iter():  # 2.424.0 C (#3524): ZUGFeRD 2.4+ deprecates empty elements
+        if len(el) == 0 and not (el.text or "").strip() and el.tag != dlv:
+            out.append(f"empty element {el.tag.rpartition('}')[2]}")
     profile = _text(root, "rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID")
     seller = _find(tx, "ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty")
     if seller is not None and not seller.findall("ram:SpecifiedTaxRegistration/ram:ID", NS) and not _text(seller, "ram:SpecifiedLegalOrganization/ram:ID") \

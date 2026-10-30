@@ -31,15 +31,78 @@ const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation'))
 const p61b_WS = {};
 const p61b_wsOn = (name, fn) => { p61b_WS[name] = fn; };
 const p61b_wsRun = after => { for (const [n, fn] of Object.entries(p61b_WS)) { try { fn(after); } catch (x) { console.error('workspace switch', n, x); } } };
-async function wsSet(ws) {
+// 2.397.0 (#3404): every workspace keeps its view on this device (LS wsView = {'private' | 'org:<id>': {...}}): the page
+// (hash), the open task, the scroll position of the view (and of the office's own scroll box), the sidebar's open groups and
+// folders and the per-device choices of its areas (WSV_KEYS). "All workspaces" has none: switching to it keeps what is shown
+// and only adds the other workspaces' data, and nothing done there is written back. WSV = the workspace + page route() drew
+// last; a jump from outside (link, notification, search, wsFollow) wins, and the next save makes it that workspace's view.
+const WSV_KEYS = ['lastKey', 'sbbLast', 'mgTab', 'ofmLast', 'sideOpenG', 'sideGroups', 'sbbOpen', 'newsFilter', 'newsKind', 'jobsFilter'];
+const WSV = {ws: '', hash: ''};
+const wsv_hashNow = () => location.hash.slice(1) || keyToHash(S.route?.key || START_KEY);
+const wsv_folders = ws => folderNames().filter(f => S.lists.some(l => !l.is_inbox && fUnder(l.folder, f) && wsOf(l) === ws));
+function wsv_save(ws, hash) {
+  if (!ws || ws === 'all' || !wsOn()) return;
+  const v = $('#view'), all = LS.get('wsView', {}) || {};
+  all[ws] = {hash, top: v?.scrollTop || 0, oft: $('#view .ofbody')?.scrollTop || 0, sel: S.sel || null,
+    ls: Object.fromEntries(WSV_KEYS.map(k => [k, LS.get(k, null)])), shut: wsv_folders(ws).filter(f => foldClosed(f))};
+  LS.set('wsView', all);
+}
+// route(): before a new page replaces the one of the same workspace (r = the parsed new route, after it: wsv_seen)
+const wsv_leave = () => { if (WSV.ws && WSV.ws === wsCur()) wsv_save(WSV.ws, WSV.hash); };
+function wsv_seen(r) { WSV.ws = wsCur(); WSV.hash = r.task || r.prop || r.msg || r.snooze || r.complete || r.nagoff ? keyToHash(S.route.key) : wsv_hashNow(); }
+addEventListener('pagehide', () => { if (WSV.ws === wsCur()) wsv_save(WSV.ws, wsv_hashNow()); });  // reloading / closing the app keeps the scroll position
+document.addEventListener('visibilitychange', () => { if (document.hidden && WSV.ws === wsCur()) wsv_save(WSV.ws, wsv_hashNow()); });
+// the open task stays only when it belongs to the workspace now shown
+const wsv_taskIn = (id, ws) => { const t = id && taskById(id); return !!t && !t.deleted_at && inWs(listById(t.list_id), ws); };
+// closing it here takes no Back step (a phone's task entry would land on the old workspace's page): the entry is cleared
+const wsv_close = () => { closeDetail(true); if (history.state?.detail) history.replaceState(null, '', location.hash); };
+// the scroll position once the page is drawn tall enough (it may load first); a page that stays shorter takes what it has
+function wsv_scroll(top, oft) {
+  const mod = S.route.mod, key = S.route.key;
+  let n = 0;
+  const step = () => {
+    if (S.route.mod !== mod || S.route.key !== key) return;
+    const v = $('#view'), of = oft ? $('#view .ofbody') : null;
+    const okV = !!v && v.scrollHeight - v.clientHeight >= top, okO = !oft || (!!of && of.scrollHeight - of.clientHeight >= oft);
+    if ((okV && okO) || ++n > 180) { if (v) v.scrollTop = top; if (of) of.scrollTop = oft; return; }
+    requestAnimationFrame(step);
+  };
+  step();
+}
+async function wsv_restore(v, ws) {
+  for (const k of WSV_KEYS) if (v.ls?.[k] == null) LS.del(k); else LS.set(k, v.ls[k]);
+  if (S.nf) { S.nf.filter = LS.get('newsFilter', '') ? 'me' : ''; S.nf.kind = LS.get('newsKind', ''); S.nf.items = null; }
+  if (S.jobs) { S.jobs.f = LS.get('jobsFilter', 'open'); S.jobs.items = null; }
+  const shut = new Set(v.shut || []);
+  for (const f of wsv_folders(ws)) if (foldClosed(f) !== shut.has(f)) foldSet(f, shut.has(f));
+  let h = String(v.hash || '');
+  if (h.startsWith('l/') && !(l => l && !l.archived && inWs(l, ws))(listById(+h.slice(2)))) h = keyToHash(START_KEY);  // a list gone or moved meanwhile
+  if (S.sel && !(v.sel === S.sel && wsv_taskIn(S.sel, ws))) wsv_close();
+  history.replaceState(history.state, '', '#' + h);
+  await route();
+  if (v.sel && S.sel !== v.sel && wsv_taskIn(v.sel, ws)) openDetail(v.sel);
+  wsv_scroll(v.top || 0, v.oft || 0);
+}
+// o.keep: the caller goes on to its own target (a link into the other workspace, News' or the office's "Switch"): the view
+// stays and only follows the filter, like the first visit of a workspace without a kept view
+async function wsSet(ws, o = {}) {
   if (!wsOptions().includes(ws)) ws = 'all';
+  const from = wsCur();
+  if (WSV.ws === from) wsv_save(from, wsv_hashNow());  // 2.397.0 (#3404)
   S.settings.workspace = ws; LS.set('ws', ws);
   closeSide?.();
   if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   p61b_wsRun(false);  // 2.66.1 (#1945)
-  // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
-  const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
-  if (ol && !inWs(ol, wsCur())) go(keyToHash(START_KEY)); else render();
+  const to = wsCur(), kept = !o.keep && to !== 'all' ? (LS.get('wsView', {}) || {})[to] : null;
+  WSV.ws = '';  // the page shown now belongs to the old workspace: route() must not keep it for the new one
+  if (kept) await wsv_restore(kept, to);  // 2.397.0 (#3404): the workspace as it was left
+  else {
+    if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
+    // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
+    // 2.397.0 (#3404): the first visit without a kept view: the same page when the workspace has it, else the start
+    const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
+    if (ol && !inWs(ol, to)) go(keyToHash(START_KEY)); else { render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }
+  }
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)
   // 2.305 (bundle): the disposition too -- it followed only the state reload of the live update, which 2.280.0 (#3109) may brake for 8 s

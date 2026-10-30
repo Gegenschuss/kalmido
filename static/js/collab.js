@@ -276,6 +276,7 @@ function newsText(it, U) {
     case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
     case 'upscan': return tr('The virus scanner found {0} in your file {1}. The file is locked.', esc(d.sig || '?'), q(d.name || ''));  // 2.61.0 (#1818)
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
+    case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
     case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
       : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
@@ -468,6 +469,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'upscan' && it.data?.where === 'fs') { go('ablage/' + it.data.ref); return; }  // 2.61.0 (#1818): the locked file
   if (it.kind === 'filereq' && it.data?.node) { go('ablage/' + it.data.node); return; }  // 2.122.0 A (#2097): the folder the files went into
+  if (it.kind === 'fetcherr') { settingsModal('fetcher'); return; }  // 2.425.0 C (#3453): the receipt fetcher's portals
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
@@ -802,6 +804,7 @@ function drawTimeline() {
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
   if (typeof ptl_draw === 'function') ptl_draw();  // 2.63.0 B (#1513): the customer report's box + the switch
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
+  cfst_since();  // 2.410.0 A (#3514): "since …" under a stage bar
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
   const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || cmSocial(t) || tlForeign(t).length > 0);

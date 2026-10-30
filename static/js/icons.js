@@ -31,6 +31,7 @@ const P = {
   week: icPath('M3 5H17M3 10H17M3 15H11') + icDot(15.5, 15),
   cal: icPath('M17 9V15A2 2 0 0 1 15 17H5A2 2 0 0 1 3 15V6A2 2 0 0 1 5 4H12M3 8.5H10.5M7 2.5V5.5') + icDot(15.5, 4.5),
   all: icPath('M3 4H17M3 8H17M3 12H17M3 16H10') + icDot(14.5, 16),
+  donedown: icPath('M3 6.5L6 9.5L11 3.5M15 5V15.5M12 12.5L15 15.5L18 12.5M3 15.5H9.5') + icDot(6, 12.5, 1.3),  // 2.410.0 (#3440): "Show completed at the bottom"
   done: icPath('M17 10A7 7 0 1 1 10 3M7 10L9.5 12.5L13.5 7.5') + icDot(15.5, 4.5),
   trash: icPath('M3.5 5.5H16.5M8 5.5V3.5H12V5.5M5 5.5L6 17H14L15 5.5') + icDot(10, 11.5, 1.6),
   list: icPath('M7 5H17M7 10H17M7 15H17') + icDot(3.5, 5) + icFill(3.5, 10) + icFill(3.5, 15),

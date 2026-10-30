@@ -31,6 +31,7 @@ ODL_LEGAL = (
     ("documents", "book", "SELECT substr(COALESCE(NULLIF(date, ''), locked_at), 1, 4) FROM office_docs "
                           "WHERE org_id=? AND locked_at IS NOT NULL"),
     ("archive", "book", "SELECT substr(COALESCE(NULLIF(date, ''), created_at), 1, 4) FROM office_archive WHERE org_id=?"),
+    ("bookarch", "book", "SELECT CAST(year AS TEXT) FROM office_bookarch WHERE org_id=?"),  # 2.414.0 (#3502): the booking archive
     # 2.152.0 review F5: the same rule as the purge hook (receipts/suggest.py olk_fs_locked): booked = paid_at or vat_pct
     # set at all, the year from the document date, else the paid / assigned day
     ("receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), NULLIF(r.paid_at, ''), r.set_at), 1, 4) FROM rc_receipts r "
@@ -115,6 +116,7 @@ ODL_MORE_SKIP = frozenset((
     "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
     "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "wiki_versions", "tchat_files",
     "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",
+    "doc_fetchers", "doc_fetch_portals",  # 2.425.0 C (#3453): a person's receipt fetchers (connections, not content)
 ))
 ODL_PRUNE = {"at": 0.0}
 

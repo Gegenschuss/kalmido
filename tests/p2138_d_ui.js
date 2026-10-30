@@ -35,7 +35,7 @@ async function part_numranges() {
   start();
   let CK;
   const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-  const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+  const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
   const Y = String(new Date().getFullYear());
   const range = async k => (await call('GET', '/api/office/number-ranges')).ranges.find(x => x.kind === k);
   await sleep(600);
@@ -131,7 +131,7 @@ async function part_rules() {
   start();
   let CK;
   const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-  const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+  const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
   const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
   const change = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
   const FEAT = 'cal,comments,collab,fields';
@@ -221,7 +221,7 @@ async function part_swimlanes() {
   const T1 = await mk('Alpha card', S1, 5, {fields: {[FS]: OPT.Idea}, assignee_id: ALICE}), T2 = await mk('Beta card', S2, 0), T3 = await mk('Gamma card', S1, 3);
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'view'});
   const task = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).tasks.find(t => t.id === id) || {};
-  const until = async (fn, n = 30) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+  const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
   const ffLogin = async ({ev, nav}, theme, user = 'alice') => {
     await nav(B + 'static/icon.svg');

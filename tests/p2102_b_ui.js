@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2102B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team,files,docs';
 const css = f => { for (const base of [path.join(__dirname, '..', 'static'), path.join(__dirname, '..', 'app', 'static')]) { try { return fs.readFileSync(path.join(base, f), 'utf8'); } catch (e) { /* next */ } } return ''; };
@@ -87,7 +87,7 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   await until(() => d.querySelector('[data-absel="mode"]'));
   check(!d.querySelector('.ablist.abselon'), 'file store: no extra room outside choosing');
   d.querySelector('[data-absel="mode"]').click();
-  check(await until(() => d.querySelector('.ablist.abselon') && d.querySelector('.abselbar')), 'file store: choosing -> the list has room for the bar');
+  check(await until(() => d.querySelector('.ablist.abselon') && d.querySelector('#ab-sbar')), 'file store: choosing -> the list has room for the bar');
   w.close();
   const dcss = css('css/docs.css'), acss = css('app.css');
   check(/\.dc-grid\.dc-selon\{padding-bottom:7\.5rem\}/.test(dcss) && /\.ablist\.abselon\{padding-bottom:7\.5rem\}/.test(acss), 'the CSS rules for the room in rem');

@@ -16,7 +16,7 @@ from ..core.db import body, bump, db
 from ..core.access import Denied, vis_sql
 from ..core.i18n import LANGS, tr
 from ..core.errors import BadInput
-from .model import office_gate, office_org, office_role, office_settings, pb_cl_sql
+from .model import office_need_feature, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .ledger import ofx_log
 from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 
@@ -61,6 +61,7 @@ def ls_from_doc_post(did):
     """A delivery note (or proof of service) draft from quotation / invoice did; 201 the new document."""
     from .docs import doc_public, doc_row, recalc
     c, uid, oid = _ctx()
+    office_need_feature(c, oid, "docs.delivery")  # 2.434.0 B (#3608)
     r = doc_row(c, oid, did)
     if r["kind"] not in LS_KINDS:
         raise Denied(409, tr("A delivery note can be made from a quotation or an invoice only"))

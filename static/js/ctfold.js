@@ -9,16 +9,26 @@
    with the others (lazy module "contacts", after contacts.js). */
 'use strict';
 
-const CTF = {d: null, v: -1, busy: false, err: ''};
-async function ctf_load(force) {
-  if (CTF.busy || (!force && CTF.d && CTF.v !== -1)) return;
-  CTF.busy = true;
+/** @type {{d: any, v: number, at: number, busy: Promise<void>|null, err: string}} */
+const CTF = {d: null, v: -1, at: 0, busy: null, err: ''};
+// 2.373.0 (#3337): CTF.busy = the running load; a second call waits on it
+function ctf_load(force) {
+  if (CTF.busy) return CTF.busy;
+  if (!force && CTF.d && CTF.v !== -1) return Promise.resolve();
+  return (CTF.busy = Promise.resolve().then(ctf_fetch).finally(() => { CTF.busy = null; }));  // busy before the fetch starts
+}
+async function ctf_fetch() {
   try { CTF.d = {spaces: [], folders: [], items: [], ...(await rawFetch('GET', '/api/contacts/folders'))}; CTF.err = ''; }
   catch (e) { if (e.message === 'auth') return; CTF.err = e.message; CTF.d = CTF.d || {spaces: [], folders: [], items: []}; }
-  finally { CTF.busy = false; CTF.v = S.v; }
+  finally { CTF.v = S.v; CTF.at = Date.now(); }
   if (S.route.mod === 'contacts' && typeof renderSide === 'function') renderSide();
 }
-const ctf_data = () => { if (!CTF.d || CTF.v === -1) ctf_load(); return CTF.d || {spaces: [], folders: [], items: []}; };
+// 2.373.0 (#3337): like office_tree.js oft_get -- again after a change (S.v, e.g. another person's folder) at most every few seconds
+const ctf_data = () => {
+  if (!CTF.d || CTF.v === -1) ctf_load();
+  else if (CTF.v !== S.v && Date.now() - CTF.at > 4000) ctf_load(true);
+  return CTF.d || {spaces: [], folders: [], items: []};
+};
 const ctf_folder = id => ctf_data().folders.find(f => f.id === +id) || null;
 const ctf_space = sp => ctf_data().spaces.find(s => s.space === sp) || null;
 const ctf_canW = f => !!f && (f.role === 'edit' || f.role === 'owner');

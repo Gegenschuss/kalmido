@@ -20,7 +20,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21684B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.querySelector('.sbbtn .n')?.textContent === txt);
 const ctx = (w, el) => { const e = new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true, button: 2}); el.dispatchEvent(e); return e; };
 const items = d => d.querySelector('#pop:not(.hidden)') ? [...d.querySelectorAll('#pop [role="menuitem"] .ml')].map(x => x.textContent) : [];
@@ -91,10 +91,11 @@ const paths = async () => ((await call('GET', '/api/wiki?space=private')).pages 
   // the phone: a long press (pointer events of a finger) opens it, the click ending the press opens nothing
   const pe = (type, el) => { const x = new w.MouseEvent(type, {bubbles: true, cancelable: true, clientX: 10, clientY: 10}); Object.defineProperty(x, 'pointerType', {value: 'touch'}); el.dispatchEvent(x); return x; };
   pe('pointerdown', deep); await sleep(700); pe('pointerup', deep);
-  check(items(d).includes('Rename…') && items(d).includes('New folder…'), 'a long press opens the folder menu ' + items(d));
+  // 2.428.0 (#3581): a long press selects the folder like everywhere; the menu stays on the right click and the "…"
+  check(await until(() => w.eval('WK.selOn && WK.sel.size === 1')) && !items(d).includes('Rename…'), 'a long press selects the folder, no menu ' + items(d));
   const h0 = w.location.hash, cl = new w.MouseEvent('click', {bubbles: true, cancelable: true}); deep.dispatchEvent(cl);
   check(cl.defaultPrevented && w.location.hash === h0, 'the click ending the long press does not open the folder');
-  shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
+  w.eval('wk_selEnd()'); shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
   // New page here: the dialog starts in the folder
   ctx(w, deep); pick(d, /^New page$/);
   check(await until(() => d.querySelector('#cdlg-in')?.value === 'Docs/Deep/'), '"New page here…" starts in the folder ' + d.querySelector('#cdlg-in')?.value);

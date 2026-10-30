@@ -23,7 +23,7 @@ const start = (extra, keep) => execFileSync('bash', [path.join(__dirname, 'start
 start('', false);
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const card = (d, k) => d.querySelector(`#pkc [data-pkc-item="${k}"]`);
 const cards = d => [...d.querySelectorAll('#pkc [data-pkc-item]')].map(x => x.dataset.pkcItem);

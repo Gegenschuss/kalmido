@@ -13,9 +13,10 @@ function dsc_slot(s) {
 }
 // Settings > Integrations: the whole part (download, set-up code, inboxes with their last use) for the shown workspace
 function dsc_integrHtml() {
-  return `<h4 id="s-scan-h">${tr('Scans from your computer')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  return `<h4 id="s-scan-h">${tr('Scans from your computer')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>${typeof fx_html === 'function' ? fx_html() : ''}`;  // 2.425.0 C (#3453): + the receipt fetcher (docfetch.js)
 }
 async function dsc_integrDraw(md) {
+  if (typeof fx_draw === 'function') fx_draw(md);  // 2.425.0 C (#3453)
   const box = md.querySelector('#s-scan'); if (!box) return;
   const cur = typeof wsCur === 'function' ? wsCur() : 'private', ws = cur.startsWith('org:') ? cur : 'private';
   try { DSCN.es = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); } catch { box.innerHTML = ''; return; }

@@ -416,6 +416,8 @@ def list_update(lid):
         from ..accounts.orgs import list_org_set
         from ..tasks.movememo import lmm_snap
         lmm0 = lmm_snap(c, lid)  # 2.273.0 B (#3042): what the change ends, for the way back
+        if role == "owner" and "family" in b and not b["family"]:  # 2.396.0 (#3385): the same body ends "shopping list" etc. (private only) first
+            c.execute("UPDATE lists SET family='' WHERE id=?", (lid,))
         if list_org_set(c, lid, b["org_id"]):  # Denied 403 / 409
             list_own_mark(c, lid, "org_id")  # 2.29.0 (#1030): differs from its folder from now on
         b = {k: v for k, v in b.items() if k != "org_id"}
@@ -459,6 +461,15 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "tap_done"))
         c.execute("UPDATE lists SET tap_done=? WHERE id=?", (int(tv), lid))
         b = {k: v for k, v in b.items() if k != "tap_done"}
+    if "props" in b:  # 2.412.0 (#3552): the properties switched by hand against the project type (owner / project admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and project admins can change this setting"), 403)
+        from ..lists.templates import props_clean
+        try:
+            c.execute("UPDATE lists SET props=? WHERE id=?", (props_clean(b["props"]), lid))
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "props"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change the shown fields"), 403)
@@ -486,7 +497,7 @@ def list_update(lid):
     pt_out = {"modules_on": tb_col_on} if tb_col_on is not None else {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:
-            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids"}))
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids", "props"}))  # 2.412.0 (#3552): + props (set above, the undo)
             pt_out["modules_on"] = [*pt_out.get("modules_on", []), *[m for m in (tb_col_on or []) if m not in pt_out.get("modules_on", [])]]
         except BadInput as e:
             return err(str(e))
@@ -545,6 +556,7 @@ def list_update(lid):
         from ..agents.core import is_agent
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
+        adm += ("checklist",) if role == "admin" else ()  # 2.410.0 (#3440): "Show completed at the bottom", like done_in_section
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this project"), 403)
         if adm and ("name" in vals or "color" in vals):
@@ -556,6 +568,8 @@ def list_update(lid):
             if "name" in vals and vals["name"] != lr["name"]:
                 c.execute("UPDATE lists SET name=? WHERE id=?", (vals["name"], lid))
                 lm_owner_news(c, lr, "lrename", extra={"old": lr["name"], "name": vals["name"]})  # colour / icon: no news
+        if "checklist" in adm and "checklist" in vals:  # 2.410.0 (#3440)
+            c.execute("UPDATE lists SET checklist=? WHERE id=?", (vals["checklist"], lid))
         if adm and "archived" in vals:
             lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:

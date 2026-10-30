@@ -104,11 +104,12 @@ def files_bulk_trash():
 
 @app.post("/api/files/restore")
 def files_bulk_restore():
-    """{ids}: every node back out of the trash like POST /api/files/nodes/<id>/restore (a taken name gets " (2)")."""
+    """{ids}: every node back out of the trash like POST /api/files/nodes/<id>/restore (a taken name gets " (2)") -> {ok, ids,
+    stays: {ref_kind: count}} (2.373.0 #3335: objects that stay in their area's trash)."""
     c = db()
     uid = me()
     ids = abm_ids(body().get("ids"))
-    rows = []
+    rows, stays = [], {}
     for i in ids:
         n = need_node(c, i, write=True, trash=True)
         if n["deleted_at"] and n["role"] != "owner" and n["deleted_by"] != uid:
@@ -126,10 +127,11 @@ def files_bulk_restore():
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
         c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
         fs_log_add(c, n["id"], "restore")
-        fs_trash_restored(c, uid, n)  # 2.199.0 A (#2742)
+        for k, v in fs_trash_restored(c, uid, n).items():  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
+            stays[k] = stays.get(k, 0) + v
     bump(c)
     c.commit()
-    return jsonify(ok=True, ids=[n["id"] for n in rows])
+    return jsonify(ok=True, ids=[n["id"] for n in rows], stays=stays)
 
 
 # ---- the ZIP

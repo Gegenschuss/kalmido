@@ -21,7 +21,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
@@ -101,10 +101,7 @@ const V = B + 'api/v1';
   // a new list in the shown organisation
   w.eval('listModal()'); let md = await until(() => d.querySelector('.modal.lnew'));
   check(md.querySelector('#l-ws') && md.querySelector('#l-ws').value === String(ORG), '#935: a new list starts in the shown workspace');
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#935: "Used for" is offered for a simple list');
-  change(w, md.querySelector('#l-fam'), 'shopping'); await sleep(50);
-  check(md.querySelector('#l-ws').value === '', '#935: "Used for" makes the list private (the workspace follows)');
-  change(w, md.querySelector('#l-fam'), ''); change(w, md.querySelector('#l-ws'), String(ORG));
+  check(!md.querySelector('.lfamrow'), '2.396.0 (#3385): no "Used for" any more (was #935: it made the list private)');
   md.querySelector('#l-name').value = 'Marketing'; click(w, md.querySelector('[data-m="save"]'));
   const mk = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Marketing'));
   check(mk && mk.org_id === ORG, '#935: created in the organisation ' + (mk && mk.org_id));
@@ -235,8 +232,8 @@ const V = B + 'api/v1';
     await o.nav(B + '#today'); await ready(ev);
     check(await ev(`!!document.querySelector('#kbar .kbsw')`), `${tag}: #935 the switch in the head bar`);  // 2.152.3 (#2619): the switch moved from the panel into the head bar
     await shot(`p2280-${th}-1440-today-all.png`);
-    await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`); await sleep(700);
-    check(await ev(`!!document.querySelector('#kbar .kbsw .wsn') && getComputedStyle(document.querySelector('#kbar .kbsw .wsn')).display !== 'none' && !document.querySelector('#top .wschip')`), `${tag}: #935 the workspace named in the head bar`);  // 2.152.3 (#2619): the header chip became the head bar's switch
+    await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`);
+    check(await until(() => ev(`!!document.querySelector('#kbar .kbsw .wsn') && getComputedStyle(document.querySelector('#kbar .kbsw .wsn')).display !== 'none' && !document.querySelector('#top .wschip')`).catch(() => false)), `${tag}: #935 the workspace named in the head bar`);  // 2.152.3 (#2619): the header chip became the head bar's switch
     await shot(`p2280-${th}-1440-today-org.png`);
     // #976: a REAL right-click on the list row right next to the sidebar grip
     const geo = await ev(`(() => { const r = document.querySelector('#side .srow[data-list="${W1}"]').getBoundingClientRect(), g = document.querySelector('#pgrip-side'); const gr = g ? g.getBoundingClientRect() : null; return {x: Math.round(r.right - 14), y: Math.round(r.top + r.height / 2), grip: gr ? [Math.round(gr.left), Math.round(gr.right)] : null}; })()`);
@@ -266,7 +263,9 @@ const V = B + 'api/v1';
     await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);  // 2.152.3 (#2619): the bell moved into the head bar
     await shot(`p2280-${th}-1440-bell.png`);
     await ev(`(() => { closePop(); return 1; })()`);
-    await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
+    await o.nav(B + '#agents/' + AG); await ready(ev);
+    // #3506: wait for the chat's messages instead of a fixed 900 ms (under the load of the full run the chat came later)
+    await until(() => ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`).catch(() => false), 60);
     check(await ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`), `${tag}: #1005 the buttons in the chat`);
     await shot(`p2280-${th}-1440-chat-choices.png`);
     await ev(`(() => { settingsModal('agents'); return 1; })()`); await sleep(1200);

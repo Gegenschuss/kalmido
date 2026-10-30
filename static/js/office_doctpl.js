@@ -188,7 +188,7 @@ function dtNewModal(p = {}) {
     if (b.dataset.m === 'close') { close(); return; }
     const v = s => $(s, md)?.value ?? '';
     try {
-      const j = await api('POST', '/api/office/gen-docs', {template_id: +v('#dt-tpl') || null, client_id: +v('#dt-client') || null, list_id: +v('#dt-list') || null, doc_id: +v('#dt-offer') || null, title: v('#dt-ntitle')});
+      const j = await api('POST', '/api/office/gen-docs', {template_id: +v('#dt-tpl') || null, client_id: +v('#dt-client') || null, list_id: +v('#dt-list') || null, doc_id: +v('#dt-offer') || null, title: v('#dt-ntitle'), ...(typeof tri_flag === 'function' ? tri_flag() : {})});  // 2.417.0 C (#3445): trial in the test mode
       md.remove(); DT.data = null; DT.pv = null; go(`office/gendocs/${j.id}`);
       toast(tr('Created'), async () => { await api('DELETE', `/api/office/gen-docs/${j.id}`); DT.data = null; go('office/gendocs'); });
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }

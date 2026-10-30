@@ -4,11 +4,12 @@
 'use strict';
 
 // the floating bar (like the tasks' selection bar): the count, then the buttons [key, icon, label, class?] with
-// data-<attr>="key" (disabled while nothing is ticked, except "all"), then the close button (Esc)
+// data-<attr>="key" (disabled while nothing is ticked, except "all"), then the close button (Esc).
+// 2.428.0 A (#3581): every selection uses it (documents, file store, knowledge, users, trip receipts): class mselbar = its look
 function ms_barHtml(id, attr, n, hint, btns) {
   // 2.66.0 A (#1835): min = the ticks a button needs (Merge: 2)
   const btn = ([k, i, lab, cls = '', min = 1]) => `<button type="button" class="mbb ${cls}" data-${attr}="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n >= min || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
-  return `<div id="${id}" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? tr('{0} selected', n) : hint}</span>
+  return `<div id="${id}" class="mselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? tr('{0} selected', n) : hint}</span>
     ${btns.map(btn).join('')}
     <button type="button" class="iconbtn mbx" data-${attr}="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
 }
@@ -127,11 +128,13 @@ function ms_merge(o) {
 // 2.210 B (#2757): the row's own "…" menu by a right click (computer; Shift+F10 / the menu key on a focused row too) or a
 // long press (phone) on a row matching sel: one menu, two ways, no own right-click list. open(row) -> true when a menu
 // came, otherwise the browser's menu stays. Shared by the file store and the knowledge folders (later the office documents).
-function cm_bind(sel, open) {
-  const st = ms_longPress(sel, () => false, r => open(r));
+// 2.428.0 A (#3581): pick(row) given = a long press selects the row (like everywhere), the right click keeps the menu
+function cm_bind(sel, open, pick) {
+  const lp = r => { if (pick) { pick(r); return true; } return open(r); };
+  const st = ms_longPress(sel, () => false, lp);
   document.addEventListener('contextmenu', e => {
     const r = e.target.closest?.(sel); if (!r || e.target.closest('input, textarea, [contenteditable="true"]')) return;
-    if (st.lp) { clearTimeout(st.lp.t); st.lp = null; st.done = Date.now(); if (open(r)) { e.preventDefault(); navigator.vibrate?.(10); } return; }  // Android: its menu event comes before the timer - one menu, not two
+    if (st.lp) { clearTimeout(st.lp.t); st.lp = null; st.done = Date.now(); if (lp(r)) { e.preventDefault(); navigator.vibrate?.(10); } return; }  // Android: its menu event comes before the timer - one menu, not two
     if (ms_lpRecent(st)) { e.preventDefault(); return; }
     if (open(r)) e.preventDefault();
   });

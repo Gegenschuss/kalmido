@@ -483,6 +483,8 @@ def ofx_unlock_post(did):
     if not ofr_admin_or(c, uid, oid, "offers", "edit", "release"):  # 2.187.0 B (#2476): office groups: level + special
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     if ofx_locked(r):
+        if r["kind"] != "offer":  # 2.417.0 (#2604 review F1): an invoice is never taken back (not the delete text)
+            raise Denied(409, tr(OFX_LOCKED))
         why = bga_offer_block(c, oid, r)
         if why:
             raise Denied(409, tr(why))

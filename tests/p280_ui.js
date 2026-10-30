@@ -19,7 +19,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -82,7 +82,7 @@ const CONTRAST = `(() => {
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');
   for (const g of ['focus', 'views', 'lists', 'team']) check(d.querySelector(`#side .sg-${g} .sgh`), `sidebar group ${g}`);
   const reach = {cal: '#srail [data-sbb="cal"]', timeline: '#side [data-act="side-timeline"]', matrix: '#side [data-go="matrix"]', habits: '#srail [data-sbb="habits"]', pomo: '#srail [data-sbb="time"]',  // 2.44.0 (#1187): the areas Time + Review  // 2.152.2 (#2622): calendar, areas and Settings in the bar #srail
-    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#kbar .kbsrch[data-act="palette"]' /* 2.152.3 (#2619): the search moved into the head bar */, settings: '#srail .sset[data-act="settings"]'};  // 2.152.2 (#2622): full selectors (#side or #srail)
+    time: '#srail [data-sbb="time"]', stats: '#srail [data-sbb="review"]', overview: '#side [data-go="overview"]', agents: '#srail [data-sbb="agents"]', news: '#side [data-go="news"]', search: '#kbar .kbsrch[data-act="palette"]' /* 2.152.3 (#2619): the search moved into the head bar */, settings: '#kbar .kbsw[data-act="sbb-ws"]' /* 2.380.2 (#3400): Settings in the Kalmido menu */};  // 2.152.2 (#2622): full selectors (#side or #srail)
   for (const [k, sel] of Object.entries(reach)) check(d.querySelector(sel), `sidebar reaches ${k}`);  // 2.152.2 (#2622): the selector says where
   check(d.querySelector('#top .ttabs [data-act="view-kanban"]') && d.querySelector('#top .ttabs [data-act="view-timeline"]'), 'kanban + timeline as text tabs in the list header');
   check(/Kanban/.test(d.querySelector('#top .ttabs').textContent), 'the view tabs are text');
@@ -140,7 +140,7 @@ const CONTRAST = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   for (const k of ['cal', 'matrix', 'habits', 'pomo', 'stats', 'time']) check(!d.querySelector(reach[k]), `module off: ${k} not in the sidebar`);  // 2.152.2 (#2622): full selectors
   check(!d.querySelector('#side [data-act="side-timeline"]') && !d.querySelector('#srail [data-sbb="cal"]'), 'timeline / calendar off: gone');  // 2.152.2 (#2622): the calendar is an icon of the bar
-  check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#srail .sset'), 'agents + settings still there');  // 2.152.2 (#2622): agents and Settings in the bar
+  check(d.querySelector('#srail [data-sbb="agents"]') && d.querySelector('#kbar .kbsw'), 'agents + settings (Kalmido menu) still there'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): agents and Settings in the bar
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   // accent migration: mint (the old default) -> the default once (2.11.0: violet, 2.300.0: petrol); another colour stays

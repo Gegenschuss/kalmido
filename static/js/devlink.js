@@ -66,7 +66,7 @@ function dlToOffice(tid) {
 // to the equipment: the office of its workspace, then its editor
 async function dlOpenEquip(tid) {
   const o = DL.byTask[tid]?.link?.other; if (!o || o.state !== 'ok') return;
-  if (typeof wsCur === 'function' && wsCur() !== o.ws && typeof wsSet === 'function') await wsSet(o.ws);
+  if (typeof wsCur === 'function' && wsCur() !== o.ws && typeof wsSet === 'function') await wsSet(o.ws, {keep: true});  // 2.397.0 (#3404): the link's target wins
   go('office/equipment');
   for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 150));

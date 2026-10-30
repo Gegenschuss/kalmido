@@ -60,7 +60,7 @@ def ml_locked(c, lid):
 
 
 def ml_fill(c, out, viewer):
-    """load_tasks: "also" on the top-level tasks of out = [{list_id, section_id, sort}] of their further lists that the
+    """load_tasks: "also" on the top-level tasks of out = [{list_id, section_id, sort, section_at}] of their further lists that the
     viewer sees (the request's list scope: health lists, a token's list limit and the organisation boundary included),
     only where both lists are still in one workspace. Absent when there is none."""
     ids = [d["id"] for d in out if not d.get("parent_id")]
@@ -68,7 +68,7 @@ def ml_fill(c, out, viewer):
         return
     q = ",".join("?" * len(ids))
     also = {}
-    for r in c.execute(f"""SELECT k.task_id, k.list_id, k.section_id, k.sort FROM task_links k JOIN tasks t ON t.id=k.task_id
+    for r in c.execute(f"""SELECT k.task_id, k.list_id, k.section_id, k.sort, k.section_at FROM task_links k JOIN tasks t ON t.id=k.task_id
                            JOIN lists o ON o.id=t.list_id JOIN lists x ON x.id=k.list_id
                            WHERE k.task_id IN ({q}) AND k.list_id!=t.list_id AND t.parent_id IS NULL
                            AND o.org_id IS NOT DISTINCT FROM x.org_id
@@ -76,7 +76,8 @@ def ml_fill(c, out, viewer):
                            AND k.list_id IN {vis_sql()} ORDER BY k.task_id, k.list_id""", (*ids, viewer, viewer)):
         if ml_locked(c, r["list_id"]):
             continue
-        also.setdefault(r["task_id"], []).append({"list_id": r["list_id"], "section_id": r["section_id"], "sort": r["sort"]})
+        also.setdefault(r["task_id"], []).append({"list_id": r["list_id"], "section_id": r["section_id"], "sort": r["sort"],
+                                                  "section_at": r["section_at"]})  # 2.410.0 B (#3515): since when in that column
     for d in out:
         if d["id"] in also:
             d["also"] = also[d["id"]]

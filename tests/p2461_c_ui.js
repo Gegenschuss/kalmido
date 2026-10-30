@@ -12,7 +12,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces'}});  // KMT_NOSTART=1: a running app
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const vcf = (p, n) => Array.from({length: n}, (_, i) => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:${p}-${i}\r\nFN:${p} Person ${i}\r\nN:Person ${i};${p};;;\r\nEND:VCARD\r\n`).join('');
 const importVcf = async (ck, bid, text) => { const fd = new FormData(); fd.append('file', new Blob([text], {type: 'text/vcard'}), 'x.vcf'); return (await fetch(B + `api/books/${bid}/import`, {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: ck}, body: fd})).status; };
 const ptr = (w, el, type, extra = {}) => {  // jsdom has no PointerEvent: a MouseEvent with pointerType

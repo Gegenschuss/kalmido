@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'cal,comments,collab,clients,office';
 const PH = {mobile: true};  // a phone for jsdom
 
@@ -148,7 +148,7 @@ const PH = {mobile: true};  // a phone for jsdom
   await until(() => d.querySelector('.office .ofdbar'), 60);
   await sleep(300);
   check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty.eact [data-ofd="new"]'), '#1637: the empty list has exactly one "New quotation", the big one in the empty state');
-  check(!d.querySelector('.office .empty.eact .tri-split ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text (2.380.0 #3418: with its menu beside it)');
+  check(!d.querySelector('.office .empty.eact [data-ofd="new"] ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text (2.417.0 #3445: one button again, no menu beside it)');
   w.eval(`go('office/invoices')`); await until(() => d.querySelector('.office .ofdkinds [data-kind="invoice"]'), 60);  // 2.380.0 (#3409): the invoices' own area
   check(!!d.querySelector('.office .ofdbar'), '#1637: the other kinds keep their bar');
   w.close();

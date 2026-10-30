@@ -1,7 +1,7 @@
 // 2.380.0 part B UI tests (#3418, #3409), own container (start.sh). jsdom, invented data only, run for a member of an
 // organisation (alice, admin) and a person without one (frida, her own admin):
-// - #3418: "New quotation" creates the draft at once (no dialog); its menu has "Trial document (SAMPLE)"; "New invoice" has
-//   the same entry; the trial document's editor head carries the one-time hint, a real one none
+// - #3418: "New quotation" creates the draft at once (no dialog); 2.417.0 C (#3445): no menu beside it and no trial entry
+//   under "New invoice" any more (trial documents come from the test mode only, tests/p2417_c_ui.js)
 // - #3409: Quotations and Invoices are two points of the group Sell (computer: the panel; phone: the group's row); Quotations
 //   has the tabs Quotations + Archive, Invoices the tabs Invoices, Credit notes, Reminders, Delivery notes, Archive; each
 //   archive shows only its own kind (mixed legacy archive), Invoices filters All / open / paid and the sum line follows the
@@ -79,11 +79,8 @@ async function archive(ck, run, f) {
     check(/^\s*Quotations\s*$/.test(d.querySelector('#side [data-ofm="offers"]')?.textContent || '') && /^\s*Invoices\s*$/.test(d.querySelector('#side [data-ofm="invoices"]')?.textContent || ''), `${who}: #3409 the names of the points`);
     check(await until(() => w.eval('Array.isArray(OFD.list) && !OFD.loading') && kinds(d) === 'offer,archive'), `${who}: #3409 Quotations: the tabs Quotations + Archive ${kinds(d)}`);
     check(!!d.querySelector('.ofdlist .ofdrow[data-id="' + Q.id + '"]') && !d.querySelector('.ofdlist .ofdrow[data-id="' + I.id + '"]'), `${who}: the quotation list`);
-    // #3418: New creates at once; the menu beside it has the trial document
-    d.querySelector('.office .ofdbar [data-ofd="new-more"]').click();
-    await until(() => items(d).length);
-    check(items(d).some(b => b.textContent.trim() === 'Trial document (SAMPLE)'), `${who}: #3418 the menu New has "Trial document (SAMPLE)"`);
-    d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    // #3418: New creates at once; 2.417.0 C (#3445): no menu beside it (the test mode decides)
+    check(!d.querySelector('.office .ofdbar [data-ofd="new-more"]'), `${who}: #3445 no trial menu beside "New quotation"`);
     d.querySelector('.office .ofdbar [data-ofd="new"]').click();
     check(await until(() => d.querySelector('.ofdeditor') && +w.eval('S.route.id') > I.id), `${who}: #3418 "New quotation" opens a new draft at once`);
     check(!d.querySelector('.modal') && !d.querySelector('.tri-hint'), `${who}: #3418 no dialog, no trial hint on a real quotation`);
@@ -105,7 +102,7 @@ async function archive(ck, run, f) {
     check(/open/.test(st) && /paid/.test(st), `${who}: #3409 the invoices filter open / paid ${st}`);
     d.querySelector('.office .ofdbar [data-ofd="new-inv"]').click();
     await until(() => items(d).length);
-    check(items(d).some(b => b.textContent.trim() === 'Empty invoice') && items(d).some(b => b.textContent.trim() === 'Trial document (SAMPLE)'), `${who}: #3418 "New invoice": Empty invoice and the trial document`);
+    check(items(d).some(b => b.textContent.trim() === 'Empty invoice') && !items(d).some(b => /Trial document/.test(b.textContent)), `${who}: #3418 "New invoice": Empty invoice; #3445 no trial entry`);
     d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
     d.querySelector('.ofdkinds [data-kind="archive"]').click();
     check(await until(() => w.location.hash === '#office/invoices/archive' && d.querySelector('.oimarch')), `${who}: #3409 the invoices' archive ${w.location.hash}`);

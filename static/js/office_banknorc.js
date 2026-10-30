@@ -40,8 +40,10 @@ function bnr_html() {
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnr_row).join('')}</ul>`
     : `<div class="empty">${ic('check')}<span>${out ? tr('Every payment has its receipt.') : tr('Every income has its invoice.')}</span></div>`;
   const rc = out && !isMobile() && items.length ? bnr_rcHtml(d.receipts || []) : '';
-  return bar + (rc ? `<div class="bnrcols"><div>${list}</div>${rc}</div>` : list)
-    + `<p class="muted ofchint">${out ? tr('Drop a file or a receipt from the right onto a booking to match it. Bank fees or tax payments need no receipt.') : tr('Money received that no invoice matched yet.')}</p>`;
+  const miss = out ? bnv_missHtml(d.missing || []) : '';  // 2.425.0 B (#3451)
+  return bar + miss + (rc ? `<div class="bnrcols"><div>${list}</div>${rc}</div>` : list)
+    + `<p class="muted ofchint">${out ? tr('Drop a file or a receipt from the right onto a booking to match it. Bank fees or tax payments need no receipt.') : tr('Money received that no invoice matched yet.')}</p>`
+    + (out ? bnv_html() : '');
 }
 function bnr_row(t) {
   const out = +t.amount < 0, title = t.counterpart || t.purpose || tr('Booking');
@@ -178,4 +180,78 @@ document.addEventListener('change', async e => {
   if (was != null && was !== v) offerUndo(tr('Saved'), histAdd({label: tr('Reminder changed'),
     undo: async () => { BNR.rem = await api('PUT', '/api/office/bank/noreceipt/reminder', {[k]: was}); ofcDraw(); },
     redo: async () => { BNR.rem = await api('PUT', '/api/office/bank/noreceipt/reminder', {[k]: v}); ofcDraw(); }}));
+});
+
+// ---- 2.425.0 B (#3451): recurring providers (the same counterpart at a regular rhythm; server: kalmido/office/bankvend.py).
+// Above the list: "Invoice <provider> <month> missing" once the office's days after the booking passed, with the portal link
+// and the upload / drop field of the booking (the receipt is matched at once, as on every row). Below the list: the providers
+// with their portal link, the hint on / off and "No receipt needed" (their bookings leave this list); the days. Every field
+// saves itself, one undo step each.
+const BNV = {oid: null, data: null, loading: false, open: false, all: false};
+const BNV_HINTS = 5;  // hints shown before "Show all"
+const BNV_EVERY = {week: N_('Weekly'), month: N_('Monthly'), quarter: N_('Quarterly'), year: N_('Yearly')};
+function bnv_missHtml(hs) {
+  if (!hs.length) return '';
+  const more = BNV.all ? 0 : hs.length - BNV_HINTS;
+  if (more > 0) hs = hs.slice(0, BNV_HINTS);
+  const acc = esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*');
+  return `<section class="bnvmiss" aria-label="${esc(tr('Missing invoices of recurring providers'))}"><h3 class="ofcgrp">${tr('Missing invoices of recurring providers')}</h3>
+    <ul class="bnklist" role="list">${hs.map(h => `<li class="bnkrow bnvhint" data-bnr-drop="${h.id}" data-bnv-hint="${h.id}"><div class="bnkhead"><span class="bnkn"><b>${esc(h.text)}</b><small class="muted">${esc(fmtDateLoc(h.day))}</small></span><span class="bnkamt out">${esc(bnkAmt(-h.amount))}</span></div>
+      <div class="bnkacts">${h.portal ? `<a class="btn sm" href="${esc(h.portal)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}<span>${tr('Customer portal')}</span></a>` : ''}<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-bnr-up="${h.id}" accept="${acc}" hidden></label></div></li>`).join('')}</ul>
+    ${more > 0 ? `<button type="button" class="btn sm ghost bnvmore" data-bnv-all>${esc(tr('Show all ({0})', hs.length + more))}</button>` : ''}</section>`;
+}
+async function bnv_load() {
+  if (BNV.loading) return;
+  BNV.loading = true;
+  try { BNV.data = await api('GET', '/api/office/bank/vendors'); } catch (x) { BNV.data = false; }
+  BNV.loading = false;
+  ofcDraw();
+}
+function bnv_html() {
+  if (BNV.oid !== OFC.info?.org_id) Object.assign(BNV, {oid: OFC.info?.org_id, data: null});
+  if (BNV.data === false) return '';
+  if (!BNV.data) { if (!BNV.loading) setTimeout(bnv_load, 0); return ''; }
+  const vs = BNV.data.items || [];
+  const rows = vs.length ? `<ul class="bnklist" role="list">${vs.map(v => {
+    const k = esc(JSON.stringify([v.kind, v.match]));
+    const sub = [v.every ? tr(BNV_EVERY[v.every]) : '', v.last_day ? fmtDateLoc(v.last_day) : '', v.amount ? ofcMoney(v.amount) : ''].filter(Boolean).join(' · ');
+    return `<li class="bnkrow bnvrow ${v.active && !v.noreceipt ? '' : 'done'}" data-bnv-k="${k}"><div class="bnkhead"><span class="bnkn"><b>${esc(v.name)}</b><small class="muted">${esc(sub)}</small></span></div>
+      <label class="bnvportal"><span class="muted">${tr('Customer portal')}</span><input type="url" inputmode="url" data-bnv-portal value="${esc(v.portal)}" placeholder="https://" aria-label="${esc(tr('Customer portal'))}: ${esc(v.name)}"${v.portal_suggested ? ` title="${esc(tr('Suggestion'))}"` : ''}></label>
+      <div class="bnkacts"><label class="chkl"><input type="checkbox" data-bnv="active" ${v.active ? 'checked' : ''}><span>${tr('Remind me of missing invoices')}</span></label>
+      <label class="chkl"><input type="checkbox" data-bnv="noreceipt" ${v.noreceipt ? 'checked' : ''}><span>${tr('No receipt needed')}</span></label></div></li>`;
+  }).join('')}</ul>` : `<p class="muted">${tr('No recurring providers found yet. A counterpart that takes money out regularly (monthly, yearly) shows up here.')}</p>`;
+  return `<details class="bnvlist" ${BNV.open ? 'open' : ''}><summary data-bnv-open>${tr('Recurring providers')}${vs.length ? ` <small>${vs.length}</small>` : ''}</summary>
+    ${ofcRowF('bnv-days', tr('Invoice missing after'), `<input id="bnv-days" type="number" min="0" max="90" step="1" inputmode="numeric" data-bnv-days value="${BNV.data.days}"> <span class="muted">${tr('days')}</span>`)}
+    ${rows}</details>`;
+}
+async function bnv_put(path, req, undoReq) {
+  try { BNV.data = await api('PUT', path, req); } catch (x) { bnv_load(); return; }
+  bnr_reload();
+  offerUndo(tr('Saved'), histAdd({label: tr('Recurring provider changed'),
+    undo: async () => { BNV.data = await api('PUT', path, undoReq); bnr_reload(); },
+    redo: async () => { BNV.data = await api('PUT', path, req); bnr_reload(); }}));
+}
+document.addEventListener('click', e => {
+  const t = /** @type {any} */ (e.target), s = t.closest?.('[data-bnv-open]');
+  if (s) BNV.open = !s.parentElement.open;
+  else if (t.closest?.('[data-bnv-all]')) { BNV.all = true; ofcDraw(); }
+});
+document.addEventListener('change', e => {
+  const t = /** @type {any} */ (e.target);
+  if (t.matches?.('[data-bnv-days]')) {
+    const v = Math.round(+t.value), was = BNV.data?.days;
+    if (!(v >= 0 && v <= 90)) { t.value = was; return; }
+    bnv_put('/api/office/bank/vendors/settings', {days: v}, {days: was});
+    return;
+  }
+  const row = t.closest?.('[data-bnv-k]'); if (!row) return;
+  const [kind, match] = JSON.parse(row.dataset.bnvK), v = (BNV.data?.items || []).find(x => x.kind === kind && x.match === match); if (!v) return;
+  if (t.matches('[data-bnv-portal]')) {
+    const p = t.value.trim();
+    if (p && !/^https:\/\/\S+$/.test(p)) { toast(tr('The link must start with https://')); t.value = v.portal; return; }
+    bnv_put('/api/office/bank/vendors', {kind, match, portal: p}, {kind, match, portal: v.portal_suggested ? '' : v.portal});
+  } else if (t.dataset.bnv) {
+    const f = t.dataset.bnv;
+    bnv_put('/api/office/bank/vendors', {kind, match, [f]: t.checked}, {kind, match, [f]: !!v[f]});
+  }
 });

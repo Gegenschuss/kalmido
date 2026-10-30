@@ -453,7 +453,8 @@ def t_tidy(api, a):
 TOOLS = [
     ("get_agent", "Who am I: the agent's user, enabled state, status, job counts, the latest event cursor and runtime (the "
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
-                  "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
+                  "timezone, reset_seq raised by 'Reset now'; 2.396.0: git_author 'Name <mail>' to commit as, git_coauthor = add "
+                  "a Co-Authored-By line; a task's repo.git_author wins in its repository). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
                   "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
                   "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule). "
@@ -831,6 +832,16 @@ TOOLS = [
     ("update_job", "Update a job: state, title, log (replace) or append_log (add lines).",
      _obj({"job_id": S_ID, "title": {"type": "string"}, "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]},
            "log": {"type": "string"}, "append_log": {"type": "string"}}, ["job_id"]), t_update_job),
+    # 2.407.0 A (#3513): "agent is working" on a task (the pulsing dot people see in the list, on the board and in the detail)
+    ("set_working", "2.407.0: you work on a task now -- people see a pulsing dot with your name, the time and your last progress "
+                    "line at the task (list, board, detail). Call it when you start and again with each short progress line "
+                    "(text, one line, prose, no secrets); end with end_working. Without a call for 15 minutes the mark fades. "
+                    "Needs write access to the task's list. It is your running job of the task (title / name only on the start).",
+     _obj({"task_id": S_ID, "text": {"type": "string"}, "title": {"type": "string"}, "name": {"type": "string", "maxLength": 24}}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/working", body=_pick(a, ("text", "title", "name")))),
+    ("end_working", "2.407.0: you stop working on a task (the dot at the task disappears at once); state done (default), failed or stopped.",
+     _obj({"task_id": S_ID, "state": {"type": "string", "enum": ["done", "failed", "stopped"]}}, ["task_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/working", _pick(a, ("state",)))),
     ("list_chats", "Chat messages people sent to the agent (all conversations) after message id `since`, with reactions and "
                    "delivered_at (reading them marks them delivered). 2.39.0: edited_at = the person edited the message later "
                    "(body is the current text; edited after you had it: the event message_edited). 2.82.0: user_id = only that "
@@ -1440,7 +1451,8 @@ TOOLS += [
     ("create_field", "Create a custom field in a project (owner / project admins; 2.39.1: any project, switches the module Custom fields on for the "
                      "project's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
                      "| formula | multiselect | currency | rating | task (2.156.0); options for select / multiselect: {options: [{id?, name, "
-                     "color?}]}, currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
+                     "color?}]}; 2.410.0: select + stages: 1 = ordered, shown as a stage bar, an option's special: red | orange = a special state (no "
+                     "stage of its own); currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
                      "joined by \",\" (a list works too), rating \"1\"..max, task = the id of a task you can see (read it with get_task; "
                      "others see its title only if they may see that task). 2.43.0: type formula + formula = a calculation "
                      "with + - * / ( ), numbers, {Field name} of number / currency / rating / formula / checkbox fields; 2.156.0: comparisons "

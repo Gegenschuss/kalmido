@@ -20,7 +20,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
@@ -266,7 +266,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
+  // rsz after a viewport change: the app's resize handlers wait 150 ms, then two frames
+  const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
+  const rsz = async ev => { await sleep(400); await frames(ev); };
+  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const SMALL = `(() => { const out = []; for (const e of document.querySelectorAll('#view button, #view a[href], #view [role=button], #view input:not([type=hidden]), #view select')) {
       const r = e.getBoundingClientRect(); if (!r.width || r.bottom < 0 || r.top > innerHeight || e.closest('.md, .cbub, p')) continue;
       if (e.tagName === 'INPUT' && /text|search/.test(e.type)) continue; const row = e.closest('.trow'); if (row && e.matches('.ttl')) continue;
@@ -283,7 +288,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     for (const [name, hash] of [['dashboard', 'home'], ['team', 'team'], ['news', 'news'], ['notes', 'notes/' + L]]) {
-      await o.nav(B + '#' + hash); await ready(ev); await sleep(500);
+      await o.nav(B + '#' + hash); await ready(ev, o.idle);
       const x = await ev(OVER);
       check(x.o <= 0 && x.v <= 0, `${tag} ${name}: nothing sideways ` + JSON.stringify(x));
       const sm = await ev(SMALL);
@@ -291,20 +296,20 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
       await shot(`p2170-${th}-390-${name}.png`);
     }
     // the team chat on a phone: tap a conversation, type, send with a tap
-    await o.nav(B + '#team'); await ready(ev);
-    let p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await sleep(1200);
+    await o.nav(B + '#team'); await ready(ev, o.idle);
+    let p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await settle(ev, o.idle);
     const lay = await ev(`(() => { const l = document.querySelector('.tclist'), r = document.querySelector('.tcroom'), c = document.querySelector('.tccomp').getBoundingClientRect(); return {list: l && getComputedStyle(l).display, room: !!r, comp: Math.round(c.bottom), ih: innerHeight, tabs: Math.round(document.querySelector('#tabs')?.getBoundingClientRect().top || innerHeight)}; })()`);
     check(lay.list === 'none' && lay.room && lay.comp <= lay.tabs + 1, `${tag}: a tap opens the conversation full screen, the box above the tab bar ` + JSON.stringify(lay));
     p = await ev(center('#tc-in')); await tap(p.x, p.y); await sleep(300);
     await ev(`(() => { const t = document.querySelector('#tc-in'); t.value = 'From the phone (${th})'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
-    p = await ev(center('[data-act="tc-send"]')); await tap(p.x, p.y); await sleep(800);
+    p = await ev(center('[data-act="tc-send"]')); await tap(p.x, p.y); await settle(ev, o.idle);
     check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg.me')].some(m => m.textContent.includes('From the phone (${th})'))`), `${tag}: sent with a tap on Send`);
     await shot(`p2170-${th}-390-team-room.png`);
-    p = await ev(center('[data-act="tc-back"]')); await tap(p.x, p.y); await sleep(500);
+    p = await ev(center('[data-act="tc-back"]')); await tap(p.x, p.y); await settle(ev, o.idle);
     check(await ev(`getComputedStyle(document.querySelector('.tclist')).display !== 'none'`), `${tag}: Back shows the conversations again`);
     // review of 2.16.1 / 2.18.0 (#651, intended change): the reactions of an OWN message sit visibly inside the screen,
     // one Tab stop per message (roving tabindex); the header keeps the search icon; an unfolded Fold (904) has a close X
-    p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await sleep(800);
+    p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await settle(ev, o.idle);
     check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg .rxrow')].every(q => q.querySelectorAll('.rx[tabindex="0"]').length === 1)`), `${tag}: one Tab stop per reaction row`);
     // 2.23.0 (#823): no reactions of one's own on one's own message; its line (time, the menu) sits on screen
     const rq = await ev(`(() => { const m = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = m?.querySelector('.cmeta'); if (!q) return null; q.scrollIntoView({block: 'center'}); const r = q.getBoundingClientRect(); return {t: Math.round(r.top), l: Math.round(r.left), r: Math.round(r.right), own: m.querySelectorAll('.rx:not([disabled]):not([data-act="tc-msg-menu"])').length}; })()`);
@@ -312,7 +317,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await ev(`(() => { const b = document.querySelector('#tc-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(200);
     const lq = await ev(`(() => { const last = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = last?.querySelector('.cmeta'), b = document.querySelector('#tc-msgs'); if (!q || !b) return null; return {qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
     check(lq && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reactions are not hidden behind the box ` + JSON.stringify(lq));
-    await o.nav(B + '#today'); await ready(ev);
+    await o.nav(B + '#today'); await ready(ev, o.idle);
     // 2.31.0 (#1057): ONE search on the phone: with the tab "Search" pinned the header magnifier steps aside, the tab is it
     const sb = await ev(`(() => { const vis = b => { const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; };
       const hd = vis(document.querySelector('#top [data-act="palette"]')), tb = vis(document.querySelector('#tabs [data-act="palette"]'));
@@ -320,7 +325,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(sb > 0, `${tag}: one search on the phone: the header icon, or the tab "Search" when it is pinned (${sb})`);
     if (th === 'light') {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 1080}});
-      await o.nav(B + '#t/' + T[0]); await ready(ev); await sleep(600);
+      await o.nav(B + '#t/' + T[0]); await ready(ev, o.idle);
       const cx = await ev(`(() => { const b = [...document.querySelectorAll('#detail .dtop [data-act="close-detail"]')].filter(e => e.getBoundingClientRect().width > 0); return b.length; })()`);
       check(cx >= 1, `${tag}: Fold 904: the task panel has a close button (${cx})`);
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
@@ -331,30 +336,30 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     for (const [name, hash] of [['dashboard', 'home'], ['team', 'team'], ['news', 'news'], ['notes', 'notes/' + L]]) {
-      await o.nav(B + '#' + hash); await ready(ev); await sleep(500);
-      if (name === 'team') { await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await sleep(1000); }
-      if (name === 'notes') { await ev(`(() => { document.querySelector('.ntcard')?.click(); return 1; })()`); await sleep(800); }
+      await o.nav(B + '#' + hash); await ready(ev, o.idle);
+      if (name === 'team') { await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await settle(ev, o.idle); }
+      if (name === 'notes') { await ev(`(() => { document.querySelector('.ntcard')?.click(); return 1; })()`); await settle(ev, o.idle); }
       const x = await ev(OVER);
       check(x.o <= 0, `${tag} ${name}: nothing sideways ` + JSON.stringify(x));
       await shot(`p2170-${th}-1440-${name}.png`);
     }
     const dg = await ev(`(() => { const cs = [...document.querySelectorAll('.dgrid .dcard')]; return {n: cs.length}; })()`);
-    await o.nav(B + '#home'); await ready(ev);
+    await o.nav(B + '#home'); await ready(ev, o.idle);
     const cols = await ev(`(() => { const cs = [...document.querySelectorAll('.dgrid .dcard')].map(c => Math.round(c.getBoundingClientRect().left)); return new Set(cs).size; })()`);
     check(cols === 2, `${tag}: the dashboard uses the width (${cols} columns)`);  // 2.45.0 (#1504): a wide and a narrow column
     // 2.17.2 (review): a room opened by its address (reload, a push) shows the newest message
-    await o.nav(B + '#team'); await ready(ev);
-    await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await sleep(1000);
+    await o.nav(B + '#team'); await ready(ev, o.idle);
+    await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await settle(ev, o.idle);
     const rh = await ev('location.hash');
-    await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev); await sleep(1500);
+    await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev, o.idle);
     const sc = await ev(`(() => { const b = document.querySelector('#tc-msgs'); return b ? {top: Math.round(b.scrollTop), max: b.scrollHeight - b.clientHeight} : null; })()`);
     check(sc && sc.max > 0 && sc.top >= sc.max - 4, `${tag}: ${rh} opened by its address ends at the newest message ` + JSON.stringify(sc));
     if (th === 'light') {  // the unfolded Fold: a note and a room get the whole width (one thing at a time)
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 1080}});
-      await o.nav(B + 'static/icon.svg'); await o.nav(B + '#note/' + NN); await ready(ev); await sleep(800);
+      await o.nav(B + 'static/icon.svg'); await o.nav(B + '#note/' + NN); await ready(ev, o.idle);
       const nw = await ev(`(() => { const t = document.querySelector('#nt-title'), l = document.querySelector('.ntlist'); return {t: Math.round(t?.getBoundingClientRect().width || 0), list: l ? getComputedStyle(l).display : ''}; })()`);
       check(nw.t >= 300, `${tag} 904: the note title has room ` + JSON.stringify(nw));
-      await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev); await sleep(1000);
+      await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev, o.idle);
       const tw = await ev(`(() => { const i = document.querySelector('#tc-in'), b = document.querySelector('.tcroom .tcback'); return {i: Math.round(i?.getBoundingClientRect().width || 0), back: !!b && b.getBoundingClientRect().width > 0}; })()`);
       check(tw.i >= 300, `${tag} 904: the message box has room ` + JSON.stringify(tw));
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});

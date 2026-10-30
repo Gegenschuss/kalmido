@@ -46,7 +46,10 @@ MAGIC = b"KALMIDO-BACKUP-ENC\x00"
 
 def start(extra=(), backups="1"):
     env = dict(os.environ, KALMIDO_ADMIN_ALERTS="1",
+               # 2.432.0 (#3584): this suite checks the complete archive (format 2); the shared store (format 3, from 64 KiB
+               # on) has its own suite p2432_bkstore_test.py, so the threshold is above every file here
                EXTRA=" ".join(["-e KALMIDO_BACKUP_TICK=1", "-e KALMIDO_BACKUP_MAX_MB=5", "-e KALMIDO_ADMIN_ALERT_WINDOW=3",
+                               "-e KALMIDO_BACKUP_SHARED_MIN=1048576",
                                f"-e KALMIDO_BACKUPS={backups}", *extra]))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -63,7 +66,10 @@ def dbx(sql, args=()):
 
 
 def state(s=None):
-    return (s or A).get(B + "/api/admin/backups").json()
+    r = (s or A).get(B + "/api/admin/backups")
+    # 2.358.0 A (#3279): CI v2.307.1 read an empty / HTML body here (a 500 of the listing): name status + text
+    assert r.ok and r.headers.get("Content-Type", "").startswith("application/json"), f"GET /api/admin/backups: {r.status_code} {r.text[:200]!r}"
+    return r.json()
 
 
 def wait_idle(n_before=None, t=30):
@@ -330,6 +336,40 @@ check(os.path.exists(os.path.join(BK, "notes.txt")), "unrelated files are never 
 os.remove(os.path.join(BK, "notes.txt"))
 A.patch(B + "/api/admin/backups", json={"keep_daily": 14, "keep_weekly": 8})
 
+# 2.358.0 A (#3279): the retention of a running backup deletes files while the list is read (CI v2.307.1: a 500 of
+# GET /api/admin/backups in backup_now above). A file that is gone between the directory listing and its size / manifest
+# is left out, never an error.
+VANISH = r"""
+import json, os
+from kalmido.admin import backup as bk
+n = "kalmido-backup-20200101-030000-auto.zip"
+full, real, res = os.path.join(bk.BK_DIR, n), os.path.getsize, {}
+for when in ("before size", "after size"):
+    open(full, "wb").write(b"x")
+    def size(p, _w=when):
+        if os.path.basename(p) != n:
+            return real(p)
+        if _w == "before size":
+            os.remove(full)
+        v = real(p)
+        os.remove(full)
+        return v
+    os.path.getsize = size
+    try:
+        res[when] = n in [x["name"] for x in bk.bk_list()]
+    except Exception as e:
+        res[when] = repr(e)
+    os.path.getsize = real
+print(json.dumps(res))
+"""
+r = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", VANISH],
+                   capture_output=True, text=True)
+try:
+    res = json.loads(r.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    res = {"error": (r.stdout + r.stderr)[-400:]}
+check(res == {"before size": False, "after size": False}, f"a backup deleted while the list is read is left out: {res}")
+
 # ---- restore a listed backup
 # 2.190.0 R (#1991): push subscriptions of sessions go with the sessions, '' (no session) stays
 _U1 = dbx("SELECT id FROM users ORDER BY id LIMIT 1")[0][0]
@@ -337,9 +377,19 @@ for _ep, _sh in (("https://push.example.com/sess", "a" * 64), ("https://push.exa
     dbx("INSERT INTO push_subs(user_id,endpoint,p256dh,auth,session_hash,created_at) VALUES(?,?,?,?,?,?)",
         (_U1, _ep, "x", "x", _sh, "2026-01-01T00:00:00+00:00"))
 C0 = table_counts()
+# 2.359.2 (#2895): an own industry pack of the instance (data folder packs/industry) goes into the backup and comes back
+PACKS = os.path.join(DATA, "packs", "industry")
+os.makedirs(PACKS, exist_ok=True)
+open(os.path.join(PACKS, "testpack.json"), "w").write('{"code": "testpack", "v": "backup"}')
 j = backup_now()
 good = j["items"][0]["name"]
 check(j["items"][0]["kind"] == "manual", "fresh backup before the changes")
+with zipfile.ZipFile(os.path.join(BK, good)) as z:
+    check("packs/industry/testpack.json" in z.namelist() and json.loads(z.read("manifest.json")).get("pack_files") == 1,
+          f"#2895: the own industry pack is in the backup (manifest pack_files 1) {[n for n in z.namelist() if n.startswith('packs')]}")
+check(j["items"][0].get("pack_files") == 1, f"#2895: the list names the packs {j['items'][0].get('pack_files')}")
+open(os.path.join(PACKS, "testpack.json"), "w").write('{"code": "testpack", "v": "changed"}')
+open(os.path.join(PACKS, "later.json"), "w").write('{"code": "later"}')
 dbx("DELETE FROM lists WHERE org_id=?", (ORGS[1],))  # 2.37.0: the second organisation goes (rows of several tables)
 dbx("DELETE FROM orgs WHERE id=?", (ORGS[1],))
 os.remove(os.path.join(OFF, "logo.png"))
@@ -410,6 +460,12 @@ check(os.path.isfile(os.path.join(OFF, "logo.png")) and not os.path.exists(os.pa
 ks, has = _kept("office", "late.png")
 check(len(ks) == 1 and has == ks, f"the office files of before stay once, with late.png: {ks}")
 check(not any(n.startswith("office.") for n in os.listdir(DATA)), "no leftover office folders")
+check(json.loads(open(os.path.join(PACKS, "testpack.json")).read()).get("v") == "backup" and os.path.isfile(os.path.join(PACKS, "later.json")),
+      "#2895: the industry pack is the backup's again, one added since stays")
+_pk = [n for n in os.listdir(os.path.join(DATA, "packs")) if n.startswith("industry.pre-restore-")]
+check(len(_pk) == 1 and "changed" in open(os.path.join(DATA, "packs", _pk[0], "testpack.json")).read(),
+      f"#2895: the replaced pack of before is kept once {_pk}")
+shutil.rmtree(os.path.join(DATA, "packs"), ignore_errors=True)
 rls = dbx("SELECT COUNT(*) FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity")[0][0]
 check(rls >= 10 and dbx("SELECT COUNT(*) FROM pg_policies WHERE schemaname='public'")[0][0] >= rls,
       f"row-level security is back after the restore ({rls} tables)")

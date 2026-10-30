@@ -33,7 +33,7 @@ function newsSummaryLine(g) {
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
-    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
+    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
 function newsGroupHtml(g, pop) {
@@ -326,10 +326,13 @@ LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the r
 LY.stats = {key: 'view_stats', title: () => tr('Customize statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
   ['bylist', N_('By project'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
   ['habits', N_('Habits'), 'repeat', 'full']]};
-LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
-  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Month'), 'clock', 'full'], ['lists', N_('Projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
-  ['tickets', N_('Customer reports'), 'megaphone', 'full'], ['gendocs', N_('Letters & contracts'), 'file', 'full'],
-  ['privacy', N_('Data protection'), 'shield', 'full']]};  // 2.63.0 B (#1513); 2.93.0 A (#1927): gendocs; 2.154.0 C (#2192): privacy
+// 2.435.0 A (#3600): month = "Time tracking", gendocs = "Documents", letters a block of their own; the blocks the client's
+// office switched off (office/model.py CLIENT_BLOCKS, clientpage.js ms_clOff) are no blocks of the card
+const LY_CL_BLOCKS = [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
+  ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Time tracking'), 'clock', 'full'], ['lists', N_('Projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
+  ['tickets', N_('Customer reports'), 'megaphone', 'full'], ['gendocs', N_('Documents'), 'file', 'full'], ['letters', N_('Letters'), 'mail', 'full'],
+  ['privacy', N_('Data protection'), 'shield', 'full']];  // 2.63.0 B (#1513); 2.93.0 A (#1927): gendocs; 2.154.0 C (#2192): privacy
+LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => LY_CL_BLOCKS.filter(b => !(typeof ms_clOff === 'function' && ms_clOff().has(b[0])))};
 LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customize Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
   ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
   ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};
@@ -379,7 +382,7 @@ function dashCard(k) {
     // 2.45.0 (#1504): only active projects (not complete, not on hold), at most 5; none at all = no card
     // 2.55.0 (#1065): settings (lyopts.js): all projects or only active ones, the order, how many
     const act = lyo_get('home', 'projects', 'active', true), srt = lyo_get('home', 'projects', 'sort', 'side');
-    const all = S.lists.filter(l => !l.archived && isTracked(l)),  // 2.352.0 B (#2752): tracked = has a status
+    const all = S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)),  // 2.352.0 B (#2752): tracked = has a status; 2.380.2 (#3407): the shown workspace
       ps = all.filter(l => !act || !['complete', 'on_hold'].includes(l.status));
     if (!all.length) return '';
     if (!ps.length) return slim(tr('Active projects: nothing'));

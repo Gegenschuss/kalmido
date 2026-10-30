@@ -34,7 +34,7 @@ const fetchR = async (u, o) => { for (let i = 0; ; i++) { try { const r = await 
   if (i === 2) console.log('p2190_family_ui: server not reachable (' + (e.cause?.code || e.message) + '), waiting');
   await new Promise(r => setTimeout(r, i < 2 ? 1500 : 2000)); } } };
 const call = async (method, url, body, ck = CK) => { const r = await fetchR(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const day = n => TC.day(n);  // 2.85.0 (#1863): the Berlin day, as the app
@@ -196,24 +196,31 @@ const FAM = 'cal,habits,comments,collab,family';
   check(!!d.querySelector('#detail .famsec [data-act="fam-ingr"]'), 'a meal: "To the shopping list" in its panel');
   w.eval('closeDetail()'); w.close();
 
-  // ================= jsdom: "Used for" in the list dialog + the bar above a family list
+  // ================= jsdom: a shopping list without "Used for" + the bar above a family list
+  // 2.396.0 (#3385): the list dialog has no "Used for" any more; a list named like a shopping list offers it once in the list
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval('listModal()'); await sleep(200);
   md = d.querySelector('.modal.lnew');
-  // 2.140.0 A (#2132): + Recipes
-  check(md.querySelector('#l-fam') && md.querySelector('#l-fam').options.length === 8, 'new list: "Used for" with eight choices (2.46.1 #1615: Family; 2.140.0: Recipes)');
-  md.querySelector('#l-name').value = 'Weekend shop';
-  change(w, md.querySelector('#l-fam'), 'shopping');
-  check(md.querySelector('#l-dab').checked, 'a shopping list: done at the bottom ticked');
+  check(!md.querySelector('#l-fam'), 'new list: no "Used for" (2.396.0 #3385)');
+  md.querySelector('#l-name').value = 'Weekend shopping';
   click(w, md.querySelector('[data-m="save"]'));
-  const WS = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Weekend shop' && l.family === 'shopping'));
+  const WS0 = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Weekend shopping'));
+  check(WS0 && !WS0.family, 'created as a plain list');
+  await until(() => w.eval('S.route.key') === 'l:' + WS0.id);
+  const shopB = await until(() => d.querySelector('#view .onehint[data-hint="shop"] [data-act="shop-on"]'));
+  check(shopB && !d.querySelector('#view .onehint[data-hint="dab"]'), 'the hint "Use as a shopping list?" (one hint, not the packing tip too)');
+  click(w, shopB);
+  const WS = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === WS0.id && l.family === 'shopping'));
   check(WS && WS.checklist === 1 && (await call('GET', '/api/state')).sections.filter(s => s.list_id === WS.id).length === 0, 'created as a shopping list (2.22.0 #747: no shop areas by itself)');
   await until(() => w.eval('S.route.key') === 'l:' + WS.id);
   check(d.querySelector('#view .fambar [data-act="shop-start"]'), 'the bar: Shopping mode');
   check(!d.querySelector('#view .ghead[data-section]'), 'empty shop areas are not listed in the list view');
   w.eval(`listModal(${L.household})`); await sleep(200);
   md = d.querySelector('.modal.lmodal');
-  check(md.querySelector('#l-fam').value === 'family', 'edit list: "Used for" Family (2.46.1 #1615)');
+  check(!md.querySelector('#l-fam'), 'edit list: no "Used for" (2.396.0 #3385)');
+  { const ck0 = !!(await call('GET', '/api/state')).lists.find(l => l.id === L.household).checklist, cb = md.querySelector('#l-dab'); cb.checked = !ck0; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
+    const hh = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L.household && !!l.checklist !== ck0));
+    check(hh && hh.family === 'family', 'an autosave keeps the stored family (2.396.0 #3385)'); }
   md.remove(); w.close();
 
   // ================= jsdom: shopping mode

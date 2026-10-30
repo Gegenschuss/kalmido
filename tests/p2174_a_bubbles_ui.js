@@ -12,7 +12,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK, TOK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + TOK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await sleep(600);
@@ -40,8 +40,8 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(col && msgs.style.getPropertyValue('--agcol') === col, 'the message area carries the agent colour (--agcol)');
   const hd = d.querySelector('.chath');
   check(hd && hd.classList.contains('agcol'), 'header still carries the colour for the input box line / name');
-  // 2.350.0 (#3317): the workspace moved from the header into its ⋯ menu ("Workspace: Alpha")
-  check(!hd.querySelector('.chws') && w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).some(x => x.label === 'Workspace: Alpha')`), 'the header menu names the workspace (organisation agent)');
+  // 2.350.0 (#3317): the workspace moved from the header into its ⋯ menu; 2.407.0 B (#3493): as the kind of agent ("Team agent · Alpha")
+  check(!hd.querySelector('.chws') && w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).some(x => x.label === 'Team agent · Alpha')`), 'the header menu names the kind of agent and its organisation');
   check(w.eval(`/class="chws"[^>]*>.*Private/.test(chatWsHtml({id: ${CL}, org_id: null}))`) || w.eval(`chatWsHtml({id: ${CL}, org_id: null}).includes('Private')`), 'a private agent shows "Private"');
   check(w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; const h = chatInner(${CL}); S.me.workspaces = o; return !h.includes('chws'); })()`), 'without organisations the header has no workspace name');
   const css = require('./boot').allCssSync();

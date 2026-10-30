@@ -20,7 +20,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team,notes,pomo';
 // what the menus offered before 2.31 (flat): each of it must still be reachable (main level or the second level)
 // 2.152.2 (#2624): project instead of list
@@ -160,12 +160,12 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
     await ev(`(() => { closeSide(); return 1; })()`); await sleep(400);
     // the tab "Lists": the drawer starts at Lists
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);
-    await tap(o, '#tabs [data-act="side"]'); await sleep(800);
+    await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(800);  // 2.417.0 (#3559): the tab opens the Projects page now, the drawer at Lists stays
     const gtop = await ev(`(() => { const s = document.querySelector('#side'), g = document.querySelector('#side .sg-lists'); return g ? Math.round(g.getBoundingClientRect().top - s.getBoundingClientRect().top) : -1; })()`);
     // 2.353.0 B (#2776): the phone drawer with its fixed top starts at the top (the project list's head stays in view)
     const fixedTop = await ev(`typeof sbm_on === 'function' && sbm_on()`);
     check(fixedTop ? gtop >= 0 && gtop < await ev('innerHeight') - 60 && await ev(`document.querySelector('#side').scrollTop === 0`)
-      : gtop >= 0 && gtop < 60 && await ev(`document.querySelector('#side').scrollTop > 0`), `${tag}: #1057 the tab "Lists" opens the drawer at Lists (${gtop}${fixedTop ? ', fixed top' : ''})`);
+      : gtop >= 0 && gtop < 60 && await ev(`document.querySelector('#side').scrollTop > 0`), `${tag}: #1057 the drawer opens at Lists (${gtop}${fixedTop ? ', fixed top' : ''})`);
     await shot('p2310c-390-drawer-lists.png');
     await ev(`(() => { closeSide(); return 1; })()`); await sleep(400);
     // the tab "Search": the palette with the focus in its field

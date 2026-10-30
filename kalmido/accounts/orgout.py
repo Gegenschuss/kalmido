@@ -32,6 +32,7 @@ OO_KINDS = {
     "video": ("video_reviews", "title", ("created_by",)),
     "poll": ("sched_polls", "title", ("user_id",)),
     "bookmark": ("bookmarks", "title", ("user_id",)),
+    "letters": ("office_letters", "subject", ("created_by",)),  # 2.356.1 (#3344): letter drafts (officemove.py)
 }
 
 
@@ -45,7 +46,7 @@ def oo_mine(c, kind, obj, uid):
     if not r or not r["org_id"] or not any(r[m] == uid for m in makers):
         return None
     name = str(r["name"] or "")
-    return r["org_id"], "" if name.startswith("e2e1:") else name[:200]  # a locked space's ciphertext is no name for the admins
+    return r["org_id"], "" if name.startswith(("e2e1:", "kenc1:")) else name[:200]  # a locked space's (2.356.1: an encrypted office's) ciphertext is no name for the admins
 
 
 def oo_grant(c, oid, kind, obj):

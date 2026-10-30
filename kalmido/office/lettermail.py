@@ -25,6 +25,8 @@ from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
+from .model import office_ctx  # 2.424.0 B (#3450)
+from ..docs.maillink import ml_token_new  # 2.424.0 B (#3450)
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 LTM_MSGID_RE = re.compile(r"<[^<>\s]{3,250}>")
@@ -43,10 +45,13 @@ def ltm_space(c, oid, uid):
     return (owner, None) if owner is not None else (uid, oid)
 
 
-def ltm_reply_address(c, oid, uid, lid=None):
+def ltm_reply_address(c, oid, uid, lid=None, info=None):
     """The document address (doc_mail token) of uid's documents space of office area oid, '' without one / no mail input.
-    2.312.0 C (#3265): with a letter lid the address bound to that letter instead (what goes to the recipient)."""
+    2.312.0 C (#3265): with a letter lid the address bound to that letter instead (what goes to the recipient).
+    2.424.0 B (#3450): info (a dict) gets on = the mail input is set up."""
     from ..integrations.mail import MAIL_IN_ON, mail_addr
+    if info is not None:
+        info["on"] = bool(MAIL_IN_ON)
     if not MAIL_IN_ON:
         return ""
     who, org = ltm_space(c, oid, uid)
@@ -54,6 +59,40 @@ def ltm_reply_address(c, oid, uid, lid=None):
     if r and lid:
         return mail_addr(ltm_letter_token(c, lid, uid))
     return mail_addr(r[0]) if r else ""
+
+
+# 2.424.0 B (#3450): the forwarding address for receipts in the office settings = the document address of the office's
+# documents space (ltm_space: a personal office -> its owner's private space, an organisation -> the person's own address
+# of its space, as in the documents settings), so the company and the personal office have separate addresses. A mail to
+# it with a PDF attached, or with a download link to one (docs/maillink.py), becomes a document of that space and runs
+# through the receipt recognition. Every office member with the office open gets their own; agents and kids never.
+def _rcmail_json(c, oid, uid):
+    info = {}
+    who, org = ltm_space(c, oid, uid)
+    addr = ltm_reply_address(c, oid, uid, info=info) if who == uid else ""
+    return {"enabled": info.get("on", False) and who == uid, "address": addr, "ws": f"org:{org}" if org else "private"}
+
+
+@app.get("/api/office/receipt-mail")
+def ltm_rcmail_get():
+    """{enabled, address, ws}: the forwarding address for receipts of this office ('' = none yet)."""
+    c, uid, oid = office_ctx()
+    return jsonify(_rcmail_json(c, oid, uid))
+
+
+@app.post("/api/office/receipt-mail")
+def ltm_rcmail_new():
+    """{renew} -- the forwarding address for receipts: made when there is none yet; renew = a new one (the old one stops)."""
+    c, uid, oid = office_ctx()
+    j = _rcmail_json(c, oid, uid)
+    if not j["enabled"]:
+        raise Denied(409, tr("E-mail to tasks is not set up on this server"))
+    if not j["address"] or body().get("renew") is True:
+        who, org = ltm_space(c, oid, uid)
+        ml_token_new(c, who, org)
+        c.commit()
+        j = _rcmail_json(c, oid, uid)
+    return jsonify(j)
 
 
 # 2.312.0 C (#3265): "l<letter>-<person>-<mac>" (base 36 ids, a MAC with the sign-in key): only valid for that letter and

@@ -223,3 +223,42 @@ document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-rsb="open"]'); if (!b) return;
   bkSheet(+b.dataset.id, false);  // (bkReload after saving reads the list again)
 });
+
+// ---- 2.424.0 B (#3450): receipts by e-mail (office settings, area Data): the forwarding address of this office (the
+// company's and the personal office's apart, GET /api/office/receipt-mail), a copy button and a short Gmail filter guide.
+// A mail to it with a PDF, or with a download link to one that needs no login, becomes a document and a receipt suggestion.
+const RCM = {d: null, oid: undefined, loading: false};
+async function rcm_load() {
+  if (RCM.loading) return;
+  RCM.loading = true;
+  const oid = OFC.info?.org_id;
+  try { RCM.d = await api('GET', '/api/office/receipt-mail'); } catch { RCM.d = false; }
+  RCM.oid = oid; RCM.loading = false;
+  ofcDraw();
+}
+function rcm_settingsHtml() {
+  if (RCM.oid !== OFC.info?.org_id && !RCM.loading) { RCM.d = null; setTimeout(rcm_load, 0); return ''; }
+  const d = RCM.d;
+  if (!d || !d.enabled) return '';  // no mail input on this server (or not loaded yet)
+  return `<h3 id="rcm-h">${tr('Receipts by e-mail')}</h3>
+    <p class="shint keep">${tr('Forward invoices to this address: attached PDFs and download links that need no login become documents and receipt suggestions.')}</p>
+    ${d.address ? `<p class="rcm-addr"><code id="rcm-addr">${esc(d.address)}</code> <button type="button" class="btn sm" data-rcm="copy">${ic('copy', 's')}<span>${tr('Copy')}</span></button> <button type="button" class="linkbtn" data-rcm="renew">${tr('New address')}</button></p>`
+      : `<p><button type="button" class="btn sm" data-rcm="make">${tr('Create address')}</button></p>`}
+    <details class="rcm-gmail"><summary>${tr('Forward automatically from Gmail')}</summary><ol>
+      <li>${esc(tr('In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.'))}</li>
+      <li>${esc(tr('Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.'))}</li>
+      <li>${esc(tr('Tick “Forward it to”, pick this address and create the filter.'))}</li></ol></details>`;
+}
+document.addEventListener('click', async e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-rcm]'); if (!b) return;
+  const k = b.dataset.rcm;
+  if (k === 'copy') {
+    const v = RCM.d?.address || '';
+    try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(v); }
+    return;
+  }
+  // 2.424.0 B2 (#3450, review): the address is the documents space's one -- its documents address and letters' reply address change too
+  if (k === 'renew' && !await askConfirm(tr('New address?'), tr('The old address stops working. The documents address and the reply address of letters of this area change with it.'), {ok: tr('New address')})) return;
+  try { RCM.d = await api('POST', '/api/office/receipt-mail', {renew: k === 'renew'}); } catch { return; }
+  ofcDraw();
+});

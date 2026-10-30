@@ -53,6 +53,20 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wktoc ul{margin:.25rem 0;padding-left:1.25rem}
 .wktoc>ul{padding-left:1rem}
 .wktoc li{margin:.125rem 0}
+/* 2.371 (#3150): tags (links in the text, the phone's list, a tag's pages) and the ```abfrage block */
+.wktag{color:var(--accent);text-decoration:none;white-space:nowrap}
+.wktag:hover{text-decoration:underline}
+.wktags{border-top:1px solid var(--line);margin-top:.5rem;padding:.5rem .75rem}
+.wktags h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
+.wktags p{margin:0;display:flex;flex-wrap:wrap;gap:.25rem .75rem;line-height:2.25}
+.wktagh{display:flex;align-items:center;gap:.375rem}
+.wkq{margin:.5rem 0}
+.wkqlist,.wkqtasks{margin:.25rem 0;padding-left:1.25rem}
+.wkqtasks{list-style:none;padding-left:.25rem}
+.wkqlist li,.wkqtasks li{margin:.125rem 0}
+.wkqtasks input{margin:0 .25rem 0 0;vertical-align:middle}
+.wkqt{width:100%}
+.wkqerr,.wkqmore{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);margin:.25rem 0}
 .wksmore{margin:.375rem 0 0 .25rem}
 .wkfiles{border-top:1px solid var(--line);padding-top:.5rem}
 .wkfiles h4{display:flex;align-items:center;gap:.375rem;margin:0 0 .375rem;font-size:var(--fs-s);color:var(--muted)}
@@ -86,7 +100,7 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 @media (max-width:600px){.wembar .wemlbl{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 .wemna{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-s)}
 /* 2.371.2 (#3151): an embedded page (![[Page]]) -- a quiet frame with its name as the link; a daily note's day switch */
-.wempg{margin:.75rem 0;padding:.5rem .75rem .625rem;border-left:3px solid var(--line2);border-radius:0 var(--r-s) var(--r-s) 0;background:var(--bg2)}
+.wempg{margin:.75rem 0;padding:.5rem .75rem .625rem;border-left:.1875rem solid var(--line2);border-radius:0 var(--r-s) var(--r-s) 0;background:var(--bg2)}
 .wempgh{display:flex;align-items:center;gap:.375rem;margin-bottom:.25rem;font-size:var(--fs-s);color:var(--muted)}
 .wempgh .wklink,.wempgh>span{display:inline-flex;align-items:center;gap:.375rem;color:inherit}
 .wempgl .wempgh{margin-bottom:0}
@@ -94,7 +108,7 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wempgb>:last-child{margin-bottom:0}
 .wempgn{margin:0;font-size:var(--fs-s)}
 .wkday{display:flex;align-items:center;gap:.375rem;margin:0 0 .5rem}
-.wkday input[type=date]{width:auto;min-width:9.5rem}
+.wkday .dpw{width:auto;min-width:9.5rem}
 a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wemref{color:var(--muted)}
 .wkmd .tref.wemdone{text-decoration:line-through;opacity:.7}
@@ -140,7 +154,8 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 /* 2.353.0 C (#2829): Select in the knowledge lists -- the file store's boxes (.absel) at the row's top (an open folder stays one row) */
 .wkselrow{align-items:flex-start}
 .wkselrow>.absel{min-height:2.5rem}
-.wkselbar{margin-bottom:.75rem}
+/* 2.428.0 A (#3581): the shared floating bar (.mselbar): room below the list so the last row stays reachable */
+#wk-res:has(+ .mselbar){padding-bottom:6.5rem}
 /* 2.350.0 B (#3147): the live preview: drawn blocks, the open block is a growing field with its Markdown */
 .wklive{position:relative;min-height:12rem;padding:.25rem 0 2rem;cursor:text}
 .wklive .wklb{border-radius:var(--r-s);min-height:.25rem}

@@ -53,9 +53,6 @@ INV_TAX_ON = N_("{0} on {1}|tax line with its taxable amount")  # 2.296.0 B (#31
 INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
                  "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
                  "delivery": N_("the document|mail, delivery note")}
-# 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
-# credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
-INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
 
 
 def _j(s, default):
