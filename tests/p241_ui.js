@@ -25,7 +25,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { if (!el) return; if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,agents,comments';
 
 async function firefox(fn) {
@@ -97,8 +97,10 @@ async function firefox(fn) {
   let a = await adm(ag.id);
   const srt = o => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
   // 2.312.0 (#3266): runtime has perm_user (null = as set up on its computer); 2.233.0 (#3189): + the interim-summary values (defaults)
+  // 2.396.0 A (#3386): + the git author of AI commits (defaults: no own name / mail, no co-author line; git_author = the one used)
   check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', perm_user: null, reset_seq: 0,
-    rotate_size: 'medium', rotate_runs: 60, rotate_idle_min: 45, rotate_mb: 0.8, rotate_tokens: 150000, rotate_idle_mb: 0.4}), 'saved: ' + JSON.stringify(a.runtime));
+    rotate_size: 'medium', rotate_runs: 60, rotate_idle_min: 45, rotate_mb: 0.8, rotate_tokens: 150000, rotate_idle_mb: 0.4,
+    git_author: 'Kalmido <noreply@kalmido.com>', git_author_name: '', git_author_email: '', git_coauthor: false}), 'saved: ' + JSON.stringify(a.runtime));
   check((await v1(ag.token, 'GET', '/agent')).runtime?.model === 'sonnet', 'the agent reads it');
   // reopen: values shown, Reset now
   w.eval(`agModal(${JSON.stringify(a)}, null)`);

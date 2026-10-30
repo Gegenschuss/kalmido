@@ -189,7 +189,7 @@ def msv_allow(c, base):
         if not base.startswith("https://"):
             raise MsvError("https")
         return frozenset()
-    allow = cal_allow(c)
+    allow = cal_allow(c, "servers")  # 2.380 G (#3389)
     if base.startswith("http://"):  # review M3: plain http only to an internal host of the admin's allow-list
         p = urllib.parse.urlsplit(base)
         if not cal_host_allowed(allow, p.hostname, p.port or 80):

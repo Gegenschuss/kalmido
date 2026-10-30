@@ -64,6 +64,8 @@ async function agbDelete(lg) {
 // the send dialog (office_docs.js ofdSendDialog): tm = GET /api/office/docs/<id>/terms
 function agbSendRow(tm, smtp) {
   if (!tm?.terms) return '';
+  // 2.434.0 (#3619): a quotation carries its terms as the last pages of its PDF - a note instead of a second file
+  if (tm.in_pdf) return `<p class="muted" id="ofd-s-terms-in">${esc(tr('The terms and conditions (as of {0}) are the last pages of the PDF.', fmtDateLoc(tm.terms.date)))}</p>`;
   return `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-terms" ${tm.default ? 'checked' : ''} ${smtp ? '' : 'disabled'}> ${tr('Attach terms and conditions')} <span class="muted">(${esc(tr('as of {0}', fmtDateLoc(tm.terms.date)))})</span></label></div>`;
 }
 // the history of a document: "sent by e-mail (with terms and conditions as of ...)"

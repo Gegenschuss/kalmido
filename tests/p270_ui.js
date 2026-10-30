@@ -24,7 +24,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const change = (w, el) => el.dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -134,7 +134,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/comes back with one tap/.test(md.textContent) && md.querySelector('.ldabrow'), 'the option with its hint');
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).checklist === 1, 'stored as the option, kind list');
   closeAll(w);
-  check(w.eval(`topMoreItems()`).some(x => x.label === 'Show completed at the bottom' && x.icon === 'cart'), '"…": the option with the cart');
+  check(w.eval(`topMoreItems()`).some(x => x.label === 'Show completed at the bottom' && x.icon === 'donedown'), '"…": the option with its icon');  // 2.410.0 (#3440): donedown instead of the cart
   await call('PATCH', `/api/lists/${L}`, {checklist: false});
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'});
   // ================= #407 the time sum

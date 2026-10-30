@@ -15,17 +15,18 @@ const GIT_TOK_PH = {gitlab: N_('read_api is enough; empty for a public project')
 function repoWire(md, lid, folder) {
   const box = $('#l-repos', md); if (!box) return;
   const isProj = () => !!folder || isProject(lid);
-  let j = null, edit = null, secret = null, errUrl = null, errHdr = null;
+  let j = null, edit = null, secret = null, errUrl = null, errHdr = null, aedit = null;  // aedit: 2.396.0 A (#3386)
   const provSel = `<select id="rp-prov" aria-label="${esc(tr('Provider'))}">${GIT_PROV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>`;
   const draw = () => {
     if (!md.isConnected) return;
     if (!j) { box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
     const rows = j.repos.map(r => `<div class="mrow reporow" data-rid="${r.id}">${ic('git', 's')}<span class="n"><a href="${esc(httpUrl(r.web_url))}" target="_blank" rel="noopener noreferrer">${esc(r.full_name)}</a>
-        <span class="muted rpm">${esc(GIT_PROV.find(x => x[0] === r.provider)?.[1] || r.provider)}${r.default_branch ? ' · ' + esc(r.default_branch) : ''}${j.may ? ' · ' + esc(r.token ? tr('Token set') : tr('No token')) + (r.hook ? ' · ' + esc(tr('Webhook on')) : '') : ''}${listById(lid)?.ticket_key ? ' · ' + esc(r.hash_ids ? tr('#number and {0}-123', listById(lid).ticket_key) : tr('only {0}-123', listById(lid).ticket_key)) : ''}</span>
+        <span class="muted rpm">${esc(GIT_PROV.find(x => x[0] === r.provider)?.[1] || r.provider)}${r.default_branch ? ' · ' + esc(r.default_branch) : ''}${j.may ? ' · ' + esc(r.token ? tr('Token set') : tr('No token')) + (r.hook ? ' · ' + esc(tr('Webhook on')) : '') : ''}${listById(lid)?.ticket_key ? ' · ' + esc(r.hash_ids ? tr('#number and {0}-123', listById(lid).ticket_key) : tr('only {0}-123', listById(lid).ticket_key)) : ''}${r.author_name || r.author_email ? ' · ' + esc(tr('Git author: {0}', [r.author_name, r.author_email ? '<' + r.author_email + '>' : ''].filter(Boolean).join(' '))) : ''}</span>
         <span class="rst rst-${esc(r.status)}">${esc(r.status === 'error' ? r.error : r.status === 'new' ? tr('Waiting for the first check') : tr('Checked {0}', relTime(r.polled_at)))}</span></span>
         <button class="iconbtn" data-rp="refresh" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>
         ${j.may ? `<button class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
       ${edit === r.id ? `<div class="mrow repoedit"><input id="rp-tok2" type="password" autocomplete="new-password" placeholder="${esc(tr('New access token (empty = remove)'))}" aria-label="${esc(tr('Access token'))}"><button class="btn sm" data-rp="tok-save">${tr('Save')}</button></div>` : ''}
+      ${aedit === r.id ? rpAuthorHtml(r) : ''}
       ${secret && secret.id === r.id ? `<div class="shint lhint rpsec">${esc(tr('Webhook: payload URL {0}, content type JSON, secret (shown only now):', r.hook_url))} <code>${esc(secret.s)}</code></div>` : ''}`).join('');
     const add = j.may && j.repos.length < j.max ? `<div class="repoadd">
         <div class="row"><label for="rp-prov">${tr('Provider')}</label>${provSel}</div>
@@ -135,9 +136,20 @@ function repoWire(md, lid, folder) {
     } else if (k === 'tok-save') {
       try { await api('PATCH', `/api/repos/${edit}`, {token: $('#rp-tok2', box).value.trim()}); toast(tr('Saved')); } catch { return; }
       edit = null; await reload();
+    } else if (k === 'auth-save') {  // 2.396.0 A (#3386): an invalid mail = the error at the field, nothing saved
+      const n = $('#rp-an', box), m = $('#rp-am', box), er = $('#rp-aerr', box), mail = m.value.trim();
+      const bad = /[<>]/.test(n.value) ? tr('Invalid value: {0}', tr('Name')) : mail && !RP_MAIL_RE.test(mail) ? tr('Git author: please enter a valid email address') : '';
+      if (er) { er.textContent = bad; er.hidden = !bad; }
+      if (bad) { (/[<>]/.test(n.value) ? n : m).focus(); return; }
+      try { await api('PATCH', `/api/repos/${aedit}`, {author_name: n.value.trim(), author_email: mail}); toast(tr('Saved')); }
+      catch (/** @type {any} */ x) { if (er && x?.status === 400) { er.textContent = x.message; er.hidden = false; } return; }
+      aedit = null; await reload();
+    } else if (k === 'auth-cancel') {
+      aedit = null; draw();
     } else if (k === 'menu') {
       const r = j.repos.find(x => x.id === rid); if (!r) return;
       menu(b, [{label: tr('Change access token'), icon: 'lock', fn: () => { edit = rid; secret = null; draw(); $('#rp-tok2', box)?.focus(); }},
+        {label: tr('Git author for AI commits'), icon: 'git', fn: () => { aedit = rid; draw(); $('#rp-an', box)?.focus(); }},  // 2.396.0 A (#3386)
         r.hook ? {label: tr('Turn the webhook off'), icon: 'x', fn: async () => { try { await api('PATCH', `/api/repos/${rid}`, {hook: 'off'}); } catch { return; } secret = null; await reload(); }}
           : {label: tr('Turn the webhook on (optional)'), icon: 'zap', title: tr('Only when the Git server can reach this server: it then triggers a check at once'), fn: async () => { let x; try { x = await api('PATCH', `/api/repos/${rid}`, {hook: 'on'}); } catch { return; } secret = {id: rid, s: x.hook_secret}; await reload(); }},
         // 2.390.0 (#3353): with a project key, "#123" counts only while this is on (on for older connections, off for new ones)
@@ -185,4 +197,14 @@ function folderRepoModal(f, opt = {}) {  // 2.37.0 (#1158): opt.back = a sub-dia
   repoWire(md, 0, f);
   return md;
 }
-
+// 2.396.0 A (#3386): the git author for AI commits in one repository (project level; empty = the agent's own git author)
+const RP_MAIL_RE = /^[^@\s<>,]{1,100}@[^@\s<>,]{1,100}\.[^@\s<>,]{1,60}$/;
+/** @param {any} r */
+function rpAuthorHtml(r) {
+  return `<div class="repoedit rpauth">
+    <div class="row"><label for="rp-an">${tr('Name')}</label><input id="rp-an" maxlength="100" autocomplete="off" value="${esc(r.author_name || '')}" placeholder="${esc(tr('empty = the agent’s'))}"></div>
+    <div class="row"><label for="rp-am">${tr('E-mail')}</label><input id="rp-am" type="email" maxlength="200" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="rp-aerr" value="${esc(r.author_email || '')}" placeholder="${esc(tr('empty = the agent’s'))}"></div>
+    <div class="calerr" role="alert" id="rp-aerr" hidden></div>
+    <div class="shint lhint">${tr('Git author for AI commits in this repository. Appears publicly in GitHub with every commit.')}</div>
+    <div class="row rprow"><span class="spacer"></span><button class="btn sm" data-rp="auth-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-rp="auth-save">${tr('Save')}</button></div></div>`;
+}

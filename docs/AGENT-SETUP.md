@@ -65,8 +65,8 @@ The examples use these names; change them if you like, but consistently:
 ## Quickest: one command on your computer
 
 2.44.0 (#1517): for a project agent on your own Mac, Windows PC or Linux computer, *Settings > Agents >* (agent) *> Set up
-on a computer* gives you one command with a one-time code; it installs the starter, keeps the token in a private file and
-starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
+on a computer* gives you one command with a one-time code; it installs the starter (since 2.380 only files whose checksum
+matches the one your server sends - this guards against a wrong or changed download, not against a compromised server itself, and only while the starter is downloaded from a different place than your server), keeps the token in a private file and starts the agent at every login (launchd / Task Scheduler / systemd --user). Details, uninstall and what it does:
 [AGENTS.md, Set up on a computer with one command](AGENTS.md#set-up-on-a-computer-with-one-command). The paths
 below are for a hardened server setup (own user, firewall) and for doing it by hand.
 
@@ -561,7 +561,10 @@ agent account.
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) starts Claude Code with the runtime settings an admin chose in
 Kalmido (*Settings > Agents > (agent) > Runtime*: model, auto-compact, nightly fresh restart, *Reset now*),
-always in a fresh session, restarts it when they change, and stops it while the agent is paused.
+always in a fresh session, restarts it when they change, and stops it while the agent is paused. 2.396.0: it also sets
+the agent's **git author** from the block *Git author* of its settings (`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` and the
+same for the committer; empty fields = `Kalmido <noreply@kalmido.com>`) and `KALMIDO_GIT_COAUTHOR=1` when
+*Append Co-Authored-By* is on. Name and address appear publicly in GitHub with every commit.
 
 **Event mode (2.35.0, recommended).** With `--events` the launcher starts the event runner
 [`mcp/agent_run.py`](../mcp/agent_run.py) (Python 3, already needed for the MCP server). It waits for the agent's events

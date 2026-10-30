@@ -266,6 +266,7 @@ async function evEditor(o = {}) {
         Object.assign(body, {rrule: rule, reminders: st.reminders || [], cal_id: +val('ev-cal'), tz: val('ev-tz'), status: val('ev-status'), busy: $('#ev-busy', md).checked,
           url: val('ev-url').trim() || null, task_id: st.task_id || null,
           attendees: atts.map(a => a.user_id ? {user_id: a.user_id, partstat: a.partstat || 'needs-action'} : a.contact_id ? {contact_id: a.contact_id, partstat: a.partstat || 'needs-action'} : {email: a.email, name: a.name || '', partstat: a.partstat || 'needs-action'})});
+        if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
         if (body.url && !validUrl(body.url)) { toast(tr('The link must start with http:// or https://')); return; }
         try {
           if (ev) await api('PATCH', `/api/events/${ev.id}`, {...body, expect: ev.updated_at});

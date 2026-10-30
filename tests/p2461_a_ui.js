@@ -114,9 +114,14 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     await ev(`(() => { listById(${L.Groceries}).icon = ''; location.hash = '#inbox'; renderSide(); return 1; })()`); await sleep(400);
 
     // #1612: below the last row = the very end (into the last folder, after its last list)
-    const last = await ev(`(() => { const r = [...document.querySelectorAll('#side .sg-lists .srow[data-list]')].pop().getBoundingClientRect(); return {x: Math.round(r.left + 40), y: Math.round(r.bottom + 8)}; })()`);
+    // #3639: measure only once the sidebar stands still (the route change above reloads it), then wait for the saved order
+    // instead of reading it once after 900 ms (a list reload under load landed in between: red and green on the same code)
+    const lastRow = `(() => { const r = [...document.querySelectorAll('#side .sg-lists .srow[data-list]')].pop().getBoundingClientRect(); return {x: Math.round(r.left + 40), y: Math.round(r.bottom + 8)}; })()`;
+    let last = await ev(lastRow);
+    for (let i = 0; i < 20; i++) { await sleep(250); const n = await ev(lastRow); if (n.x === last.x && n.y === last.y) break; last = n; }
     const d1 = await ev(`__sideDrag(${L.Todo}, ${last.x}, ${last.y})`);
-    const o1 = await ev(`__order()`);
+    let o1 = await ev(`__order()`);
+    for (let i = 0; i < 24 && !/Ideas@Home,Todo@Home$/.test(o1); i++) { await sleep(250); o1 = await ev(`__order()`); }
     check(d1.ok && /dropafter/.test(d1.mark) && /Ideas@Home,Todo@Home$/.test(o1), `${tag}: #1612: dropped below the last list = at the very end ` + JSON.stringify(d1) + ' ' + o1);
     // on its own folder's header = the end of that folder
     const fh = await ev(`(() => { const r = document.querySelector('#side .fhead[data-folder="Family"] .sic').getBoundingClientRect(); return {x: Math.round(r.left + 4), y: Math.round(r.top + r.height / 2)}; })()`);

@@ -3,7 +3,7 @@ of a period as CSV tables plus index.xml in the description standard of the GDPd
 2.188.0 A (#2498): the official DTD gdpdu-01-03-2019.dtd, version 1.6, from gdpdudtd.py lies next to index.xml).
 Tables: bookings (the lines of the DATEV batch, input side included), invoices / credit notes,
 their positions, payments, receipts, cash book, clients, opening balances, the office log and (2.187.0 B, #2476) the log of
-the office rights.
+the office rights; 2.414.0 (#3502): the booking archive of past years (its lines in the period and the account labels).
 
 CSV: UTF-8, ';', CRLF, text in double quotes, decimal comma, dates DD.MM.YYYY, no header line (the columns are in
 index.xml). Only finalised documents; drafts are no bookings. Admins (and the accounting role) of the office area.
@@ -23,6 +23,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, local_now
 from ..core.orgcrypt import oc_dec_fields
+from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from .books import bk_gaps_text
 from .calc import dec, money
@@ -141,11 +142,13 @@ def gx_tables(c, oid, frm, to, gaps=None):
     out.append(t)
 
     t = _Tbl("receipts.csv", "Belege", "Eingangsbelege (Belegfach) nach Belegdatum",
-             [("Beleg_ID", A), ("Belegdatum", D), ("Bezahlt_am", D), ("Brutto", N), ("USt_Satz", A), ("Netto", N), ("USt", N),
-              ("Kategorie", A), ("Datei", A)])
-    for r in bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps):
-        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", r["amount"], r["vat_pct"] or "", r["net"], r["vat"],
-              r["category"], r["title"])
+             [("Beleg_ID", A), ("Belegdatum", D), ("Bezahlt_am", D), ("Geprueft_am", D), ("Geprueft_von", A), ("Brutto", N), ("USt_Satz", A),
+              ("Netto", N), ("USt", N), ("Kategorie", A), ("Datei", A)])
+    rcs = bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps)
+    who = user_names(c, [r["checked_by"] for r in rcs])  # 2.420.0 C (#3448): + the person's tick "checked" (day, name)
+    for r in rcs:
+        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", (r["checked_at"] or "")[:10], who.get(r["checked_by"], ""),
+              r["amount"], r["vat_pct"] or "", r["net"], r["vat"], r["category"], r["title"])
     out.append(t)
 
     t = _Tbl("cashbook.csv", "Kassenbuch", "Kassenbuchungen aller Kassen",
@@ -169,6 +172,31 @@ def gx_tables(c, oid, frm, to, gaps=None):
                        (oid, int(frm[:4]), int(to[:4]))).fetchall():
         t.add(r["id"], r["year"], r["account"], r["label"], r["amount"], r["side"])
     out.append(t)
+
+    # 2.414.0 (#3502): the booking archive of past years (office/bookarch.py) -- its lines of the period unchanged, only when there are any
+    # (review F7: a line without a readable date comes with its fiscal year when the period covers that whole year)
+    arch = c.execute("SELECT b.* FROM office_bookarch b JOIN office_import_runs r ON r.id=b.run_id WHERE b.org_id=? AND r.undone_at IS NULL "
+                     "AND ((b.day>=? AND b.day<=?) OR (b.day='' AND b.year>=? AND b.year<=?)) ORDER BY b.year, b.day, b.run_id, b.line, b.id",
+                     (oid, frm, to, int(frm[:4]) + (frm[5:] != "01-01"), int(to[:4]) - (to[5:] != "12-31"))).fetchall()
+    if arch:
+        t = _Tbl("archive_bookings.csv", "Buchungsarchiv", "Buchungen der Altjahre aus dem DATEV-Buchungsstapel (Buchungsarchiv, unveraendert)",
+                 [("ID", A), ("Wirtschaftsjahr", A), ("Zeile", A), ("Belegdatum", D), ("Konto", A), ("Gegenkonto", A), ("Soll/Haben", A),
+                  ("Umsatz", N), ("Waehrung", A), ("BU-Schluessel", A), ("Belegfeld1", A), ("Belegfeld2", A), ("Buchungstext", A),
+                  ("Beleglink", A)])
+        for r in arch:
+            r = oc_dec_fields(c, oid, "office_bookarch", r)
+            t.add(r["id"], r["year"], r["line"], r["day"], r["account"], r["counter"], r["side"], r["amount"], r["currency"], r["bu"],
+                  r["doc1"], r["doc2"], r["text"], r["link"])
+        out.append(t)
+        t = _Tbl("archive_accounts.csv", "Kontenbeschriftungen", "Beschriftungen der Konten des Buchungsarchivs (Sachkonten, Personenkonten)",
+                 [("ID", A), ("Konto", A), ("Wirtschaftsjahr", A), ("Beschriftung", A), ("Art", A)])
+        years = sorted({r["year"] for r in arch})
+        for r in c.execute("SELECT a.* FROM office_bookarch_accts a JOIN office_import_runs r ON r.id=a.run_id WHERE a.org_id=? "
+                           "AND r.undone_at IS NULL AND (a.year IS NULL OR (a.year>=? AND a.year<=?)) ORDER BY a.account, a.year, a.id",
+                           (oid, years[0], years[-1])).fetchall():
+            r = oc_dec_fields(c, oid, "office_bookarch_accts", r)
+            t.add(r["id"], r["account"], r["year"] or "", r["label"], "Personenkonto" if r["kind"] == "person" else "Sachkonto")
+        out.append(t)
 
     t = _Tbl("log.csv", "Protokoll", "Aenderungsprotokoll des Bueros (GoBD), ohne Inhalte der Aenderungen",
              [("ID", A), ("Zeitpunkt", A), ("Person", A), ("Aktion", A), ("Ziel", A), ("Dokument_ID", A)])

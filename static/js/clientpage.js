@@ -100,6 +100,26 @@ function ms_clView() {
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(cdn_label(c))}</b><small class="muted">${esc([cdn_label(c) !== c.name ? c.name : '', c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
   return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}${MSC.items?.length && !MSC.pick ? oim_link('master') : ''}</div>`}${card}</div></div>`;
 }
+// 2.435.0 A (#3600): the blocks of the client card like the blocks of a list: the office admin switches blocks off for the
+// office (office setting client_blocks_off, sent with the client: blocks_off), each person shows / hides the others for
+// themselves (the view builder) and folds them open / closed -- kept per person in the opts of view_clients, alike for every
+// client. Open by default: details, contact persons, open invoices (and the note); the others closed, with their number.
+const MSC_OPEN = ['details', 'persons', 'invoices', 'note'];
+const ms_clOff = () => new Set(CLV.data && !CLV.data.error ? CLV.data.blocks_off || [] : []);
+const ms_clOpen = k => !!lyOpt('clients', k, 'open', MSC_OPEN.includes(k));
+function ms_clFold(k, html, n) {
+  if (!html || S.ly.view === 'clients') return html;  // the editor shows the blocks themselves
+  const b = LY_CL_BLOCKS.find(x => x[0] === k), open = ms_clOpen(k);
+  return `<div class="ctfw${open ? ' on' : ''}"><h4 class="ctfh"><button type="button" class="ctfb" data-mscl="fold" data-k="${k}" aria-expanded="${open}">${ic('chev', 's fcar')}<span>${esc(tr(b?.[1] || k))}</span>${n != null ? `<span class="ctfn">(${esc(String(n))})</span>` : ''}</button></h4>${open ? html : ''}</div>`;
+}
+function ms_clFoldAll(c, ks, inv, parts) {
+  const st = c.stats || {}, num = {persons: ks.length, invoices: inv.length, month: st.month_seconds ? fmtHours(st.month_seconds) : null,
+    lists: (c.per_list || []).length, tickets: (c.tickets || []).length, gendocs: MSC.gd?.id === c.id ? MSC.gd.docs?.length : null,
+    letters: MSC.lt?.id === c.id ? MSC.lt.letters?.length : null, privacy: DSB.cl?.id === c.id ? DSB.cl.sheets?.length : null};
+  const off = ms_clOff(), out = {};
+  for (const [k, h] of Object.entries(parts)) if (!off.has(k)) out[k] = ms_clFold(k, h, num[k]);
+  return out;
+}
 function ms_clCard(c) {
   const b = c.billing || {}, cur = S.settings.time_currency || '€';  // 2.368.0 C (#2983): amounts through curMoney (i18n.js)
   const ii = k => typeof ux_info === 'function' ? ux_info(k) : '';  // 2.47.3 (D, #1382): the (i) explanations of the office
@@ -111,7 +131,7 @@ function ms_clCard(c) {
   return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(cdn_label(c))}</h3>${cdn_label(c) !== c.name ? `<small class="muted cdnlegal">${esc(c.name)}</small>` : ''}<div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
-    <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
+    <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', ms_clFoldAll(c, ks, inv, {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
       details: `<div class="ctfields">
       ${f('money', tr('Hourly rate'), c.rate != null ? esc(curMoney(c.rate, cur)) : '')}
       ${f('chart', tr('Budget'), esc(bud))}
@@ -129,8 +149,9 @@ function ms_clCard(c) {
       invoices: typeof officeOn === 'function' && officeOn() && MSC.inv !== null ? `<div class="ctsec"><h4>${tr('Open invoices')}</h4>${inv.length ? `<ul class="ctlinks">${inv.map(x => `<li><a class="linkbtn" href="#office/invoices/${x.id}">${ic('receipt', 's')} ${esc(x.number || tr('Draft'))}</a><span class="muted"> · ${esc(x.date ? fmtDateLoc(x.date) : '')} · ${esc(x.open_text || '')} · ${esc(x.status_text || '')}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No open invoices.')}</p>`}</div>` : '',
       privacy: dsb_clHtml(c),  // 2.154.0 C (#2192): the data protection sheets (office admins)
       tickets: typeof ptl_clientHtml === 'function' ? ptl_clientHtml(c) : '',  // 2.63.0 B (#1513): the client's reports
-      gendocs: ms_clGdHtml(c) + ms_clLtHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins); 2.153.0 (#2028): + letters
-      ...clientDetailParts(c)})}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}${typeof vdr_clientHtml === 'function' ? vdr_clientHtml(c) : ''}${''/* 2.99.1 A (#1959): video sign-offs */}</div>
+      gendocs: ms_clGdHtml(c),  // 2.93.0 A (#1927): the documents made from templates (office admins)
+      letters: ms_clLtHtml(c),  // 2.153.0 (#2028); 2.435.0 A (#3600): a block of its own
+      ...clientDetailParts(c)}))}${clm_histHtml(c)}${typeof hbm_clientHtml === 'function' ? hbm_clientHtml(c) : ''}${typeof vdr_clientHtml === 'function' ? vdr_clientHtml(c) : ''}${''/* 2.99.1 A (#1959): video sign-offs */}</div>
   </article>`;
 }
 
@@ -253,6 +274,10 @@ document.addEventListener('click', e => {
   if (k === 'pick') { MSC.pick = MSC.pick ? null : new Set(); MSC.last = null; ms_clDraw(); }
   else if (k === 'trest' || k === 'tpurge') ms_clTrashAct(k, +b.dataset.id);  // 2.272.0 D (#3029)
   else if (k === 'back') go('clients');
+  else if (k === 'fold') {  // 2.435.0 A (#3600): fold a block open / closed (kept per person)
+    const bk = b.dataset.k; lyOptSet('clients', bk, 'open', !ms_clOpen(bk)); ms_clDraw();
+    setTimeout(() => $(`#view [data-mscl="fold"][data-k="${bk}"]`)?.focus({preventScroll: true}), 0);
+  }
   else if (k === 'cmenu' && CLV.data?.id) {
     const c = CLV.data;
     menu(b, [{label: c.archived ? tr('Restore') : tr('Archive'), icon: c.archived ? 'undo' : 'archive', fn: async () => {

@@ -58,9 +58,11 @@ next to PostgreSQL 17.
 - **Virus scanner.** The installer and `.env.example` switch the virus scanner ClamAV on (`COMPOSE_PROFILES=localdb,clamav`).
   It needs 1-1.5 GB of memory and up to five minutes on its first start (it downloads its signatures). On a small server
   remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty in `.env`; see [Virus scan of uploads](#virus-scan-of-uploads).
-- **Backups take room.** Each automatic backup holds the database and every attachment; with the default retention (14
-  daily, 8 weekly) plan roughly 20 times the size of the data, or lower the retention, encrypt and move the folder
-  (`KALMIDO_BACKUP_DIR`) to another disk.
+- **Backups take room.** Each automatic backup holds the database and the small files; files from 64 KiB on
+  (`KALMIDO_BACKUP_SHARED_MIN`) are kept only once for all backups in the hidden folder `backups/.store` (2.432.0). Plan
+  about the size of the attachments once plus 22 times the database (default retention 14 daily, 8 weekly). When you
+  copy the backup folder somewhere else, copy it **with `.store`** (`rsync -a backups/ …`, not only `*.zip*`): a backup
+  of 2.432 or later needs its shared files. The *Download* button always gives one complete file.
 - **Raspberry Pi.** A Pi 4 or 5 with 4 GB or more and a 64-bit OS (Raspberry Pi OS 64-bit, Debian or Ubuntu arm64)
   runs Kalmido well for a household or a small team. Boot or at least keep `pgdata/` and `data/` on an **SSD** (USB 3
   or NVMe on the Pi 5): PostgreSQL writes constantly in small pieces, which is slow on an SD card and wears it out. A
@@ -357,6 +359,15 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
 - **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
   large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
   transaction may idle 5 minutes. At the start Kalmido waits up to 60 s for the database (`KALMIDO_DB_WAIT`).
+- **A copy of the backup folder elsewhere** (an off-site target, a second machine): put the backup and its shared files
+  (`backups/.store`, or the `kalmido-blob-…` files on the off-site target) into one folder and assemble one complete
+  file from them, then restore it under *Backups > Restore from a file*. Inside the app container:
+
+  ```bash
+  docker compose exec kalmido python3 -I /app/kalmido/admin/bkstore.py assemble /data/backups/kalmido-backup-20261029-023000-auto.zip.enc /data/backups/.store /data/complete.zip.enc --passphrase-file /data/passphrase.txt
+  ```
+
+  Any machine with Python 3.11 and the `cryptography` package can run `bkstore.py` the same way (it needs nothing else).
 - **Backups outside the app** (scripts, a pull from a second machine): use `pg_dump -Fc` with row-level security
   switched on and the system context, otherwise the dump stops or misses rows:
 
@@ -512,6 +523,14 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
+  the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
+  `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the
+  text cache of attachments (`textcache/`, built again), the organisation exports waiting for download (`exports/`) and
+  anything outside the data folder (`.env`, `docker-compose.yml`). A restore keeps the backup settings and the off-site
+  target of the restoring server as they are; a server that had none gets none from the backup (before 2.359.2 a
+  production backup restored on a fresh test server brought the production target and its access data along, and the
+  test server's uploads then thinned out production's copies there).
   2.360: downloading a backup, a restore, downloading an account or organisation export and switching on what opens the
   server (public links, a registration mode, accounts on the first single sign-on) or off the two-factor policy ask for
   the account password (a download: `POST` with `{"password"}` gives a one-time ticket, `GET ?t=<ticket>` the file; signed
@@ -922,7 +941,13 @@ organisation.
   file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
   `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
   address; never the status link, a new server would send new links) and the members with their roles (name, user
-  name, e-mail address).
+  name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
+  exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
+  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
+  contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
+  office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
+  import does not take them over, a booking page belongs to one person). An open channel stays open in the target
+  organisation: every member there can read its history.
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
   personal data (settings, own tags, filters, templates, direct messages, agent chats). Filed e-mails follow the rule of
@@ -931,6 +956,12 @@ organisation.
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
   ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
+  Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
+  messages they belong to their people), closed channels the admin is not a member of, notification channels,
+  invitations and join requests, the pictures of the organisation and its projects, synchronisation data of calendar
+  and task apps, groups of people, and (not yet) bookmarks, feeds and scheduling polls of the organisation. Every other
+  table with an organisation or project column is either exported or listed with its reason in the code
+  (`kalmido/admin/orgexport.py` OX_LEFT; `tests/export_coverage_test.py` fails on a new table that is neither).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
@@ -990,11 +1021,14 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
-**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files), their tasks with
-subtasks, dependencies, field values and your tags, comments, attachments, time entries, habits, filters, templates,
+**What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
+their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
+(2.362), time entries, habits, filters, templates,
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
 work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
-encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. Into an account
+encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. The import keeps
+the old server's binding of each note and file (`legacy_aad`), so they open again although their ids changed; a note is
+sealed anew the next time you save it. Into an account
 that has no encryption keys yet, the bundle is taken over and that content opens with the same passphrase. Into an
 account that already has its own keys, those keys stay and the content from the file arrives unreadable (you may delete
 it). Projects encrypted in the browser are not taken over at all: switch their encryption off before the export or
@@ -1050,8 +1084,9 @@ playbooks, project notes and notepads, time entries, customer reports and browse
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
 invoice that comes along point at the new invoice; without it they stay billed but not billable, never open again (the same
-for an account import, which carries no invoices). Rows that cannot be taken over are named in the report with their number
-per area.
+for an account import, which carries no invoices). Since 2.362 a billed receipt whose invoice did not come along stays
+billed as well ("billed, the invoice did not come along" in the bookkeeping): it cannot be billed a second time; free it
+there only if it was never billed. Rows that cannot be taken over are named in the report with their number per area.
 
 **Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
@@ -1839,6 +1874,9 @@ stay blocked until you allow them.
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
   older version; go back to 2.148 or newer first.
+- **Back to 2.413 or older after using the booking archive (2.414.0, #3502).** 2.414 adds new tables only
+  (`office_bookarch*`); older versions ignore them and the archive files (`bka-*` in the office folder). Their import page
+  lists an archive run but cannot undo it - undo it on 2.414 or newer.
 
 ## Run by a hoster: the operator interface
 

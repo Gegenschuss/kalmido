@@ -22,12 +22,25 @@ _cache = {}
 # features_off); a function that is not switchable (the finalising rules) stays in force whatever the settings say.
 PACK_FEATURES = {
     "books.datev": {"switch": True},         # DATEV: booking batch (EXTF), document inbox, SKR accounts, travel "in DATEV"
+    "docs.delivery": {"switch": True},       # 2.434.0 B (#3608): delivery notes / proofs of service (creating them; existing ones stay readable)
     "docs.einvoice": {"switch": True},       # e-invoice XML (XRechnung / ZUGFeRD / Factur-X) on finalising and mailing
     "books.vat_return": {"switch": True},    # the VAT return figures (UStVA); the filing itself (ELSTER) stays outside
     "books.tax_dates": {"switch": True},     # tax dates as tasks (deadlines)
     "books.export_csv": {"switch": True},    # neutral export for any tax advisor: booking list (CSV) + receipts (ZIP)
     "books.gobd": {"switch": False},         # finalising rules: locked documents, number gaps with a reason, date order
+    # 2.380 F (#3411): points of Money every pack offers (base) that the admin may switch off; off = no menu point and the
+    # routes of its path segments (PACK_FEATURE_SEGS) answer 404, the data stays
+    "money.cashflow": {"switch": True, "base": True},
+    "money.kpi": {"switch": True, "base": True},
+    "money.travel": {"switch": True, "base": True},
+    "money.meals": {"switch": True, "base": True},
+    "money.subs": {"switch": True, "base": True},
 }
+# 2.380 F (#3411): first path segment under /api/office/ -> the base function it belongs to (trips/bill-docs serves the
+# bookkeeping's "bill on" too and stays open)
+PACK_FEATURE_SEGS = {"cashflow": "money.cashflow", "kpi": "money.kpi", "trips": "money.travel", "meals": "money.meals", "subs": "money.subs"}
+PACK_FEATURE_OPEN = ("trips/bill-docs",)
+PACK_BASE = {k: "ready" for k, m in PACK_FEATURES.items() if m.get("base")}
 PACK_FEATURES_PLANNED = ("books.receipt_images", "books.period_lock", "books.procedure_doc")  # 2.148 (#2470-#2472)
 PACK_FEATURE_STATUS = ("ready", "planned")
 # 2.147.0 (#2459, #2461): how long receipts and books are kept (years). editable = the office sets its own value (the
@@ -207,9 +220,11 @@ def pack_features(d):
     d = d or {}
     ft = d.get("features")
     if isinstance(ft, dict):
-        return {k: v.get("status") for k, v in ft.items() if isinstance(v, dict) and (k in PACK_FEATURES or k in PACK_FEATURES_PLANNED)}
+        out = {**PACK_BASE, **{k: v.get("status") for k, v in ft.items() if isinstance(v, dict) and (k in PACK_FEATURES or k in PACK_FEATURES_PLANNED)}}
+        out.setdefault("docs.delivery", "ready")  # 2.434.0 B (#3608): packs built before the switch keep their delivery notes
+        return out
     # (review 2.147.0: an office on such a pack had the VAT return figures and tax dates before -- they stay)
-    out = {"books.export_csv": "ready", "books.gobd": "ready", "books.vat_return": "ready", "books.tax_dates": "ready"}
+    out = {**PACK_BASE, "docs.delivery": "ready", "books.export_csv": "ready", "books.gobd": "ready", "books.vat_return": "ready", "books.tax_dates": "ready"}
     ev, bk = d.get("einvoice") or {}, d.get("bookkeeping") or {}
     if ev.get("formats"):
         out["docs.einvoice"] = ev.get("status") or "planned"
@@ -230,6 +245,17 @@ def office_features(s, pack=None):
 
 def office_feature_on(s, key, pack=None):
     return bool(office_features(s, pack).get(key))
+
+
+def office_path_feature(path):
+    """2.380 F (#3411): the base function (PACK_FEATURE_SEGS) an /api/office/ path belongs to, else None."""
+    if not path.startswith("/api/office/"):
+        return None
+    rest = path[len("/api/office/"):]
+    if rest.startswith(PACK_FEATURE_OPEN):
+        return None
+    seg = re.split(r"[/.]", rest, maxsplit=1)[0]
+    return PACK_FEATURE_SEGS.get(seg)
 
 
 def pack_retention(pack, s=None):

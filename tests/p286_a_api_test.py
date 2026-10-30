@@ -29,19 +29,9 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 PP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SMTP = (" -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none"
         " -e KALMIDO_MAIL_FROM=kalmido@example.test")
-
-
-def sess(user, pw="password123", ip=None):
-    s = requests.Session()
-    s.headers.update(H)
-    if ip:
-        s.headers["X-Forwarded-For"] = ip
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def login(user, pw, ip):
@@ -94,7 +84,7 @@ check(dbx("SELECT COUNT(*) FROM user_invites WHERE user_id=? AND kind='reset'", 
 
 # ================================================================== N2 per-name login ceiling
 KNOWN = "198.51.100.200"
-G = sess("gina", ip=KNOWN)  # gina logged in from here before
+G = sess("gina", headers={"X-Forwarded-For": KNOWN})  # gina logged in from here before
 with ThreadPoolExecutor(8) as ex:  # 20 addresses x 5 wrong passwords = the ceiling of 100 for the name
     codes = list(ex.map(lambda i: login("gina", "wrong-password", f"192.0.2.{1 + i // 5}").status_code, range(100)))
 check(codes.count(401) == 100, f"setup: 100 wrong passwords counted ({sorted(set(codes))})")

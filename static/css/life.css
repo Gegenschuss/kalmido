@@ -13,7 +13,7 @@
 .lcost .numin{width:6.5rem;flex:none}
 .ltypes{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:.75rem}
 .ltypes .ptcard{flex-direction:column;align-items:center;text-align:center;gap:.25rem}
-.ltypes .ptcard span{font-size:1.25rem;line-height:1}
+.ltypes .ptcard span{font-size:var(--fs-xl);line-height:1}
 .ltypes .ptcard b{white-space:normal;overflow-wrap:anywhere;font-size:var(--fs-s)}
 .lifebar .ltrip{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lifebar>.i{color:var(--accent);flex:none}
@@ -22,7 +22,7 @@
 .rvhead .fwnav{align-items:center;gap:.25rem}
 .rvlab{font-weight:600;min-width:7rem;text-align:center}
 .rvmood{display:flex;gap:.25rem;margin:0 0 .5rem}
-.rvmood button{width:2.5rem;height:2.5rem;border-radius:50%;border:1px solid var(--line);background:transparent;font-size:1.25rem;line-height:1;cursor:pointer;filter:grayscale(.6);opacity:.75}
+.rvmood button{width:2.5rem;height:2.5rem;border-radius:50%;border:1px solid var(--line);background:transparent;font-size:var(--fs-xl);line-height:1;cursor:pointer;filter:grayscale(.6);opacity:.75}
 .rvmood button.on{border-color:var(--accent);filter:none;opacity:1;background:var(--bg3)}
 #rv-text{width:100%;min-height:9rem;resize:vertical;box-sizing:border-box;font:inherit;padding:.625rem .75rem;border-radius:var(--radius);border:1px solid var(--line);background:var(--bg);color:var(--text)}
 .rvpriv{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-xs);margin:.375rem 0 0}

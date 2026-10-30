@@ -829,13 +829,10 @@ def classify(c, m, node, text, given=None):
         if f == "folder":
             if not folder_ok(c, node, label):
                 continue
-            # 2.360.0 B (#2496): a learned folder only one the uploading person sees; files into it on its own only where
-            # they may edit (like a rule), else a suggestion
-            fr = _fs_role(c, int(label), uid)
-            if not fr:
+            # 2.360.0 B (#2496); 2.373.0 (#3336): a learned folder only one the uploading person may edit (like a rule),
+            # neither filed nor suggested otherwise -- the file stays where it lands
+            if _fs_role(c, int(label), uid) not in ("owner", "edit"):
                 continue
-            if fr not in ("owner", "edit"):
-                conf = min(conf, CL.MAYBE)
         elif not label_ok(c, ws, f, label) or not _learn_seen(c, m, uid, f, label):
             continue
         val = label if f == "folder" else int(label)
@@ -1064,6 +1061,8 @@ def process(c, nid):
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     # 2.273.0 C (#3047): the row locked from here on (a save waits); the values a person set by hand stay
     m2 = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
+        return None
     if asn_found and not m2["asn"]:
         asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write
         if not asn_taken(c, ws, asn_found, nid):

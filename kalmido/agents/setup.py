@@ -40,6 +40,19 @@ def ains_version():
         return ""
 
 
+def ains_starter_sha():
+    """2.380 G (#3390): {file name: sha256} of the starter files this version was released with (mcp/starter_sha256.txt, made by
+    tools/starter_sha.py; the image has it in /app, a checkout in mcp/) -- {} when missing: the setup then checks nothing."""
+    for p in (os.path.join(app.root_path, "starter_sha256.txt"), os.path.join(app.root_path, "mcp", "starter_sha256.txt")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                rows = [ln.split() for ln in f if ln.strip() and not ln.startswith("#")]
+        except OSError:
+            continue
+        return {r[1]: r[0].lower() for r in rows if len(r) == 2 and re.fullmatch(r"[0-9a-fA-F]{64}", r[0])}
+    return {}
+
+
 def ains_text(v, n, what):
     v = v if isinstance(v, str) else ""
     v = v.strip()
@@ -172,7 +185,8 @@ def ains_admin_machine_del(aid, tid):
 
 @app.post("/api/agent-setup/redeem")
 def ains_redeem():
-    """{code, host?, folder?, os?} -> {token, url, agent, operator_id, starter_base, version}. No login: the one-time code is the credential."""
+    """{code, host?, folder?, os?} -> {token, url, agent, operator_id, starter_base, starter_sha256, version}. No login: the one-time
+    code is the credential. 2.380 G (#3390): starter_sha256 = {file: sha256}, the setup refuses a downloaded file that differs."""
     from ..agents.admin import agent_token_new
     keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
@@ -208,7 +222,8 @@ def ains_redeem():
         return jsonify(token=tok, url=(PUBLIC_URL or request.host_url).rstrip("/"), version=ver,
                        agent={"id": a["user_id"], "name": _plain(a["display_name"] or a["username"]), "username": _plain(a["username"]),
                               "team": not a["owner_id"]},
-                       operator_id=ains_operator(c, a, r), starter_base=AINS_STARTER_BASE.replace("{version}", ver or "main"))
+                       operator_id=ains_operator(c, a, r), starter_base=AINS_STARTER_BASE.replace("{version}", ver or "main"),
+                       starter_sha256=ains_starter_sha())
 
 
 @app.post("/api/agent-setup/remove")

@@ -1287,6 +1287,9 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     if r["kind"] == "datev":  # 2.148.0 D (#2458): a DATEV import run (office/datevimp.py) has its own undo
         from .datevimp import di_undo
         return di_undo(c, oid, uid, r)
+    if r["kind"] == "datev_archive":  # 2.414.0 (#3502): a run of the booking archive (office/bookarch.py)
+        from .bookarch import ba_undo
+        return ba_undo(c, oid, uid, r)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
     detail = bk_detail(r)
@@ -1489,8 +1492,9 @@ def sr_row(c, oid, kind, rid):
 
 
 def _unlink_files(oid, files):
+    from .bookarch import ba_path  # 2.414.0 (#3502): the files of an undone booking archive run
     for f in files:
-        p = fi_archive_path(oid, f)
+        p = fi_archive_path(oid, f) or ba_path(oid, f)
         if p:
             try:
                 os.unlink(p)

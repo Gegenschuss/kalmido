@@ -146,19 +146,30 @@ check(A.patch(B + f"/api/lists/{W}", json={"client_id": CL}).ok, "setup: an orga
 r = A.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private", "dry": 1})
 check(r.ok and (r.json().get("count") or {}).get("copied") == 1, f"setup: the dry run copies the client {r.text[:200]}")
 res = []
+pair, start = [sess("alice"), sess("alice")], threading.Barrier(2)  # the sign-in stays out of the race: both moves leave together
 
 
-def go():
-    res.append(sess("alice").post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"}).status_code)
+def go(s):
+    start.wait()
+    res.append(s.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"}).status_code)
 
 
-th = [threading.Thread(target=go) for _ in range(2)]
+th = [threading.Thread(target=go, args=(s,)) for s in pair]
 for x in th:
     x.start()
 for x in th:
     x.join()
 mine = [x for x in A.get(B + "/api/clients").json().get("clients", []) if x.get("name") == "Northwind Example GmbH" and not x.get("org_id")]
 check(sorted(res) == [200, 409] and len(mine) == 1, f"#3042: two parallel copy moves -> one copy, the other 409 ({res}, {len(mine)} copies)")
+# 2.407.0 (#3396 #3397): a request that reads only after the first one's commit (same rows before and after the lock) is the
+# race above made sure: the client a copy move archived is not copied again
+r = A.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"})
+mine = [x for x in A.get(B + "/api/clients").json().get("clients", []) if x.get("name") == "Northwind Example GmbH" and not x.get("org_id")]
+check(r.status_code == 409 and len(mine) == 1, f"#3396: a copy move after the first one's commit -> 409, still one copy ({r.status_code}, {len(mine)} copies)")
+# 2.407.0 (#3396, review): a copy into the same workspace long ago is no race: copying the archived client again works
+kt.dbx("UPDATE space_moves SET at='2020-01-01T00:00:00+00:00' WHERE kind='office_clients' AND obj_id=?", (CL,))
+r = A.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"})
+check(r.ok, f"#3396: a copy move long after the last one into the same workspace is no 409 ({r.status_code} {r.text[:120]})")
 
 # 2.273.0 F1 (#3042): a position added in the organisation since a draft moved there goes back with the undo without the
 # organisation's service (as on the way there: service / list of the old office end)

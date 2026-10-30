@@ -286,7 +286,7 @@ function palAll() {
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload & absences')], ['office', 'receipt', N_('Office & finance')]])
-    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
+    if (modOn(m) && !o3a_hid(m) && (m !== 'workload' || wlShown() /* 2.380.2 (#3407) */)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
   for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_icon(mg_area(id)), () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
@@ -363,7 +363,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418); 2.417.0 C (#3445): trial in the test mode */, {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
@@ -738,6 +738,15 @@ function checkAt(p) {  // the big check: pops (overshoot) right after the arriva
   const [p0, s0, o0] = k[i], [p1, s1, o1] = k[i + 1], t = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 1;
   return {transform: `translate(-50%,-50%) scale(${celeLerp(s0, s1, t).toFixed(3)})`, opacity: +celeLerp(o0, o1, t).toFixed(3)};
 }
+// 2.380 E (#3331): with the undo message showing, the figure's line sits above it (its top edge minus a gap), else it stays at the bottom
+function celeStackNow(q) {
+  const t = $('#toast'), r = t && !t.classList.contains('hidden') && t.offsetWidth ? t.getBoundingClientRect() : null;
+  q.style.bottom = r ? Math.round(innerHeight - r.top + 8) + 'px' : '';
+}
+function celeStack(q) {
+  celeStackNow(q);
+  for (const ms of [60, 400]) setTimeout(() => { if (q.isConnected) celeStackNow(q); }, ms);  // the message settles after its first paint
+}
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
   celeEnd();
@@ -750,7 +759,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   try { if (frame === null && navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(tier.vib); } catch { /* not allowed */ }
   if (reducedMotion()) {  // calm variant: the small still figure + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
-    document.body.appendChild(q);
+    document.body.appendChild(q); celeStack(q);
     if (frame === null) CELE.timers.push(setTimeout(() => q.remove(), 4200));
     q.addEventListener('pointerdown', celeEnd);
     return q;
@@ -759,7 +768,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = `<div class="cbot">${botFig('erledigt', 'cbotfig')}</div><div class="ccheck">${CHECK_SVG}</div>`;
-  document.body.appendChild(el); document.body.appendChild(q);
+  document.body.appendChild(el); document.body.appendChild(q); celeStack(q);
   const fig = $('.cbot', el), chk = $('.ccheck', el);
   fig.style.width = bw + 'px';
   const cy = vh * 0.4;

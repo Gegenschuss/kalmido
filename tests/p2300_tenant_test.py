@@ -390,12 +390,16 @@ for p in ("/event-calendars", "/address-books", "/events?from=2026-10-01&to=2026
     hidden(agb.get(p), f"matrix agent: {p}")
 # webhooks: carol's hook gets nothing of the first organisation (deliveries only for visible tasks)
 WC = Ca.post(B + "/api/me/webhooks", json={"name": "c", "url": "https://hooks.example.invalid/hook", "events": ["task.created"]}).json()["id"]
+# 2.380 (#3391): a new personal webhook gets no organisation's list at all (also not carol's own one in Beta): her own task
+# comes from a private list of hers
+LCP = Ca.post(B + "/api/lists", json={"name": "Carol private", "org_id": None}).json()["id"]
 Bo.post(B + "/api/tasks", json={"title": f"{MARK} later", "list_id": LA})
 Ca.post(B + "/api/tasks", json={"title": "Beta later", "list_id": LB})
+Ca.post(B + "/api/tasks", json={"title": "Carol private later", "list_id": LCP})
 time.sleep(1.5)
 q = dbx("SELECT payload FROM webhook_queue WHERE webhook_id=?", (WC,))
 lg = dbx("SELECT COUNT(*) FROM webhook_log WHERE webhook_id=?", (WC,))[0][0]
-check(not any(MARK in r_[0] for r_ in q) and (q or lg), f"matrix webhook: carol's hook has her own task, nothing of the first organisation ({len(q)} queued, {lg} logged)")
+check(not any(MARK in r_[0] or "Beta later" in r_[0] for r_ in q) and (q or lg), f"matrix webhook: carol's hook has her own task, nothing of the first organisation ({len(q)} queued, {lg} logged)")
 check(SCH in {x["id"] for x in A.get(B + f"/api/agents/{AG1}/schedules").json().get("data", [])},
       "matrix agent: the planned job is untouched (nobody of the other organisation changed or deleted it)")
 check(boundary(A)["violations"] == 0, "the boundary is still clean after the whole suite")

@@ -52,6 +52,8 @@ RX_TABLES = (
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
     ("archive/archive.csv", "office_archive"),
+    ("archive/bookarch.csv", "office_bookarch"),  # 2.414.0 (#3502): the booking archive of past DATEV years (books, 10 years)
+    ("archive/bookarch-accounts.csv", "office_bookarch_accts"),
     ("cashbook/cashbooks.csv", "office_cashbooks"),
     ("cashbook/entries.csv", "office_cash_entries"),
     ("cashbook/closings.csv", "office_cash_closings"),
@@ -66,6 +68,7 @@ RX_TABLES = (
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
+    ("logs/drive-closed.csv", "office_drive_closed"),  # 2.362.0 (#3096): the closed months of the logbook
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
 )
 RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'

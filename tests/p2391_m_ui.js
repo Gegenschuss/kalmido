@@ -42,7 +42,7 @@ const FEAT = 'comments,collab,agents,stats,time';
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const until = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  const until = (ev, expr, n) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
   const act = (cmd, ctx, kind, steps) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p' + kind, parameters: {pointerType: kind}, actions: steps}]}).then(() => cmd('input.releaseActions', {context: ctx}));
   const tap = (cmd, ctx, x, y, hold = 0) => act(cmd, ctx, 'touch', [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, ...(hold ? [{type: 'pause', duration: hold}] : []), {type: 'pointerUp', button: 0}]);
   const rect = (ev, sel) => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top, h: r.height, w: r.width}; })()`);

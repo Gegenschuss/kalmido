@@ -206,7 +206,7 @@ def _url_ok(c, u, uid=None):
         ip = None
     if cal_host_allowed(_pep_hosts(c, uid), h, port):
         return True
-    internal = cal_host_allowed(cal_allow(c), h, port) or h in ("localhost", "localhost.localdomain") or \
+    internal = cal_host_allowed(cal_allow(c, "peppol"), h, port) or h in ("localhost", "localhost.localdomain") or \
         (ip is not None and not cal_ip_public(ip))
     return p.scheme == "https" and not internal
 
@@ -217,7 +217,7 @@ def _pep_hosts(c, uid):
     env = frozenset(cal_allow_parse(PEP_ALLOW_ENV)[0])
     r = c.execute("SELECT is_admin, kind, disabled FROM users WHERE id=?", (uid,)).fetchone() if uid else None
     adm = bool(r and r["is_admin"] and not r["disabled"] and (r["kind"] or "user") != "agent")
-    return frozenset(cal_allow(c) | env) if adm else env
+    return frozenset(cal_allow(c, "peppol") | env) if adm else env
 
 
 def _pep_allow(c, oid):
@@ -398,7 +398,7 @@ def pep_adapter(c, oid, conf=None):
     if conf["provider"] not in ADAPTERS or not key:
         raise PepError("config")
     # 2.306.0 D2 (#2875): the provider address is the operator's (env); an own endpoint reaches internal hosts only when an instance admin set it
-    return ADAPTERS[conf["provider"]](c, conf, key, cal_allow(c) if conf["provider"] != "custom" else _pep_allow(c, oid))
+    return ADAPTERS[conf["provider"]](c, conf, key, cal_allow(c, "peppol") if conf["provider"] != "custom" else _pep_allow(c, oid))
 
 
 # ---------------------------------------------------------------- documents

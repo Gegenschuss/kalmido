@@ -68,7 +68,7 @@ function swlBoard(lid, m, cols, tasks, o) {
     const dot = L.opt ? `<i class="swldot" ${lrSelStyle(L.opt)}></i>` : L.uid ? av(L.uid, L.name, 'avatar swlav') : L.cls ? `<span class="${L.cls}">${ic('flag', 's')}</span>` : '';
     return `<section class="swlane${closed ? ' closed' : ''}" data-swl="${esc(L.key)}" aria-label="${esc(L.name)}">
       <button type="button" class="swlh" data-act="collapse" data-key="${esc(k)}" aria-expanded="${!closed}">${ic('chev', 's')}${dot}<span class="swln">${esc(L.name)}</span><span class="c">${n}</span></button>
-      ${closed ? '' : `<div class="swlrow">${cols.map((c, i) => `<div class="kcol swlc" data-kcol="${c.id ?? ''}"><div class="kcards">${per[i].map(t => taskRow(t, {compact: true})).join('')}</div>${o.add(c, L.key, L.name)}</div>`).join('')}</div>`}
+      ${closed ? '' : `<div class="swlrow">${cols.map((c, i) => `<div class="kcol swlc" data-kcol="${c.id ?? ''}"><div class="kcards">${per[i].map(t => taskRow(t, {compact: true, dwell: lid})).join('')}</div>${o.add(c, L.key, L.name)}</div>`).join('')}</div>`}
     </section>`;
   }).join('')}</div>`;
 }

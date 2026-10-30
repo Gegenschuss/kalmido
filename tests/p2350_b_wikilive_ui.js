@@ -41,7 +41,7 @@ const K = {Enter: '', Escape: '', ArrowUp: '', ArrowDown: '', Contro
 
   for (const [[vw, vh], run] of [[[1280, 800], runs[0]], [[820, 1180], runs[1]]]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
     const tag = `${vw} ${run.who}`;
-    const until = async (expr, n = 40) => { for (let i = 0; i < n; i++) { const x = await ev(expr).catch(() => null); if (x) return x; await sleep(250); } return ev(expr).catch(() => null); };
+    const until = (expr, n) => require('./boot').until(() => ev(expr).catch(() => null), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
     const saved = async want => { let b = ''; for (let i = 0; i < 60 && b !== want; i++) { await sleep(250); b = (await call(run.ck, 'GET', `/api/wiki/pages/${run.id}`)).body; } return b; };
     const act = actions => cmd('input.performActions', {context: ctx, actions}).then(() => cmd('input.releaseActions', {context: ctx}));
     const type = s => act([{type: 'key', id: 'k', actions: [...s].flatMap(c => [{type: 'keyDown', value: c}, {type: 'keyUp', value: c}])}]);

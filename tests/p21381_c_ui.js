@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21381C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 
 (async () => {
@@ -42,14 +42,14 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(bar && bar === d.querySelector('#kbar button') && bar.dataset.act === 'sbb-ws' && /Private/.test(bar.querySelector('.wsn')?.textContent || '') && bar.querySelector('.wsp-dot') && bar.querySelector('svg.i:last-child'), '#2392: row 1 = the workspace switch: dot + name + arrow');
   check(d.querySelector('#side .sbhead .sbtools .sbbfa') && d.querySelector('#side .sbhead .sbtools .sbbhide') && d.querySelector('#side .sbhead h2.sbbpt'), '#2392: fold-all sits in the head\'s tools (hover / focus)');  // 2.152.3 (#2619): the panel head = area name + Fold all (.sbbfa) + Hide the panel
   const acct = d.querySelector('#kbar .kbend .kbacct');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
-  check(acct && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot') && !d.querySelector('#srail .sbacct') && [...d.querySelectorAll('#srail .srfoot > *')].every(x => x.classList.contains('sset')), '#2392: the avatar without dots in the head bar, only Settings at the bottom of the bar');  // 2.152.3 (#2619): the account in the head bar
+  check(acct && acct.querySelector('.avatar') && !acct.querySelector('.netdot, .dot') && !d.querySelector('#srail .sbacct') && !d.querySelector('#srail .srfoot'), '#2392: the avatar without dots in the head bar, nothing at the bottom of the bar'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account in the head bar
   const nd = () => d.querySelector('#kbar .netdot');  // 2.152.3 (#2619): the dot moved from the panel head into the head bar
   check(nd()?.classList.contains('n-on') && nd().getAttribute('aria-label') === 'Online', '#2392: online: the dot is there for the state but n-on (hidden by CSS)');
   w.eval(`OUT.flushing = true; netDotDraw()`);
   check(nd()?.classList.contains('n-sync'), '#2392: syncing: the dot shows');
   w.eval(`OUT.flushing = false; netDotDraw()`);
   w.eval(`S.about = Object.assign(S.about || {}, {available: '99.0.0'}); renderSide()`);
-  check(d.querySelector('#srail .sset .nunread') && !d.querySelector('#kbar .kbacct .dot'), '#2392: the update dot only at Settings');  // 2.152.3 (#2619): the account in the head bar
+  check(d.querySelector('#kbar .kbsw .kbupd') && !d.querySelector('#kbar .kbacct .dot'), '#2392: the update dot only at the Kalmido menu (Settings)'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account in the head bar
   w.eval(`S.about.available = null; renderSide()`);
   click(w, d.querySelector('#kbar .kbacct')); await sleep(200);  // 2.152.3 (#2619): the account in the head bar
   const home = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
@@ -72,9 +72,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(app().style.getPropertyValue('--wbd') === '#2dd4bf', '#2389: my own choice wins over the organisation\'s colour');
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'none'}); render()`);
   check(!app().classList.contains('wsb-on'), '#2389: "No color": a grey stripe');
-  w.eval(`S.settings.ws_colors = JSON.stringify({private: 'blue'}); wsSet('private')`); await sleep(400);
+  // #3506: the choice is saved on the server too and the check waits for the stripe - a state reload under load (core.js
+  // takes S.settings from the server) wiped the local-only choice before the fixed 400 ms were over (Vorprüfung 2.409)
+  await call('PATCH', '/api/settings', {ws_colors: JSON.stringify({private: 'blue'})});
+  await w.eval(`S.settings.ws_colors = JSON.stringify({private: 'blue'}); wsSet('private')`);
+  await until(() => app().style.getPropertyValue('--wbd') === '#6d8cff');
   check(app().style.getPropertyValue('--wbd') === '#6d8cff', '#2389: Private: my own choice wins over purple');
-  w.eval(`S.settings.ws_colors = '{}'; wsSet('all')`); await sleep(400);
+  await call('PATCH', '/api/settings', {ws_colors: '{}'});
+  await w.eval(`S.settings.ws_colors = '{}'; wsSet('all')`);
+  await until(() => !app().classList.contains('wsb-on'));
   check(!app().classList.contains('wsb-on'), '#2389: "All": a grey stripe');
   w.eval(`wsSet('private')`); await sleep(300);
   // the setting: "Workspace colour", Private's default = purple

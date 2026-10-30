@@ -645,8 +645,8 @@ function shopDraw() {
 document.addEventListener('submit', async e => {
   if (!e.target.matches?.('[data-shopadd]')) return;
   e.preventDefault();
-  const inp = $('#shop-in'), v = inp?.value.trim(); if (!v || !S.shop) return;
-  inp.value = '';
+  const inp = $('#shop-in'), raw = inp?.value || '', v = raw.trim(); if (!v || !S.shop || inp.dataset.qbusy) return;
+  inp.dataset.qbusy = '1';  // 2.359.2 B (#3049): the text stays until the item is saved; a second Enter sends nothing twice
   // 2.140.0 A (#2131): a clear leading amount goes to the amount field; an open item of the same name is not added twice
   // (the amount is added to it when the units match), also offline
   const sp = shopSplit(v), lid = S.shop.lid, k = shopKeyC(sp.name);
@@ -658,8 +658,10 @@ document.addEventListener('submit', async e => {
       else if (sp.qty != null && f?.qty != null && uk(f.unit) === uk(sp.unit)) await patchTask(same.id, {fam: shopFamWith(same, {qty: Math.round((f.qty + sp.qty) * 1000) / 1000})}, true);
       toast(tr('Already on the list: {0}', same.title));
     } else await createTask({title: sp.qty != null ? sp.name : v, list_id: lid, ...(sp.qty != null ? {fam: shopFamWith({}, {qty: sp.qty, unit: sp.unit})} : {})});
+    const f = $('#shop-in'); if (f && f.value === raw) f.value = '';  // saved: empty (text typed meanwhile stays)
+    if (inp.value === raw) inp.value = '';
     await load();
-  } catch { /* api() said it */ }
+  } catch { /* api() said it; the text stays in the field */ } finally { delete inp.dataset.qbusy; }
   shopDraw(); $('#shop-in')?.focus({preventScroll: true});
 });
 

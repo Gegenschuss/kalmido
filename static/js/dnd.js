@@ -110,20 +110,12 @@ async function dropTask0(id, el, clientY) {
       if (!target) return;
       // insert before target: sort between the target and its predecessor in the rendered order
       const mode = sortMode();
-      // 2.36.2 (#1136): completed tasks shown in their section do not count as neighbours (only the target itself)
-      let rows = vl_ids().map(i => S.tasks.get(i)).filter(x => x && x.parent_id === target.parent_id && x.id !== id && (x.status === 0 || x.id === target.id));  // 2.65.0 (#1825): neighbours from the data (vl_ids)
+      let rows = dndNeighbours(vl_ids().map(i => S.tasks.get(i)), target, id);  // 2.65.0 (#1825): neighbours from the data (vl_ids)
       if (mode === 'prio' && !kcol) {  // dropping into another priority block takes over that priority
         if (target.priority !== t.priority) { item.priority = target.priority; toast(tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][target.priority]))); }
         rows = rows.filter(x => x.priority === target.priority);
       }
-      const i = rows.findIndex(x => x.id === target.id);
-      if (dropAfter(row, clientY)) {  // after the target: between it and its successor
-        const next = rows[i + 1];
-        item.sort = next && next.list_id === target.list_id ? (target.sort + next.sort) / 2 : target.sort + 1;
-      } else {
-        const prev = rows[i - 1];
-        item.sort = prev && prev.list_id === target.list_id ? (prev.sort + target.sort) / 2 : target.sort - 1;
-      }
+      item.sort = dndSortAt(rows, target, dropAfter(row, clientY));
       if (target.list_id !== t.list_id) item.list_id = target.list_id;
       if (target.parent_id !== t.parent_id) {
         try { await patchTask(id, {parent_id: target.parent_id, ...(target.list_id !== t.list_id ? {list_id: target.list_id} : {})}); } catch { return; }
@@ -151,6 +143,15 @@ async function dropTask0(id, el, clientY) {
     histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res}));
 }
 
+// 2.380 F (#3436): shared by the list and the task view's subtasks. The neighbours of target in the rendered order: its
+// siblings (same parent) without the dragged task; 2.36.2 (#1136): completed ones do not count (only the target itself)
+const dndNeighbours = (order, target, id) => order.filter(x => x && x.parent_id === target.parent_id && x.id !== id && (x.status === 0 || x.id === target.id));
+// the sort of a task put before / after target: between it and its neighbour (same list), else one step beyond
+function dndSortAt(rows, target, after) {
+  const i = rows.findIndex(x => x.id === target.id);
+  if (after) { const next = rows[i + 1]; return next && next.list_id === target.list_id ? (target.sort + next.sort) / 2 : target.sort + 1; }
+  const prev = rows[i - 1]; return prev && prev.list_id === target.list_id ? (prev.sort + target.sort) / 2 : target.sort - 1;
+}
 // 2.270.0 D (#3028): the values the drop changes as this device saw them (server: reorder _prev; the position is never one)
 const dndPrev = (before, item) => Object.fromEntries(Object.keys(item).filter(k => k !== 'id' && k !== 'sort').map(k => [k, before?.[k] ?? null]));
 
@@ -498,6 +499,7 @@ function tdOver(d, x, y) {
   if (mv) mv.classList.toggle('on', onMv);
   const p = tdAt(x, y); d.at = p.at;
   if (onMv) { mdLast = null; $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); }
+  else if (dsb_mark(dsb_spot(d.id, document.elementFromPoint(x, y), y))) mdLast = null;  // 2.380 F (#3436): among the task view's subtasks
   else if (!dgs_touchMark(p.at, d.id, p.y)) markDrop(p.at, d.id, p.y);  // 2.122.3 B (#2334): the middle of a row = its subtask (dragmulti.js)
   // hold at the left edge: open the list drawer so the task can be dropped on another list
   if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
@@ -525,6 +527,7 @@ function tdDrop(d, x, y) {
   swiped = true; setTimeout(() => { swiped = false; }, 400);
   if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(x, y) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  const sb = dsb_spot(d.id, document.elementFromPoint(x, y), y); if (sb) { dsb_drop(d.id, sb); return; }  // 2.380 F (#3436)
   if (el && dgs_touchDrop(el, d.id, p.y)) return;  // 2.122.3 B (#2334): onto the middle of a row = its subtask
   // after the last row also when the list moves once the drop zones go (it was scrolled into their room)
   if (el) dropTask(d.id, el, zone ? y : p.end ? 1e9 : p.y);
@@ -564,3 +567,53 @@ document.addEventListener('contextmenu', e => {
   if (lp || S.multiMode || isKanban() || !S.tasks.has(id) || r.classList.contains('ghost')) return;
   S.multiMode = true; S.multi.add(id); S.multiLast = id; render();
 });
+
+// ---- 2.380 F (#3436): the subtasks of the task view sorted by dragging, only among themselves (not out of the task, not into
+// another one): the mouse drags the row itself (its own drag, caught here before the list's handlers), touch the long press of
+// tdStart. The same sort field as in the list (dndSortAt), completed ones are no neighbours, only with the right to edit.
+// dragmulti.js keeps leaving #detail alone.
+// -> {target, after, row} for the dragged task id over el, or null (not a sibling here, read-only, itself)
+function dsb_spot(id, el, y) {
+  const box = $('#detail .subs'), t = S.tasks.get(id);
+  if (!box || !t || !el?.closest || !box.contains(el) || !box.querySelector(`.trow[data-id="${id}"]`) || !canEdit(t)) return null;
+  let row = el.closest('.trow[data-id]');
+  if (!row || !box.contains(row)) {  // the box's free room below the rows = after the last one
+    const rs = [...box.querySelectorAll(':scope > .trow[data-id]')], last = rs[rs.length - 1];
+    if (!last || y <= last.getBoundingClientRect().bottom) return null;
+    row = last; y = 1e9;
+  }
+  const target = S.tasks.get(+row.dataset.id);
+  if (!target || target.id === id || target.parent_id !== t.parent_id) return null;
+  return {target, after: dropAfter(row, y), row};
+}
+function dsb_mark(sp) {
+  if (!sp) return false;
+  const cls = sp.after ? 'dropafter' : 'dropbefore';
+  if (!sp.row.classList.contains(cls)) { $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); sp.row.classList.add(cls); }
+  return true;
+}
+async function dsb_drop(id, sp) {
+  $$('.dropbefore,.dropafter,.drop,.dragging').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop', 'dragging'));
+  const t = S.tasks.get(id), box = $('#detail .subs'); if (!t || !box) return;
+  const order = [...box.querySelectorAll('.trow[data-id]')].map(r => S.tasks.get(+r.dataset.id));
+  const item = {id, sort: dndSortAt(dndNeighbours(order, sp.target, id), sp.target, sp.after)};
+  if (item.sort === t.sort) return;
+  const before = snapTask(t);
+  Object.assign(t, item); render();
+  let res;
+  try { res = await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { await load().catch(() => {}); render(); return; }
+  if (res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028)
+  await load().catch(() => {}); render();
+}
+document.addEventListener('dragover', e => {
+  if (!dragId) return;
+  const sp = dsb_spot(dragId, e.target, e.clientY); if (!sp) return;
+  e.preventDefault(); e.stopPropagation(); mdLast = null; dsb_mark(sp);
+}, true);
+document.addEventListener('drop', e => {
+  if (!dragId) return;
+  const sp = dsb_spot(dragId, e.target, e.clientY); if (!sp) return;
+  e.preventDefault(); e.stopPropagation();
+  const id = dragId; dragId = null; document.body.classList.remove('tdrag');
+  dsb_drop(id, sp);
+}, true);

@@ -2,8 +2,7 @@
 
 <h1 align="center">Kalmido</h1>
 
-<p align="center">The task app for households and small teams that you own: personal planning, shared projects and time tracking in one app.<br>Free, without per-user fees, on your own server.<br>
-Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, comments and shared lists in one small web app you run yourself.</p>
+<p align="center"><b>You plan. Kalmido pitches in.</b><br>Tasks, team and office in one app for freelancers and teams: lists, calendar, projects, time tracking, quotes and e-invoices, receipts and bank, docs and wiki, plus AI agents that only act with your approval. Self-hosted with Docker, free for any number of people. AGPL-3.0.</p>
 
 <p align="center"><a href="https://kalmido.com"><b>kalmido.com</b></a> · <a href="#quick-start">Quick start</a> · <a href="#updating">Updating</a> · <a href="TRANSLATING.md">Translate</a> · <a href="CHANGELOG.md">Changelog</a></p>
 
@@ -19,6 +18,18 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 > Kalmido is an independent project and not affiliated with or endorsed by any of the products or companies named here; their names are trademarks of their respective owners and are used only to describe compatibility (import, calendar, export, agents).
 
 ## What's new
+
+**2.409.0** (2026-10-29):
+- **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
+- **File store**: one area for files and documents (list or cards per folder, recognition per folder), locked end-to-end encrypted folders.
+- **First start**: a short "What do you use Kalmido for?" for added accounts, Start as home page, tablets with the computer navigation, one Organisation area for people, agents and data.
+- **Workspaces**: areas can be switched on and off per workspace (Private by each person, an organisation by its admins).
+- **Knowledge**: reading styles, a "/" task picker, formulas (LaTeX) and Mermaid diagrams.
+- **Office**: Quotations and Invoices as two areas, with a paid filter in the invoice archive.
+- **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
+- **Software projects**: ticket keys like APP-123, linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text.
+- **Office**: receipts by e-mail, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, quotation PDF with a compact closing.
+- **Settings**: areas per workspace and "View as member" (Settings > Account).
 
 **2.412.0** (2026-10-28):
 - **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
@@ -201,7 +212,7 @@ per area here; the details are under [Documentation](#documentation), every sing
 **Office, files and knowledge**
 - **Office & finance**: quotes and invoices with PDFs, e-invoices, receipts, letters on your own letterhead, bank import and DATEV export ([docs/OFFICE.md](docs/OFFICE.md))
 - **Files and documents**: folders and files for you and each organisation, with versions, a trash and sharing ([Files and documents](#files-and-documents))
-- **Knowledge pages and tables**: knowledge spaces with a mind map, also offline, and tables ([docs/WIKI.md](docs/WIKI.md), [docs/SHEETS.md](docs/SHEETS.md))
+- **Knowledge pages and tables**: knowledge spaces with a mind map, also offline, reading styles (Book, Compact, Notepad), formulas, Mermaid diagrams, a "/" task picker, and tables ([docs/WIKI.md](docs/WIKI.md), [docs/SHEETS.md](docs/SHEETS.md))
 - **Events and contacts**: your own calendars and address books in Kalmido, synced with the phone's apps ([Events](#events), [Contacts](#contacts))
 
 **AI agents**

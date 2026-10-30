@@ -19,7 +19,6 @@
 import base64
 import hashlib
 import hmac
-import html
 import json
 import os
 import secrets
@@ -33,6 +32,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc, write_lock
 from ..core.access import Denied, collab_all
 from ..core.pg import insert_id, system_ctx
+from ..core.mailframe import mail_html
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
 
 DISC_DAY = 30            # searches per account and day
@@ -149,19 +149,13 @@ def disc_profile(c, u):
 def _confirm_mail(c, u, email, tok):
     lg = lang(c, u["id"])
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
-    e = html.escape
     link = f"{PUBLIC_URL}/#dsc-confirm/{tok}"
     subject = t(N_("Confirm your address to be findable at {0}"), APP_NAME)
     intro = t(N_("You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this mail and nothing changes."), APP_NAME, DISC_TOKEN_DAYS)
     button = t(N_("Confirm my address"))
     text = f"{t(N_('Hello {0},'), u['display_name'] or u['username'])}\n\n{intro}\n\n{button}: {link}\n"
-    body_html = f"""<!doctype html><html lang="{lg}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>{e(subject)}</title></head>
-<body style="margin:0;padding:24px 12px;background:#eef5f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#14272b">
-<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;padding:28px 28px 24px">
-<h1 style="margin:0 0 12px;font-size:20px">{e(t(N_('Hello {0},'), u['display_name'] or u['username']))}</h1>
-<p style="margin:0 0 20px;font-size:16px;line-height:1.55">{e(intro)}</p>
-<p style="margin:0 0 8px"><a href="{e(link)}" style="display:inline-block;background:#1a7f8e;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600">{e(button)}</a></p>
-<p style="margin:16px 0 0;font-size:13px;color:#5f6b6e">{e(email)}</p></div></body></html>"""
+    # 2.420.0 B (#3499): the shared mail frame (was its own 520 px card)
+    body_html = mail_html(subject, [intro], button, link, email, t(N_('Hello {0},'), u['display_name'] or u['username']), lang=lg)
     return subject, text, body_html
 
 

@@ -8,7 +8,7 @@ import time
 from datetime import timedelta
 from flask import g, has_request_context
 
-from ..core.config import app
+from ..core.config import app, EMAIL_RE
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
@@ -297,7 +297,7 @@ def agent_task_data(c, tid, aid, full=None, **extra):
         task["comments"] = agent_event_comments(c, tid)
         task["comments_total"] = c.execute("SELECT COUNT(*) FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,)).fetchone()[0]
         lst["sections"] = list_sections(c, aid, row["list_id"])
-        rp = git_repo_for_task(c, row)  # 2.2.0 (#339): the repository to work in, a branch name, the linked code
+        rp = git_repo_for_task(c, row, aid)  # 2.2.0 (#339): the repository to work in, a branch name, the linked code (2.396.0 A #3386: its git author)
         if rp:
             return {"task": task, "list": lst, "repo": rp, **extra}
     return {"task": task, "list": lst, **extra}
@@ -696,7 +696,12 @@ def tidy_tick(c):
 # and sends the event reset: the host restarts the agent with a fresh session.
 RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "",
                     "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
-                    "perm_user": None}  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
+                    "perm_user": None,  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
+                    "git_author_name": "", "git_author_email": "", "git_coauthor": False}  # 2.396.0 A (#3386)
+# 2.396.0 A (#3386): the git author the agent's host sets for its commits (public in GitHub). '' = the neutral default;
+# git_coauthor: whether the AI appends a Co-Authored-By line. A project with a repo may override name / mail (git_author_of).
+GIT_AUTHOR_DEFAULT = ("Kalmido", "noreply@kalmido.com")
+GIT_AUTHOR_NAME_MAX = 100
 # 2.233.0 B (#3189): when the host ends a chat conversation with a summary and starts a fresh one (the "interim summary"):
 # at a session size (small / medium / large; handed out as MB of the session file and as context tokens), after so many
 # runs, after so many minutes of pause (0 = never; counts only from the small size on). The daily summary is the fresh
@@ -722,7 +727,29 @@ def agent_runtime(a):
 def runtime_derived(rt):
     """2.233.0 B (#3189): the values a host needs without knowing the size names (always filled in)."""
     mb, tok = ROTATE_SIZES.get(rt.get("rotate_size"), ROTATE_SIZES["medium"])
-    return {"rotate_mb": mb, "rotate_tokens": tok, "rotate_idle_mb": ROTATE_SIZES["small"][0]}
+    return {"rotate_mb": mb, "rotate_tokens": tok, "rotate_idle_mb": ROTATE_SIZES["small"][0],
+            "git_author": git_author_str(rt.get("git_author_name"), rt.get("git_author_email"))}
+
+
+def git_author_str(name, email):
+    """2.396.0 A (#3386): "Name <mail>", each empty part falls back to the neutral default."""
+    return "%s <%s>" % (name or GIT_AUTHOR_DEFAULT[0], email or GIT_AUTHOR_DEFAULT[1])
+
+
+def git_author_clean(name, email):
+    """2.396.0 A (#3386): validates a git author name / mail pair (None / '' = default); returns (name, email)."""
+    if name is None:
+        name = ""
+    if email is None:
+        email = ""
+    if not isinstance(name, str) or len(name.strip()) > GIT_AUTHOR_NAME_MAX or any(ch in "<>\x7f" or ord(ch) < 32 for ch in name):  # review: no control characters (logs, git log)
+        raise BadInput(tr("Invalid value: {0}", "git_author_name"))
+    if not isinstance(email, str):
+        raise BadInput(tr("Invalid value: {0}", "git_author_email"))
+    email = email.strip()
+    if email and (len(email) > 200 or any(ch in "<>,\x7f" or ord(ch) < 32 for ch in email) or not EMAIL_RE.fullmatch(email)):
+        raise BadInput(tr("Git author: please enter a valid email address"))
+    return name.strip(), email
 
 
 def runtime_clean(cur, b):
@@ -777,6 +804,13 @@ def runtime_clean(cur, b):
             if isinstance(v, bool) or not isinstance(v, int) or not (lo <= v <= hi or (off and v == 0)):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v
+    if "git_author_name" in b or "git_author_email" in b:  # 2.396.0 A (#3386)
+        out["git_author_name"], out["git_author_email"] = git_author_clean(
+            b.get("git_author_name", out["git_author_name"]), b.get("git_author_email", out["git_author_email"]))
+    if "git_coauthor" in b:
+        if not isinstance(b["git_coauthor"], bool):
+            raise BadInput(tr("Invalid value: {0}", "git_coauthor"))
+        out["git_coauthor"] = b["git_coauthor"]
     return out
 
 
@@ -1051,7 +1085,7 @@ def job_may_act(c, j, uid, action):
 
 def agent_public(c, a, uid=None):
     """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat."""
-    from ..agents.usage import usage_block
+    from ..agents.usage import usage_block, usage_cost_public
     jobs = c.execute("SELECT * FROM agent_jobs WHERE agent_id=? AND state IN ('running','waiting') ORDER BY id DESC LIMIT 200",
                      (a["user_id"],)).fetchall()
     if uid is not None:
@@ -1090,6 +1124,8 @@ def agent_public(c, a, uid=None):
             "host": _host_info(a), "runtime_model": agent_runtime(a)["model"],
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
+            # 2.407.0 B (#3493): its costs (API-key agents: the ring against its cost limit; amounts only for owner / admins)
+            "cost": usage_cost_public(c, a, uid),
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
             "approvals_open": _approvals_open(c, a["user_id"], uid),
             # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists

@@ -119,7 +119,7 @@ def nwl_conn(c, ws):
 
 def nwl_adapter_for(c, r, secret=None):
     from ..calendars.subscriptions import cal_allow
-    return nwl_adapter(r["kind"], r["url"], secret if secret is not None else nwl_secret(r), cal_allow(c))
+    return nwl_adapter(r["kind"], r["url"], secret if secret is not None else nwl_secret(r), cal_allow(c, "newsletter"))
 
 
 # ---- the contacts of a workspace and the segments ----------------------------------------------------------------------

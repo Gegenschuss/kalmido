@@ -652,11 +652,11 @@ def files_node_restore(nid):
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")
-    fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742)
+    stays = fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
     bump(c)
     c.commit()
     n = need_node(c, nid)
-    return jsonify(fs_node_json(c, n, n["role"]))
+    return jsonify({**fs_node_json(c, n, n["role"]), "stays": stays})
 
 
 # ---- shares

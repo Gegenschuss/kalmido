@@ -325,6 +325,62 @@ function moreSummary(t, ks) {
   if (has('snippets') && snipCount(t)) out.push(trn('{0} code snippet', '{0} code snippets', snipCount(t)));  // 2.35.0 (#1095)
   return out.join(' · ');
 }
+// ---- 2.380 F (#3435): every section with a heading folds on its own (not the description); the folded ones are ONE account
+// setting for all tasks and lists, on every device (detail_fold: the keys, comma separated). A folded head says in short what
+// it holds ("2 open", "3 files", "12:00 of 10 h", red when over, "blocked"). Nothing opens by itself; "Fold all sections" /
+// "Unfold all sections" in the task's "…" menu. The comments of the desktop's split keep their own fold (detail_cm_fold).
+const DFOLD_KEYS = ['subtasks', 'deps', 'links', 'attachments', 'video', 'tags', 'custom', 'time', 'comments'];
+const DFOLD_BUDGET = ['budget h', 'budget (h)', 'budget hours', 'budget std', 'budget (std)', 'budget-stunden', 'budgetstunden'];  // timetrack.py BUDGET_FIELD_NAMES
+let dfPend = null;  // a change of this device until the server has it (a state reload in between keeps it)
+const dfSet = () => new Set(String(dfPend ?? S.settings?.detail_fold ?? '').split(',').filter(k => DFOLD_KEYS.includes(k)));
+function dfSave(set) {
+  const v = DFOLD_KEYS.filter(k => set.has(k)).join(',');
+  dfPend = v; if (S.settings) S.settings.detail_fold = v;
+  renderDetail();
+  api('PATCH', '/api/settings', {detail_fold: v}).then(() => { if (dfPend === v) dfPend = null; }, () => { /* api() showed it; the local value stays */ });
+}
+// the short line of a folded section: [text, class]
+function dfSum(k, t, ncm) {
+  const n = (x, txt) => x ? [txt, ''] : ['', ''];  // (literal tr / trn calls: tools/i18n_check.py finds the keys)
+  if (k === 'subtasks') { const ks = children(t.id), o = ks.filter(x => x.status === 0).length; return !ks.length ? ['', ''] : o ? [tr('{0} open', o), ''] : [tr('all done'), '']; }
+  if (k === 'attachments') { const c = (t.attachments || []).length; return n(c, trn('{0} file', '{0} files', c)); }
+  if (k === 'tags') { const c = (t.tags || []).length + (t.ltags || []).length; return n(c, trn('{0} tag', '{0} tags', c)); }
+  if (k === 'custom') { const c = fieldsOf(t.list_id).filter(f => { const v = (t.fields || {})[f.id]; return v !== undefined && v !== null && v !== ''; }).length; return n(c, trn('{0} field', '{0} fields', c)); }
+  if (k === 'deps') { const c = (t.blockers || []).length; return t.blocked && !t.status ? [tr('blocked'), 'dfbad'] : c ? [trn('{0} dependency', '{0} dependencies', c), ''] : t.waiting_at ? [tr('Waiting'), 'dfwait'] : ['', '']; }
+  if (k === 'links') { const c = ((S.tcontacts || {})[t.id] || []).length + ((S.evlinks || {})[t.id] || []).length; return n(c, trn('{0} entry', '{0} entries', c)); }
+  if (k === 'video') { const c = typeof vdr_count === 'function' ? vdr_count(t) : 0; return n(c, trn('{0} sign-off', '{0} sign-offs', c)); }
+  if (k === 'comments') return n(ncm, trn('{0} comment', '{0} comments', ncm));
+  if (k === 'time') {
+    const sec = typeof taskTime === 'function' ? taskTime(t.id)[0] : 0, f = fieldsOf(t.list_id).find(x => x.type === 'number' && DFOLD_BUDGET.includes(String(x.name || '').trim().toLowerCase()));
+    const b = f ? +((t.fields || {})[f.id]) || 0 : 0, hm = `${Math.floor(sec / 3600)}:${pad(Math.floor(sec % 3600 / 60))}`;
+    if (!b) return sec >= 60 ? [hm, ''] : ['', ''];
+    return [tr('{0} of {1} h', hm, fmtNum(b, 1)), sec > b * 3600 ? 'dfbad' : ''];
+  }
+  return ['', ''];
+}
+// a section's html with the fold: data-dfold on its element, the chevron in front of its heading, the short line when folded
+function dfWrap(k, html, t, ncm) {
+  if (!html || !html.trim()) return html;
+  const i = html.indexOf('<h5'), d = i < 0 ? -1 : html.lastIndexOf('class="dsec', i), j = i < 0 ? -1 : html.indexOf('>', i), e = j < 0 ? -1 : html.indexOf('</h5>', j);
+  if (d < 0 || e < 0) return html;
+  const on = dfSet().has(k), [sum, cls] = on ? dfSum(k, t, ncm) : ['', ''], lab = on ? tr('Unfold') : tr('Fold');
+  const btn = `<button type="button" class="iconbtn dfbtn" data-dfb="${k}" aria-expanded="${!on}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('chev', 's fcar')}</button>`;
+  const inner = html.slice(j + 1, e), sp = inner.indexOf('<span class="spacer">'), sm = sum ? `<span class="dfsum muted ${cls}">${esc(sum)}</span>` : '';
+  return html.slice(0, d) + `data-dfold="${k}" class="dsec dfold${on ? ' dfolded' : ''}` + html.slice(d + 11, i) + html.slice(i, j + 1) + btn
+    + (sp < 0 ? inner + sm : inner.slice(0, sp) + sm + inner.slice(sp)) + html.slice(e);
+}
+const df_menuItem = () => {  // both while some are folded and some open
+  const f = dfSet(), ks = $$('#detail [data-dfold]').map(x => x.dataset.dfold), out = [];
+  if (ks.some(k => f.has(k))) out.push({label: tr('Unfold all sections'), icon: 'chev', fn: () => dfSave(new Set([...f].filter(k => !ks.includes(k))))});
+  if (ks.some(k => !f.has(k))) out.push({label: tr('Fold all sections'), icon: 'chev', fn: () => dfSave(new Set([...f, ...ks]))});
+  return out;
+};
+document.addEventListener('click', e => {
+  const h = e.target.closest?.('#detail .dfold > h5'); if (!h) return;
+  const b = e.target.closest('button, a, input, select, label, textarea'); if (b && !b.matches('.dfbtn')) return;
+  const k = h.parentElement.dataset.dfold, f = dfSet(); if (f.has(k)) f.delete(k); else f.add(k);
+  dfSave(f);
+});
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -561,7 +617,7 @@ function renderDetail0() {
   // fold after ~8 lines. 2.31.0 (#1054): no "Details | Comments" tabs on phones any more, a small jump to the comments instead
   const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !LS.get('mdOpen', false);  // 2.101.0 (#2157): one device setting for all tasks
   // 2.31.0 (#1054): the assignee once, as the chip under the title (people, agents, groups, "Take it"; no select below)
-  const whoOn = !ck && t.id > 0 && collab() && (shared || t.assignee_id);
+  const whoOn = !ck && t.id > 0 && collab() && (shared || t.assignee_id) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id);  // 2.412.0 (#3552)
   const jump = cm === 'full' && !split ? `<button type="button" class="linkbtn djump" data-act="d-jump-cm" aria-controls="d-tl">${ic('down', 's')}<span>${tr('To the comments')}</span><span class="c" id="d-jump-count">${ncm || ''}</span></button>` : '';
   // 2.18.0 (#430): a milestone (no subtasks; its own section with progress, burndown, release notes) / the milestone a task
   // of a list with milestones belongs to (open ones + the current one)
@@ -574,14 +630,14 @@ function renderDetail0() {
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}`,  // 2.22.0 (#686)
-    tags: ck ? '' : `<div class="dsec"><h5>${tr('Tags')}</h5>${tagEditHtml(t, tlkR)}</div>`,
+    tags: ck || !pz_show(t, 'tags', (t.tags || []).length + (t.ltags || []).length) ? '' : `<div class="dsec"><h5>${tr('Tags')}</h5>${tagEditHtml(t, tlkR)}</div>`,
     attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5>${typeof le2uAttHead === 'function' ? le2uAttHead(t) : ''}<div class="atts">${(t.attachments || []).map(attHtml).join('')}
         ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>${typeof le2eOn === 'function' && le2eOn(t.list_id) ? '' : e2eAttAddHtml(t)}` : ''}</div>${t.attachments_trash?.length ? (typeof attTrashHtml === 'function' ? attTrashHtml(t) : (loadModule('trashui').then(() => renderDetail(), () => {}), '')) : '' /* 2.272.0 G (#3038): trashui.js */}
 </div>`,
     fields: ck ? '' : `<div class="dsec fields">
         ${''/* 2.25.0 (UX-44): list and section are changed in the path on top (a tap on it), no fields here any more */}
-        ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
-        ${spt_detailHtml(t, ro)}${''/* 2.60.0 (#1511): story points */}
+        ${ticketsOn(t.list_id) && pz_show(t, 'ttype', t.ttype) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
+        ${pz_show(t, 'points', t.points) ? spt_detailHtml(t, ro) : ''}${''/* 2.60.0 (#1511): story points */}
         ${msTog ? `<label for="d-ms">${tr('Milestone')}</label><label class="chkl dmsl"><input type="checkbox" id="d-ms" ${msT ? 'checked' : ''} ${ro ? 'disabled' : ''}><i class="msd" aria-hidden="true"></i>${tr('This task is a milestone')}</label>` : ''}
         ${msSel.length ? `<label for="d-msel">${msTog ? tr('Belongs to') : tr('Milestone')}</label><select id="d-msel" data-sheet-ico="flag" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${msSel.map(m => `<option value="${m.id}" ${m.id === t.milestone_id ? 'selected' : ''}>${esc(m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''))}</option>`).join('')}</select>${typeof env_taskNote === 'function' ? env_taskNote(t) : ''}` : ''}
         ${t.url || S.editLink ? `<label>${tr('Link')}</label>${linkField(t, ro)}` : ro ? '' : `<button type="button" class="btn sm linkadd" data-act="link-edit">${ic('link', 's')} ${tr('Add link')}</button>`}${''/* 2.41.0 (#1475): the Link row only with a link */}
@@ -589,11 +645,11 @@ function renderDetail0() {
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
     time: ck ? '' : `${tFor(t) && t.id > 0 && !t.context ? `<div class="dsec tesec" id="d-time">${taskTimeHtml(t)}</div>` : ''}`,
-    code: ck ? '' : codeHtml(t),
-    snippets: ck ? '' : snipHtml(t, ro),  // 2.35.0 (#1095): code snippets
+    code: ck || !pz_show(t, 'repo', (t.code?.prs || []).length || (t.code?.commits || []).length) ? '' : codeHtml(t),  // 2.412.0 (#3552): the project's properties
+    snippets: ck || !pz_show(t, 'repo', snipCount(t)) ? '' : snipHtml(t, ro),  // 2.35.0 (#1095): code snippets
     family: ck ? '' : famDetailHtml(t, l, ro),  // 2.19.0 (#653)
     life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
-    video: ck || typeof vdr_taskHtml !== 'function' ? '' : vdr_taskHtml(t, ro),  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
+    video: ck || typeof vdr_taskHtml !== 'function' || !pz_show(t, 'video', typeof vdr_count === 'function' && vdr_count(t)) ? '' : vdr_taskHtml(t, ro),  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
   setHtml($('#detail'), `
     <div class="dtop">
@@ -619,6 +675,7 @@ function renderDetail0() {
       ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
+      ${t.working ? `<div class="dagw">${agwChip(t)}</div>` : ''}${''/* 2.407.0 A (#3513): an agent works on it */}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}
@@ -633,12 +690,17 @@ function renderDetail0() {
       ${ck ? '' : e2eNoteHtml(t)}${''/* 2.42.0 (#828): my encrypted note (e2e.js) */}
       ${ck ? '' : wk_mentionHtml(t)}${''/* 2.49.0 (#1199): mentioned in knowledge pages (wiki.js) */}
       ${ck || typeof hbm_taskLinkHtml !== 'function' ? '' : hbm_taskLinkHtml(t)}${''/* 2.141.0 B (#2139): the e-mail the task was made from (hubmail.js) */}
-      ${ck ? '' : dlk_taskHtml(t)}${''/* 2.154.0 A (#1111): the documents linked with the task */}
+      ${ck || !pz_show(t, 'docs', (DLK[t.id]?.docs || []).length) ? '' : dlk_taskHtml(t)}${''/* 2.154.0 A (#1111): the documents linked with the task */}
       ${ck || typeof rt9_detailHtml !== 'function' ? '' : rt9_detailHtml(t)}${''/* 2.59.0 B (#1375): related tasks (related.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
-        const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || listById(t.list_id)?.ptype === 'software'))  // 2.35.0 (#1095)
-          || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
+        // 2.380 F (#3435): every section with content stands on its own above "More details" (it holds only the empty ones)
+        for (const k of DFOLD_KEYS) if (k !== 'comments' || !split) SEC[k] = dfWrap(k, SEC[k], t, ncm);
+        const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || (listById(t.list_id)?.ptype === 'software' && pz_on(t.list_id, 'repo'))))  // 2.35.0 (#1095)
+          || (k === 'custom' && (dfSum('custom', t)[0] || fieldsOf(t.list_id).some(cfst_on)))  // 2.410.0 A (#3514): a stage bar is seen at once
+          || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length))
+          || (k === 'tags' && (t.tags || []).length + (t.ltags || []).length) || (k === 'time' && dfSum('time', t)[0])
+          || (k === 'fields' && (t.url || t.ttype || t.milestone_id || isMs(t)));
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));

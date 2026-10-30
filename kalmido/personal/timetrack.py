@@ -290,10 +290,25 @@ def time_day_h(c):
 BUDGET_FIELD_NAMES = ("budget h", "budget (h)", "budget hours", "budget std", "budget (std)", "budget-stunden", "budgetstunden")
 
 
+def budget_parents(c, lid, vals):
+    """2.410.0 (#3437): a budget counts once per branch - the tasks of list lid with a budget value (vals: {task_id: hours})
+    below them; their own value is left out of the sum (the subtasks' values count instead; the stored value stays)."""
+    up = dict(c.execute("SELECT id, parent_id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND parent_id IS NOT NULL", (lid,)).fetchall())
+    out = set()
+    for tid in vals:
+        p, seen = up.get(tid), {tid}
+        while p is not None and p not in seen:  # every ancestor (guarded against a broken cycle)
+            seen.add(p)
+            out.add(p)
+            p = up.get(p)
+    return out
+
+
 def time_list_totals(c, uid, own=False):
     """2.7.0 (#407): {list_id: {"s": seconds of everyone I can see, "b": budget hours or None}} of my project lists with
     time: the finished entries (with or without a task; the client adds my running timer) and the sum of a number field
-    called "Budget h" (the agency project type's field, any language) over the list's tasks. own (2.144.5 C, #1523): the
+    called "Budget h" (the agency project type's field, any language) over the list's tasks, once per branch (2.410.0, #3437:
+    budget_parents). own (2.144.5 C, #1523): the
     sum of the list header (time_lists in /api/state and the delta) follows the time window: other people's entries only
     for the list's owner, its admins and the organisation's admins (n43_admin_lists); the other sums stay everyone's."""
     out = {}
@@ -308,15 +323,17 @@ def time_list_totals(c, uid, own=False):
                            AND f.list_id IN {MT_TIME_SQL}""", (uid, uid)).fetchall():
         if (r["name"] or "").strip().lower() not in names or r["list_id"] in part:
             continue
-        tot = 0.0
-        for (v,) in c.execute("""SELECT v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                 WHERE v.field_id=? AND t.deleted_at IS NULL""", (r["id"],)):
+        vals = {}
+        for tid, v in c.execute("""SELECT v.task_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                                   WHERE v.field_id=? AND t.deleted_at IS NULL""", (r["id"],)):
             try:
                 x = float(str(v).replace(",", "."))
             except (TypeError, ValueError):
                 continue
             if math.isfinite(x) and x > 0:
-                tot += x
+                vals[tid] = x
+        skip = budget_parents(c, r["list_id"], vals) if vals else set()
+        tot = sum(x for tid, x in vals.items() if tid not in skip)
         if tot > 0:
             o = out.setdefault(r["list_id"], {"s": 0, "b": None})
             o["b"] = round((o["b"] or 0) + tot, 2)

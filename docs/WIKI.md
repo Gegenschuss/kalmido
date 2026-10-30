@@ -116,6 +116,34 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Source / Preview** (2.382.0). The formatting bar of the editor has a button that switches between the live preview
   (the page drawn while writing) and the plain Markdown source; the page's "…" menu has the same entry.
 
+- **Tags (2.371).** `#word` in the text (starting with a letter: `#project`, `#customer/north`; `#123` stays a task) or
+  `tags: [a, b]` in the frontmatter tag a page. A tag in the text is a link to its list; the panel has the group *Tags*
+  below the folders (on a phone: below the pages), most used first. Case is ignored. The server keeps no tag in plain text:
+  the word index holds a keyed hash per tag, the names are read from the texts in memory when the list is shown. Routes:
+  `GET /api/wiki/tags?space=` (the tags) and `&tag=` (the pages with it).
+- **Live queries (2.371).** A fenced block with the language `abfrage` (or `query`) shows pages of the same space, fresh on
+  every change. One `key: value` per line, nothing else:
+
+  ````
+  ```abfrage
+  tag: project
+  eigenschaft: status = open
+  sortiere: geändert absteigend
+  als: tabelle
+  spalten: status, owner
+  ```
+  ````
+
+  `tag:` every tag named (several lines: all of them) · `ordner:` (folder) that folder and below · `eigenschaft:`
+  (property) a frontmatter value, without `= ...` the key is enough · `zeige:` (show) `seiten` | `aufgaben` (pages |
+  tasks = the open checkboxes `- [ ] ...` of those pages) · `sortiere:` (sort) `name` | `geändert` | `erstellt` | a key,
+  `absteigend` (desc) after it · `grenze:` (limit) default 50, at most 200 · `als:` (as) `liste` | `tabelle` · `spalten:`
+  (columns) of the table.
+
+  The page with the block and the templates are never listed; a line that is not understood is named below the result. The
+  reader sees only pages they may read (through a share only the shared ones). In an encrypted space the browser runs the
+  query over the pages it opened. Route: `GET /api/wiki/query?page=<id>&q=<the block's text>`.
+
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
 the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.
 
@@ -211,9 +239,13 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   longer counts as a live share (mark, limit). Make a new link if it is still needed.
 
 Routes: `GET /api/wiki/shares?page=<id> | space=&folder=`, `POST /api/wiki/shares {page_id | space + folder, kind: person |
-link, user_id | email, expires}`, `PATCH /api/wiki/shares/<id> {expires}`, `DELETE /api/wiki/shares/<id>` (revoke),
+link, user_id | email, expires, images}`, `PATCH /api/wiki/shares/<id> {expires, images}`, `DELETE /api/wiki/shares/<id>` (revoke),
 `POST /api/wiki/shares/<id>/restore`; the guest: `GET /api/wiki/shared`, `GET /api/wiki/shared/pages/<id>`,
 `GET /api/wiki/shared/files/<id>`; the public page: `GET /s/w/<token>`, `/s/w/<token>/p/<id>`, `/s/w/<token>/file/<id>`.
+2.380: `images: true` (the switch *Show embedded pictures*, default off) shows the pictures of the file store embedded in the
+page (`![…](/api/files/nodes/<id>/content)`, image types only, never a locked folder, only while the person who made the share
+may still see them) through `GET /api/wiki/shared/pages/<id>/img/<node>` and `/s/w/<token>/img/<page>/<node>`; other files stay
+placeholders.
 
 ## Mind map
 

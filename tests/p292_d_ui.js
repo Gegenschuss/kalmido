@@ -9,7 +9,7 @@ const {boot, errs, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p292_d_ui', check, shots: 'P292D_SHOTS'});
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P292D_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -75,7 +75,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     await ev(`(() => { const c = document.querySelector('#a-users .ua8chk:not(:disabled)'); c.click(); return 1; })()`);
     await sleep(400);
     const top1 = await ev(`Math.round(document.querySelector('#a-users').getBoundingClientRect().top)`);
-    const bar = await ev(`(() => { const r = document.querySelector('#a-usel').getBoundingClientRect(); return {hidden: document.querySelector('#a-usel').hidden, b: Math.round(r.bottom), vh: innerHeight}; })()`);
+    const bar = await ev(`(() => { const r = document.querySelector('#ua-sbar').getBoundingClientRect(); return {hidden: document.querySelector('#a-usel').hidden, b: Math.round(r.bottom), vh: innerHeight}; })()`);
     check(top0 === top1, 'phone: the list stays put on the first tick ' + top0 + ' -> ' + top1);
     check(bar && !bar.hidden && bar.b <= bar.vh, 'phone: the selection bar is inside the screen ' + JSON.stringify(bar));
     await shot('p292d-users-390.png');

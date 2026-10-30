@@ -97,12 +97,12 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   const old = (await call(CF, 'POST', '/api/wiki/pages', {space: 'private', path: 'journal/2020-01-02', body: 'alt'})).id;
   w.eval('WK.idx.private.v = -1; WK.pg._v = -1; renderView()');
   const bar = await until(() => d.querySelector(`#view .wkday [data-wkday="2020-01-02"]`) && d.querySelector('#view .wkday'));
-  check(bar && bar.querySelector('input[type=date]')?.value === today && bar.querySelectorAll('button[disabled]').length === 1, 'the day switch: the earlier note, no later one, the date field on this day');
+  check(bar && bar.querySelector('input[data-wk-day]')?.value === today && bar.querySelectorAll('button[disabled]').length === 1, 'the day switch: the earlier note, no later one, the date field on this day');
   bar?.querySelector('[data-wkday="2020-01-02"]').click();
   check(await until(() => w.location.hash === '#wiki/' + old), 'the arrow opens the earlier note');
   const back = await until(() => d.querySelector(`#view .wkday [data-wkday="${today}"].btn`));
   check(back, 'an older note offers "Today"');
-  const di = d.querySelector('#view .wkday input[type=date]');
+  const di = d.querySelector('#view .wkday input[data-wk-day]');
   if (di) { di.value = '2020-03-04'; di.dispatchEvent(new w.Event('change', {bubbles: true})); }
   const np = await until(async () => ((await call(CF, 'GET', '/api/wiki?space=private')).pages || []).find(p => p.path === 'journal/2020-03-04'));
   check(np && await until(() => w.location.hash === '#wiki/' + np.id), 'the date field makes and opens that day\'s note');
@@ -123,7 +123,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
       check(g.inside && g.line && g.bg, `Firefox ${tag}: the frame inside the text, a line on the left, its own background ` + JSON.stringify(g));
       await shot(`p23712-embed-${tag}.png`);
       await nav(B + '#wiki/' + old);
-      if (!check(await ready(ev, `!!document.querySelector('.wkday input[type=date]')`), `Firefox ${tag}: the day switch shows`)) continue;
+      if (!check(await ready(ev, `!!document.querySelector('.wkday input[data-wk-day]')`), `Firefox ${tag}: the day switch shows`)) continue;
       const r = JSON.parse(await ev(`(() => { const xs = [...document.querySelectorAll('.wkday > *')].map(x => x.getBoundingClientRect()); return JSON.stringify({row: xs.every(x => Math.abs(x.top - xs[0].top) < 12), inside: xs.every(x => x.right <= document.documentElement.clientWidth)}); })()`) || '{}');
       check(r.row && r.inside, `Firefox ${tag}: the day switch in one row, inside the screen ` + JSON.stringify(r));
       await shot(`p23712-day-${tag}.png`);

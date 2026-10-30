@@ -9,11 +9,13 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const st = async (ck = CK) => call('GET', '/api/state', null, ck);
 const taskOf = async (id, ck = CK) => (await st(ck)).tasks.find(t => t.id === id);
 const secOrder = async (lid, ck = CK) => (await st(ck)).sections.filter(s => s.list_id === lid).map(s => s.id);
 const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || '';
+// 2.358.0 B (#3282): every text #toast showed since the call (a toast of 2.5-6 s could be gone again before a slow check looked)
+const toastSeen = w => { const el = w.document.querySelector('#toast'), seen = []; new w.MutationObserver(() => { if (!el.classList.contains('hidden')) seen.push(el.textContent); }).observe(el, {childList: true, subtree: true, characterData: true, attributes: true}); return seen; };
 const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); e.dataTransfer = {setData() {}, getData: () => '', effectAllowed: '', dropEffect: ''}; e.clientY = 10; el.dispatchEvent(e); return e; };
 const touch = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); e.touches = type === 'touchend' ? [] : [{clientX: 20, clientY: 20}]; el.dispatchEvent(e); return e; };
 const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) => { calls.push([(o.method || 'GET').toUpperCase(), String(u)]); return of(u, o); }; return calls; };
@@ -50,7 +52,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const tA = (await st()).tasks.filter(t => t.section_id === A && !t.parent_id);
   check((await taskOf(t4)).sort < Math.min(...tA.filter(t => t.id !== t4).map(t => t.sort)), 'at the top of the section');
   check(w.eval(`LS.get('sort2.l:${L}')`) === 'prio', 'a manual drop switches date sorting back to manual order');
-  check(await until(() => /Moved to section Doing/.test(toastText(d)) && d.querySelector('#toast button')), `toast with Undo: ${toastText(d)}`);
+  check(await until(() => /Moved to section Doing/.test(toastText(d)) && d.querySelector('#toast button'), 15000), `toast with Undo: ${toastText(d)}`);
   d.querySelector('#toast button').click();
   check(await until(async () => (await taskOf(t4)).section_id === Bs), 'undo: back in "Next"');
   // ---- into an empty section via its drop zone
@@ -63,9 +65,10 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(!d.body.classList.contains('tdrag'), 'drop zones hidden again');
   // ---- a subtask onto a header: standalone in that section
   await until(() => row(s1));
+  const seen = toastSeen(w);  // 2.358.0 B (#3282): watched from before the drop
   dnd(w, row(s1), 'dragstart'); dnd(w, head(Bs), 'dragover'); dnd(w, head(Bs), 'drop');
-  check(await until(async () => { const x = await taskOf(s1); return x.parent_id === null && x.section_id === Bs; }), 'subtask dropped on a header: standalone task in that section');
-  check(await until(() => /Subtask is now standalone/.test(toastText(d)), 10000), `toast says so: "${toastText(d)}"`);  // CI of 2.307.4: the toast follows the move + a full reload
+  check(await until(async () => { const x = await taskOf(s1); return x.parent_id === null && x.section_id === Bs; }, 15000), 'subtask dropped on a header: standalone task in that section');
+  check(await until(() => seen.some(x => /Subtask is now standalone/.test(x)), 20000), `toast says so: "${seen.join(' / ')}"`);  // CI of 2.307.4: the toast follows the move + a full reload
   // ---- reorder sections by the handle
   const calls = spy(w);
   await until(() => head(C));
@@ -74,7 +77,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   dnd(w, head(A), 'drop');
   check(await until(async () => JSON.stringify(await secOrder(L)) === JSON.stringify([C, A, Bs])), 'Later moved before Doing (server)');
   check(calls.filter(c => c[0] === 'POST' && /sections\/order/.test(c[1])).length === 1 && !calls.some(c => c[0] === 'PATCH' && /sections/.test(c[1])), 'one request for the new order');
-  check(await until(() => /Sections reordered/.test(toastText(d))), 'toast');
+  check(await until(() => /Sections reordered/.test(toastText(d)), 15000), 'toast');
   d.querySelector('#toast button').click();
   check(await until(async () => JSON.stringify(await secOrder(L)) === JSON.stringify([A, Bs, C])), 'undo: old order back');
   // ---- section menu: move down = the same request
@@ -129,7 +132,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(pop && /Nicht zugeordnet/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Later').click();
   check(await until(async () => (await taskOf(t2, BK)).section_id === C), 'picked: moved to "Later"');
-  check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d))), `German toast: ${toastText(d)}`);
+  check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d)), 15000), `German toast: ${toastText(d)}`);
   const hb = () => d.querySelector(`#view .ghead[data-section="${Bs}"]`);
   touch(w, hb(), 'touchstart'); await sleep(520);
   const he = touch(w, hb(), 'touchend'); await sleep(150);
