@@ -181,7 +181,7 @@ for p in pub:
     hits = [l.strip()[:80] for l in read(p).splitlines() if WORDS.search(l)]
     check(not hits, f"no sloth in {p}: {hits[:2]}")
 q = json.loads(read("static", "quips.json") or '{"en": [], "de": []}')
-check(len(q["en"]) == len(q["de"]) == 50, "quips.json: 50 lines in en + de")
+check(all(len(q.get(c, [])) == 50 for c in ("en", "de", "fr", "es", "it", "nl")), "quips.json: 50 lines per language (2.446.0: + fr es it nl)")
 
 # ---- the generator: a fresh render is byte-identical to the files on disk
 gen = os.path.join(ROOT, "tools", "make_icons.py")

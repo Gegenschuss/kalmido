@@ -968,9 +968,9 @@ function settingsModal(focus) {
   // plus a few synonyms (words people search for that the labels do not use); a hit inside a sub-tab (Administration,
   // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
   const sres = $('#s-search', md) && $('#s-sres', md);
-  const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
-    [['sidebar', 'seitenleiste'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
-    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
+  const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen', 'déconnexion', 'cerrar sesión', 'esci', 'uitloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell', 'notificación', 'notifica', 'melding', 'cloche', 'campana', 'campanella'], '[data-pane="notify"] h4'],
+    [['sidebar', 'seitenleiste', 'barre latérale', 'barra lateral', 'zijbalk'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort', 'mot de passe', 'contraseña', 'wachtwoord'], '#a-cur'],
+    [['speicher', 'storage', 'quota', 'kontingent', 'stockage', 'almacenamiento', 'archiviazione', 'opslag'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme', 'sombre', 'oscuro', 'scuro', 'donker', 'thème', 'tema', 'thema'], '#s-lookin h4'], [['sprache', 'language', 'langue', 'idioma', 'lingua', 'taal'], '#s-lang-h'], [['region', 'région', 'regione', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
   const sq = $('#s-search', md);

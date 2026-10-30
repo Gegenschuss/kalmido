@@ -11,7 +11,9 @@ const CTY_CODES = ('AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE 
   'NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN ' +
   'SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ' +
   'ZA ZM ZW').split(' ');
-const CTY_TOP = ['DE', 'AT', 'CH'];
+// 2.446.0 (#3763): the countries on top fit the language (the neighbours people write to); other languages keep DE / AT / CH
+const CTY_TOPS = {fr: ['FR', 'BE', 'CH'], es: ['ES', 'MX', 'AR'], it: ['IT', 'CH', 'SM'], nl: ['NL', 'BE', 'DE']};
+const ctyTop = () => CTY_TOPS[typeof I18N === 'object' && I18N.code] || ['DE', 'AT', 'CH'];
 const CTY_FIX = {UK: 'GB', EL: 'GR'};
 const CTYS = {names: null, lang: ''};  // (CTY is taken by listedit.js)
 function ctyNames() {
@@ -31,8 +33,8 @@ const ctyName = code => code ? `${ctyNames()[code] || code} (${code})` : '';
 // [[code, label]] in the order of the list: the three on top, then every country by name; q filters by name or code
 function ctyList(q) {
   const n = ctyNames(), f = ctyFold(q).trim();
-  const rest = CTY_CODES.filter(c => !CTY_TOP.includes(c)).sort((a, b) => n[a].localeCompare(n[b], typeof LOCALE === 'function' ? LOCALE() : undefined));
-  const all = [...CTY_TOP, ...rest];
+  const rest = CTY_CODES.filter(c => !ctyTop().includes(c)).sort((a, b) => n[a].localeCompare(n[b], typeof LOCALE === 'function' ? LOCALE() : undefined));
+  const all = [...ctyTop(), ...rest];
   if (!f) return all;
   const up = f.toUpperCase();
   const hit = all.filter(c => c === up || ctyFold(n[c]).includes(f) || (f.length <= 3 && c.startsWith(up)));
@@ -51,7 +53,7 @@ function ctyOpen(q, filter) {
   const box = q.closest('[data-cty]'), ul = box && $('.ctyl', box); if (!ul) return;
   const codes = ctyList(filter ? q.value : '');
   const cur = ctyCode($('input[type=hidden]', box).value);
-  ul.innerHTML = codes.length ? codes.map((c, i) => `<li role="option" id="${esc(q.id)}-o${i}" data-code="${c}" aria-selected="${c === cur}" class="${c === cur ? 'on' : ''}${i === CTY_TOP.length - 1 && !filter ? ' sep' : ''}">${esc(ctyNames()[c])} <span class="muted">${c}</span></li>`).join('')
+  ul.innerHTML = codes.length ? codes.map((c, i) => `<li role="option" id="${esc(q.id)}-o${i}" data-code="${c}" aria-selected="${c === cur}" class="${c === cur ? 'on' : ''}${i === ctyTop().length - 1 && !filter ? ' sep' : ''}">${esc(ctyNames()[c])} <span class="muted">${c}</span></li>`).join('')
     : `<li class="muted" aria-disabled="true">${esc(tr('Nothing matches.'))}</li>`;
   ul.hidden = false; q.setAttribute('aria-expanded', 'true');
   const on = $('li.on', ul); if (on && !filter) on.scrollIntoView?.({block: 'nearest'});

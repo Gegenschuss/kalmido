@@ -591,11 +591,11 @@ function ofcCompanyFieldsHtml(cf, dis) {
   return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''}${k === 'website' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="www.example.com"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}</div>`;
 }
 // 2.40.0 (#1377): the word printed before the management's names (Geschäftsführung, Gesellschafter, ...); the options show the
-// German and English print word, the document's language picks one; '' = Geschäftsführung as before
+// print word of the document's language (German in the German interface, otherwise English; 2.446.0 #3763); '' = Geschäftsführung as before
 const OFC_MD_LABELS = [['', 'Geschäftsführung', 'Managing directors'], ['shareholders', 'Gesellschafter', 'Shareholders'], ['owner_m', 'Inhaber', 'Owner'],
   ['owner_f', 'Inhaberin', 'Owner'], ['board', 'Vorstand', 'Executive board'], ['partners', 'Partner', 'Partners'],
   ['gbr_partners', 'Gesellschafter (GbR)', 'Partners (GbR)']];  // 2.138.0 E (#2242): prints Gesellschafter / Partners
-const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(de)} · ${esc(en)}</option>`).join('')}</select>`)
+const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(I18N.code === 'de' ? de : en)}</option>`).join('')}</select>`)
   + `<div class="shint">${esc(tr('The word before the names in the footer, e.g. GmbH: Geschäftsführung, sole proprietor: Inhaber/in.'))}</div>`;
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server

@@ -106,6 +106,22 @@ fi = ns["fmt_int"]
 check(fi(1234567, "en") == "1,234,567" and fi(1234567, "de") == "1.234.567" and fi(1234567, "fr") == "1\u202f234\u202f567"
       and fi(1234567, "nl") == "1.234.567", "thousands separators")
 check(all(ns["dec_comma"](x) for x in ("de", "fr", "es", "it", "nl")) and not ns["dec_comma"]("en"), "decimal comma (CSV ';') languages")
+
+# 2.446.0 (#3763): the completion lines (static/quips.json) have one block per language, all the same length; a language without
+# a block gets no line (never an English one); the new keys of this package are translated
+qd = json.load(open(os.path.join(ROOT, "static", "quips.json"), encoding="utf-8"))
+check(set(qd) == {"de", "en", "fr", "es", "it", "nl"} and len({len(v) for v in qd.values()}) == 1 and len(qd["de"]) == 50,
+      f"quips.json: 50 lines in each of de en fr es it nl ({ {k: len(v) for k, v in qd.items()} })")
+check(all(len(set(v)) == len(v) and all(x.strip() for x in v) for v in qd.values()), "quips.json: no empty or doubled line")
+check(not any(qd[a] == qd["en"] for a in ("fr", "es", "it", "nl")), "quips.json: the blocks are not copies of the English one")
+pal = open(os.path.join(ROOT, "static", "js", "palette.js"), encoding="utf-8").read()
+nq = pal[pal.index("function nextQuip()"):pal.index("QUIPS.last = LS.get")]
+check("d[I18N.code]" in nq and "d.en" not in nq, "nextQuip: no block for the language = no line (no English fallback)")
+for code in ("de", "fr", "es", "it", "nl"):
+    tk = json.load(open(os.path.join(I18N, code + ".json"), encoding="utf-8"))
+    for k in ("Answer to", "By list", "Lists and projects", "Kalmido text", "Auto-compact", "incl. producing ({0})"):
+        check(tk.get(k) not in (None, k), f"{code}: '{k}' is translated")
+
 # 2.447.0 (#3762): the app addresses everyone with "tu" in French, like "du" in German; "vous" only where the German text says "Sie"
 # (outsiders, customer mails, documents). A French text with vous / votre / vos whose German text has a du word and no Sie word fails.
 DE_DU = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)

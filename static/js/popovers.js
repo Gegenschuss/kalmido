@@ -1013,7 +1013,7 @@ function vvDebug(on = true) {
   if (!on) { el?.remove(); clearInterval(vvDebug.t); return; }
   if (el || !document.body) return;
   el = document.createElement('div'); el.id = 'vvdbg'; el.setAttribute('aria-live', 'off');
-  el.innerHTML = '<button type="button" class="vvdx" aria-label="Close">\u00d7</button><pre></pre>';
+  el.innerHTML = '<button type="button" class="vvdx" aria-label="' + esc(tr('Close')) + '">\u00d7</button><pre></pre>';
   document.body.appendChild(el);
   el.addEventListener('mousedown', e => e.preventDefault());  // a tap on the box keeps the focus (and the keyboard)
   el.querySelector('.vvdx').addEventListener('click', e => { e.stopPropagation(); vvDebug(false); });

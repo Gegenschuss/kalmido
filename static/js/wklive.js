@@ -200,21 +200,21 @@ function wklv_srcBtn() {
 // ---- slash commands (#3149): "/" at the start of a line, in both editors (wiki.js wk_acUpdate / wk_acPick)
 /** @type {any[]} */
 const WKLV_CMDS = [
-  ['h', 'h', N_('Heading'), 'heading überschrift', '## '],
-  ['ul', 'list', N_('List'), 'list liste bullet', '- '],
-  ['ol', 'list', N_('Numbered list'), 'numbered nummer ordered 1.', '1. '],
-  ['cb', 'select', N_('Checkbox'), 'checkbox todo häkchen aufgabe', '- [ ] '],
-  ['tb', 'sheet', N_('Table'), 'table tabelle', null],
+  ['h', 'h', N_('Heading'), 'heading überschrift titre título titolo kop', '## '],
+  ['ul', 'list', N_('List'), 'list liste bullet liste lista lijst puce viñeta elenco', '- '],
+  ['ol', 'list', N_('Numbered list'), 'numbered nummer ordered 1. numérotée numerada numerata genummerd', '1. '],
+  ['cb', 'select', N_('Checkbox'), 'checkbox todo häkchen aufgabe case tâche casilla tarea casella compito vakje taak', '- [ ] '],
+  ['tb', 'sheet', N_('Table'), 'table tabelle tableau tabla tabella tabel', null],
   ['code', 'code', N_('Code'), 'code', null],
-  ['mm', 'mindmap', N_('Mind map'), 'mindmap mind map', null],
-  ['math', 'calc', N_('Formula'), 'formula formel math latex katex', null],  // 2.382.0 (#3153): drawn by diagram.js
-  ['mmd', 'chart', N_('Diagram'), 'diagram diagramm mermaid flowchart chart', null],
-  ['file', 'picture', N_('Picture or file'), 'picture image bild file datei upload', null],
-  ['emb', 'sheet', N_('Embed a table'), 'embed einbetten table tabelle', '[[tabelle:'],
-  ['ln', 'link', N_('Link to a page'), 'link verweis page seite [[', '[['],
-  ['embp', 'note', N_('Embed a page'), 'embed einbetten page seite ![[', '![['],  // 2.371.2 (#3151)
-  ['date', 'cal', N_('Date'), 'date datum today heute', null],
-  ['task', 'check', N_('Task (#)'), 'task aufgabe # ticket', null],  // 2.371.3 (#3333): a search over the tasks the person sees
+  ['mm', 'mindmap', N_('Mind map'), 'mindmap mind map carte mentale mapa mental mappa mentale', null],
+  ['math', 'calc', N_('Formula'), 'formula formel math latex katex formule fórmula formula', null],  // 2.382.0 (#3153): drawn by diagram.js
+  ['mmd', 'chart', N_('Diagram'), 'diagram diagramm mermaid flowchart chart diagramme diagrama diagramma', null],
+  ['file', 'picture', N_('Picture or file'), 'picture image bild file datei upload image imagen immagine afbeelding fichier archivo file bestand', null],
+  ['emb', 'sheet', N_('Embed a table'), 'embed einbetten table tabelle intégrer incrustar incorporare insluiten tableau tabla tabella tabel', '[[tabelle:'],
+  ['ln', 'link', N_('Link to a page'), 'link verweis page seite [[ lien enlace collegamento koppeling página pagina', '[['],
+  ['embp', 'note', N_('Embed a page'), 'embed einbetten page seite ![[ intégrer incrustar incorporare insluiten página pagina', '![['],  // 2.371.2 (#3151)
+  ['date', 'cal', N_('Date'), 'date datum today heute fecha data aujourd\'hui hoy oggi vandaag', null],
+  ['task', 'check', N_('Task (#)'), 'task aufgabe # ticket tâche tarea compito taak', null],  // 2.371.3 (#3333): a search over the tasks the person sees
 ];
 function wklv_cmds(sp) {
   const e2e = wk_e2e(sp);

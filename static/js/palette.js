@@ -709,7 +709,7 @@ async function quipsLoad() {
 }
 function nextQuip() {
   const d = QUIPS.data; if (!d) return '';
-  const arr = d[I18N.code] || d.en || []; if (!arr.length) return '';
+  const arr = d[I18N.code] || []; if (!arr.length) return '';  // 2.446.0 (#3763): no block for the language = no line (never an English one)
   let i = Math.floor(Math.random() * arr.length);
   if (arr.length > 1 && i === QUIPS.last) i = (i + 1 + Math.floor(Math.random() * (arr.length - 1))) % arr.length;  // no immediate repeat
   QUIPS.last = i; LS.set('quipLast', i);

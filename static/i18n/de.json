@@ -15288,5 +15288,8 @@
   "Flag": "Fahne",
   "Flash": "Blitz",
   "Briefcase": "Aktentasche",
-  "This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.": "Diese Sicherung wurde mit einer früheren Passphrase verschlüsselt. Gib diese Passphrase ein, um sie zu prüfen, wiederherzustellen oder herunterzuladen."
+  "This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.": "Diese Sicherung wurde mit einer früheren Passphrase verschlüsselt. Gib diese Passphrase ein, um sie zu prüfen, wiederherzustellen oder herunterzuladen.",
+  "Answer to": "Antwort auf",
+  "By list": "Nach Liste",
+  "Lists and projects": "Listen und Projekte"
 }
