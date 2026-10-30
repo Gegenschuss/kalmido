@@ -97,7 +97,8 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
   w = await boot({hash: 'office/settings'}); d = w.document;
   await until(() => d.querySelector('#ofc-set #os-inv-scheme'), 60);
-  check(d.querySelector('#os-inv-scheme')?.value === 'RE-{yyyy}-{seq:03}' && d.querySelector('#os-cr-scheme')?.value === 'GS-{yyyy}-{seq:03}' && !!d.querySelector('#os-datev') && !!d.querySelector('#os-einv') && !!d.querySelector('#os-datev-auto'), 'settings: invoice / credit note schemes, DATEV inbox, e-invoice format');
+  // 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+  check(d.querySelector('#os-inv-scheme')?.value === 'RE-{yyyy}-{seq:03}' && d.querySelector('#os-cr-scheme')?.value === 'RK-{yyyy}-{seq:03}' && !!d.querySelector('#os-datev') && !!d.querySelector('#os-einv') && !!d.querySelector('#os-datev-auto'), 'settings: invoice / credit note schemes, DATEV inbox, e-invoice format');
   w.close();
 
   console.log(`p2380_a_ui: ${ok} ok, ${F.length} failed`);

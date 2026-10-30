@@ -291,7 +291,7 @@ def sig_offer_new(did):
         return err(str(x))
     write_lock(c, f"office_signoff_doc_{int(did)}")
     h, m = sig_doc_hash(c, oid, did)
-    title = " ".join(x for x in (m.get("title") or "", r["number"] or "", r["project_title"] or "") if x)
+    title = " ".join(x for x in (m.get("title") or "", r["number"] or "", " ".join((r["project_title"] or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
     row, tok = sig_create(c, oid, "offer", title, h, uid, exp, doc_id=did)
     ofx_log(c, oid, "signoff_link", doc_id=did, detail={"signoff": row["id"], "expires_at": exp, "doc_hash": h})
     c.commit()

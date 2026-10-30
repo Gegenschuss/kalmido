@@ -242,7 +242,9 @@ def pbt_receipts(c, uid, src):
     return [r[0] for r in c.execute(
         "SELECT n.id FROM fs_nodes n WHERE n.kind='file' AND n.deleted_at IS NULL AND n.agent_id IS NULL AND n.org_id IS NULL "
         "AND n.owner_id=? AND (n.id IN (SELECT node_id FROM office_cash_entries WHERE org_id=?) "
-        "OR n.id IN (SELECT receipt_node_id FROM office_equipment WHERE org_id=?)) ORDER BY n.id", (uid, src, src))]
+        "OR n.id IN (SELECT receipt_node_id FROM office_equipment WHERE org_id=?) "
+        "OR n.id IN (SELECT node_id FROM office_cc_statements WHERE org_id=?) "  # 2.444.0 (#3447)
+        "OR n.id IN (SELECT node_id FROM office_cc_lines WHERE org_id=?)) ORDER BY n.id", (uid, src, src, src, src))]
 
 
 def pbt_dup_notes(c, src, dst):

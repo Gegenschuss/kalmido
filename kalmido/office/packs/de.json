@@ -397,7 +397,7 @@
   "numbering": {
     "offer": "KVA-{yyyy}-{seq:03}",
     "invoice": "RE-{yyyy}-{seq:03}",
-    "credit": "GS-{yyyy}-{seq:03}",
+    "credit": "RK-{yyyy}-{seq:03}",
     "reminder": "MA-{yyyy}-{seq:03}",
     "delivery": "LS-{yyyy}-{seq:03}"
   },

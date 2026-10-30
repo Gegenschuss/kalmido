@@ -59,6 +59,9 @@ RX_TABLES = (
     ("cashbook/closings.csv", "office_cash_closings"),
     ("bank/imports.csv", "office_bank_imports"),
     ("bank/transactions.csv", "office_bank_tx"),
+    ("bank/card-cards.csv", "office_cc_cards"),  # 2.444.0 (#3447): credit card statements
+    ("bank/card-statements.csv", "office_cc_statements"),
+    ("bank/card-positions.csv", "office_cc_lines"),
     ("expenses/meals.csv", "office_meals"),
     ("expenses/trips.csv", "office_trips"),
     ("expenses/trip-items.csv", "office_trip_items"),

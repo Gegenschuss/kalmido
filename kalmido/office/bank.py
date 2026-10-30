@@ -34,7 +34,8 @@ from ..docs.store import doc_open  # 2.355.0 B (#2843)
 
 # 2.299.0 C (#3192): noreceipt = a business booking that needs no receipt (bank fees, tax payments), set and undone like
 # private / ignored. A version before 2.299 reads it as "matched" with an unknown kind (shown, undone as before), never breaks.
-BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt")
+# 2.444.0 (#3447): card = the total of a credit card statement (match_id = office_cc_statements.id): the statement is its receipt
+BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt", "card")
 BNK_STATES = ("open", "matched", "all")
 BNK_LIST_MAX = 2000
 BNK_TEXT_MAX = 300
@@ -519,6 +520,8 @@ def _tx_public(t, inv_by_id, rc_by_id, rule_names=None, splits=None):
         elif t["match_kind"] == "receipt":
             r = rc_by_id.get(t["match_id"])
             m["label"] = (r.get("title") or "") if r else ""
+        elif t["match_kind"] == "card":  # 2.444.0 (#3447)
+            m["label"] = t.get("card_label") or ""
     return {"id": t["id"], "day": t["day"], "amount": dstr(t["amount"]), "currency": t["currency"], "counterpart": t["counterpart"] or "",
             "purpose": t["purpose"] or "", "iban": t["iban"], "ref": t["ref"], "import_id": t["import_id"], "match": m}
 
@@ -566,6 +569,7 @@ def bnk_tx_list():
     sps = _splits(c, oid, [t["id"] for t in rows if t["match_kind"] == "invoice"])  # 2.355.0 B (#2843)
     inv_lbl = _inv_labels(c, oid, {t["match_id"] for t in rows if t["match_kind"] == "invoice"} | {d for sp in sps.values() for d, _a in sp})
     rc_by_id = {r["node_id"]: r for r in receipts}
+    _card_labels(c, oid, rows)  # 2.444.0 (#3447)
     rules, names = _br.br_rules(c, oid), _br.br_names(c, oid, {t["rule_id"] for t in rows if t["match_kind"]})  # 2.299.0 B (#3191)
     items = []
     for t in rows:
@@ -609,6 +613,8 @@ def bnk_candidates(tid):
             if q and q not in _norm(f"{lbl} {r.get('category') or ''} {dstr(money(dec(r['amount'])))}"):
                 continue
             out.append({"kind": "receipt", "id": r["node_id"], "label": lbl, "amount": dstr(money(dec(r["amount"]))), "date": r["date"]})
+        from .cards import cc_bank_open
+        out = cc_bank_open(c, oid, t, q) + out  # 2.444.0 (#3447): the statements waiting for their booking, the fitting total first
     return jsonify(items=out[:30])
 
 
@@ -619,8 +625,17 @@ def _tx_row(c, oid, tid):
     return r
 
 
+def _card_labels(c, oid, rows):
+    """2.444.0 (#3447): the statement's month and the card's digits on the bookings matched with a statement."""
+    from .cards import cc_stmt_label
+    for t in rows:
+        if t["match_kind"] == "card":
+            t["card_label"] = cc_stmt_label(c, oid, t["match_id"])
+
+
 def _tx_answer(c, oid, uid, tid):
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
+    _card_labels(c, oid, [t])
     sps = _splits(c, oid, [tid]) if t["match_kind"] == "invoice" else {}  # 2.355.0 B (#2843)
     inv = _inv_labels(c, oid, ({t["match_id"]} | {d for d, _a in sps.get(tid, [])}) if t["match_kind"] == "invoice" else set())
     rc = {}
@@ -654,7 +669,7 @@ def bnk_match(tid):
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
     mid = pid = differs = None
     split = kind == "invoice" and b.get("parts") is not None  # 2.355.0 B (#2843): one booking on several invoices / with a rest
-    if kind in ("invoice", "receipt") and not split:
+    if kind in ("invoice", "receipt", "card") and not split:
         try:
             mid = int(b.get("id"))
         except (TypeError, ValueError):
@@ -689,6 +704,9 @@ def bnk_match(tid):
         if split:  # each payment knows its booking (unmatch takes all back); the rest of the booking stays visible
             c.execute(f"UPDATE office_payments SET bank_tx_id=? WHERE org_id=? AND id IN ({','.join('?' * len(pids))})", (tid, oid, *pids))
         mid, pid = parts[0][0], pids[0]
+    elif kind == "card":
+        from .cards import cc_bank_check
+        cc_bank_check(c, oid, t, mid, b.get("accept_diff") is True)  # 2.444.0 (#3447): the sum of the statement against the booking
     elif kind == "receipt":
         from .books import bk_receipt_set_paid
         from ..files.store import fs_role
@@ -698,6 +716,8 @@ def bnk_match(tid):
         if c.execute("SELECT 1 FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind='receipt' AND match_id=? LIMIT 1",
                      (oid, mid)).fetchone():
             raise Denied(409, tr("This receipt is matched with another booking"))
+        if c.execute("SELECT 1 FROM office_cc_lines WHERE org_id=? AND node_id=? AND state='matched' LIMIT 1", (oid, mid)).fetchone():
+            raise Denied(409, tr("This receipt is matched with another booking"))  # 2.444.0 (#3447): paid by card
         if not fs_role(c, mid, uid):  # as bk_receipts: only documents the person sees
             raise Denied(404)
         rc = _rc_paid_amount(c, oid, mid)

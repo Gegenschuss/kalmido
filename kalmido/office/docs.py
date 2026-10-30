@@ -25,7 +25,7 @@ from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
-from .model import (NAME_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
+from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -84,6 +84,11 @@ def _text(v, name, mx=TEXT_MAX):
     if not isinstance(v, str):
         raise BadInput(tr("Invalid value: {0}", name))
     return CTRL_RE.sub("", v).strip()[:mx]  # 2.39.0 (#1209 audit M2): control characters break the e-invoice XML / PDF/A
+
+
+def pt_text(v, name="project_title"):
+    """2.431.0 (#3594 review): the multi-line subject - CRLF / CR become LF on every way in (form, agents), then _text."""
+    return _text(v.replace("\r\n", "\n").replace("\r", "\n") if isinstance(v, str) else v, name, PT_MAX)
 
 
 def _num(v, name, lo=None, hi=None):
@@ -683,9 +688,9 @@ def clean_doc(c, oid, b, cur, admin):
             f["recipient"] = json.dumps(rec, ensure_ascii=False)
     elif "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
-    for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
+    for k, mx in (("project_title", PT_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
-            f[k] = _text(b.get(k), k, mx)
+            f[k] = pt_text(b.get(k), k) if k == "project_title" else _text(b.get(k), k, mx)  # 2.431.0 B (#3594)
     for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
             f[k] = _date(b.get(k), k)
@@ -940,23 +945,32 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
         if r["kind"] != "offer":  # 2.38.0: only above the series' last value (no back-dating), the counter follows
             inv_manual_number(c, oid, r, s, num, reason)
     else:
-        rec = _j(r["recipient"], {})
-        d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
-        # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
-        # quotations count per organisation, client or project (onc_next)
-        ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
-                                                                             "initials": _initials(c, x["created_by"]), "kuerzel": _client_code(c, x)})
-        for _ in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
-            num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
-                                 initials=_initials(c, r["created_by"]), version=ver, kuerzel=_client_code(c, r))
-            if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
-                    and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
-                break
+        num = doc_next_number(c, oid, r, s)
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
         raise BadInput(tr("The number {0} is already used", num))
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
     from .docref import ofd_renamed
     ofd_renamed(c, did)  # 2.199.0 B (#2742)
+    return num
+
+
+def doc_next_number(c, oid, r, s, peek=False):
+    """The number of the scheme that document row r (no number yet, not a trial) gets from settings s; the counter moves.
+    2.431.0 B (#3605): peek = the same choice (scheme, counter, project / client / initials / date / version) only looked
+    at, for the finalise dialog (odoc_number_preview) -- a later change of the choice lands in both."""
+    from .legacyimport import fi_number_taken
+    rec = _j(r["recipient"], {})
+    d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
+    # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
+    # quotations count per organisation, client or project (onc_next)
+    ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
+                                                                         "initials": _initials(c, x["created_by"]), "kuerzel": _client_code(c, x)})
+    for i in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
+        num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, peek=peek, ahead=i if peek else 0, project=r["project_title"],
+                             client=rec.get("name") or "", initials=_initials(c, r["created_by"]), version=ver, kuerzel=_client_code(c, r))
+        if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \
+                and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
+            break
     return num
 
 
@@ -1445,6 +1459,19 @@ def odoc_number(did):
     bump(c)
     c.commit()
     return jsonify(id=did, number=num)
+
+
+@app.get("/api/office/docs/<int:did>/number-preview")
+def odoc_number_preview(did):
+    """2.431.0 B (#3605): {number, given} -- the number finalising the document gives it (the finalise dialog): its own
+    number when it has one (given true), else the next one of its scheme, the counter only looked at. Who may finalise
+    may look (the same office context)."""
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["number"]:
+        return jsonify(number=r["number"], given=True)
+    num = office_trial_number(c, oid, did, peek=True) if r["trial"] else doc_next_number(c, oid, r, office_settings(c, oid), peek=True)
+    return jsonify(number=num, given=False)
 
 
 @app.post("/api/office/docs/<int:did>/status")

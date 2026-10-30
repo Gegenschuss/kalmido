@@ -71,6 +71,15 @@ def _rows(c, ws, where, args):
                      + where + " ORDER BY r.submitted_at DESC, r.node_id DESC LIMIT ?", (ws, *args, RSB_LIST)).fetchall()
 
 
+def rsb_ingest(c, uid, org, f, name, info):
+    """One uploaded file into the office's documents -> its node id; ValueError with a readable text (also no space left)."""
+    from ..admin.hosting import QuotaExceeded
+    try:
+        return docs_ingest(c, uid, org, name, h6d_read(f), f.mimetype, "upload", dedup=True, info=info)
+    except QuotaExceeded:
+        raise ValueError(tr("{0}: no space left in your storage", name)) from None
+
+
 @app.post("/api/office/receipts/submit")
 def rsb_submit():
     from ..receipts.suggest import rc_set
@@ -82,14 +91,13 @@ def rsb_submit():
     files = request.files.getlist("files") or request.files.getlist("file")
     if not files:
         raise BadInput(tr("No file"))
-    from ..admin.hosting import QuotaExceeded
     ids, dups, errors, at = [], [], [], local_now().isoformat(timespec="seconds")
     for f in files[:RSB_FILES]:
         info = {}
         name = f.filename or "receipt.jpg"
         try:
             with c.savepoint():
-                nid = docs_ingest(c, uid, org, name, h6d_read(f), f.mimetype, "upload", dedup=True, info=info)
+                nid = rsb_ingest(c, uid, org, f, name, info)
                 if info.get("dup"):
                     dups.append({"id": nid, "name": name})
                     continue
@@ -97,8 +105,6 @@ def rsb_submit():
                 rc_set(c, {"id": nid, "org_id": org}, ws, None, "", uid, keep=True)
                 c.execute("UPDATE rc_receipts SET submitted_by=?, submitted_at=? WHERE node_id=?", (uid, at, nid))
                 ids.append(nid)
-        except QuotaExceeded:
-            errors.append(tr("{0}: no space left in your storage", name))
         except ValueError as e:
             errors.append(str(e))
     c.commit()

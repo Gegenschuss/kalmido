@@ -65,6 +65,7 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')]];
 const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
+const ofm_cc = () => typeof OFC !== 'undefined' && !!OFC.info?.cards;  // 2.444.0 (#3447): the person holds a card here
 const OFM_ITEMS = [
   {key: 'pipeline', go: 'office/pipeline', icon: 'target', name: N_('Pipeline'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
@@ -84,6 +85,7 @@ const OFM_ITEMS = [
   {key: 'gendocs', go: 'office/gendocs', icon: 'file', name: N_('Documents'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
+  {key: 'cards', go: 'office/cards', icon: 'card', name: N_('Credit cards'), group: 'money', on: ofm_ofc, get adm() { return ofm_cc() ? 0 : 1; }},  // 2.444.0 (#3447): also for the holder of a card
   {key: 'books', go: 'office/books', icon: 'book', name: N_('Bookkeeping'), group: 'money', on: ofm_ofc, adm: 1},
   // 2.276.0 A (#3039): the receipts (upload + list, office_receipts.js rcp_tabHtml) for everybody with the bookkeeping (lvk = its area)
   // 2.356.0 D (#3129): the same point is "Submit receipt" for the people who may hand in receipts but do not see the
@@ -196,7 +198,7 @@ const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEM
   .map(t => ({key: t[0], go: 'office/' + t[0], icon: t[1], name: t[2], group: OFM_GROUPS.some(g => g[0] === t[5]) ? t[5] : 'admin', on: ofm_ofc, adm: t[3], need: t[6]}))];  // 2.147.0: [6] = need
 // 2.98.0 C (#2180): the order inside the groups (a part not named here keeps its place at the end of its group);
 // tpl = a tab under Settings, not in the menu
-const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
+const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'contacts', 'contracts', 'receipts', 'cashflow', 'kpi', 'bank', 'cards', 'books', 'subs', 'travel', 'meals', 'equipment', 'agreements', 'settings'];
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
