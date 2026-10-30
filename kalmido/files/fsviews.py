@@ -36,9 +36,8 @@ from ..accounts.session import me
 from ..accounts.wsareas import wsa_org_check, wsa_org_off
 from ..lists.projects import need_overview
 from ..sheets.core import sh_need
-from ..wiki.pages import wiki_space_sql
+from ..wiki.pages import wiki_may_read, wiki_space_sql
 from ..wiki.wikiatt import wka_locked, wka_url
-from ..wiki.wkfolder import wkf_role
 from .fsroots import fs_area_ws
 from .store import fs_role
 
@@ -125,7 +124,7 @@ def _wiki(c, uid, oid, limit):
         if p is None:
             continue
         if p["id"] not in ok:
-            ok[p["id"]] = not wka_locked(c, p) and wkf_role(c, uid, p) is not None
+            ok[p["id"]] = not wka_locked(c, p) and wiki_may_read(c, uid, p)
         if not ok[p["id"]]:
             continue
         url = wka_url(r["id"], r["name"])
