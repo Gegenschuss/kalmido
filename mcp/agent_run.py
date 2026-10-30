@@ -2395,6 +2395,25 @@ def launcher_gone():
     return False
 
 
+def stop_on_signal(r):
+    """2.443.0 (#2940): TERM / INT end the running command with everything it started, then the runner. The command runs in
+    a session of its own, so the launcher's signal to this process group never reaches it: without this a run went on after
+    the launcher stopped. Jobs of agent_job.py stay, they outlive a restart by design. The event is not done yet, so the next
+    start runs it again. On Windows the launcher ends the tree with taskkill /T."""
+    import signal
+
+    def stop(signum, _frame):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        p = r.proc
+        log(f"signal {signum}: ending" + (" the running command" if p is not None else ""))
+        if p is not None and p.poll() is None:
+            kill_tree(p)
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+
 def main(argv):
     if argv[:1] == ["--perm-hook"]:  # 2.44.0 (#1442): the PermissionRequest hook of a run
         return perm_hook(argv[1:])
@@ -2424,6 +2443,7 @@ def main(argv):
     if not dry and not lock.acquire():  # 2.44.0 (#1448): never two runners on one state folder
         log("another runner works with this state folder already: not starting a second one")
         return 3
+    stop_on_signal(r)
     if once:
         with open(once, encoding="utf-8") as f:
             r.handle([json.loads(l) for l in f if l.strip()])

@@ -2515,7 +2515,9 @@ as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, defaul
 person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
-values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
+values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call).
+2.443.0: both launchers stop alike: TERM / INT end the command and all it started (KILL after 30 s; Windows `taskkill /T`,
+`/F` after 30 s), a command that cannot start or an error in one round never ends the launcher. The list of these capabilities is
 [`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the
 two launchers lacks one.
 
