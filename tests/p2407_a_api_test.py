@@ -202,12 +202,14 @@ fag.headers.update({"Authorization": "Bearer " + r.json()["token"]})
 LF = Fr.post(B + "/api/lists", json={"name": "Frida A"}).json()["id"]
 check(Fr.put(B + f"/api/lists/{LF}/members", json={"user_id": FAG, "role": "edit"}).ok, "freelancer #3513 setup: the own agent in the own project")
 TF = Fr.post(B + "/api/tasks", json={"title": "Frida task", "list_id": LF}).json()["id"]
-r = fag.post(path(TF), json={"text": "Invoice drafted", "name": "Holston"})
+r = fag.post(V + f"/tasks/{TF}/working", json={"text": "Invoice drafted", "name": "Holston"})
 check(r.status_code == 201, f"freelancer #3513: the own agent marks her task ({r.status_code} {r.text[:200]})")
 w = wk(Fr, TF)
 check(w and w.get("name") == "Holston" and w.get("text") == "Invoice drafted", f"freelancer #3513: she sees name and line {w}")
 check(not wk(Bo, TF) and state_task(Bo, TF) is None, "freelancer #3513: nobody else sees her task or the mark")
 check(cl.post(path(TF), json={"text": "x"}).status_code == 404, "freelancer #3513: an agent of the organisation does not reach her task")
-check(fag.delete(path(TF)).ok and not wk(Fr, TF), "freelancer #3513: ending it removes the mark")
+r = fag.patch(V + f"/tasks/{TF}/working", json={"text": "PDF checked"})
+check(r.ok and (wk(Fr, TF) or {}).get("text") == "PDF checked", f"freelancer #3513: a new line of the own agent ({r.status_code} {r.text[:200]})")
+check(fag.delete(V + f"/tasks/{TF}/working").ok and not wk(Fr, TF), "freelancer #3513: ending it removes the mark")
 
 sys.exit(kt.done("p2407_a"))

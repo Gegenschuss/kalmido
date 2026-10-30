@@ -79,12 +79,14 @@ async function orr_personSave(el) {
 
 // ---- Groups
 function orr_matrixHtml(d, g, edit) {
-  const caps = d.caps?.levels || {}, cs = d.caps?.specials || [], dis = edit ? '' : 'disabled';
+  const caps = d.caps?.levels || {}, cs = d.caps?.specials || [];
   const areas = d.areas || [];
   const sel = a => {
     const lvs = (d.levels || []).filter(l => l !== 'own' || a.own);
     const capI = (d.levels || []).indexOf(caps[a.key] || 'none');
-    return `<select data-orr="lv" data-gid="${g.id || ''}" data-area="${esc(a.key)}" aria-label="${esc(a.name)}" ${dis}>${lvs.map(l => `<option value="${l}" ${(g.levels || {})[a.key] === l ? 'selected' : ''} ${edit && (d.levels || []).indexOf(l) > capI ? 'disabled' : ''}>${esc(orr_lvName(l))}</option>`).join('')}</select>`;
+    // 2.433.0 (#3607): a fixed group (template, or one the person may not change) shows its level as text, not as a select that looks active
+    if (!edit) return `<span class="orr-lv-ro" data-orr="lv-ro" data-area="${esc(a.key)}">${esc(orr_lvName((g.levels || {})[a.key] || 'none'))}</span>`;
+    return `<select data-orr="lv" data-gid="${g.id || ''}" data-area="${esc(a.key)}" aria-label="${esc(a.name)}">${lvs.map(l => `<option value="${l}" ${(g.levels || {})[a.key] === l ? 'selected' : ''} ${(d.levels || []).indexOf(l) > capI ? 'disabled' : ''}>${esc(orr_lvName(l))}</option>`).join('')}</select>`;
   };
   const grp = OFM_GROUPS.map(mg => { const as = areas.filter(a => a.group === mg[0]); return as.length ? `<div class="orr-mg"><h4>${esc(tr(mg[2]))}</h4>${as.map(a => `<label class="orr-row"><span>${esc(a.name)}</span>${sel(a)}</label>`).join('')}</div>` : ''; }).join('');
   const sp = (d.specials || []).map(s => `<label class="chkl"><input type="checkbox" data-orr="sp" data-gid="${g.id || ''}" value="${esc(s.key)}" ${(g.specials || []).includes(s.key) ? 'checked' : ''} ${edit && cs.includes(s.key) ? '' : 'disabled'}><span>${esc(s.name)}</span></label>`).join('');
@@ -94,7 +96,9 @@ function orr_groupsHtml(d) {
   const tpl = (d.templates || []).map(t => {
     const k = t.ref, copy = t.can_give && t.key !== 'legacy' ? `<button type="button" class="btn sm" data-orr="copy" data-ref="${esc(t.ref)}">${ic('copy', 's')}<span>${tr('Copy')}</span></button>` : '';
     const inner = t.levels ? orr_matrixHtml(d, t, false) : `<p class="muted">${esc(t.hint)}</p>`;
-    return `<li><details class="orr-g" data-orr-open="${k}" ${ORR.open.has(k) ? 'open' : ''}><summary><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc(t.hint)}</small></span>${ic('chev', 's')}</summary><div class="orr-gb">${copy ? `<div class="orr-act">${copy}</div>` : ''}${inner}</div></details></li>`;
+    // 2.433.0 (#3607): templates stay fixed - say so above the levels, the Copy button right next to it
+    const note = t.levels ? `<div class="orr-tpln">${ic('lock', 's')}<span>${esc(copy ? tr('Template - copy it to adjust') : tr('Template - cannot be changed'))}</span>${copy}</div>` : (copy ? `<div class="orr-act">${copy}</div>` : '');
+    return `<li><details class="orr-g" data-orr-open="${k}" ${ORR.open.has(k) ? 'open' : ''}><summary><span class="ofcn"><b>${esc(t.name)}</b><small class="muted">${esc(t.hint)}</small></span>${ic('chev', 's')}</summary><div class="orr-gb">${note}${inner}</div></details></li>`;
   }).join('');
   const own = (d.groups || []).map(g => {
     const k = g.ref, edit = !!g.can_edit && !!g.can_give;

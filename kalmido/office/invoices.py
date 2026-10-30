@@ -27,7 +27,8 @@ from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_o
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
-from .model import office_feature, office_gate, office_need_feature, office_org, office_role, office_settings, pb_cl_sql, trial_flag
+from .model import num_kind, num_scheme, office_feature, office_gate, office_need_feature, office_org, office_role, office_scheme_period, office_settings, pb_cl_sql, trial_flag
+from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
 from .model import SCHEME_RE, scheme_variants  # 2.355.0 A (#2839)
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
@@ -127,24 +128,24 @@ def inv_manual_number(c, oid, r, s, num, reason=""):
     """2.38.0: a manual number of an invoice / credit note must follow the scheme and lie above the series' last value
     (no back-dating); the counter then continues from it. 2.39.1 (#1210 N2): more than one above the counter (a gap in
     the series) only with a reason (kept in the office log). The caller holds the number lock. BadInput otherwise."""
-    from .model import office_scheme_period
     scheme = inv_scheme(s, r["kind"])
+    kind = num_kind(s, r["kind"])  # 2.433.0 (#3597): a correction on the invoices' shared counter (its period) follows that one
     seq = inv_manual_seq(scheme, num)
     if seq is None:
         raise BadInput(tr("The number must follow the scheme {0}", scheme))
     d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
-    period = office_scheme_period(scheme, d)
+    period = office_scheme_period(num_scheme(s, r["kind"]), d)
     y = inv_number_year(scheme, num)
     if period and y is not None and y != d.year:  # 2.355.0 A (#2839): never another year's number (nor its counter)
         raise Denied(409, tr("The number carries the year {0}, the invoice date is in {1}", y, d.year))
-    row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, r["kind"], period)).fetchone()
+    row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
     last = row["last"] if row else 0
     if seq < last or (seq == last and num != (r["number"] or "")):  # 2.38.0 review: re-setting its own number is fine
         raise BadInput(tr("The number must be above the last one of the series ({0})", last))
     if seq > last + 1 and len((reason or "").strip()) < INV_SKIP_REASON_MIN:
         raise BadInput(tr("The number skips {0} numbers of the series; give a reason (GoBD)", seq - last - 1))
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
-              (oid, r["kind"], period, seq))
+              (oid, kind, period, seq))
 
 
 # ---------------------------------------------------------------- payments and the derived state
@@ -1130,6 +1131,9 @@ def inv_datev_ready(c, oid, r, s):
         raise Denied(409, tr("Trial documents do not go to the accounting"))
 
 
+INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
+
+
 def inv_send(c, oid, uid, r, b, later=False):
     """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
     sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
@@ -1146,8 +1150,13 @@ def inv_send(c, oid, uid, r, b, later=False):
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
-    if not re.fullmatch(mail_re, to) or (cc and not re.fullmatch(mail_re, cc)):
+    # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
+    ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
+    if not re.fullmatch(mail_re, to):
         raise BadInput(tr("Invalid value: {0}", "to"))
+    if len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
+        raise BadInput(tr("Invalid value: {0}", "cc"))
+    cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
@@ -1166,7 +1175,7 @@ def inv_send(c, oid, uid, r, b, later=False):
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
     if own:
         inv_own_text_quota(c, oid, uid)
-    h6c_send_budget(c, oid, uid, [to] + ([cc] if cc else []))  # 2.86.0 (N27)
+    h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     sheet = []
@@ -1590,6 +1599,17 @@ def inv_pay_del(c, oid, did, pid, note="", uid=None):
     # a bank booking matched by this payment is open again
     c.execute("UPDATE office_bank_tx SET match_kind=NULL, match_id=NULL, payment_id=NULL, matched_by=NULL, matched_at=NULL "
               "WHERE org_id=? AND payment_id=?", (oid, pid))
+
+
+@app.get("/api/office/docs/<int:did>/recipients")
+def inv_recipients_get(did):
+    """2.433.0 (#3599): the addresses the send dialog of document did starts with ({to, cc: [...]}, contacts_cl.fk_send_rcpts):
+    invoices / corrections / reminders to the e-mail for invoices with the contact persons for invoices in copy,
+    quotations to the default contact person with the e-mail for invoices in copy."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    return jsonify(fk_send_rcpts(c, r["client_id"], oid, r["kind"]))
 
 
 @app.post("/api/office/docs/<int:did>/send")

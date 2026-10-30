@@ -830,6 +830,13 @@ function fl_viewSoon(raw, mod) {
   const wait = Math.max(0, (FL.vlast || 0) + 400 - Date.now());
   FL.vt = setTimeout(run, Math.max(16, wait));  // a timer, not a frame: a page that goes away takes it along
 }
+// 2.431.0 C (#3598): clients and contacts scroll in their two columns (the list, the card): a redraw keeps the list's scroll on
+// the same page and the card's on the same entry; the card of another entry starts at its top (a morph kept the old offset)
+function ct_scrollKeep(el) {
+  const sc = () => { const v = el.querySelector('.ctview'), c = v?.querySelector('.ctcard'); return v && [v.classList.contains('msclients'), v.querySelector('.ctlistw'), c, c?.dataset.ck]; };
+  const a = sc(), ls = a?.[1]?.scrollTop, cs = a?.[2]?.scrollTop;
+  return () => { const b = sc(); if (!a || !b || a[0] !== b[0]) return; if (b[1]) b[1].scrollTop = ls || 0; if (b[2]) b[2].scrollTop = a[3] === b[3] ? cs || 0 : 0; };
+}
 function setHtml(el, html) {
   const fg = typeof fgKeep === 'function' ? fgKeep(el) : null;  // 2.40.0 (#1371): unsaved form input survives the redraw
   if (morphRoot !== el) el.innerHTML = html;
@@ -940,7 +947,7 @@ function renderView0() {
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
   if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
-  const scroll = el.scrollTop;
+  const scroll = el.scrollTop, ctk = ct_scrollKeep(el);  // 2.431.0 C (#3598)
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
   const tin = $('#view .ttlin'), tinF = !!tin && document.activeElement === tin;  // 2.0.2: inline title edit + section input too
@@ -993,7 +1000,7 @@ function renderView0() {
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
   else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
-  el.scrollTop = scroll;
+  el.scrollTop = scroll; ctk();
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }

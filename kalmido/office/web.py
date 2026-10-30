@@ -15,13 +15,14 @@ from .packs import office_features, office_pack, office_pack_codes, office_pack_
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_lock, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS,
+    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS, num_kind, num_scheme,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 from .rcsubmit import rsb_flag  # 2.356.0 D (#3129)
+from .cards import cc_flag  # 2.444.0 (#3447)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -52,6 +53,7 @@ def office_settings_get():
                    industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
                    used=of_used(c, oid),  # 2.276.0 A (#3039): what the office already holds (start page, folded group, menu points)
                    submit=rsb_flag(c, uid, oid),  # 2.356.0 D (#3129): "Submit receipt" (may hand in, does not see the bookkeeping)
+                   cards=cc_flag(c, uid, oid),  # 2.444.0 (#3447): the person holds a card here
                    **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
 
 
@@ -212,9 +214,11 @@ def office_number_preview():
         return jsonify(preview="", valid=False, error=str(e))
     if kind == "offer":  # 2.118.0 A (#2265): ?counter=org|client|project (the choice on the page), example client / project from 1
         cnt = request.args.get("counter")
-        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB")
+        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")
     else:
-        pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
+        s = office_settings(c, oid)  # 2.433.0 (#3597): a correction on the shared counter peeks at the invoices' one
+        pv = office_number_next(c, oid, num_kind(s, kind), scheme, peek=True, pscheme=num_scheme(s, kind) if num_kind(s, kind) != kind else None,
+                                project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")[0]
     return jsonify(preview=pv, valid=True, yearly=bool(office_scheme_period(scheme)))
 
 

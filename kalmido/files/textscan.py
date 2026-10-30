@@ -35,6 +35,7 @@ from ..docs import store as S
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from .fslock import fl_is_locked  # 2.353.0 A (#2758)
+from .fsviews import fsv_drop  # 2.429.0 (#3580)
 
 KINDS = ("att", "list", "fs")
 COL = {"att": "att_id", "list": "list_file_id", "fs": "node_id"}
@@ -554,6 +555,7 @@ def files_search():
     raw = ts_query()
     space = (request.args.get("space") or "").strip()
     rows, hit = ts_files_find(c, uid, raw, space)
+    rows = fsv_drop(c, rows)  # 2.429.0 (#3580): no folder / knowledge page / table of another area (the global search finds those)
     items = [x for x in _items(c, rows) if not x.get("no_access")]  # a link to an original the asker may not open
     parents = {r["id"]: r["parent_id"] for r in rows}
     pids = sorted({p for p in parents.values() if p})

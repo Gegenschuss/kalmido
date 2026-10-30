@@ -128,7 +128,7 @@ def kp_items(c, oid, rows, lg):
         st = inv_state(r, pm) if r["kind"] != "offer" else r["status"]
         if r["kind"] == "credit" and st not in ("paid", "cancelled"):
             st = "credit"  # a credit note is not "open" for the customer: it was sent
-        sub = [pt_day(r["date"] or "", lg), r["project_title"] or "", fmt_money(t.get("gross") or 0, dl, cur)]
+        sub = [pt_day(r["date"] or "", lg), " ".join((r["project_title"] or "").split()), fmt_money(t.get("gross") or 0, dl, cur)]  # 2.431.0 B (#3594): the subject on one line
         if r["kind"] == "invoice" and st in ("sent", "issued", "partial", "overdue"):
             mf = inv_money_fields(r, pm)
             if st == "partial":

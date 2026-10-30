@@ -65,7 +65,8 @@ def got(path, event, pred=None, timeout=15):
 # ---------------------------------------------------------------- #2520: the words (no server needed)
 # key -> (the old inline German, the old English or None where the old fallback was German in both languages)
 OLD = {
-    "Invoice|document": ("Rechnung", "Invoice"), "Credit note|document": ("Gutschrift", "Credit note"),
+    # 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+    "Invoice|document": ("Rechnung", "Invoice"), "Credit note|document": ("Rechnungskorrektur", "Credit note"),
     "Payment reminder|document": ("Zahlungserinnerung", "Payment reminder"), "Reminder|document": ("Mahnung", "Reminder"),
     "Final reminder|document": ("Letzte Mahnung", "Final reminder"), "Delivery note|document": ("Lieferschein", "Delivery note"),
     "Proof of service|document": ("Leistungsnachweis", "Proof of service"), "Quotation|document": ("Angebot", "Quotation"),
@@ -79,7 +80,7 @@ OLD = {
                                                                      "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}"),
     "Amount outstanding|document": ("Offener Betrag", "Amount outstanding"), "Reminder fee|document": ("Mahngebühr", "Reminder fee"),
     "Total amount due|document": ("Gesamtbetrag", "Total amount due"), "Due|document": ("Fällig", "Due"), "Amount|document": ("Betrag", "Amount"),
-    "Subtotal|document": ("Zwischensumme", "Subtotal"), "Total|invoice": ("Rechnungsbetrag", "Total"), "Total|credit note": ("Gutschriftsbetrag", "Total"),
+    "Subtotal|document": ("Zwischensumme", "Subtotal"), "Total|invoice": ("Rechnungsbetrag", "Total"), "Total|credit note": ("Korrekturbetrag", "Total"),
     "Already paid|document": ("Bereits bezahlt", "Already paid"), "Received / accepted|document": ("Erhalten / abgenommen", "Received / accepted"),
     "Payable by {date} without deduction.|document": ("Zahlbar bis {date} ohne Abzug.", "Payable by {date} without deduction."),
     "Quotation no.|document": ("Angebot Nr.", None), "Valid until|document": ("Gültig bis", None), "Exceptions|document": ("Ausnahmen", None),

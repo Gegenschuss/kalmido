@@ -35,7 +35,7 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
     const md = d.querySelector('.modal.cldlg');
     const more = md.querySelector('details#cl-more');
     check(md && more && !more.open, tag + ': details folded');
-    const vis = [...md.querySelectorAll('input:not([type=hidden]),textarea,select')].filter(x => !more.contains(x)).map(x => x.id);
+    const vis = [...md.querySelectorAll('input:not([type=hidden]),textarea,select')].filter(x => !more.contains(x)).map(x => x.id).filter(x => x !== 'clb-email_invoice');  // 2.433.0 (#3599): with the office the invoice e-mail sits next to E-mail
     check(JSON.stringify(vis) === JSON.stringify(['cl-name', 'cl-email', 'clb-city']), tag + ': short form = name, e-mail, city: ' + vis);
     check(more.querySelector('#cl-phone') && more.querySelector('#cl-note') && more.querySelector('#clb-street') && more.querySelector('#cl-nx') && !more.querySelector('#clb-city'), tag + ': the rest sits under More details');
     check(md.querySelector('.foot.clfoot [data-m="save"]'), tag + ': "Add" in the sticky foot');

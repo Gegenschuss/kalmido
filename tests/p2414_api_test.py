@@ -289,7 +289,10 @@ check(Ca.get(B + BA).json()["years"] == [] and Ca.get(B + BA + "/bookings", para
 for path in (f"/bookings/{it['RE-1']['id']}", f"/docs/{it['RE-1']['doc_id']}", f"/files/{fid}"):
     check(Ca.get(B + BA + path).status_code == 404, f"another organisation: 404 {path}")
 check(Ca.post(B + BA + f"/runs/{RUN}/undo").status_code == 404, "another organisation cannot undo the run")
-r = up(Er, BA + "/import", [("own.csv", extf21(Y2, [("42,00", "S", "1000", "8400", "0505", "E-1", "Eigenes", "")]))])
+OWN = [("own.csv", extf21(Y2, [("42,00", "S", "1000", "8400", "0505", "E-1", "Eigenes", "")]))]
+r = Er.post(B + BA + "/check", files=[("file", (n, d, "application/octet-stream")) for n, d in OWN])
+check(r.status_code == 200, "freelancer: the preview of its own upload " + r.text[:200])
+r = up(Er, BA + "/import", OWN)  # POST
 check(r.status_code == 201, "freelancer: imports into the personal office " + r.text[:200])
 ej = Er.get(B + BA + "/bookings", params={"year": Y2}).json()
 check(ej["total"] == 1 and ej["items"][0]["text"] == "Eigenes", "freelancer: sees its own line only")

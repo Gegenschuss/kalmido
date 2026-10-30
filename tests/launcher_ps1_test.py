@@ -3,7 +3,7 @@
 the paused agent (403), the env file (quotes, comments, export), the token never in the output; then the loop with a fake
 agent command: started with the settings, restarted on "Reset now" (reset_seq), on changed settings, stopped when paused.
 Needs pwsh (PowerShell 7) on PATH or in $PWSH; prints SKIP and exits 0 without it."""
-import json, os, shutil, subprocess, sys, tempfile, threading
+import json, os, re, shutil, subprocess, sys, tempfile, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from kt import check, done, until  # 2.206.0 B (#2762): shared helpers (tests/kt.py)
@@ -123,6 +123,52 @@ finally:
         p.kill(); p.wait()
     errf.seek(0); err = errf.read(); errf.close()
     subprocess.run(["pkill", "-f", "python3 " + fake])
+# ---- 2.443.0 (#2940): robust like the .sh; the rest of the parity in launcher_parity_test.py
+envr = os.path.join(tmp, "robust.env")
+with open(envr, "w") as f:
+    f.write(f"KALMIDO_URL={URL}\nKALMIDO_TOKEN={TOKEN}\nKALMIDO_POLL=1\nKALMIDO_RESTART_DELAY=1\n")
+STATE["runtime"].update(reset_seq=0, nightly_reset=None)
+STATE["enabled"] = True
+errp = os.path.join(tmp, "robust.err")
+
+
+def robust_log():
+    with open(errp) as f:
+        return f.read()
+
+
+p = subprocess.Popen([PWSH, "-NoProfile", "-NonInteractive", "-File", PS1, "-e", envr, "--", os.path.join(tmp, "no-such-agent")],
+                     stdout=subprocess.DEVNULL, stderr=open(errp, "w"))
+check(until(lambda: robust_log().count("the command did not start") >= 2, 45), "a command that cannot start is tried again: " + robust_log()[-300:])
+check(p.poll() is None, "the launcher stays")
+STATE["runtime"]["reset_seq"] = "x"  # a value that throws in the round: only that round fails
+check(until(lambda: "error:" in robust_log(), 30), "an error in one round is logged: " + robust_log()[-300:])
+check(p.poll() is None, "an error in one round does not end the launcher")
+STATE["runtime"]["reset_seq"] = 0
+p.terminate()
+check(p.wait(30) == 0, "TERM after errors: exit 0")
+
+# the scheduled task writes with *>> into agent.log: stderr is a console there, not a pipe. A pty stands in for that console
+import pty  # noqa: E402
+
+agentlog = os.path.join(tmp, "agent.log")
+master, slave = pty.openpty()
+with open(os.path.join(tmp, "noname.env"), "w") as f:
+    f.write(f"KALMIDO_URL={URL}\n")
+noname = os.path.join(tmp, "noname.env")
+r = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", f"& '{PS1}' -e '{noname}' --once *>> '{agentlog}'"], stdin=slave, stdout=slave, stderr=slave, timeout=60)
+os.close(slave); os.close(master)
+check(os.path.exists(agentlog) and "KALMIDO_TOKEN missing" in open(agentlog).read(), "the log line is in the file of *>>")
+
+# the table for Windows PowerShell 5.1: every Windows id is a real one, Europe/Berlin is in it
+src = open(PS1, encoding="utf-8").read()
+table = src[src.index("$WinZones = @{"):src.index("function Now-In")]
+ids = re.findall(r"^  '([^']+)' = '", table, re.M)
+check(len(ids) > 30 and "Europe/Berlin" in table, f"the zone table: {len(ids)}")
+script = "foreach ($i in @(" + ",".join(f"'{i}'" for i in ids) + ")) { try { [void][TimeZoneInfo]::FindSystemTimeZoneById($i) } catch { Write-Output \"BAD $i\" } }"
+r = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, timeout=60)
+check(r.returncode == 0 and "BAD" not in r.stdout, f"every Windows zone id exists: {r.stdout[-300:]} {r.stderr[-200:]}")
+
 check(TOKEN not in (err or ""), "the token is never in the log")
 check("restart: reset now (0 -> 1)" in (err or "") and "restart: runtime settings changed" in (err or "") and "paused in Kalmido: stopping" in (err or ""),
       "the log names every restart: " + (err or "")[-400:])

@@ -243,6 +243,7 @@ check(Fi.put(B + f"/api/orgs/{ORG}/members", json={"email": "neu2@example.com", 
 # ---------------------------------------------------------------- (d) bookkeeping
 check(Bk.get(B + O + "/docs").ok, "(d) bookkeeping: the invoices 200")
 check(Bk.post(B + O + f"/docs/{INV}/finalize").status_code == 403, "(d) bookkeeping without release: finalise 403")
+check(Bk.get(B + O + f"/docs/{INV}/number-preview").status_code == 403, "(d) bookkeeping without release: no number preview (2.431.0, #3605 review)")
 check(Bk.post(B + O + f"/docs/{INV}/send", json={}).status_code == 403, "(d) bookkeeping without release: send 403")
 r = Bk.get(B + O + "/datev/extf", params={"from": f"{Y}-01-01", "to": f"{Y}-12-31"})
 check(r.status_code != 403 and r.status_code < 500, f"(d) bookkeeping with export: DATEV export {r.status_code} {r.text[:160]}")

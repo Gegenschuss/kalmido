@@ -908,7 +908,7 @@ function chatInner(aid) {
   // switch, ⋯ and close as one group (the phone: only ⋯). The search button stays hidden as the anchor of the search bar.
   return `<div class="chath chh2${gcs}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
       <span class="chhb" role="group" aria-label="${esc(tr('Chat'))}">${back ? '' : chatWinBtns()}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</span></div>
-    ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs"${gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
+    ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs" id="chat-msgs" data-agid="${a.id}"${gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
     ${chatStepsLiveHtml()}
