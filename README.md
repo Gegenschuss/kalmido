@@ -19,13 +19,14 @@
 
 ## What's new
 
-**2.409.0** (2026-10-29):
+**2.409.0** (2026-10-30):
 - **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
 - **File store**: one area for files and documents (list or cards per folder, recognition per folder), locked end-to-end encrypted folders.
 - **First start**: a short "What do you use Kalmido for?" for added accounts, Start as home page, tablets with the computer navigation, one Organisation area for people, agents and data.
 - **Workspaces**: areas can be switched on and off per workspace (Private by each person, an organisation by its admins).
 - **Knowledge**: reading styles, a "/" task picker, formulas (LaTeX) and Mermaid diagrams.
 - **Office**: Quotations and Invoices as two areas, with a paid filter in the invoice archive.
+- **Office PDFs**: quotation PDF with a compact closing and the totals at the bottom; logo size and side selectable in the office settings.
 - **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
 - **Software projects**: ticket keys like APP-123, linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text.
 - **Office**: receipts by e-mail, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, quotation PDF with a compact closing.
