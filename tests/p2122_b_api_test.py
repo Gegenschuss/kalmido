@@ -344,7 +344,7 @@ deep = [x["id"] for x in fv(tag=TID).json()["data"]]
 check(D1 in deep and DOCROOT not in deep, f"#2338: without parent_id at any depth, only with the tag ({deep})")
 check(F1 not in deep, "#2338: an unshared file with the tag stays hidden from the agent")
 check(fv(tag=f"{TID};999999").json()["data"] != [] and fv(tag=f"{TID};999999", tag_mode="all").json()["data"] == [], "#2338: tag_mode=all = every tag")
-check(fv(tag="abc").status_code == 400 and fv(tag="9" * 30).status_code == 400 and fv(not_tag="x").status_code == 400, "#2338: a bad tag filter is 400, never the unfiltered list")
+check(fv(tag="abc").status_code == 400 and fv(tag="9" * 30).status_code == 400 and fv(not_tag="x").status_code == 400 and fv(tag="²").status_code == 400 and fv(tag=TID, tag_mode="x").status_code == 400, "#2338: a bad tag filter is 400, never the unfiltered list")
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 fa = Fr.post(B + "/api/my/agents", json={"username": "fridabot2338", "display_name": "Frida's bot", "scopes": ["read", "files:read"]}).json()["id"]
 FAH = {"Authorization": "Bearer " + Fr.post(B + f"/api/my/agents/{fa}/token").json().get("token", ""), "X-Requested-With": "kalmido"}

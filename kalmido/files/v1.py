@@ -69,6 +69,8 @@ def v1_files_list():
     for k, got in (("tag", groups), ("not_tag", nots)):
         if (a.get(k) and not got) or any(i > 10 ** 12 for x in got for i in (x if isinstance(x, list) else [x])):
             raise BadInput(tr("Invalid value: {0}", k))
+    if a.get("tag_mode") not in (None, "", "all"):
+        raise BadInput(tr("Invalid value: {0}", "tag_mode"))
     tagged = bool(groups or nots)
     tw, tp = [], []
     dt_where(groups, nots, str(a.get("tag_mode") or "") == "all", tw, tp)
