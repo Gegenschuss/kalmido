@@ -2,7 +2,7 @@
 # natively on the build machine (also for a multi-platform image), tested, packed; Settings > Documents offers the files
 # 2.168.5: ${BUILDPLATFORM:-linux/amd64} and no RUN --mount - the classic builder (Docker without buildx, e.g. a
 # staging host) knows neither; BuildKit (release, multi-platform) still sets BUILDPLATFORM itself, so the default stays unused
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.27-alpine AS folderwatch
+FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS folderwatch
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-trimpath
 WORKDIR /src
 COPY folderwatch/ .
@@ -19,20 +19,23 @@ RUN set -e; go vet ./...; go test ./...; v="$(cat /VERSION)"; \
     cp "$(go env GOROOT)/LICENSE" /out/LICENSE-Go.txt; \
     chmod 0644 /out/*; chmod 0755 /out/kalmido-folder-watcher-linux-*; /build/pack sums /out
 
+# 2.360.3 (#2915): base images by digest (the tag stays readable), kept current with tools/pins.py --update
 # 2.442.0 (#2808): JS / CSS packed ahead of time (gzip, brotli) on the build machine, the app sends them by Accept-Encoding
-FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim AS staticpack
+FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS staticpack
 RUN pip install --no-cache-dir brotli==1.2.1
 COPY static /src/static
 COPY kalmido/core/strip.py tools/pack_static.py /src/tools/
 RUN python /src/tools/pack_static.py /src/static /out
 
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
 # 2.37.0: pg_dump/pg_restore for the in-app backup (Debian 13 ships PostgreSQL 17)
 # 2.143.0 B (#2152): + openssh-client (sftp) for the off-site backup target
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 openssh-client && rm -rf /var/lib/apt/lists/*
 # 2.48.0 (#1111): OCR -- text recognition of scanned documents (German / English), page previews, QR codes (archive numbers)
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-fra tesseract-ocr-ita tesseract-ocr-spa tesseract-ocr-nld poppler-utils libzbar0t64 && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir flask==3.1.3 werkzeug==3.1.9 waitress==3.0.2 python-dateutil==2.9.0 cryptography==50.0.1 icalendar==7.3.0 recurring-ical-events==3.8.2 x-wr-timezone==2.0.1 click==8.5.0 segno==1.6.6 webauthn==3.0.1 cbor2==6.1.4 pyasn1==0.6.5 pyasn1-modules==0.4.2 pyOpenSSL==26.4.0 typing-extensions==4.16.0 pillow==13.0.0 pi-heif==1.4.0 pypdf==6.21.4 xlrd==2.0.2 psycopg[binary]==3.3.6 psycopg-pool==3.3.3 tzdata
+# 2.360.3 (#2915): every package with its version and hashes, also what the direct ones pull in (tools/requirements.in + .lock)
+COPY tools/requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
 WORKDIR /app
 # 2.380 G (#3390): + the hashes of the agent starter files (mcp/starter_sha256.txt, tools/starter_sha.py); the pattern lets a
 # checkout without mcp/ build too (then the agent setup gets no hashes and checks nothing, as before)
