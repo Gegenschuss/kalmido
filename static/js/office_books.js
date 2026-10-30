@@ -58,12 +58,14 @@ function bkTabHtml() {
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
+  if (bkSub() === 'archive' && typeof bkaHtml === 'function') return bkaHtml();  // 2.414.0 A (#3502): the booking archive (office_bookarch.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
   const yNow = new Date().getFullYear(), years = [];
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
+    ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
     <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
     ${bkPhotoHtml()}`;
   const txd = typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '';  // part C: the tax dates; 2.147.0 (#2460): only while on

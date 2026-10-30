@@ -10,7 +10,11 @@
 // device subscribed for (a daily check-in keeps the server copy current, logout removes it).
 const wpSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+// 2.435.0 B (#3578): the native app shell: desktop sets window.__KALMIDO_SHELL__, the iOS / Android shells add "KalmidoApp/" to the user agent
+const shellInfo = () => { const s = window.__KALMIDO_SHELL__; return s && typeof s === 'object' ? s : /KalmidoApp\//.test(navigator.userAgent) ? {kind: 'mobile'} : null; };
+const shellIOS = () => !!shellInfo() && /KalmidoApp\//.test(navigator.userAgent) && /iPhone|iPad|iPod/.test(navigator.userAgent);  // no Web Push in WKWebView
+const shellServerUrl = () => { const s = window.__KALMIDO_SHELL__; if (s && typeof s === 'object') return typeof s.changeServer === 'string' && s.changeServer ? s.changeServer : ''; return !shellInfo() ? '' : shellIOS() ? 'capacitor://localhost/?change=1' : 'https://localhost/?change=1'; };
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || !!shellInfo();
 const b64uBytes = s => { const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
 function deviceLabel() {
   const u = navigator.userAgent;

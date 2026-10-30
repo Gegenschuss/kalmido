@@ -87,7 +87,7 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   await until(() => d.querySelector('[data-absel="mode"]'));
   check(!d.querySelector('.ablist.abselon'), 'file store: no extra room outside choosing');
   d.querySelector('[data-absel="mode"]').click();
-  check(await until(() => d.querySelector('.ablist.abselon') && d.querySelector('.abselbar')), 'file store: choosing -> the list has room for the bar');
+  check(await until(() => d.querySelector('.ablist.abselon') && d.querySelector('#ab-sbar')), 'file store: choosing -> the list has room for the bar');
   w.close();
   const dcss = css('css/docs.css'), acss = css('app.css');
   check(/\.dc-grid\.dc-selon\{padding-bottom:7\.5rem\}/.test(dcss) && /\.ablist\.abselon\{padding-bottom:7\.5rem\}/.test(acss), 'the CSS rules for the room in rem');

@@ -51,10 +51,10 @@ const feats = async ck => ((await call('GET', '/api/state', null, ck)).settings 
     check(pal === 'Contacts', '#3018 fiona: one name for the area everywhere (mg_nameKey) ' + pal);
     const hint = await until(() => d.querySelector('#view .ct18'));
     check(hint && /Quotations and invoices\?/.test(hint.textContent) && /Turn on Office & finance/.test(hint.textContent), '#3018 fiona: the contacts page offers Office & finance');
-    // the clients' text in Settings > Modules: no "only within your organisation" without an organisation
+    // the clients' text in Settings > Modules: no "only within the workspace" without an organisation (2.411 #2938: was "your organisation")
     w.eval(`settingsModal('modules')`);
     const row = await until(() => d.querySelector('.smodal [data-modrow="clients"]'));
-    check(row && /Clients above the projects/.test(row.textContent) && !/only within your organisation/.test(row.textContent), '#3018 fiona: the clients text without "only within your organisation"');
+    check(row && /Clients above the projects/.test(row.textContent) && !/only within (your organisation|the workspace)/.test(row.textContent), '#3018 fiona: the clients text without "only within the workspace"');
     d.querySelector('.smodal [data-m="close"], .smodal .mclose')?.click();
     for (const m of d.querySelectorAll('.smodal')) m.remove();
     // the switch turns Office & finance on and opens the office
@@ -75,7 +75,7 @@ const feats = async ck => ((await call('GET', '/api/state', null, ck)).settings 
     check(await until(() => !d.querySelector('.ct18')) && w.localStorage.getItem('tasks.ct18Hide') === 'true', '#3018 alice: "Hide" hides the hint on this device');
     w.eval(`settingsModal('modules')`);
     const row = await until(() => d.querySelector('.smodal [data-modrow="clients"]'));
-    check(/only within your organisation/.test(row?.textContent || ''), '#3018 alice: in an organisation the clients text keeps "only within your organisation"');
+    check(/only within the workspace/.test(row?.textContent || ''), '#3018 alice: in an organisation the clients text keeps "only within the workspace" (#2938)');
     w.close();
   }
 

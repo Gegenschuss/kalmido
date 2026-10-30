@@ -33,6 +33,7 @@ from .model import office_feature, office_gate, office_logo_set, office_need_fea
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .pdf import office_pdf, pdf_lang, pdf_to_8bit  # 2.296.0 D (#3172): + pdf_to_8bit, 2.357.0 D (#3183): + pdf_lang
 from .einvoice import ein_build
+from .terms import agb_offer_pdf  # 2.434.0 (#3619)
 
 LOGO_MAX_MB = 4
 LOGO_MAX_PX = 1600
@@ -280,9 +281,16 @@ def epdf_sweep_request(_):
         epdf_sweep(c)
 
 
-def epdf_doc_files(c, oid, did):
+def epdf_xrechnung(xml):
+    """2.434.0 (#3616): True when the stored e-invoice XML is an XRechnung (its guideline id names it)."""
+    return b"urn:xeinkauf.de:kosit:xrechnung" in (xml or b"")
+
+
+def epdf_doc_files(c, oid, did, zugferd_xml=False):
     """[(file name, bytes, mime)] of document did for the mail dispatch: the stored PDF (and XML for an invoice / credit
-    note); a finalised document without stored files (older) or a draft is rendered on the fly."""
+    note); a finalised document without stored files (older) or a draft is rendered on the fly.
+    2.434.0 (#3616): the XML only for an XRechnung (there it is the invoice itself, the PDF a reading copy); a ZUGFeRD PDF
+    carries its factur-x.xml inside, so mail and DATEV get the PDF alone. zugferd_xml=True keeps the XML (books export)."""
     from .docs import doc_row
     r = doc_row(c, oid, did)
     name = epdf_name(r)
@@ -290,12 +298,12 @@ def epdf_doc_files(c, oid, did):
     p, x = epdf_stored(c, oid, r, "pdf"), epdf_stored(c, oid, r, "xml")  # 2.296.0 C (#3177): checked against the hashes
     if p is not None:
         out.append((name + ".pdf", p, "application/pdf"))  # 2.42.0 (#828): decrypted
-        if x is not None:
+        if x is not None and (zugferd_xml or epdf_xrechnung(x)):
             out.append((name + ".xml", x, "application/xml"))
         return out
-    pdf, xml, _fmt = _render(c, oid, r)
+    pdf, xml, fmt = _render(c, oid, r)
     out.append((name + ".pdf", pdf, "application/pdf"))
-    if xml:
+    if xml and (zugferd_xml or fmt == "xrechnung"):
         out.append((name + ".xml", xml, "application/xml"))
     return out
 
@@ -343,6 +351,12 @@ def qac_pdf(c, oid, r, s):
     return data
 
 
+def epdf_out(c, oid, r, pdf):
+    """2.434.0 (#3619): the PDF of document row r as it leaves Kalmido: a quotation with the terms line gets the terms
+    pages behind it (terms.agb_offer_pdf); the stored file stays as it is."""
+    return agb_offer_pdf(c, oid, r, pdf)
+
+
 def _file_response(data, name, mime, inline=False):
     resp = Response(data, mimetype=mime)
     resp.headers["Content-Disposition"] = f'{"inline" if inline else "attachment"}; filename="{name}"'
@@ -363,11 +377,11 @@ def opdf_doc_pdf(did):
     c.commit()
     acc = qac_signoff(c, oid, r) if request.args.get("original") != "1" and not g.get("ofd_original") else None  # 2.238.0 A (#2863)
     if acc:  # 2.99.0 C (#2195): a quotation accepted online opens as accepted (?original=1 the original as sent)
-        return _file_response(qac_pdf(c, oid, r, acc), epdf_name(r) + "-accepted.pdf", "application/pdf", inline=request.args.get("inline") == "1")
+        return _file_response(epdf_out(c, oid, r, qac_pdf(c, oid, r, acc)), epdf_name(r) + "-accepted.pdf", "application/pdf", inline=request.args.get("inline") == "1")
     data = epdf_stored(c, oid, r, "pdf")  # 2.42.0 (#828): the stored PDF/A-3 is sealed at rest, served as the original (2.296.0 C #3177: hash checked)
     if data is None:
         data = _render(c, oid, r)[0]
-    return _file_response(data, epdf_name(r) + ".pdf", "application/pdf", inline=request.args.get("inline") == "1")
+    return _file_response(epdf_out(c, oid, r, data), epdf_name(r) + ".pdf", "application/pdf", inline=request.args.get("inline") == "1")
 
 
 @app.get("/api/office/docs/<int:did>/xml")

@@ -25,7 +25,7 @@ const menuLabels = async (w, row) => {
   row.querySelector('[data-ab="menu"]').click();
   await until(() => w.document.querySelector('#pop [role="menuitem"]'));
   const out = [...w.document.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
-  w.document.querySelector('#pop')?.remove();
+  w.eval('closePop()');  // 2.428.0 (#3581): closed, not removed -- the selection bar's "More" opens a menu in the same window later
   return out;
 };
 // the shared dialog: wait for the dry run, then press "Move"
@@ -69,9 +69,13 @@ const confirmMove = async w => {
   d.querySelector('[data-absel="mode"]').click();
   await until(() => d.querySelector('.absel input'));
   for (const id of [A1, A2]) { const b = d.querySelector(`[data-absel="one"][data-id="${id}"]`); b.checked = true; b.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  const bar = await until(() => /2 selected/.test(d.querySelector('.abselbar')?.textContent || '') && d.querySelector('.abselbar'));
-  check(bar && bar.querySelector('[data-absel="space"]') && !bar.querySelector('[data-absel="space"]').disabled, 'the bar: 2 selected, "Move to another workspace…" ' + (bar?.textContent || ''));
-  bar?.querySelector('[data-absel="space"]').click();
+  // 2.428.0 (#3581): the shared floating bar; "Move to another workspace…" sits under its "More"
+  const bar = await until(() => /2 selected/.test(d.querySelector('#ab-sbar')?.textContent || '') && d.querySelector('#ab-sbar'));
+  check(bar && bar.querySelector('[data-absel="more"]') && !bar.querySelector('[data-absel="more"]').disabled, 'the bar: 2 selected, "More" ' + (bar?.textContent || ''));
+  bar?.querySelector('[data-absel="more"]').click();
+  const sp1 = await until(() => d.querySelector('#pop .menu-list .msm-space'));
+  check(sp1, 'More offers "Move to another workspace…"');
+  sp1?.click();
   const md2 = await confirmMove(w);
   check(md2 && /2 items/.test(md2.querySelector('.smv-what')?.textContent || ''), 'the dialog says "2 items"');
   check(await until(async () => (await call('GET', `/api/files/nodes/${A1}`)).org_id === ORG && (await call('GET', `/api/files/nodes/${A2}`)).org_id === ORG, 60),
@@ -90,12 +94,15 @@ const confirmMove = async w => {
   const card = await until(() => vd.querySelector(`[data-dco="${DOC}"]`), 60);
   check(card, 'the document card');
   vd.querySelector('[data-dcsel="mode"]')?.click();
-  await until(() => vd.querySelector(`[data-dco="${DOC}"][aria-pressed]`));
-  vd.querySelector(`[data-dco="${DOC}"]`).click();
-  check(await until(() => vd.querySelector(`[data-dco="${DOC}"]`)?.getAttribute('aria-pressed') === 'true' && !vd.querySelector('.dc-md')), 'Select: a click chooses the card, nothing opens');
-  const dbar = await until(() => /1 selected/.test(vd.querySelector('.dc-selbar')?.textContent || '') && vd.querySelector('.dc-selbar'));
-  check(dbar && dbar.querySelector('[data-dcsel="space"]'), 'the bar of the documents: 1 selected, "Move to another workspace…"');
-  dbar?.querySelector('[data-dcsel="space"]').click();
+  // 2.430.0 (#3582): a plain click on a card opens it even while choosing; the box on the card chooses
+  await until(() => vd.querySelector(`.dc-grid.dc-selon [data-dcchk="${DOC}"]`));
+  vd.querySelector(`[data-dcchk="${DOC}"]`).click();
+  check(await until(() => vd.querySelector(`[data-dcchk="${DOC}"]`)?.getAttribute('aria-checked') === 'true' && !vd.querySelector('.dc-md')), 'Select: the box chooses the card, nothing opens');
+  const dbar = await until(() => /1 selected/.test(vd.querySelector('#dc-sbar')?.textContent || '') && vd.querySelector('#dc-sbar'));  // 2.428.0 (#3581)
+  dbar?.querySelector('[data-dcsel="more"]')?.click();
+  const sp2 = await until(() => vd.querySelector('#pop .menu-list .msm-space'));
+  check(dbar && sp2, 'the bar of the documents: 1 selected, "Move to another workspace…" under More');
+  sp2?.click();
   await confirmMove(v);
   check(await until(async () => (await call('GET', `/api/docs/${DOC}`)).org_id === ORG, 60), 'the document is in Alpha');
   check(await until(() => v.eval(`!!HIST.undo.length && /workspace/.test(HIST.undo[HIST.undo.length - 1].label)`)), 'documents: one undo step');
@@ -112,8 +119,8 @@ const confirmMove = async w => {
   check(frow && fl.length && !fl.some(t => /another workspace/.test(t)), 'freelancer: no "Move to another workspace…" in the menu ' + fl.join('|'));
   check(f.eval('smv_can(null)') === false, 'freelancer: smv_can is false');
   fdoc.querySelector('[data-absel="mode"]')?.click();
-  await until(() => fdoc.querySelector('.abselbar'));
-  check(fdoc.querySelector('.abselbar') && !fdoc.querySelector('[data-absel="space"]'), 'freelancer: the bar has no workspace button');
+  await until(() => fdoc.querySelector('#ab-sbar'));  // 2.428.0 (#3581): the shared bar, without "More" (nothing else in it)
+  check(fdoc.querySelector('#ab-sbar') && !fdoc.querySelector('[data-absel="space"], [data-absel="more"]'), 'freelancer: the bar has no workspace button');
   f.close();
 
   console.log(`p296_a_ui: ${ok} ok, ${F.length} failed`);

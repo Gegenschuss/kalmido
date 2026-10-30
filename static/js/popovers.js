@@ -111,7 +111,7 @@ function popFocusBack() {
 }
 document.addEventListener('keydown', e => {
   const m = e.target.closest?.('#pop [role="menu"]'); if (!m || e.altKey || e.ctrlKey || e.metaKey) return;
-  const it = $$('[role="menuitem"]:not([disabled])', m), i = it.indexOf(e.target.closest('[role="menuitem"]'));
+  const it = $$('[role="menuitem"]:not([disabled])', m).filter(b => !b.closest('[hidden]')), i = it.indexOf(e.target.closest('[role="menuitem"]'));  // 2.435.0 (#3606): not the ones a search hid
   // 2.31.0 (#1056): → on an entry with a second level opens it, ← inside a second level goes back
   const p = $('#pop');
   if (e.key === 'ArrowRight' && e.target.closest('.msubm') && p._menuOpen) { e.preventDefault(); e.stopPropagation(); e.target.closest('.msubm').click(); return; }
@@ -736,16 +736,40 @@ const moveListItem = (anchor, id) => ({label: tr('Move to project…'), icon: 'l
 // 2.38.0 (#1177): ONE list picker for "Move to list…" (task menu, a note, the Inbox's move button): the Inbox first, then the
 // lists in the sidebar's order; a folder is only a heading with its lists indented below it (a subfolder one step deeper).
 // opts: filter(list) = which lists, pick(list) = what a choice does, title = the sheet's title (default "Move to list")
+// 2.435.0 (#3606): pre = menu items on top (e.g. "No project"), first = {head, lists, rest} a group on top (e.g. the client's
+// projects) with the other lists below the heading rest, on = the current list's id (a check), search = a search field
+// from this many entries
 function tch_listPicker(anchor, o = {}) {
-  const ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
-  const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', fn: () => o.pick(l)});
-  const ls = sideOrder().filter(ok), rows = [...(ok(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it)];
+  const top = o.first?.lists || [], ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
+  const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', on: !!o.on && l.id === o.on, fn: () => o.pick(l)});
+  const ls = sideOrder().filter(l => ok(l) && !top.includes(l)), rows = [...(o.pre || [])];
+  if (top.length) rows.push({head: o.first.head, keep: true}, ...sideOrder().filter(l => top.includes(l) && ok(l)).map(it), {head: o.first.rest || tr('Other projects'), keep: true});
+  rows.push(...(ok(ib) && !top.includes(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it));
   for (const f of folderNames()) {
     const fl = ls.filter(l => l.folder === f), sub = !!fParent(f);
     if (!fl.length && (sub || !ls.some(l => fUnder(l.folder, f)))) continue;  // a folder without lists here is left out
     rows.push({head: sub ? fName(f) : f, cls: 'tch-fd' + (sub ? ' tch-fd2' : ''), keep: !sub}, ...fl.map(it));
   }
-  return menu(anchor, rows, null, null, o.title || tr('Move to project'));
+  const p = menu(anchor, rows, null, null, o.title || tr('Move to project'));
+  if (o.search && rows.filter(r => !r.head).length >= o.search) tch_menuSearch(p);
+  return p;
+}
+// 2.435.0 (#3606): a search field above a long menu (like the phone's choice sheet): typing hides the entries without the
+// text and the empty groups, Enter picks the first one left, ↓ goes into the list
+function tch_menuSearch(p) {
+  const ml = p.querySelector('.menu-list'); if (!ml) return;
+  ml.insertAdjacentHTML('beforebegin', `<div class="sssearch mqs">${ic('search', 's')}<input id="mq-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>`);
+  const q = /** @type {HTMLInputElement} */ (p.querySelector('#mq-q'));
+  const vis = () => [...ml.querySelectorAll('[role="menuitem"]:not([disabled])')].filter(b => !b.closest('[hidden]'));
+  q.addEventListener('input', () => {
+    const v = q.value.trim().toLowerCase();
+    ml.querySelectorAll('[role="menuitem"]').forEach(b => { b.hidden = !!v && !b.textContent.toLowerCase().includes(v); });
+    ml.querySelectorAll('.mgrp').forEach(g => { g.hidden = !!v && !g.querySelector('[role="menuitem"]:not([hidden])'); });
+  });
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); vis()[0]?.click(); } else if (e.key === 'ArrowDown') { e.preventDefault(); vis()[0]?.focus(); }
+  });
+  setTimeout(() => { if (q.isConnected && !isTouch()) q.focus({preventScroll: true}); }, 0);  // after the menu's own focus
 }
 function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
@@ -771,7 +795,7 @@ function taskMenu(anchor, id, o = {}) {
     }}] : []),
     // priority, assignee
     ...(inPanel ? [] : [PRIO_ROW(id)]),
-    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
     {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
@@ -803,14 +827,14 @@ function taskMenu(anchor, id, o = {}) {
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)
     {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }, ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
     ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
-    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
+    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
     ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
     ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
-    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
+    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
     '-',
@@ -880,6 +904,12 @@ function sortMenu(anchor) {
 const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
 // 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
 const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
+// 2.396.0 (#3385): the hint "Use as a shopping list?" (render.js): list kind shopping + ticked at the bottom, one undo step
+async function setShopList(id) {
+  if (!listById(id)) return;
+  const e = await listPatch(id, {family: 'shopping', checklist: true}, tr('Use as a shopping list'));
+  if (e) offerUndo(tr('Now a shopping list'), e);
+}
 async function setDab(id, on) {
   const l = listById(id); if (!l) return;
   const e = await listPatch(id, {checklist: on}, tr('Show completed at the bottom'));
@@ -1054,7 +1084,7 @@ document.addEventListener('contextmenu', e => {
 // Bigger text: the system's font size is still followed (rem based). 2.331.0 E (#3311): the timelines zoom themselves
 // (timeline.js), the page stays locked there.
 let tchVp = null;
-const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
+const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || (typeof shellInfo === 'function' && !!shellInfo()); } catch { return false; } };
 const tch_zoomFree = () => !!document.querySelector('.lightbox');
 function tch_zoomSync() {
   if (typeof document === 'undefined' || !document) return;  // a closed window (observer after unload)

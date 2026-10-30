@@ -4,7 +4,7 @@ unblock push + News, trash / restore, undo, recurring, batch), project status (p
 progress numbers on seeded data, custom fields (CRUD per type, validation, permissions, values, moves, member
 removal, search, activity, export, templates, recurring copies)."""
 import json, os, dbx, sys, time
-from datetime import timedelta
+from datetime import date, timedelta
 import requests
 import testclock
 
@@ -405,8 +405,12 @@ fd = tpl["data"]["fields"]
 check([f["name"] for f in fd][:3] == ["Stage", "Budget", "Customer"] and fd[0]["options"]["options"][0]["name"] == "In progress", "list template: field definitions")
 node = next(n for n in tpl["data"]["tasks"] if n["title"] == "Ship")
 idx = {f["name"]: str(i) for i, f in enumerate(fd)}
-check(node["fv"].get(idx["Deadline"]) == 4 and node["fv"].get(idx["Budget"]) == "5" and idx["Reviewer"] not in node["fv"], f"node values: date as offset, no person: {node.get('fv')}")
-nl = A.post(B + f"/api/templates/{tpl['id']}/apply", json={"name": "From tpl"}).json()["list_id"]
+# 2.352.0 B (#2752): list templates are always relative - the offset counts from the project start (earliest open date)
+with db() as c:
+    T0 = c.execute("SELECT MIN(COALESCE(start, due)) FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND due IS NOT NULL", (W,)).fetchone()[0] or D(0)
+OFF = (date.fromisoformat(D(4)) - date.fromisoformat(T0)).days
+check(node["fv"].get(idx["Deadline"]) == OFF and node["fv"].get(idx["Budget"]) == "5" and idx["Reviewer"] not in node["fv"], f"node values: date as offset, no person: {node.get('fv')}")
+nl = A.post(B + f"/api/templates/{tpl['id']}/apply", json={"name": "From tpl", "start": T0}).json()["list_id"]
 st2 = state(A)
 nf = {f["name"]: f for f in st2["fields"] if f["list_id"] == nl}
 check(set(nf) == {f["name"] for f in fd} and nf["Stage"]["pinned"] == 1, "applied: fields created in the new list")

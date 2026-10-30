@@ -62,6 +62,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
 
   // ================= clients
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
+  // 2.435.0 (#3600): the blocks Time tracking and Projects of the client card start folded: open them for alice (kept per person)
+  await call('PATCH', '/api/settings', {view_clients: JSON.stringify({opts: {month: {open: true}, lists: {open: true}}})}); w.eval(`S.settings.view_clients = ${JSON.stringify(JSON.stringify({opts: {month: {open: true}, lists: {open: true}}}))}`);
   // 2.44.0 (#1187): the clients are a tab of the area Office (no own sidebar group); "New client" on their page
   const grp = d.querySelector('#srail [data-sbb="office"]');  // 2.152.2 (#2622): the area is an icon of the bar
   check(grp && grp.dataset.go === 'clients' && !d.querySelector('#side .sg-clients'), 'the area "Office" in the bar opens the clients (no own group)');  // 2.152.2 (#2622)

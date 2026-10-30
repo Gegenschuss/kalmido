@@ -356,6 +356,10 @@ APP_ONLY = [
     ("2.207.0 A (#2763): scan inboxes (upload-only keys for the folder watcher), the folder watcher downloads and the mail note are a "
      "person's setup in the document settings; agents upload with /documents (files:write) and never get docs:upload",
      ("* /api/docs/scan-keys", "=POST /api/docs/mail-notice", "* /api/docs/folder-watcher/")),
+    # 2.425.0 C (#3453)
+    ("2.425.0 C (#3453): receipt fetchers (a helper program with its own key kind: setup code, portals on / off, disconnect) are a "
+     "person's setup in Settings > Integrations; agents never connect, see or switch them",
+     ("* /api/docs/fetchers",)),
     # 2.353.0 D (#2759)
     ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
      "documents); agents keep their shares, read and change documents with /documents and files with /files",
@@ -376,11 +380,13 @@ APP_ONLY = [
      "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
      "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
      "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
-     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app",
+     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app; 2.371 (#3150): the tag list "
+     "and the ```abfrage block are views of the panel / a page like search",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
       "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
-      "=POST /api/outline/parse", "=PUT /api/wiki/style")),
+      "=POST /api/outline/parse", "=PUT /api/wiki/style", "=GET /api/wiki/tags",
+      "=GET /api/wiki/query")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
      "disposition (booking crew and equipment): people only; agents read GET /absences (\"away\" only)",
      ("POST /api/team/absences", "PATCH /api/team/absences/", "DELETE /api/team/absences/", "PUT /api/team/absences/",
@@ -713,8 +719,13 @@ check(not both, f"routes both mapped and excepted: {both}")
 # ---- 2. the mapped API routes exist
 gone = sorted({x for v in APP_TO_API.values() for x in v if x not in API})
 check(not gone, f"mapped API routes that do not exist: {gone}")
+# CI of 2.409.0 (#3506): the train branch runs without 2.371 (#3150, knowledge tags, only on main); its two entries count
+# only where its module is there (main keeps the full check)
+LATER = set() if os.path.exists(os.path.join(ROOT, "kalmido", "wiki", "wktags.py")) else {"=GET /api/wiki/tags", "=GET /api/wiki/query"}
 for pats in (x[1] for x in APP_ONLY):
     for pat in pats:
+        if pat in LATER:
+            continue
         if pat.startswith("="):
             check(pat[1:] in APP, f"APP_ONLY entry matches nothing: {pat}")
             continue
@@ -768,6 +779,8 @@ for name, _, schema, fn in mcp.TOOLS:
         base["base64"] = "eA=="
     if name == "send_chat":
         base["body"] = "x"
+    if name == "get_task":  # 2.390.0 (#3353): task_id or key - neither is required alone
+        base["task_id"] = 1
     for extra in [{}] + TOOL_VARIANTS.get(name, []):
         rec.tool = name
         try:
@@ -779,7 +792,12 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",
+    "GET /tasks/{}/working": "2.407.0 A (#3513): set_working answers the same (working + job); the job itself via get_job",
+    "PATCH /tasks/{}/working": "2.407.0 A (#3513): set_working (POST) adds the line as well while working; PATCH is for scripts that must not start one",
     "GET /documents/upload-target": "2.207.0 A (#2763): only for scan inbox keys (docs:upload, the folder watcher); never agents",
+    "GET /fetcher": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
+    "PUT /fetcher/status": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
+    "POST /fetcher/documents": "2.425.0 C (#3453): only for receipt fetcher keys (their own key kind, a helper program); never agents",
     "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",

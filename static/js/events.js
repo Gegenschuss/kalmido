@@ -500,6 +500,7 @@ document.addEventListener('click', async e => {
       {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
@@ -521,6 +522,7 @@ document.addEventListener('click', async e => {
     case 'dep-add': depPicker(id, a.dataset.dir); break;
     case 'wait-on': waitOnMenu(a, id); break;  // 2.25.0 (UX-43)
     case 'dab-on': hintDone('dab'); setDab(id, true); break;  // 2.25.0 (UX-28)
+    case 'shop-on': hintDone('shop'); setShopList(id); break;  // 2.396.0 (#3385)
     case 'dep-rm': {
       const b = +a.dataset.b;
       try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }

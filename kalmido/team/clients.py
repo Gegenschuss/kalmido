@@ -300,6 +300,22 @@ def clients_list():
                             for r in client_rows(c, uid, archived=arch)])
 
 
+def client_blocks_off(c, r):
+    """2.435.0 A (#3600): the blocks of the client card the client's office switched off (office setting client_blocks_off of
+    the organisation, a private client: its owner's personal office). Unreadable or unset = none (every block shows)."""
+    oid = r["org_id"]
+    if oid is None:
+        with system_ctx(c):  # instance structure: the owner's own hidden office area (office/model.py pb_personal)
+            p = c.execute("SELECT id FROM orgs WHERE personal_of=?", (r["created_by"],)).fetchone()
+        oid = p[0] if p else None
+    s = c.execute("SELECT data FROM office_settings WHERE org_id=?", (oid,)).fetchone() if oid else None
+    try:
+        v = (json.loads(s["data"]) if s and s["data"] else {}).get("client_blocks_off")
+    except (ValueError, AttributeError):
+        v = None
+    return [k for k in v if isinstance(k, str)][:20] if isinstance(v, list) else []
+
+
 @app.get("/api/clients/<int:cid>")
 def client_get(cid):
     c = db()
@@ -315,6 +331,7 @@ def client_get(cid):
         st = client_stats(c, uid, cid, [lid], request.args.get("month"))
         per.append({"id": lid, "name": l["name"], "kind": l["kind"], "rate": l["rate"], "status": l["status"], **st})
     d["per_list"] = per
+    d["blocks_off"] = client_blocks_off(c, r)  # 2.435.0 A (#3600)
     from .clientmerge import clm_history
     if (g.user["kind"] or "user") != "agent":  # 2.63.0 B (#1513): the client's reports (customer portal) the person sees
         from .portal import pt_client_tickets

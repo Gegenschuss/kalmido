@@ -92,7 +92,7 @@ start(["-e KALMIDO_WEBHOOKS=0", "-e KALMIDO_WEBHOOK_ALLOW_HOSTS=127.0.0.1:8097"]
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "password": "password123"}).ok
 A = sess("alice")
-check(A.get(B + "/api/state").json()["webhooks"] == {"enabled": False}, "off: state says disabled")
+check(A.get(B + "/api/state").json()["webhooks"] == {"enabled": False, "mine": False}, "off: state says disabled")
 check(A.post(B + "/api/me/webhooks", json={"url": STUB + "/ok", "events": ALL}).status_code == 409, "off: adding refused")
 check(A.get(B + "/api/me/webhooks").json()["enabled"] is False, "off: list says disabled")
 dbx("INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(1,'x',?,?,'',1,'2026','2026')",
@@ -112,7 +112,7 @@ for u in ("bob", "carol"):
     assert A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok
 A.patch(B + "/api/users/1", json={"ntfy_topic": "admintopic"})
 Bo, Ca = sess("bob"), sess("carol")
-check(A.get(B + "/api/state").json()["webhooks"] == {"enabled": True}, "state: webhooks on")
+check(A.get(B + "/api/state").json()["webhooks"]["enabled"] is True, "state: webhooks on")  # 2.364.0 C (#3044): + mine
 
 # ---- settings API: validation + SSRF at save time
 for url, what in (("http://example.com/hook", "http:// to a public host"), ("https://10.1.2.3/x", "private IP"),

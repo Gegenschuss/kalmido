@@ -91,7 +91,10 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   const card = d.querySelector('#view .msclcard');
   check(/Client/.test(card.querySelector('.mstag-cl')?.textContent || '') && card.querySelector('.mscav'), '#1734: the card carries the tag Client and the briefcase');
   check(/Hourly rate/.test(card.textContent) && /90/.test(card.textContent) && /20 h/.test(card.textContent) && /Max Example/.test(card.querySelector('.msclks')?.textContent || ''), '#1734: rate, budget, contact persons on the card');
-  check(!!card.querySelector('[data-act="client-edit"]') && !!card.querySelector('.cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
+  // 2.435.0 (#3600): the block Time tracking starts folded: open it at its title (kept per person)
+  card.querySelector('[data-mscl="fold"][data-k="month"]')?.click();
+  await until(() => d.querySelector('#view .msclcard .cldetail .sttiles'), 40);
+  check(!!d.querySelector('#view .msclcard [data-act="client-edit"]') && !!d.querySelector('#view .msclcard .cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
   // search
   typeIn(w, d.querySelector('#mscl-q'), 'beta'); await sleep(250);
   check(d.querySelectorAll('#view .msclients .ctrow').length === 1, '#1734: the search narrows the list');

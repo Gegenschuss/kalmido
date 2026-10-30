@@ -212,7 +212,26 @@ neg = [dd(x["rate"]) for x in F2["items"] if x["kind"] == "discount"]
 check(neg == [Decimal("2666.40"), Decimal("666.60")] and dd(F2["totals"]["net"]) == Decimal("6667.00"), f"storno: the new final invoice deducts progress 1 only {neg}")
 check(A.post(B + f"{D}/{F2['id']}/finalize").ok, "final invoice finalised")
 x = xml(A, F2["id"])
-check(type_code(x) == "380" and re.search(r"<ram:LineTotalAmount>-2666\.40</ram:LineTotalAmount>", x) is not None, "final: type 380, negative lines")
+# 2.408.0 (#3520): BMF letter of 15.10.2026 no. 3 -- no negative lines any more: the whole service (10000.00 + 1520.00 + 140.00),
+# progress 1 (3333.00 net + 506.62 + 46.66 VAT = 3886.28) as the paid amount BT-113, its details in a note BT-22; due stays 7773.72
+P1N = A.get(B + f"{D}/{PS[0]}").json()["number"]
+check(type_code(x) == "380" and re.search(r"<ram:LineTotalAmount>-", x) is None, "final: type 380, no negative lines")
+check(re.search(r"<ram:GrandTotalAmount>11660\.00</ram:GrandTotalAmount>", x) and re.search(r"<ram:TotalPrepaidAmount>3886\.28</ram:TotalPrepaidAmount>", x)
+      and re.search(r'<ram:TaxTotalAmount currencyID="EUR">1660\.00</ram:TaxTotalAmount>', x) and re.search(r"<ram:LineTotalAmount>10000\.00</ram:LineTotalAmount>", x),
+      "#3520 final: full sums, the progress invoice as BT-113 " + str(re.findall(r"<ram:(?:GrandTotal|TotalPrepaid|TaxTotal)Amount[^>]*>[^<]*", x)))
+nt = re.findall(r"<ram:IncludedNote>\s*<ram:Content>([^<]*)</ram:Content>", x)
+check(any(P1N in n and "Abschlagsrechnung" in n and "506,62" in n and "46,66" in n for n in nt), f"#3520 final: BT-22 names progress 1 with net and VAT per rate {nt}")
+rd = A.get(B + f"{D}/{F2['id']}/render").json()
+rows = [r_[0] for r_ in rd["totals"]["rows"]]
+check(not any(ln.get("kind") == "discount" for ln in rd["lines"]) and rows[-1] == "Restbetrag" and sum(1 for r_ in rows if P1N in r_) == 2
+      and any(r_[1] == "11.660,00 €" for r_ in rd["totals"]["rows"]), f"#3520 PDF model: deductions below the total, then the remaining amount {rd['totals']['rows']}")
+check(dd(rd["totals"]["gross"]) == Decimal("7773.72"), "#3520: the stored total stays the remaining amount (books, open items)")
+import io  # noqa: E402
+import pdfcheck  # noqa: E402
+from pypdf import PdfReader  # noqa: E402
+pb = A.get(B + f"{D}/{F2['id']}/pdf").content
+t = "\n".join(p_.extract_text() or "" for p_ in PdfReader(io.BytesIO(pb)).pages)
+check("11.660,00" in t and "7.773,72" in t and P1N in t and not pdfcheck.problems(pb), f"#3520 PDF: total, remaining amount, progress 1; layout clean {pdfcheck.problems(pb)[:3]}")
 check(re.search(r"<ram:DuePayableAmount>7773\.72</ram:DuePayableAmount>", x) is not None, "final: amount due 6667.00 + 1013.38 + 93.34 " +
       (re.search(r"<ram:DuePayableAmount>[^<]*", x) or [""])[0])
 check(any(i.get("inv_type") == "final" for i in A.get(B + D, params={"kind": "invoice"}).json().get("docs", [])), "list: the type is in the list rows")

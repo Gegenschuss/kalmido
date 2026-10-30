@@ -191,7 +191,7 @@ The shipped international base pack (`kalmido/office/packs/xx.json`) is the best
 - `formats`, `labels`, `texts`, `numbering`: how documents look and read in your country (both languages, plain text)
 - `einvoice.formats`: the e-invoice formats you can vouch for (`zugferd` = EN 16931 / Factur-X; `xrechnung` is German)
 - `features`: only the functions that are correct for your country, each `{"status": "ready"}` (or `planned`). Known keys:
-  `books.datev`, `docs.einvoice`, `books.vat_return`, `books.tax_dates`, `books.export_csv`, `books.gobd`; planned for
+  `books.datev`, `docs.delivery` (a pack without it keeps delivery notes on), `docs.einvoice`, `books.vat_return`, `books.tax_dates`, `books.export_csv`, `books.gobd`; planned for
   later packages: `books.receipt_images`, `books.period_lock`, `books.procedure_doc`. Unknown keys fail the check.
 - `retention`: years for receipts and books, the legal minimum as `min_years`
 

@@ -2220,3 +2220,5 @@ fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2354_c_ui node p2354_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.380.0 (#3420): the film pack offers Producing by amount, also switchable in a quotation made before the pack; freelancer-matrix: office
 fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.435.0 A (#3600): the client card blocks fold (open / folded with the number, kept per person), the office switches blocks off; freelancer-matrix: office
+fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"

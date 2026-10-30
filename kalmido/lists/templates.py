@@ -672,6 +672,41 @@ PTYPES = {
 }
 
 
+# 2.412.0 (#3552): the properties of a task a project can show (client static/js/props.js PZ_KEYS) and the cut of each
+# project type: what it hides. Owner / project admins switch single ones back on or off (lists.props, only the deviations);
+# a blank project ('') shows everything its modules allow. Display only: agents, import and the API keep setting values.
+PROP_KEYS = ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs", "tags")
+PTYPE_PROPS_OFF = {"software": ("video", "client", "docs"),
+                   "agency": ("repo", "ttype"),
+                   "private": ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs")}
+
+
+def props_clean(v):
+    """2.412.0 (#3552): lists.props from a request: {key: true | false} of known keys (null / missing = as the type); a JSON
+    text is read too (the undo sends the stored value back). Returns the stored text ('' = none)."""
+    if v in (None, ""):
+        return ""
+    if isinstance(v, str):
+        try:
+            v = json.loads(v)
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "props")) from None
+    if not isinstance(v, dict) or any(k not in PROP_KEYS or not isinstance(x, (bool, int)) or x not in (0, 1) for k, x in v.items() if x is not None):
+        raise BadInput(tr("Invalid value: {0}", "props"))
+    out = {k: int(v[k]) for k in PROP_KEYS if v.get(k) is not None}
+    return json.dumps(out, sort_keys=True) if out else ""  # the format of lp_norm (the `_prev` check)
+
+
+def props_for_type(cur, k):
+    """2.412.0 (#3552): a type change takes the new type's cut: what was switched on by hand stays on, a property switched
+    off by hand follows the new type again. cur = the stored text; returns the new stored text."""
+    try:
+        own = json.loads(cur or "{}") or {}
+    except ValueError:
+        own = {}
+    return props_clean({x: 1 for x, v in own.items() if v and x in PTYPE_PROPS_OFF.get(k, ())})
+
+
 # 2.60.0 (#1510): WIP limits a new project of the type gets on its standard sections (section name -> limit)
 PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
 
@@ -739,6 +774,9 @@ def list_ptype_set(c, lid, role, k, skip=()):
             out["ptype_missing"] = ptype_missing(c, lid, k, lang(c, me()))
         return out
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))
+    if "props" not in skip and (cur["props"] or "") != props_for_type(cur["props"], k):  # 2.412.0 (#3552): the new type's cut
+        out["ptype_prev"]["props"] = cur["props"] or ""
+        c.execute("UPDATE lists SET props=? WHERE id=?", (props_for_type(cur["props"], k), lid))
     if "listen_agent_ids" not in skip:  # 2.30.0 (#1034): a new type starts over with its default (software: agents listen in)
         c.execute("UPDATE lists SET agent_listen=NULL WHERE id=?", (lid,))
     if not k:

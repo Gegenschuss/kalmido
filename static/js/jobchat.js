@@ -358,8 +358,10 @@ function jcd_filtHtml() { return ''; }
 // (2.117.0 C #2260 / 2.144.0 A #2419 had the filter as an own icon.)
 function jcd_fbtnHtml() {
   // 2.350.0 A (#3317): no second dot in the header any more; a filter other than "All" is named in the button's title / label
-  const dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all', t = dot ? tr('More') + ' · ' + tr('Filter: {0}', jcd_filterName()) : tr('More');
-  return `<button type="button" class="iconbtn jcdfbtn${dot ? ' jcdfon' : ''}" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}</button>`;
+  const dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all', t0 = dot ? tr('More') + ' · ' + tr('Filter: {0}', jcd_filterName()) : tr('More');
+  // 2.411.0 (#3446): while the answer runs a red dot: Stop sits in this menu
+  const busy = typeof chatBusy === 'function' && chatBusy(agentById(S.chat.aid)), t = busy ? t0 + ' · ' + tr('Stop the answer') : t0;
+  return `<button type="button" class="iconbtn jcdfbtn${dot ? ' jcdfon' : ''}${busy ? ' chbusy' : ''}" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}</button>`;
 }
 const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentById(S.chat.aid)?.name || ''), res: tr('Me, {0} and job results', agentById(S.chat.aid)?.name || ''), jobs: tr('Jobs')})[jcd_filter()];
 // the three choices as the submenu of the menu entry "Filter: …"

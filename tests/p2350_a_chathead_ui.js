@@ -87,14 +87,15 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
       check(g && g.h <= 56, L + ': the header is at most 56 px high ' + JSON.stringify(g));
       check(g && g.name === 'Dev Bot' && !g.cut.length && g.right <= g.vw, L + ': nothing cut off ' + JSON.stringify(g));
       check(g && /^working: Billing: notes/.test(g.st || '') && /st-working/.test(g.dot) && (g.spin === 'aspin' || g.rm), L + ': the state once, "working: <job>", the spinning circle (a still dot with reduced motion) ' + JSON.stringify(g));
-      check(g && !g.gone.length && !g.ring, L + ': no mode, model, workspace or usage ring in the header ' + JSON.stringify(g));
+      // 2.407.0 B (#3493): the usage ring is always shown (41 % = accent), no longer only near its limit
+      check(g && !g.gone.length && g.ring === 1, L + ': no mode, model or workspace in the header, the usage ring always ' + JSON.stringify(g));
       const head = await ev(HEAD('#view'));
       check(head.length === 1 && head[0] === 'chat-head-menu', L + ': right only the ⋯ menu ' + JSON.stringify(head));
       await shot(`p2350a-phone-${W}-${theme}.png`);
       if (!full) return;
       await openMenu(ev, '#view');
       const it = await ev(items);
-      check(it.some(x => x === 'Permissions: Host default (Auto)') && it.some(x => x === 'Model: Opus 5.5') && it.some(x => x === 'Workspace: Alpha')
+      check(it.some(x => x === 'Permissions: Host default (Auto)') && it.some(x => x === 'Model: Opus 5.5') && it.some(x => x === 'Team agent · Alpha') /* 2.407.0 B (#3493): the kind of agent instead of the workspace */
         && it.some(x => /^Usage: 41 %/.test(x)) && it.some(x => x === 'Search in this chat') && it.some(x => /^Filter|^Fold long messages/.test(x)), L + ': ⋯ names what moved there with its value ' + JSON.stringify(it));
       // Permissions opens the mode menu; "Ask first" switches the agent
       await pickItem(ev, '/^Permissions/');
@@ -120,7 +121,8 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
       check(up, L + ': the chat is up' + (up ? '' : ' ' + await diag(ev)));
       const g = await ev(GEO(sel));
       check(g && !g.cut.length && g.name === 'Dev Bot' && /^working: Billing: notes/.test(g.st || '') && g.right <= g.vw, L + ': nothing cut off ' + JSON.stringify(g));
-      check(g && !g.gone.length && !g.ring, L + ': no mode, model, workspace or usage ring in the header ' + JSON.stringify(g));
+      // 2.407.0 B (#3493): the usage ring is always shown (41 % = accent), no longer only near its limit
+      check(g && !g.gone.length && g.ring === 1, L + ': no mode, model or workspace in the header, the usage ring always ' + JSON.stringify(g));
       const head = (await ev(HEAD(sel))).sort();
       check(JSON.stringify(head) === JSON.stringify(page ? ['chat-head-menu'] : ['chat-close', 'chat-dock', 'chat-head-menu']), L + ': right exactly ' + (page ? '⋯ (the page has its back button)' : 'side panel, ⋯ and close') + ' ' + JSON.stringify(head));
       const c = await ev(COMP(sel));

@@ -164,6 +164,7 @@ ROUTES = {
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -269,6 +270,10 @@ ROUTES = {
     # 2.207.0 A (#2763): scan inboxes of the own documents, the upload key, the mail note, the folder watcher downloads
     "GET /api/docs/scan-keys": "files", "POST /api/docs/scan-keys": "files", "DELETE /api/docs/scan-keys/{}": "files",
     "GET /api/v1/documents/upload-target": "files", "POST /api/docs/mail-notice": "files", "GET /api/docs/folder-watcher/{}": "files",
+    # 2.425.0 C (#3453): receipt fetchers of the personal office (p2425_c_api_test.py, freelancer-matrix: files)
+    "GET /api/docs/fetchers": "files", "POST /api/docs/fetchers": "files", "DELETE /api/docs/fetchers/{}": "files",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files", "PUT /api/v1/fetcher/status": "files",
+    "POST /api/v1/fetcher/documents": "files",
     "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
@@ -421,6 +426,9 @@ ROUTES = {
     "GET /api/newsletter/lists": "office", "GET /api/office/agents/{}": "office", "GET /api/office/cashflow": "office",
     "GET /api/office/cashflow/check": "office", "GET /api/office/catalog": "office", "GET /api/office/datev/extf": "office", "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090)
     "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",  # 2.148.0 D (#2458)
+    "GET /api/office/books/archive": "office", "GET /api/office/books/archive/bookings": "office", "GET /api/office/books/archive/bookings/{}": "office",  # 2.414.0 (#3502)
+    "GET /api/office/books/archive/accounts": "office", "GET /api/office/books/archive/docs/{}": "office", "GET /api/office/books/archive/files/{}": "office",
+    "POST /api/office/books/archive/check": "office", "POST /api/office/books/archive/import": "office", "POST /api/office/books/archive/runs/{}/undo": "office",
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",
@@ -759,6 +767,9 @@ ROUTES = {
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
     "POST /api/lists/{}/move-space": "lists",  # 2.401.0 (#2924): p2401_a_api_test.py (409 without an organisation: no other workspace)
+    # 2.407.0 A (#3513): "agent is working" on a task (p2407_a_api_test.py: the own agent of a person without an organisation)
+    "GET /api/v1/tasks/{}/working": "agents", "POST /api/v1/tasks/{}/working": "agents",
+    "PATCH /api/v1/tasks/{}/working": "agents", "DELETE /api/v1/tasks/{}/working": "agents",
     # 2.124.0 C (#2113): shares of one table (p2124_c_api_test.py)
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
@@ -843,6 +854,7 @@ ROUTES = {
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
+    "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
     # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private space)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
@@ -967,6 +979,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area, admin; a person without an organisation is their own admin (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): the count for the test mode section of the settings
     # 2.148.0 C (#2472): the procedure documentation (GoBD) of the office (p2148_c_api_test.py as a person without an organisation)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
@@ -983,6 +996,8 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
+    "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }
 
 

@@ -160,11 +160,21 @@ for dump in DUMPS:
     load(dump)
     before = kt.dbx("SELECT COUNT(*) FROM tasks")[0][0]
     try:
+        os.environ["START_WAIT_S"] = "150"  # #3506: every migration since the dump runs at this first start
         kt.fresh(keep=True)
         started = True
     except AssertionError as e:
         started = False
         print(str(e)[-3000:])
+        try:  # #3506: what the hanging start waits for (its statements, their lock waits)
+            for r in kt.dbx("SELECT pid, state, wait_event_type, wait_event, now() - xact_start AS age, left(query, 400) AS q FROM pg_stat_activity "
+                            "WHERE datname = current_database() AND pid <> pg_backend_pid()"):
+                print("   pg:", tuple(r))
+            for r in kt.dbx("SELECT l.pid, l.locktype, l.mode, l.granted, c.relname FROM pg_locks l LEFT JOIN pg_class c ON c.oid = l.relation "
+                            "WHERE NOT l.granted"):
+                print("   waiting lock:", tuple(r))
+        except Exception as x:  # noqa: BLE001 - only a diagnosis
+            print("   pg_stat_activity:", x)
     check(started, f"{tag}: the current server starts on the old database")
     if not started:
         continue

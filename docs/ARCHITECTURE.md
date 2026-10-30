@@ -172,6 +172,7 @@ The most used helpers:
 | `calendars/subscriptions.py` | External calendars (read-only subscriptions): SSRF guard, ICS / CalDAV sync, API. |
 | `calendars/polls.py` | 2.98.0: scheduling polls -- proposed times, the public vote page `/s/v/<token>`, the chosen time becomes an event. |
 | `admin/backup.py` | Backups and restore (admins). |
+| `admin/bkstore.py` | 2.432.0 (#3584): the shared file store of the backups (larger files kept once, by content; encrypted with a store key of the passphrase), the download assembler, and a command line assembler for copies (standard library + cryptography only). |
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
 | `tasks/dayplan.py` | Day planning ("Plan my day") and the evening review. |
 | `api/openapi.py` | The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once). |

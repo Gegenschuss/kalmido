@@ -94,6 +94,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await shot('p293-a-final-phone.png');
     // the client page lists the document
     await nav(B + `#client/${cl.id}`);
+    // 2.435.0 (#3600): the block Documents starts folded: open it
+    await ready(ev, `!!document.querySelector('#view [data-mscl="fold"][data-k="gendocs"]')`, 80); await ev(`(() => { document.querySelector('#view [data-mscl="fold"][data-k="gendocs"]')?.click(); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('a[href^="#office/gendocs/"]')].some(a => /Kurzvertrag/.test(a.textContent))`, 80), 'the client page lists the document');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // ================= member

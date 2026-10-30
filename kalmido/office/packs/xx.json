@@ -397,6 +397,9 @@
     "status": "ready"
   },
   "features": {
+    "docs.delivery": {
+      "status": "ready"
+    },
     "docs.einvoice": {
       "status": "ready"
     },

@@ -363,7 +363,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418); 2.417.0 C (#3445): trial in the test mode */, {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)

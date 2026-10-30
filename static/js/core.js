@@ -156,7 +156,7 @@ const updDot = () => !!(S.me?.is_admin && S.about?.available);
 const modOn = m => m === 'tasks' || m === 'home' || m === 'msv' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'bookmarks' ? feat('reading') : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111); 2.97.0 A (#1950): bookmarks = module reading
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
-const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
+const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects'];  // 2.417.0 A (#3559): + the start page of Projects
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
 // 2.19.0 (#669, a regression of 2.7.2): the tablet layout with the docked "Add task" bar (600-899 px wide, 600 px high) is
@@ -205,8 +205,9 @@ const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
 const isProject = lid => { const l = listById(lid); return !!l && !l.is_inbox; };
-const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
-const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
+// 2.412.0 (#3552): + the project's properties (props.js); a task with tracked time / dependencies keeps showing them
+const tFor = t => !!t && timeOn() && mtTime(t.list_id) && pz_show(t, 'time', taskTime(t.id)[0]);    // time tracking for this task (2.41.0 #1471: the list's switch)
+const dFor = t => !!t && depsOn() && isProject(t.list_id) && pz_show(t, 'deps', (t.blockers || []).length);    // dependencies for this task
 const progressFor = l => !!l && progressOn() && !l.is_inbox;
 const statusFor = l => !!l && statusOn() && !l.is_inbox;
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
@@ -611,7 +612,7 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
+  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -622,6 +623,19 @@ async function api(method, url, body) {
     }
     throw e;
   }
+}
+// 2.436.0 (#3620): "View as member": the one place the own admin marks read as a member's (display only; settings.js mvSet)
+const MV = {me: null};
+const mvOn = () => S.settings?.member_view === '1';
+const mvOrg = o => o?.role === 'admin' ? {...o, role: 'member', real_role: 'admin'} : o;
+const mvMe = me => me ? {...me, real_admin: !!me.is_admin, is_admin: false, ...(Array.isArray(me.workspaces) ? {workspaces: me.workspaces.map(mvOrg)} : {})} : me;
+function mvResp(url, j) {
+  if (!j || typeof j !== 'object') return j;
+  const p = String(url).split('?')[0];
+  if (p === '/api/state') { if (j.me) MV.me = j.me; return j.me && j.settings?.member_view === '1' ? {...j, me: mvMe(j.me)} : j; }
+  if (!mvOn()) return j;
+  if (p === '/api/me') return mvMe(j);
+  return p === '/api/orgs' && Array.isArray(j.orgs) ? {...j, orgs: j.orgs.map(mvOrg)} : j;
 }
 // 2.359.0 A (#3023): the address with a temporary id replaced: the real id once its create went out (this tab or another,
 // the service worker); null = its create still waits in the queue; false = no create waits for it (it failed)
@@ -1322,6 +1336,7 @@ function parseHash() {
   const [a, b] = h.split('/');
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
+  if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)
   if (a === 'team') return {mod: 'team', key: 'team', rid: +b || null};  // 2.17.0 (#419)
   if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message
   if (a === 'notes' && +b) return {mod: 'notes', key: 'notes', lid: +b};  // 2.17.0 (#442)
@@ -1352,8 +1367,8 @@ function parseHash() {
   if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null, ...((b === 'f' || b === 'b') && +h.split('/')[2] ? {[b === 'f' ? 'ctf' : 'ctb']: +h.split('/')[2]} : {})};  // 2.21.0 (#658); 2.351.0 B (#2749): contacts/f/<folder>, contacts/b/<book>
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
   if (a === 'mailhub') return {mod: 'clients', key: 'clients', client: 'mailhub'};  // 2.84.0 A (#1198): the hub's e-mail inbox (hubmail.js)
-  if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"
-  if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
+  if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : p[3] === 't' ? {wtag: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"
+  if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : b === 't' ? {wtag: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null};  // 2.48.0 (#1207): ablage/<folder or file id>
   if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null, ...(b === 'review' ? {review: true} : {})};  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
@@ -1382,7 +1397,7 @@ async function route() {
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }

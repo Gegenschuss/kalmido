@@ -829,13 +829,10 @@ def classify(c, m, node, text, given=None):
         if f == "folder":
             if not folder_ok(c, node, label):
                 continue
-            # 2.360.0 B (#2496): a learned folder only one the uploading person sees; files into it on its own only where
-            # they may edit (like a rule), else a suggestion
-            fr = _fs_role(c, int(label), uid)
-            if not fr:
+            # 2.360.0 B (#2496); 2.373.0 (#3336): a learned folder only one the uploading person may edit (like a rule),
+            # neither filed nor suggested otherwise -- the file stays where it lands
+            if _fs_role(c, int(label), uid) not in ("owner", "edit"):
                 continue
-            if fr not in ("owner", "edit"):
-                conf = min(conf, CL.MAYBE)
         elif not label_ok(c, ws, f, label) or not _learn_seen(c, m, uid, f, label):
             continue
         val = label if f == "folder" else int(label)
