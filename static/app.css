@@ -7170,6 +7170,8 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
 .cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
 .cmsg.agc.apv .cbub{background:transparent}
+/* 2.438.0 A (#3322): a thin edge in the agent's colour (25 %) on its tinted bubbles; no colour chosen = no edge */
+:root:not([data-chat-agent]) .cmsg.agc:not(.jobm):not(.apv) .cbub:not(.del):not(.tcedit){box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--agcol,transparent) 25%,transparent)}
 /* 2.233.0 C (#3196): chat bubble colour of people / agents (settings > Appearance > Chat); icons.js applyLook sets data-chat-human /
    data-chat-agent + the palette's two tones; no attribute = "Default" = the rules above. Text stays var(--text) on a light tint (contrast). */
 :root{--chat-h:var(--chat-h-d,var(--accent));--chat-a:var(--chat-a-d,var(--accent))}
