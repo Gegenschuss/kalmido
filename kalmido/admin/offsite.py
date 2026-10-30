@@ -736,18 +736,21 @@ def stepup_need(c, b, proxy_ok=False):
     return e
 
 
-def stepup_download(c, proxy_ok=False):
+def stepup_download(c, proxy_ok=False, ticket=None):
     """2.223.2 C (#2871): a download behind the step-up (the caller checked the right first): POST with the step-up ->
-    {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this path; the IP address is not compared) -> None = send the file; else the response."""
+    {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this path; the IP address is not compared) -> None = send the file; else the response.
+    2.446.0 (#3613): ticket() runs after the step-up of the POST, its dict rides in the ticket (g.sudl on the GET)."""
     if request.method == "POST":
         e = stepup_need(c, body(), proxy_ok)
         if e is not None:
             return e
+        extra = ticket() if ticket else {}
         tok = secrets.token_urlsafe(32)
-        pend_set("sudl:" + hashlib.sha256(tok.encode()).hexdigest(), uid=g.user["id"], path=request.path)
+        pend_set("sudl:" + hashlib.sha256(tok.encode()).hexdigest(), uid=g.user["id"], path=request.path, **extra)
         return jsonify(ticket=tok)
     p = pend_take("sudl:" + hashlib.sha256((request.args.get("t") or "").encode()).hexdigest())
     if p and p.get("uid") == g.user["id"] and p.get("path") == request.path:
+        g.sudl = p
         return None
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     return jsonify(error=tr("Confirm the download again."), need=rck_step(c, u)), 403

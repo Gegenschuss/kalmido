@@ -161,7 +161,7 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "rollback": N_("The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now."),
           # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
           "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
-          "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.")}
+          "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
 
@@ -1937,14 +1937,35 @@ def backups_download(name):
     from .offsite import stepup_download
     need_backups()
     p = bk_path(name)
-    e = stepup_download(db(), proxy_ok=True)
+    enc = bool(bk_parse_name(name)["encrypted"])
+    fmt3 = bk_meta(p, enc).get("format_version") == 3
+    e = stepup_download(db(), proxy_ok=True, ticket=(lambda: bk_download_pass(p)) if enc and fmt3 else None)
     if e is not None:
         return e
-    enc = bool(bk_parse_name(name)["encrypted"])
-    if bk_meta(p, enc).get("format_version") == 3:  # 2.432.0 (#3584): put together from the store, a complete file
-        return bk_download_assembled(p, name, enc, bk_passphrase(db()) if enc else "")
+    if fmt3:  # 2.432.0 (#3584): put together from the store, a complete file
+        return bk_download_assembled(p, name, enc, (g.sudl.get("passphrase") or bk_passphrase(db())) if enc else "")
     return send_file(p, as_attachment=True, download_name=name, mimetype="application/octet-stream",
                      conditional=False, max_age=0)
+
+
+def bk_download_pass(p):
+    """2.446.0 (#3613): the passphrase of the POST (behind the step-up): the download of a format-3 backup opens it, so
+    the one that fits is asked for here, in JSON, and not on the GET of the browser. {passphrase?} goes into the ticket:
+    only an earlier one the person typed in, in memory until the GET; the download stays encrypted with it."""
+    given = str(body().get("passphrase") or "")
+    pw = given or bk_passphrase(db())
+    if not pw:
+        raise BackupError("need_passphrase")
+    work = tempfile.mkdtemp(prefix=".tmp-dl-", dir=BK_DIR)
+    try:
+        bk_decrypt(p, os.path.join(work, "archive.zip"), pw)
+    except BackupError as e:
+        if e.code == "passphrase" and not given:
+            raise BackupError("old_passphrase") from None
+        raise
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return {"passphrase": given} if given else {}
 
 
 def bk_download_assembled(p, name, enc, pw):

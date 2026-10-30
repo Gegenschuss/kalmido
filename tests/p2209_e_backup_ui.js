@@ -69,6 +69,31 @@ print(json.dumps({"tries": bk.BK_RESTORE_TRIES, "once": case(1, dl), "always": c
   check(!box.querySelector('.bkspace'), 'room for four more: no note');
   await w.bkDraw(md, {...box._j, free_bytes: 1, items: []});
   check(!box.querySelector('.bkspace'), 'no backup yet: no note (nothing to measure by)');
+  // ---- 2.446.0 (#3613): a backup of an earlier passphrase: the download asks for it in the same step, the ticket carries it
+  w.__dialogs = 'manual';
+  const DL = '/api/admin/backups/older.zip.enc/download', sent = [], clicked = [], fetch0 = w.fetch;
+  const J = (st, o) => new Response(JSON.stringify(o), {status: st, headers: {'Content-Type': 'application/json'}});
+  w.fetch = async (u, o) => {
+    if (!String(u).startsWith(DL)) return fetch0(u, o);
+    const b = JSON.parse(o.body); sent.push(b);
+    return b.passphrase === 'the older one' ? J(200, {ticket: 'tk'}) : J(400, {code: b.passphrase ? 'passphrase' : 'old_passphrase', error: b.passphrase ? 'Wrong passphrase' : 'An earlier passphrase'});
+  };
+  const aclick = w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click = function () { if (this.hidden) clicked.push(this.getAttribute('href')); else aclick.call(this); };
+  d.body.insertAdjacentHTML('beforeend', `<a id="t3613" href="${DL}" data-sudl>x</a>`);
+  const answer = async (text, pass) => {
+    const inp = await until(() => { const x = d.querySelector('#cdlg-in'); return x && x.closest('.modal,.smodal,dialog,div')?.isConnected && d.body.textContent.includes(text) && x; });
+    check(!!inp, `the passphrase is asked for: ${text}`);
+    inp.value = pass; d.querySelector('[data-cd="yes"]').click();
+  };
+  d.querySelector('#t3613').click();
+  await answer('An earlier passphrase', 'wrong one');
+  await until(() => sent.length === 2);
+  await answer('Wrong passphrase', 'the older one');
+  await until(() => clicked.length);
+  check(JSON.stringify(sent.map(x => x.passphrase || '')) === '["","wrong one","the older one"]', 'the passphrases sent: ' + JSON.stringify(sent));
+  check(clicked[0] === `${DL}?t=tk`, 'the file comes with the ticket: ' + clicked[0]);
+  w.fetch = fetch0; w.HTMLAnchorElement.prototype.click = aclick; w.__dialogs = undefined;
   check(!errs.length, 'no script errors: ' + errs.join(' | '));
 
   // ---- the restore tries pg_restore again after a deadlock only
