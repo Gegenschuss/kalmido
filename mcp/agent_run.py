@@ -46,7 +46,8 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
                                 rotate_idle_min, set in the agent's runtime section "Interim summary"; a new day starts at
                                 runtime nightly_reset)
   KALMIDO_RUN_TIMEOUT           seconds per run (default 3600, 0 = none); KALMIDO_APPROVAL_REMIND / KALMIDO_APPROVAL_TTL
-  KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode
+  KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode; set, the mode counts as
+                                fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
 Never prints the token or message contents; the log has event types, ids and lengths only.
@@ -157,6 +158,7 @@ class Api:
     def __init__(self, url, token):
         self.base = url.rstrip("/") + "/api/v1"
         self.token = token
+        self.no_fixed = False  # 2.437.0 (#2931): this server takes no permission_fixed in the status
         self.progress_ok = self.host_ok = self.quota_ok = self.approval_ok = self.choices_ok = self.notice_ok = None
 
     def req(self, method, path, body=None, query=None, timeout=30, retry=True):
@@ -200,7 +202,11 @@ class Api:
         if task_id and status in ("working", "waiting"):
             b["task_id"] = task_id
         if host and self.host_ok is not False:
-            st = self.soft("PUT", "/agent/status", {**b, **{k: v for k, v in host.items() if v}})
+            h = {k: v for k, v in host.items() if v or (k == "permission_fixed" and not self.no_fixed)}
+            st = self.soft("PUT", "/agent/status", {**b, **h})
+            if st == 400 and h.pop("permission_fixed", None) is not None:  # 2.437.0 (#2931): a server before it
+                self.no_fixed = True
+                st = self.soft("PUT", "/agent/status", {**b, **h})
             if st != 400:
                 self.host_ok = self.host_ok or st == 200
                 return
@@ -507,10 +513,20 @@ def model_label(model):
     return f"{m.group(1).capitalize()} {m.group(2)}" + (f".{m.group(3)}" if m.group(3) else "")
 
 
+PERM_FLAG = {"ask": "default", "auto": "auto"}  # runtime permission_mode -> --permission-mode of Claude Code
+
+
 # kalmido-capability: permission_mode
-def permission_modes(cmd):
+def permission_fixed(cmd):
+    """2.437.0 (#2931): COMMAND or KALMIDO_PERMISSION_MODE set the mode: Kalmido's switch does not reach this computer."""
+    return bool(os.environ.get("KALMIDO_PERMISSION_MODE")) or any(
+        a in ("--permission-mode", "--dangerously-skip-permissions") or a.startswith("--permission-mode=") for a in cmd)
+
+
+def permission_modes(cmd, runtime=""):
     """(the mode this run uses, the host's own default) as Kalmido's values ask | auto. The run: --permission-mode of
-    COMMAND, else KALMIDO_PERMISSION_MODE, else the host default; the host default: defaultMode of ./.claude/settings.json."""
+    COMMAND, else KALMIDO_PERMISSION_MODE, else runtime (the switch in the chat header, 2.437.0, #2931), else the host
+    default; the host default: defaultMode of ./.claude/settings.json."""
     def label(m):
         return "" if not m else "ask" if m in ("default", "plan") else "auto"
     host = ""
@@ -525,7 +541,7 @@ def permission_modes(cmd):
             run = cmd[i + 1]
         elif a.startswith("--permission-mode="):
             run = a.split("=", 1)[1]
-    run = run or os.environ.get("KALMIDO_PERMISSION_MODE") or host or "default"
+    run = run or os.environ.get("KALMIDO_PERMISSION_MODE") or PERM_FLAG.get(runtime) or host or "default"
     return label(run), label(host or "default")
 
 
@@ -1490,8 +1506,21 @@ class Runner:
         ids = [self.perm_user(), (self.agent or {}).get("owner_id")] + (os.environ.get("KALMIDO_OWNER_IDS") or "").split(",")
         return {int(str(x).strip()) for x in ids if str(x or "").strip().isdigit()}
 
+    def mode_args(self, args):
+        """2.437.0 (#2931): the switch in the chat header (runtime permission_mode) on this run, unless this computer fixed
+        the mode; "Host default" = no flag. Read per run: runtime_changed makes the next run read the runtime again."""
+        rt = ((self.agent or {}).get("runtime") or {}).get("permission_mode") or ""
+        if self.mode_fixed():
+            rt = ""
+        self.pmode, self.host_pmode = permission_modes(self.cmd, rt)
+        return args + ["--permission-mode", PERM_FLAG[rt]] if rt in PERM_FLAG else args
+
+    def mode_fixed(self):
+        return permission_fixed(self.cmd) or not self.is_claude()
+
     def run_args(self, args):
         """--settings with the hook file when the command is Claude Code and has no --settings of its own."""
+        args = self.mode_args(args)
         if not self.is_claude() or any(a == "--settings" or a.startswith("--settings=") for a in args):
             return args
         hs = self.hook_settings()  # 2.306.0 E (#2927): also without perm_relay when the usage hook is in it
@@ -1506,7 +1535,8 @@ class Runner:
         return args + ["--settings", f]
 
     def host(self):
-        return {"model": model_label(self.model), "permission_mode": self.pmode, "host_permission_mode": self.host_pmode}
+        return {"model": model_label(self.model), "permission_mode": self.pmode, "host_permission_mode": self.host_pmode,
+                "permission_fixed": self.mode_fixed()}
 
     def cursor_file(self):
         return os.path.join(self.state_dir, "cursor")

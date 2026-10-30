@@ -631,14 +631,17 @@ const AG_PMODES = {auto: N_('Auto|permission'), ask: N_('Ask first'), '': N_('Ho
 // running host really uses differs from the wish: both ("Ask first · runs: Auto")
 const agHostDef = a => { const h = a.host?.host_permission_mode; return h ? tr('Host default ({0})', tr(AG_PMODES[h])) : tr(AG_PMODES['']); };
 const agModeLbl = (a, m = a.permission_mode || '') => m ? tr(AG_PMODES[m] || AG_PMODES['']) : agHostDef(a);
+// 2.437.0 (#2931): the computer fixed the mode (its command or KALMIDO_PERMISSION_MODE): the switch does not reach it, so it is locked
+const agModeFree = a => a.may_set_mode && !a.host?.permission_fixed;
+const agFixedLbl = a => tr(AG_PMODES[a.host?.permission_mode] || AG_PMODES['']) + ' · ' + tr('Set on its computer');
 function chatModeHtml(a) {
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (!m && !a.may_set_mode && !a.host?.host_permission_mode) return '';
-  const lbl = agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : '');
+  const lbl = a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : '');
   const t = tr('Permissions: {0}', lbl);
   // 2.34.0 (#1090): narrow phones show only the mode it runs with (data-short, CSS), the full text stays in title / label
   const sh = (run || want) ? tr(AG_PMODES[run || want] || AG_PMODES['']) : tr('Default');
-  return a.may_set_mode ? `<button type="button" class="chmode pm-${m || 'def'}" data-act="chat-mode" data-short="${esc(sh)}" title="${esc(t)}" aria-label="${esc(t)}" aria-haspopup="menu"><span class="pmlong">${esc(lbl)}</span></button>`
+  return agModeFree(a) ? `<button type="button" class="chmode pm-${m || 'def'}" data-act="chat-mode" data-short="${esc(sh)}" title="${esc(t)}" aria-label="${esc(t)}" aria-haspopup="menu"><span class="pmlong">${esc(lbl)}</span></button>`
     : `<span class="chmode pm-${m || 'def'}" data-short="${esc(sh)}" title="${esc(t)}" role="note" aria-label="${esc(t)}"><span class="pmlong">${esc(lbl)}</span></span>`;
 }
 // 2.32.0 (#1079): the model the host really runs ("Opus 5.5"); a model set in the runtime the host has not taken yet: both
@@ -788,8 +791,8 @@ function chatHeadInfo(b) {
   const it = [], info = label => ({label, dis: true, cls: 'minfo'});
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (m || a.may_set_mode || a.host?.host_permission_mode) {
-    const l = tr('Permissions: {0}', agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
-    it.push(a.may_set_mode ? {label: l, icon: 'lock', cls: 'chmi-mode', fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
+    const l = tr('Permissions: {0}', a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
+    it.push(agModeFree(a) ? {label: l, icon: 'lock', cls: 'chmi-mode', fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
   }
   const mr = a.host?.model || '', ms = a.runtime_model || '';
   if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
@@ -1750,7 +1753,7 @@ function agRtFields(a) {
     <div class="row"><label for="ag-model">${tr('Model')}</label><input id="ag-model" list="ag-models" value="${esc(rt.model || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><datalist id="ag-models">${AG_MODELS.map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
-    <div class="row"><label for="ag-pm">${tr('Approvals')}</label><select id="ag-pm">${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
+    <div class="row"><label for="ag-pm">${tr('Approvals')}</label><select id="ag-pm"${a?.host?.permission_fixed ? ` disabled title="${esc(tr('Set on its computer'))}"` : ''}>${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
     <div class="shint">${tr('Model: e.g. opus, sonnet or a full model id. Approvals: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
     ${a ? `<div class="row"><label for="ag-pu">${tr('Permission questions go to')}</label><select id="ag-pu" disabled><option value="">${esc(tr('As set up on its computer'))}</option></select></div>
     <div class="shint" id="ag-puhint">${a.owner ? tr('A personal agent asks its owner.') : tr('Who answers when it asks for permission in the chat. Only people it reaches in a shared project; its computer takes the choice before its next run.')}</div>` : ''}
@@ -1761,7 +1764,7 @@ function agRtBody(md) {
   if (pct && (!/^\d+$/.test(pct) || +pct < 10 || +pct > 100)) { const e = $('#ag-err', md); e.textContent = tr('Auto-compact: a percentage from 10 to 100'); e.hidden = false; $('#ag-acp', md).focus(); return null; }
   const pu = $('#ag-pu', md), ow = $('#ag-owner', md);  // 2.312.0 D (#3266): a team agent's person for permission questions
   return {model: $('#ag-model', md).value.trim(), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
-    ...($('#ag-pm', md) ? {permission_mode: $('#ag-pm', md).value} : {}),
+    ...($('#ag-pm:not(:disabled)', md) ? {permission_mode: $('#ag-pm', md).value} : {}),
     ...(pu && !pu.disabled && !ow?.value ? {perm_user: pu.value ? +pu.value : null} : {})};
 }
 // 2.312.0 D (#3266): the choice "Permission questions": people who may answer (GET /api/agents/<id>/perm-users); a personal

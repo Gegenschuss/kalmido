@@ -129,6 +129,44 @@ os.chdir(tempfile.mkdtemp(prefix="kalmido-parity-"))  # no .claude/settings.json
 r = ar.Runner(["claude", "--permission-mode", "acceptEdits"], os.path.join(os.getcwd(), "state"))
 check((r.pmode, r.host_pmode) == ("auto", "ask"), f"permission modes: {(r.pmode, r.host_pmode)}")
 check(ar.permission_modes(["claude", "--permission-mode=plan"])[0] == "ask", "plan = ask")
+# 2.437.0 (#2931): the switch in the chat header reaches the run, unless this computer fixed the mode
+check(r.mode_args(["claude"]) == ["claude"] and r.host()["permission_fixed"] is True, "a fixed mode in the command: no second flag")
+r.agent = {"runtime": {"permission_mode": "ask"}}
+check(r.mode_args(["claude"]) == ["claude"] and r.pmode == "auto", "a fixed mode wins over the switch")
+r2 = ar.Runner(["claude", "-p", "x"], os.path.join(os.getcwd(), "state2"))
+check(r2.mode_args(["claude"]) == ["claude"] and r2.host()["permission_fixed"] is False, "no switch: no flag")
+r2.agent = {"runtime": {"permission_mode": "auto"}}
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"] and r2.host()["permission_mode"] == "auto", "auto = --permission-mode auto")
+r2.agent = {"runtime": {"permission_mode": "ask"}}
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "default"] and r2.pmode == "ask", "ask = --permission-mode default")
+r2.agent = {"runtime": {"permission_mode": ""}}
+check(r2.mode_args(["claude"]) == ["claude"] and r2.pmode == "ask", "Host default: the flag goes again")
+r2.agent = {"runtime": {"permission_mode": "ask"}}
+check("--permission-mode" in r2.run_args(["claude"]), "run_args carries the flag")
+os.environ["KALMIDO_PERMISSION_MODE"] = "auto"
+check(r2.mode_args(["claude"]) == ["claude"] and r2.pmode == "auto" and r2.mode_fixed(), "KALMIDO_PERMISSION_MODE fixes it too")
+del os.environ["KALMIDO_PERMISSION_MODE"]
+check(ar.permission_fixed(["claude", "--dangerously-skip-permissions"]), "skipping all permissions is a fixed mode")
+r3 = ar.Runner(["codex"], os.path.join(os.getcwd(), "state3"))
+r3.agent = {"runtime": {"permission_mode": "ask"}}
+check(r3.mode_args(["codex"]) == ["codex"] and r3.mode_fixed(), "another command takes no flag and counts as fixed")
+
+
+class _SApi(ar.Api):
+    def __init__(self):
+        self.no_fixed, self.host_ok, self.sent = False, None, []
+
+    def soft(self, _m, _p, b, **_kw):
+        self.sent.append(b)
+        return 400 if "permission_fixed" in b else 200
+
+
+api = _SApi()
+api.status("idle", host={"model": "M", "permission_fixed": False})
+check(api.sent[0].get("permission_fixed") is False and "permission_fixed" not in api.sent[1] and api.sent[1]["model"] == "M" and api.host_ok,
+      "a server before 2.437: the field goes, the model stays")
+api.status("idle", host={"model": "M", "permission_fixed": False})
+check("permission_fixed" not in api.sent[2], "and it is not sent again")
 g = r.groups([{"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 1}}}, {"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 2}}},
               {"event": "comment", "data": {"task": {"id": 1}}}, {"event": "reset"}, {"event": "chat", "data": {"user": {"id": 8}, "message": {"id": 3}}},
               {"event": "reaction", "data": {"chat_message": {"id": 1}, "approval": "approved"}}])

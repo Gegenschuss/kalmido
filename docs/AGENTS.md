@@ -1359,7 +1359,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
-`host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
+`host_permission_mode` (its own default when the person chose "Host default"), and 2.437.0 `permission_fixed` (true: the
+computer set the mode, Kalmido's switch does not reach it). Kalmido keeps the last values with the
 agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
 "Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
 "Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
@@ -2420,6 +2421,9 @@ agent accordingly.
 personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
 or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
 host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
+2.437.0: this holds unless the computer fixed the mode: `--permission-mode` in the agent's command, or
+`KALMIDO_PERMISSION_MODE`, win over the switch; the same goes for a command that is not Claude Code. The host then reports
+`permission_fixed: true`, and the switch shows "Set on its computer" and is locked.
 
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
