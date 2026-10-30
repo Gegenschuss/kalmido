@@ -211,7 +211,8 @@ check(mlink, f"the invitation mail with the link ({len(ml)} mail(s))")
 inv["link"] = mlink.group(0) if mlink else ""
 r = Bo.get(B + f"/api/orgs/{ORG}/invites")
 iv = r.json()["invites"] if r.ok else []
-check(len(iv) == 1 and iv[0]["user_id"] == NU and iv[0]["role"] == "admin" and iv[0]["state"] == "invited", f"the open invitation is listed: {iv}")
+# 2.360.2 (#2561): an organisation admin gets an opaque ref, no account id
+check(len(iv) == 1 and iv[0]["user_id"] is None and iv[0]["email"].lower() == "nina.new@example.com" and iv[0]["ref"] and iv[0]["role"] == "admin" and iv[0]["state"] == "invited", f"the open invitation is listed: {iv}")
 check(Fk.get(B + f"/api/orgs/{ORG}/invites").status_code == 404, "another organisation's admin does not see it")
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "nina.new@example.com", "role": "admin"})
 check(r.ok and set(r.json()) == {"ok", "by_email", "invites"}, "the address again (it has an account now): the same answer " + r.text[:200])  # 2.148.1 (#2480)
@@ -264,7 +265,7 @@ r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "rita@example.com"})
 RU = uid_of("rita@example.com") if r.ok else None
 check(RU and Bo.delete(B + f"/api/orgs/{ORG}/members/{RU}").ok, "an invited person removed from the organisation")
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{RU}").status_code == 404 and DB.execute("SELECT 1 FROM users WHERE id=?", (RU,)).fetchone()
-      and not any(v["user_id"] == RU for v in Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]),
+      and len(A.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]) == sum(v["user_id"] != RU for v in A.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]),
       "no longer a member: no withdraw (the account stays), not listed")
 
 # ---- the daily limit
