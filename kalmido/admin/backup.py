@@ -19,13 +19,13 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
-from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
+from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SECRET_KEY, SESSION_DAYS, TZ
 from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
-from ..core.db import appver_newer_minor
+from ..core.db import appver_newer_minor, appver_parse, skfp_kek, skfp_of, skfp_row_opens, SKFP_KEY
 from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
@@ -154,6 +154,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "no_passphrase": N_("Encryption needs a passphrase (at least 10 characters)."),
           # 2.152.0 B (#2172)
           "encrypt_required": N_("This server only writes encrypted backups: set a passphrase (at least 10 characters)."),
+          # 2.359.3 (#2893)
+          "server_key": N_("This backup was made with another server key, so its encrypted data could not be read here. Nothing was changed. Put the key of the old server in place, restart and restore again (see SELF-HOSTING.md)."),
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
@@ -165,6 +167,9 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
           "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
           "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.")}
+# 2.359.3 (#2893): what a restore warns about (bk_key_state; "foreign" only gets this far with KALMIDO_SECRET_KEY_CHANGED=1)
+BK_KEY_WARN = {"foreign": N_("This backup was made with another server key: attachments, private files and encrypted fields stay unreadable until that key is back in place."),
+               "secrets": N_("This backup may come from another server key: stored access tokens (Git, documents, single sign-on) may be unreadable. Enter them again or put the old key back.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
 
@@ -1179,6 +1184,44 @@ def _restore_args(toc):
     return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--single-transaction", f"--use-list={toc}"]
 
 
+# 2.359.3 (#2893): the same columns as core/db.py skfp_keys_match, the start check of the server key
+BK_KEY_COLS = {"org_keys": ("org_id", "kek_check", "kek_check_rot"), "user_keys": ("user_id", "kek_check")}
+
+
+def bk_key_cols(table, copy_line):
+    """Positions of the id and the check values in a COPY block of org_keys / user_keys; None for every other table."""
+    want = BK_KEY_COLS.get(table)
+    if not want:
+        return None
+    cols = [x.strip().strip('"') for x in copy_line[copy_line.index(b"(") + 1:copy_line.rindex(b")")].decode().split(",")]
+    return [cols.index(x) for x in want if x in cols]
+
+
+def bk_key_row(kek, table, kcols, line):
+    """Does this data row of org_keys / user_keys open with kek? (column values of a server-made COPY block: digits and hex)"""
+    v = line.rstrip(b"\n").split(b"\t")
+    try:
+        sid = int(v[kcols[0]])
+        return skfp_row_opens(kek, sid if table == "org_keys" else -sid, [v[i].decode("ascii", "replace") for i in kcols[1:] if v[i] != b"\\N"])
+    except (IndexError, ValueError):
+        return False
+
+
+def bk_key_state(man):
+    """2.359.3 (#2893): does a checked backup fit the server key here (read from the dump, nothing restored)? "ok"; "foreign":
+    it holds organisation / account keys and none opens; "secrets": no such keys, but its fingerprint is another one (or a
+    version before the fingerprint, 2.190, made it): only stored tokens are at stake."""
+    d = man.get("db")
+    if not d:
+        return "ok"  # format 1, before 2.37: no sealed data yet
+    if d["key_rows"]:
+        return "ok" if d["key_opens"] else "foreign"
+    if d["secret_fp"]:
+        return "ok" if SECRET_KEY and skfp_of(SECRET_KEY) == d["secret_fp"] else "secrets"
+    v = appver_parse(man.get("app_version"))
+    return "secrets" if v and v < (2, 190, 0) else "ok"
+
+
 def bk_scan_dump(dump):
     """Reads the whole dump through pg_restore (to SQL text; no database involved): every data block must be readable
     (else "integrity"), every statement one of a Kalmido dump ("objects"), the schema version (kalmido_meta) not newer
@@ -1186,6 +1229,7 @@ def bk_scan_dump(dump):
     exe = _pg_tool("pg_restore")
     toc, _ = _toc_file(dump)
     rows, ddl, ddl_n, meta, table = {}, [], 0, {}, None
+    kek, key_rows, key_opens, kcols = skfp_kek(SECRET_KEY) if SECRET_KEY else None, 0, False, None  # 2.359.3 (#2893)
     with tempfile.TemporaryFile() as errf:
         p = subprocess.Popen([exe, *_restore_args(toc), "-f", "-", dump], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=errf, env={"PATH": os.environ.get("PATH", "")})
@@ -1200,6 +1244,10 @@ def bk_scan_dump(dump):
                         if table == "kalmido_meta" and len(meta) < 100:
                             k, _, v = line.rstrip(b"\n").partition(b"\t")
                             meta[k.decode("utf-8", "replace")] = v.decode("utf-8", "replace")
+                        if kcols:
+                            key_rows += 1
+                            if kek and not key_opens:
+                                key_opens = bk_key_row(kek, table, kcols, line)
                     continue
                 if line.startswith(b"COPY "):
                     m = _COPY.fullmatch(line)
@@ -1211,6 +1259,7 @@ def bk_scan_dump(dump):
                         bad = "objects"
                         break
                     rows[table] = 0
+                    kcols = bk_key_cols(table, line)
                     continue
                 if line.startswith(b"\\"):  # psql meta commands: only the \restrict / \unrestrict pair of pg_dump 17.6+
                     if not re.fullmatch(rb"\\(un)?restrict [A-Za-z0-9]{1,128}\n", line):
@@ -1249,7 +1298,8 @@ def bk_scan_dump(dump):
         raise BackupError("format")
     if int(sv) > SCHEMA_VERSION:
         raise BackupError("schema", int(sv))
-    return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
+    return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0), "key_rows": key_rows, "key_opens": key_opens,
+            "secret_fp": meta.get(SKFP_KEY, "")}
 
 
 def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
@@ -1321,6 +1371,7 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, p
         raise BackupError("format") from None
     if not man["_legacy"]:
         man["db"] = bk_scan_dump(dbp)
+        man["key_state"] = bk_key_state(man)  # 2.359.3 (#2893)
     elif restore:
         from .migrate import is_kalmido_sqlite
         if not is_kalmido_sqlite(dbp):
@@ -1671,6 +1722,9 @@ def bk_restore(path, pw, admin, via):
         pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
         os.makedirs(pack_new, mode=0o755)
         man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
+        kstate = man.get("key_state", "ok")
+        if kstate == "foreign" and not env_bool("KALMIDO_SECRET_KEY_CHANGED", False):  # 2.359.3 (#2893): before anything changes
+            raise BackupError("server_key")
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
@@ -1766,6 +1820,9 @@ def bk_restore(path, pw, admin, via):
         bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
+        if kstate != "ok":  # 2.359.3 (#2893)
+            print(f"restore: server key check: {kstate}", flush=True)
+            aa_now("security", f"restore-key:{int(time.time())}", BK_KEY_WARN[kstate], [])
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
         man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
                          if jobs else []) + [(BK_OFFLINE_NOTE,)]
@@ -2081,6 +2138,11 @@ def backups_delete(name):
     return jsonify(bk_state(db()))
 
 
+def bk_key_warning(man):
+    t = BK_KEY_WARN.get(man.get("key_state", "ok"))
+    return tr(t) if t else ""
+
+
 @app.post("/api/admin/backups/<name>/verify")
 def backups_verify(name):
     """Full check without changing anything: decrypt, member list, every checksum, database integrity."""
@@ -2097,6 +2159,7 @@ def backups_verify(name):
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
                    pack_files=man.get("pack_files") or 0,  # 2.359.2 (#2895)
+                   key_warning=bk_key_warning(man),  # 2.359.3 (#2893)
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
@@ -2181,6 +2244,7 @@ def backups_restore():
         with contextlib.suppress(OSError):
             os.remove(p)
     resp = jsonify(ok=True, safety=safety, relogin=tok is None and via != "proxy", created_at=man.get("created_at"),
+                   key_warning=bk_key_warning(man),  # 2.359.3 (#2893)
                    deleted_again=man.get("_again") or {},  # 2.152.0 B (#2172): accounts of the journal
                    notes=[tr(*n) for n in man.get("_notes") or []])  # 2.273.0 A (#3051 p. 12, 13)
     if tok:

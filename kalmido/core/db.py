@@ -506,11 +506,21 @@ def _skfp_kek_check(kek, sid):
     return hmac.new(kek, b"kalmido-orgkey-check-v1|%d" % sid, hashlib.sha256).hexdigest()[:32]
 
 
-def skfp_keys_match(c, key):
-    """None = no sealed organisation / account key in the database; True = at least one opens with key; False = none."""
+def skfp_kek(key):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-    kek = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-kek-v1").derive(key)  # = orgcrypt._kek
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-kek-v1").derive(key)  # = orgcrypt._kek
+
+
+def skfp_row_opens(kek, sid, checks):
+    """One row of org_keys (sid = org id) / user_keys (sid = -user id): does one of its kek_check values fit kek?
+    2.359.3 (#2893): also used on the rows of a backup."""
+    return any(v and _skfp_eq(str(v), _skfp_kek_check(kek, sid)) for v in checks)
+
+
+def skfp_keys_match(c, key):
+    """None = no sealed organisation / account key in the database; True = at least one opens with key; False = none."""
+    kek = skfp_kek(key)
     seen = False
     with pg_system_ctx(c):
         for t, idc, cols in (("org_keys", "org_id", ("kek_check", "kek_check_rot")), ("user_keys", "user_id", ("kek_check",))):
@@ -519,7 +529,7 @@ def skfp_keys_match(c, key):
             for r in c.execute(f"SELECT {idc}, {', '.join(cols)} FROM {t}").fetchall():  # (init_db: the columns exist)
                 seen = True
                 sid = int(r[0]) if t == "org_keys" else -int(r[0])
-                if any(v and _skfp_eq(str(v), _skfp_kek_check(kek, sid)) for v in tuple(r)[1:]):
+                if skfp_row_opens(kek, sid, tuple(r)[1:]):
                     return True
     return False if seen else None
 

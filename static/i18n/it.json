@@ -15403,5 +15403,8 @@
   "Not copied: {0}": "Non copiato: {0}",
   "Hold the handle, then drag it.": "Tieni premuta la maniglia, poi trascina.",
   "No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md).": "Nessun backup possibile: pg_dump {0} rifiuta il PostgreSQL {1} più recente di questo server. Usa un'immagine Kalmido con postgresql-client {1} (vedi SELF-HOSTING.md).",
-  "Backups are not possible": "I backup non sono possibili"
+  "Backups are not possible": "I backup non sono possibili",
+  "This backup was made with another server key, so its encrypted data could not be read here. Nothing was changed. Put the key of the old server in place, restart and restore again (see SELF-HOSTING.md).": "Questo backup è stato creato con un'altra chiave del server: i suoi dati cifrati non sarebbero leggibili qui. Non è stato modificato nulla. Inserisci la chiave del vecchio server, riavvia e ripristina di nuovo (vedi SELF-HOSTING.md).",
+  "This backup was made with another server key: attachments, private files and encrypted fields stay unreadable until that key is back in place.": "Questo backup è stato creato con un'altra chiave del server: allegati, file privati e campi cifrati restano illeggibili finché quella chiave non viene reinserita.",
+  "This backup may come from another server key: stored access tokens (Git, documents, single sign-on) may be unreadable. Enter them again or put the old key back.": "Questo backup potrebbe provenire da un'altra chiave del server: i token di accesso salvati (Git, documenti, single sign-on) potrebbero essere illeggibili. Inseriscili di nuovo o reinserisci la vecchia chiave."
 }
