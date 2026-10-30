@@ -278,6 +278,7 @@ function newsText(it, U) {
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
+    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
     case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
       : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)

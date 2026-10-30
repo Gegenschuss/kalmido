@@ -32,7 +32,7 @@ from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_co
 from .shfuncs import SHF_HELP
 from .vars import SH_VAR_WORD, sh_fields_of, sh_here_value, sh_slug_of, sh_id_of, sh_source, sh_var_value
 from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
-from .shbook import (shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
+from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
 
 SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
@@ -41,6 +41,8 @@ SH_COLOR_MODES = ("cell", "row")
 # one table. The environment values are for the tests only
 SH_RANGE_BUDGET = int(os.environ.get("KALMIDO_SHEET_RANGE_BUDGET") or 15_000_000)
 SH_BOOK_CELLS_MAX = int(os.environ.get("KALMIDO_SHEET_CELLS_MAX") or 1_000_000)
+SH_BOOK_MB_MAX = int(os.environ.get("KALMIDO_SHEET_MB_MAX") or 200)  # 2.360.2 L (#2561): the same for the size of the inputs
+SH_BOOK_SMALL = 1024  # 2.360.2 L (#2561): a change of an existing cell below this size is not summed up on every keystroke
 SH_TITLE_MAX, SH_COL_TITLE_MAX, SH_COLS_MAX, SH_ROWS_MAX, SH_CELLS_MAX, SH_OPTIONS_MAX = 200, 80, 200, 5000, 5000, 100
 SH_START_COLS, SH_START_ROWS = 3, 10
 SH_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
@@ -1141,21 +1143,23 @@ def _resolve_target(book, d):
 def _book_cells_check(c, sheet_row, book, cells):
     """2.148.1 D (#2485): a table holds at most SH_BOOK_CELLS_MAX stored cells over all its sheets (counted only when the
     call adds cells)."""
-    new = 0
+    new = size = 0
     for d in cells:
         if isinstance(d, dict) and d.get("raw") not in (None, ""):
+            size += len(str(d["raw"]).encode("utf-8", "replace"))
             try:
                 if _resolve_target(book, d) not in book.at:
                     new += 1
             except BadInput:
                 pass  # reported by the write itself
-    if not new:
+    if not new and size < SH_BOOK_SMALL:
         return
     bid = sheet_row["book_id"] or sheet_row["id"]
-    have = c.execute("SELECT COUNT(*) FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE id=? OR book_id=?)",
-                     (bid, bid)).fetchone()[0]
+    have, have_b = shb_cell_stats(c, bid)
     if have + new > SH_BOOK_CELLS_MAX:
         raise BadInput(tr("The table is full (at most {0} cells)", SH_BOOK_CELLS_MAX))
+    if have_b + size > SH_BOOK_MB_MAX * 1048576:  # 2.360.2 L (#2561)
+        raise BadInput(tr("The table is full (at most {0} MB)", SH_BOOK_MB_MAX))
 
 
 def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book, conflicts=None):

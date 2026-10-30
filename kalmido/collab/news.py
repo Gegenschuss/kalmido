@@ -76,7 +76,7 @@ NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind == "approval":  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -532,7 +532,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..office.signoff import sig_news_live
             if not sig_news_live(c, uid, r["data"]):
                 continue
-        elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
+        elif kind in ("ptlimit", "apblimit"):  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list); 2.360.2 L (#2561): the booking page's
             pass
         elif kind == "orgjoin":  # 2.148.1 A (#2480): while the invitation is open
             from ..accounts.orginvite import ojn_open

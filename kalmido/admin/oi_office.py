@@ -73,7 +73,7 @@ def _oi_name(name):
     return "files/office/" + _safe_part(name)
 
 
-def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
+def _oi_put(ctx, old, new, seal=True, mime="", keep=False, strict=False):
     """Archive file `old` (a bare name below the source's office folder) -> `new` below the target's office folder. keep:
     a content-addressed name (logo / letterhead snapshots): an existing file of that name stays. -> new or None."""
     if not old or not new or os.path.basename(old) != old or os.path.basename(new) != new:
@@ -84,7 +84,7 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
     done = ctx.run.__dict__.setdefault("oi_office_files", set())
     if (ctx.space, new) in done:
         return new
-    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal)
+    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal, strict=strict)
     if not r:
         return None
     done.add((ctx.space, new))
@@ -143,7 +143,7 @@ def _p_settings(c, run, src, d, ctx):
     if isinstance(lh, dict) and lh.get("file"):
         from ..office.letterhead import BP_FILE_RE
         f = str(lh["file"])
-        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf") or "") if BP_FILE_RE.fullmatch(f) else ""
+        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf", strict=True) or "") if BP_FILE_RE.fullmatch(f) else ""
     d["data"] = json.dumps(oc_json_store(c, ctx.space, "office_settings", "data", j), ensure_ascii=False)
     return d
 

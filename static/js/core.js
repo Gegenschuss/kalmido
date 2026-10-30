@@ -536,8 +536,9 @@ async function rawFetch0(method, url, body, key) {
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
   // 2.359.0 A (#3023): an HTML page with a server error (500, a database restart) the same way (the change waits, no reload)
+  // 2.360.2 L (#2561): the write lock of a key rotation too (JSON for API clients, the header X-Kalmido-Maint marks it)
   const ctype = r.headers.get('content-type') || '';
-  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && !ctype.includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && (!ctype.includes('application/json') || r.headers.get('X-Kalmido-Maint'))) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   // 2.359.0 A (#3023): an HTML 404 / 405 / 4xx (an address without a route, e.g. a temporary id; a proxy's page) is an error

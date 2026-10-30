@@ -86,7 +86,7 @@ VARS = (
     _v("KALMIDO_SECRET_KEY_CHANGED", "0", "Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again).", "security"),  # 2.190.0 B (#2592)
     _v("KALMIDO_ORGCRYPT_PAUSE", "0.2", "Seconds between two portions of the background encryption pass.", "security"),
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
-    _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "5", "Seconds the key rotation waits after the switch to the new key.", "security"),
+    _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "30", "Longest wait in seconds of a key rotation for running writers after it locked writes.", "security"),
     _v("KALMIDO_TENANT_CHECK", "", "Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never.", "security"),
     _v("KALMIDO_TENANT_CHECK_HOUR", "3", "Local hour from which the daily boundary check runs.", "security"),
     _v("KALMIDO_PUBLIC_RATE", "60", "Page views of public links per client address and minute.", "security"),
@@ -303,6 +303,7 @@ VARS = (
     _v("KALMIDO_TEST_DUN_TICKS", "10", "Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0).", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
+    _v("KALMIDO_SHEET_MB_MAX", "200", "Tests: size in MB of the inputs over all sheets of one table (2.360.2).", "test"),
     _v("KALMIDO_PEPPOL_STORECOVE_URL", "", "Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0).", "test"),
     _v("KALMIDO_AGENT_BURST_S", "60", "Seconds in which several new tasks of an agent count as one burst (one summary event).", "agents"),
     _v("KALMIDO_AGENT_BURST_QUIET_S", "15", "Seconds without more new tasks after which the burst summary of an agent is sent.", "agents"),
