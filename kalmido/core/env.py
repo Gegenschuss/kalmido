@@ -302,6 +302,7 @@ VARS = (
     _v("KALMIDO_TEST_BK_ZIP_DELAY", "", "Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118).", "test"),
     _v("KALMIDO_TEST_UMZ_END_DELAY", "", "Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280).", "test"),
     _v("KALMIDO_TEST_BK_IDLE_TX_MS", "", "Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118).", "test"),
+    _v("KALMIDO_TEST_PG_DUMP_VERSION", "", "Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945).", "test"),
     _v("KALMIDO_TEST_DUN_TICKS", "10", "Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0).", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
