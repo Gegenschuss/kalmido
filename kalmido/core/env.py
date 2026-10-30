@@ -292,6 +292,7 @@ VARS = (
     _v("KALMIDO_PURGE_TRASH", "", "Switch for the trash only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
 
     # ---- tests and development
+    _v("KALMIDO_TEST_TIMING_ALL", "", "Tests: Server-Timing for every account, not only instance admins (1).", "test"),  # 2.360.2 (#2561)
     _v("KALMIDO_TEST_ROT_ABORT", "", "Tests: stop the key rotation right after the switch (1).", "test"),
     _v("KALMIDO_TEST", "0", "Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server.", "test"),
     _v("KALMIDO_TEST_NOW", "", "Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there.", "test"),
