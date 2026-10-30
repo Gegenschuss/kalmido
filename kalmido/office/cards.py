@@ -33,7 +33,7 @@ from .cfbank import cfb_balances
 from .ledger import ofx_log
 from .model import office_ctx, office_ctx_admin, office_role, pb_owner
 from .periodlock import period_need_open, pl_is_locked
-from .rights import LV, ofr_rights
+from .rights import LV, ofr_allows, ofr_need_area, ofr_rights
 
 CC_PROVIDERS = {"mastercard": "Mastercard"}
 CC_KINDS = ("purchase", "fee", "credit")
@@ -151,7 +151,7 @@ def cc_list():
     rows = [oc_dec_fields(c, oid, "office_cc_cards", r) for r in c.execute(q, (oid,) if every else (oid, uid)).fetchall()]
     out = {"items": [_card_public(c, oid, r) for r in rows], "manage": every, "currency": _home(c, oid), "providers": [{"id": k, "name": v} for k, v in CC_PROVIDERS.items()]}
     if every:
-        out.update(people=_members(c, oid), accounts=_accounts(c, oid))
+        out.update(people=_members(c, oid), accounts=_accounts(c, oid) if ofr_allows(c, uid, oid, "bank", "view") else [])  # the accounts: the bank's area
     return jsonify(out)
 
 
@@ -252,7 +252,7 @@ def _stmt_public(c, oid, s, lines=None):
     tot, sm = money(dec(s["total"], "0")), cc_sum(lines)
     t = cc_bank_of(c, oid, s["id"])
     return {"id": s["id"], "card_id": s["card_id"], "month": s["month"], "day": s["day"], "total": dstr(tot), "sum": dstr(sm), "diff": dstr(sm - tot),
-            "currency": s["currency"], "state": s["state"], "reader": s["reader"], "node_id": s["node_id"], "locked": pl_is_locked(c, oid, s["day"]) if s["day"] else False,
+            "total_missing": not s["total"], "currency": s["currency"], "state": s["state"], "reader": s["reader"], "node_id": s["node_id"], "locked": pl_is_locked(c, oid, s["day"]) if s["day"] else False,
             "lines": len(lines), "open": sum(1 for x in lines if x["state"] == "open"),
             "private": dstr(sum((x["amount"] for x in lines if x["state"] == "private"), money(dec(0)))),
             "bank": {"id": t["id"], "day": t["day"], "amount": dstr(t["amount"])} if t else None}
@@ -300,8 +300,8 @@ def cc_upload(cid):
     ws = bk_ws(c, oid)
     nid = docs_ingest(c, uid, None if ws[0] == "u" else oid, f.filename or "statement.pdf", data, "application/pdf", "upload", dedup=True, info={})
     fs_log_add(c, nid, "upload")
-    total = r["total"] if r["total"] is not None else cc_sum(r["lines"])
-    row = oc_enc_fields(c, oid, "office_cc_statements", {"org_id": oid, "card_id": cid, "month": mo, "day": day, "total": dstr(total), "currency": _home(c, oid), "node_id": nid,
+    total = r["total"]  # none printed that the reader finds: the person types it, the sum check never compares the positions with themselves
+    row = oc_enc_fields(c, oid, "office_cc_statements", {"org_id": oid, "card_id": cid, "month": mo, "day": day, "total": dstr(total) if total is not None else "", "currency": _home(c, oid), "node_id": nid,
                                                          "reader": card["provider"] if r["lines"] else "manual", "state": "draft", "created_by": uid, "created_at": iso(now_utc())})
     sid = insert_id(c, f"INSERT INTO office_cc_statements({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for n, x in enumerate(r["lines"]):
@@ -310,7 +310,7 @@ def cc_upload(cid):
     bump(c)
     c.commit()
     docs_kick()
-    return jsonify(statement=_stmt_public(c, oid, cc_stmt_row(c, oid, sid)), read=bool(r["lines"]), digits_differ=bool(r["last4"] and r["last4"] != card["last4"])), 201
+    return jsonify(statement=_stmt_public(c, oid, cc_stmt_row(c, oid, sid)), read=bool(r["lines"]), total_found=total is not None, digits_differ=bool(r["last4"] and r["last4"] != card["last4"])), 201
 
 
 @app.get("/api/office/cards/statements/<int:sid>")
@@ -334,9 +334,9 @@ def cc_stmt_file(sid):
     return Response(fs_read(c, s["node_id"]), mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="statement-{s["month"]}.pdf"', "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
-def cc_writable(c, oid, s):
-    """A write on statement s: not in a locked month."""
-    period_need_open(c, oid, s["day"])
+def cc_writable(c, oid, s, *days):
+    """A write on statement s (and positions of days): not in a locked month; the exports go by the position's day."""
+    period_need_open(c, oid, s["day"], *days)
 
 
 def _money(v, what):
@@ -350,6 +350,7 @@ def _money(v, what):
 def cc_stmt_patch(sid):
     """{day?, total?}: the head of a draft (the printed total, for the check of the sum)."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     s = cc_stmt(c, oid, sid, uid, every)
     cc_writable(c, oid, s)
     if s["state"] != "draft":
@@ -386,6 +387,7 @@ def cc_confirm(sid):
     """{accept_diff?}: the person confirms the positions; from now on they count. 409 when they do not add up to the printed
     total, unless accept_diff (the person has seen the difference)."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     s = cc_stmt(c, oid, sid, uid, every)
     cc_writable(c, oid, s)
     if s["state"] != "draft":
@@ -394,6 +396,9 @@ def cc_confirm(sid):
     lines = cc_lines(c, oid, sid)
     if not lines:
         raise Denied(409, tr("Enter the positions first"))
+    if not s["total"]:
+        raise Denied(409, tr("Enter the total of the statement first"))
+    cc_writable(c, oid, s, *(x["day"] for x in lines))
     if cc_sum(lines) != money(dec(s["total"], "0")) and not (isinstance(b, dict) and b.get("accept_diff") is True):
         raise Denied(409, tr("The positions do not add up to the total of the statement"))
     c.execute("UPDATE office_cc_statements SET state='confirmed', confirmed_by=?, confirmed_at=? WHERE id=? AND org_id=?", (uid, iso(now_utc()), sid, oid))
@@ -415,6 +420,7 @@ def _untouched(c, oid, sid):
 def cc_reopen(sid):
     """Takes the confirmation back (the undo of confirm) while nothing hangs on the statement."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     s = cc_stmt(c, oid, sid, uid, every)
     cc_writable(c, oid, s)
     _untouched(c, oid, sid)
@@ -428,6 +434,7 @@ def cc_reopen(sid):
 def cc_stmt_del(sid):
     """Takes a statement back while nothing hangs on it (POST .../restore brings it back); its document stays."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     s = cc_stmt(c, oid, sid, uid, every)
     cc_writable(c, oid, s)
     _untouched(c, oid, sid)
@@ -445,6 +452,7 @@ def cc_stmt_restore(sid):
     if r is None:
         raise Denied(404)
     cc_card(c, oid, r["card_id"], uid, every)
+    period_need_open(c, oid, r["day"])
     write_lock(c, f"office_cc_{oid}")
     if c.execute("SELECT 1 FROM office_cc_statements WHERE org_id=? AND card_id=? AND month=? AND deleted_at IS NULL LIMIT 1", (oid, r["card_id"], r["month"])).fetchone():
         raise Denied(409, tr("This card already has a statement for this month"))
@@ -497,7 +505,8 @@ def cc_bank_candidates(sid):
     """{items: [{id, day, amount, counterpart, purpose, fits}]}: the open bookings out of the business account that can be this
     statement's total, the fitting amount first. The match itself: POST /api/office/bank/tx/<id>/match {kind: card, id}."""
     from .bank import BNK_LIST_MAX
-    c, _uid, oid = office_ctx_admin()
+    c, uid, oid = office_ctx_admin()
+    ofr_need_area(c, uid, oid, "bank", "view")  # bank bookings: the bank's right, not only the cards'
     s = cc_stmt_row(c, oid, sid)
     tot = money(dec(s["total"], "0"))
     out = []

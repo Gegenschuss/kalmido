@@ -15239,5 +15239,7 @@
   "Total of the statement": "Totaal van het overzicht",
   "Upload statement": "Overzicht uploaden",
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Upload de bonnen van deze kaartposten of markeer ze als niet nodig. De taak rondt zichzelf af zodra elke post zijn bon heeft.",
-  "Waiting for confirmation": "Wacht op bevestiging"
+  "Waiting for confirmation": "Wacht op bevestiging",
+  "Enter the total of the statement first": "Voer eerst het totaal van het overzicht in",
+  "Statement read, but its total was not found: please enter it": "Overzicht gelezen, maar totaal niet gevonden: voer het in"
 }

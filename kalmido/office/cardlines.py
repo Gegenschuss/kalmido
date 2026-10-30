@@ -97,7 +97,7 @@ def cl_found(c, uid, x, docs, q=""):
     for sc, d, why in hits:
         if _seen(c, d["node_id"], uid):
             out.append({"id": d["node_id"], "label": d["sender"] or d["title"], "title": d["title"], "amount": dstr(d["amount"]) if d["amount"] is not None else None,
-                        "date": d["date"], "reason": ", ".join(why), "score": sc})
+                        "date": d["date"], "reason": ", ".join(why), "score": sc, "amount_fits": sc >= 5 and bool(why) and why[0] in (tr("same amount"), tr("same original amount"))})
             if len(out) >= CL_SHOW:
                 break
     return out
@@ -122,7 +122,7 @@ def cl_view(c, oid, uid, s, lines):
         p = _public(c, x, gone)
         if x["state"] == "open" and docs:
             best = cl_found(c, uid, x, docs)
-            p["suggestion"] = best[0] if best and best[0]["score"] >= 5 else None
+            p["suggestion"] = next((d for d in best if d["amount_fits"]), None)  # a name alone is a search hit, no suggestion
         out.append(p)
     return out
 
@@ -177,6 +177,7 @@ def _draft(s):
 def cl_add(sid):
     """{day, merchant, amount, orig_amount?, orig_currency?, kind?}: a position typed in (a draft only) -> 201."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     s = cc_stmt(c, oid, sid, uid, every)
     cc_writable(c, oid, s)
     _draft(s)
@@ -184,6 +185,7 @@ def cl_add(sid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     v = _fields(b)
+    cc_writable(c, oid, s, v["day"])
     n = c.execute("SELECT COALESCE(MAX(sort), -1)+1 AS n FROM office_cc_lines WHERE org_id=? AND statement_id=?", (oid, sid)).fetchone()["n"]
     lid = _line_insert(c, oid, sid, n, v)
     bump(c)
@@ -196,8 +198,9 @@ def cl_patch(lid):
     """{state: open|noreceipt|private} marks a position of a confirmed statement (not a matched one); the fields of POST
     change a position of a draft."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
-    cc_writable(c, oid, s)
+    cc_writable(c, oid, s, x["day"])
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
@@ -211,6 +214,7 @@ def cl_patch(lid):
     if keys:
         _draft(s)
         v = _fields(b, {k: x[k] for k in ("day", "merchant", "amount", "orig_amount", "orig_currency", "kind")})
+        cc_writable(c, oid, s, v["day"])
         row = oc_enc_fields(c, oid, "office_cc_lines", {"merchant": v["merchant"], "amount": dstr(v["amount"]), "orig_amount": dstr(v["orig_amount"]) if v["orig_amount"] is not None else ""})
         c.execute("UPDATE office_cc_lines SET day=?, merchant=?, amount=?, orig_amount=?, orig_currency=?, kind=?, state=? WHERE id=? AND org_id=?",
                   (v["day"], row["merchant"], row["amount"], row["orig_amount"], v["orig_currency"], v["kind"], "noreceipt" if v["kind"] == "fee" else "open", lid, oid))
@@ -223,8 +227,9 @@ def cl_patch(lid):
 def cl_del(lid):
     """A position of a draft goes (the reader's mistake); the answer carries it for the undo (POST .../lines)."""
     c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
-    cc_writable(c, oid, s)
+    cc_writable(c, oid, s, x["day"])
     _draft(s)
     c.execute("DELETE FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid))
     bump(c)
@@ -278,7 +283,7 @@ def cl_match(lid):
         raise BadInput(tr("Invalid value: {0}", "node_id"))
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
-    cc_writable(c, oid, s)
+    cc_writable(c, oid, s, x["day"])
     differs = _match(c, oid, uid, x, s, nid)
     bump(c)
     c.commit()
@@ -293,7 +298,7 @@ def cl_unmatch(lid):
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
-    cc_writable(c, oid, s)
+    cc_writable(c, oid, s, x["day"])
     if x["state"] != "matched":
         raise Denied(409, tr("This position has no receipt"))
     try:
@@ -317,7 +322,7 @@ def cl_upload(lid):
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
-    cc_writable(c, oid, s)
+    cc_writable(c, oid, s, x["day"])
     if s["state"] != "confirmed":
         raise Denied(409, tr(CC_DRAFT_ONLY))
     f = request.files.get("file")

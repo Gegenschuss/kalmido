@@ -15239,5 +15239,7 @@
   "Total of the statement": "Total du relevé",
   "Upload statement": "Téléverser le relevé",
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Téléversez les justificatifs de ces positions de carte ou indiquez qu’ils ne sont pas nécessaires. La tâche se termine d’elle-même lorsque chaque position a son justificatif.",
-  "Waiting for confirmation": "En attente de confirmation"
+  "Waiting for confirmation": "En attente de confirmation",
+  "Enter the total of the statement first": "Saisissez d’abord le total du relevé",
+  "Statement read, but its total was not found: please enter it": "Relevé lu, mais total introuvable : saisissez-le"
 }

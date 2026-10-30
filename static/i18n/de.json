@@ -15239,5 +15239,7 @@
   "Total of the statement": "Summe der Abrechnung",
   "Upload statement": "Abrechnung hochladen",
   "Upload the receipts of these card positions or mark them as not needing a receipt. The task is done by itself once every position has its receipt.": "Lade die Belege dieser Kartenpositionen hoch oder markiere sie als „Kein Beleg nötig“. Die Aufgabe erledigt sich von selbst, sobald jede Position ihren Beleg hat.",
-  "Waiting for confirmation": "Wartet auf Bestätigung"
+  "Waiting for confirmation": "Wartet auf Bestätigung",
+  "Enter the total of the statement first": "Bitte zuerst die Summe der Abrechnung eingeben",
+  "Statement read, but its total was not found: please enter it": "Abrechnung gelesen, aber die Summe nicht gefunden: bitte eingeben"
 }

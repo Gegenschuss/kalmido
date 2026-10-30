@@ -52,7 +52,7 @@ function ccSheetHtml() {
   if (!CC.sheet) { setTimeout(ccSheet, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const s = CC.sheet.statement, ls = CC.sheet.lines || [], draft = s.state === 'draft', lock = s.locked;
   const diff = +s.diff !== 0, priv = +s.private !== 0;
-  const facts = `<dl class="ccfacts"><div><dt>${tr('Total of the statement')}</dt><dd>${ofcMoney(s.total)}${draft && !lock ? ` <button class="btn sm ghost" data-cc="total">${tr('Edit')}</button>` : ''}</dd></div>
+  const facts = `<dl class="ccfacts"><div><dt>${tr('Total of the statement')}</dt><dd>${s.total_missing ? esc(tr('Not found')) : ofcMoney(s.total)}${draft && !lock ? ` <button class="btn sm ghost" data-cc="total">${tr('Edit')}</button>` : ''}</dd></div>
     <div><dt>${tr('Sum of the positions')}</dt><dd class="${diff ? 'ccdiff' : ''}">${ofcMoney(s.sum)}</dd></div>
     ${priv ? `<div><dt>${tr('Holder pays back')}</dt><dd>${ofcMoney(s.private)}</dd></div>` : ''}
     ${s.bank ? `<div><dt>${tr('Bank booking')}</dt><dd>${esc(fmtDateLoc(s.bank.day))}</dd></div>` : ''}</dl>`;
@@ -138,7 +138,7 @@ async function ccUpload(cid, file) {
   let j; try { j = await api('POST', `/api/office/cards/${cid}/statements`, fd); } catch (x) { return; }
   CC.sid = j.statement.id; ccStale();
   if (j.digits_differ) toast(tr('The statement names other digits than this card'));
-  else toast(j.read ? tr('Statement read: please check the positions') : tr('This statement could not be read. Enter its positions by hand.'));
+  else toast(j.read ? (j.total_found ? tr('Statement read: please check the positions') : tr('Statement read, but its total was not found: please enter it')) : tr('This statement could not be read. Enter its positions by hand.'));
 }
 async function ccRcUpload(lid, file) {
   const fd = new FormData(); fd.append('file', file, file.name || 'receipt.pdf');
@@ -152,6 +152,7 @@ async function ccRcUpload(lid, file) {
 async function ccConfirm(sid) {
   const s = CC.sheet.statement;
   let accept = false;
+  if (s.total_missing) { toast(tr('Enter the total of the statement first')); return; }
   if (+s.diff !== 0) {
     if (!await askConfirm(tr('The positions do not add up to the total of the statement'), tr('Difference: {0}', ofcMoney(s.diff)), {ok: tr('Confirm positions')})) return;
     accept = true;

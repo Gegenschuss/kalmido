@@ -218,8 +218,9 @@ def cc_bk_rows(c, oid, frm, to, uid=None):
         if home is None:
             from .homecur import hc_home
             home = hc_home(office_settings(c, oid))
+        # a position with its receipt: the receipt's own row carries the amount, this one only the link (the rows of a type add up)
         rows.append({"type": "card", "date": x["day"], "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": x["merchant"] or "", "text": labels.get(x["state"], ""),
-                     "category": "", "tax_pct": "", "net": "", "tax": "", "gross": -x["amount"], "currency": home, "file": "", "_node": see(x["node_id"])})
+                     "category": "", "tax_pct": "", "net": "", "tax": "", "gross": "" if x["state"] == "matched" else -x["amount"], "currency": home, "file": "", "_node": see(x["node_id"])})
         if x["statement_id"] not in seen:
             seen.add(x["statement_id"])
             rows.append({"type": "card", "date": f"{x['s_month']}-01", "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": "", "text": tr("Credit card statement"),

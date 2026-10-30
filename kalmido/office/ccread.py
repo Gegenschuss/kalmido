@@ -12,6 +12,7 @@ the direction that fits the printed total (no total: the larger side). Balances,
 statement are no positions. Fees, interest and the foreign fee are kind "fee"; money back is kind "credit"."""
 import io
 import re
+from datetime import date
 from decimal import Decimal
 
 from .calc import dec, money
@@ -31,9 +32,19 @@ FEE_RE = re.compile(r"auslandseinsatz|auslandsentgelt|fremdw(?:ä|ae)hrung\w*\s*
                     r"karten(?:preis|entgelt|geb)|sollzins|\bzinsen\b|bargeld\w*\s*(?:entgelt|geb)|bargeld(?:entgelt|geb)|\bentgelt\b|geb(?:ü|ue)hr", re.I)
 TOTAL_RE = re.compile(rf"(?:neuer saldo|neuer kontostand|rechnungsbetrag|abrechnungsbetrag|gesamtbetrag|einzugsbetrag|lastschriftbetrag|"
                       rf"zu zahlender betrag|wird .{{0,40}}eingezogen|wird .{{0,40}}belastet)\D{{0,40}}(?P<amt>{_NUM})", re.I)
+# the amount in front: "wird am 15.11. mit 1.234,56 EUR eingezogen"
+TOTAL2_RE = re.compile(rf"(?P<amt>{_NUM})\s*(?:EUR|€)?\s+(?:\S+\s+){{0,6}}(?:eingezogen|belastet)\b", re.I)
 HEAD_DAY_RE = re.compile(r"(?:abrechnungsdatum|abrechnung vom|abrechnung per|rechnungsdatum|datum der abrechnung|kartenabrechnung vom|abrechnung)\D{0,20}(\d{2}\.\d{2}\.\d{4})", re.I)
 LAST4_RE = re.compile(r"(?:\d{4}|[xX*•]{4})[ -]?(?:\d{2}[xX*•]{2}|[xX*•]{4})[ -]?[xX*•]{4}[ -]?(\d{4})\b")
 LAST4_WORD_RE = re.compile(r"karten-?\s?(?:nummer|nr\.?)\D{0,30}(\d{4})\b", re.I)
+
+
+def _real(y, m, d):
+    """'YYYY-MM-DD' of a day that exists, else None (31.02. is no day)."""
+    try:
+        return date(int(y), int(m), int(d)).isoformat()
+    except ValueError:
+        return None
 
 
 def _num(v):
@@ -43,7 +54,7 @@ def _num(v):
 def _iso(v):
     """'31.10.2026' -> '2026-10-31' (None when it is no day)."""
     d, m, y = v.split(".")
-    return f"{y}-{m}-{d}" if len(y) == 4 and 1 <= int(d) <= 31 and 1 <= int(m) <= 12 else None
+    return _real(y, m, d) if len(y) == 4 else None
 
 
 def _day(v, head):
@@ -52,16 +63,13 @@ def _day(v, head):
     if not v:
         return None
     d, m, y = v.split(".")
-    if not (1 <= int(d) <= 31 and 1 <= int(m) <= 12):
-        return None
     if len(y) == 4:
-        return f"{y}-{m}-{d}"
+        return _real(y, m, d)
     if len(y) == 2:
-        return f"20{y}-{m}-{d}"
-    if not head:
+        return _real(f"20{y}", m, d)
+    if not head or not 1 <= int(m) <= 12:
         return None
-    yr = int(head[:4]) - (1 if m > head[5:7] else 0)
-    return f"{yr:04d}-{m}-{d}"
+    return _real(int(head[:4]) - (1 if m > head[5:7] else 0), m, d)
 
 
 def _signed(m):
@@ -95,7 +103,7 @@ def ccr_mastercard(text):
     for x in rows:
         if not x:
             continue
-        m = TOTAL_RE.search(x)
+        m = TOTAL_RE.search(x) or TOTAL2_RE.search(x)
         if m:
             total = _num(m["amt"])  # the last one printed is the end of the statement
         if last4 is None:

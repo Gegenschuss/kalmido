@@ -178,6 +178,7 @@ OTHER = doc(A, "anderes.pdf", "99.00", f"{Y}-06-01")
 c = A.get(B + f"{K}/lines/{L[0]['id']}/candidates").json()["items"]
 check(c and c[0]["id"] == CAFE, f"found over all documents, also unsorted {c}")
 check(all(x["id"] != OTHER for x in c), "what does not fit is not offered")
+check(sheet(A, SID)["lines"][3].get("suggestion") is None, "a name alone suggests nothing (2.444.0 review)")
 c = A.get(B + f"{K}/lines/{L[1]['id']}/candidates").json()["items"]
 check(c and c[0]["id"] == CLOUD, f"found by the original amount {c}")
 check(A.get(B + f"{K}/lines/{L[0]['id']}/candidates?q=anderes").json()["items"][0]["id"] == OTHER, "the search finds the rest")
@@ -296,6 +297,36 @@ check(r.ok, "the card account can be set")
 check("1732" in A.get(B + O + f"/datev/extf?from={Y}-01-01&to={Y}-03-31").text, "and is used")
 check(A.put(B + O + "/settings", json={"datev_extf": {"card": "abc"}}).status_code == 400, "digits only")
 
+# ---- 2.444.0 review: a total not found is typed, the sum never checks the positions against themselves
+r = up(A, CARD, pdf([f"Abrechnung vom 15.06.{Y}", "02.06. 02.06. Laden Ohne Summe 7,00-"]))
+check(r.status_code == 201 and r.json()["read"] is True and r.json()["total_found"] is False and r.json()["statement"]["total_missing"] is True, f"no total printed {r.text[:300]}")
+NT = r.json()["statement"]["id"]
+check(A.post(B + f"{K}/statements/{NT}/confirm", json={"accept_diff": True}).status_code == 409, "without a total no confirmation, also with accept_diff")
+assert A.patch(B + f"{K}/statements/{NT}", json={"total": "7.00"}).ok
+check(A.post(B + f"{K}/statements/{NT}/confirm", json={}).ok, "the typed total counts")
+r = up(A, CARD, pdf([f"Abrechnung vom 15.07.{Y}", "02.07. 02.07. Laden Beispiel 3,00-", "31.02. 31.02. Kein Tag 1,00-", f"Der Betrag wird am 20.07. mit 3,00 EUR eingezogen"]))
+check(r.ok and r.json()["statement"]["total"] == "3.00" and r.json()["statement"]["lines"] == 1, f"the amount in front of eingezogen; 31.02. is no day {r.text[:300]}")
+# ---- 2.444.0 review: matched positions count once in the neutral export
+gross = [x[9] for x in list(csv.reader(io.StringIO(A.get(B + O + f"/books/export?from={Y}-01-01&to={Y}-02-28").text.lstrip("\ufeff")), delimiter=";")) if x and "Credit card" in x[0] and "Handeintrag" in x[3]]
+check(gross == [""], f"a position with its receipt: the receipt's row carries the amount {gross}")
+# ---- 2.444.0 review: the bank's right for the bank bookings
+assert A.put(B + O + f"/rights/people/{BOB}", json={"groups": ["tpl:staff"]}).ok
+check(Bo.get(B + K).ok, "level own: the holder's list")
+check(Bo.get(B + f"{K}/statements/{SID}/bank").status_code == 403, "level own: no bank")
+check(Bo.get(B + K + "/reminder").status_code == 403, "level own: no reminder settings")
+assert A.put(B + O + f"/rights/people/{BOB}", json={"groups": ["tpl:legacy"]}).ok
+# ---- 2.444.0 review: a locked month goes by the position's day, not only the statement's
+S5 = up(A, CARD, pdf([f"Abrechnung vom 15.08.{Y}", "10.01. 10.01. Altes Datum Beispiel 4,00-", "Neuer Saldo 4,00-"])).json()["statement"]["id"]
+S6 = up(A, CARD, pdf([f"Abrechnung vom 15.09.{Y}", "02.09. 02.09. Neu Beispiel 2,00-", "Neuer Saldo 2,00-"])).json()["statement"]["id"]
+assert A.post(B + f"{K}/statements/{S5}/confirm", json={}).ok
+L5 = sheet(A, S5)["lines"][0]["id"]
+assert A.delete(B + f"{K}/statements/{S6}").ok
+r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-02"})
+assert r.ok, r.text
+check(A.patch(B + f"{K}/lines/{L5}", json={"state": "private"}).status_code == 409, "a position of a locked month stays, also on a statement of an open one")
+r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-09"})
+assert r.ok, r.text
+check(A.post(B + f"{K}/statements/{S6}/restore").status_code == 409, "a statement does not come back into a locked month")
 # ---- a card out of the list, the undo
 check(A.delete(B + f"{K}/{CARD2}").ok and all(k["id"] != CARD2 for k in A.get(B + K).json()["items"]), "a card leaves the list")
 check(A.post(B + f"{K}/{CARD2}/restore").ok, "and comes back")

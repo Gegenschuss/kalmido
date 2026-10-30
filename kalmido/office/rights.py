@@ -90,7 +90,7 @@ MANAGE_ROUTES = frozenset({
     "/api/office/cards/reminder",  # 2.444.0 (#3447)
 })
 # routes whose reading needs "manage" too: the whole office log (every area's before / after) and the master data export
-MANAGE_READ = frozenset({"/api/office/log", "/api/office/export"})
+MANAGE_READ = frozenset({"/api/office/log", "/api/office/export", "/api/office/cards/reminder"})
 # "METHOD rule" -> the special a group needs for it (on top of the area's level). 2.187.0 B (#2476)
 SPECIAL_ROUTES = {
     # release: finalise, take back, send (mail, e-invoice network, the DATEV inbox counts as export), make a series' invoice now
