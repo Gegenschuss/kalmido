@@ -298,7 +298,7 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 .subadd input{flex:1;background:transparent;border:0;padding:.1875rem 0}
 .tagedit{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .tagpill{display:inline-flex;align-items:center;gap:.25rem;padding:1px .25rem 1px .4375rem;border-radius:var(--r-s);border:1px solid var(--line2);color:var(--text2);font:var(--fs-s) var(--mono)}
-.tagpill button{color:inherit;opacity:.7;display:inline-flex}
+.tagpill button{color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;min-height:1.5rem;margin:-.25rem 0}
 .tagedit input{background:transparent;border:0;padding:.25rem 2px;width:7.5rem;font-family:var(--mono);font-size:var(--fs-s)}
 .dfoot{display:flex;align-items:center;gap:.25rem;padding:.5rem .75rem;border-top:1px solid var(--line);color:var(--muted);font:var(--fs-xs) var(--mono);position:sticky;bottom:0;background:var(--bg2)}
 .fields{display:grid;grid-template-columns:auto 1fr;gap:.5rem .875rem;align-items:center;font-size:var(--fs-m)}
@@ -3865,7 +3865,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 }
 /* 2.427.0 B (#3551): the field strip above the rows wherever .lchead is hidden (phones < 600 px, narrow list containers on wider
    screens; tablets 600-767 px keep the column titles): names swipe sideways, 44 px targets, "Fields" stays at the right end */
-.lcbar{display:none;align-items:center;margin-bottom:2px;border-bottom:1px solid var(--line);font:500 var(--fs-xs)/1.2 var(--mono);color:var(--muted)}
+.lcbar{display:none;align-items:center;margin-bottom:2px;border-bottom:1px solid var(--line);font:500 var(--fs-xs)/var(--lh-tight) var(--mono);color:var(--muted)}
 @media (max-width:599px){ .lcbar{display:flex} }
 @media (min-width:768px){ @container lrows (max-width:48rem){ .lcbar{display:flex} } }
 .lcbar .lcbs{display:flex;flex:1;min-width:0;gap:.125rem;padding-left:.25rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
@@ -7260,7 +7260,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .nwl-imp-sum { margin: .375rem 0; }
 .nwl-imp-err { list-style: none; margin: .25rem 0; padding: 0; max-height: 10rem; overflow: auto; font-size: var(--fs-b); }
 .nwl-imp-err li { padding: .125rem 0; }
-.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .45rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
+.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .4375rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .375rem; }
 .nwl-segs li { display: flex; align-items: center; gap: .375rem; padding: .5rem .625rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }
 .nwl-sn { flex: 1; min-width: 0; }
