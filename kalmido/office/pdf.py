@@ -2156,7 +2156,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # 2.438.0 B (#3622): where each part of the overview landed (the page of its first block)
     ov_at.update({key: line_at[key] for *_, key in ov_rows or []})
     if ov_rows or pp_on:
-        ov_at["start"] = ov_after if ov_rows else ov_at[pp_on[0]]
+        ov_at["start"] = ov_after if ov_rows else min(ov_at[k] for k in pp_on)  # the first part printed, not the first row of the title page
     for key, i_ in ov_at.items():
         blocks[i_]["draw"] = lambda p, y, fn=blocks[i_]["draw"], key=key: (ov_pg.setdefault(key, (p, y)), fn(p, y))[1]
 

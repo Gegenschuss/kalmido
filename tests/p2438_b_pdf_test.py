@@ -204,6 +204,11 @@ check(not texts(p4, "ÜBERSICHT") and [t["s"] for _, t in tags(p4)] == [f"SEITE 
 check([x[3] for x in l4[0]] == [starts["Dreh"], starts["Schnitt"]], f"printed parts: the links go to the parts' pages {l4[0]}")
 check(texts(p4, f"Die Einzelpositionen je Teil stehen ab Seite {starts['Dreh']}.") == [1], "printed parts: the hint on the title page")
 check(pdfcheck.problems(d4) == [], f"printed parts: clean layout {pdfcheck.problems(d4)[:3]}")
+# review: the title page may name the parts in another order than they are printed: the hint names the first part printed
+pr = dict(pt, lines=list(reversed(pt["lines"][:2])) + pt["lines"][2:])
+pr5 = pdfcheck.layout(pdf.office_pdf(pr))
+first5 = min(n for t in ("Dreh", "Schnitt") for n in texts(pr5, t) if n > 1)
+check(texts(pr5, f"Die Einzelpositionen je Teil stehen ab Seite {first5}.") == [1], "printed parts: the hint names the first part printed, not the first row")
 
 
 # ---------------------------------------------------------------- through the API
