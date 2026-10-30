@@ -1609,7 +1609,7 @@ def main():
     marked = {}
     for name, t in tests.items():
         for line in re.findall(r"freelancer-matrix:([\w ,-]+)", t):
-            for k in line.split(","):
+            for k in re.sub(r"\S+-matrix\s*$", "", line).split(","):  # 2.421.0 (#2936): "... own  tenant-matrix: org" names the area own
                 if k.strip():
                     marked.setdefault(k.strip(), set()).add(name)
     for r, k in sorted(ROUTES.items()):
