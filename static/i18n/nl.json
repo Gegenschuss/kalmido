@@ -15133,5 +15133,11 @@
   "Menu order changed": "Menuvolgorde gewijzigd",
   "Menu points in this organisation": "Menupunten in deze organisatie",
   "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Uitgeschakeld staat een punt in deze organisatie bij niemand in het menu, ook niet onder Verborgen; de rest ordent elk lid zelf.",
-  "Set on its computer": "Vastgelegd op de computer"
+  "Set on its computer": "Vastgelegd op de computer",
+  "Replaced by": "Vervangen door",
+  "Replaces": "Vervangt",
+  "Superseded": "Vervangen",
+  "Mark the old quotation as superseded?": "Oude offerte als vervangen markeren?",
+  "Yes, {0} no longer counts": "Ja, {0} telt niet meer",
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig."
 }

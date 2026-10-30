@@ -15133,5 +15133,11 @@
   "Menu order changed": "Reihenfolge im Menü geändert",
   "Menu points in this organisation": "Menüpunkte in dieser Organisation",
   "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Abgeschaltet steht ein Punkt in dieser Organisation bei niemandem im Menü, auch nicht unter Ausgeblendet; die übrigen ordnet jedes Mitglied selbst.",
-  "Set on its computer": "Vom Rechner festgelegt"
+  "Set on its computer": "Vom Rechner festgelegt",
+  "Replaced by": "Ersetzt durch",
+  "Replaces": "Ersetzt",
+  "Superseded": "Ersetzt",
+  "Mark the old quotation as superseded?": "Altes Angebot als ersetzt markieren?",
+  "Yes, {0} no longer counts": "Ja, {0} zählt nicht mehr",
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig."
 }

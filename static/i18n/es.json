@@ -15133,5 +15133,11 @@
   "Menu order changed": "Orden del menú cambiado",
   "Menu points in this organisation": "Puntos de menú en esta organización",
   "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Desactivado, un punto no aparece en el menú de ningún miembro de esta organización, ni siquiera en Ocultos; cada miembro ordena los demás.",
-  "Set on its computer": "Fijado en su ordenador"
+  "Set on its computer": "Fijado en su ordenador",
+  "Replaced by": "Sustituido por",
+  "Replaces": "Sustituye a",
+  "Superseded": "Sustituido",
+  "Mark the old quotation as superseded?": "¿Marcar el presupuesto anterior como sustituido?",
+  "Yes, {0} no longer counts": "Sí, {0} ya no cuenta",
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes."
 }

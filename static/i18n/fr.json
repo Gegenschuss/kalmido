@@ -15133,5 +15133,11 @@
   "Menu order changed": "Ordre du menu modifié",
   "Menu points in this organisation": "Entrées de menu dans cette organisation",
   "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Désactivée, une entrée n'apparaît dans le menu d'aucun membre de cette organisation, même pas sous Masqués ; chaque membre organise les autres.",
-  "Set on its computer": "Défini sur son ordinateur"
+  "Set on its computer": "Défini sur son ordinateur",
+  "Replaced by": "Remplacé par",
+  "Replaces": "Remplace",
+  "Superseded": "Remplacé",
+  "Mark the old quotation as superseded?": "Marquer l'ancien devis comme remplacé ?",
+  "Yes, {0} no longer counts": "Oui, {0} ne compte plus",
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Pour un avenant ne contenant que les nouvelles lignes, décochez cette case : les deux devis restent valables."
 }
