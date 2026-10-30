@@ -103,7 +103,7 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = false;
   ofcDraw();
 }
-function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
+function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); ost_markBack(); }
 // 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
 // is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
 // A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
@@ -124,6 +124,7 @@ function ofcPaint(el, force) {
   const ob = $('.ofbody', el); if (same && ob && btop && ob.scrollTop !== btop) ob.scrollTop = btop;  // 2.144.1 A (#2445): touch tablets scroll the page in .ofbody
   const r = OFCP.replay; OFCP.replay = null;
   if (r && same) { const b = el.querySelector(r); if (b) setTimeout(() => b.click(), 0); }
+  ost_markBack();
 }
 document.addEventListener('click', e => {
   const v = $('#view'); if (!OFCP.stale || !v || !v.contains(e.target) || !v.querySelector('.dash.office')) return;
@@ -931,6 +932,13 @@ function ost_mark(el, st, x) {
   m.innerHTML = st === 'err' ? `${ic('alert', 's')}<span>${esc(x)}</span>` : `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>${x ? `<button type="button" class="linkbtn" data-ost-undo>${esc(tr('Undo'))}</button>` : ''}`;
   m._e = st === 'ok' ? x : null; m.classList.add('on');
   clearTimeout(m._t); if (st === 'ok') m._t = setTimeout(() => { m.classList.remove('on'); m._e = null; }, 4000);
+  OST.mk = st === 'ok' && el.id ? {m, id: el.id} : null;
+}
+// 2.440.0 (#3782): a redraw after the save (a part that finished loading) took "Saved" away: the mark goes back to its field
+function ost_markBack() {
+  const k = OST.mk; if (!k || k.m.isConnected || !k.m.classList.contains('on')) return;
+  const row = $('#ofc-set #' + CSS.escape(k.id))?.closest('.row, .pkc-on');
+  if (row && !row.querySelector(':scope > .ostok')) row.append(k.m);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };

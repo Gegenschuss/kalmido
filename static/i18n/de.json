@@ -15243,8 +15243,10 @@
   "Waiting for confirmation": "Wartet auf Bestätigung",
   "Enter the total of the statement first": "Bitte zuerst die Summe der Abrechnung eingeben",
   "Statement read, but its total was not found: please enter it": "Abrechnung gelesen, aber die Summe nicht gefunden: bitte eingeben",
-  "Menu points": "Menüpunkte",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Ein hier abgeschalteter Punkt verschwindet für alle in diesem Büro. Gelöscht wird nichts: Wieder einschalten bringt alles zurück.",
+  "Hide on Today": "In Heute ausblenden",
+  "Show on Today": "In Heute einblenden",
+  "“{0}” is hidden on Today": "„{0}“ ist in Heute ausgeblendet",
+  "“{0}” is shown on Today": "„{0}“ wird in Heute angezeigt",
   "Set on its computer": "Vom Rechner festgelegt",
   "Replaced by": "Ersetzt durch",
   "Replaces": "Ersetzt",
@@ -15253,8 +15255,6 @@
   "Yes, {0} no longer counts": "Ja, {0} zählt nicht mehr",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig.",
   "This quotation was superseded": "Dieses Angebot wurde ersetzt",
-  "Hide on Today": "In Heute ausblenden",
-  "Show on Today": "In Heute einblenden",
-  "“{0}” is hidden on Today": "„{0}“ ist in Heute ausgeblendet",
-  "“{0}” is shown on Today": "„{0}“ wird in Heute angezeigt"
+  "Menu points": "Menüpunkte",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Ein hier abgeschalteter Punkt verschwindet für alle in diesem Büro. Gelöscht wird nichts: Wieder einschalten bringt alles zurück."
 }

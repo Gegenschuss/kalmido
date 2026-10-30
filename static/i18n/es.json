@@ -15243,8 +15243,10 @@
   "Waiting for confirmation": "Pendiente de confirmación",
   "Enter the total of the statement first": "Introduce primero el total del extracto",
   "Statement read, but its total was not found: please enter it": "Extracto leído, pero sin encontrar el total: introdúcelo",
-  "Menu points": "Puntos del menú",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un punto desactivado aquí desaparece para todos en esta oficina. No se borra nada: al activarlo de nuevo vuelve todo.",
+  "Hide on Today": "Ocultar en Hoy",
+  "Show on Today": "Mostrar en Hoy",
+  "“{0}” is hidden on Today": "«{0}» está oculto en Hoy",
+  "“{0}” is shown on Today": "«{0}» se muestra en Hoy",
   "Set on its computer": "Fijado en su ordenador",
   "Replaced by": "Sustituido por",
   "Replaces": "Sustituye a",
@@ -15253,8 +15255,6 @@
   "Yes, {0} no longer counts": "Sí, {0} ya no cuenta",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes.",
   "This quotation was superseded": "Este presupuesto fue reemplazado",
-  "Hide on Today": "Ocultar en Hoy",
-  "Show on Today": "Mostrar en Hoy",
-  "“{0}” is hidden on Today": "«{0}» está oculto en Hoy",
-  "“{0}” is shown on Today": "«{0}» se muestra en Hoy"
+  "Menu points": "Puntos del menú",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un punto desactivado aquí desaparece para todos en esta oficina. No se borra nada: al activarlo de nuevo vuelve todo."
 }

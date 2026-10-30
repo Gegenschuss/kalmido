@@ -15243,8 +15243,10 @@
   "Waiting for confirmation": "En attente de confirmation",
   "Enter the total of the statement first": "Saisissez d’abord le total du relevé",
   "Statement read, but its total was not found: please enter it": "Relevé lu, mais total introuvable : saisissez-le",
-  "Menu points": "Points de menu",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un point désactivé ici disparaît pour tout le monde dans ce bureau. Rien n'est supprimé : le réactiver ramène tout.",
+  "Hide on Today": "Masquer dans Aujourd'hui",
+  "Show on Today": "Afficher dans Aujourd'hui",
+  "“{0}” is hidden on Today": "« {0} » est masqué dans Aujourd'hui",
+  "“{0}” is shown on Today": "« {0} » est affiché dans Aujourd'hui",
   "Set on its computer": "Défini sur son ordinateur",
   "Replaced by": "Remplacé par",
   "Replaces": "Remplace",
@@ -15253,8 +15255,6 @@
   "Yes, {0} no longer counts": "Oui, {0} ne compte plus",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Pour un avenant ne contenant que les nouvelles lignes, décochez cette case : les deux devis restent valables.",
   "This quotation was superseded": "Ce devis a été remplacé",
-  "Hide on Today": "Masquer dans Aujourd'hui",
-  "Show on Today": "Afficher dans Aujourd'hui",
-  "“{0}” is hidden on Today": "« {0} » est masqué dans Aujourd'hui",
-  "“{0}” is shown on Today": "« {0} » est affiché dans Aujourd'hui"
+  "Menu points": "Points de menu",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un point désactivé ici disparaît pour tout le monde dans ce bureau. Rien n'est supprimé : le réactiver ramène tout."
 }
