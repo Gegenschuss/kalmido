@@ -321,10 +321,10 @@ S6 = up(A, CARD, pdf([f"Abrechnung vom 15.09.{Y}", "02.09. 02.09. Neu Beispiel 2
 assert A.post(B + f"{K}/statements/{S5}/confirm", json={}).ok
 L5 = sheet(A, S5)["lines"][0]["id"]
 assert A.delete(B + f"{K}/statements/{S6}").ok
-r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-02"})
+r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-02", "confirm": f"02/{Y}"})
 assert r.ok, r.text
 check(A.patch(B + f"{K}/lines/{L5}", json={"state": "private"}).status_code == 409, "a position of a locked month stays, also on a statement of an open one")
-r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-09"})
+r = A.post(B + O + "/periods/lock", json={"through": f"{Y}-09", "confirm": f"09/{Y}"})
 assert r.ok, r.text
 check(A.post(B + f"{K}/statements/{S6}/restore").status_code == 409, "a statement does not come back into a locked month")
 # ---- a card out of the list, the undo
