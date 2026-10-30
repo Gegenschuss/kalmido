@@ -67,15 +67,18 @@ const asks = w => { const e = new w.Event('beforeunload', {cancelable: true}); w
   // ================= 2.440.0 (#3654): a failed save: the text is only in the form, closing / reloading asks
   w.eval(`listModal(${P})`);
   check(await until(() => !!w.document.querySelector('.modal #l-name')), 'the list dialog is open again');
-  const realFetch = w.fetch;
+  // the suite's bridge (boot.js) answers a question at once: "Keep editing" here, so the dialog stays and lfail stays set
+  const realFetch = w.fetch, realConfirm = w.confirm; let asked = '';
+  w.confirm = t => { asked = t; return false; };
   w.fetch = (u, o = {}) => (o.method || '').toUpperCase() === 'PATCH' && new URL(String(u), B).pathname === '/api/lists/' + P
     ? Promise.resolve(new Response('{"error":"nope"}', {status: 400, headers: {'Content-Type': 'application/json'}})) : realFetch(u, o);
   type(w, '.modal #l-name', 'Garden lost');
   // Close saves first and, as the save failed, asks whether to discard: from then on lfail is set and nothing waits or runs
   w.eval("window.__closed = document.querySelector('.modal')._close()");
-  check(await until(() => /Discard changes/.test(w.document.body.textContent)), 'failed save: Close asks whether to discard');
+  check(await until(() => /Discard changes/.test(asked)), 'failed save: Close asks whether to discard');
+  check(!!w.document.querySelector('.modal #l-name'), 'failed save: "Keep editing" keeps the dialog');
   check(asks(w) === true, 'failed save: nothing waits any more, but the text is only in the form: closing the page asks');
-  w.fetch = realFetch;
+  w.fetch = realFetch; w.confirm = realConfirm;
   w.eval("document.querySelectorAll('.modal, .askbg, [role=\"alertdialog\"]').forEach(m => m.remove())");
   check(await until(() => asks(w) === false, {timeout: 5000}), 'failed save: dialog closed, no question');
   await w.eval('load()');
