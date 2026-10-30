@@ -208,7 +208,7 @@ def shs_redeem(c, u):
     """2.360.2 M (#2561): at sign-in the open address rows of the account's e-mail address become its shares. u = a users row.
     A row that does not fit yet (an organisation's table, not a member) stays open for a later sign-in. Returns how many."""
     em = (u["email"] or "").strip().lower()
-    if not em or (u["kind"] or "user") == "agent":
+    if not em or em != u["email_proved"] or (u["kind"] or "user") == "agent":  # review: a typed-in address takes nobody's tables
         return 0
     n = 0
     with system_ctx(c):  # tables of organisations the person may not be in yet; the checks are in _bind

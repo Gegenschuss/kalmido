@@ -770,8 +770,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
   ```
 
-  While it runs the server takes no writes on any process: writes get a 503 and wait in the app's queue, reading and
-  signing in go on (a run that dies frees the server after two minutes; 2.360.2).
+  Around the key switch the server takes no writes on any process, up to about half a minute: writes get a 503 and wait
+  in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
   it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop

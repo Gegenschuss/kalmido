@@ -535,7 +535,7 @@ def start_session(c, uid, remember, via="password"):
                ses_ua() if has_request_context() else ""))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
-    _shs_signin(c, c.execute("SELECT id, email, kind FROM users WHERE id=?", (uid,)).fetchone())
+    _shs_signin(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (uid,)).fetchone())
     from flask import has_request_context
     from ..notify.sev import sev_login
     sev_login(c, uid, client_ip() if has_request_context() else "", via)  # 2.36.2 (#1133): an admin from a new address

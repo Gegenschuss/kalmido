@@ -1265,8 +1265,17 @@ def rot_lock_on(c):
     done = threading.Event()
     done.keep = threading.Thread(target=_rot_lock_keep, args=(done,), daemon=True)
     done.keep.start()
+    try:
+        rot_lock_wait(c)
+    except Exception:
+        rot_lock_off(c, done)  # review: no lock left behind by a failed wait
+        raise
+    return done
+
+
+def rot_lock_wait(c):
     if ROT_SETTLE <= 0:
-        return done
+        return
     time.sleep(oc.ROT_LOCK_TTL + 0.5)
     mark = c.execute("SELECT now()").fetchone()[0]
     c.commit()
@@ -1274,10 +1283,10 @@ def rot_lock_on(c):
     while True:
         n = _rot_older_xacts(c, mark)
         if not n:
-            return done
+            return
         if time.monotonic() >= end:
             print(TAG, "rotate:", n, "older transactions still run; the two empty rounds below catch what they write", flush=True)
-            return done
+            return
         time.sleep(0.5)
 
 
@@ -1304,6 +1313,8 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
     try:
         lock = rot_lock_on(c)  # 2.360.2 L (#2561): before the key switch; no writer holds the earlier key after it
         k1, k2, started = oc.rck_rot_begin(c, oid)
+        rot_lock_off(c, lock)  # review: only the switch needs it: a writer from here on reads the new key row, the run may take hours
+        lock = None
         out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
         empty = 0
         for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)

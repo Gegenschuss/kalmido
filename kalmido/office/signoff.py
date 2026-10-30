@@ -368,9 +368,11 @@ def sig_offer_revoke(sid):
 SIG_GONE_MAX = 200
 
 
-def sig_gone_kept(r):
-    """The last day of the legal period of an organisation's decided record (as orgretain ODL "signoffs"); None: free to delete."""
-    if not r["org_id"] or not (r["signed_at"] or r["state"] == "accepted"):
+def sig_gone_kept(c, r):
+    """The last day of the legal period of a decided record of an organisation or a personal office (as orgretain ODL "signoffs");
+    None: free to delete."""
+    office = r["org_id"] or c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (r["created_by"],)).fetchone()
+    if not office or not (r["signed_at"] or r["state"] == "accepted"):
         return None
     return f"{int((r['signed_at'] or r['created_at'])[:4]) + RET_LEGAL_YEARS['letter']}-12-31"
 
@@ -381,7 +383,7 @@ def sig_gone_out(c, r):
     except OrgCryptError:  # a private record sealed with an owner other than its creator
         d = dict(r)
     d = {k: None if oc_is_enc(d[k]) else d[k] for k in ("signer_name", "signer_email", "signed_at")} | {k: d[k] for k in ("id", "org_id", "title", "state", "created_at")}
-    return {**d, "kept_until": sig_gone_kept(r)}
+    return {**d, "kept_until": sig_gone_kept(c, r)}
 
 
 def sig_gone_rows(c, uid):
@@ -413,7 +415,7 @@ def sig_gone_delete(sid):
     r = next((x for x in sig_gone_rows(c, uid) if x["id"] == sid), None)
     if not r:
         raise Denied(404)
-    kept = sig_gone_kept(r)
+    kept = sig_gone_kept(c, r)
     if kept and kept >= iso(now_utc())[:10]:
         raise Denied(409, tr("This record is kept until {0} by law", kept))
     c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))

@@ -123,6 +123,28 @@ except oc.OrgCryptError:
 c.rollback()
 seen["after"] = gsetting(c, oc.ROT_LOCK_KEY)
 c.commit()
+# review: the lock lasts for the switch only, the long run works without it
+def nolock(*a):
+    seen["during"] = gsetting(c, oc.ROT_LOCK_KEY)
+    c.commit()
+    raise oc.OrgCryptError("boom")
+oc.rck_rot_begin, cl.rot_fields = (lambda c2, oid: (b"", b"", None)), nolock
+try:
+    cl.rotate_org(c, 1)
+except oc.OrgCryptError:
+    c.rollback()
+# review: a failed wait for the writers leaves no lock behind
+cl.ROT_SETTLE, keep = 1.0, cl._rot_older_xacts
+def fail(*a):
+    raise RuntimeError("boom")
+cl._rot_older_xacts, cl.oc.ROT_LOCK_TTL, ttl = fail, 0, cl.oc.ROT_LOCK_TTL
+try:
+    cl.rot_lock_on(c)
+except RuntimeError:
+    c.rollback()
+cl._rot_older_xacts, cl.oc.ROT_LOCK_TTL = keep, ttl
+seen["failed"] = gsetting(c, oc.ROT_LOCK_KEY)
+c.commit()
 # a transaction older than the lock is waited for, within the limit
 c2 = connect()
 c2.execute("SELECT 1 FROM users LIMIT 1").fetchall()
@@ -137,6 +159,8 @@ out = seen
 """)
 check(j.get("held") and j.get("raised"), f"(1) rotate_org holds the lock at the key switch {j}")
 check(j.get("after") == "" and j.get("after2") == "", f"(1) the lock is cleared after an error, too {j}")
+check(j.get("during") == "", f"(1) review: the run after the switch holds no lock {j}")
+check(j.get("failed") == "", f"(1) review: a failed wait clears the lock {j}")
 check(j.get("waited", 0) >= 3.0, f"(1) the wait covers the gate's cache and an older transaction {j}")
 
 # ================================================================== (2) + (3) filed mails

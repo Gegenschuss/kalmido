@@ -291,6 +291,7 @@ def umz_people(c, uid, salt=None):
 
 def umz_extra_queries(uid):
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
+    private = "(SELECT id FROM lists WHERE owner_id=? AND org_id IS NULL)"  # 2.360.2 (#2561): answers sent to an organisation stay there
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     sheets = "org_id IS NULL AND owner_id=?"
     polls = "org_id IS NULL AND user_id=? AND deleted_at IS NULL"
@@ -348,9 +349,9 @@ def umz_extra_queries(uid):
         "poll_options": (f"SELECT * FROM sched_poll_options WHERE poll_id IN (SELECT id FROM sched_polls WHERE {polls}) ORDER BY id", (uid,)),
         "poll_votes": (f"SELECT id, poll_id, name, answers, created_at, updated_at FROM sched_poll_votes WHERE poll_id IN (SELECT id FROM sched_polls WHERE {polls}) ORDER BY id", (uid,)),
         "forms": (f"""SELECT id, list_id, title, intro, access, section_id, ask_email, enabled, count, last_at, questions, created_at
-                      FROM forms WHERE list_id IN {own} ORDER BY id""", (uid,)),
+                      FROM forms WHERE list_id IN {private} ORDER BY id""", (uid,)),
         "form_entries": (f"""SELECT e.task_id, e.form_id, e.sender, e.email, e.answers, e.created_at FROM form_entries e JOIN forms f ON f.id=e.form_id
-                             WHERE f.list_id IN {own} ORDER BY e.created_at""", (uid,)),
+                             WHERE f.list_id IN {private} ORDER BY e.created_at""", (uid,)),
         "leave_quota": ("SELECT org_id, year, days, carry, updated_at FROM hub_leave_quota WHERE user_id=? ORDER BY year, org_id", (uid,)),
     }
 

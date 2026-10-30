@@ -3892,6 +3892,8 @@ MIGRATIONS = [
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
     ("users", "wiki_style", "ALTER TABLE users ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
+    # 2.360.2 (#2561): the address (lower case) this account proved: link in a mail, verified OIDC claim; another address = not proved
+    ("users", "email_proved", "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_proved TEXT NOT NULL DEFAULT ''"),
     # 2.361.0 (#2922): who moved a project from their private space into its organisation (accounts/orgs.py list_org_set);
     # it goes back to that person's private space when they leave (org_leave). Older versions ignore it (the way back)
     ("lists", "brought_by", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS brought_by BIGINT"),

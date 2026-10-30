@@ -112,6 +112,12 @@ check(set(F) == {MINE, SEAL} and F[MINE]["signer_name"] == "Eva Customer" and F[
       f"a person without an organisation sees their private records; an unreadable name is left out {F}")
 check(A.delete(B + f"/api/videos/signoffs/orphaned/{MINE}").status_code == 404, "another person's private record: 404")
 check(Fr.delete(B + f"/api/videos/signoffs/orphaned/{MINE}").ok and not dbx("SELECT 1 FROM office_signoffs WHERE id=?", (MINE,)), "the creator deletes it")
+# review: with a personal office the decision is a business record there, as in an organisation
+PO = dbx("INSERT INTO orgs(name,personal_of,created_at) VALUES('Own office',?,?) RETURNING id", (FID, T))[0][0]
+KEPT = sig(None, FID, "Kept cut", "accepted", T, "Eva Customer")
+check(Fr.delete(B + f"/api/videos/signoffs/orphaned/{KEPT}").status_code == 409, "a personal office keeps a decided record for its legal period")
+dbx("DELETE FROM office_signoffs WHERE id=?", (KEPT,))
+dbx("DELETE FROM orgs WHERE id=?", (PO,))
 GONE, Gs = freelancer(B, A, "gert")
 GS = sig(None, GONE, "Left behind")
 r = A.delete(B + f"/api/users/{GONE}")
@@ -138,6 +144,10 @@ text = json.dumps(D)
 check("192.0.2.7" not in text and "hash-x" not in text and "hans@example.com" not in text and '"tk"' not in text and '"eh"' not in text,
       "no network address, voter's address, link or hash")
 check(D["polls"][0]["title"] == "When?" and D["poll_votes"][0]["name"] == "Hans", "polls with votes")
+dbx("UPDATE lists SET org_id=? WHERE id=?", (ORG, PL))  # review: senders' answers to an organisation stay there
+_, _, DO = export_of(Fr)
+dbx("UPDATE lists SET org_id=NULL WHERE id=?", (PL,))
+check(not DO["forms"] and not DO["form_entries"], "the forms of an organisation's list are not in the private export")
 check(D["forms"][0]["title"] == "Contact form" and D["form_entries"][0]["email"] == "fay@example.com", "forms with entries (the owner's)")
 check(not any("booking pages" in x for x in MAN["not_included"]) and not any("content of your private" in x for x in MAN["not_included"]), "the manifest no longer says they are missing")
 dbx("INSERT INTO hub_leave_quota(org_id,user_id,year,days,carry,updated_at) VALUES(?,?,2026,28,2,?) RETURNING id", (ORG, AL, T))
