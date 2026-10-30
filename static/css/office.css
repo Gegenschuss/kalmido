@@ -879,6 +879,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.138.0 D (#2256): the next running number of every series (settings) and a draft's number in the editor */
 .onum h4{margin:1rem 0 .25rem}
 .onum .onumrow .numin{width:8rem}
+.onum .onumshared .numin{opacity:.6}  /* 2.433.0 (#3597): on the invoices' counter */
 .onumwhy{flex-basis:100%}
 .onumwhy input{flex:1;min-width:0}
 .onumdoc{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-m)}
@@ -1036,6 +1037,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.25rem}
 .orr-row>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .orr-row select{flex:none;width:9.5rem}
+/* 2.433.0 (#3607): fixed groups - the level as plain text, locked specials greyed, the template note with Copy */
+.orr-lv-ro{flex:none;width:9.5rem;color:var(--muted);font-size:var(--fs-s);text-align:right}
+.orr-sp .chkl:has(input:disabled){opacity:.55;cursor:default}
+.orr-tpln{display:flex;align-items:center;gap:.5rem;margin:.5rem 0;color:var(--muted)}
+.orr-tpln>span{flex:1;min-width:0}
 .orr-gb .row{display:flex;flex-direction:column;align-items:stretch;gap:.25rem;max-width:24rem;margin:.75rem 0}
 .orr-lv{font-weight:500;font-size:var(--fs-s)}.orr-lv.lv-none{color:var(--muted);font-weight:400}
 .orr-sp{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
@@ -1043,7 +1049,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-le{padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .orr-le>summary{cursor:pointer;min-height:2rem;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .375rem}
 .orr-ld{margin:.375rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
-@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
+@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select,.orr-lv-ro{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
 @media (pointer:coarse){.orr .orrsub button,.orr-pick>summary,.orr-opts .chkl,.orr-sp .chkl{min-height:2.75rem}}
 /* 2.224.0 B (#2816): the country card on a page that is not the office's first one: one slim line */
 .ocf-choose.ocf-slim{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-style:dashed;padding:.375rem .75rem;margin:0 0 .75rem}
