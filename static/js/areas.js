@@ -472,7 +472,8 @@ function sbb_render(hid) {
 // one history entry, the next ones replace it, so one Back closes the drawer (route() closes it on that entry)
 const SBM = {keep: false, focus: ''};
 // the row is one tab stop of its own (a scrolling region reachable by keyboard; its icons rove with the sidebar)
-const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div class="sbmr" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).join('')}</div>`; };
+// 2.442.0 (#3739): --sbmc = columns: never more than two rows (with up to 5 areas one row of the usual width)
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).filter(Boolean); return `<div class="sbmr" style="--sbmc:${Math.max(Math.ceil(bs.length / 2), Math.min(bs.length, 5))}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
 // route() asks once whether this route came from the row (the drawer stays open)
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
