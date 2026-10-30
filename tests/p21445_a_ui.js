@@ -77,7 +77,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const tt = await until(() => { const e = w.document.querySelector('#toast'); return e && /auth_time/.test(e.textContent) ? e.textContent : ''; });
   check(/did not say when you signed in/.test(tt) && w.location.hash === '', '#2387: back with an error the app says why: ' + tt);
   // ---- #2387 F8: a refused download shows the reason
-  w.eval(`window._f = window.fetch; window.fetch = async () => ({ok: false, status: 403, json: async () => ({error: 'Refused for a test reason'})}); S.me.drop_token_set = false`);
+  w.eval(`window._f = window.fetch; window.fetch = async (u, o) => /httpshortcuts/.test(u) ? {ok: false, status: 403, json: async () => ({error: 'Refused for a test reason'})} : window._f(u, o); S.me.drop_token_set = false`);
   w.eval(`(() => { const a = document.createElement('a'); a.href = '/api/me/share/httpshortcuts.zip'; a.setAttribute('download', 'x.zip'); tkh_zipClick({preventDefault() {}}, a, document.body); })()`);
   const t8 = await until(() => { const e = w.document.querySelector('#toast'); return e && /test reason/.test(e.textContent) ? e.textContent : ''; });
   check(/Refused for a test reason/.test(t8), 'F8: the refusal of the download is shown: ' + t8);

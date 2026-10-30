@@ -96,7 +96,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `document.getElementById('os-paydays')?.value === '28'`), '#2247: the field shows it');
     // a choice saves at once; the shown area survives the redraw
     await ev(`(() => { const s = document.getElementById('os-currency'); s.value = 'USD'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(!!(await srv(j => j.settings?.currency === 'USD')) && await ready(ev, `${shown} === 'docs'`), '#2247: a choice saves at once, the area stays');
+    const cs = !!(await srv(j => j.settings?.currency === 'USD'));  // 2.424.0 (#3572): the message names what failed (the save or the area)
+    check(cs && await ready(ev, `${shown} === 'docs'`), '#2247: a choice saves at once, the area stays ' + JSON.stringify([cs, await ev(shown), await ev(`location.hash + ' ' + !!document.querySelector('#ofc-set')`)]));
     await call(CA, 'PUT', '/api/office/settings', {currency: 'EUR'});
 
     // ================= #2246 the pack card

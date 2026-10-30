@@ -719,8 +719,13 @@ check(not both, f"routes both mapped and excepted: {both}")
 # ---- 2. the mapped API routes exist
 gone = sorted({x for v in APP_TO_API.values() for x in v if x not in API})
 check(not gone, f"mapped API routes that do not exist: {gone}")
+# CI of 2.409.0 (#3506): the train branch runs without 2.371 (#3150, knowledge tags, only on main); its two entries count
+# only where its module is there (main keeps the full check)
+LATER = set() if os.path.exists(os.path.join(ROOT, "kalmido", "wiki", "wktags.py")) else {"=GET /api/wiki/tags", "=GET /api/wiki/query"}
 for pats in (x[1] for x in APP_ONLY):
     for pat in pats:
+        if pat in LATER:
+            continue
         if pat.startswith("="):
             check(pat[1:] in APP, f"APP_ONLY entry matches nothing: {pat}")
             continue
