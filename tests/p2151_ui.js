@@ -150,7 +150,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   };
   const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight - (document.querySelector('#tabs')?.offsetHeight || 0)) { e.scrollIntoView({block: 'center'}); } const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
   // the task header: rows, sizes, the date in full, nothing outside
-  // 2.365.0 (#2824): on a phone (touch below 900 px) the date, Today / Tomorrow and Complete sit in the bottom bar .dthumb: they
+  // 2.365.0 (#2824): on a phone (touch up to 767 px) the date, Today / Tomorrow and Complete sit in the bottom bar .dthumb: they
   // are measured there (b = the bar when it is there, else the header), Pin and "…" stay in the header
   const HEAD = `(() => { const d = document.querySelector('#detail .dtop'); if (!d) return null; const R = d.getBoundingClientRect(), vis = e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
     const bar = document.querySelector('#detail .dthumb'), B2 = bar ? bar.getBoundingClientRect() : null;
