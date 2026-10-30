@@ -108,6 +108,11 @@ the app). Keep a copy of the key apart from the backups (a password manager): ba
 backup alone does not reveal the encrypted data. Without any key *Administration > Server* shows a red warning, no
 token can be stored and organisation data stays unencrypted.
 
+**An existing server without a key (#2510)** keeps starting, because a refusal would lock it out with an update:
+*Settings > Administration* shows the warning, and at every start the admins get an alert (none with
+`KALMIDO_NO_SECRET_KEY=1`, which says you decided so). The image sets no key path of its own on purpose: a path inside the
+container would be gone with the container, so without Compose the way stays the volume at `/secret` described above.
+
 A new key never makes data unreadable that was readable before: without a key nothing can be sealed. Since 2.149 the
 server also never creates a new key file for a database that already holds organisation or account keys (the key
 file got lost, a container was recreated without its `/secret` volume): it names the reason and the file in the log
@@ -556,9 +561,13 @@ docker compose up -d kalmido
   (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
   copy of the key apart from the backups (a password manager). To restore on another server (a move, a new disk, a lost
   server), put the old key in place **before the new server's first start**: in `.env` as `KALMIDO_SECRET_KEY=…`, or as the
-  file `secret/kalmido.key`. Then start it and restore the backup. Restored with a different key, the database comes back but
-  attachments, private files, organisation files, office documents and fields and the wiki history cannot be decrypted
-  (the app answers with the code `orgcrypt`); with the old key back in place they are readable again. Account keys have
+  file `secret/kalmido.key`. Then start it and restore the backup. A backup whose organisation or account keys do not open with
+  this server's key is refused before anything changes (#2893; *Verify* warns about it too): put the old key in place,
+  restart and restore again. Only when the old key is lost for good, start with `KALMIDO_SECRET_KEY_CHANGED=1` to restore
+  anyway: the database comes back with a red warning, but attachments, private files, organisation files, office documents
+  and fields and the wiki history cannot be decrypted (the app answers with the code `orgcrypt`); remove the variable
+  afterwards. A backup without such keys but from another key restores with a warning: its stored access tokens (Git,
+  documents, single sign-on) may be unreadable; enter them again. Account keys have
   no recovery key: without the old server key private files are lost for good. The backup passphrase and the off-site
   access data set on the restoring server stay usable after the restore (2.359.0; before, encrypted backups failed until
   the passphrase was entered again).

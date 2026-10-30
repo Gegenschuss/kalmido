@@ -7,7 +7,7 @@ from .core.db import connect, init_db, mig_flags_sync
 from .core.pages import ntfy_inbox_loop
 from .core.instance import update_loop
 from .notify.push import watchdog
-from .notify.alerts import aa_now
+from .notify.alerts import aa_now, aa_secret_key
 from .calendars.subscriptions import cal_loop, CAL_ON
 from .admin.backup import backup_loop, bk_tools_note, BK_ON_ENV
 from .api.v1 import WH_ON
@@ -83,6 +83,7 @@ if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.
         print("office: number scheme check:", type(e).__name__, flush=True)
     finally:
         _c.close()
+    aa_secret_key()  # 2.359.3 (#2510)
     if BK_ON_ENV:
         try:
             bk_tools_note()  # 2.359.3 (#2945)
