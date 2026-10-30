@@ -24,7 +24,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
@@ -62,6 +62,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
 
   // ================= clients
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
+  // 2.435.0 (#3600): the blocks Time tracking and Projects of the client card start folded: open them for alice (kept per person)
+  await call('PATCH', '/api/settings', {view_clients: JSON.stringify({opts: {month: {open: true}, lists: {open: true}}})}); w.eval(`S.settings.view_clients = ${JSON.stringify(JSON.stringify({opts: {month: {open: true}, lists: {open: true}}}))}`);
   // 2.44.0 (#1187): the clients are a tab of the area Office (no own sidebar group); "New client" on their page
   const grp = d.querySelector('#srail [data-sbb="office"]');  // 2.152.2 (#2622): the area is an icon of the bar
   check(grp && grp.dataset.go === 'clients' && !d.querySelector('#side .sg-clients'), 'the area "Office" in the bar opens the clients (no own group)');  // 2.152.2 (#2622)

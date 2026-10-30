@@ -13,7 +13,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2122C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const cks = {};
 const call = async (u, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: cks[u]}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   const stream = `BT /F1 12 Tf 60 740 Td (${line}) Tj ET`;
   const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -45,8 +45,8 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => d.querySelector('[data-dcsel="mode"]'));
   d.querySelector('[data-dcsel="mode"]').click(); await sleep(300);
-  const btn = () => d.querySelector('[data-dcsel="csv"]');
-  check(btn() && btn().disabled && /Export as CSV/.test(btn().textContent), 'the CSV button waits for a choice');
+  const btn = () => d.querySelector('#dc-sbar [data-dcsel="more"]');  // 2.428.0 (#3581): "Export as CSV" sits under "More" of the shared bar
+  check(btn() && btn().disabled, 'More (with the CSV export) waits for a choice');
   const dl = []; const calls = [];
   w.HTMLAnchorElement.prototype.click = function () { dl.push({name: this.download, href: this.href}); };
   w.URL.createObjectURL = () => 'blob:csv'; w.URL.revokeObjectURL = () => {};
@@ -55,8 +55,11 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
   check(ids.length === 2, 'two documents listed');
   for (const id of ids) w.eval(`dc_smvToggle(${id})`);
   await sleep(300);
-  check(!btn().disabled, 'the CSV button is on with a choice');
+  check(!btn().disabled, 'More is on with a choice');
   btn().click();
+  const csv = await until(() => d.querySelector('#pop .menu-list .msm-csv'));
+  check(csv && /Export as CSV/.test(csv.textContent), 'More offers "Export as CSV"');
+  csv?.click();
   await until(() => dl.length);
   check(calls.length === 1 && calls[0].method === 'POST' && JSON.parse(calls[0].body).ids.length === 2, 'the chosen ids are posted ' + JSON.stringify(calls[0] || {}).slice(0, 120));
   check(dl.length === 1 && dl[0].name === 'documents.csv' && dl[0].href === 'blob:csv', 'a download of documents.csv starts');

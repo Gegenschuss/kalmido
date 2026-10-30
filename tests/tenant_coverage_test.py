@@ -44,7 +44,8 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
-                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0)"),
+                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
+                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -61,7 +62,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser)"),
+    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser), p2414_api_test.py (the booking archive: lines, receipts, files, runs of another organisation 404)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
@@ -265,6 +266,7 @@ ROUTES = {
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -489,12 +491,16 @@ ROUTES = {
     "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090): input side accounts, admin only (p2120_c_api_test.py)
     # 2.148.0 D (#2458): the DATEV import, suppliers, opening balances; admin only, another organisation 404 (p2148_d_api_test.py)
     "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",
+    "GET /api/office/books/archive": "office", "GET /api/office/books/archive/bookings": "office", "GET /api/office/books/archive/bookings/{}": "office",  # 2.414.0 (#3502)
+    "GET /api/office/books/archive/accounts": "office", "GET /api/office/books/archive/docs/{}": "office", "GET /api/office/books/archive/files/{}": "office",
+    "POST /api/office/books/archive/check": "office", "POST /api/office/books/archive/import": "office", "POST /api/office/books/archive/runs/{}/undo": "office",
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
     "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
+    "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py
     "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
     # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
     "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
@@ -699,6 +705,7 @@ ROUTES = {
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
+    "POST /api/orgs": "org",  # 2.422.0 (#2937): p2422_orgself_test.py
     "GET /api/admin/orgs/{}/delete-info": "org",  # 2.152.0 A (#2167): numbers for the delete dialog (instance admin)
     "GET /api/orgs/{}/leave-info": "org",  # 2.361.0 (#2922): the leave preview (the member / an admin of it)
     "POST /api/admin/orgs/{}/delete-notice": "org", "DELETE /api/admin/orgs/{}/delete-notice": "org",  # 2.361.0 (#2920): instance admin
@@ -902,7 +909,8 @@ ROUTES = {
     "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
     "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
     "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
-    "POST /api/hooks/in/{}": "token", "GET /api/lists/{}/hooks-in": "list", "POST /api/lists/{}/hooks-in": "list",
+    "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "list",  # 2.380 G (#2289): header variant
+    "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
     "POST /api/hooks-in/{}/restore": "list",
     # ---- 2.34.0 (#264 #265): the briefing (a person's own, an agent: of a person it may chat with, only shared lists) and
@@ -945,7 +953,7 @@ ROUTES = {
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
-    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
@@ -969,7 +977,9 @@ ROUTES = {
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
+    "GET /api/wiki/shared/pages/{}/img/{}": "wiki",  # 2.380 H (#2356): p2380r_h_api_test.py (a person without an organisation)
     "GET /s/w/{}": "wiki", "GET /s/w/{}/p/{}": "wiki", "GET /s/w/{}/file/{}": "wiki",
+    "GET /s/w/{}/img/{}/{}": "wiki",  # 2.380 H (#2356)
     # 2.123.0 A (#2102): the history of a page (a page of another organisation / person: 404, p2123_a_api_test.py)
     "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
     "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
@@ -1198,6 +1208,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area one works in, admins only (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): only the count of the office open now (office_ctx; another organisation: its own office, never ours - p2417_c_api)
     # 2.148.0 C (#2472): the procedure documentation of the office area one works in, admins save versions (p2148_c_api_test.py)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",

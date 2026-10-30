@@ -146,13 +146,15 @@ check(A.patch(B + f"/api/lists/{W}", json={"client_id": CL}).ok, "setup: an orga
 r = A.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private", "dry": 1})
 check(r.ok and (r.json().get("count") or {}).get("copied") == 1, f"setup: the dry run copies the client {r.text[:200]}")
 res = []
+pair, start = [sess("alice"), sess("alice")], threading.Barrier(2)  # the sign-in stays out of the race: both moves leave together
 
 
-def go():
-    res.append(sess("alice").post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"}).status_code)
+def go(s):
+    start.wait()
+    res.append(s.post(B + "/api/office/move-space", json={"what": "clients", "ids": [CL], "to": "private"}).status_code)
 
 
-th = [threading.Thread(target=go) for _ in range(2)]
+th = [threading.Thread(target=go, args=(s,)) for s in pair]
 for x in th:
     x.start()
 for x in th:

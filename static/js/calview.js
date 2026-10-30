@@ -66,12 +66,13 @@ function calsWire(md) {
     }
   });
   md.addEventListener('change', e => { const i = e.target.closest('[data-calact="vis"]'); if (i) calPatch(md, +i.closest('[data-cal]').dataset.cal, {visible: i.checked}); });
-  // allowed internal hosts (admins): saved when leaving the field, one history step
+  // allowed internal hosts (admins): saved when leaving the field, one history step. 2.380 G (#3389): one field per service
   md.addEventListener('change', async e => {
-    if (e.target.id !== 's-calhosts') return;
-    const from = S.about?.cal_allow_hosts || '', to = e.target.value;
+    const k = e.target.dataset?.allowp; if (!k) return;
+    const from = S.about?.allow_hosts_by_purpose?.[k] ?? '', to = e.target.value;
     if (from.trim() === to.trim()) return;
-    const put = async v => { const j = await api('PATCH', '/api/admin/settings', {cal_allow_hosts: v}); S.about = {...S.about, ...j}; const f = $('#s-calhosts'); if (f && f !== document.activeElement) f.value = j.cal_allow_hosts || ''; return {skipped: []}; };
+    const put = async v => { const j = await api('PATCH', '/api/admin/settings', {allow_hosts_by_purpose: {[k]: v}}); S.about = {...S.about, ...j};
+      const f = $(`[data-allowp="${k}"]`); if (f && f !== document.activeElement) f.value = j.allow_hosts_by_purpose?.[k] ?? ''; return {skipped: []}; };
     try { await put(to); } catch { return; }
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Allowed internal hosts')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });

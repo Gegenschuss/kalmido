@@ -28,7 +28,7 @@ from flask import jsonify, request
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
 from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
-from ..core.db import body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
+from ..core.db import ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
@@ -161,9 +161,31 @@ def cal_allow_text(entries):
     return ", ".join((f"[{h}]" if ":" in h else h) + (f":{p}" if p else "") for h, p in entries)
 
 
-def cal_allow(c):
-    """Hosts that may be internal: env KALMIDO_CALENDAR_ALLOW_HOSTS + the admin setting."""
-    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + cal_allow_parse(gsetting(c, "cal_allow_hosts"))[0])
+# 2.380 G (#3389): the internal hosts are allowed per purpose (the service that connects, core/db.py ALLOW_PURPOSES), no
+# longer one list for all: the admin setting allow_hosts_by_purpose = JSON {purpose: "host, host:port"}; a one-shot at the
+# start (core/db.py, flag migr_allow2380) copies the old list cal_allow_hosts into every purpose, so nothing that worked stops.
+# KALMIDO_CALENDAR_ALLOW_HOSTS (the server configuration) still counts for every purpose. cal_allow_hosts stays as it was
+# (an older version reads it).
+
+
+def allow_by_purpose(c):
+    """{purpose: the admin's hosts text} for every purpose (a purpose the setting lacks: the old shared list)."""
+    try:
+        d = json.loads(gsetting(c, "allow_hosts_by_purpose") or "{}")
+    except ValueError:
+        d = {}
+    d = d if isinstance(d, dict) else {}
+    old = gsetting(c, "cal_allow_hosts")
+    return {p: d[p] if isinstance(d.get(p), str) else old for p in ALLOW_PURPOSES}
+
+
+def cal_allow(c, purpose):
+    """Hosts that may be internal for one purpose (ALLOW_PURPOSES): env KALMIDO_CALENDAR_ALLOW_HOSTS + the admin's list of
+    that purpose. 2.380 G (#3389): the purpose is required (review: a caller without one must not get every purpose's hosts)."""
+    by = allow_by_purpose(c)
+    if purpose not in by:
+        raise ValueError(f"unknown allow-list purpose {purpose!r}")
+    return frozenset(cal_allow_parse(CAL_ALLOW_ENV)[0] + cal_allow_parse(by[purpose])[0])
 
 
 def cal_host_allowed(allow, host, port):
@@ -198,16 +220,27 @@ def _cal_connector(allow):
     return create
 
 
+_CAL_WATCH = threading.local()  # 2.424.0 B2 (#3450): the connections of a cal_http call with `until` (its watchdog)
+
+
+def _cal_watch(conn):
+    w = getattr(_CAL_WATCH, "conns", None)
+    if w is not None:
+        w.append(conn)
+
+
 class _CalHTTPConnection(http.client.HTTPConnection):
     def __init__(self, *a, cal_allow=frozenset(), **k):
         super().__init__(*a, **k)
         self._create_connection = _cal_connector(cal_allow)
+        _cal_watch(self)
 
 
 class _CalHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *a, cal_allow=frozenset(), **k):
         super().__init__(*a, **k)
         self._create_connection = _cal_connector(cal_allow)  # then TLS with server_hostname = the host name
+        _cal_watch(self)
 
 
 class _CalHTTPHandler(urllib.request.HTTPHandler):
@@ -276,13 +309,51 @@ _CAL_CRED_HEADERS = {"authorization", "proxy-authorization", "cookie", "x-api-ke
 
 
 def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozenset(), cross_redirects=False,
-             max_bytes=None, timeout=None, deadline=None):
+             max_bytes=None, timeout=None, deadline=None, until=None):
     """One request, redirects followed by hand (at most 5; never https -> http). Returns (status, headers, body,
     final url). auth = (user, password): Basic auth, only ever sent to the host of `url`; a redirect to another
-    host is only followed without credentials (cross_redirects, https only). Every hop runs through the SSRF guard."""
+    host is only followed without credentials (cross_redirects, https only). Every hop runs through the SSRF guard.
+    until (2.424.0 B2, #3450): a time.monotonic() point the whole call ends at, also in the connect and header phase (a
+    server sending its headers drop by drop): each hop's socket timeout is at most the time left and a watchdog shuts
+    the open connections down then (CalError timeout). Without it (the calendar subscriptions) nothing changes."""
+    if until is None:
+        return _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, None)
+    _CAL_WATCH.conns = conns = []
+    cut = threading.Event()
+    dog = threading.Timer(max(0.0, until - time.monotonic()), _cal_cut, (conns, cut))
+    dog.daemon = True
+    dog.start()
+    try:
+        res = _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until)
+    except CalError:
+        if cut.is_set() or time.monotonic() >= until:
+            raise CalError("timeout") from None
+        raise
+    finally:
+        dog.cancel()
+        _CAL_WATCH.conns = None
+    if cut.is_set():  # a body cut off by the watchdog reads like its end
+        raise CalError("timeout")
+    return res
+
+
+def _cal_cut(conns, cut):
+    """The watchdog of cal_http(until=...): shuts the sockets of its connections down (a blocked read returns)."""
+    cut.set()
+    for conn in list(conns):
+        try:
+            if conn.sock is not None:
+                conn.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
+def _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until):
     first = (urllib.parse.urlsplit(url).hostname or "").lower()
     op = _cal_opener(allow)
     deadline = time.monotonic() + (deadline or CAL_DEADLINE)  # 2.47.3 (#1738): max_bytes / timeout / deadline for small fetches (contact photos)
+    if until is not None:
+        deadline = min(deadline, until)
     max_bytes = max_bytes or CAL_MAX_BYTES
     for _hop in range(6):
         p = urllib.parse.urlsplit(url)
@@ -293,7 +364,10 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
             hd["Authorization"] = "Basic " + base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
         req = urllib.request.Request(url, data=body, method=method, headers=hd)
         try:
-            r = op.open(req, timeout=timeout or CAL_TIMEOUT)
+            left = deadline - time.monotonic() if until is not None else None
+            if left is not None and left <= 0:
+                raise CalError("timeout")
+            r = op.open(req, timeout=min(timeout or CAL_TIMEOUT, left) if left is not None else timeout or CAL_TIMEOUT)
         except urllib.error.HTTPError as e:
             loc, code = (e.headers.get("Location") if e.headers else None), e.code
             hdrs = e.headers
@@ -786,7 +860,7 @@ def cal_sync(c, sid, force=False):
         fresh = not force and bool(s["fetched_at"]) and parse_iso(s["fetched_at"]).astimezone(TZ).date() == local_now().date()
         upd, url, lg = {}, "", lang(c, s["user_id"])
         try:
-            allow = cal_allow(c)
+            allow = cal_allow(c, "calendar")  # 2.380 G (#3389)
             url = cal_unseal(c, s["user_id"], s["url"])
             auth = (s["username"], cal_unseal(c, s["user_id"], s["password"])) if s["kind"] == "caldav" else None
             c.commit()  # 2.37.0 (#1150): no open transaction while the calendar server is asked (snapshot, pool)
@@ -993,7 +1067,7 @@ def cal_discover_api():
     if not cal_rate(me()):
         return _cal_limited()
     try:
-        cals = caldav_discover(url, (user.strip(), pw), cal_allow(db()))
+        cals = caldav_discover(url, (user.strip(), pw), cal_allow(db(), "calendar"))
     except CalError as e:
         return jsonify(error=cal_err_text(e.stored()), code=e.code), 400
     return jsonify(calendars=cals)

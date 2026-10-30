@@ -16,7 +16,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2115A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const FEAT = 'cal,comments,collab,events,files,time';
 
@@ -47,8 +47,8 @@ const FEAT = 'cal,comments,collab,events,files,time';
   check(!!inp, '#2061: "Add" asks for a name');
   inp.value = 'Home Assistant';
   d.querySelector('.cdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  await until(() => box()?.querySelector('.whi-url code'));
-  const url = box()?.querySelector('.whi-url code')?.textContent || '';
+  await until(() => box()?.querySelector('.whi-url code.whi-u'));
+  const url = box()?.querySelector('.whi-url code.whi-u')?.textContent || '';  // 2.380 G (#2289): the token (header variant) shows first
   check(/\/api\/hooks\/in\/khi_/.test(url), '#2061: the URL shows once: ' + url.slice(0, 60));
   check(!!box()?.querySelector('[data-whi-copy="url"]') && !!box()?.querySelector('[data-whi-copy="curl"]'), '#2061: copy buttons for the URL and the curl example');
   check(/curl -X POST/.test(box()?.querySelector('.whi-ex')?.textContent || ''), '#2061: the curl example');

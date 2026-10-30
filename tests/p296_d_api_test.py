@@ -31,31 +31,14 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-FAILS, OKS = [], [0]
+import kt  # noqa: E402
+from kt import FAILS, OKS, check, sess  # noqa: E402  2.358.0 D (#2783): shared helpers (tests/kt.py)
+
+kt.docker_logs_on_first_fail(60, 6000)  # the server's side of the first failure
 
 
 def EH(email):
     return hashlib.sha256(("kalmido-people|" + email.strip().lower()).encode()).hexdigest()
-
-
-def check(cond, what):
-    if cond:
-        OKS[0] += 1
-    else:
-        FAILS.append(what)
-        print("FAIL:", what, flush=True)
-        if len(FAILS) == 1:
-            ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-            print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True).stdout[-6000:], flush=True)
-
-
-def sess(user, pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def dbx(sql, args=()):

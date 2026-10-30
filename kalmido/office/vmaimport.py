@@ -31,7 +31,7 @@ from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..core.errors import BadInput
 from .calc import dstr, money
-from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_trip
+from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 
 VMI_FILE_MAX = 2 * 1024 * 1024
 VMI_SHEETS_MAX = 30
@@ -59,6 +59,7 @@ VMI_BLOCK_HEAD_RE = re.compile(r"(auslands|inlands)?pauschal|per diem|land\s*=\s
 VMI_REASONS = {
     "date": N_("Date missing or not readable"), "order": N_("The end is before the start"),
     "times": N_("Start and end time missing: no per diem"), "year": N_("No per diem rates for {0}"),
+    "older": N_("Rates of {0} used, the BMF letter for {1} is not entered yet"),
     "diff": N_("Differs from the spreadsheet"), "days": N_("The days in the comment do not match the period"),
     "country": N_("Country not recognised: {0}"), "rate": N_("Rate {0} not in the table for {1}"),
     "time": N_("Time not readable: {0}"), "dup": N_("Already there"),
@@ -249,7 +250,7 @@ def _rate_place(year, code, rate, want=""):
     """(place, kind full|partial) of the year's table where the country's rate equals rate (the named place first, then
     "im Uebrigen", then the cities), or None."""
     if code == "DE":
-        f, p = VMA_HOME.get(year, (None, None))
+        f, p = VMA_HOME.get(vma_table_year(year), (None, None))
         return ("", "full") if rate == f else ("", "partial") if rate == p else None
     places = (vma_places(year) or {}).get(code)
     if not places:
@@ -424,6 +425,8 @@ def vmi_sheet(sh, known, seen):
                 why.append(tr(VMI_REASONS["times"]))
             elif h["key"] == "year":
                 why.append(tr(VMI_REASONS["year"], h["year"]))
+            elif h["key"] == "older":  # 2.428.0 (#3522)
+                why.append(tr(VMI_REASONS["older"], h["used"], h["year"]))
         if row["amount"] != row["excel"] and not (row["amount"] is None and row["excel"] is None):
             why.append(tr(VMI_REASONS["diff"]))
         key = vmi_trip_key(pk, df, dt, dest)

@@ -34,6 +34,10 @@ def _v1_doc(c, m, node, full=False, role=None):
     d.pop("split", None)  # 2.154.0 A (#1111): the stack mark is for the people of the app (agents never split)
     d["url"] = f"/api/v1/documents/{m['node_id']}"
     d["content_url"] = f"/api/v1/files/{m['node_id']}/content"
+    if full:  # 2.420.0 C (#3448): whether a person ticked the receipt as checked (read only: agents never tick it)
+        r = c.execute("SELECT r.checked_at, u.display_name, u.username FROM rc_receipts r LEFT JOIN users u ON u.id=r.checked_by "
+                      "WHERE r.node_id=?", (m["node_id"],)).fetchone()
+        d["receipt_checked"] = ({"at": r["checked_at"], "by": r["display_name"] or r["username"]} if r and r["checked_at"] else None)
     return d
 
 

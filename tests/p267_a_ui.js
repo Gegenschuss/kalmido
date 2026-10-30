@@ -88,10 +88,14 @@ const ym = TC.today().slice(0, 7);
     check(await ready(ev, `!document.querySelector('.fcidlg') && [...document.querySelectorAll('[data-rkf="fixed"]')].some(b => /Software subscription/.test(b.textContent) && /VAT 7 %/.test(b.textContent))`),
       'taken over with the changed rate');
     check(await ev(`fetch('/api/office/fixed-costs', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.items.length === 3 && !j.items.some(i => /Liability/.test(i.label)))`), 'the unticked row is not taken over');
-    // ---- the monthly check
-    check(await ready(ev, `!!document.querySelector('[data-fcc="on"]') && !document.querySelector('[data-fcc="on"]').checked`), 'the monthly check, off');
-    await ev(`(() => { const c = document.querySelector('[data-fcc="on"]'); c.checked = true; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    // ---- the monthly check; 2.365.2 D (#2789): set in Settings > Company & office > Bank & taxes, the cash flow links there
+    check(await ready(ev, `!document.querySelector('.office [data-fcc="on"]') && !!document.querySelector('.office [data-setgo="biz-tax"]')`), 'the cash flow links to the monthly check');
+    await ev(`(() => { document.querySelector('.office [data-setgo="biz-tax"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.smodal [data-fcc="on"]') && !document.querySelector('.smodal [data-fcc="on"]').checked`), 'the monthly check, off');
+    await ev(`(() => { const c = document.querySelector('.smodal [data-fcc="on"]'); c.checked = true; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/cashflow/check', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.on && j.user_id === ${me.id} && !!j.task_id)`), 'switched on for the admin');
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.smodal')`);
     await shot('p267-a-cashflow.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

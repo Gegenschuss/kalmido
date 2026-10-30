@@ -12,7 +12,7 @@ const {boot, errs, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p288_b_ui', check, shots: 'P288B_SHOTS'});
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -62,7 +62,7 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
   const bar = md.querySelector('#a-usel');
   check(!bar.hidden && /1 selected/.test(bar.textContent) && bar.querySelector('[data-ubulk="disable"]') && bar.querySelector('[data-ubulk="enable"]'), 'a selection shows the bar ' + bar.textContent);
-  bar.querySelector('[data-ubulk="clear"]').click();
+  bar.querySelector('[data-ubulk="close"]').click();  // 2.428.0 (#3581): the shared bar's X
   check(bar.hidden && !cb.checked, 'clear selection');
 
   // ---- the delete dialog

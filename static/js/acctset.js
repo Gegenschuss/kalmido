@@ -121,13 +121,19 @@ function accountHtml() {
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
+    ${mvHas() ? `<h4 id="s-mview-h">${tr('View as member')}</h4><div class="row"><label class="chkl"><input type="checkbox" id="s-mview" ${mvOn() ? 'checked' : ''}> ${tr('View as member')}</label></div>
+    <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
+    ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>
+    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button></div>
+    <div class="shint">${tr('Greeting, name and picture under your letters (the same dialog as in the Office, Letters).')}</div>` : ''}${''/* 2.365.2 C (#2789) */}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
     ${acz_linkHtml(S.api?.enabled)}</details>${''/* 2.166.0 (#2633): the API tokens moved to Access */}
+    ${shellServerUrl() ? `<div class="row"><label>${tr('Server|settings')}</label><button class="btn sm" data-acc="shell-server">${ic('link', 's')} ${tr('Change server')}</button></div>` : ''}${''/* 2.435.0 B (#3578): only in the app shell */}
     ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
 // 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once
@@ -135,7 +141,7 @@ const UA8_FLT = [['people', N_('People')], ['active', N_('Active')], ['disabled'
 const UA8_PAGE = 50;
 const usersHtml = () => `<h4>${tr('Users')}</h4>
   <div class="ua8bar"><input type="search" id="a-uq" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="a-uflt" aria-label="${esc(tr('Filter'))}">${UA8_FLT.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
-  <div class="ua8sel" id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
+  <div id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
   <div class="members" id="a-users" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="ua8pg" id="a-upg"></div>
   <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
@@ -283,7 +289,39 @@ async function orgModal(o, done) {
 }
 function wsPaneHtml(hint) {
   return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Every project belongs to one workspace; the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to it.'))}
-    <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+    <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    ${(S.me.workspaces || []).length ? `<h4 id="s-wsr-h">${tr('Absences and vacation')}</h4><div id="s-wsr"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}${''/* 2.365.2 C (#2789) */}`;
+}
+// 2.365.2 C (#2789): the rules of an organisation that the Absences tab used to hold: vacation needs an approval, the state
+// of the public holidays (same routes; only admins of the organisation write)
+async function wsr_draw(md, oid) {
+  const box = $('#s-wsr', md); if (!box) return;
+  const orgs = S.me.workspaces || [], c = wsCur();
+  oid = oid || (c.startsWith('org:') && orgs.some(w => 'org:' + w.id === c) ? +c.slice(4) : orgs[0]?.id);
+  if (!oid) { box.innerHTML = ''; return; }
+  let lv, ab; try { [lv, ab] = await Promise.all([api('GET', `/api/team/leave?org=${oid}`), api('GET', `/api/team/absences?org=${oid}`)]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  if (!md.isConnected) return;
+  const dis = lv.admin ? '' : 'disabled';
+  box.innerHTML = `${orgs.length > 1 ? `<div class="row"><label for="s-wsr-org">${tr('Organisation')}</label><select id="s-wsr-org">${orgs.map(w => `<option value="${w.id}" ${w.id === oid ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div>` : ''}
+    ${lv.personal ? '' : `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-wsr-appr" data-org="${oid}" ${lv.approval ? 'checked' : ''} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${tr('Vacation of members needs an approval')}</span></label></div>
+    <div class="shint">${tr('On: vacation a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering vacation for someone approve it at once.')}</div>`}
+    <div class="row"><label for="s-wsr-state">${tr('Public holidays')}</label><select id="s-wsr-state" data-org="${oid}" ${dis}><option value="">${tr('None')}</option>${Object.entries(ab.states).map(([k, v]) => `<option value="${esc(k)}" ${k === ab.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    ${lv.admin ? '' : `<div class="shint">${tr('Only admins of this workspace can change this')}</div>`}`;
+}
+function wsr_wire(md) {
+  md.addEventListener('change', async e => {
+    const t = /** @type {any} */ (e.target);
+    if (t.id === 's-wsr-org') { wsr_draw(md, +t.value); return; }
+    if (t.id !== 's-wsr-appr' && t.id !== 's-wsr-state') return;
+    const org = +t.dataset.org;
+    if (t.id === 's-wsr-appr') {
+      const to = t.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); };
+      try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.checked = !to; /* api() said it */ }
+    } else {
+      const from = t.dataset.was ?? [...t.options].find(o => o.defaultSelected)?.value ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
+      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.value = from; /* api() said it */ }
+    }
+  });
 }
 function accountWire(md) {
   let users = [];
@@ -307,6 +345,7 @@ function accountWire(md) {
   ua8_wire(md, us, drawUsers);
   drawUsers();
   orgsDraw(md);
+  if ($('#s-wsr', md)) { wsr_draw(md); wsr_wire(md); }  // 2.365.2 C (#2789)
   if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); } else wsp_paneWire(md);  // 2.28.0 (#935); 2.138.2 C (#2389): the colour of Private
   md.addEventListener('change', async e => {  // 2.22.0 (#752): whom people see
     if (e.target.id !== 'a-vis') return;
@@ -333,6 +372,7 @@ function accountWire(md) {
         $('#a-cur', md).value = ''; $('#a-new', md).value = ''; toast(tr('Password changed'));
       }
       if (a === 'logout') logout();
+      if (a === 'shell-server') { const u = shellServerUrl(); if (u) location.href = u; }  // 2.435.0 B (#3578)
       if (a === 'user-new') userModal(null, () => { drawUsers(); orgsDraw(md); });  // 2.58.0 (#1724): the organisations' member counts follow at once
       if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
@@ -713,18 +753,22 @@ function ua8_wire(md, us, draw) {
     const t = e.target;
     if (t.id === 'a-uflt') { us.flt = t.value; us.off = 0; draw(); return; }
     if (t.dataset?.usel) { const id = +t.dataset.usel; t.checked ? us.sel.add(id) : us.sel.delete(id); ua8_selDraw(md, us); return; }
-    if (t.id === 'a-uborg' && +t.value) {
-      const o = (S.orgs || []).find(x => x.id === +t.value); t.value = '';
-      if (o && await askConfirm(trn('Add {0} person to “{1}”?', 'Add {0} people to “{1}”?', us.sel.size, o.name), tr('They become members of the organisation; their other organisations stay.'), {ok: tr('Add')})) await ua8_bulk(md, us, draw, 'org_add', o.id);
-    }
   });
+  const orgAdd = async o => {
+    if (await askConfirm(trn('Add {0} person to “{1}”?', 'Add {0} people to “{1}”?', us.sel.size, o.name), tr('They become members of the organisation; their other organisations stay.'), {ok: tr('Add')})) await ua8_bulk(md, us, draw, 'org_add', o.id);
+  };
+  const clear = () => { us.sel.clear(); $$('[data-usel]', md).forEach(x => { x.checked = false; }); ua8_selDraw(md, us); };
+  md.addEventListener('keydown', e => { if (e.key === 'Escape' && us.sel.size && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); clear(); } });  // 2.428.0 A (#3581): Esc ends the selection first
   md.addEventListener('click', async e => {
     const p = e.target.closest('[data-upg]');
     if (p) { us.off = Math.max(0, us.off + (+p.dataset.upg) * UA8_PAGE); draw(); $('#a-uq', md)?.scrollIntoView({block: 'nearest'}); return; }
     const b = e.target.closest('[data-ubulk]'); if (!b) return;
-    if (b.dataset.ubulk === 'clear') { us.sel.clear(); $$('[data-usel]', md).forEach(x => { x.checked = false; }); ua8_selDraw(md, us); return; }
-    if (b.dataset.ubulk === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
-    await ua8_bulk(md, us, draw, b.dataset.ubulk);
+    const k = b.dataset.ubulk;
+    if (k === 'close' || k === 'clear') { clear(); return; }
+    if (k === 'all') { $$('[data-usel]:not(:disabled)', md).forEach(x => { x.checked = true; us.sel.add(+x.dataset.usel); }); ua8_selDraw(md, us); return; }
+    if (k === 'more') { menu(b, ua8_orgs().map(o => ({label: o.name, icon: 'building', fn: () => orgAdd(o)})), null, null, tr('Add to an organisation')); return; }
+    if (k === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
+    await ua8_bulk(md, us, draw, k);
   });
 }
 function ua8_pagerDraw(md, us) {
@@ -733,14 +777,14 @@ function ua8_pagerDraw(md, us) {
   box.innerHTML = us.total > UA8_PAGE ? `<button type="button" class="iconbtn" data-upg="-1" aria-label="${esc(tr('Previous page'))}" title="${esc(tr('Previous page'))}" ${us.off ? '' : 'disabled'}>${ic('left', 's')}</button><span class="muted">${esc(tr('{0}–{1} of {2}', us.off + 1, to, us.total))}</span><button type="button" class="iconbtn" data-upg="1" aria-label="${esc(tr('Next page'))}" title="${esc(tr('Next page'))}" ${to < us.total ? '' : 'disabled'}>${ic('right', 's')}</button>`
     : us.total > 1 ? `<span class="muted">${esc(trn('{0} account', '{0} accounts', us.total))}</span>` : '';
 }
+const ua8_orgs = () => S.instanceMode === 'workspaces' ? (S.orgs || []) : [];
+// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Disable, Enable; "Add to an organisation" under "More"
 function ua8_selDraw(md, us) {
   const box = $('#a-usel', md); if (!box) return;
   box.hidden = !us.sel.size;
   if (!us.sel.size) { box.innerHTML = ''; return; }
-  const os = S.instanceMode === 'workspaces' ? (S.orgs || []) : [];
-  box.innerHTML = `<span class="n">${esc(tr('{0} selected', us.sel.size))}</span><button type="button" class="btn sm" data-ubulk="disable">${tr('Disable')}</button><button type="button" class="btn sm" data-ubulk="enable">${tr('Enable')}</button>`
-    + (os.length ? `<select id="a-uborg" aria-label="${esc(tr('Add to an organisation'))}"><option value="0">${tr('Add to an organisation …')}</option>${os.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select>` : '')
-    + `<button type="button" class="linkbtn" data-ubulk="clear">${tr('Clear selection')}</button>`;
+  box.innerHTML = ms_barHtml('ua-sbar', 'ubulk', us.sel.size, '', [['all', 'all', tr('All')], ['disable', 'ban', tr('Disable')], ['enable', 'check', tr('Enable')],
+    ...ua8_orgs().length ? [['more', 'dots', tr('More')]] : []]);
 }
 async function ua8_bulk(md, us, draw, action, orgId) {
   const ids = [...us.sel];
@@ -916,4 +960,13 @@ function ua8PurgeHtml(p) {
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
   rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
+}
+
+// 2.365.2 C (#2789): the letter signature dialog of the Office, opened from Settings > Account (the Office module loads first)
+async function ltSigSettings() {
+  try {
+    if (typeof ltProfileModal !== 'function') await loadModule('office');
+    const profile = await api('GET', '/api/office/letters/profile');
+    ltProfileModal({profile, done: () => toast(tr('Saved'))});
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
 }

@@ -89,6 +89,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts';
     check(await ready(ev, `/^#office\\/letters\\/\\d+$/.test(location.hash) && document.querySelector('#lt-greeting')?.value === 'Beste Grüße'`, 80), '#office/letters/new opens a new draft with the profile');
     // ================= the client page
     await nav(B + `#client/${cl.id}`);
+    // 2.435.0 (#3600): the block Letters starts folded with its number in the title: open it
+    check(await ready(ev, `/Letters\\s*\\(1\\)/.test(document.querySelector('#view [data-mscl="fold"][data-k="letters"]')?.textContent || '')`, 80), 'the folded block Letters shows its number');
+    await ev(click('#view [data-mscl="fold"][data-k="letters"]'));
     check(await ready(ev, `[...document.querySelectorAll('a[href^="#office/letters/"]')].some(a => /Kündigung/.test(a.textContent))`, 80), 'the client page lists the letter');
     // ================= member
     await signIn(ev, 'bob');

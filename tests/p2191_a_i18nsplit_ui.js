@@ -16,7 +16,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 // a plain text of a part: no placeholder, no markup, translated differently, long enough not to occur by chance
 const plain = part => Object.entries(part).filter(([k, v]) => typeof v === 'string' && v !== k && k.length > 14 && !/[{<|]/.test(k) && !/[{<]/.test(v));
 const rec = seen => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(String(u)); return f0(u, o); }; };

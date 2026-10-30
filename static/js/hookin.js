@@ -7,8 +7,9 @@
 'use strict';
 
 const WHI = {};  // list id -> {hooks, limit, available, reason, url: {id, url} shown once}
-function whiCurl(url) {
-  return `curl -X POST -H 'Content-Type: application/json' -d '{"title": "${tr('Call back')}", "due": "2026-01-31", "priority": "high"}' '${url}'`;
+function whiCurl(u) {  // 2.380 G (#2289): the header variant first (the token stays out of proxy logs); u = {url, endpoint?, token?}
+  const auth = u.token ? `-H 'X-Kalmido-Hook-Token: ${u.token}' ` : '', to = u.token ? u.endpoint : u.url;
+  return `curl -X POST ${auth}-H 'Content-Type: application/json' -d '{"title": "${tr('Call back')}", "due": "2026-01-31", "priority": "high"}' '${to}'`;
 }
 function whiRowsHtml(lid) {
   const d = WHI[lid]; if (!d) return `<div class="muted mhint">${tr('Loading…')}</div>`;
@@ -16,9 +17,12 @@ function whiRowsHtml(lid) {
   const rows = d.hooks.map(h => {
     const st = [h.uses ? trn('{0} task created', '{0} tasks created', h.uses) : tr('Not used yet'), h.last_used_at ? tr('last {0}', relTime(h.last_used_at)) : ''].filter(Boolean).join(' · ');
     const nm = h.name || tr('Inbound webhook');
-    const shown = d.url && d.url.id === h.id ? `<div class="shint lhint whi-url" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(d.url.url)}</code>
+    const u = d.url, hdr = u && u.token ? `<div class="whi-hdr">${esc(tr('Recommended: send the token as the header {0} to {1}', u.header || 'X-Kalmido-Hook-Token', u.endpoint))}
+      <code class="whi-tok">${esc(u.token)}</code> <button type="button" class="linkbtn" data-whi-copy="token">${ic('copy', 's')} ${tr('Copy')}</button></div>
+      <div class="muted">${esc(tr('Or the URL with the token in it (for tools without headers):'))}</div>` : `${esc(tr('Webhook URL (shown only now, keep it secret):'))} `;
+    const shown = u && u.id === h.id ? `<div class="shint lhint whi-url" role="status">${u.token ? `${esc(tr('Shown only now, keep it secret.'))} ` : ''}${hdr}<code class="whi-u">${esc(u.url)}</code>
       <button type="button" class="linkbtn" data-whi-copy="url">${ic('copy', 's')} ${tr('Copy')}</button>
-      <div class="whi-ex"><span class="muted">${tr('Example')}</span> <code>${esc(whiCurl(d.url.url))}</code> <button type="button" class="linkbtn" data-whi-copy="curl">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : '';
+      <div class="whi-ex"><span class="muted">${tr('Example')}</span> <code>${esc(whiCurl(u))}</code> <button type="button" class="linkbtn" data-whi-copy="curl">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : '';
     return `<div class="mrow rul-row whi-row${h.paused_reason ? ' off' : ''}" data-whi="${h.id}">${ic('zap', 's')}
       <div class="rul-txt"><b>${esc(nm)}</b><span class="muted">${esc(st)}</span>${h.paused_text ? `<span class="rul-paused">${esc(tr('Paused: {0}', h.paused_text))}</span>` : ''}</div>
       <button type="button" class="iconbtn" data-whi-menu="${h.id}" title="${esc(nm)}: ${esc(tr('More'))}" aria-label="${esc(nm)}: ${esc(tr('More'))}">${ic('dots', 's')}</button></div>${shown}`;
@@ -37,13 +41,14 @@ function whiMount(md, l) {
   const again = async () => { await whiLoad(lid).catch(() => {}); draw(); return {skipped: []}; };
   WHI[lid] = null;
   whiLoad(lid).then(draw).catch(() => { box.innerHTML = `<div class="muted mhint">${tr('Could not load the inbound webhooks.')}</div>`; });
-  const showUrl = async x => { WHI[lid] = WHI[lid] || {hooks: []}; await whiLoad(lid).catch(() => {}); WHI[lid].url = {id: x.id, url: x.url}; draw(); $('#l-whi [data-whi-copy="url"]', md)?.focus(); };
+  const showUrl = async x => { WHI[lid] = WHI[lid] || {hooks: []}; await whiLoad(lid).catch(() => {});
+    WHI[lid].url = {id: x.id, url: x.url, endpoint: x.endpoint, token: x.token, header: x.header}; draw(); $('#l-whi [data-whi-copy="url"]', md)?.focus(); };
   box.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('button'); if (!b) return;
     e.stopPropagation();
     const d = WHI[lid], h = d?.hooks.find(x => x.id === +(b.dataset.whiMenu || 0));
     if (b.dataset.whiCopy) {
-      const u = d?.url?.url || '', x = b.dataset.whiCopy === 'curl' ? whiCurl(u) : u;  // never the secret URL in a toast
+      const u = d?.url || {url: ''}, k = b.dataset.whiCopy, x = k === 'curl' ? whiCurl(u) : k === 'token' ? u.token || '' : u.url || '';  // never the secret in a toast
       try { await navigator.clipboard.writeText(x); toast(tr('Copied')); } catch { toast(x); }
       return;
     }

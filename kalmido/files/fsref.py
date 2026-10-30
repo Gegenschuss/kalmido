@@ -34,7 +34,8 @@ Interface (signatures fixed; B / C and 2.200-2.202 use them):
       protect   f(c, ref_id) -> a reason (text for people, translated) or None: the object may not go into the trash
       hidden    f(c, uid) -> an SQL subquery in parentheses (ids inlined, no ? parameters) of the ref_ids a folder must not open to
                 uid, or '' (none)
-      on_trash  f(c, uid, ref_id, restore) -> None: the node went into the trash (restore False) / came back (True)
+      on_trash  f(c, uid, ref_id, restore) -> None: the node went into the trash (restore False) / came back (True);
+                2.373.0 (#3335): coming back "stays" = the object stays in its area's trash (uid lacks the right)
       title     f(c, ref_id) -> the object's title: the node's name when fs_ref_place gets none (else the label)
       content   f(c, uid, ref_id) -> (bytes, file name, mime) | None: the object as a file (its PDF ...) for the content
                 routes of the file store (web and /api/v1, + text); called only with fs_ref_role >= 'view'
@@ -357,10 +358,12 @@ def fs_protect(c, n, hooks=True):
 
 
 def fs_ref_trashed(c, uid, n, restore):
-    """Tell the area of reference node n (a row) that it went into the trash / came back (its on_trash hook)."""
+    """Tell the area of reference node n (a row) that it went into the trash / came back (its on_trash hook) -> what the
+    hook says ("stays": the object stays in its area's trash, 2.373.0 #3335)."""
     reg = FSR.get(n["ref_kind"] or "") if n["kind"] == "ref" else None
     if reg and reg["on_trash"]:
-        reg["on_trash"](c, uid, n["ref_id"], bool(restore))
+        return reg["on_trash"](c, uid, n["ref_id"], bool(restore))
+    return None
 
 
 def _live_below(c, nid):
@@ -456,10 +459,14 @@ def fs_trash_prepare(c, uid, n):
 
 
 def fs_trash_restored(c, uid, n):
-    """After node n (a row) came back out of the trash: on_trash(restore=True) for it / the reference nodes below it."""
+    """After node n (a row) came back out of the trash: on_trash(restore=True) for it / the reference nodes below it ->
+    {ref_kind: count} of the objects that stay in their area's trash (2.373.0 #3335, e.g. a table without uid's right)."""
     rows = [n] if n["kind"] == "ref" else [r for r in _live_below(c, n["id"]) if r["kind"] == "ref"]
+    stays = {}
     for r in rows:
-        fs_ref_trashed(c, uid, r, True)
+        if fs_ref_trashed(c, uid, r, True) == "stays":
+            stays[r["ref_kind"]] = stays.get(r["ref_kind"], 0) + 1
+    return stays
 
 
 def fs_ref_json(n):

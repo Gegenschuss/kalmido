@@ -20,7 +20,8 @@ async function wpDraw(md) {
   const sub = await wpSub(), mine = sub && j.subs.find(x => x.endpoint === sub.endpoint);
   const hint = t => `<div class="shint">${t}</div>`;
   let h = '';
-  if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
+  if (shellIOS()) h += hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
+  else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
   else if (!wpSupported()) h += hintK(tr('This browser does not support Web Push'));
   else {
     h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;
@@ -35,9 +36,9 @@ async function wpDraw(md) {
   // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Turn on" / "Send test"
   const now = $('#s-pushnow', md);
   if (now) {
-    const can = wpSupported() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
+    const can = wpSupported() && !shellIOS() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
     now.className = 'pushnow ' + (mine ? 'on' : 'off');
-    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(!wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
+    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(shellIOS() ? tr('Notifications are not available in the iPhone app yet.') : !wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
       + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Turn on')}</button>` : '');
   }
 }
@@ -51,6 +52,7 @@ async function wpDraw(md) {
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
+  biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
   data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
@@ -59,6 +61,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
   's-startpg': ['start_page', N_('Open the app on'), 'sel'],  // 2.364.0 B (#3031)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
+  's-agsteps': ['agent_steps_always', N_('Always show steps'), 'chk'],  // 2.365.2 C (#2789): same setting as the switch in the agent chat
   's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
@@ -91,6 +94,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
   's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
+  's-mview': ['member_view', N_('View as member'), 'chk'],  // 2.436.0 (#3620): core.js mvResp
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -114,7 +118,7 @@ async function setApply(patch, label, o = {}) {
   if (Object.keys(patch).every(k => String(before[k]) === String(patch[k]))) return null;
   // 2.41.2 (#1501): the value counts at once (a view that reads it while the request runs), put back on an error
   // 2.269.0 B (#3014): o.send / o.back = the request body of the change / of its undo (e.g. set_delta: one entry, not the whole value)
-  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
+  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(o.keep); return false; }  // 2.359.2 B (#3049): o.keep = a typed field that keeps its text
   await setAfter(patch);
   const e = histAdd({label: tr('Changed setting: {0}', label), sett: true, post: settingsSync,
     undo: () => setStep(before, patch, label, o.back), redo: () => setStep(patch, before, label, o.send)});
@@ -125,7 +129,10 @@ async function setStep(to, from, label, wire) {  // one way of a settings step; 
   const body = {}, skip = [];
   // 2.290.0 (#3197): a step sent as single entries (set_delta) needs no whole-value check: the server keeps its own order and
   // entries this client does not know, so the whole value never matches; the delta itself leaves other changes alone
-  for (const k in to) { if (!wire?.set_delta?.[k] && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
+  // 2.358.0 B (#3302): the same for a partial matrix (notify {event: {news|push}}: only this switch, it writes notify +
+  // news_kinds); a reload between save and undo brought the server's order of news_kinds, so the step was skipped
+  const part = k => wire?.set_delta?.[k] || (wire?.notify && typeof wire.notify === 'object' && (k === 'notify' || k === 'news_kinds'));
+  for (const k in to) { if (!part(k) && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
   if (!Object.keys(body).length) return {skipped: skip, none: true};
   await api('PATCH', '/api/settings', wire && !skip.length ? wire : body);  // 2.269.0 B (#3014)
   Object.assign(S.settings, body);
@@ -136,7 +143,28 @@ async function setAfter(patch) {
   if ('lang' in patch) { await i18nLoad(patch.lang); LS.set('lang', patch.lang); document.documentElement.lang = patch.lang; }
   if ('features' in patch || 'nav_order' in patch) { try { await load(); } catch { /* offline: the local copy is right */ } await route(); return; }  // route: a view whose module went off
   if ('assistant_on' in patch) asst_onSync(patch.assistant_on);  // 2.75.0 (#1411): the entry points follow the switch
+  if ('member_view' in patch) { await mvAfter(); return; }  // 2.436.0 (#3620): the whole view follows (core.js)
   if (Object.keys(patch).some(k => SET_RENDER.includes(k))) render();
+}
+// 2.436.0 (#3620): the person has something "View as member" hides (only then Settings > Account offers it)
+const mvHas = () => !!(S.me?.real_admin || S.me?.is_admin || (S.me?.workspaces || []).some(w => (w.real_role || w.role) === 'admin'));
+// 2.436.0 (#3620): "View as member" (core.js mvResp): the view follows a change of the switch: the account at once, then the state again; an open Settings is drawn anew
+async function mvAfter() {
+  if (MV.me && MV.me.id === S.me?.id) { const raw = {...S.me, is_admin: MV.me.is_admin, workspaces: MV.me.workspaces}; delete raw.real_admin; S.me = mvOn() ? mvMe(raw) : raw; }
+  try { await load(); } catch { /* offline: the account above holds until the next load */ }
+  if (typeof OFC !== 'undefined') OFC.data = {};  // the office's lists follow its menu
+  render();
+  const md = $$('.smodal').pop();
+  if (md) { md._noflush = true; md.remove(); settingsModal(mvOn() || LS.get('settingsSec', 'account') === 'org' ? 'account' : LS.get('settingsSec', 'account')); }
+}
+// the way back (the entry under the settings' areas, the account menu): one click, no question
+async function mvSet(on) {
+  const v = on ? '1' : '0';
+  if ((S.settings?.member_view || '0') === v) return;
+  try { await api('PATCH', '/api/settings', {member_view: v}); } catch { return; }
+  S.settings.member_view = v;
+  await mvAfter();
+  toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
 }
 // local (per device) settings: appearance, tab bar
 function setLocal(label, get, set, to) {
@@ -156,11 +184,11 @@ function setSaved(e) {
   clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('on'); el._e = null; }, 6000);
 }
 // the dialog shows what the settings are now (after an undo / redo or a change on another device)
-function settingsSync() {
+function settingsSync(keep = null) {
   const md = $$('.smodal').pop(); if (!md) return;
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
-    const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
+    const el = $('#' + id, md); if (!el || el === document.activeElement || el === keep) continue;
     if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' || k === 'side_count' || k === 'side_dots' || k === 'side_share' ? s[k] !== '0' : s[k] === '1';  // 2.56.1 (#1799): side_*
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
@@ -236,7 +264,7 @@ function integrCardsHtml() {
   const C = [['cal', N_('Calendar on your phone'), N_('Your tasks with a date in the phone’s calendar app'), S.caldav?.enabled && S.me ? '#s-dav-h' : '#s-ical-h'],
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
     ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
-    ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Scans from your computer'), N_('Folder watcher program for Mac and Windows, scan inboxes'), '#s-scan-h']] : []),  // 2.353.0 B (#2773)
+    ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Documents: inboxes'), N_('Folder of the file store, folder watcher for Mac and Windows, scan inboxes, e-mail address'), '#s-scan-h']] : []),  // 2.353.0 B (#2773); 2.365.2 B (#2789): all inboxes
     ...(feat('docs') && feat('office') && typeof fx_html === 'function' ? [['file', N_('Receipt fetcher'), N_('Invoices from portals like Amazon straight into your office'), '#s-fetch-h']] : []),  // 2.425.0 C (#3453): docfetch.js
     ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
@@ -328,7 +356,10 @@ function aiHtml(hint, want) {
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('How to set one up')}</button></div>
     ${acz_linkHtml(true)}${''/* 2.166.0 (#2633) */}
-    ${agDotsHtml(hint)}`)}
+    ${agDotsHtml(hint)}
+    <h4 id="s-agsteps-h">${tr('Steps in the chat')}</h4>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-agsteps" ${S.settings?.agent_steps_always === '1' ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Always show steps')}</span></label></div>
+    ${hint(tr('The short notes an agent writes between its work steps stay above every answer and in the history of every job. The switch in the agent chat does the same.'))}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which projects they see') : tr('Which projects it sees')}</h4>
     ${hint(tr('Share below or in the project’s Share dialog; taking a project out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
@@ -696,7 +727,7 @@ function settingsModal(focus) {
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
-    integr: integrCardsHtml() + calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
+    integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
       <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared projects)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
@@ -712,14 +743,16 @@ function settingsModal(focus) {
       ${caldavHtml(hint)}
       ${feat('docs') && typeof dsc_integrHtml === 'function' ? dsc_integrHtml() : ''}${''/* 2.353.0 B (#2773): docscan.js, drawn by dsc_integrDraw */}
       ${feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : ''}
+      ${kks_html()}${nwls_html()}${apbs_html()}${''/* 2.365.2 B (#2789): Karakeep, newsletter service, booking page (integrations.js) */}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
         ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+      ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
-      ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
+      ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}${nwls_impLinkHtml()}
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
       <div class="shelp impHelp" id="s-imp-help">${impHelp('todoist')}</div>
       <div class="row"><label for="s-import">${tr('File')}</label>${fileBtn('s-import', IMP_ACCEPT.todoist)}</div>
@@ -755,7 +788,7 @@ function settingsModal(focus) {
       <h4>${tr('Formatting (Markdown)')}</h4>
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
       <h4>${tr('Projects')}</h4>
-      <div class="shelp">${tr('Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. For shopping or packing lists: project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
+      <div class="shelp">${tr('Every task list is a project with a project page, progress and dependencies. Give it a status to follow it on the start page and in “Where is it stuck?”; clear the status to stop following it. Project menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.')}</div>
       <h4>${tr('Favourites')}</h4>
       <div class="shelp">${tr(VW_FAV_HELP)}</div>
       <h4>${tr('Locked notes')}</h4>
@@ -769,15 +802,21 @@ function settingsModal(focus) {
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the projects (dropping a subtask there = standalone task in that project).')}</div>`,
   };
   pane.help += asst_helpHtml();  // 2.75.0 (#1411)
+  // 2.365.2 (#2789): what was set inside a module: Company & office (the office's settings, following the workspace) and Documents
+  pane.biz = typeof biz_paneHtml === 'function' ? biz_paneHtml() : '';
+  pane.docs = typeof dcs_paneHtml === 'function' ? dcs_paneHtml() : '';
+  pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || focus;  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
+    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
@@ -802,6 +841,7 @@ function settingsModal(focus) {
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
+  if (INTB_FOCUS[focus]) setTimeout(() => $(INTB_FOCUS[focus], md)?.scrollIntoView({block: 'start'}), 50);  // 2.365.2 B (#2789)
   if (focus === 'fetcher') setTimeout(() => $('#s-fetch-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.425.0 C (#3453)
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
@@ -813,7 +853,10 @@ function settingsModal(focus) {
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;
     if (k === 'data') templatesDraw(md);
-    if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
+    if (k === 'general' && typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789)
+    if (k === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+    if (k === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
+    if (k === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); intB_draw(md); }
     if (k === 'access') { acz_draw(md); const nb = $('.snav [data-sec="access"]', md); if (nb) nb.hidden = false; }  // 2.166.0 (#2633); 2.364.0 C (#3044): listed once opened
     if (k === 'notify') wpDraw(md);
     if (k === 'users' || k === 'org') ad_secDraw(md);  // 2.364.0 C (#3041)
@@ -831,7 +874,7 @@ function settingsModal(focus) {
     const v = setVal(el, d[2]);
     if (v === undefined) { settingsSync(); return; }  // not a valid value: back to what is saved
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
-    await setApply({[d[0]]: v}, tr(d[1]));
+    await setApply({[d[0]]: v}, tr(d[1]), d[2] === 'chk' || d[2] === 'sel' ? {} : {keep: el});  // 2.359.2 B (#3049): a failed save leaves the typed text
     if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
     if (d[0] === 'tz' || d[0] === 'time_split_midnight') S.tv.key = '';  // 2.125.0 B (#2120): the time report again
     if (d[0] === 'chat_read_receipts' && typeof teamChanged === 'function') teamChanged();  // 2.139.0 A (#2129): "Read by" comes / goes
@@ -956,8 +999,11 @@ function settingsModal(focus) {
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
-  if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); }
+  if (cur === 'integr') { icalDraw(md); calsDraw(md); if (typeof dsc_integrDraw === 'function') dsc_integrDraw(md); intB_draw(md); }
   if (cur === 'access') acz_draw(md);  // 2.166.0 (#2633)
+  if (cur === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
+  if (cur === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
+  if (typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789): its box exists only in General
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
   asst_setWire(md);  // 2.75.0 (#1411)
@@ -1258,10 +1304,14 @@ function instanceHtml(chk, hint) {
     ${hint(tr('Projects show their tracked time in hours and in days of this length. A project can set its own value (project dialog); it then applies to everyone in that project.'))}` : ''}
     ${cer_html(a, hint)}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
-    ${hint(tr('Calendar subscriptions and webhooks only reach public addresses. List servers in your own network here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
-    <div class="row"><textarea id="s-calhosts" rows="2" spellcheck="false" autocapitalize="off" aria-labelledby="s-calhosts-h" placeholder="nextcloud.home.arpa, 10.0.0.20:5232">${esc(a.cal_allow_hosts || '')}</textarea></div>
+    ${hint(tr('Connections from the server only reach public addresses. List servers in your own network per service here (host or host:port, comma-separated); webhooks may use http:// only for these.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed for every service by the server configuration: {0}', a.cal_allow_env)) : ''))}
+    ${ALLOWP.map(([k, n]) => `<div class="row"><label for="s-allowp-${k}">${esc(tr(n))}</label><input id="s-allowp-${k}" data-allowp="${k}" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="nextcloud.home.arpa, 10.0.0.20:5232" value="${esc((a.allow_hosts_by_purpose || {})[k] ?? a.cal_allow_hosts ?? '')}"></div>`).join('')}
     </details>` : ''}`;
 }
+// 2.380 G (#3389): the allowed internal hosts per service (server: calendars/subscriptions.py ALLOW_PURPOSES), saved in calview.js
+const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('Mail (IMAP / SMTP)')],
+  ['git', N_('Git')], ['newsletter', N_('Newsletter')], ['ntfy', N_('ntfy')], ['peppol', N_('Peppol')], ['feeds', N_('Feeds (RSS)')],
+  ['oidc', N_('Single sign-on (OIDC)')], ['paperless', N_('Paperless')], ['karakeep', N_('Karakeep')], ['servers', N_('Servers')]];
 // 2.102.0 E (#1999): the browser's own errors (static/js/clienterr.js) as bug tickets in one project list with error reports
 // on (list dialog > Repository); only lists the admin manages. "Off" = the browsers send nothing.
 function cer_html(a, hint) {
@@ -1497,12 +1547,17 @@ const SS_SYN = [  // [the words in every language, the label(s) to look for inst
   [['logo', 'signet', 'emblem', 'emblema', 'emblème'], () => [tr('Symbol')]],
   [['mitglieder', 'mitglied', 'members', 'member', 'miembros', 'membres', 'membri', 'leden'], () => [tr('People|admin'), tr('People')]],
   // 2.353.0 E (#2775): the words people type for the integrations (the scan program is under Integrations since #2773)
-  [['scanner', 'scannen', 'scan', 'wächter', 'waechter', 'ordner-wächter', 'watcher', 'folder watcher', 'download', 'herunterladen', 'mac', 'macos', 'windows', 'programm', 'program'], () => [tr('Scans from your computer')]],
+  [['scanner', 'scannen', 'scan', 'wächter', 'waechter', 'ordner-wächter', 'watcher', 'folder watcher', 'download', 'herunterladen', 'mac', 'macos', 'windows', 'programm', 'program', 'eingang', 'eingänge', 'inbox', 'mail-eingang'], () => [tr('Documents: inboxes')]],  // 2.365.2 B (#2789)
   [['import', 'importieren', 'einlesen', 'importer', 'importar', 'importeren'], () => [tr('Import')]],
   [['export', 'exportieren', 'exporter', 'exportar', 'exporteren'], () => [tr('Export')]],
   [['token', 'tokens', 'api', 'api-key', 'api key', 'zugangsschlüssel', 'app-passwort'], () => [tr('API tokens'), tr('App passwords')]],
   [['kalender', 'calendar', 'calendrier', 'calendario', 'agenda', 'ical', 'ics', 'caldav', 'kalender-abo'], () => [tr('Calendar subscription'), tr('Calendar apps (CalDAV)'), tr('Calendars')]],
   [['mail', 'e-mail', 'email', 'mails', 'postfach', 'mailbox', 'correo', 'courriel'], () => [tr('Tasks by e-mail'), tr('E-mail for single events')]],
+  // 2.365.2 (#2789): the setups that moved from the modules into Integrations
+  [['carddav', 'geburtstag', 'geburtstage', 'birthday', 'birthdays', 'adressbuch', 'address book', 'cumpleaños', 'anniversaire', 'compleanno', 'verjaardag'], () => [tr('Birthdays from your contacts')]],
+  [['newsletter', 'listmonk', 'brevo', 'cleverreach', 'rundbrief'], () => [tr('Newsletter service')]],
+  [['lesezeichen', 'bookmarklet', 'bookmark', 'marcador', 'marque-page', 'segnalibro', 'bladwijzer'], () => [tr('Bookmark button for the browser')]],
+  [['buchungsseite', 'termin buchen', 'booking', 'reservierung', 'reserva', 'réservation', 'prenotazione', 'boekingspagina'], () => [tr('Booking page')]],
   [['urlaub', 'abwesenheit', 'krank', 'frei', 'vacation', 'absence', 'holiday', 'sick', 'leave', 'vacaciones', 'ausencia', 'congé', 'ferie', 'assenza', 'vakantie', 'afwezig'], 'absence']];
 // the text of an element with a blank between its parts (textContent glues "Title" + "explanation" together)
 function ss_text(el) {
@@ -1560,28 +1615,32 @@ function ss_hits(md, q, shown, SYN) {
 const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
 const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
 const SS_AREA = [
-  {src: ['dc_settings', 'dc_sDraw', 'dc_cfSettings', 'dsc_slot'], area: N_('File store|area'), name: N_('Settings of the documents'), words: ['dokumente', 'documents', 'ablage', 'erkennung', 'recognition', 'paperless'],
-    on: () => modOn('docs') && typeof dc_settings === 'function', open: async () => { go('docs'); await ss_until(() => $('[data-dc="settings"]')); return dc_settings(); }, root: '.dc-smd',
-    secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise', 'archivnummer', 'asn', 'trennblatt']], [N_('Rules'), ['regel', 'rule']],
-      [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
-      [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
+  // 2.365.2 B (#2789): Settings > Documents (docs.js dcs_paneHtml, drawn by dc_sDraw); the lists and fields open from there in the module
+  {src: ['dc_settings', 'dc_sDraw', 'dc_cfSettings'], area: N_('Settings'), name: N_('Documents|settings'), words: ['dokumente', 'documents', 'ablage', 'erkennung', 'recognition', 'paperless'],
+    on: () => feat('docs') && typeof dcs_paneHtml === 'function', open: () => settingsModal('docs'), root: '#s-dcs',
+    secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise'], '#s-dcs-auto-h'], [N_('Archive numbers'), ['archivnummer', 'asn', 'trennblatt', 'separator'], '#s-dcs-asn-h'],
+      [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
+      [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
-    on: () => modOn('office') && ss_ofm('settings'), open: () => go('office/settings'), root: '#ofc-set',
-    secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
-      [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
-      [N_('Documents & numbers'), ['nummer', 'nummern', 'number', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice'], '', 'docs'],
-      [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
+    secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'],
+      [N_('Bank & taxes'), ['steuer', 'steuerrücklage', 'tax reserve', 'ust', 'vat', 'ist', 'soll', 'steuertermine', 'tax dates', 'kasse', 'kassen', 'cash box', 'anfangsbestand', 'kilometer', 'km', 'pauschale', 'mileage', 'bank'], '#s-biz-tax', 'tax'],
+      [N_('Documents & numbers'), ['nummer', 'nummern', 'nummernkreis', 'number', 'numbering', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice', 'zahlungsziel', 'payment terms', 'skonto'], '', 'docs'],
+      [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
       [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
       [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
-      [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
+      [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'steuerberater', 'tax advisor', 'skr03', 'skr04'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
+      [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
-      [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
-      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},
-  {src: ['bkSettingsHtml'], area: N_('Office|area'), name: N_('Bookkeeping'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],
-    on: () => modOn('office') && ss_ofm('books'), open: () => go('office/books'), root: '#bk-sh', secs: [[N_('Settings'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping'], '#bk-sh']]}];
+      [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
+      [N_('E-mail'), ['imap', 'smtp', 'postfach', 'mailbox', 'absender', 'sender', 'mailserver'], '#s-bizmail-h', '']]},  // 2.365.2 (#2789): the workspace's mailbox
+  {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
+    on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];
 // the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
 function ss_areaHits(q, max = 6) {
   const out = [], lo = s => String(s || '').toLowerCase();
@@ -1619,4 +1678,46 @@ async function ss_areaOpen(h) {
   const mo = new MutationObserver(() => { if (!r.isConnected || !r.classList.contains('sflash')) { const n = mark(); if (n && n !== r) { r = n; r.scrollIntoView?.({block: 'center'}); } } });  // (a morphing redraw keeps the element, drops the class)
   mo.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']});
   setTimeout(() => { mo.disconnect(); r.classList.remove('sflash'); }, 1600);
+}
+// ---- 2.365.2 (#2789): Settings > Company & office: the office's settings (were the page Office > Settings) for the current workspace;
+// office.js biz_paint draws them (the office scripts load here when the area is opened)
+function biz_paneHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<div id="s-biz" class="sbiz"><div class="muted mhint">${tr('Loading…')}</div></div><div id="s-bizmail"></div>`;
+}
+// the workspace's own mailbox (IMAP / SMTP, hubmailbox.js; also in Clients > E-mail filing): its state and Set up / Change
+async function biz_mailDraw(md) {
+  const box = $('#s-bizmail', md); if (!box) return;
+  try { await loadModule('hubmailbox'); await hmb_load(); } catch { box.innerHTML = ''; return; }
+  const ws = ofcWs(), x = (HMB.j?.spaces || []).find(y => y.ws === ws);
+  if (!box.isConnected) return;
+  if (!x || !(x.manage || x.set)) { box.innerHTML = ''; return; }
+  const what = !x.set ? tr('No mailbox yet') : [x.receive ? tr('receives') : '', x.send ? tr('sends') : ''].filter(Boolean).join(' · ') + (x.active ? '' : ' · ' + tr('paused'));
+  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its mails are filed here like forwarded ones, and replies go out from its address.')}</p>
+    <div class="row"><span class="muted">${x.address ? esc(x.address) + ' · ' : ''}${esc(what)}</span>${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</div>
+    ${x.error_text ? `<p class="hmberr" role="status">${ic('info', 's')} ${esc(x.error_text)}</p>` : ''}`;
+}
+async function biz_draw(md) {
+  const box = $('#s-biz', md); if (!box) return;
+  try { await loadModule('office'); } catch { box.innerHTML = `<p class="muted">${esc(tr('Could not be loaded'))}</p>`; return; }
+  if (!box.isConnected) return;
+  if (S.route.mod === 'office' && ofcTab() === 'settings' && !['import', 'rights'].includes(S.route.tab)) go('office/start');  // one settings form on the screen
+  if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
+  setTimeout(biz_paint, 0);
+  biz_mailDraw(md);
+}
+// 2.365.2 D (#2789): Settings > Data > Office: the master data file (export at once; import and the transfers sit in Company &
+// office > Data next to the office's other data) and the page of the legacy imports; Settings > Integrations > E-invoice:
+// the way to the Peppol access (its fields stay in one place, with the invoices). data-setgo: events.js
+function biz_dataHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<h4 id="s-ofdata-h">${tr('Office')}</h4><div class="shint">${tr('Master data, legacy data and transfers of the office of the current workspace.')}</div>
+    <div class="row lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export master data')}</a>
+    <button type="button" class="btn sm" data-setgo="biz-data">${ic('upload', 's')} ${tr('Import and transfer…')}</button>
+    <button type="button" class="btn sm" data-setgo="#office/import">${ic('archive', 's')} ${tr('Import legacy data')}</button></div>`;
+}
+function biz_integrHtml() {
+  if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
+  return `<h4 id="s-pep-h">${tr('E-invoice (Peppol)')}</h4><div class="shint">${tr('The Peppol access of the office (provider, account, sender id) is set with its invoices.')}</div>
+    <div class="row"><button type="button" class="btn sm" data-setgo="biz-peppol">${ic('building', 's')} ${esc(tr('Settings › Company & office › {0}', tr('Peppol')))}</button></div>`;
 }

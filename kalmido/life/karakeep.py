@@ -156,7 +156,7 @@ def kk_req(c, r, path, method="GET", body=None):
     if left <= 0:
         raise KkError("network")
     try:
-        with _cal_opener(cal_allow(c)).open(req, timeout=min(KK_TIMEOUT, max(left, 1))) as resp:
+        with _cal_opener(cal_allow(c, "karakeep")).open(req, timeout=min(KK_TIMEOUT, max(left, 1))) as resp:
             raw = b""
             while len(raw) <= KK_MAX_BYTES:
                 part = resp.read1(65536)  # 2.148.1 G (#2485): one receive per round, the deadline check below runs

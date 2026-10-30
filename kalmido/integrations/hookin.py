@@ -31,6 +31,8 @@ from ..api.common import hit_limit
 # keys, list tags the list does not have and fields of other lists are IGNORED (never created, never stored) and named in
 # the answer ("ignored"), so a flow keeps running when the list changes; invalid values (date, priority, a field value)
 # are a 400. Limits: WHI_MAX_BYTES per body, WHI_PER_MIN / WHI_PER_DAY requests per webhook, WHI_LIST_MAX per list.
+# 2.380 G (#2289): the token may also come as the header X-Kalmido-Hook-Token on POST /api/hooks/in (no token in the path,
+# so it never lands in reverse-proxy logs); the settings and the docs show this variant first, the path token stays valid.
 WHI_MAX_BYTES = 64 * 1024
 WHI_UNKNOWN_PER_MIN = 30  # 2.148.1 E (#2496): unknown tokens per address and minute
 WHI_PER_MIN = _env_int("KALMIDO_HOOK_IN_PER_MIN", 60)
@@ -51,6 +53,14 @@ def whi_hash(tok):
 
 def whi_url(tok):
     return f"{PUBLIC_URL.rstrip('/')}/api/hooks/in/{tok}"
+
+
+WHI_HEADER = "X-Kalmido-Hook-Token"  # 2.380 G (#2289)
+
+
+def whi_shown(tok):
+    """2.380 G (#2289): what the settings show once: the path URL (still valid) plus the header variant (endpoint + token)."""
+    return {"url": whi_url(tok), "endpoint": f"{PUBLIC_URL.rstrip('/')}/api/hooks/in", "token": tok, "header": WHI_HEADER}
 
 
 def whi_list_ok(c, lid):
@@ -130,7 +140,7 @@ def whi_create(lid):
                     (lid, me(), name, whi_hash(tok), iso(now_utc())))
     bump(c)
     c.commit()
-    return jsonify({**whi_dict(c, whi_need(c, hid)), "url": whi_url(tok)}), 201
+    return jsonify({**whi_dict(c, whi_need(c, hid)), **whi_shown(tok)}), 201
 
 
 @app.patch("/api/hooks-in/<int:hid>")
@@ -160,7 +170,7 @@ def whi_rotate(hid):
     c.execute("UPDATE hook_in SET token_hash=?, created_by=?, paused_reason='' WHERE id=?", (whi_hash(tok), me(), hid))
     bump(c)
     c.commit()
-    return jsonify({**whi_dict(c, whi_need(c, hid)), "url": whi_url(tok)})
+    return jsonify({**whi_dict(c, whi_need(c, hid)), **whi_shown(tok)})
 
 
 @app.delete("/api/hooks-in/<int:hid>")
@@ -283,6 +293,12 @@ def whi_pause(c, hid, why):
     c.commit()
 
 
+@app.post("/api/hooks/in")
+def whi_in_header():
+    """2.380 G (#2289): the same inbound webhook with the token in the header X-Kalmido-Hook-Token (the recommended way)."""
+    return whi_in(request.headers.get(WHI_HEADER, "").strip())
+
+
 @app.post("/api/hooks/in/<token>")
 def whi_in(token):
     """Inbound webhook: one task in the webhook's list (see above). 201 {id, url, ignored}."""
@@ -292,7 +308,7 @@ def whi_in(token):
     request.max_content_length = WHI_MAX_BYTES  # 2.190.0 D (#2561): also a body without a length is read only up to the cap (413)
     if (request.content_length or 0) > WHI_MAX_BYTES:  # 2.148.1 E (#2496): size first, before anything is read
         return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
-    h = whi_hash(token) if len(token) <= 200 else ""
+    h = whi_hash(token) if token and len(token) <= 200 else ""
     with system_ctx(c):  # 2.115.0 A (#2061): resolve the token (one row by its hash) across organisations, then act as its owner
         r = c.execute("""SELECT h.*, l.archived FROM hook_in h JOIN lists l ON l.id=h.list_id
                          WHERE h.token_hash=? AND h.deleted_at IS NULL""", (h,)).fetchone() if h else None

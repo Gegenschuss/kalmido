@@ -20,6 +20,7 @@
 #                                (JSDOM.fromURL; own `new JSDOM` windows: testClock(w)) by the same offset, testNow() for suites
 #                                2.206.0 A (#2512): `now real; fresh; run ...` = this group always at the real time (TOTP, fake
 #                                services with their own clock, real-time JWTs), also when KALMIDO_TEST_NOW is set for the whole run
+#   KALMIDO_TEST_NOW_FORCE=<when>  2.358.0 (#2784): a probe - every group at that time, own `now` lines included (`now real` stays)
 #   Timings: every suite and every group (container start included) -> $KALMIDO_TIMINGS (default tests/timings.csv, appended:
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
@@ -81,6 +82,12 @@ if [[ ${#PLAN[@]} -gt 0 && -z "$PLAN_STAGE" ]]; then
     [[ -n "${PLAN[${GFIRST[$g]}]:-}" ]] || { echo "run_all.sh: group ${GFIRST[$g]} is not in $KALMIDO_SHARD_PLAN (plan older than run_all.sh?)"; exit 2; }
   done
 fi
+# 2.358.0 (#3281): ONLY with a name the list does not know (a suite of another package, a typo) is an error - it used to end
+# after a second with "ALL SUITES PASSED" (kalmido-mactest.sh run SUITE)
+for s in ${ONLY:-}; do
+  grep -qE "^(now [^;]*; *)?(fresh;)?[ \t]*run $s " <<< "$LIST" \
+    || { echo "run_all.sh: ONLY: unknown suite $s (not in tests/suites.txt, no kalmido-suite marker)"; exit 2; }
+done
 if [[ -n "${ONLY_GROUPS:-}" ]]; then [[ -n "$WANT_G" ]] || { echo "ONLY_GROUPS: no such suite in run_all.sh"; exit 2; }; WANT_G+=" "; fi
 _ms() { local t=${EPOCHREALTIME:-}; [[ -n "$t" ]] || { echo $((SECONDS * 1000)); return; }; t=${t/,/.}; local f=${t#*.}000
   echo $(( ${t%.*} * 1000 + 10#${f:0:3} )); }
@@ -107,6 +114,9 @@ PY
 mine() {
   if [[ "${FUNCNAME[1]:-}" == fresh ]]; then
     _group_end; GI=$((GI + 1)); GT0=$(_ms)
+    # 2.358.0 (#2784): KALMIDO_TEST_NOW_FORCE (kalmido-mactest.sh KMT_TEST_NOW) = a probe: every group at that time, also the
+    # ones with their own `now` (not `now real`) - the DST night probe of p270_api / admin_alerts sits in `now wed 10:00` groups
+    [[ -n "${KALMIDO_TEST_NOW_FORCE:-}" && "$NEXT_NOW" != real ]] && NEXT_NOW=$KALMIDO_TEST_NOW_FORCE
     if [[ "$NEXT_NOW" == real ]]; then unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT  # 2.206.0 A (#2512): real time, also under a run-wide test time
     elif [[ -n "${NEXT_NOW:-$BASE_NOW}" ]]; then
       KALMIDO_TEST_NOW=$(_now_iso ${NEXT_NOW:-$BASE_NOW}) || { echo "run_all.sh: now ${NEXT_NOW:-$BASE_NOW}: not a time"; exit 2; }

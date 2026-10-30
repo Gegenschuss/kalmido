@@ -71,22 +71,26 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
   const show = m => { const x = wsh$('[data-wsh-err]', md); if (x) { x.textContent = m || ''; x.hidden = !m; } };
   const via = s => s.direct ? '' : `<small class="muted">${esc(tr('via folder “{0}”', wsh_baseName(s.path)))}</small>`;
   // 2.126.2 B (#2358): a public link whose maker left the organisation does not work any more -- shown like an expired one
+  // 2.380 H (#2356): a share that shows the file store pictures embedded in the page says so; a direct one switches it here
+  const img = s => (s.images ? ` · ${esc(tr('Pictures shown'))}` : '') + (s.direct && !s.ended ? ` <button type="button" class="btn sm" data-wsh="img" data-id="${s.id}" aria-pressed="${!!s.images}">${esc(s.images ? tr('Hide pictures') : tr('Show pictures'))}</button>` : '');
   const exp = s => s.ended ? `<span class="calerr">${tr('Ended')}</span> · ${esc(tr('Its creator is no longer in the organisation'))}` : s.expired ? `<span class="calerr">${tr('Expired')}</span>` : s.expires_at ? esc(tr('valid until {0}', fmtDate(wsh_day(s.expires_at)))) : '';
   const draw = () => {
     const box = wsh$('.wsh-body', md); if (!box || !j) return;
     if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This space is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
     const ppl = j.shares.filter(s => s.kind === 'person'), links = j.shares.filter(s => s.kind === 'link');
     const cand = legacy ? [] : (users || []).filter(u => !ppl.some(s => s.direct && s.user?.id === u.id));  // 2.200.0 B (#2747): people are chosen above, by e-mail address here
-    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read only')}${exp(s) ? ' · ' + exp(s) : ''}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>
+    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>
       <div class="row shmail">${cand.length ? `<select id="wsh-user" aria-label="${esc(tr('Person'))}"><option value="">${tr('Choose a person…')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name || u.username || '?')}</option>`).join('')}</select>` : ''}<input id="wsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-wsh="person">${ic('plus', 's')} ${tr('Add')}</button></div>`
       : legacy ? '' : `<div class="shint keep">${esc(tr('Every member of the organisation reads these pages already. For people outside it, use a public link.'))}</div>`;
     const pub = !j.enabled ? `<div class="shint keep">${esc(tr('Public links are turned off on this server'))}</div>`
       : `${links.map(s => `<div class="wshlink"><div class="row icalrow"><input readonly value="${esc(s.url)}" data-wsh-url="${s.id}" aria-label="${esc(tr('Public link'))}"><button type="button" class="btn sm pri" data-wsh="copy" data-id="${s.id}"${s.ended ? ' disabled' : ''}>${ic('copy', 's')} ${tr('Copy')}</button></div>
-          <div class="shint">${via(s)}${exp(s) ? exp(s) + ' · ' : ''}${esc(trn('opened {0} time', 'opened {0} times', s.views))}${s.last_used_at ? ' · ' + esc(tr('last {0}', relTime(s.last_used_at))) : ''}${s.direct ? ` <button type="button" class="btn sm danger" data-wsh="end" data-id="${s.id}">${tr('Turn off')}</button>` : ''}</div></div>`).join('')}
+          <div class="shint">${via(s)}${exp(s) ? exp(s) + ' · ' : ''}${esc(trn('opened {0} time', 'opened {0} times', s.views))}${s.last_used_at ? ' · ' + esc(tr('last {0}', relTime(s.last_used_at))) : ''}${img(s)}${s.direct ? ` <button type="button" class="btn sm danger" data-wsh="end" data-id="${s.id}">${tr('Turn off')}</button>` : ''}</div></div>`).join('')}
         ${links.length ? '' : `<div class="shint keep">${esc(tr('People without an account can read it through a secret link: only what you share here, nothing else of your pages.'))}</div>`}
         <div class="row"><label for="wsh-exp">${tr('Valid until')}</label>${dateIn('wsh-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
         <div class="row"><button type="button" class="btn sm${links.some(s => s.direct && !s.ended) ? '' : ' pri'}" data-wsh="link">${ic('link', 's')} ${tr(links.some(s => s.direct && !s.ended) ? N_('Another public link') : N_('Create public link'))}</button></div>`;
-    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4><div id="wsh-pub">${pub}</div>`;
+    // 2.380 H (#2356): new shares show the pictures of the file store embedded in the page only with this switch (default off)
+    const imgRow = `<div class="row"><label for="wsh-img">${tr('Show embedded pictures')}</label><label class="swc"><input type="checkbox" id="wsh-img"><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show embedded pictures'))}</span></label></div><div class="shint">${esc(tr('Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.'))}</div>`;
+    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4><div id="wsh-pub">${pub}</div>` + imgRow;
   };
   const load = async () => {
     try { j = await calReq('GET', '/api/wiki/shares?' + q); } catch (x) { const b = wsh$('.wsh-body', md); if (b) b.innerHTML = `<div class="muted mhint">${esc(x.status === 404 ? tr('No links yet: a public link can be made once the folder holds a page.') : x.message)}</div>`; return; }
@@ -106,19 +110,23 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
     const b = t.closest('[data-wsh]'); if (!b) return;
     const a = b.dataset.wsh; show('');
     if (a === 'copy') { const i = wsh$(`[data-wsh-url="${b.dataset.id}"]`, md); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } return; }
-    const exp = wsh$('#wsh-exp', md)?.value || null;
+    const exp = wsh$('#wsh-exp', md)?.value || null, images = !!wsh$('#wsh-img', md)?.checked;
     b.disabled = true;
     try {
       if (a === 'link') {
-        const s = await calReq('POST', '/api/wiki/shares', {...tgt, kind: 'link', expires: exp});
+        const s = await calReq('POST', '/api/wiki/shares', {...tgt, kind: 'link', expires: exp, images});
         await changed(); step(tr('Public link created'), s.id, true);
         try { await navigator.clipboard.writeText(s.url); toast(tr('Link copied')); } catch { /* the field shows it */ }
       } else if (a === 'person') {
         const uid = +(wsh$('#wsh-user', md)?.value || 0), em = (wsh$('#wsh-email', md)?.value || '').trim();
         if (!uid && !em) { show(tr('Choose a person or type an e-mail address')); return; }
-        const s = await calReq('POST', '/api/wiki/shares', {...tgt, kind: 'person', ...(uid ? {user_id: uid} : {email: em}), expires: exp});
+        const s = await calReq('POST', '/api/wiki/shares', {...tgt, kind: 'person', ...(uid ? {user_id: uid} : {email: em}), expires: exp, images});
         if (s.by_email) toast(tr('If an account has this address, it can read the page now.'));
         else { step(tr('Shared with {0}|wiki', s.user?.name || '?'), s.id, true); }
+        await changed();
+      } else if (a === 'img') {  // 2.380 H (#2356)
+        const s = j.shares.find(x => x.id === +b.dataset.id); if (!s) return;
+        await calReq('PATCH', `/api/wiki/shares/${s.id}`, {images: !s.images});
         await changed();
       } else if (a === 'end') {
         const s = j.shares.find(x => x.id === +b.dataset.id); if (!s) return;

@@ -36,6 +36,7 @@ from ..accounts.session import GATE, me
 from ..accounts.orgs import org_role  # 2.240.0 B2 (#2867): pulled up from functions
 from ..core.access import Denied, org_trip_sql, ov_open, reading_sql, task_visible
 from ..core.errors import BadInput
+from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int
 from ..core.env import env_bool
 
@@ -835,8 +836,10 @@ def evm_content(lines, total, lg):
     text = "\n\n".join(f"- {w} · {ln}\n  {u}" for w, ln, u in lines) + \
         (("\n\n" + trn("and {0} more", "and {0} more", more, lg=lg)) if more > 0 else "") + "\n\n-- \n" + foot + "\n"
     e = html.escape
-    hb = "<ul>" + "".join(f'<li><a href="{e(u)}">{e(w)}</a> <span style="color:#666">· {e(ln)}</span></li>' for w, ln, u in lines) + "</ul>"
-    if more > 0:
-        hb += f"<p>{e(trn('and {0} more', 'and {0} more', more, lg=lg))}</p>"
-    hb += f'<p style="color:#666;font-size:90%">{e(foot.rsplit(" ", 1)[0])} <a href="{e(PUBLIC_URL)}/#settings/notify">{e(tr("Settings", lg=lg))}</a></p>'
-    return subj, text, f"<!doctype html><html><body style=\"font-family:sans-serif\">{hb}</body></html>"
+    # 2.420.0 B (#3499): the shared mail frame (was a bare page)
+    ul = Safe('<ul style="margin:0;padding-left:20px;font-size:16px;line-height:1.55">' + "".join(
+        f'<li style="margin:0 0 6px"><a href="{e(u, quote=True)}" style="color:{MAIL_ACC}">{e(w)}</a> <span style="color:{MAIL_MUTED}">· {e(ln)}</span></li>'
+        for w, ln, u in lines) + "</ul>")
+    paras = [ul] + ([trn("and {0} more", "and {0} more", more, lg=lg)] if more > 0 else [])
+    hfoot = Safe(f'{e(foot.rsplit(" ", 1)[0])} <a href="{e(PUBLIC_URL)}/#settings/notify" style="color:{MAIL_ACC}">{e(tr("Settings", lg=lg))}</a>')
+    return subj, text, mail_html(subj, paras, foot=hfoot, lang=lg)

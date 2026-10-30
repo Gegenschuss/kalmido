@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2299D_NOSTART && !process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const head = ['Muster Werkstatt GmbH', 'Industrieweg 12', '12345 Beispielstadt', '', 'Rechnung an:', 'Beispiel Agentur', 'Hauptstraße 7', '54321 Musterdorf', ''];
 const BAD = [...head, 'Rechnungsnummer: RE-2026-502', 'Rechnungsdatum: 12.10.2026', '1  4 h  Wartung Druckmaschine  320,00 EUR', '2  1 Stk  Ersatzteil Walze  80,00 EUR',
   'Nettobetrag  400,00 EUR', 'zzgl. 19 % MwSt  76,00 EUR', 'Gesamtbetrag  496,00 EUR'].join('\n');

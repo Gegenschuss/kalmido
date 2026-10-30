@@ -15,15 +15,16 @@ from datetime import timedelta
 
 from ..core.config import app
 from ..core.db import connect, iso, now_utc
-from ..accounts.session import bg_here
+from ..accounts.session import GATE, bg_here
 from ..core.pg import system_ctx
 from ..files.store import fs_add_hooks, fs_on_delete, fs_put, fs_role
 from . import store as S
 from .unpack import doc_unpack
 from ..core.access import acx_of, Denied  # 2.149.0 G (#2517): pulled up from functions
-from ..core.i18n import tr  # 2.353.0 (#2769)
+from ..core.i18n import lang, tr  # 2.353.0 (#2769)
 from ..office.lettermail import ltm_token_space  # 2.312.0 C (#3265)
 from ..files.fslock import fl_is_locked  # 2.353.0 (#2769)
+from .maillink import ML_TAG, ml_budget, ml_collect, ml_links, ml_mail_name  # 2.424.0 B (#3450)
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -263,15 +264,71 @@ def inbox_scan(c):
 
 
 # ---- mail -------------------------------------------------------------------------------------------------------------
-def docs_mail_import(c, msg, raw):
-    """A mail to a document address (plus address with a doc_mail token): its attachments become documents of that
-    person / organisation. None = not a document address (the task import goes on); else the first node id or 0."""
+def _mail_toks(msg):
+    """(the plus address tokens of a mail's recipients, mail_text of integrations/mail.py, ei_is)."""
     from ..integrations.mail import MAIL_TOKEN_RE, mail_text
-    from ..admin.hosting import QuotaExceeded
-    import hashlib
     from ..office.einvoice_in import ei_is
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
-    toks = MAIL_TOKEN_RE.findall(hdrs)
+    return MAIL_TOKEN_RE.findall(hdrs), mail_text, ei_is
+
+
+def _mail_parts(files, ei_is, mid):
+    """The files of a documents mail that become documents: [(index, [(name, mime, bytes, ext_id)])]. A receipt candidate
+    is a PDF, an e-invoice XML, an archive (ZIP / winmail.dat, 2.146.0 B #2453) or an image attached as a file (2.424.0 B2,
+    #3450: mail_text att_images -- an inline logo is none)."""
+    out = []
+    for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
+        parts = doc_unpack(name, data, MAIL_UNPACKED)  # 2.146.0 B (#2453): a ZIP / winmail.dat -> its files
+        if parts is not None:
+            for e in parts[1]:
+                print("docs: mail attachment", e[:200], flush=True)
+            # 2.146.0 A (#2451): an XML in it only when it is an e-invoice, like a single attachment
+            parts = [(n, m2, b, f"mail:{mid}:{i}:{j}") for j, (n, b, m2) in enumerate(parts[0])
+                     if not n.casefold().endswith(".xml") or ei_is(b)]
+        # 2.146.0 A (#2451): an e-invoice XML (XRechnung UBL / CII) goes in too, any other XML does not
+        elif mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf") or ei_is(data):
+            parts = [(name, mime, data, f"mail:{mid}:{i}")]
+        else:
+            continue
+        out.append((i, parts))
+    return out
+
+
+def docs_mail_prefetch(msg):
+    """2.424.0 B2 (#3450, review): the invoice link downloads of a documents mail BEFORE its database transaction
+    (integrations/mail.py mail_fetch prefetch, outside the gate): a slow server never holds a transaction open nor the
+    gate. Only for a known document address (doc_mail token, its person active and still a member) whose mail has no
+    file of its own; at most ML_HOUR_LINKS downloads per address and hour (ml_budget). -> (links found, downloads) for
+    docs_mail_import(pre=...); ([], []) = nothing fetched."""
+    toks, mail_text, ei_is = _mail_toks(msg)
+    links = ml_links(msg) if toks else []
+    if not links or _mail_parts(mail_text(msg, att_images=True)[1], ei_is, ""):
+        return [], []
+    k = 0
+    with GATE.bg():
+        c = connect()
+        try:
+            with system_ctx(c):  # resolving the secret address token, like docs_mail_import
+                r = next((x for x in (c.execute("SELECT * FROM doc_mail WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
+                u = r and c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
+                if u and not u["disabled"] and (not r["org_id"] or int(r["org_id"]) in acx_of(c, r["user_id"]).org_ids):
+                    k = ml_budget(c, r["token"], "links", len(links))
+            c.commit()
+        finally:
+            c.close()
+    if not k:
+        return [], []  # 2.424.0 (#3450): budget spent -> no links counted, so the mail is not tagged "needs a login"
+    return ml_collect(msg, limit=k, links=links)
+
+
+def docs_mail_import(c, msg, raw, pre=None):
+    """A mail to a document address (plus address with a doc_mail token): its attachments become documents of that
+    person / organisation. None = not a document address (the task import goes on); else the first node id or 0.
+    pre (2.424.0 B2, #3450): the result of docs_mail_prefetch (the downloads made before this transaction); False = it
+    failed (nothing downloaded); None = not prefetched (a direct call): the links are downloaded here."""
+    from ..admin.hosting import QuotaExceeded
+    import hashlib
+    toks, mail_text, ei_is = _mail_toks(msg)
     if not toks:
         return None
     with system_ctx(c):  # docs mail: resolving a secret address token (like a public link), membership checked below
@@ -290,21 +347,10 @@ def docs_mail_import(c, msg, raw):
         if org and int(org) not in acx_of(c, uid).org_ids:
             return 0  # no longer a member: nothing goes in
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
-        _text, files = mail_text(msg)
-        first, made = 0, []
-        for i, (name, mime, data) in enumerate(files[:MAIL_FILES]):
-            parts = doc_unpack(name, data, MAIL_UNPACKED)  # 2.146.0 B (#2453): a ZIP / winmail.dat -> its files
-            if parts is not None:
-                for e in parts[1]:
-                    print("docs: mail attachment", e[:200], flush=True)
-                # 2.146.0 A (#2451): an XML in it only when it is an e-invoice, like a single attachment
-                parts = [(n, m2, b, f"mail:{mid}:{i}:{j}") for j, (n, b, m2) in enumerate(parts[0])
-                         if not n.casefold().endswith(".xml") or ei_is(b)]
-            # 2.146.0 A (#2451): an e-invoice XML (XRechnung UBL / CII) goes in too, any other XML does not
-            elif mime.startswith("image/") or mime == "application/pdf" or name.lower().endswith(".pdf") or ei_is(data):
-                parts = [(name, mime, data, f"mail:{mid}:{i}")]
-            else:
-                continue
+        _text, files = mail_text(msg, att_images=True)
+        first, made, cand = 0, [], False
+        for _i, parts in _mail_parts(files, ei_is, mid):
+            cand = True
             for pname, pmime, pdata, pext in parts:
                 try:
                     with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
@@ -313,6 +359,35 @@ def docs_mail_import(c, msg, raw):
                     made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:
                     print("docs: mail attachment refused", type(e).__name__, flush=True)
+        if not cand and letter is None:
+            # 2.424.0 B (#3450): no file attached -> the invoice download links of the mail (docs/maillink.py: https, SSRF
+            # guard, limits, PDF only); a link that gives no PDF (a login page) -> the mail itself, tagged "needs a login"; no
+            # link at all -> the mail itself too (an invoice in the mail text, a confirmation code of a mail filter)
+            if pre is None and r:  # a direct call: the downloads here (within this transaction), with the same budget
+                pre = ml_collect(msg, limit=ml_budget(c, r["token"], "links", len(ml_links(msg))))
+            links, got = pre or ([], [])
+            for k, pname, pdata in got:
+                try:
+                    with c.savepoint():
+                        nid = docs_ingest(c, uid, org, pname, pdata, "application/pdf", "mail", {"ext_id": f"mail:{mid}:link:{k}"}, dedup=True)
+                    first = first or nid
+                    made.append(nid)
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("docs: receipt link refused", type(e).__name__, flush=True)
+            if not got and not (r and ml_budget(c, r["token"], "eml")):
+                pass  # 2.424.0 B2 (#3450): the hour's budget of mails filed without a file is spent (ml_budget logs it)
+            elif not got:
+                tag = tr(ML_TAG, lg=lang(c, uid)) if links else ""
+                meta = {"ext_id": f"mail:{mid}:eml", "text": ((tag + "\n\n" if tag else "") + _text)[:200_000] or ml_mail_name(msg)}
+                if tag:
+                    meta["tags"] = [tag]
+                try:
+                    with c.savepoint():
+                        nid = docs_ingest(c, uid, org, ml_mail_name(msg), raw, "message/rfc822", "mail", meta, dedup=True)
+                    first = first or nid
+                    made.append(nid)
+                except (Denied, ValueError, QuotaExceeded) as e:
+                    print("docs: mail document refused", type(e).__name__, flush=True)
         if made:  # 2.153.0 (#2029): the answer to a letter sent by e-mail (In-Reply-To / References) -> linked to it
             try:
                 from ..office.lettermail import ltm_link_replies

@@ -284,6 +284,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
 }
 function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
+  if (k === 'projects') return tr('Projects');  // 2.417.0 A (#3559)
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
   if (k.startsWith('who:')) { const id = +k.slice(4); return S.me && id === S.me.id ? tr('My tasks') : tr('Tasks of {0}', personNameAny(id) || '?'); }

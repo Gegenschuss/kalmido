@@ -11,7 +11,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2122D_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await sleep(600);
@@ -24,7 +24,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const yPrev = new Date().getFullYear() - 1;
 
   const w = await boot({hash: 'office/books/ustva'}); const d = w.document;
-  check(await until(() => d.querySelector('#bk-ustva .seg') && d.querySelector('#txd-ustva'), 80), 'the bookkeeping tab with the VAT figures and the tax dates');
+  // 2.365.2 D (#2789): the tax dates are set in Settings > Company & office > Bank & taxes; the bookkeeping tab links there
+  check(await until(() => d.querySelector('#bk-ustva .seg') && d.querySelector('#view [data-setgo="biz-tax"]'), 80) && !d.querySelector('#view #txd-ustva'), 'the bookkeeping tab with the VAT figures and the link to the tax dates');
   const seg = () => [...d.querySelectorAll('#bk-ustva [data-bk="mode"]')];
   check(seg().map(b => b.dataset.v).join() === 'month,quarter,year' && /Whole year/.test(seg()[2]?.textContent || ''), 'the period: month / quarter / whole year');
   check(w.eval('BK.mode') === 'quarter' && !!d.querySelector('#bk-period'), 'no tax dates: quarters by default, the quarter field');
@@ -38,6 +39,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(await until(() => w.eval(`BK.mode === 'quarter' && /^q[1-4]$/.test(BK.period)`) && !!d.querySelector('#bk-period'), 40), 'back to quarters');
 
   // the tax dates: yearly
+  d.querySelector('#view [data-setgo="biz-tax"]').click();
+  check(await until(() => d.querySelector('.smodal #s-biz #txd-ustva'), 80), 'the link opens Settings > Company & office with the tax dates');
   check(d.querySelectorAll('#txd-ustva option').length === 4 && !!d.querySelector('#txd-ustva option[value="year"]')
     && /Yearly \(annual return only\)/.test(d.querySelector('#txd-ustva option[value="year"]').textContent), 'the tax dates offer "Yearly (annual return only)"');
   const sel = d.querySelector('#txd-ustva'); sel.value = 'year';

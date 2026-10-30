@@ -396,7 +396,8 @@ check(A.post(B + "/api/admin/alerts/test").status_code == 409, "test refused whi
 switch("collab_all", False)
 switch("collab_all", True)
 time.sleep(2)
-check(not admin_msgs(), "env off: no alerts at all")
+# 2.358.0 C (#2784): the FAIL line names what was sent (red once in a probe at Sun 25.10.2026 23:50, not reproduced at 23:50 / 23:59)
+check(not admin_msgs(), f"env off: no alerts at all: {[(x['topic'], x['title'], x['msg'][:80]) for x in admin_msgs()[:3]]}")
 
 # ------------------------------------------------------------------ container 3: KALMIDO_ADMIN_TOPIC, refused inbox, PAPERLESS_* ignored
 clear()

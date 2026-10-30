@@ -16,17 +16,19 @@ function dpj_defName(d) {
   const cl = d.client_id && typeof clientById === 'function' ? clientById(d.client_id) : null;
   return [(cl?.name || d.recipient?.name || '').trim(), (d.project_title || '').trim()].filter(Boolean).join(' – ');
 }
+// 2.435.0 (#3606): the row shows a button with the project's icon and name (as the sidebar shows it); a click opens the
+// project picker of "Move to project" (No project, the client's projects, then the rest in the sidebar's order, a search
+// from 10 entries, a sheet on a phone) instead of a native select with the names' old emojis
 function dpj_rowHtml(d) {
   if (!d?.id || !DPJ_KINDS.includes(d.kind)) return '';
-  const ls = dpj_lists(), opt = l => `<option value="${l.id}" ${l.id === d.list_id ? 'selected' : ''}>${esc(l.name)}</option>`;
-  const mine = d.client_id ? ls.filter(l => l.client_id === d.client_id) : [], rest = ls.filter(l => !mine.includes(l));
-  const known = !d.list_id || ls.some(l => l.id === d.list_id);
-  const hidden = known ? '' : `<option value="${d.list_id}" selected>${esc(d.list_name || tr('Project (not visible)'))}</option>`;
-  const groups = mine.length ? `<optgroup label="${esc(tr('Projects of the client'))}">${mine.map(opt).join('')}</optgroup><optgroup label="${esc(tr('Other projects'))}">${rest.map(opt).join('')}</optgroup>` : rest.map(opt).join('');
+  const ls = dpj_lists(), l = d.list_id ? ls.find(x => x.id === d.list_id) : null;
+  const known = !d.list_id || !!l;
+  const cur = l ? `${listIconHtml(l, {cls: 'mlic'}) || ic('list', 's')}<span class="dpjnm">${esc(licName(l))}</span>`
+    : d.list_id ? `${ic('list', 's')}<span class="dpjnm">${esc(d.list_name || tr('Project (not visible)'))}</span>` : `<span class="dpjnm muted">${tr('No project')}</span>`;
   const open = d.list_id && (known || d.list_name) ? `<a class="btn sm" href="#l/${d.list_id}">${ic('arrow', 's')}<span>${tr('Open project')}</span></a>` : '';
   const nw = DPJ.newFor === d.id;
   return `<div class="ofdgrid dpjrow"><div class="row"><label for="dpj-sel">${tr('Project')}</label><span class="lacts">
-    <select id="dpj-sel" data-dpj="sel"><option value="">${tr('No project')}</option>${hidden}${groups}</select>${open}</span></div>
+    <button type="button" class="btn sm dpjpick" id="dpj-sel" data-dpj="sel" data-lid="${d.list_id || ''}" aria-haspopup="menu">${cur}${ic('down', 's dpjchev')}</button>${open}</span></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="dpj-new" data-dpj="new" ${nw ? 'checked' : ''}> ${tr('Create new project')}</label></div>
     ${nw ? `<div class="row dpjnew"><label for="dpj-name">${tr('Name')}</label><span class="lacts"><input id="dpj-name" maxlength="200" value="${esc(dpj_defName(d))}" placeholder="${esc(tr('Client – project title'))}">
     <button type="button" class="btn sm pri" data-dpj="make">${tr('Create')}</button></span></div>` : ''}</div>`;
@@ -35,13 +37,27 @@ async function dpj_set(body) {
   const d = OFD.doc; if (!d) return null;
   return await ofdSave('POST', `/api/office/docs/${d.id}/project`, body);
 }
-document.addEventListener('change', async e => {
-  const t = /** @type {HTMLInputElement} */ (e.target);
-  if (t.dataset?.dpj === 'new') { DPJ.newFor = t.checked ? OFD.doc?.id || 0 : 0; ofdDraw(); if (t.checked) setTimeout(() => /** @type {HTMLInputElement|null} */ ($('#dpj-name'))?.select(), 0); return; }
-  if (t.dataset?.dpj !== 'sel' || !OFD.doc) return;
-  const before = OFD.doc.list_id || null, v = t.value ? +t.value : null;
+async function dpj_pickTo(v) {
+  if (!OFD.doc) return;
+  const before = OFD.doc.list_id || null;
   if (v === before) return;
   if (await dpj_set({list_id: v})) toast(tr('Saved'), async () => { await dpj_set({list_id: before}); });
+}
+function dpj_picker(b) {
+  const d = OFD.doc; if (!d) return;
+  const ls = dpj_lists(), mine = d.client_id ? ls.filter(l => l.client_id === d.client_id) : [];
+  tch_listPicker(b, {title: tr('Project'), filter: l => ls.includes(l), on: d.list_id || 0, search: 10,
+    pre: [{label: tr('No project'), icon: 'ban', on: !d.list_id, fn: () => dpj_pickTo(null)}],
+    first: mine.length ? {head: tr('Projects of the client'), lists: mine, rest: tr('Other projects')} : null,
+    pick: l => dpj_pickTo(l.id)});
+}
+document.addEventListener('change', async e => {
+  const t = /** @type {HTMLInputElement} */ (e.target);
+  if (t.dataset?.dpj === 'new') { DPJ.newFor = t.checked ? OFD.doc?.id || 0 : 0; ofdDraw(); if (t.checked) setTimeout(() => /** @type {HTMLInputElement|null} */ ($('#dpj-name'))?.select(), 0); }
+});
+document.addEventListener('click', e => {
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-dpj="sel"]');
+  if (b && OFD.doc) { e.preventDefault(); dpj_picker(/** @type {HTMLElement} */ (b)); }
 });
 document.addEventListener('click', async e => {
   const b = /** @type {HTMLButtonElement} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-dpj="make"]'));

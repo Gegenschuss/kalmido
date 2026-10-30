@@ -16,7 +16,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21445A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...h, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await sleep(600);
@@ -77,7 +77,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const tt = await until(() => { const e = w.document.querySelector('#toast'); return e && /auth_time/.test(e.textContent) ? e.textContent : ''; });
   check(/did not say when you signed in/.test(tt) && w.location.hash === '', '#2387: back with an error the app says why: ' + tt);
   // ---- #2387 F8: a refused download shows the reason
-  w.eval(`window._f = window.fetch; window.fetch = async () => ({ok: false, status: 403, json: async () => ({error: 'Refused for a test reason'})}); S.me.drop_token_set = false`);
+  w.eval(`window._f = window.fetch; window.fetch = async (u, o) => /httpshortcuts/.test(u) ? {ok: false, status: 403, json: async () => ({error: 'Refused for a test reason'})} : window._f(u, o); S.me.drop_token_set = false`);
   w.eval(`(() => { const a = document.createElement('a'); a.href = '/api/me/share/httpshortcuts.zip'; a.setAttribute('download', 'x.zip'); tkh_zipClick({preventDefault() {}}, a, document.body); })()`);
   const t8 = await until(() => { const e = w.document.querySelector('#toast'); return e && /test reason/.test(e.textContent) ? e.textContent : ''; });
   check(/Refused for a test reason/.test(t8), 'F8: the refusal of the download is shown: ' + t8);

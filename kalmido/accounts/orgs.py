@@ -15,7 +15,7 @@ from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
-from .orgretain import odl_former  # 2.186.0 A (#2599)
+from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -84,7 +84,8 @@ def instance_mode(c=None):
 
 def main_org(c):
     with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
-        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
+        # 2.422.0 (#2937 review): a company a person created herself is never the server's organisation
+        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
     return r[0] if r else None
 
 
@@ -262,7 +263,7 @@ def _visible_people(c, uid):
             full = [o for o in user_orgs_full(c, uid) if o in orgs]
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q}) AND (role='admin' OR org_id IN ({','.join(str(int(o)) for o in full) or 'NULL'}))", orgs)}
-        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
+        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 LIMIT 1").fetchone():  # 2.152.0 A; 2.422.0 (#2937 review): like om_has_orgs
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
@@ -825,6 +826,45 @@ def org_create():
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
 
 
+# 2.422.0 (#2937): a self-employed person creates a company of her own (work apart from her private
+# things) without the server's admin: mode workspaces, a person (no agent, no kid account), she becomes its admin. At most
+# ORG_SELF_MAX such companies per person. Marked self_made: only a server admin sets its e-mail domains (nobody joins it by
+# the domain of their address), and it does not count as the server's organisation for open registration (signup.py), its
+# main organisation (main_org) or the household rule "everyone sees everyone" (_visible_people). self_made holds the id of
+# the person who created it (0 = the server's admin), so leaving one never frees a place.
+ORG_SELF_MAX = 3
+
+
+def org_self_made_n(c, uid):
+    """The companies uid created herself (2.422.0, #2937; review: also the ones she left or handed over)."""
+    return c.execute("SELECT COUNT(*) FROM orgs WHERE self_made=? AND personal_of IS NULL AND retired_at IS NULL", (uid,)).fetchone()[0]
+
+
+@app.post("/api/orgs")
+def org_self_create():
+    """2.422.0 (#2937): {name, icon?} -- the signed-in person creates a company and becomes its admin (201, like
+    POST /api/admin/orgs). 403 for agents and kid accounts, 403 outside the mode workspaces, 409 for a taken name or when
+    she already has ORG_SELF_MAX companies of her own."""
+    if (g.user["kind"] or "user") == "agent" or g.user["kid"]:
+        raise Denied(403, tr("Only a person can create a company"))
+    c, b, uid = db(), body(), me()
+    with system_ctx(c):  # creating an organisation (instance structure) with the caller as its only member
+        if instance_mode(c) != "workspaces":
+            raise Denied(403, tr("Only an admin of this server can create an organisation"))
+        name = _clean_name(b.get("name"))
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+            return err(tr("An organisation with this name exists"), 409)
+        if org_self_made_n(c, uid) >= ORG_SELF_MAX:
+            return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at,self_made) VALUES(?,?,?,?,?)",
+                        (name, _clean_icon(b.get("icon")), "", iso(now_utc()), uid))
+        org_member_add(c, oid, uid, "admin", keep_office=False)
+        bump(c)
+        c.commit()
+        print("organisation", oid, "created by its own admin", login_log_who(g.user), flush=True)
+        return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
+
+
 @app.patch("/api/admin/orgs/<int:oid>")
 def org_update(oid):
     """{name?, icon?, members?: [user ids] (replaces them), domains?} -- only on an instance that kept several organisations
@@ -883,6 +923,9 @@ def _org_patch(c, oid, b):
             c.execute("UPDATE orgs SET icon=? WHERE id=?", (v, oid))
             org_icon_drop_file(oid, old)  # an emoji replaces the own picture
     if "domains" in b:
+        # 2.422.0 (#2937): a company a person created herself takes e-mail domains only from an admin of the server
+        if not g.user["is_admin"] and (c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone() or [0])[0]:
+            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of this company"))
         c.execute("UPDATE orgs SET domains=? WHERE id=?", (_clean_domains(b["domains"]), oid))
 
 
@@ -928,6 +971,8 @@ def org_delete(oid):
         n = fs_org_live(c, oid)  # 2.48.0 (#1207): nothing of the file store disappears with it (the trash does)
         if n and not info["kept_until"]:
             return err(tr("This organisation still has {0} folders and files in its file store: delete them first", n), 409)
+        # #3090: its documents locked before the deletion's first write (no deadlock with a recognition run, users.user_delete)
+        c.execute("SELECT node_id FROM doc_meta WHERE org_id=? ORDER BY node_id FOR UPDATE", (oid,)).fetchall()
         from ..admin.retexport import rx_alert, rx_gate, rx_subject
         bad, retained = rx_gate(c, rx_subject(c, "org", oid))  # 2.146.0 D (#2468): the retention export (or its waiver) first
         if bad:
@@ -983,7 +1028,8 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
              "open_receipts": ("{0} receipt", "{0} receipts"), "einvoices": ("{0} invoice", "{0} invoices"),
              "payments": ("{0} payment", "{0} payments"), "signoffs": ("{0} confirmed sign-off", "{0} confirmed sign-offs"),
              "procdocs": ("{0} version of the procedure documentation", "{0} versions of the procedure documentation"),
-             "assets": ("{0} device", "{0} devices")}  # 2.355.0 B (#2845): the asset register
+             "assets": ("{0} device", "{0} devices"),  # 2.355.0 B (#2845): the asset register
+             "bookarch": Nn_("{0} archived booking", "{0} archived bookings")}  # 2.414.0 (#3502): the booking archive
 
 
 def odl_text(counts):
@@ -1349,8 +1395,9 @@ def org_leave(c, oid, uid, heir, back=None):
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
         c.execute("DELETE FROM doc_fetchers WHERE org_id=? AND user_id=?", (oid, uid))  # 2.425.0 (#3453 review): their receipt fetchers end (coming back = no old key)
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
-    # 2.351.0 D (#3214): their read marks in the organisation's channels / groups and list conversations go too (tchat_sig_q
-    # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible)
+    # 2.351.0 D (#3214): their read marks in the organisation's channels and list conversations go too (tchat_sig_q
+    # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible); 2.373.0 (#3337):
+    # groups have no organisation and the person stays a member there -- their marks stay
     c.execute("DELETE FROM tchat_reads WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR "
               "list_id IN (SELECT id FROM lists WHERE org_id=?))" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid, oid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)

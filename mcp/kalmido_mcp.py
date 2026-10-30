@@ -453,7 +453,8 @@ def t_tidy(api, a):
 TOOLS = [
     ("get_agent", "Who am I: the agent's user, enabled state, status, job counts, the latest event cursor and runtime (the "
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
-                  "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
+                  "timezone, reset_seq raised by 'Reset now'; 2.396.0: git_author 'Name <mail>' to commit as, git_coauthor = add "
+                  "a Co-Authored-By line; a task's repo.git_author wins in its repository). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
                   "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
                   "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule). "
@@ -1018,6 +1019,7 @@ EV_IN = {"cal_id": S_ID, "title": {"type": "string"}, "location": {"type": "stri
          "reminders": {"type": "array", "items": {"type": "integer"}, "description": "minutes before the start"},
          "status": {"type": "string", "enum": ["confirmed", "tentative", "cancelled"]}, "busy": {"type": "boolean"},
          "url": {"type": ["string", "null"]}, "task_id": {"type": ["integer", "null"]},
+         "guests_visible": {"type": "boolean", "description": "2.380: the invitation to external guests names all guests (default false)"},
          "attendees": {"type": "array", "items": {"type": "object", "properties": {"user_id": S_ID, "contact_id": S_ID, "email": {"type": "string"},
                                                                                  "name": {"type": "string"}}}}}
 EV_KEYS = tuple(EV_IN)
@@ -1449,7 +1451,8 @@ TOOLS += [
     ("create_field", "Create a custom field in a project (owner / project admins; 2.39.1: any project, switches the module Custom fields on for the "
                      "project's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
                      "| formula | multiselect | currency | rating | task (2.156.0); options for select / multiselect: {options: [{id?, name, "
-                     "color?}]}, currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
+                     "color?}]}; 2.410.0: select + stages: 1 = ordered, shown as a stage bar, an option's special: red | orange = a special state (no "
+                     "stage of its own); currency: {currency: \"EUR\"}, rating: {max: 3-10}. Values in a task's fields: multiselect = option ids "
                      "joined by \",\" (a list works too), rating \"1\"..max, task = the id of a task you can see (read it with get_task; "
                      "others see its title only if they may see that task). 2.43.0: type formula + formula = a calculation "
                      "with + - * / ( ), numbers, {Field name} of number / currency / rating / formula / checkbox fields; 2.156.0: comparisons "

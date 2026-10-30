@@ -20,8 +20,24 @@ function wt_setHtml(s, hint) {
   return `<h4 id="s-wt-h">${tr('Working week')}</h4>
       <div class="row"><span class="lbl">${tr('Working days')}</span>${wt_daysHtml('s-wtdays', wt_parse(s.workdays))}</div>
       <div class="row"><label for="s-wthours">${tr('Hours per week')}</label><input id="s-wthours" value="${esc(s.capacity_h || '')}" inputmode="decimal" placeholder="${esc(fmtNum(5 * (S.timeDayH || 8), 1))}" class="numin"><span class="muted">${tr('Empty = 5 × the hours per day of the server')}</span></div>
-      ${hint(tr('Hours per week spread over your working days; absences and public holidays lower the workload.'))}`;
+      ${hint(tr('Hours per week spread over your working days; absences and public holidays lower the workload.'))}
+      <div id="s-holst-box"></div>`;
 }
+// 2.365.2 C (#2789): my own state of the public holidays (was only in the Calendars window); works without an organisation
+async function wt_holDraw(md) {
+  const box = $('#s-holst-box', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/team/absences/feed'); } catch { return; }
+  if (!md.isConnected) return;
+  box.innerHTML = `<div class="row"><label for="s-holst">${tr('Public holidays of')}</label><select id="s-holst"><option value="">${esc(j.area ? tr('As my organisation ({0})', j.states[j.area] || j.area) : tr('None'))}</option>
+    ${Object.entries(j.states).map(([k, v]) => `<option value="${esc(k)}" ${k === j.own ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    <div class="shint">${tr('Shows in your calendar and lowers your workload on these days.')}</div>`;
+}
+document.addEventListener('change', async ev => {
+  const t = /** @type {any} */ (ev.target);
+  if (t.id !== 's-holst') return;
+  await setApply({holiday_state: t.value}, tr('Public holidays'));
+  if (typeof abc_load === 'function' && typeof ABC === 'object' && ABC.info) { ABC.info = null; }
+});
 function wt_sync(md) {
   const el = $('#s-wtdays', md); if (!el) return;
   const d = wt_parse(S.settings.workdays);
@@ -79,8 +95,7 @@ function lv_html(ad) {
     return (own?.quota ? `<div class="lvacc"><span class="lvt">${esc(tr('Your vacation {0}', String(year)))}</span>${lv_accLine(own)}</div>` : '') + pendHtml;
   }
   const rows = d.people.map(p => `<li><button type="button" class="ab2li" data-act="lv-edit" data-uid="${p.id}">${av(p.id, p.display_name)}<span class="ab2lt"><b>${esc(p.display_name)}</b><span class="muted">${esc(lv_wtText(p))}</span>${lv_accLine(p)}</span>${ic('edit', 's')}</button></li>`).join('');
-  const sw = d.personal ? '' : `<div class="row lvsw"><label class="chkl"><input type="checkbox" id="lv-approval" ${d.approval ? 'checked' : ''}> ${tr('Vacation of members needs an approval')}</label></div>
-      <div class="shint">${tr('On: vacation a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering vacation for someone approve it at once.')}</div>`;
+  const sw = d.personal ? '' : `<div class="row lvsw"><button type="button" class="linkbtn" data-act="mod-settings" data-sec="org">${tr('Vacation approval: in Settings > Organisation')}</button></div>`;  // 2.365.2 C (#2789): the switch moved to Settings
   return `${pendHtml}<details class="lvbox" ${LV.open ? 'open' : ''}><summary>${esc(tr('Vacation accounts {0}', String(year)))}</summary>
       <ul class="ab2list">${rows}</ul>${sw}</details>`;
 }
@@ -135,12 +150,6 @@ function lv_click(a, k) {
   if (k === 'lv-edit') { const p = d.people.find(x => x.id === +a.dataset.uid); if (p) lv_sheet(p); }
   else if (k === 'lv-ok' || k === 'lv-no') { const it = d.pending.find(x => x.id === +a.dataset.id); if (it) lv_decide(it, k === 'lv-ok'); }
 }
-document.addEventListener('change', async ev => {
-  const e = {target: /** @type {any} */ (ev.target)};  // 2.125.1 (#2117): for the type check
-  if (e.target.id !== 'lv-approval') return;
-  const org = LV.data?.org_id, to = e.target.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); ab2_reload(); };
-  try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to)}); savedTick(e.target); } catch { e.target.checked = !to; /* api() said it */ }  // 2.298.0 A1 (#3186): the quiet tick
-});
 
 document.addEventListener('click', async e => {
   const a = /** @type {any} */ (e.target).closest?.('[data-act^="wt-"], [data-act^="lv-"]'); if (!a || a.disabled) return;

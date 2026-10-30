@@ -34,16 +34,17 @@ function cbHtml() {
   if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
-  if (!CB.base || (CB.view !== 'books' && (!CB.list || CB.q !== `${CB.bid}:${CB.year}`))) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!CB.base || !CB.list || CB.q !== `${CB.bid}:${CB.year}`) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);
   const y0 = new Date().getFullYear(), years = [y0, y0 - 1, y0 - 2, y0 - 3, y0 - 4].map(String);
   const q = `book_id=${CB.bid}&year=${CB.year}`;
   const bar = `<div class="ofcbar cb-bar">${act.length > 1 ? `<select id="cb-book" aria-label="${esc(tr('Cash box'))}">${act.map(x => `<option value="${x.id}" ${x.id === CB.bid ? 'selected' : ''}>${esc(x.name + (x.archived ? ` · ${tr('archived')}` : ''))}</option>`).join('')}</select>` : ''}
     <select id="cb-year" aria-label="${esc(tr('Year'))}">${years.map(y => `<option ${y === CB.year ? 'selected' : ''}>${y}</option>`).join('')}</select>
-    <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${[['entries', tr('Entries')], ['closings', tr('Day closings')], ['books', tr('Cash boxes')]].map(([k, n]) => `<button type="button" data-cb="view" data-v="${k}" class="${CB.view === k ? 'on' : ''}" aria-pressed="${CB.view === k}">${n}</button>`).join('')}</div>
-    <span class="spacer"></span><a class="btn sm ghost" href="/api/office/cashbook.csv?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/cashbook.pdf?${q}" download>${ic('download', 's')}<span>PDF</span></a></div>`;
+    <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${[['entries', tr('Entries')], ['closings', tr('Day closings')]].map(([k, n]) => `<button type="button" data-cb="view" data-v="${k}" class="${CB.view === k ? 'on' : ''}" aria-pressed="${CB.view === k}">${n}</button>`).join('')}</div>
+    <span class="spacer"></span><a class="btn sm ghost" href="/api/office/cashbook.csv?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/cashbook.pdf?${q}" download>${ic('download', 's')}<span>PDF</span></a>
+    <button type="button" class="btn sm ghost" data-setgo="biz-tax">${ic('gear', 's')}<span>${tr('Cash boxes')}</span></button></div>`;  // 2.365.2 D (#2789): set in Settings > Company & office > Bank & taxes
   const note = `<details class="lgb-note cb-note"><summary>${ic('alert', 's')}<span>${tr('Note on the cash book')}</span></summary><p class="muted">${esc(CB.base.note)}</p></details>`;
-  const body = CB.view === 'books' ? cbBooksHtml() : CB.view === 'closings' ? cbClosingsHtml() : cbHeadHtml(b) + cbQuickHtml(b) + cbListHtml();
+  const body = CB.view === 'closings' ? cbClosingsHtml() : cbHeadHtml(b) + cbQuickHtml(b) + cbListHtml();
   return bar + body + note;
 }
 function cbHeadHtml(b) {
@@ -86,6 +87,14 @@ function cbClosingsHtml() {
   return `<div class="lgb-cards cb-cards">${cs.map(x => `<div class="lgb-card"><h4>${esc(fmtDateLoc(x.day))}</h4><p class="muted">${esc([trn('{0} entry', '{0} entries', x.count), x.by].filter(Boolean).join(' · '))}</p>
     <dl class="lgb-dl"><dt>${tr('Opening balance')}</dt><dd>${ofcMoney(x.opening)}</dd><dt>${tr('Income')}</dt><dd>${ofcMoney(x.sum_in)}</dd>
     <dt>${tr('Expense')}</dt><dd>${ofcMoney(x.sum_out)}</dd><dt>${tr('Closing balance')}</dt><dd><b>${ofcMoney(x.closing)}</b></dd></dl></div>`).join('')}</div>`;
+}
+// 2.365.2 D (#2789): the cash boxes are set in Settings > Company & office > Bank & taxes (decision 23.10.: cash boxes and their
+// opening balance with the bank and taxes); the cash book tab links there
+function cb_setHtml() {
+  if (CB.oid !== OFC.info?.org_id) Object.assign(CB, {oid: OFC.info?.org_id, base: null, list: null, err: null, bid: null, links: null});  // another office area
+  const head = `<h3 id="cbset-h">${tr('Cash boxes')}</h3><p class="muted ofchint">${tr('Name, opening balance and opening day of each cash box; the entries are in Office > Cash book.')}</p>`;
+  if (!CB.base) { if (!CB.loading && !CB.err) setTimeout(cbLoad, 0); return `<section class="cbset">${head}<p class="muted">${esc(CB.err || tr('Loading…'))}</p></section>`; }
+  return `<section class="cbset" aria-labelledby="cbset-h">${head}${cbBooksHtml()}</section>`;
 }
 function cbBooksHtml() {  // the settings of the cash boxes: sections like the general settings, saved on change
   const bs = CB.base.books;

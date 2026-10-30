@@ -33,11 +33,19 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   // 2.308.0 (#3249): a sign-in that hangs in the browser ends after 30 s with a name (rare, seen once under load), and the
   // same sign-in from here tells whether the server answers (server or browser side)
-  const signIn = async (ev, u) => {
-    const st = await ev(`(() => { const ac = new AbortController(), t = setTimeout(() => ac.abort(), 30000); return fetch('/api/auth/login', {method: 'POST', signal: ac.signal, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status, e => 'browser: ' + e.name).finally(() => clearTimeout(t)); })()`);
+  // 2.358.0 A (#3249): when the server answers the same sign-in from here, the browser's request alone hung: once more
+  // (only this network step, never a check) on a freshly loaded page
+  const signIn = async (ev, nav, u) => {
+    const once = () => ev(`(() => { const ac = new AbortController(), t = setTimeout(() => ac.abort(), 30000); return fetch('/api/auth/login', {method: 'POST', signal: ac.signal, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status, e => 'browser: ' + e.name).finally(() => clearTimeout(t)); })()`).catch(e => 'ev: ' + e.message);
+    let st = await once();
     if (st !== 200) {
       const t0 = Date.now(), nr = await fetch(B + 'api/auth/login', {method: 'POST', headers: H, body: JSON.stringify({username: u, password: 'password123'}), signal: AbortSignal.timeout(30000)}).then(r => r.status, e => e.name);
       console.log(`sign-in ${u}: ${st} in Firefox, ${nr} from the test (${Date.now() - t0} ms)`);
+      if (nr === 200) {
+        await nav(B + 'static/icon.svg');
+        st = await once();
+        console.log(`sign-in ${u}: once more in Firefox on a fresh page: ${st}`);
+      }
     }
     return st;
   };
@@ -57,7 +65,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await nav(B + 'static/icon.svg');
       await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
       // 2.308.0 (#3249): a failed sign-in names itself instead of timing out in every later wait
-      const st = await signIn(ev, u);
+      const st = await signIn(ev, nav, u);
       check(st === 200, tag + 'signs in ' + st);
       // the delivery note editor: positions without prices
       await nav(B + `#office/offers/${prep[u].ls}`);

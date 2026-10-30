@@ -592,7 +592,7 @@ def h6c_sig_pdf_ok(c, r):
 
 @app.get("/s/q/<token>/pdf")
 def sig_pdf_get(token):
-    from .pdfweb import _file_response, _render, epdf_name, epdf_stored
+    from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored
     from .docs import doc_row
     c = db()
     if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
@@ -615,7 +615,7 @@ def sig_pdf_get(token):
     d = doc_row(c, r["org_id"], r["doc_id"])
     if r["state"] == "accepted":  # 2.99.0 C (#2195): the accepted version with the signer's box (h6c_sig_pdf_ok: content unchanged)
         from .pdfweb import qac_pdf
-        resp = _file_response(qac_pdf(c, r["org_id"], d, sig_dec(c, r)), epdf_name(d) + "-accepted.pdf", "application/pdf")
+        resp = _file_response(epdf_out(c, r["org_id"], d, qac_pdf(c, r["org_id"], d, sig_dec(c, r))), epdf_name(d) + "-accepted.pdf", "application/pdf")
         resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         resp.headers["Referrer-Policy"] = "no-referrer"
         return resp
@@ -624,7 +624,7 @@ def sig_pdf_get(token):
     except Denied:
         return pub_gone()
     data = data if data is not None else _render(c, r["org_id"], d)[0]
-    resp = _file_response(data, epdf_name(d) + ".pdf", "application/pdf")
+    resp = _file_response(epdf_out(c, r["org_id"], d, data), epdf_name(d) + ".pdf", "application/pdf")  # 2.434.0 (#3619): + terms
     resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp

@@ -31,7 +31,7 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SEEN = []  # every response text of this suite: no token may ever be in one
 
 
@@ -40,14 +40,6 @@ class S(requests.Session):
         r = super().request(*a, **k)
         SEEN.append(r.text)
         return r
-
-
-def sess(user, pw="password123"):
-    s = S()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    assert r.ok, (user, r.text)
-    return s
 
 
 def b64u(b):
@@ -142,13 +134,13 @@ start()
 s0 = S()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice")
+A = sess("alice", session_cls=S)
 ids = {"alice": 1}
 for u in ("bob", "gert"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
-Bo, Ge = sess("bob"), sess("gert")
+Bo, Ge = sess("bob", session_cls=S), sess("gert", session_cls=S)
 for x in (A, Bo, Ge):
     x.patch(B + "/api/settings", json={"lang": "en"})
 

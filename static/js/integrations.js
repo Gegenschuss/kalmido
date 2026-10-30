@@ -246,8 +246,16 @@ async function whDraw(md) {
       <button class="iconbtn" data-wh="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${w.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-wh="log" title="${tr('Delivery log')}" aria-label="${tr('Delivery log')}">${ic('list', 's')}</button>
       <button class="iconbtn" data-wh="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
-      <button class="iconbtn danger" data-wh="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')
+      <button class="iconbtn danger" data-wh="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button></div>${whOrgHint(w)}`).join('')
     : `<div class="muted mhint">${tr('No webhooks yet.')}</div>`;
+}
+// 2.380 G (#3391): a personal webhook that reaches lists of an organisation: until when it still delivers them (the webhooks from
+// before 2.380, 30 days) or that it no longer does, and for that organisation's admins "Set up as organisation webhook"
+function whOrgHint(w) {
+  return (w.org_hits || []).map(o => `<div class="shint lhint whorg" data-whorg="${o.id}" data-whid="${w.id}">${esc(w.org_until
+    ? tr('Also delivers events of the organisation {0}, until {1}. After that only an organisation webhook does.', o.name, fmtDayAbs(w.org_until))
+    : tr('Events of the organisation {0} are not delivered here: that needs an organisation webhook.', o.name))}${o.admin
+    ? ` <button type="button" class="linkbtn" data-wh="toorg">${ic('plus', 's')} ${tr('Set up as organisation webhook')}</button>` : ''}</div>`).join('');
 }
 function whWire(md) {
   md.addEventListener('click', async e => {
@@ -258,6 +266,15 @@ function whWire(md) {
     const a = b.dataset.wh;
     if (a === 'edit') whModal(w, box._j, () => whDraw(md));
     if (a === 'log') whLog(w);
+    if (a === 'toorg') {  // 2.380 G (#3391): the same name, address and events as a webhook of the organisation (its own new secret)
+      const oid = +b.closest('[data-whorg]').dataset.whorg, o = (w.org_hits || []).find(x => x.id === oid); if (!o) return;
+      if (!await askConfirm(tr('Set up “{0}” as a webhook of {1}?', w.name || urlHost(w.url), o.name), tr('It gets its own signing secret. Your personal webhook stays as it is.'), {ok: tr('Set up')})) return;
+      b.disabled = true;
+      try { const r = await calReq('POST', `/api/orgs/${oid}/webhooks`, {name: w.name, url: w.url, events: w.events});
+        secretModal(tr('Signing secret'), r.secret, tr('Copy it now into the receiver: it is shown only this once. It signs every delivery (header X-Kalmido-Signature).')); }
+      catch (x) { toast(x.message); } finally { b.disabled = false; }
+      whDraw(md);
+    }
     if (a === 'test') {
       b.disabled = true;
       try { const r = await api('POST', `/api/me/webhooks/${w.id}/test`); toast(r.ok ? tr('Test delivered (HTTP {0}, {1} ms)', r.status, r.ms) : tr('Test failed: {0}', r.error_text)); } catch { /* api() showed it */ }
@@ -556,3 +573,73 @@ function chn_modal(ch, j, base, done, org) {
   });
   if (!isTouch()) setTimeout(() => $(ch ? '#chn-name' : '#chn-kind', md)?.focus(), 50);
 }
+
+// 2.365.2 B (#2789): what was set inside a module, now in Settings > Integrations: Karakeep (Read later), the newsletter
+// service (Contacts), the bookmark button (Read later), the address books for birthdays (Family, family.js famDavHtml) and
+// the booking page (Calendar, apptbook.js). The modules keep a link (settingsModal('karakeep' | 'newsletter' | …)).
+// intB_draw fills the parts that load (called when Integrations shows).
+const INTB_FOCUS = {karakeep: '#s-kk-h', newsletter: '#s-nwl-h', bookmarklet: '#s-bmlet-h', carddav: '#s-carddav-h', booking: '#s-apb-h'};
+function intB_draw(md) {
+  kks_draw(md);
+  if (typeof famDavDraw === 'function') famDavDraw(md);
+  if ($('.nwl-set', md)) loadModule('contacts').then(() => { if (typeof nwl_setOpen === 'function') nwl_setOpen(); }).catch(() => {});
+}
+// ---- Karakeep: connect, the project, fetch (one connection per person; was life.js kkModal)
+const kks_html = () => feat('reading') ? `<h4 id="s-kk-h">${tr('Karakeep')}</h4><div id="s-kk" class="kks"><div class="muted mhint">${tr('Loading…')}</div></div>` : '';
+async function kks_draw(md) {
+  const box = $('#s-kk', md); if (!box) return;
+  let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { box.innerHTML = ''; return; }
+  if (!box.isConnected) return;
+  box._cur = cur;
+  const rl = S.lists.filter(l => l.life === 'reading' && !l.archived && canEditList(l.id));
+  box.innerHTML = `<p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” project; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
+    <div class="row"><label for="kk-url">${tr('Address')}</label><input id="kk-url" type="url" inputmode="url" autocomplete="off" value="${esc(cur.url || '')}" placeholder="https://karakeep.example.com"></div>
+    <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
+    ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('Project')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
+    ${cur.error ? `<p class="aerr">${esc(cur.error)}</p>` : ''}
+    <div class="aerr" role="alert" data-kks="err"></div>
+    <div class="row">${cur.connected ? `<button type="button" class="btn sm" data-kks="sync">${ic('sync', 's')} ${tr('Fetch now')}</button><button type="button" class="btn sm danger" data-kks="del">${tr('Disconnect')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn sm pri" data-kks="save">${cur.connected ? tr('Save') : tr('Connect')}</button></div>`;
+  if (box._on) return;
+  box._on = true;
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-kks]'); if (!b) return;
+    const c = box._cur || {}, a = b.dataset.kks, err = $('[data-kks="err"]', box), v = id => $(id, box)?.value?.trim() ?? '';
+    const fetched = j => toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added));
+    if (a === 'del' && !await askConfirm(tr('Disconnect Karakeep?'), tr('The API key is removed; the tasks stay.'), {ok: tr('Disconnect'), danger: true})) return;
+    const body = {url: v('#kk-url'), archive: !!$('#kk-arch', box)?.checked, ...(v('#kk-tok') ? {token: v('#kk-tok')} : {}), ...(v('#kk-list') ? {list_id: +v('#kk-list')} : {})};
+    if (a === 'save' && !body.url) { $('#kk-url', box).focus(); err.textContent = tr('Please enter the address'); return; }
+    if (a === 'save' && !c.token_set && !body.token) { $('#kk-tok', box).focus(); err.textContent = tr('Please enter the API key'); return; }
+    b.disabled = true; err.textContent = '';
+    try {
+      if (a === 'save') { await rawFetch('PUT', '/api/life/karakeep', body); fetched(await rawFetch('POST', '/api/life/karakeep/sync', {})); }
+      if (a === 'sync') fetched(await rawFetch('POST', '/api/life/karakeep/sync', {}));
+      if (a === 'del') await rawFetch('DELETE', '/api/life/karakeep');
+      await load();
+      if (typeof lifeReload === 'function') lifeReload();
+    } catch (x) { err.textContent = x?.message || ''; }
+    b.disabled = false;
+    kks_draw(box.parentElement);
+  });
+}
+// ---- the newsletter service of the shown workspace (newsletter.js draws into .nwl-set, loaded with the module Contacts)
+const nwls_html = () => feat('contacts') ? `<h4 id="s-nwl-h">${tr('Newsletter service')}</h4><div class="nwl-md nwl-set"><div class="nwl-body"><p class="muted">${tr('Loading…')}</p></div></div>` : '';
+// Settings > Data > Import: the consent import stays in the newsletter dialog, here the way to it
+const nwls_impLinkHtml = () => feat('contacts') ? `<div class="row"><span class="muted">${tr('Consents to the newsletter from a CSV file: Contacts > Newsletter.')}</span><button type="button" class="btn sm" data-intb="nwl">${ic('mail', 's')} ${tr('Newsletter…')}</button></div>` : '';
+// ---- the bookmark button for the browser (opens /share?bm=1 with the page in a small window; the normal sign-in, no token)
+const bm_bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/share')}+'?bm=1&title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_bm','popup,width=560,height=680')})()`;
+const bmls_html = () => feat('reading') ? `<h4 id="s-bmlet-h">${tr('Bookmark button for the browser')}</h4>
+  <div class="row caprow"><a class="btn pri capbm" href="${esc(bm_bookmarklet())}" data-intb="bmhint" draggable="true">${ic('bookmark', 's')} ${tr('Save to Kalmido')}</a></div>
+  <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page, Save keeps it as a bookmark and opens it for tags and a note. It runs no code of ours on that page and uses your normal sign-in.')}</div>
+  <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Save as bookmark”.')}</div>` : '';
+// ---- the booking page (its own dialog, apptbook.js; the calendars dialog keeps its button)
+const apbs_html = () => feat('events') && !S.me?.kid ? `<h4 id="s-apb-h">${tr('Booking page')}</h4>
+  <div class="row"><span class="muted">${tr('A public page where others book an appointment with you: times, appointment types, the calendar it goes into.')}</span><button type="button" class="btn sm" data-intb="apb">${ic('cal', 's')} ${tr('Booking page…')}</button></div>` : '';
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('.modal [data-intb]'); if (!b) return;
+  const a = b.dataset.intb;
+  if (a === 'bmhint') { e.preventDefault(); toast(tr('Drag the button to your bookmarks bar')); return; }
+  const sm = b.closest('.modal'); if (sm) modalClose(sm);
+  if (a === 'apb') apbOpen();
+  if (a === 'nwl') loadModule('contacts').then(() => nwl_open()).catch(() => {});
+});

@@ -286,7 +286,7 @@ function palAll() {
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
   wk_palAdd(add);  // 2.49.0 (#1199): knowledge pages (wiki.js)
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload & absences')], ['office', 'receipt', N_('Office & finance')]])
-    if (modOn(m) && !o3a_hid(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
+    if (modOn(m) && !o3a_hid(m) && (m !== 'workload' || wlShown() /* 2.380.2 (#3407) */)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : '', route: m, ...(mg_title(m) ? {sub: mg_title(m)} : {})});  // 2.44.0 (#1187): the area of a tab; 2.250.0 B (#2993 #2996): route = the target, for pg_dedupe; the workload page holds the absences
   for (const id of MG_IDS) if (mg_on(id) && !o3a_hid(id)) add('v:a-' + id, 'view', tr(mg_nameKey(mg_area(id))), mg_icon(mg_area(id)), () => go(mg_target(id)), {route: id, prio: 1});  // 2.44.0 (#1187): the areas
   // 2.87.9 (#1934): the parts of the areas (Documents, Budget, Feeds …) with the area below, and what their views list (palSub)
   for (const [aid, , aname, parts] of MG_AREAS) {
@@ -319,6 +319,7 @@ function palAll() {
     if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
     if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
     if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
+    if ((k === 'biz' && !officeOn()) || (k === 'docs' && !feat('docs'))) continue;  // 2.365.2 (#2789)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   pg_settingParts(add);
@@ -363,7 +364,7 @@ function pg_actions(add) {
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
-    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418) */, {sub: tr('Office|area')});
+    add('a:inv-new', 'action', tr('Add invoice'), 'receipt', () => loadModule('office').then(() => tri_new('invoice'))  /* 2.380.0 B (#3418); 2.417.0 C (#3445): trial in the test mode */, {sub: tr('Office|area')});
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
@@ -563,7 +564,10 @@ function tourSteps() {
   if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'), sel: '#top .menu', r: rect('#top .menu')}
+  // 2.365.0 (#2802): the phone's own wording: the Basket is in the bar at the bottom (the ring went to the menu at the top)
+  const vis = q => $$(q).find(e => e.offsetWidth || e.offsetHeight);
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: vis('#tabs [data-go="inbox"]') ? N_('New tasks without a project land in the Basket, down in the bar. Today, Tomorrow and Next 7 days collect from all projects.') : N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
+    sel: '#tabs [data-go="inbox"], #top .menu', r: rect(() => vis('#tabs [data-go="inbox"]') || $('#top .menu'))}
     : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   const org = tourOrg(), wsEl = () => $$('[data-act="ws-menu"]').find(e => e.getBoundingClientRect().width) || null;
@@ -577,8 +581,12 @@ function tourSteps() {
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
   s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
+  // 2.365.0 (#2802): one step for what the start switched on: the office (Office & finance), else the team (Team, Software)
+  const ofc = officeOn() && vis('#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]');
+  if (ofc) s.push({id: 'office', sel: '#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]', t: N_('Office|area'), d: N_('Here you create clients and quotations.'), r: () => ofc.getBoundingClientRect()});
+  else if (collab() && !S.me?.kid) s.push({id: 'team', t: N_('Work as a team'), d: N_('Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.')});
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
-  return s.slice(0, 6);
+  return s.slice(0, 7);  // 2.365.0 (#2802): 7 with the step of the chosen start
 }
 // 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic
 // start (tour still pending) runs at most once per session and only in Projects: a link with a target (#cal, #office,
@@ -738,6 +746,15 @@ function checkAt(p) {  // the big check: pops (overshoot) right after the arriva
   const [p0, s0, o0] = k[i], [p1, s1, o1] = k[i + 1], t = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 1;
   return {transform: `translate(-50%,-50%) scale(${celeLerp(s0, s1, t).toFixed(3)})`, opacity: +celeLerp(o0, o1, t).toFixed(3)};
 }
+// 2.380 E (#3331): with the undo message showing, the figure's line sits above it (its top edge minus a gap), else it stays at the bottom
+function celeStackNow(q) {
+  const t = $('#toast'), r = t && !t.classList.contains('hidden') && t.offsetWidth ? t.getBoundingClientRect() : null;
+  q.style.bottom = r ? Math.round(innerHeight - r.top + 8) + 'px' : '';
+}
+function celeStack(q) {
+  celeStackNow(q);
+  for (const ms of [60, 400]) setTimeout(() => { if (q.isConnected) celeStackNow(q); }, ms);  // the message settles after its first paint
+}
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
   celeEnd();
@@ -750,7 +767,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   try { if (frame === null && navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(tier.vib); } catch { /* not allowed */ }
   if (reducedMotion()) {  // calm variant: the small still figure + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
-    document.body.appendChild(q);
+    document.body.appendChild(q); celeStack(q);
     if (frame === null) CELE.timers.push(setTimeout(() => q.remove(), 4200));
     q.addEventListener('pointerdown', celeEnd);
     return q;
@@ -759,7 +776,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = `<div class="cbot">${botFig('erledigt', 'cbotfig')}</div><div class="ccheck">${CHECK_SVG}</div>`;
-  document.body.appendChild(el); document.body.appendChild(q);
+  document.body.appendChild(el); document.body.appendChild(q); celeStack(q);
   const fig = $('.cbot', el), chk = $('.ccheck', el);
   fig.style.width = bw + 'px';
   const cy = vh * 0.4;

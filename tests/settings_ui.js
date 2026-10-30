@@ -11,7 +11,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval('settingsModal()'); await sleep(400);
   let md = d.querySelector('.modal.smodal');
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): a server admin always has Organisation (People, Agents, Data)
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'docs', 'access', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): a server admin always has Organisation (People, Agents, Data) // 2.365.2 B (#2789): + Documents
   check(md.querySelector('.snav .on')?.dataset.sec === 'general', 'default section: General');
   check(md.querySelectorAll('.spane:not(.hidden)').length === 1, 'exactly one pane visible');
   for (const k of secs) {
@@ -88,7 +88,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({user: 'bob', mobile: true}); d = w.document;
   w.eval('settingsModal()'); await sleep(400); md = d.querySelector('.smodal');
   const bsecs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(!bsecs.includes('users') && bsecs.includes('ai') && !bsecs.includes('org') && bsecs.length === 10, 'non-admin: no Administration section (2.22.0 #739: a new person has the module Agents, so its page) ' + bsecs.join());  // 2.39.1 (#1188): + Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access
+  check(!bsecs.includes('users') && bsecs.includes('ai') && !bsecs.includes('org') && bsecs.length === 11, 'non-admin: no Administration section (2.22.0 #739: a new person has the module Agents, so its page) ' + bsecs.join());  // 2.39.1 (#1188): + Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access
   const txt = md.textContent;
   check(/Allgemein/.test(txt) && /Benachrichtigungen/.test(txt) && /Integrationen/.test(txt) && /Hilfe/.test(txt) && /Dieses Gerät/.test(txt), 'German section labels');
   for (const k of bsecs) click(w, md.querySelector(`.snav [data-sec="${k}"]`));

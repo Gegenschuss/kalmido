@@ -45,28 +45,33 @@ const up = async (url, name) => { const fd = new FormData(); fd.append('file', n
     const sc = await ev(`(() => { const s = document.querySelector('#side'), t0 = s.querySelector('.sbfix').getBoundingClientRect().top; s.scrollTop = 400; return new Promise(r => setTimeout(() => { const f = document.querySelector('#side .sbfix'); r({pos: getComputedStyle(f).position, flow: f.classList.contains('sbfix-flow'), moved: document.querySelector('#side').scrollTop > 0, t0, t1: f.getBoundingClientRect().top}); }, 300)); })()`);
     check(sc.flow && sc.pos === 'static' && sc.moved && sc.t1 < sc.t0 && sc.t1 < 0, '#3303: sidebar B head scrolls out of view ' + JSON.stringify(sc));
     // ===== #3307 project files: 8 rows
+    // CI of 2.409.0 (#3506): a late redraw of the project page may swap a button out for a moment - click it once it is there
+    const tap = async (sel, what) => check(await ready(ev, `(() => { const b = document.querySelector(${JSON.stringify(sel)}); if (!b) return false; b.click(); return true; })()`), what);
     const rows = k => ev(`[...document.querySelectorAll('#pov-files .povfl[data-k="${k}"] .povf')].filter(e => e.offsetParent).length`);
     check(await ready(ev, `!!document.querySelector('#pov-files .povfl[data-k="files"]')`), 'files list is there');
     check(await rows('files') === 8, '#3307: 8 of 12 project files show ' + await rows('files'));
     check(await ev(`document.querySelector('#pov-files [data-pov="fl-more"][data-k="files"]').textContent.trim()`) === 'Show all 12', '#3307: "Show all 12"');
     check(await ev(`!!document.querySelector('#pov-files input.povfq[data-k="files"]')`), '#3307: search field from 9 entries');
     check(await ev(`document.querySelector('#pov-files details.povtf') && !document.querySelector('#pov-files details.povtf').open`) , '#3307: task attachments (10) are closed by default');
-    await ev(`(() => { document.querySelector('#pov-files [data-pov="fl-more"][data-k="files"]').click(); return 1; })()`);
+    await tap('#pov-files [data-pov="fl-more"][data-k="files"]', '#3307: "Show all" is there');
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 12`), '#3307: show all shows 12');
     await nav(B + '#l/' + P); await nav(B + '#l/' + P);
     await ev('location.reload()');
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 12`), '#3307: the state stays after reloading');
     await ev(`(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); q.value = 'plan-11'; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 1`), '#3307: the search filters by file name');
-    await ev(`(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); document.querySelector('#pov-files [data-pov="fl-more"][data-k="files"]').click(); return 1; })()`);
+    await ev(`(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 12`);
+    await tap('#pov-files [data-pov="fl-more"][data-k="files"]', '#3307: "Show less" is there');
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 8`), '#3307: show less goes back to 8');
     // ===== #3310 a long description is folded in the view
-    check(await ev(`document.querySelector('#pov-desc .povmd').classList.contains('clamp') && document.querySelector('#pov-desc [data-pov="md-more"]').textContent.trim() === 'Show more'`), '#3310: a long description is folded with "Show more"');
-    await ev(`(() => { document.querySelector('#pov-desc [data-pov="md-more"]').click(); return 1; })()`);
+    // CI of 2.409.0 (#3506): the view may still redraw after "show less" of the files - wait for the description (was a JS crash)
+    check(await ready(ev, `!!document.querySelector('#pov-desc .povmd') && document.querySelector('#pov-desc .povmd').classList.contains('clamp') && document.querySelector('#pov-desc [data-pov="md-more"]').textContent.trim() === 'Show more'`), '#3310: a long description is folded with "Show more"');
+    await tap('#pov-desc [data-pov="md-more"]', '#3310: "Show more" / "Show less" is there');
     check(await ready(ev, `!document.querySelector('#pov-desc .povmd').classList.contains('clamp') && document.querySelector('#pov-desc [data-pov="md-more"]').textContent.trim() === 'Show less'`), '#3310: Show more unfolds');
     await ev('location.reload()');
     check(await ready(ev, `!!document.querySelector('#pov-desc .povmd') && !document.querySelector('#pov-desc .povmd').classList.contains('clamp')`), '#3310: the state stays after reloading');
-    await ev(`(() => { document.querySelector('#pov-desc [data-pov="md-more"]').click(); return 1; })()`);
+    await tap('#pov-desc [data-pov="md-more"]', '#3310: "Show more" / "Show less" is there');
     check(await ready(ev, `document.querySelector('#pov-desc .povmd').classList.contains('clamp')`), '#3310: Show less folds again');
     await nav(B + 'static/icon.svg'); await nav(B + '#l/' + PS);
     check(await ready(ev, `!!document.querySelector('#pov-desc .povmd') && /Just one line/.test(document.querySelector('#pov-desc').textContent)`) && await ev(`!document.querySelector('#pov-desc [data-pov="md-more"]') && !document.querySelector('#pov-desc .povmd.clamp')`), '#3310: a short description has no button ');

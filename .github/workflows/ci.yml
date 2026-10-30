@@ -191,6 +191,9 @@ jobs:
         run: npx --yes -p eslint@10.13.0 -c "python tools/strip_check.py -v --need-espree"
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
+      # 2.380 G (#3390): the hashes the server sends to the agent setup match the starter files
+      - name: Starter file hashes (mcp/starter_sha256.txt)
+        run: python tools/starter_sha.py --check
       # 2.149.0 F (#2519): a start file calls a function of a module loaded on demand only guarded (a fresh device has not
       # loaded it yet), and every var(--x) without a fallback is defined
       - name: Calls into modules loaded on demand are guarded, CSS variables defined

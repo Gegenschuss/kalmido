@@ -153,7 +153,21 @@ const aiuTaskLine = t => t.ai_usage ? `<label>${tr('Agent usage')}</label><div c
 { let t = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(chatFabDraw, 150); }); }
 
 // 2.235.0 D (#2899): phones: after sending, the keyboard closes so the answer has the whole screen (a tap into the box brings it back); per chat, default on
-const kbd_close = which => isTouch() && S.settings?.['chat_kbd_' + which] !== '0';
+// 2.380 E (#3449): a hardware keyboard (no on-screen keyboard open: the visual viewport is not shrunk) keeps the focus whatever the switch says
+const kbd_close = which => isTouch() && S.settings?.['chat_kbd_' + which] !== '0' && (typeof kbReal !== 'function' || kbReal());
+// the switch as a chat menu entry (touch devices only; the same setting as Settings > Chat, kept in step with its checkbox)
+function kbd_item(which) {
+  if (!isTouch()) return [];
+  return [{label: tr('Close the keyboard after sending'), icon: 'keyboard', on: S.settings?.['chat_kbd_' + which] !== '0', fn: () => kbd_toggle(which)}];
+}
+function kbd_toggle(which) {
+  if (!S.settings) return;
+  const k = 'chat_kbd_' + which, on = S.settings[k] === '0';
+  S.settings[k] = on ? '1' : '0';
+  api('PATCH', '/api/settings', {[k]: S.settings[k]}).catch(() => { /* api() said it; the local value stays */ });
+  const c = $('#s-kbd' + (which === 'agent' ? 'a' : 't')); if (c) c.checked = on;
+  toast(on ? tr('The keyboard closes after sending') : tr('The keyboard stays open after sending'));
+}
 const kbd_setHtml = (s, chk, hint) => ((typeof feat === 'function' && feat('agents')) || (typeof teamOn === 'function' && teamOn())) ? `<h4 id="s-kbd-h">${tr('Chat')}</h4>
   ${typeof feat === 'function' && feat('agents') ? `<div class="row">${chk('s-kbda', s.chat_kbd_agent !== '0', tr('Close the keyboard after sending (agent chat)'))}</div>` : ''}${typeof teamOn === 'function' && teamOn() ? `<div class="row">${chk('s-kbdt', s.chat_kbd_team !== '0', tr('Close the keyboard after sending (team chat)'))}</div>` : ''}
   ${hint(tr('On a phone the keyboard closes after you send a message or press a suggestion, so the answer has the whole screen. A tap into the box opens it again.'))}` : '';

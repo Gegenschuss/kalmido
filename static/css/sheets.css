@@ -2,7 +2,7 @@
    LD_CSS). One accent: Kalmido values in the accent, formulas in the second text colour, frozen values grey, errors red. */
 .shvwrap{display:flex;flex-direction:column;gap:.5rem;min-height:0;padding-bottom:1rem}
 .shvtop{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.25rem}
-.shvh{margin:0;font-size:1.125rem;font-weight:650;min-width:0;overflow-wrap:anywhere}
+.shvh{margin:0;font-size:var(--fs-h);font-weight:650;min-width:0;overflow-wrap:anywhere}
 .shvtitle{font:inherit;color:inherit;text-align:left;padding:.125rem .25rem;border-radius:var(--r-s)}
 .shvtitle:not([disabled]):hover{background:var(--bg3)}
 .shvro{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--fs-s);color:var(--muted)}
@@ -165,8 +165,8 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shc-svg{display:block;overflow:visible}
 .shc-grid{stroke:var(--line2);stroke-width:1}
 .shc-zero{stroke:var(--faint)}
-.shc-ax{fill:var(--muted);font-size:.6875rem}
-.shc-val{fill:var(--text);font-size:.6875rem;font-weight:600}
+.shc-ax{fill:var(--muted);font-size:var(--fs-xs)}
+.shc-val{fill:var(--text);font-size:var(--fs-xs);font-weight:600}
 .shc-svg path:not(.shc-ln){stroke:var(--bg2);stroke-width:2}
 .shc-ln{fill:none!important;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .shc-svg .shc-dot{stroke:var(--bg2);stroke-width:2}
@@ -192,7 +192,7 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shvc.shkcb{text-align:center;padding:0}
 .shkbox{display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border:.125rem solid var(--line2);border-radius:.3125rem;vertical-align:middle;cursor:pointer}
 .shkbox.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.shkbox svg.i{width:.875rem;height:.875rem}
+.shkbox svg.i{width:var(--ic-s);height:var(--ic-s)}
 .shvc .shkav{width:1.25rem;height:1.25rem;margin-right:.375rem;vertical-align:middle}
 .shvc.k-link,.shvc.k-file{padding-right:1.75rem}
 .shvc.k-file>svg.i{margin-right:.25rem;vertical-align:-.125rem;color:var(--muted)}
@@ -244,7 +244,7 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shbtab:hover{color:var(--text);background:var(--bg3)}
 .shbtab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 .shbtab.drag{opacity:.5}
-.shbtab svg.i{width:.875rem;height:.875rem}
+.shbtab svg.i{width:var(--ic-s);height:var(--ic-s)}
 .shbadd{flex:none}
 @media (pointer:coarse){.shbtab{min-height:2.75rem}}
 /* 2.138.4 A (#2372): on a phone the sheet bar stays above the bottom tab bar (a short sheet ended half under it) */

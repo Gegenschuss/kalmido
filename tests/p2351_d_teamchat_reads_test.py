@@ -6,6 +6,7 @@ Invented names only, addresses @example.com. tenant-matrix: org  freelancer-matr
    he leaves the organisation: the marks of the channel and the list chat are gone (tchat_sig_q counted them), the direct one stays
  - nora is taken out by the admin (the same way): her channel mark goes too; alice's marks stay
  - a person without an organisation: the read mark of her own channel stays untouched by the others leaving
+ - 2.373.0 (#3337): a group (no organisation, bob stays a member) keeps bob's read mark after he leaves
 usage: p2351_d_teamchat_reads_test.py <datadir>"""
 import os
 import subprocess
@@ -80,6 +81,10 @@ for s, who in ((Bo, "bob"), (No, "nora"), (A, "alice")):
     for rid in ((CH, LR, DM) if who == "bob" else (CH, LR) if who == "alice" else (CH,)):
         check(s.post(B + f"/api/team/rooms/{rid}/read", json={}).ok, f"setup: {who} reads room {rid}")
 check(marks(BOB, (CH, LR, DM)) == {CH, LR, DM}, "setup: bob's three read marks")
+check(A.put(B + f"/api/lists/{L}/members", json={"user_id": NORA, "role": "view"}).ok, "setup: nora in the list too (a group needs people who work together)")
+r = A.post(B + "/api/team/groups", json={"members": [BOB, NORA], "name": "Lunch"})
+GR = r.json().get("id") if r.status_code == 201 else None
+check(GR and Bo.post(B + f"/api/team/rooms/{GR}/read", json={}).ok and marks(BOB, (GR,)) == {GR}, "setup: a group, bob's read mark there " + r.text[:200])
 check(marks(NORA, (CH,)) == {CH}, "setup: nora's read mark")
 
 # ================================================================ a person without an organisation (own space)
@@ -93,6 +98,7 @@ r = Bo.delete(B + f"/api/orgs/{ORG}/members/{BOB}")
 check(r.ok, "bob leaves the organisation " + r.text[:200])
 check(not marks(BOB, (CH, LR)), "#3214: bob's read marks of the organisation's channel and list chat are gone " + str(marks(BOB, (CH, LR))))
 check(marks(BOB, (DM,)) == {DM}, "#3214: bob's direct message keeps its read mark")
+check(marks(BOB, (GR,)) == {GR}, "2.373.0 (#3337): the group (no organisation, bob stays in it) keeps his read mark")
 r = A.delete(B + f"/api/orgs/{ORG}/members/{NORA}")
 check(r.ok, "alice takes nora out " + r.text[:200])
 check(not marks(NORA, (CH,)), "#3214: nora's read mark of the channel is gone")

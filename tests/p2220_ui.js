@@ -25,7 +25,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
@@ -107,9 +107,10 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(/Rome/.test(d.querySelector('#view .lifebar')?.textContent || '') && d.querySelector('#view [data-act="life-tripedit"]'), 'trip: its list opens with the trip bar');
   // Karakeep dialog
   w.location.hash = '#life'; await until(() => d.querySelector('#view .lc-reading'));
-  await w.eval('kkModal()'); await sleep(300); md = d.querySelector('.modal.lifedlg');
-  check(md && md.querySelector('#kk-url') && md.querySelector('#kk-tok').type === 'password', 'Karakeep: address + API key (password field)');
-  md.remove();
+  // 2.365.2 B (#2789): Karakeep is set up in Settings > Integrations, the module opens it there
+  await w.eval('kkModal()'); md = await until(() => d.querySelector('.smodal #s-kk #kk-url') && d.querySelector('.smodal'));
+  check(md && md.querySelector('#kk-tok').type === 'password' && !md.querySelector('[data-pane="integr"]').classList.contains('hidden'), 'Karakeep: address + API key (password field) in Settings > Integrations');
+  md?.remove();
   // health list bar
   const HL = st.lists.find(l => l.life === 'health').id;
   w.location.hash = '#l/' + HL; await until(() => d.querySelector('#view .lifebar'));

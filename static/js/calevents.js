@@ -266,6 +266,7 @@ async function evEditor(o = {}) {
         Object.assign(body, {rrule: rule, reminders: st.reminders || [], cal_id: +val('ev-cal'), tz: val('ev-tz'), status: val('ev-status'), busy: $('#ev-busy', md).checked,
           url: val('ev-url').trim() || null, task_id: st.task_id || null,
           attendees: atts.map(a => a.user_id ? {user_id: a.user_id, partstat: a.partstat || 'needs-action'} : a.contact_id ? {contact_id: a.contact_id, partstat: a.partstat || 'needs-action'} : {email: a.email, name: a.name || '', partstat: a.partstat || 'needs-action'})});
+        if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
         if (body.url && !validUrl(body.url)) { toast(tr('The link must start with http:// or https://')); return; }
         try {
           if (ev) await api('PATCH', `/api/events/${ev.id}`, {...body, expect: ev.updated_at});
@@ -409,7 +410,7 @@ async function evCalsModal() {
     const b = e.target.closest('[data-evc]'); if (!b) return;
     if (b.dataset.evc === 'close') md.remove();
     if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
-    if (b.dataset.evc === 'phone') { md.remove(); davGuide(); }
+    if (b.dataset.evc === 'phone') { md.remove(); settingsModal('caldav'); }  // 2.365.2 B (#2789): the steps live in Settings > Integrations
     if (b.dataset.evc === 'booking') { md.remove(); apbOpen(); }  // 2.94.0 B (#1929): apptbook.js (lazy module calendar)
     if (b.dataset.evc === 'subs') { md.remove(); settingsModal('calendars'); }
     if (b.dataset.evc === 'new') {

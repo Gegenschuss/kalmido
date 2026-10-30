@@ -51,7 +51,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-name')`, 80), 'the settings page');
 
     // ================= #2247 the areas
-    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).join(',')`) === 'company,docs,packs,functions,data,access', '#2247: the areas (2.147.0 #2460: + Functions)');  // 2.147.0 (#2460): six areas
+    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).join(',')`) === 'company,tax,docs,packs,functions,data,access', '#2247: the areas (2.147.0 #2460: + Functions)');  // 2.147.0 (#2460): six areas; 2.365.2 D (#2789): + Bank & taxes
     check(await ev(`!!document.querySelector('#ofc-set .seg.aisub[role="tablist"] [data-ostsub="company"][aria-selected="true"] svg')`), '#2247: the strip of Settings > Administration (icon, tab roles), Company first');
     check(await ev(shown) === 'company' && await ev(vis('os-name')) && !(await ev(vis('os-pack'))) && !(await ev(vis('os-paydays'))), '#2247: only the area Company is shown ' + await ev(shown));
     check(await ev(`!document.querySelector('[data-ofc="save-settings"]')`), '#2247: no Save button');
@@ -63,7 +63,7 @@ const FEAT = 'cal,comments,collab,office,clients';
       await ev(tab(k));
       check(await ev(shown) === k && await ev(vis(id)) && await ev(`document.querySelector('[data-ostsub="${k}"]').getAttribute('aria-selected') === 'true'`), `#2247: the area ${k} shows ${id} only ` + await ev(shown));
     }
-    check(await ev(`!!document.getElementById('osc-street') && !!document.querySelector('#ofc-set [data-ostp="company"] a[href="/api/office/export"]')`), '#2247: the master data file in Company');
+    check(await ev(`!!document.getElementById('osc-street') && !!document.querySelector('#ofc-set [data-ostp="data"] a[href="/api/office/export"]')`), '#2247: the master data file in Data');  // 2.365.2 D (#2789): was in Company
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="data"] a[href="#office/import"]') && !!document.querySelector('#ofc-set [data-ostp="data"] .dxset')`), '#2247: legacy import and DATEV in Data');
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="docs"] #os-parts-inv') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-intro-de') && !!document.querySelector('#ofc-set [data-ostp="docs"] #os-raw-on')`), '#2247: templates, default texts and calculation rules in Documents');
     check(await ev(`!!document.querySelector('#ofc-set [data-ostp="packs"] #pkc') && !!document.querySelector('#ofc-set [data-ostp="access"] [data-ofc="log"]')`), '#2247: the packs in Packs, the access log in Access');
@@ -96,7 +96,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `document.getElementById('os-paydays')?.value === '28'`), '#2247: the field shows it');
     // a choice saves at once; the shown area survives the redraw
     await ev(`(() => { const s = document.getElementById('os-currency'); s.value = 'USD'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(!!(await srv(j => j.settings?.currency === 'USD')) && await ready(ev, `${shown} === 'docs'`), '#2247: a choice saves at once, the area stays');
+    const cs = !!(await srv(j => j.settings?.currency === 'USD'));  // 2.424.0 (#3572): the message names what failed (the save or the area)
+    check(cs && await ready(ev, `${shown} === 'docs'`), '#2247: a choice saves at once, the area stays ' + JSON.stringify([cs, await ev(shown), await ev(`location.hash + ' ' + !!document.querySelector('#ofc-set')`)]));
     await call(CA, 'PUT', '/api/office/settings', {currency: 'EUR'});
 
     // ================= #2246 the pack card

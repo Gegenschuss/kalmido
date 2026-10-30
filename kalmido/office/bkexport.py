@@ -197,7 +197,7 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
             missing = []
             for did, r, mine in docs:
                 try:
-                    files = epdf_doc_files(c, oid, did)
+                    files = epdf_doc_files(c, oid, did, zugferd_xml=True)  # 2.434.0 (#3616): the books ZIP keeps the XML
                 except (OSError, Denied, BadInput):
                     missing.append((tr("Invoice"), r["number"]))  # a damaged stored file: named in missing.txt, the rest still comes
                     for row in mine:

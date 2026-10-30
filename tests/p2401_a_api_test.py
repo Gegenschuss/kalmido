@@ -90,7 +90,10 @@ r = dry(A, P, f"org:{ORG}")
 check(r.ok and "frida" in (r.json().get("block") or "").lower(), f"#2924: a member outside the organisation blocks the dry run {r.text[:200]}")
 FAM = new_list(A, "Shopping", family="shopping")
 r = dry(A, FAM, f"org:{ORG}")
-check(r.ok and r.json().get("block"), f"#2924: a family project blocks the dry run {r.text[:200]}")
+check(r.ok and not r.json().get("block") and any("shopping list" in n for n in r.json().get("notes") or []),
+      f"#3385: a shopping list does not block the dry run, it notes the end of its list kind {r.text[:200]}")
+r = A.patch(B + f"/api/lists/{FAM}", json={"family": "", "org_id": ORG})
+check(r.ok, f"#3385: the dialog's body (family cleared + organisation) moves it, no 409 {r.status_code} {r.text[:200]}")
 r = dry(A, P, "private")
 check(r.status_code == 409, f"#2924: private -> private = 409 {r.status_code}")
 

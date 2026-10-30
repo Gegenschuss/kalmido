@@ -7,7 +7,7 @@
 .abscno{flex:1;min-width:0}
 .abscacts{display:flex;gap:.125rem}
 .abscacts .iconbtn{min-width:2.75rem;min-height:2.75rem}
-.abscempty{padding:1rem 0;text-align:center}
+.abscempty{padding:1.5rem 1rem;text-align:center;font-size:var(--fs-m)}
 .abscshot{width:100%;justify-content:center;min-height:2.75rem;margin:.25rem 0 .75rem}
 .absclbl{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.75rem}
 .absclbl.chkl{flex-direction:row;align-items:center;gap:.5rem}

@@ -61,7 +61,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
       if (where === 'project') {  // the device test missed only after the sheet had been used: add a task, close by a tap beside it, + again
         await ev(`(() => { const i = document.querySelector('#qsheet'); i.value = 'Tapped task'; i.dispatchEvent(new InputEvent('input', {bubbles: true})); document.querySelector('[data-act="qsheet-send"]').click(); return 1; })()`);
         let made = false;
-        for (let i = 0; i < 30 && !(made = await ev(`[...S.tasks.values()].some(t => t.title === 'Tapped task' && t.list_id === ${W})`)); i++) await sleep(100);
+        // 2.381.0 (#3543): up to 15 s - under a loaded runner the new task was not there after 3 s (alone green)
+        for (let i = 0; i < 150 && !(made = await ev(`[...S.tasks.values()].some(t => t.title === 'Tapped task' && t.list_id === ${W})`)); i++) await sleep(100);
         check(made, 'project: the task from the sheet is in the project');
         await tap(200, 120);
         for (let i = 0; i < 30 && (await ev(`!!document.querySelector('.qadd.sheet') || !document.querySelector('#fab:not(.gone)') || !!document.querySelector('.an-out')`)); i++) await sleep(100);

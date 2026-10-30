@@ -10,9 +10,12 @@ function toastPlace(el) {
   // 2.46.4 (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
   // coordinates); the message sits above the lowest input field there (the comment field), else right above the keyboard
   const vv = window.visualViewport, kb = typeof kbReal === 'function' && kbReal();
-  const vis = kb ? Math.round(vv.offsetTop + vv.height) : innerHeight;
+  // 2.365.0 (#2824): measured against the layout viewport (position:fixed counts from its bottom), not innerHeight, which
+  // follows the visible area on some phones while the keyboard is up (the message then sat in the middle of the list)
+  const lay = document.documentElement.clientHeight || innerHeight;
+  const vis = kb ? Math.round(vv.offsetTop + vv.height) : lay;
   let top = vis;
-  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)']) {
+  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)', '#detail .dthumb']) {  // 2.365.0 (#2824): + the phone's task bar
     const e = $(s); if (!e || !e.offsetWidth) continue;
     const r = e.getBoundingClientRect(); if (r.top > vis * .5 && r.top < top && r.bottom > vis - 160) top = r.top;
   }
@@ -32,8 +35,8 @@ function toastPlace(el) {
   // 2.46.4 (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
   const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
   el.classList.remove('totop');
-  if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
-  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  if (sr && sr.top >= lay * .3) top = Math.min(top, sr.top);
+  el.style.bottom = top < lay ? Math.round(lay - top + 12) + 'px' : '';
   // 2.92.0 D (#2009): on the phone the message never covers the quotation editor's "In the cash flow" choice: it goes to the top
   const cf = $('.cf8sec .seg');
   if (cf && cf.offsetWidth && (isMobile() || isTouch())) {
@@ -41,6 +44,8 @@ function toastPlace(el) {
     if (a.bottom > b.top && a.top < b.bottom) { el.classList.add('totop'); el.style.bottom = ''; }
   }
 }
+// 2.365.0 (#2824): a message already shown follows the keyboard (it opens, closes, the visible area scrolls): right above it
+if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => { const el = $('#toast'); if (el && !el.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(el)); });
 // 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
 // text is set a moment after clearing it, so the same message twice is read twice
 let announceT;
@@ -135,6 +140,12 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
 
 // ------------------------------------------------------------------ quick add wiring
 function currentQuickInput() { return $('#qinput'); }
+// 2.380.2 (#3403): a chip picked after the text names the same thing wins for this task (qovPick)
+function qovChipWins(type) {
+  const inp = $('#qinput'); if (!inp) return;
+  if (parseQuick(inp.value, S.quick.ignore).chips.some(c => c.type === type && !c.off)) S.qov.win = {...S.qov.win, [type]: 1};
+  updateChips(inp); inp.focus();
+}
 function updateChips(input) {
   if (input.id === 'qinput') qdockChips();
   input.closest('.qadd.dock')?.classList.toggle('has-text', !!input.value.trim());  // 2.24.0 (UX-30)
@@ -161,6 +172,14 @@ function renderKeepField(sel, fn) {
   if (n !== o) n.value = v;
   if (f) { n.focus(); try { n.setSelectionRange(a, b); } catch { /* not a text field */ } }
 }
+// 2.359.2 B (#3049): a quick field (input t holding raw) is emptied only once save() worked; on an error the text stays, also in
+// the field a redraw put in its place (again()); true = saved
+async function keepOnFail(save, t, raw, again) {
+  try { await save(); } catch { const f = again?.() || t; if (f && !f.value.trim()) f.value = raw; return false; } finally { delete t.dataset.qbusy; }  // api() said why
+  const f = again?.() || t; if (f.value === raw) f.value = '';
+  if (f !== t && t.value === raw) t.value = '';
+  return true;
+}
 async function submitQuick(input, extra = {}) {
   if (!Object.keys(extra).length && await msvvQuick(input)) return;  // 2.73.0 C (#661): the target is another server
   const cap = input.id === 'qsheet' && S.quickPreset.capture;  // 2.4.0 (#187): a capture ignores the view (inbox unless ~list)
@@ -174,7 +193,8 @@ async function submitQuick(input, extra = {}) {
   if (!r.title && d.files?.length) r.title = d.files[0].name.replace(/\.[^.]+$/, '');  // shared file without a title
   if (!r.title) return;
   const o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};  // chips of the docked composer
-  const body = {title: r.title, list_id: o.list_id || r.list_id || d.list_id, due: 'due' in o ? o.due : r.due || d.due, due_time: r.due_time || d.due_time, priority: 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0,
+  const q = qovPick(o, r, d);  // 2.380.2 (#3403): the text wins over a chip
+  const body = {title: r.title, list_id: q.list_id, due: q.due, due_time: r.due_time || d.due_time, priority: q.priority,
     tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || '', section_id: d.section_id, content: d.content || ''};
   if (url) body.url = url;
   if (r.ttype) body.ttype = r.ttype;  // 2.4.0 (#340): !bug / !feature / !task
@@ -188,11 +208,16 @@ async function submitQuick(input, extra = {}) {
   if (d.who && d.noList && !body.list_id) { toast(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
-  input.value = ''; S.quick.ignore = new Set(); updateChips(input);
+  // 2.359.2 B (#3049): the text, the images and the sheet stay until the task is saved (a 403/409/500 lost them); a second
+  // Enter while it saves sends nothing twice; text typed meanwhile is not cleared
+  if (input.dataset.qbusy) return;
+  const raw = input.value; let created;
+  input.dataset.qbusy = '1';
+  try { created = await createTask(body); } catch { return; } finally { delete input.dataset.qbusy; }  // api() said why
+  if (input.value === raw) { input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input); }  // 2.380.2 (#3403): the chips stay, their win over the text not
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
-  const created = await createTask(body);
   if (r.wait && created?.id) { try { putTask(await api('PUT', `/api/tasks/${created.id}/waiting`, {note: r.wait, until: addDays(today(), 7)})); render(); } catch { /* api() said it */ } }  // 2.22.0 (#686)
   if (cap) { captureDone(created, body); return; }
   if (d.open && created?.id) { openDetail(created.id); return; }  // 2.14.0 (#484): "Add and open"
@@ -326,6 +351,8 @@ document.addEventListener('click', async e => {
     // back preview already shows it; route() used to close it right away = a short flash)
     if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
     S.viaDrawer = g.closest('#side') ? g.dataset.go : null;  // 2.354.0 C (#3013): an area opened from the drawer does not light up "More"
+    // 2.365.2 (#2789): the office menu's Settings open Settings > Company & office (a person without the settings keeps the page "My rights")
+    if (g.dataset.ofm === 'settings' && !(typeof ofr_grp === 'function' && ofr_grp() && ofr_lvOf('settings') === 'none')) { if ($('#side.open')) closeSide(); settingsModal('biz'); return; }
     go(g.dataset.go); return;
   }
   const qc = e.target.closest('.qchip:not([data-act])');  // 2.36.2 (#1138): a chip with its own action (the list of "Tasks of X") is no parser chip
@@ -452,7 +479,7 @@ document.addEventListener('click', async e => {
     case 'news-kind': newsKindSet(a.dataset.nk); renderView(); break;
     case 'news-dismiss': newsDismiss(+a.dataset.i); break;
     case 'news-settings': settingsModal('newskinds'); break;
-    case 'news-ws': wsSet(a.dataset.ws); break;  // 2.145.0 A (#2444)
+    case 'news-ws': wsSet(a.dataset.ws, {keep: true}); break;  // 2.145.0 A (#2444); 2.397.0 (#3404): News stays
     case 'news-unread': S.nf.unread = !S.nf.unread; LS.set('newsUnread', S.nf.unread); renderView(); break;
     case 'news-readall': newsReadAll().then(() => { if (S.route.mod === 'news') renderView(); }); break;  // 2.13.0: with undo
     case 'news-filter': if (a.dataset.nk === '') newsKindSet(''); S.nf.filter = 'fme' in a.dataset && S.nf.filter === 'me' && a.getAttribute('aria-pressed') === 'true' ? '' : a.dataset.f; LS.set('newsFilter', S.nf.filter);  /* 2.13.0: the chip toggles */ S.nf.items = null; renderView(); break;
@@ -487,6 +514,7 @@ document.addEventListener('click', async e => {
       {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
@@ -508,6 +536,7 @@ document.addEventListener('click', async e => {
     case 'dep-add': depPicker(id, a.dataset.dir); break;
     case 'wait-on': waitOnMenu(a, id); break;  // 2.25.0 (UX-43)
     case 'dab-on': hintDone('dab'); setDab(id, true); break;  // 2.25.0 (UX-28)
+    case 'shop-on': hintDone('shop'); setShopList(id); break;  // 2.396.0 (#3385)
     case 'dep-rm': {
       const b = +a.dataset.b;
       try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }
@@ -572,7 +601,13 @@ document.addEventListener('click', async e => {
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-edit': { const t = taskById(S.sel); if (!canEdit(t)) break; if (tlkIs(t)) tlkToast(t); else editContent(); break; }  // 2.40.0 (#1203): the pen
     case 'md-more': { const open = !LS.get('mdOpen', false); LS.set('mdOpen', open); const m = $('#d-md'); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }  // 2.101.0 (#2157): for all tasks
-    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) { tl.style.scrollMarginTop = ($('#detail .dtop')?.offsetHeight || 0) + 'px'; tl.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
+    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) {
+      // 2.365.0 (#2824): the panel scrolls itself to the heading right below its sticky header (scrollIntoView with a scroll
+      // margin went to the panel's end on the phone with the bottom bar: the heading sat under the header)
+      const de = $('#detail'), hh = $('#detail .dtop')?.offsetHeight || 0, behavior = reducedMotion() ? 'auto' : 'smooth';
+      if (de && de.scrollHeight > de.clientHeight && de.contains(tl)) de.scrollTo({top: Math.max(0, Math.round(tl.getBoundingClientRect().top - de.getBoundingClientRect().top + de.scrollTop - hh)), behavior});
+      else { tl.style.scrollMarginTop = hh + 'px'; tl.scrollIntoView({block: 'start', behavior}); }
+    } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
@@ -659,13 +694,13 @@ document.addEventListener('click', async e => {
     case 'purge': if (await askConfirm(tr('Delete permanently?'), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) { await api('DELETE', `/api/tasks/${id}?hard=1`); await load(); render(); } break;
     case 'done-clean': doneCleanup(); break;
     case 'qd-date': {
-      const inp = $('#qinput'), cur = 'due' in (S.qov || {}) ? S.qov.due : parseQuick(inp?.value || '', S.quick.ignore).due || quickDefaults().due || '';
-      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qdockChips(); $('#qinput')?.focus(); }});
+      const inp = $('#qinput'), cur = qovPick(S.qov || {}, parseQuick(inp?.value || '', S.quick.ignore), quickDefaults()).due || '';
+      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qovChipWins('date'); }});
       break;
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
-    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qdockChips(); $('#qinput')?.focus(); }}))); break;
-    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qdockChips(); $('#qinput')?.focus(); }}))); break;
+    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
+    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
     case 'mx-due': mxSet({due: a.dataset.k}); break;
@@ -756,6 +791,8 @@ document.addEventListener('click', async e => {
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
+    case 'lt-sigset': ltSigSettings(); break;  // 2.365.2 C (#2789): from Settings > Account  // lazy-ok: the button sits in Settings > Account (acctset.js loads with it)
+    case 'mod-settings': settingsModal(a.dataset.sec); break;  // 2.365.2 C (#2789): module -> its Settings area
     case 'tvg-add': entryModal(null, {task_id: id || null, date: a.dataset.d}); break;  // 2.34.0 (#269): a day without tracked time
     case 'tvg-x': tvgDismiss(); break;
   }
@@ -837,20 +874,26 @@ document.addEventListener('keydown', async e => {
       }).catch(() => { const f = $('#d-sub'); if (f && !f.value) f.value = v; });  // not saved: the text comes back (api() showed why)
       return;
     }
+    // 2.359.2 B (#3049): tag, board and matrix fields keep their text until it is saved (a rebuilt field gets it back on an error)
     if (t.id === 'd-tag' && t.value.trim()) {
-      const p = taskById(S.sel); const v = t.value.trim().replace(/^#/, ''); t.value = '';
-      await tagAdd(p, v); $('#d-tag')?.focus(); return;
+      e.preventDefault(); if (t.dataset.qbusy) return;
+      const p = taskById(S.sel); const raw = t.value, v = raw.trim().replace(/^#/, ''); t.dataset.qbusy = '1';
+      const ok = await keepOnFail(() => tagAdd(p, v), t, raw, () => $('#d-tag')); if (ok) $('#d-tag')?.focus(); return;
     }
     if (t.dataset.kadd !== undefined && t.value.trim()) {
+      e.preventDefault(); if (t.dataset.qbusy) return;
       const lid = S.route.key === 'inbox' ? inbox().id : +S.route.key.slice(2);
-      const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask(qa2_body(r, {title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)}));  // 2.138.0 D (#2060): + the swimlane's value
-      [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl)?.focus(); return;
+      const raw = t.value, r = parseQuick(raw.trim()); t.dataset.qbusy = '1';
+      const again = () => [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl);
+      await keepOnFail(() => createTask(qa2_body(r, {title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)})), t, raw, again);  // 2.138.0 D (#2060): + the swimlane's value
+      again()?.focus(); return;
     }
     if (t.dataset.qadd !== undefined && t.value.trim()) {
-      const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask(qa2_body(r, {title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''}));
-      $(`[data-qadd="${t.dataset.qadd}"]`)?.focus(); return;
+      e.preventDefault(); if (t.dataset.qbusy) return;
+      const raw = t.value, r = parseQuick(raw.trim()); t.dataset.qbusy = '1';
+      const again = () => $(`[data-qadd="${t.dataset.qadd}"]`);
+      await keepOnFail(() => createTask(qa2_body(r, {title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''})), t, raw, again);
+      again()?.focus(); return;
     }
   }
   if (e.key === 'Escape') {
@@ -909,7 +952,7 @@ S.qfiles = {};  // input id -> [File]
 function qTargetList(input) {
   const r = parseQuick(input.value, S.quick.ignore), o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};
   const d = input.id === 'qsheet' && S.quickPreset.capture ? {} : {...quickDefaults(), ...(input.id === 'qsheet' ? S.quickPreset : {})};
-  return listById(o.list_id || r.list_id || d.list_id || inbox()?.id);
+  return listById(r.list_id || o.list_id || d.list_id || inbox()?.id);
 }
 function qPeople(input) {
   const l = qTargetList(input);
@@ -978,3 +1021,13 @@ document.addEventListener('click', e => {
   const fs = S.qfiles[b.dataset.in] || []; fs.splice(+b.dataset.i, 1);
   const inp = document.getElementById(b.dataset.in); if (inp) { qFilesDraw(inp); inp.focus(); }
 }, true);
+// 2.365.2 D (#2789): a link to Settings from a module, a dialog or another settings area (data-setgo="biz-tax" = a part of
+// Company & office, "agents" = an area, "#office/import" = a page): the dialog around it closes (asking first when it holds
+// unsaved input), an open Settings dialog makes room for the new one
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-setgo]'); if (!a) return;
+  e.preventDefault();
+  const m = a.closest('.modal'); if (m && !m.classList.contains('smodal')) modalClose(m);
+  const sm = $('.smodal'); if (sm) { sm._noflush = true; sm.remove(); }
+  const to = a.dataset.setgo; if (to.startsWith('#')) location.hash = to; else settingsModal(to);
+});
