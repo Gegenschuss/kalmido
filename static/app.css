@@ -8606,7 +8606,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
    drawer's scrolling box is its parent). Its background reaches the top of the screen over the safe area and ends at the head
    above it while at rest (the head paints over it), the rows slide under it */
 #side .sbfix-m,#side .sbfix-m .sbmtop{display:contents}
-#side .sbfix-m .sbhead{position:relative;z-index:4}
+#side .sbfix-m .sbhead{position:relative;z-index:4;margin-top:var(--sbpt)}  /* the gap .sbfix itself has elsewhere */
 #side .sbmsrch{position:sticky;top:0;z-index:3;margin:calc(-1 * var(--safe-t,0px)) -.75rem 0;padding:calc(.5rem + var(--safe-t,0px)) .75rem 0;background:var(--sbbg,var(--bg2))}
 #side .sbfix-m .sbmr{margin-bottom:.375rem}
 #side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:.75rem;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}

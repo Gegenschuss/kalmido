@@ -64,7 +64,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const noMedia = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '').replace('calc(16px * var(--ui))', '').replaceAll('max(1rem,16px)', '');  // 2.38.0 (#1173): the 16 px floor of form fields on touch screens keeps iOS from zooming on focus // 2.52.1 (#1016): the same 16 px iOS floor for the inline title field of a new event
   const bad = [...noMedia.matchAll(/(?<![\w.#-])(\d*\.?\d+)px/g)].map(m => +m[1]).filter(v => v > 2 && v < 9999);
   check(bad.length === 0, 'app.css: only rem sizes (px > 2 left: ' + bad.slice(0, 5) + ')');
-  check(/html\{[^}]*font-size:calc\(16px \* var\(--ui\)\)/.test(css) && /:root\[data-fsize="xl"\]\{--ui:1\.25\}/.test(css) && /:root\[data-fsize="s"\]\{--ui:\.9\}/.test(css), 'root font size = 16px x --ui, sizes 90 / 112 / 125 %');
+  check(/html\{[^}]*font-size:calc\(100% \* var\(--ui\)\)/.test(css) /* 2.442.0 (#2810): the browser's default size, 16 px unless changed */ && /:root\[data-fsize="xl"\]\{--ui:1\.25\}/.test(css) && /:root\[data-fsize="s"\]\{--ui:\.9\}/.test(css), 'root font size = 100 % x --ui, sizes 90 / 112 / 125 %');
   check(/@media print\{:root\[data-fsize\]\{--ui:1\}\}/.test(css), 'print: always 100 %');
   check(/:root\[data-font="atkinson"\]\{--sans:"Atkinson Hyperlegible"/.test(css) && /:root\[data-font="system"\]\{--sans:system-ui/.test(css), 'font variables');
   check(/--mono:"Geist Mono"/.test(css) && !/data-font[^{]*\{[^}]*--mono/.test(css), 'mono details always Geist Mono');

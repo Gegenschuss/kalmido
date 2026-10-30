@@ -166,10 +166,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('#side .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
-    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix'), t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
+    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
       return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, ft = document.elementFromPoint(r.left + r.width / 2, f.getBoundingClientRect().top + 8);
-        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: f.classList.contains('sbfix-flow')}); })); })()`);
+        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: !!f.closest('.sbfix-flow')}); })); })()`);
     check(m, tag + ': head and tiles drawn');
     if (m) {
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
