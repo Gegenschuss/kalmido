@@ -456,7 +456,7 @@ function trd_pick(list) {
   return null;
 }
 function trd_lineHtml(m, th) {
-  const rb = m.read_by, U = S.tc.users;
+  const rb = m.read_by;
   // 2.437.0 A (#3318): two ticks in the accent colour (+ the count in a group); the words only as title / aria-label
   const two = `<span class="cdlv on" aria-hidden="true">${ic('check', 's')}${ic('check', 's')}</span>`;
   if (S.tc.room?.kind === 'dm') { const w = tr('Read|receipt'); return `<div class="trdline" role="img" title="${esc(w)}" aria-label="${esc(w)}">${two}</div>`; }
