@@ -679,7 +679,6 @@ p296_a_api
 p2106_a_api
 p2106_b_api
 p2106_d_api
-p296_d_api
 p296_e_api
 p2102_a_api
 p297_a_api
