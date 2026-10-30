@@ -35,7 +35,7 @@ const hash = w => w.location.hash;
   const s0 = items(w);
   check(s0.includes('pipeline') && s0.includes('cashbook') && s0.includes('equipment'), 'before: the points are in the menu ' + s0);
   check(await until(() => !!d.querySelector('#ocm-cashbook')), 'the switch of the cash book is there');
-  for (const k of ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'bank', 'equipment', 'agreements']) check(d.querySelector('#ocm-' + k)?.checked === true, 'a switch, on: ' + k);
+  for (const k of ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'bank', 'cards', 'equipment', 'agreements']) check(d.querySelector('#ocm-' + k)?.checked === true, 'a switch, on: ' + k);
   for (const k of ['cashflow', 'kpi', 'meals', 'subs', 'travel']) check(!!d.querySelector(`.ocf-list #ocf-money-${k}`) && !d.querySelector('#ocm-' + k), 'one switch, the function\'s: ' + k);
   for (const k of ['offers', 'invoices', 'clients', 'contacts', 'books', 'receipts', 'settings']) check(!d.querySelector('#ocm-' + k), 'no switch: ' + k);
   const cb = d.querySelector('#ocm-cashbook'); cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));

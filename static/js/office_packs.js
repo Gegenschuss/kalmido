@@ -229,7 +229,7 @@ function ocf_settingsHtml(dis) {
 }
 // 2.440.0 (#3609): the points of the office menu, one switch each for the whole office. Off = only hidden, the data stays. The
 // points with a function of the country pack (2.380 F, #3411) stand here with their function's switch: one switch per point
-const OCM_POINTS = ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'meals', 'travel', 'subs', 'bank', 'cashflow', 'kpi', 'equipment', 'agreements'];
+const OCM_POINTS = ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'meals', 'travel', 'subs', 'bank', 'cards', 'cashflow', 'kpi', 'equipment', 'agreements'];
 function ocm_settingsHtml(dis) {
   const off = OFC.info.settings?.menu_off || [], foff = OFC.info.settings?.features_off || [], of = ocf_offers();
   const row = k => {

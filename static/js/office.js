@@ -883,7 +883,7 @@ async function ost_put(b) {
   return j.settings?.pack !== pk;
 }
 // what changes more than the field itself is drawn again (pack: its tax rates; currency: the symbols; industry packs: the cards)
-const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'menu_off', 'tax_rates', 'retention_years'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
+const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'menu_off', 'tax_rates', 'retention_years', 'credit_shared'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
 const OST = {q: Promise.resolve()};
 function ost_save(el) {
   const form = el.closest?.('#ofc-set');

@@ -157,7 +157,7 @@ SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 # the details always show)
 # 2.440.0 (#3609): the points of the office menu that can be switched off for the whole office; off = only hidden (data and
 # routes stay). The other points of Money have a function of their own (features_off, packs.PACK_FEATURES money.*)
-OFFICE_MENU_OFF = ("pipeline", "gendocs", "letters", "time", "contracts", "cashbook", "bank", "equipment", "agreements")
+OFFICE_MENU_OFF = ("pipeline", "gendocs", "letters", "time", "contracts", "cashbook", "bank", "cards", "equipment", "agreements")
 CLIENT_BLOCKS = ("persons", "invoices", "month", "lists", "note", "tickets", "gendocs", "letters", "privacy")
 
 
