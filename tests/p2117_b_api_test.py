@@ -104,7 +104,8 @@ check(keys == ["contract", "confirmation", "nda"] + LETTERS + ["privacy_dpa", "p
 check(st["lang"] == "de" and all(x["lang"] == "de" and x["name"] and x["body"] for x in st["starters"]), "#2283: German in a German office")
 names = {x["key"]: x["name"] for x in st["starters"]}
 check(names["reminder"] == "Zahlungserinnerung" and names["dunning"] == "Mahnung" and names["authority"] == "Vollmacht"
-      and names["handover"] == "Übergabeprotokoll" and names["credit"] == "Gutschrift-Anschreiben" and names["termination"] == "Kündigung",
+      # 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+      and names["handover"] == "Übergabeprotokoll" and names["credit"] == "Rechnungskorrektur-Anschreiben" and names["termination"] == "Kündigung",
       f"#2283: German names {names}")
 ste = A.get(B + TP + "/starters?lang=en").json()
 check(ste["lang"] == "en" and {x["key"]: x["name"] for x in ste["starters"]}["handover"] == "Handover record", "#2283: English samples")

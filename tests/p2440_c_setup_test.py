@@ -284,6 +284,16 @@ for b in BASHES:
     check(os.path.isfile(ef) and stat.S_IMODE(os.stat(ef).st_mode) == 0o600 and f"KALMIDO_TOKEN={TOKEN}" in read(ef) and f"KALMIDO_URL={URL}" in read(ef),
           f"{b}: env file mode 600 with the token and the address that worked")
     check(f"KALMIDO_STATE_DIR={os.path.join(inst, 'state')}" in read(ef), f"{b}: a state folder of its own per instance")
+    # 2.443.0 (#2940): the launcher reads the env file as shell: a space in the home folder
+    sp = os.path.join(home, "with space")
+    os.makedirs(sp)
+    r = subprocess.run([b, SETUP_SH, "--url", URL, "--code", "ks_good_code", "--dir", "~/proj", "--cmd", "fakeagent", "--no-autostart"],
+                       env={**env, "HOME": sp, "KALMIDO_PYTHON": sys.executable}, capture_output=True, text=True, timeout=120)
+    spi = os.path.join(sp, ".kalmido", "agents")
+    spe = os.path.join(spi, os.listdir(spi)[0], "kalmido-agent.env") if os.path.isdir(spi) else ""
+    v = subprocess.run(["bash", "-c", '. "$1"; printf "%s|%s" "$KALMIDO_STATE_DIR" "$KALMIDO_PYTHON"', "_", spe], capture_output=True, text=True).stdout
+    check(r.returncode == 0 and v == os.path.join(os.path.dirname(spe), "state") + "|" + sys.executable, f"{b}: the env file reads back with a space in the home folder: {v!r} {r.stderr[-200:]}")
+    shutil.rmtree(sp, ignore_errors=True)
     for need in ("agent_launcher.sh", "agent_run.py", "kalmido_mcp.py", "starter_files.txt", "mcp.json"):
         check(os.path.isfile(os.path.join(inst, need)), f"{b}: {need} in the instance folder")
     mj = json.loads(read(os.path.join(inst, "mcp.json"))) if os.path.isfile(os.path.join(inst, "mcp.json")) else {}

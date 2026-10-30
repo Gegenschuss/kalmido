@@ -429,8 +429,9 @@ def burst_gate(c, uid, tid, mentioned=False, event=False):
         c.execute("""UPDATE task_push SET pending=pending+?, events=events+?, mentioned=GREATEST(mentioned,?)
                      WHERE user_id=? AND task_id=?""", (0 if event else 1, 1 if event else 0, 1 if mentioned else 0, uid, tid))
         return False
+    # 2.421.0 (#3512): the counters of the last window stay - the watchdog sends them (also "you were mentioned") one gap later
     c.execute("INSERT INTO task_push(user_id,task_id,sent_at) VALUES(?,?,?) ON CONFLICT(user_id,task_id) "
-              "DO UPDATE SET sent_at=excluded.sent_at, pending=0, events=0, mentioned=0", (uid, tid, now))
+              "DO UPDATE SET sent_at=excluded.sent_at", (uid, tid, now))
     return True
 
 
@@ -669,13 +670,13 @@ def task_push_tick(c, users, S, LG):
     from ..notify.push import _wd_fail
     now = time.time()
     rows = c.execute("""SELECT p.*, t.title, t.list_id, t.deleted_at FROM task_push p JOIN tasks t ON t.id=p.task_id
-                        WHERE (p.pending>0 OR p.events>0) AND p.sent_at<=?""", (now - TASK_PUSH_GAP,)).fetchall()
+                        WHERE (p.pending>0 OR p.events>0 OR p.mentioned>0) AND p.sent_at<=?""", (now - TASK_PUSH_GAP,)).fetchall()
     for p in rows:
         try:
             _push_tick_one(c, p, users, S, LG, now)
         except Exception as e:  # noqa: BLE001
             _wd_fail(c, "collab push", (p["user_id"], p["task_id"]), e)
-    c.execute("DELETE FROM task_push WHERE pending=0 AND events=0 AND sent_at<?", (now - 86400,))
+    c.execute("DELETE FROM task_push WHERE pending=0 AND events=0 AND mentioned=0 AND sent_at<?", (now - 86400,))
     c.commit()
 
 

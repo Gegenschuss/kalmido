@@ -1899,7 +1899,10 @@ TOOLS += [
 
 # ---- 2.48.0 (#1207): the file store ("Ablage"): folders and files people share with the agent, plus its own result folder
 def t_list_files(api, a):
-    """Without folder_id: the top of what is shared with you (and your own result folder); with it: that folder and its children."""
+    """Without folder_id: the top of what is shared with you (and your own result folder); with it: that folder and its children.
+    2.443.0 (#2338): tag / not_tag: only nodes with these tags (without folder_id at any depth)."""
+    if a.get("tag") or a.get("not_tag"):
+        return api.call("GET", "/files", {"parent_id": a.get("folder_id"), "tag": a.get("tag"), "tag_mode": a.get("tag_mode"), "not_tag": a.get("not_tag")})
     if a.get("folder_id"):
         return api.call("GET", f"/files/{int(a['folder_id'])}")
     return api.call("GET", "/files")
@@ -1936,8 +1939,9 @@ def t_write_file(api, a):
 TOOLS += [
     ("list_files", "2.48.0: the file store (\"Ablage\"): without folder_id the folders / files people shared with you plus your own result "
                    "folder; with folder_id that folder's children. role = what you may do (view / edit). Every access is shown to the owner. "
-                   "2.199.0: kind ref = an office document / table filed in the folder (ref_kind, ref_id, label, open); read_file reads it where it has a file.",
-     _obj({"folder_id": S_ID}), t_list_files),
+                   "2.199.0: kind ref = an office document / table filed in the folder (ref_kind, ref_id, label, open); read_file reads it where it has a file. "
+                   "2.443.0: every node has tags ([{id, name}]); tag / not_tag filter by tag ids (\"1,7;3\" = two tags, tag_mode \"all\" = every one), without folder_id at any depth (at most 500).",
+     _obj({"folder_id": S_ID, "tag": {"type": "string"}, "tag_mode": {"type": "string", "enum": ["all"]}, "not_tag": {"type": "string"}}), t_list_files),
     ("read_file", "2.48.0: read a file of the file store: as text (default; PDFs: the text layer, 2.92.0: Word / Excel as text) or as base64 (as \"base64\", "
                   "version = an older version, max_bytes).",
      _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "version": {"type": "integer", "minimum": 1},
@@ -2339,7 +2343,7 @@ TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read")  # 2.200.0 C (#1781)
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
 TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
-TOOL_SCOPES["tasks:write"] += ("review_task",)
+TOOL_SCOPES["tasks:write"] += ("review_task", "set_working", "end_working")  # 2.407.0 (#3513): the working mark writes to the task
 TOOL_SCOPES["files:read"] += ("list_documents", "get_document")
 TOOL_SCOPES["files:write"] += ("update_document",)
 TOOL_SCOPES["agent"] += ("confirm_abort",)

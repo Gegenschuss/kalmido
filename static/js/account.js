@@ -33,6 +33,7 @@ document.addEventListener('click', async e => {
   const prev = (S.colors || {})[aid || S.me.id] || '';
   try { await api('PATCH', aid ? `/api/agents/${aid}/color` : '/api/me', {color: c}); } catch { return; }  // the error is shown
   (S.colors ||= {})[aid || S.me.id] = c;
+  if (aid) for (const el of document.querySelectorAll(`[data-agid="${aid}"]`)) el.style.setProperty('--agcol', c);  // 2.438.0 A (#3322): bubbles take the new colour at once
   if (aid && prev && prev !== c && typeof histAdd === 'function') {  // 2.83.0 (#1775): one undo step for an agent's colour
     const put = v => async () => { await api('PATCH', `/api/agents/${aid}/color`, {color: v}); S.colors[aid] = v; render(); return {}; };
     offerUndo(tr('Saved'), histAdd({label: tr('Colour changed'), undo: put(prev), redo: put(c)}));

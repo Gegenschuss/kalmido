@@ -31,7 +31,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 STUB = "http://127.0.0.1:8097"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):
@@ -407,6 +407,22 @@ pp = [x for x in pushes() if x["topic"] == "t-pete"]
 pblob = json.dumps(pp)
 check(any("for you" in x["msg"] or (x["title"].startswith("Pete top task") and "mentioned" in x["msg"]) for x in pp), f"push for the mention on my task {pp}")
 check("HIDDEN" not in pblob and "PARENT2" not in pblob and "Secret parent" not in pblob and "Hidden task" not in pblob, f"no pushes about hidden tasks {pblob[:400]}")
+# 2.421.0 (#3512): a mention counted in the burst window, then the next push after the window but before the watchdog's
+# summary (in one transaction, so the watchdog cannot send in between): the counters stay and the summary still says so
+code = ("import app, json, time\nfrom kalmido.core.db import connect\nfrom kalmido.core.pg import system_ctx\n"
+        "from kalmido.collab.comments import burst_gate\nc = connect()\nu, t = %d, %d\n"
+        "with system_ctx(c):\n"
+        "    c.execute('DELETE FROM task_push WHERE user_id=? AND task_id=?', (u, t))\n"
+        "    c.execute('INSERT INTO task_push(user_id,task_id,sent_at,pending,events,mentioned) VALUES(?,?,?,1,0,1)', (u, t, time.time() - 60))\n"
+        "    g = burst_gate(c, u, t, event=True)\n"
+        "    c.commit()\n"
+        "    r = c.execute('SELECT pending, mentioned FROM task_push WHERE user_id=? AND task_id=?', (u, t)).fetchone()\n"
+        "print(json.dumps([g, r[0], r[1]]))\nc.close()") % (ids["pete"], T2a)
+open(os.path.join(DATA, "ntfy.log"), "w").close()
+out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True, text=True)
+check(out.stdout.strip().endswith("[true, 1, 1]"), f"#3512: the push after the window keeps the counted mention {(out.stdout + out.stderr)[-300:]}")
+got = until(lambda: [x for x in pushes() if x["topic"] == "t-pete" and x["title"] == "Pete assigned subtask" and "mentioned" in x["msg"]], 20)
+check(got, f"#3512: the summary one window later says 'you were mentioned' {[x for x in pushes() if x['topic'] == 't-pete']}")
 check(any(x["topic"] == "t-carol" and "HIDDEN2" not in x["msg"] for x in pushes()) or True, "carol pushes (not asserted)")
 check(any("Hidden task" in json.dumps(n) for n in A.get(B + "/api/news").json()["items"]) or True, "owner feed")
 # reminders: an unassigned task pete created, later moved out of his sight, reminds the owner instead

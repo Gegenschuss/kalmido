@@ -14,6 +14,7 @@ const LD_MODS = {
     'office_pipeline', 'office_kpi', 'office_datev', 'office_datevimp', 'office_bookarch', 'office_periods', 'officeagents', 'office_packs',  // 2.148.0 D (#2458): office_datevimp; 2.414.0 A (#3502): office_bookarch
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
+    'office_cards',  // 2.444.0 (#3447): credit card statements
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
     'office_bankrules',  // 2.299.0 B (#3191): bank rules

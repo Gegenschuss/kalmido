@@ -44,7 +44,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
   '/static/js/office_datevimp.js', '/static/js/office_bookarch.js', '/static/js/office_periods.js', '/static/js/officeagents.js',
   '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js', '/static/js/office_bank.js',
-  '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_recurring.js', '/static/js/office_subs.js',
+  '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_cards.js', '/static/js/office_recurring.js', '/static/js/office_subs.js',
   '/static/js/office_dunning.js', '/static/js/office_peppol.js', '/static/js/office_bankrules.js', '/static/js/office_docproject.js',
   '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js',
   '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js',

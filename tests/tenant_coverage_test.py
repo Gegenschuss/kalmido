@@ -518,6 +518,7 @@ ROUTES = {
     "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office", "GET /api/office/docs/{}/recipients": "office",  # 2.433.0 (#3599)
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/number-preview": "office",  # 2.431.0 B (#3605): the number of the finalise dialog
     "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
@@ -1228,6 +1229,16 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/{}": "office", "DELETE /api/office/cards/{}": "office",
+    "POST /api/office/cards/{}/restore": "office", "GET /api/office/cards/{}/statements": "office", "POST /api/office/cards/{}/statements": "office",
+    "GET /api/office/cards/statements/{}": "office", "GET /api/office/cards/statements/{}/file": "office", "PATCH /api/office/cards/statements/{}": "office",
+    "DELETE /api/office/cards/statements/{}": "office", "POST /api/office/cards/statements/{}/restore": "office",
+    "POST /api/office/cards/statements/{}/confirm": "office", "POST /api/office/cards/statements/{}/reopen": "office",
+    "GET /api/office/cards/statements/{}/bank": "office", "POST /api/office/cards/statements/{}/lines": "office",
+    "PATCH /api/office/cards/lines/{}": "office", "DELETE /api/office/cards/lines/{}": "office", "GET /api/office/cards/lines/{}/candidates": "office",
+    "POST /api/office/cards/lines/{}/match": "office", "POST /api/office/cards/lines/{}/unmatch": "office", "POST /api/office/cards/lines/{}/upload": "office",
+    "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py: another organisation sees none, 404)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }

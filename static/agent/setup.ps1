@@ -158,7 +158,8 @@ if (-not $OnWindows -and -not $DryRun) { Die (M 'wrongos') }
 Step (M 's_prereq')
 $missing = @()
 $Py = $null; $PyArgs = @()
-foreach ($n in @('py', 'python', 'python3')) {  # python3 may be the Microsoft Store stub: the version check sorts it out
+# 2.443.0 (#2940): KALMIDO_PYTHON first and alone, as in setup.sh
+foreach ($n in $(if ($env:KALMIDO_PYTHON) { @($env:KALMIDO_PYTHON) } else { @('py', 'python', 'python3') })) {  # python3 may be the Microsoft Store stub: the version check sorts it out
   $c = Get-Command $n -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $c) { continue }
   $pa = @(); if ($n -eq 'py') { $pa = @('-3') }
@@ -273,7 +274,8 @@ else {
   $AgUser = [string]$r.agent.username -replace '[\x00-\x1f\x7f]', ' '
   $lines = @("# Kalmido agent $AgName ($AgUser), set up by agent-setup.ps1 -- keep this file private",
              "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1',
-             "KALMIDO_STATE_DIR=$(Join-Path $Inst 'state')")  # one state folder per instance (cursor, approvals, lock)
+             "KALMIDO_STATE_DIR=`"$(Join-Path $Inst 'state')`"")  # one state folder per instance (cursor, approvals, lock); 2.443.0 (#2940): quoted, a " #" in a value starts a comment
+  if ($env:KALMIDO_PYTHON) { $lines += "KALMIDO_PYTHON=`"$env:KALMIDO_PYTHON`"" }  # 2.443.0 (#2940): the autostart runs without this shell's variables
   # 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
   # person who made the code (operator_id), as KALMIDO_PERM_USER; KALMIDO_OWNER_IDS would also narrow who gives orders
   $keep = @()
@@ -283,7 +285,8 @@ else {
   elseif ($null -ne $op -and "$op" -match '^\d+$') { $perm = "$op"; $keep = @("KALMIDO_PERM_USER=$op") }
   elseif ($r.agent.team) { $perm = 'none' }
   else { $perm = 'owner' }
-  [IO.File]::WriteAllLines($EnvF, @($lines + $keep))
+  [IO.File]::WriteAllLines("$EnvF.new", @($lines + $keep))  # 2.443.0 (#2940): written whole, then moved into place, as in setup.sh
+  Move-Item -LiteralPath "$EnvF.new" -Destination $EnvF -Force
   # 2.306.0 (#2927): the server's version next to the starter files (the MCP server reports it; they have no VERSION file)
   if ([string]$r.version -match '^\d+(\.\d+){1,3}$') { [IO.File]::WriteAllText((Join-Path $Inst 'VERSION'), "$($r.version)`n") }
   $script:Redeemed = $true
@@ -327,6 +330,7 @@ else {
   # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
   if (-not $From -and $StarterBase -notmatch '^https://' -and -not $StarterBase.StartsWith($Url + '/')) { Die (M 'basehttp' @($StarterBase)) }
   if (-not $From -and $StarterSha.Count -eq 0) { Say (M 'shanone') }
+  Get-ChildItem -LiteralPath $Inst -Filter '*.new' | Remove-Item -Force  # 2.443.0 (#2940): what a broken earlier setup left, as in setup.sh
   $list = Join-Path $Inst 'starter_files.txt'
   if (-not (InstallStarter 'starter_files.txt' $list)) {
     if ($From) { Die (M 'nolist' @($From)) }
@@ -383,6 +387,8 @@ $PsExe = (Get-Process -Id $PID).Path
 $Log = Join-Path $Inst 'agent.log'
 $Inner = "Set-Location -LiteralPath $(Q $Dir); & $(Q (Join-Path $Inst 'agent_launcher.ps1')) -e $(Q $EnvF) --events -- $(Q $(if ($Agent) { $Agent } else { $Cmd })) --mcp-config $(Q $McpJ) *>> $(Q $Log)"
 $PsArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$Inner`""
+# 2.443.0 (#2940): the Startup folder has no restart of its own: this loop does what RestartSec=30 / ThrottleInterval do in setup.sh
+$LoopArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"while (`$true) { $Inner; Start-Sleep -Seconds 30 }`""
 if ($NoAutostart) { Say (M 'noauto'); Say "  $Inner" }
 else {
   Stop-Autostart
@@ -403,8 +409,8 @@ else {
     } catch { Say (M 'taskfail' @($_.Exception.Message)) }
     if (-not $done) {
       New-Item -ItemType Directory -Force -Path $StartupDir | Out-Null
-      [IO.File]::WriteAllLines($StartupCmd, @('@echo off', "start `"`" /min `"$PsExe`" $PsArgs"))
-      Start-Process -FilePath $PsExe -ArgumentList $PsArgs -WindowStyle Hidden
+      [IO.File]::WriteAllLines($StartupCmd, @('@echo off', "start `"`" /min `"$PsExe`" $LoopArgs"))
+      Start-Process -FilePath $PsExe -ArgumentList $LoopArgs -WindowStyle Hidden
       Say (M 'startupok' @($StartupCmd, $Log))
     }
   }

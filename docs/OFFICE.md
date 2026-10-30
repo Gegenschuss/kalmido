@@ -1246,6 +1246,39 @@ moving the personal office into an organisation turns "every vehicle" into each 
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
+## Credit cards
+
+*Since 2.444.*
+
+Only the total of a credit card statement leaves the business account; the positions need their receipts. **Credit cards** in
+the menu group Money (the people of the bookkeeping; a holder with an account sees only their own cards; in a personal office
+its owner):
+
+- **Card**: holder (a person of the area, or a free name), provider (Mastercard for now), last four digits, the business account.
+  Several cards per holder and provider.
+- **Statement**: one PDF per card and month. Kalmido reads the positions itself, without a model or an outside service: day,
+  merchant, the euro amount, the original amount and currency, the foreign fee as a position of its own. Please check them and
+  press **Confirm positions**; until then they count for nothing. If they do not add up to the printed total you are told. A total
+  that cannot be found is typed in; a PDF that cannot be read (a scan) gets its positions typed in by hand. Layouts differ between
+  issuers: the reader follows the common German Mastercard layout.
+- **Receipts**: an open position shows the receipt found when its amount fits (also the original amount), **Choose receipt...**
+  searches all documents you see, also unsorted ones. A receipt is matched only when you press it; it becomes a receipt paid on
+  the position's day. Or **Upload receipt**: filed and matched at once.
+- Fees and interest need no receipt: the statement is the proof. **Private** marks a position; the statement shows what the holder
+  pays back.
+- **Match bank booking** (or the bank's own list): the sum is checked, the booking then counts as having its receipt and leaves
+  **Without receipt**.
+- **Reminder** (**Settings**, section Data, off by default): weekly or monthly one task for the holder while positions are open, done
+  by itself. Cards with a free name go to the person you choose.
+- **Exports**: the neutral bookkeeping export lists the positions (type *Credit card*; a position with its receipt only points at
+  it, the receipt's row carries the amount), its ZIP has the statements and receipts under `cards/`. DATEV: the card is an account of
+  its own (default SKR03 1730 / SKR04 3610, private 1800 / 2100, set in the DATEV settings): a receipt paid by card is booked against
+  it, fees and private positions too, the bank booking of the total takes it back to zero. Positions still without a receipt are not
+  exported; the check names them.
+
+Rights: office area **Credit cards**; the level *own* means the cards the person holds. Locked months stay as they are, by the
+position's day.
+
 ## Cash book
 
 *Since 2.121.*

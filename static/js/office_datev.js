@@ -114,6 +114,8 @@ function dv_settingsHtml(st) {
     ${ofcRowF('dv-counter', tr('Counter account of the receipts'), `<select id="dv-counter" data-dv="in_counter">${[['creditor', tr('Collective creditor')], ['bank', tr('Bank account')]].map(([v, n]) => `<option value="${v}" ${(st.in_counter || 'creditor') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
     ${ofcRowF('dv-cred', tr('Collective creditor'), num('dv-cred', 'creditor', st.creditor, 9, ph('7', 1)))}
     ${ofcRowF('dv-other', tr('Other expenses'), num('dv-other', 'in_other', st.in_other, 8, ph(st.chart === 'SKR04' ? '63' : '49')), tr('receipts without a category or a known one'))}
+    ${ofcRowF('dv-card', tr('Credit card account'), num('dv-card', 'card', st.card, 8, ph(st.chart === 'SKR04' ? '361' : '173')), tr('receipts paid by card, fees and the bank booking of the total'))}
+    ${ofcRowF('dv-cardp', tr('Private card payments'), num('dv-cardp', 'card_private', st.card_private, 8, ph(st.chart === 'SKR04' ? '21' : '18')))}
     ${ofcRowF('dv-bu19', tr('Input tax key 19 %'), num('dv-bu19', 'bu19', bu['19'], 4, '9'))}
     ${ofcRowF('dv-bu7', tr('Input tax key 7 %'), num('dv-bu7', 'bu7', bu['7'], 4, '8'))}
     <div id="dv-acc">${dv_accHtml()}</div>

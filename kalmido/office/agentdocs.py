@@ -373,15 +373,15 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
     [{service_id, text, qty, unit?, price, discount?}], list_id}. Never a number (a person reserves it or finalising does).
     PermissionError when uid does not work in that office; BadInput / Denied for wrong values. Returns the id (caller
     commits)."""
-    from .docs import _put_items, _text, doc_create, doc_row, recalc
-    from .model import NAME_MAX, TEXT_MAX
+    from .docs import _put_items, _text, doc_create, doc_row, pt_text, recalc
+    from .model import TEXT_MAX
     if office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise PermissionError("office")
     if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS + ("trial",) for k in data):
         raise BadInput(tr("Invalid data"))
     lid = _list_ok(c, oid, uid, data.get("list_id"))  # a person applies it (part B) or the v1 route checked the agent's view
     office_seed_texts(c, oid)
-    b = {"project_title": _text(data.get("title"), "title", NAME_MAX)}
+    b = {"project_title": pt_text(data.get("title"), "title")}
     if data.get("client_id") not in (None, "", 0):
         b["client_id"] = data["client_id"]
     if data.get("intro") not in (None, ""):
@@ -648,9 +648,9 @@ def v1_office_offer_patch(did):
     expect_updated_at? (2.269.0 A, #3012 / 2.270.0 D, #3028: the draft's updated_at the agent read; another one = 409 with the
     current doc in error.doc and current)}. Positions with their id (or, without one, the same service at the same place / with
     the same text) keep id, purchase price and list; price, unit and flags stay unless sent (2.270.0 D)."""
-    from .docs import _put_items, _text, clean_doc, doc_items, doc_row, recalc
+    from .docs import _put_items, _text, clean_doc, doc_items, doc_row, pt_text, recalc
     from .ledger import ofx_diff, ofx_items_brief, ofx_locked, ofx_log
-    from .model import NAME_MAX, TEXT_MAX
+    from .model import TEXT_MAX
     b = _json(OFA_DATA_KEYS + ("notify", "cashflow", "expect_updated_at"))
     c = db()
     notify = _flag_notify(b)
@@ -669,7 +669,7 @@ def v1_office_offer_patch(did):
         return out
     f = {}
     if "title" in b:
-        f["project_title"] = _text(b.get("title"), "title", NAME_MAX)
+        f["project_title"] = pt_text(b.get("title"), "title")
     if "intro" in b:
         f["intro"] = _text(b.get("intro"), "intro", TEXT_MAX)
     if "client_id" in b:
