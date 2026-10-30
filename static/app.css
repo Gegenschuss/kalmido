@@ -6402,6 +6402,14 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
   .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
   .trow.hascols.iedit .meta{flex:0 1 auto}
 }
+/* 2.437.0 A (#3626): in a narrow list (task panel open) the row is the phone row, title above the columns: the field fills the
+   width right of the circle (the row-mode centring above left it floating mid-row) */
+@media (min-width:600px){
+  @container lrows (max-width:48rem){
+    .trow.hascols.iedit .tmain{align-items:stretch}
+    .trow.hascols.iedit .ttl{flex:none;width:100%}
+  }
+}
 
 /* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,
    the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
