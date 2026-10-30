@@ -260,6 +260,15 @@ IDS["cashbook"] = _id(ok(F.post(B + "/api/office/cashbooks", json={"name": "Till
                        "sweep setup: a cash book", (200, 201)))
 ok(F.patch(B + f"/api/lists/{IDS['list']}", json={"folder": "Work"}), "sweep setup: the private list in a folder")
 ok(F.put(B + "/api/office/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345"}}), "sweep setup: DATEV numbers")
+IDS["card"] = ok(F.post(B + "/api/office/cards", json={"holder_id": FID, "last4": "1234"}), "office: a credit card", (200, 201)).get("id")  # 2.444.0 (#3447)
+c = ok(F.post(B + f"/api/office/cards/{IDS['card']}/statements", files={"file": ("stmt.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")}, data={"month": D[:7]}),
+       "office: a statement of the card (no text: typed in)", (200, 201))
+IDS["cardstmt"] = c["statement"]["id"]
+IDS["cardline"] = ok(F.post(B + f"/api/office/cards/statements/{IDS['cardstmt']}/lines", json={"day": D, "merchant": "Lens rental", "amount": "10.00"}),
+                     "office: a typed position", (200, 201))["line"]["id"]
+c = ok(F.post(B + f"/api/office/cards/statements/{IDS['cardstmt']}/lines", json={"day": D, "merchant": "Typo", "amount": "1.00"}), "office: another", (200, 201))
+ok(F.delete(B + f"/api/office/cards/lines/{c['line']['id']}"), "office: a typed position goes again")
+IDS["collection"] = "wiki"  # 2.429.0 (#3580): a collection of the file store (empty is fine)
 for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
     if F.get(B + "/api/account/export").json().get("state") != "running":
         break
@@ -272,6 +281,7 @@ SUBST = [
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),
+    (r"/office/cards/lines/$", "cardline"), (r"/office/cards/statements/$", "cardstmt"), (r"/office/cards/$", "card"), (r"/files/collections/$", "collection"),
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
     (r"/lists/\d+/files/$", None),
     (r"/office/docs/$", "doc"), (r"/office/services/$", "service"), (r"/api(/v1)?/office/$", "officekind"),
@@ -310,7 +320,8 @@ QUERY = {
     "GET /api/team/absences/check": {"user": "{me}", "date": D}, "GET /api/team/dispo/free": {"date": D},
     "GET /api/v1/dispo/free": {"date": D}, "GET /api/videos": {"task_id": "{task}"}, "GET /api/v1/videos": {"task_id": "{task}"},
     "GET /api/office/books/archive/accounts": {"year": "2026"}, "GET /api/office/books/archive/bookings": {"year": "2026"},
-    "GET /api/wiki/query": {"page": "{wiki}", "q": "zeige: seiten"}, "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"}, "GET /api/wiki/refs": {"file": "{node}"},
+    "GET /api/wiki/query": {"page": "{wiki}", "q": "zeige: seiten"}, "GET /api/wiki/mentions": {"task": "{task}"}, "GET /api/forms/{}/client-link": {"client": "{client}"},
+    "GET /api/files/collections/{}": {"space": "private"}, "GET /api/wiki/refs": {"file": "{node}"},
 }
 
 

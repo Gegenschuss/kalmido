@@ -1186,7 +1186,6 @@ PATCH /api/envs/{}
 PATCH /api/evcals/{}
 PATCH /api/family/rewards/{}
 PATCH /api/filters/{}
-PATCH /api/fsref/office_doc/{}
 PATCH /api/layouts/saved/{}
 PATCH /api/list-checks/{}
 PATCH /api/list-tags/{}
@@ -1279,15 +1278,6 @@ POST /api/family/packing
 POST /api/family/rewards/{}/decide
 POST /api/family/rewards/{}/request
 POST /api/favorites/suggestion
-POST /api/files/lock/folder
-POST /api/files/lock/move/{}
-POST /api/files/lock/rename/{}
-POST /api/files/lock/upload
-POST /api/files/lock/version/{}
-POST /api/files/lock/{}/convert/{}
-POST /api/files/lock/{}/keys
-POST /api/files/lock/{}/stop
-POST /api/files/nodes/{}/versions/{}/restore
 POST /api/filters
 POST /api/folders/delete
 POST /api/folders/owner
@@ -1361,7 +1351,6 @@ POST /api/office/datev/import
 POST /api/office/datev/import/check
 POST /api/office/deals/{}/project
 POST /api/office/deals/{}/restore
-POST /api/office/docs/tree/folders
 POST /api/office/docs/{}/project
 POST /api/office/drives/{}/restore
 POST /api/office/drives/{}/trip
@@ -1532,7 +1521,6 @@ PUT /api/folders/agents
 PUT /api/folders/groups/{}
 PUT /api/folders/playbook
 PUT /api/folders/public-links
-PUT /api/fsref/office_doc/{}/items
 PUT /api/life/karakeep
 PUT /api/lists/{}/bell
 PUT /api/lists/{}/favorite
