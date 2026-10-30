@@ -19,7 +19,7 @@ version you pass, and make a backup first. There is no need to stop at each vers
 |---|---|---|
 | 2.37 | PostgreSQL is required: add the database service, set `POSTGRES_PASSWORD` and `DATABASE_URL`. The installer does it. | [Upgrade to 2.37](SELF-HOSTING.md#upgrade-to-237-postgresql-required) |
 | 2.45 | The server key moves into a file on its own folder: `mkdir secret && chown 1000 secret` next to `data`, then restart. The installer does it. | [The server key](SELF-HOSTING.md#first-setup-and-the-server-key) |
-| 2.46 | One kind of server: the instance mode is gone, a variable for it is ignored. Remove it from `.env`. | CHANGELOG 2.46.0 |
+| 2.46 | One kind of server: the instance mode is gone; its variable is only read for the row-level security check (see ENV.md). | CHANGELOG 2.46.0 |
 | 2.149 | `.env` needs a `COMPOSE_PROFILES` line (for example `COMPOSE_PROFILES=localdb,clamav`) and Docker Compose 2.20 or newer. The installer adds the line. | [Update, downgrade and restore](SELF-HOSTING.md#update-downgrade-and-restore) |
 
 ## Format limits: going back

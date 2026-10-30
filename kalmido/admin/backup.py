@@ -156,6 +156,7 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "encrypt_required": N_("This server only writes encrypted backups: set a passphrase (at least 10 characters)."),
           # 2.359.3 (#2893)
           "server_key": N_("This backup was made with another server key, so its encrypted data could not be read here. Nothing was changed. Put the key of the old server in place, restart and restore again (see SELF-HOSTING.md)."),
+          "server_key_none": N_("This server has no server key, so the encrypted data of this backup could not be read here. Nothing was changed. Set the key of the server that made the backup, restart and restore again (see SELF-HOSTING.md)."),
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
@@ -1193,7 +1194,7 @@ def bk_key_cols(table, copy_line):
     want = BK_KEY_COLS.get(table)
     if not want:
         return None
-    cols = [x.strip().strip('"') for x in copy_line[copy_line.index(b"(") + 1:copy_line.rindex(b")")].decode().split(",")]
+    cols = [x.strip().strip('"') for x in copy_line[copy_line.index(b"(") + 1:copy_line.rindex(b")")].decode("utf-8", "replace").split(",")]
     return [cols.index(x) for x in want if x in cols]
 
 
@@ -1203,7 +1204,7 @@ def bk_key_row(kek, table, kcols, line):
     try:
         sid = int(v[kcols[0]])
         return skfp_row_opens(kek, sid if table == "org_keys" else -sid, [v[i].decode("ascii", "replace") for i in kcols[1:] if v[i] != b"\\N"])
-    except (IndexError, ValueError):
+    except (IndexError, TypeError, ValueError):  # (a crafted archive; TypeError: compare_digest refuses non-ASCII text)
         return False
 
 
@@ -1724,7 +1725,7 @@ def bk_restore(path, pw, admin, via):
         man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
         kstate = man.get("key_state", "ok")
         if kstate == "foreign" and not env_bool("KALMIDO_SECRET_KEY_CHANGED", False):  # 2.359.3 (#2893): before anything changes
-            raise BackupError("server_key")
+            raise BackupError("server_key" if SECRET_KEY else "server_key_none")
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target

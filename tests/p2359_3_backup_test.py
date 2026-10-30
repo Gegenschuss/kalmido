@@ -162,6 +162,16 @@ A = sess("alice")
 r = restore(A, upload=upload(A, sealed))
 check(r.ok and "another server key" in r.json().get("key_warning", ""), f"#2893: KALMIDO_SECRET_KEY_CHANGED=1: restored, with a warning: {r.text[:200]}")
 
+res = in_app("from kalmido.admin.backup import bk_key_cols, bk_key_row\n"
+             "bad = b'COPY public.org_keys (org_id, \\xff) FROM stdin;\\n'\n"
+             "print(json.dumps([bk_key_cols('org_keys', bad), bk_key_row(b'k' * 32, 'org_keys', [0, 1], b'1\\t\\xc3\\xa4\\n')]))")
+check(res == "[[0], false]", f"#2893: crafted key rows of an upload do not break the check: {res}")
+
+assert start(KALMIDO_SECRET_KEY_CHANGED=""), "a fresh server without a key"
+A = first_admin()
+r = restore(A, upload=upload(A, sealed))
+check(r.status_code == 400 and r.json().get("code") == "server_key_none", f"#2893: no key here: refused, and the message says so: {r.text[:200]}")
+
 assert key_start(K1), "a server without sealed keys"
 A = first_admin()
 wipe_keys()
