@@ -345,7 +345,11 @@ check(D1 in deep and DOCROOT not in deep, f"#2338: without parent_id at any dept
 check(F1 not in deep, "#2338: an unshared file with the tag stays hidden from the agent")
 check(fv(tag=f"{TID};999999").json()["data"] != [] and fv(tag=f"{TID};999999", tag_mode="all").json()["data"] == [], "#2338: tag_mode=all = every tag")
 check(fv(tag="abc").status_code == 400 and fv(tag="9" * 30).status_code == 400 and fv(not_tag="x").status_code == 400, "#2338: a bad tag filter is 400, never the unfiltered list")
-r = Fr.get(B + "/api/v1/files", params={"tag": FT})  # freelancer-matrix: files
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+fa = Fr.post(B + "/api/my/agents", json={"username": "fridabot2338", "display_name": "Frida's bot", "scopes": ["read", "files:read"]}).json()["id"]
+FAH = {"Authorization": "Bearer " + Fr.post(B + f"/api/my/agents/{fa}/token").json().get("token", ""), "X-Requested-With": "kalmido"}
+check(Fr.post(B + f"/api/files/nodes/{FP}/shares", json={"agent_id": fa, "role": "view"}).status_code == 201, "#2338: freelancer shares the folder with the own agent")
+r = requests.get(B + "/api/v1/files", params={"tag": FT}, headers=FAH)  # freelancer-matrix: files
 check(r.ok and [x["id"] for x in r.json()["data"]] == [FP], f"#2338: freelancer: the v1 filter finds the own tagged folder ({r.text[:200]})")
 
 # freelancer-matrix: files -- the documents of a person without an organisation

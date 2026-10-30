@@ -16,10 +16,12 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_of
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
+from ..docs.dsearch import dsr_ids
 from .store import (fs_chain, fs_log_add, fs_mail_rows, fs_new_version, fs_put, fs_read, fs_visible_ids, need_node, safe_fs_name,
                     _now, _place)
 from .fsroots import fs_area_folder_name, fs_area_of  # 2.200.0 A (#2747, review 6)
 from .fsref import fs_ref_content  # 2.199.0 A (#2742)
+from .fstags import DT_HITS, dt_attach, dt_where  # 2.443.0 (#2338)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
 
 V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_base64
@@ -27,6 +29,7 @@ V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_
 
 def _v1_node(c, n):
     out = fs_node_json(c, n, n.get("role"))
+    dt_attach(c, [out])  # 2.443.0 (#2338): the tags as in the list
     out["url"] = f"/api/v1/files/{n['id']}"
     if n["kind"] in ("file", "link") or (n["kind"] == "ref" and n.get("ref_id")):  # 2.199.0 A (#2742): + a filed document
         out["content_url"] = f"/api/v1/files/{n['id']}/content"
@@ -57,10 +60,19 @@ def _area_ok(c, nid):
 @v1_view
 def v1_files_list():
     """?parent_id=<folder>: its children; without: the top -- what is shared with you whose folder above is not (an agent:
-    plus its own result folder)."""
-    a = v1_args(("parent_id",))
+    plus its own result folder). 2.443.0 (#2338): + tag / not_tag (ids, "1,7;3" = two), tag_mode=all as with documents: with
+    parent_id its children with these tags, without: everything you see with them at any depth (at most DT_HITS)."""
+    a = v1_args(("parent_id", "tag", "tag_mode", "not_tag"))
     c = db()
     uid = me()
+    groups, nots = dsr_ids(a, "tag"), [i for grp in dsr_ids(a, "not_tag") for i in grp]
+    for k, got in (("tag", groups), ("not_tag", nots)):
+        if (a.get(k) and not got) or any(i > 10 ** 12 for x in got for i in (x if isinstance(x, list) else [x])):
+            raise BadInput(tr("Invalid value: {0}", k))
+    tagged = bool(groups or nots)
+    tw, tp = [], []
+    dt_where(groups, nots, str(a.get("tag_mode") or "") == "all", tw, tp)
+    tq = "".join(f" AND {x}" for x in tw)
     if a.get("parent_id"):
         try:
             pid = int(a["parent_id"])
@@ -70,7 +82,7 @@ def v1_files_list():
         if n["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
         _area_scope(c, pid)  # 2.200.0 F (#1781)
-        rows = fs_mail_rows(c, me(), c.execute("SELECT * FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL ORDER BY id", (pid,)).fetchall())  # 2.148.1 D (#2488)
+        rows = fs_mail_rows(c, me(), c.execute(f"SELECT * FROM fs_nodes n WHERE parent_id=? AND deleted_at IS NULL{tq} ORDER BY id", (pid, *tp)).fetchall())  # 2.148.1 D (#2488)
         fs_log_add(c, pid, "list")
         c.commit()
         items = _items(c, rows, n["role"])
@@ -82,7 +94,10 @@ def v1_files_list():
         rows = []
         if vis:
             q = ",".join(str(int(x)) for x in vis)
-            rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id") if r["parent_id"] not in vis]
+            if tagged:  # 2.443.0 (#2338): at any depth, so as a folder's listing: without what a person may not read here
+                rows = fs_mail_rows(c, uid, c.execute(f"SELECT * FROM fs_nodes n WHERE id IN ({q}){tq} ORDER BY id LIMIT {DT_HITS}", tp).fetchall())
+            else:
+                rows = [r for r in c.execute(f"SELECT * FROM fs_nodes WHERE id IN ({q}) ORDER BY id") if r["parent_id"] not in vis]
             rows = [r for r in rows if _area_ok(c, r["id"])]  # 2.200.0 F (#1781): knowledge folders only with wiki:read
         for r in rows:
             fs_log_add(c, r["id"], "list")
@@ -300,6 +315,7 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "open": {"type": "string", "description": "kind ref: the app route of the object"}, "label": {"type": "string"},
         "recog": {"type": "string", "enum": ["on", "off"], "description": "2.353.0: the folder's / file's own recognition switch "
                   "(absent: as the folder above; set by people in the app)"}}}
+    node["properties"]["tags"] = {"type": "array", "items": {"type": "object"}, "description": "2.443.0: [{id, name}]"}
     schemas["FileNode"] = node
     schemas["FileNodePage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("FileNode")}, "next_cursor": {"type": "null"}}}
     T = "Files"
@@ -312,7 +328,10 @@ def files_spec(paths, schemas, op, ok, errs, ref, pid, q):
     ver = {"type": "object", "properties": {"content": {"type": "string"}, "content_base64": {"type": "string"}, "mime": {"type": "string"}}}
     paths["/files"] = {
         "get": op("Folders and files shared with you (2.48.0)", T, ok(ref("FileNodePage")) | errs("400", "403", "404", "409"),
-                  [q("parent_id", "A folder: its children (default: the top of what you may see)", {"type": "integer"})], scope="files:read",
+                  [q("parent_id", "A folder: its children (default: the top of what you may see)", {"type": "integer"}),
+                   q("tag", "2.443.0: tag ids, \"1,7;3\" = two tags (ids separated by a comma = one of them); with parent_id its children, without: every node you see at any depth, at most 500", {"type": "string"}),
+                   q("tag_mode", "all = every tag (default: one of them)", {"type": "string", "enum": ["all"]}),
+                   q("not_tag", "Without these tag ids", {"type": "string"})], scope="files:read",
                   desc="An agent sees exactly the folders and files shared with it plus its own result folder (created on first use). "
                        "Every access of an agent is in the file's history, visible to its owner."),
         "post": op("Create a file or folder (2.48.0)", T, ok(ref("FileNode"), "Created", "201") | errs("400", "403", "404", "409", "413"),
