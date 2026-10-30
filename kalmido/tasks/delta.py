@@ -153,7 +153,7 @@ def dl_floor_check(c, sig):
     r = c.execute("SELECT value FROM kalmido_meta WHERE key='app_version'").fetchone()
     have, mine = appver_parse(r[0]) if r else None, appver_parse(APP_VERSION)
     back = bool(have and mine and have > mine)
-    if back or gsetting(c, "dl_sig") != sig:
+    if gsetting(c, "dl_sig") != ("" if back else sig):  # once per step back, not at every start of the older image
         gset(c, "dl_floor", gsetting(c, "version") or "0")
         gset(c, "dl_sig", "" if back else sig)
 

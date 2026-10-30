@@ -15265,6 +15265,6 @@
   "Sign-ins": "Connexions",
   "Push devices": "Appareils push",
   "Agent chat settings": "Réglages des discussions d’agents",
-  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Suppression du compte #{0} : {1} fichiers conservés par la loi restent dans la corbeille d’un administrateur jusqu’à la fin du délai.",
+  "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Suppression du compte #{0} : {1} fichiers conservés par la loi restent confiés à un administrateur de l’instance jusqu’à la fin du délai.",
   "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Après la restauration, {0} organisations et entrées supprimées auparavant ont été supprimées à nouveau ; {1} des {2} derniers jours restent, au cas où la restauration devait les ramener ; {3} n’ont pas pu être supprimées à nouveau (voir le journal du serveur)."
 }

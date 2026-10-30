@@ -15265,6 +15265,6 @@
   "Sign-ins": "Accessi",
   "Push devices": "Dispositivi push",
   "Agent chat settings": "Impostazioni delle chat degli agenti",
-  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Eliminazione dell’account #{0}: {1} file conservati per legge restano nel cestino di un amministratore fino alla scadenza.",
+  "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Eliminazione dell’account #{0}: {1} file conservati per legge restano affidati a un amministratore dell’istanza fino alla scadenza.",
   "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Dopo il ripristino {0} organizzazioni e voci eliminate in precedenza sono state eliminate di nuovo; {1} degli ultimi {2} giorni restano, nel caso il ripristino dovesse recuperarle; {3} non si sono potute eliminare di nuovo (vedi il log del server)."
 }

@@ -15265,6 +15265,6 @@
   "Sign-ins": "Aanmeldingen",
   "Push devices": "Pushapparaten",
   "Agent chat settings": "Instellingen van agentchats",
-  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Account #{0} verwijderen: {1} wettelijk bewaarde bestanden blijven tot het einde van de termijn in de prullenbak van een beheerder.",
+  "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Account #{0} verwijderen: {1} wettelijk bewaarde bestanden blijven tot het einde van de termijn bij een instantiebeheerder.",
   "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Na het herstel zijn {0} eerder verwijderde organisaties en items opnieuw verwijderd; {1} van de laatste {2} dagen blijven, voor het geval het herstel ze moest terughalen; {3} konden niet opnieuw worden verwijderd (zie het serverlogboek)."
 }

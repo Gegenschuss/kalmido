@@ -765,7 +765,7 @@ def fs_keep_nodes(c, uid, kept):
         raise kept[0][1]
     c.execute(f"UPDATE fs_nodes SET owner_id=?, deleted_at=COALESCE(deleted_at, ?) WHERE id IN ({q})", (keeper, iso(now_utc()), *ids))
     print(f"account deletion: {len(ids)} locked node(s) kept (#3243)", flush=True)
-    aa_now("storage", f"fs-kept:{int(uid)}", N_("Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends."), [str(int(uid)), str(len(ids))])
+    aa_now("storage", f"fs-kept:{int(uid)}", N_("Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends."), [str(int(uid)), str(len(ids))])
 
 
 def fs_org_live(c, oid):

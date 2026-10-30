@@ -134,34 +134,52 @@ T2 = Fr.post(B + "/api/tasks", json={"title": "Recent task", "list_id": L2}).jso
 T3 = Fr.post(B + "/api/tasks", json={"title": "Same id later", "list_id": L2}).json()["id"]
 T4 = Fr.post(B + "/api/tasks", json={"title": "Came back", "list_id": L2}).json()["id"]
 N1 = node(FR, None)[0][0]
+L3 = Fr.post(B + "/api/lists", json={"name": "Deleted project"}).json()["id"]
+T5 = Fr.post(B + "/api/tasks", json={"title": "Task of the deleted project", "list_id": L3}).json()["id"]
+sql("UPDATE lists SET created_at=? WHERE id=?", (ago(100), L3), write=True)
+F1 = sql("INSERT INTO fs_nodes(kind, name, owner_id, created_at, updated_at) VALUES('folder','Merged',?,?,?) RETURNING id", (FR, ago(100), ago(100)))[0][0]
 sql("UPDATE orgs SET created_at=? WHERE id IN (?,?)", (ago(100), OR2, OR3), write=True)
 sql("UPDATE tasks SET created_at=? WHERE id IN (?,?,?,?)", (ago(100), T1, T2, T3, T4), write=True)
-sql("UPDATE tasks SET created_at=? WHERE id=?", (ago(1), T3), write=True)  # made after the id's deletion (below): another task
 BK = py("from kalmido.admin import backup as bk\nprint(json.dumps({'name': bk.bk_create('manual')}))").get("name")
 check(bool(BK), f"setup: a backup {BK}")
-for t_, i in (("orgs", OR2), ("orgs", OR3), ("tasks", T1), ("tasks", T2), ("tasks", T3), ("fs_nodes", N1)):
+for t_, i in (("orgs", OR2), ("orgs", OR3), ("tasks", T1), ("tasks", T2), ("tasks", T3), ("fs_nodes", N1), ("fs_nodes", F1), ("lists", L3)):
     sql(f"DELETE FROM {t_} WHERE id=?", (i,), write=True)
 rows = dict(((a, b), c) for a, b, c in sql("SELECT tbl, ref_id, at FROM purged_rows"))
 check(("orgs", OR2) in rows and ("tasks", T1) in rows and ("fs_nodes", N1) in rows, "(2) the trigger notes what went")
+check(("fs_nodes", F1) not in rows, "(2) a folder is not noted: it also goes when it is merged or dissolved")
 sql("DELETE FROM tasks WHERE id=?", (T4,), write=True)
 sql("INSERT INTO tasks(id, list_id, title, created_by, created_at, updated_at) VALUES(?,?,'Came back',?,?,?)", (T4, L2, FR, ago(100), ago(100)), write=True)
 check(("tasks", T4) not in dict(((a, b), c) for a, b, c in sql("SELECT tbl, ref_id, at FROM purged_rows")), "(2) a row that came back with its id leaves the list")
-for t_, i, at in (("orgs", OR2, OLD), ("orgs", OR3, RECENT), ("tasks", T1, OLD), ("tasks", T2, RECENT), ("tasks", T3, OLD), ("fs_nodes", N1, OLD)):
+for t_, i, at in (("orgs", OR2, OLD), ("orgs", OR3, RECENT), ("tasks", T1, OLD), ("tasks", T2, RECENT), ("tasks", T3, OLD), ("fs_nodes", N1, OLD), ("lists", L3, OLD)):
     sql("UPDATE purged_rows SET at=? WHERE tbl=? AND ref_id=?", (at, t_, i), write=True)
+sql("DELETE FROM purged_rows WHERE tbl='tasks' AND ref_id=?", (T5,), write=True)  # the app moves a project's tasks to the trash first
+sql("UPDATE purged_rows SET made='2001-01-01T00:00:00+00:00' WHERE tbl='tasks' AND ref_id=?", (T3,), write=True)  # another row with this id went
 r = A.post(B + "/api/admin/backups/restore", json={"name": BK, "confirm": "RESTORE", "password": PW})
 check(r.ok, f"(2) restore {r.status_code} {r.text[:200]}")
 A = sess("alice")
 ag = r.json().get("deleted_again") or {}
-check(ag.get("entries") == 3 and ag.get("entries_recent") == 2 and not ag.get("entries_failed"), f"(2) the numbers of the result {ag}")
+check(ag.get("entries") == 4 and ag.get("entries_recent") == 2 and not ag.get("entries_failed"), f"(2) the numbers of the result {ag}")
 check(not sql("SELECT 1 FROM orgs WHERE id=?", (OR2,)), "(2) an organisation deleted earlier is gone again")
 check(bool(sql("SELECT 1 FROM orgs WHERE id=?", (OR3,))), "(2) one deleted in the last days stays")
 check(not sql("SELECT 1 FROM tasks WHERE id=?", (T1,)) and bool(sql("SELECT 1 FROM tasks WHERE id=?", (T2,))), "(2) the same for tasks")
 check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (N1,)), "(2) a file-store node deleted earlier is gone again")
-check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T3,))), "(2) a row made after the deletion with the same id stays")
+check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T3,))), "(2) another row with the same id stays")
+check(not sql("SELECT 1 FROM lists WHERE id=?", (L3,)), "(2) a project deleted earlier is gone again")
+check(sql("SELECT deleted_at IS NOT NULL FROM tasks WHERE id=?", (T5,)) == [(True,)], "(2) its tasks lie in the trash, as after the owner's delete")
+check(bool(sql("SELECT 1 FROM fs_nodes WHERE id=?", (F1,))), "(2) the folder stays")
 check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T4,))), "(2) a row that came back stays")
 check(sql("SELECT at FROM purged_rows WHERE tbl='orgs' AND ref_id=?", (OR2,)) == [(OLD,)], "(2) the list keeps the first time")
 log = subprocess.run(["docker", "logs", CT], capture_output=True, text=True)
-check("restore: entries deleted earlier: 3 deleted again, 2 kept" in log.stdout + log.stderr, "(2) the numbers are in the log (and the alert, sent when alerts are on)")
+check("restore: entries deleted earlier: 4 deleted again, 2 kept" in log.stdout + log.stderr, "(2) the numbers are in the log (and the alert, sent when alerts are on)")
+
+Fr = sess("frieda")  # the restore ended every session
+r = Fr.post(B + "/api/books", json={"name": "Mine", "org_id": None})
+check(r.ok, f"(2) setup: an address book {r.status_code} {r.text[:160]}")
+BID = r.json().get("id")
+C1, C2 = (Fr.post(B + "/api/contacts", json={"book_id": BID, "given": "Eva", "family": "Muster"}).json().get("id") for _ in range(2))
+r = Fr.post(B + "/api/contacts/merge", json={"target": C1, "ids": [C1, C2], "pick": {}})
+check(r.ok and not sql("SELECT 1 FROM contacts WHERE id=?", (C2,)), f"(2) setup: contacts merged {r.status_code} {r.text[:160]}")
+check(not sql("SELECT 1 FROM purged_rows WHERE tbl='contacts' AND ref_id=?", (C2,)), "(2) a merged contact is not noted as deleted")
 
 # ================================================================== #3243 (3) a lock of its own never stops a deletion
 OR4 = org("Locked Studio")

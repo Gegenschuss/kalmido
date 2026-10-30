@@ -141,7 +141,8 @@ def _until(kind, years):
 
 # 2.186.0 review M1: the file-store nodes a lock can sit on; olk_fs_locked (receipts/suggest.py) decides which are kept
 # (paid / VAT, cash book, equipment, billed, doc_meta.kept_until, #2600; 2.360.4, #3243: open receipts and e-invoices too)
-UPG_DOCS = ("(EXISTS(SELECT 1 FROM rc_receipts r WHERE r.node_id=n.id) OR EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id) "
+UPG_DOCS = ("(EXISTS(SELECT 1 FROM rc_receipts r WHERE r.node_id=n.id) "
+            "OR EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND (m.kept_until IS NOT NULL OR m.extracted<>'')) "
             "OR EXISTS(SELECT 1 FROM office_cash_entries e WHERE e.node_id=n.id) "
             "OR EXISTS(SELECT 1 FROM office_equipment a WHERE a.receipt_node_id=n.id))")
 
@@ -173,8 +174,9 @@ def odl_retention(c, oid):
             counts["einvoices"] = len(years)
             ends.append(end)
         # 2.360.4 (#3243): a file locked on its own (a booking taken back, doc_meta.kept_until) keeps the organisation as well:
-        # fs_nodes cascades with it, so a lock met only in the purge could not stay; it is retired instead of failing with a 409
-        locked = odl_file_locks(c, f"n.org_id=? AND {UPG_DOCS}", int(oid))
+        # fs_nodes cascades with it, so a lock met only in the purge could not stay; it is retired instead of failing with a 409.
+        # Only these: the rest of what olk_fs_locked asks ODL_LEGAL has counted above
+        locked = odl_file_locks(c, "n.org_id=? AND EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND m.kept_until IS NOT NULL)", int(oid))
         if locked:
             counts.setdefault("receipts", len(locked))
             ends.append(max(x[1] for x in locked))

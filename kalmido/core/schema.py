@@ -2186,9 +2186,9 @@ CREATE TABLE IF NOT EXISTS deleted_accounts (
 -- 2.360.0 R (#2496): hashes of API tokens / app passwords that went (trigger REVOKED_TRIGGER); a restore deletes them again
 -- when the backup brings them back. New table only: older versions never read it
 CREATE TABLE IF NOT EXISTS revoked_creds (hash TEXT PRIMARY KEY, at TEXT NOT NULL);
--- 2.360.4 (#3243): organisations and entries deleted for good, by table and id only (trigger PURGED_TRIGGER); a restore
--- deletes them again when the backup brings them back. New table only: older versions never read it
-CREATE TABLE IF NOT EXISTS purged_rows (tbl TEXT NOT NULL, ref_id BIGINT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tbl, ref_id));
+-- 2.360.4 (#3243): organisations and entries deleted for good, by table, id and made-at time only (trigger PURGED_TRIGGER);
+-- a restore deletes them again when the backup brings them back. New table only: older versions never read it
+CREATE TABLE IF NOT EXISTS purged_rows (tbl TEXT NOT NULL, ref_id BIGINT NOT NULL, made TEXT NOT NULL DEFAULT '', at TEXT NOT NULL, PRIMARY KEY (tbl, ref_id));
 CREATE INDEX IF NOT EXISTS purged_rows_at ON purged_rows(at);
 -- 2.97.0 A (#1950): bookmarks (new tables below this line)
 -- bookmarks: links with a preview (module "reading", life/bookmarks.py). org_id NULL = private (only user_id sees it), else
@@ -2814,17 +2814,24 @@ CREATE OR REPLACE TRIGGER kalmido_revoked_api_tokens AFTER DELETE ON api_tokens 
 CREATE OR REPLACE TRIGGER kalmido_revoked_app_passwords AFTER DELETE ON app_passwords FOR EACH ROW
   EXECUTE FUNCTION kalmido_revoked_note('pw_hash')"""
 # 2.360.4 (#3243): the same for what is deleted for good (cascades included): table + id into purged_rows; a row that comes
-# back with its id (an undo, an import) leaves the list again, so only what stayed gone counts. Re-created on every start.
+# back with its id (an undo, an import) leaves the list again, so only what stayed gone counts; of fs_nodes only files (a
+# folder also goes when it is merged or dissolved, its content lives on); a merge takes its losers off the list. made = the
+# row's created_at: ids are given out again after a restore. Re-created on every start.
 PURGED_TABLES = ("orgs", "lists", "tasks", "fs_nodes", "wiki_pages", "events", "sheets", "contacts", "clients", "hub_mails", "office_deals")
 PURGED_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_purged_note() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     DELETE FROM purged_rows WHERE tbl=TG_TABLE_NAME AND ref_id=NEW.id;
-  ELSE
-    INSERT INTO purged_rows(tbl, ref_id, at)
-      VALUES (TG_TABLE_NAME, OLD.id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
-      ON CONFLICT (tbl, ref_id) DO UPDATE SET at=excluded.at;
+    RETURN NULL;
   END IF;
+  IF TG_TABLE_NAME = 'fs_nodes' THEN
+    IF to_jsonb(OLD)->>'kind' <> 'file' THEN
+      RETURN NULL;
+    END IF;
+  END IF;
+  INSERT INTO purged_rows(tbl, ref_id, made, at)
+    VALUES (TG_TABLE_NAME, OLD.id, COALESCE(to_jsonb(OLD)->>'created_at', ''), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+    ON CONFLICT (tbl, ref_id) DO UPDATE SET made=excluded.made, at=excluded.at;
   RETURN NULL;
 END $fn$;
 """ + ";\n".join(f"CREATE OR REPLACE TRIGGER kalmido_purged_{t} AFTER INSERT OR DELETE ON {t} FOR EACH ROW EXECUTE FUNCTION kalmido_purged_note()"

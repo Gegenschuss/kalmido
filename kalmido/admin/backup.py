@@ -1478,19 +1478,19 @@ BKR_RECENT_DAYS = 7
 # ---- 2.360.4 (#3243): organisations and entries deleted for good after the backup was written stay deleted: by the list
 # of what went (purged_rows, filled by a database trigger, core/schema.py PURGED_TRIGGER; read before, written back after).
 # The account rule applies: what went in the last BKR_RECENT_DAYS days stays (the restore may be meant to bring it back,
-# the admin learns the number); only a row made no later than it was deleted counts (ids are given out again after a restore).
+# the admin learns the number); only the same row counts (same made-at time: ids are given out again after a restore).
 def bkr_purged_read(c):
     """The list now [(table, id, at)]; caller is in system_ctx."""
     try:
         with c.savepoint():
-            return [tuple(r) for r in c.execute("SELECT tbl, ref_id, at FROM purged_rows")]
+            return [tuple(r) for r in c.execute("SELECT tbl, ref_id, made, at FROM purged_rows")]
     except _pg.Error:  # a database from before 2.360.4 (no table yet)
         return []
 
 
 def bkr_purged_note(c, rows):
-    for r in rows:
-        c.execute("INSERT INTO purged_rows(tbl, ref_id, at) VALUES(?,?,?) ON CONFLICT (tbl, ref_id) DO UPDATE SET at=excluded.at", r)
+    c.executemany("INSERT INTO purged_rows(tbl, ref_id, made, at) VALUES(?,?,?,?) ON CONFLICT (tbl, ref_id) "
+                  "DO UPDATE SET made=excluded.made, at=excluded.at", rows)
 
 
 def bkr_purged_drop(c, tbl, rid):
@@ -1503,13 +1503,15 @@ def bkr_purged_drop(c, tbl, rid):
         from ..files.store import fs_purge, fs_purge_files
         ids, paths = fs_purge(c, rid)
         return [lambda: fs_purge_files(ids, paths)]
+    if tbl == "lists":  # as the owner's delete: the tasks go to the trash of the inbox, what became of them has its own rows
+        from ..lists.lists import list_purge
+        inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox=1", (rid,)).fetchone()
+        return list_purge(c, rid, inbox[0] if inbox else None)[1]
     files = []
-    if tbl in ("tasks", "lists"):
-        files = [r[0] for r in c.execute(f"""WITH RECURSIVE t(id) AS (SELECT id FROM tasks WHERE {'id' if tbl == 'tasks' else 'list_id'}=?
-                                             UNION SELECT k.id FROM tasks k JOIN t ON k.parent_id=t.id)
-                                             SELECT a.path FROM attachments a JOIN t ON t.id=a.task_id""", (rid,))]
-    if tbl == "lists":
-        files += [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (rid,))]
+    if tbl == "tasks":
+        files = [r[0] for r in c.execute("""WITH RECURSIVE t(id) AS (SELECT id FROM tasks WHERE id=?
+                                            UNION SELECT k.id FROM tasks k JOIN t ON k.parent_id=t.id)
+                                            SELECT a.path FROM attachments a JOIN t ON t.id=a.task_id""", (rid,))]
     c.execute(f"DELETE FROM {tbl} WHERE id=?", (rid,))
     return files
 
@@ -1526,11 +1528,19 @@ def bkr_purged_after(c, rows):
         bkr_purged_note(c, rows)
         c.commit()
         for tbl in PURGED_TABLES:  # the big ones first: what goes with them needs no step of its own
-            for t, rid, at in rows:
-                if t != tbl or not c.execute(f"SELECT 1 FROM {tbl} WHERE id=? AND created_at<=?", (rid, at)).fetchone():
-                    continue
+            todo = {r[1]: r for r in rows if r[0] == tbl}
+            ids = sorted(todo)
+            here = []
+            for i in range(0, len(ids), 1000):
+                part = ids[i:i + 1000]
+                here += [r[0] for r in c.execute(f"SELECT id, created_at FROM {tbl} WHERE id IN ({','.join('?' * len(part))})", part).fetchall()
+                         if r[1] == todo[r[0]][2]]
+            for rid in here:
+                at = todo[rid][3]
                 if at >= cut:
                     recent += 1
+                    continue
+                if not c.execute(f"SELECT 1 FROM {tbl} WHERE id=?", (rid,)).fetchone():  # went with one before it
                     continue
                 try:
                     with c.savepoint():
