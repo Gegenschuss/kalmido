@@ -266,7 +266,9 @@ const V = B + 'api/v1';
     await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);  // 2.152.3 (#2619): the bell moved into the head bar
     await shot(`p2280-${th}-1440-bell.png`);
     await ev(`(() => { closePop(); return 1; })()`);
-    await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
+    await o.nav(B + '#agents/' + AG); await ready(ev);
+    // #3506: wait for the chat's messages instead of a fixed 900 ms (under the load of the full run the chat came later)
+    await until(() => ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`).catch(() => false), 60);
     check(await ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`), `${tag}: #1005 the buttons in the chat`);
     await shot(`p2280-${th}-1440-chat-choices.png`);
     await ev(`(() => { settingsModal('agents'); return 1; })()`); await sleep(1200);

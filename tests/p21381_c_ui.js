@@ -72,9 +72,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(app().style.getPropertyValue('--wbd') === '#2dd4bf', '#2389: my own choice wins over the organisation\'s colour');
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'none'}); render()`);
   check(!app().classList.contains('wsb-on'), '#2389: "No color": a grey stripe');
-  w.eval(`S.settings.ws_colors = JSON.stringify({private: 'blue'}); wsSet('private')`); await sleep(400);
+  // #3506: the choice is saved on the server too and the check waits for the stripe - a state reload under load (core.js
+  // takes S.settings from the server) wiped the local-only choice before the fixed 400 ms were over (Vorprüfung 2.409)
+  await call('PATCH', '/api/settings', {ws_colors: JSON.stringify({private: 'blue'})});
+  await w.eval(`S.settings.ws_colors = JSON.stringify({private: 'blue'}); wsSet('private')`);
+  await until(() => app().style.getPropertyValue('--wbd') === '#6d8cff');
   check(app().style.getPropertyValue('--wbd') === '#6d8cff', '#2389: Private: my own choice wins over purple');
-  w.eval(`S.settings.ws_colors = '{}'; wsSet('all')`); await sleep(400);
+  await call('PATCH', '/api/settings', {ws_colors: '{}'});
+  await w.eval(`S.settings.ws_colors = '{}'; wsSet('all')`);
+  await until(() => !app().classList.contains('wsb-on'));
   check(!app().classList.contains('wsb-on'), '#2389: "All": a grey stripe');
   w.eval(`wsSet('private')`); await sleep(300);
   // the setting: "Workspace colour", Private's default = purple
