@@ -412,9 +412,11 @@ _DERIVED = "derived or working data, rebuilt on the target"
 _SERVER = "state of this server (keys, jobs, scanner, queues)"
 _AGENT = "agents and their logs (never in the organisation export)"
 _LATER = "not yet in the export (named in not_included, follow-up task #3469)"
+_LATER2 = "not yet in the export (2.390 / 2.352 tables, follow-up task #3642)"
 OX_LEFT = {
     # organisation column
     "agents": _AGENT, "bg_jobs": _SERVER, "bookmarks": _LATER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
+    "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
     "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted, 2.353.0 #2758)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "office_peppol": _SECRET, "office_trash": "the trash (not_included)",
     "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
@@ -431,7 +433,7 @@ OX_LEFT = {
     "hook_in": _SECRET, "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
     "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL, "list_notif": _PERSONAL,
     "list_paperless": _SECRET, "mail_tokens": _SECRET, "notifications": _PERSONAL, "playbook_proposals": _AGENT, "public_links": _SECRET,
-    "shop_memory": _PERSONAL,
+    "shop_memory": _PERSONAL, "list_ticket_seq": _DERIVED, "task_keys": _LATER2, "list_folder_skip": _LATER2,
 }
 
 # 2.223.3 B (#2879): soft-deleted rows (the trash, undone entries) stay out of the organisation and the retention export, and
