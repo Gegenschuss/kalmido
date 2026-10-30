@@ -44,7 +44,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
   '/static/js/office_datevimp.js', '/static/js/office_bookarch.js', '/static/js/office_periods.js', '/static/js/officeagents.js',
   '/static/js/office_packs.js', '/static/js/office_books.js', '/static/js/office_receipts.js', '/static/js/office_bank.js',
-  '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_recurring.js', '/static/js/office_subs.js',
+  '/static/js/office_taxdates.js', '/static/js/office_banknorc.js', '/static/js/office_cards.js', '/static/js/office_recurring.js', '/static/js/office_subs.js',
   '/static/js/office_dunning.js', '/static/js/office_peppol.js', '/static/js/office_bankrules.js', '/static/js/office_docproject.js',
   '/static/js/office_agreements.js', '/static/js/office_assets.js', '/static/js/office_meals.js', '/static/js/office_leads.js',
   '/static/js/office_cfiles.js', '/static/js/office_letterhead.js', '/static/js/office_numranges.js', '/static/js/office_terms.js',
@@ -62,11 +62,11 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js',
   '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/fslock.js',
   '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js',
-  '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/office_undo.js', '/static/js/voice.js',
-  '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js',
-  '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js',
-  '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js',
-  '/static/js/trashui.js'];
+  '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/navmenu.js',
+  '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js',
+  '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js',
+  '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js',
+  '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
@@ -74,7 +74,7 @@ const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/stat
   '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css',
   '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css',
   '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css',
-  '/static/css/filereq.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css'];
+  '/static/css/filereq.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and

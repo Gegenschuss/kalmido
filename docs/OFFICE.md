@@ -158,12 +158,22 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 **Quotes & invoices** for everybody; the Pipeline becomes the start only once the office has an inquiry or a lead. The
 group **Money** stays folded until the office holds its first invoice or receipt (a fold or unfold by hand is kept per
 device). Cash flow, Figures, Travel expenses, Entertainment receipts and Subscriptions & tools appear once there is
-something in them; until then **Show more** at the end of Money lists them (and keeps them shown on this device), a
-direct link or a point opened once keeps working. The signal is `used` in `GET /api/office/settings` (existence checks
+something in them; until then they wait under **Hidden** of the menu's editor (2.418.0, #3560; before that behind
+**Show more**), a direct link keeps working and the open point always shows. The signal is `used` in `GET /api/office/settings` (existence checks
 only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Receipts** (`#office/receipts`, for everybody
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.418.0 (#3560):* every person arranges the office menu (and the menus of Home, Reading, Time, Review and the
+file store, and the phone's tab bar) with one editor: on a computer **Customize** at the end of the area's panel (or a
+right-click on a point: *Hide from menu*), on a phone the pen on top of the menu, and all of them at once under
+**Settings > Navigation**. Each row has a Minus (hide) and a grip (drag; on the grip the arrow keys move it), hidden
+points stay under **Hidden** with a Plus. Hiding only takes a point out of the menu: its data, function and rights stay
+and the search still finds it. The arrangement is the person's and the same on phone and computer (user setting
+`nav_menus`). In an organisation its admins switch menu points off for every member (Settings > Workspaces >
+*Menu points in this organisation*, `orgs.nav_off`); those are not in any member's menu there, not even under Hidden.
+Without an organisation the person is the own admin and arranges everything.
 
 *Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
 has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
@@ -235,8 +245,8 @@ The country pack decides which office functions exist at all; the office admin s
 | Subscriptions & tools | `money.subs` | yes | yes |
 
 *Since 2.380:* the five points of Money are offered by every country pack. Switched off, the point leaves the sidebar and
-the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: every
-point a person may open is shown.
+the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: what a
+person may open is in the menu or under **Hidden** of the menu's editor (2.418.0, #3560).
 
 - **Off only hides.** Nothing is deleted: the DATEV address and booking settings, tax date settings and stored XML files
   stay; switching on again brings everything back. The server checks too: the routes of a function that is off answer
@@ -1235,6 +1245,39 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 moving the personal office into an organisation turns "every vehicle" into each of its own vehicles; a closed drive: `PATCH` / `DELETE` 409, a
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
+
+## Credit cards
+
+*Since 2.444.*
+
+Only the total of a credit card statement leaves the business account; the positions need their receipts. **Credit cards** in
+the menu group Money (the people of the bookkeeping; a holder with an account sees only their own cards; in a personal office
+its owner):
+
+- **Card**: holder (a person of the area, or a free name), provider (Mastercard for now), last four digits, the business account.
+  Several cards per holder and provider.
+- **Statement**: one PDF per card and month. Kalmido reads the positions itself, without a model or an outside service: day,
+  merchant, the euro amount, the original amount and currency, the foreign fee as a position of its own. Please check them and
+  press **Confirm positions**; until then they count for nothing. If they do not add up to the printed total you are told. A total
+  that cannot be found is typed in; a PDF that cannot be read (a scan) gets its positions typed in by hand. Layouts differ between
+  issuers: the reader follows the common German Mastercard layout.
+- **Receipts**: an open position shows the receipt found when its amount fits (also the original amount), **Choose receipt...**
+  searches all documents you see, also unsorted ones. A receipt is matched only when you press it; it becomes a receipt paid on
+  the position's day. Or **Upload receipt**: filed and matched at once.
+- Fees and interest need no receipt: the statement is the proof. **Private** marks a position; the statement shows what the holder
+  pays back.
+- **Match bank booking** (or the bank's own list): the sum is checked, the booking then counts as having its receipt and leaves
+  **Without receipt**.
+- **Reminder** (**Settings**, section Data, off by default): weekly or monthly one task for the holder while positions are open, done
+  by itself. Cards with a free name go to the person you choose.
+- **Exports**: the neutral bookkeeping export lists the positions (type *Credit card*; a position with its receipt only points at
+  it, the receipt's row carries the amount), its ZIP has the statements and receipts under `cards/`. DATEV: the card is an account of
+  its own (default SKR03 1730 / SKR04 3610, private 1800 / 2100, set in the DATEV settings): a receipt paid by card is booked against
+  it, fees and private positions too, the bank booking of the total takes it back to zero. Positions still without a receipt are not
+  exported; the check names them.
+
+Rights: office area **Credit cards**; the level *own* means the cards the person holds. Locked months stay as they are, by the
+position's day.
 
 ## Cash book
 

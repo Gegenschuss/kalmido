@@ -15,6 +15,7 @@ from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 
 
@@ -316,8 +317,9 @@ def workspaces_for(c, uid):
     # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
     # 2.409.0 (#3490): + areas_off (the areas its admins switched off for the members, accounts/wsareas.py)
     return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member",
-             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x]}
-            for r in c.execute(f"SELECT id, name, icon, color, areas_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],
+             "nav_off": nav_org_off(r)}  # 2.418.0 (#3560): menu points its admins switched off
+            for r in c.execute(f"SELECT id, name, icon, color, areas_off, nav_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
 def org_peers(c, uid):
@@ -1107,6 +1109,7 @@ def org_mine_dict(c, r, uid):
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
             "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],  # 2.409.0 (#3490): areas its admins switched off
+            "nav_off": nav_org_off(r),  # 2.418.0 (#3560): menu points its admins switched off for the members
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1165,6 +1168,8 @@ def org_mine_update(oid):
     if "areas_off" in b:  # 2.409.0 (#3490): the areas switched off for every member (admins only); nothing is deleted
         from .wsareas import wsa_clean_org
         c.execute("UPDATE orgs SET areas_off=? WHERE id=?", (wsa_clean_org(b["areas_off"]), oid))
+    if "nav_off" in b:  # 2.418.0 (#3560): menu points switched off for every member (admins only); only the menus change
+        c.execute("UPDATE orgs SET nav_off=? WHERE id=?", (nav_clean_org(b["nav_off"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()

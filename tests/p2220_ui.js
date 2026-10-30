@@ -350,7 +350,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
         const a = [...document.querySelectorAll('.smodal a:not(.btn):not(.linkbtn)')].filter(x => x.offsetParent).map(x => getComputedStyle(x).textDecorationLine);
         const ib = document.querySelector('.smodal .lkfs')?.previousElementSibling?.querySelector('.ib') || null;
         return {h: Math.round(c.height), w: Math.round(c.width), bg, under: a.filter(x => x.includes('underline')).length, fsInfo: !!ib, prio: !!document.querySelector('.lookpv .lpv-prio.flag-5 svg'),
-          link: getComputedStyle(document.querySelector('.lookpv .lpv-link')).textDecorationLine, dev: getComputedStyle(document.querySelector('.smodal .devtag')).fontFamily}; })()`);
+          link: getComputedStyle(document.querySelector('.lookpv .lpv-link')).textDecorationLine, dev: (x => getComputedStyle(x).fontFamily)(document.querySelector('.smodal .devtag') || document.querySelector('.smodal #s-tabbar-h'))}; })()`);  // 2.418.0 (#3560): the tab bar lost its "This device" tag (per person now): its heading instead
       check(sd.h >= 0.8 * vh && sd.w >= 900, '#679: the dialog is tall and wide (~85 % of the height) ' + JSON.stringify(sd));
       check(+(sd.bg.match(/[\d.]+(?=\))/) || [0])[0] >= 0.5 && !sd.under && sd.link === 'none', '#679: a darker backdrop, links without an underline ' + JSON.stringify(sd));
       check(sd.fsInfo && sd.prio && !/mono/i.test(sd.dev), '#679: (i) at the "Font size" heading, "!high" as a flag, no monospace for words ' + JSON.stringify(sd));

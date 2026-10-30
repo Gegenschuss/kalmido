@@ -85,8 +85,8 @@ const V = B + 'api/v1';
   check(!!mi, 'the header menu has "Chat settings"');
   mi?.click();
   const md = await until(() => d.querySelector('.modal.acsetmd'));
-  check(md && md.querySelectorAll('fieldset.acset-f').length === 4 && md.querySelector('[data-acset="sugg"][value="collect"]')?.checked && !md.querySelector('.foot .pri'),
-    'a dialog with four groups, "collect" chosen, no save button');
+  check(md && md.querySelectorAll('fieldset.acset-f').length === 5 && md.querySelector('[data-acset="sugg"][value="collect"]')?.checked && !md.querySelector('.foot .pri'),
+    'a dialog with five groups (2.407.0 #3493: Chat header), "collect" chosen, no save button');
   const keep = md.querySelector('[data-acset="sugg"][value="keep"]'); keep.checked = true; keep.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.sugg === 'keep');
   check((await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs.sugg === 'keep', 'autosave: stored at once');

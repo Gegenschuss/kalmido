@@ -25,7 +25,7 @@ from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
-from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
+from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -964,14 +964,21 @@ def doc_next_number(c, oid, r, s, peek=False):
     # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
     # quotations count per organisation, client or project (onc_next)
     ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
-                                                                         "initials": _initials(c, x["created_by"])})
+                                                                         "initials": _initials(c, x["created_by"]), "kuerzel": _client_code(c, x)})
     for i in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
         num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, peek=peek, ahead=i if peek else 0, project=r["project_title"],
-                             client=rec.get("name") or "", initials=_initials(c, r["created_by"]), version=ver)
+                             client=rec.get("name") or "", initials=_initials(c, r["created_by"]), version=ver, kuerzel=_client_code(c, r))
         if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \
                 and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
             break
     return num
+
+
+def _client_code(c, r):
+    """2.433.0 (#3604): the text of {kuerzel} for document row r: its client's short code, else the first three letters of the
+    client's (or, without a client, the recipient's) name."""
+    cl = c.execute("SELECT name, short_code FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
+    return client_short_code(cl["short_code"] if cl else "", (cl["name"] if cl else "") or _j(r["recipient"], {}).get("name") or "")
 
 
 def _initials(c, uid):

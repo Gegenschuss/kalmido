@@ -1,0 +1,31 @@
+/* 2.418.0 (#3560): the editor of the areas' menus (navmenu.js, loaded with it): in place of a panel / the office's start
+   page and under Settings > Navigation. A row = Minus, icon, name, grip; Hidden below with Plus. On a computer Minus shows
+   while the pointer is over the row (or it has the focus), on a phone always. */
+.naved{display:flex;flex-direction:column;gap:.25rem;padding:.25rem .125rem .5rem}
+.navedh{display:flex;align-items:center;gap:.5rem;padding:.25rem .25rem .375rem;border-bottom:1px solid var(--line)}
+.navedh .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.naved .navgh{margin:.5rem .25rem .125rem;font-size:var(--fs-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.naved .navl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.naved .navr{display:flex;align-items:center;gap:.375rem;min-height:2.25rem;padding:0 .125rem;border-radius:var(--radius);background:var(--bg);user-select:none;-webkit-user-select:none}
+.naved .navr:hover{background:var(--bg3)}
+.naved .navi{display:inline-flex;color:var(--muted)}
+.naved .navn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.naved .navgrip{cursor:grab;touch-action:none;color:var(--muted)}
+.naved .navl:not(.navoffl) .navr{cursor:grab}
+.naved .navr.navdrag{cursor:grabbing;box-shadow:0 .125rem .5rem rgba(0,0,0,.15);position:relative;z-index:1}
+.naved .navmin{color:var(--danger)}
+.naved .navplus{color:var(--accent)}
+.naved .navoff .navn{color:var(--muted)}
+.naved:not(.navtouch) .navmin{opacity:0}
+.naved:not(.navtouch) .navr:hover .navmin,.naved:not(.navtouch) .navr:focus-within .navmin{opacity:1}
+.naved .navhint,.naved .navnone{margin:.25rem;font-size:var(--fs-s)}
+.naved .linkbtn{align-self:flex-start;margin:0 .25rem}
+.navtouch .navr{min-height:2.75rem}
+/* Settings > Navigation: one folding section per menu */
+#s-navmenus .navsec{border:1px solid var(--line);border-radius:var(--radius);margin:.5rem 0;padding:.25rem .5rem}
+#s-navmenus .navsec>summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;padding:.375rem 0;font-weight:600;list-style:none}
+#s-navmenus .navsec>summary::-webkit-details-marker{display:none}
+#s-navmenus .navsec>summary span{flex:1}
+#s-navmenus .navsec[open]>summary .fcar{transform:rotate(90deg)}
+.nav-org .navorg{margin:.25rem 0}
+.nav-org .navorg>summary{cursor:pointer;font-weight:600;padding:.25rem 0}

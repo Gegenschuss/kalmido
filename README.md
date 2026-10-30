@@ -19,6 +19,16 @@
 
 ## What's new
 
+**2.430.0** (2026-10-30):
+- **Workspaces**: each workspace remembers its own view; create your own company from the workspace menu, with optional private registration without an invitation.
+- **Projects**: properties per project type (software, agency, personal), "Project type" in folder settings.
+- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP; git author for AI commits is a setting.
+- **Knowledge**: tags (#word) with a list in the panel, live query blocks, `![[Page]]` embeds, daily notes and template placeholders.
+- **Office**: receipts by e-mail, missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, the client card's blocks fold, "Checked" ticks on receipts.
+- **Documents**: the open document stands in a pane beside the list, the list can be sorted.
+- **Settings**: new areas "Company & office" and "Documents"; "View as member" under Settings > Account.
+- **Backups**: larger files are kept once in `data/backups/.store` for all backups; copy the backup folder WITH `.store`.
+
 **2.409.0** (2026-10-30):
 - **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
 - **File store**: one area for files and documents (list or cards per folder, recognition per folder), locked end-to-end encrypted folders.

@@ -49,7 +49,7 @@ async function wpDraw(md) {
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 // 2.53.0 (#1410): SET_SECS lives in setcore.js (the command palette lists the sections)
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
-const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'), nav: N_('The menus of the areas and the tab bar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
   biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
@@ -208,6 +208,7 @@ function settingsSync(keep = null) {
   if (typeof wt_sync === 'function') wt_sync(md);  // 2.125.0 A (#2118)
   md._tabDraw?.();
   md._sideDraw?.();
+  if (typeof nav_pageDraw === 'function' && !$('#s-navmenus .navdrag', md)) nav_pageDraw($('#s-navmenus', md));  // 2.418.0 (#3560): after an undo / another device
 }
 function ntfyShow(md) {  // U06: the ntfy details only when ntfy is (also) the channel
   const ch = $('#s-pushch', md)?.value || S.settings.push_channel || 'webpush';
@@ -637,7 +638,7 @@ function settingsModal(focus) {
   if (kd_pinNeed()) return kd_pinAsk(() => settingsModal(focus));  // 2.49.0 (#1551): a child with the parents' PIN
   const s = S.settings;
   const topicUrl = httpUrl(`${S.ntfyUrl}/${s.ntfy_topic}`);  // 2.306.0 D4 (#2875): only http(s) in the link
-  const dev = `<span class="devtag">${tr('This device')}</span>`, hint = t => `<div class="shint">${t}</div>`;
+  const hint = t => `<div class="shint">${t}</div>`;  // 2.418.0 (#3560): the tab bar is the person's now (no "This device")
   const chk = (id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`;
   const prio = `<div class="row"><label for="s-pushprio">${tr('How urgent')}</label><select id="s-pushprio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${(s.push_priority || '4') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
@@ -648,6 +649,8 @@ function settingsModal(focus) {
       users: (lmOrgPaneOn() ? wsPaneHtml(hint) : '') + (S.me.is_admin ? usersHtml() + grpHtml() + orphHtml() + orgsHtml() + actHtml() : ''),
       agents: S.me.is_admin ? orgAgentsHtml(hint) + ad_agentsHtml(hint) : '',  // 2.46.6 (#1710)
       odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) + bkHtml() + stoHtml() : '')}, ad_admFocus(focus)) : '',
+    // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
+    nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
       <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
@@ -657,7 +660,7 @@ function settingsModal(focus) {
       ${hint(tr('The default for every project and view; a folder or a single project can choose otherwise.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
-      <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
+      <h4 id="s-tabbar-h">${tr('Tab bar')}</h4>
       ${hint(tr('A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
@@ -964,7 +967,7 @@ function settingsModal(focus) {
   // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
-    [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
+    [['sidebar', 'seitenleiste'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
     [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
@@ -1057,9 +1060,14 @@ function settingsModal(focus) {
     for (const y of x.split(',')) e.target.checked ? h.delete('e:' + y) : h.add('e:' + y);  // 2.44.0 (#1187): an area = all its parts
     sideSave({order: p.order, hidden: [...h]});
   });
-  const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };
-  const tabSet = ids => setLocal(tr('Tab bar'), () => LS.get('tabbar', null), tabApply, ids);
+  // 2.418.0 (#3560): the tab bar is the person's (setting nav_menus "tabbar", the same on every phone), no longer per device
+  const tabSet = ids => {
+    nav_pref('tabbar'); const o = {...NAV.o}; if (ids) o.tabbar = {order: ids.length ? ids : ['none']}; else delete o.tabbar;
+    LS.set('tabbar', null);
+    return setApply({nav_menus: JSON.stringify(o)}, tr('Tab bar')).then(() => { tabDraw(); renderTabs(); if (typeof nav_pageDraw === 'function') nav_pageDraw($('#s-navmenus', md)); });
+  };
   tabDraw();
+  if ($('#s-navmenus', md)) loadModule('navmenu').then(() => nav_pageDraw($('#s-navmenus', md)), () => {});  // 2.418.0 (#3560)
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
   niWire(md);  // 2.142.0 C (#2150)
@@ -1633,7 +1641,7 @@ const SS_AREA = [
       [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
       [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'steuerberater', 'tax advisor', 'skr03', 'skr04'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
-      [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
+      [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'], [N_('Card positions without a receipt'), ['beleg', 'receipt', 'karte', 'card', 'kreditkarte'], '', 'data'],
       [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
