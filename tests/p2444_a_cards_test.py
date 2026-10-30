@@ -160,7 +160,7 @@ WSO = f"org:{ORG}"
 
 
 def doc(s, name, amount, day, currency=None, ws=WSO):
-    r = s.post(B + "/api/docs", data={"ws": ws}, files={"files": (name, pdf(["Rechnung"]), "application/pdf")})
+    r = s.post(B + "/api/docs", data={"ws": ws}, files={"files": (name, pdf(["Rechnung " + name]), "application/pdf")})
     assert r.ok, r.text
     nid = r.json()["ids"][0]
     until(lambda: (sql("SELECT state FROM doc_meta WHERE node_id=?", (nid,)) or [["wait"]])[0][0] in ("done", "failed"), 30)
