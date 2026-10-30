@@ -563,7 +563,13 @@ async function saveField(el) {
   if (v && (f.type === 'number' || f.type === 'currency')) v = numIn(v);  // 2.156.0 B (#2069): + currency
   if (f.type === 'select') { const o = selOpt(f, v); el.classList.toggle('fill', !!lrSelFill(o)); el.style.cssText = o && lrSelFill(o) ? `--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}` : ''; }  // #1193
   if ((t.fields?.[fid] ?? null) === v) return;
-  try { await patchTask(t.id, {fields: {[fid]: v}}); } catch { renderDetail(); }
+  try { await patchTask(t.id, {fields: {[fid]: v}}); } catch {
+    // 2.359.2 B (#3049): not saved (api() said why): the detail is drawn again, a typed value stays in its field and leaving it tries again
+    const typed = el.type !== 'checkbox' && el.tagName !== 'SELECT' ? el.value : null;
+    renderDetail();
+    const n = typed != null && $(`#detail [data-cf="${fid}"]`);
+    if (n && n.tagName === el.tagName && n.type === el.type) { n.value = typed; n.addEventListener('blur', () => saveField(n), {once: true}); }
+  }
 }
 function fieldModal(lid, f, done) {
   const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}]))};

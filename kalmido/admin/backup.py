@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from flask import g, jsonify, request, send_file
+from flask import Response, g, jsonify, request, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
 from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
@@ -41,6 +41,7 @@ from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
 from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
 from ..calendars.subscriptions import _CAL_KEY
+from . import bkstore as bks  # 2.432.0 (#3584): the shared file store
 
 
 # ---------------------------------------------------------------- backups + restore (admins)
@@ -65,6 +66,11 @@ from ..calendars.subscriptions import _CAL_KEY
 # Backups of format 1 (tasks.db, SQLite, up to 2.36) can still be listed, uploaded and checked, but not restored here.
 # Row-level security (2.37): pg_dump / pg_restore always run with --enable-row-security and PGOPTIONS="-c app.role=system"
 # (the policies let the system role through; the password goes through the environment, never on the command line).
+# 2.432.0 (#3584): files from BK_SHARED_MIN on are kept ONCE in the shared store BK_DIR/.store (bkstore.py, by content,
+# encrypted with a store key of the passphrase when the backups are encrypted); such a backup is format 3: its zip holds
+# the dump, the small files and the manifest with the list "shared". A shared file goes once no backup in the folder
+# refers to it (bk_store_gc after the rotation and after a delete). Download = one complete format-2 file put together
+# while it streams; check / restore read the shared files from the store (SHA-256 checked like the members).
 BK_ON_ENV = env_bool("KALMIDO_BACKUPS", True)
 BK_DIR = os.path.abspath(os.environ.get("KALMIDO_BACKUP_DIR", "").strip() or os.path.join(os.path.dirname(os.path.abspath(DB)), "backups"))
 BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
@@ -95,6 +101,10 @@ BK_DUMP = "kalmido.dump"    # format 2 (2.37.0, Postgres): pg_dump -Fc
 BK_LEGACY = "tasks.db"      # format 1 (up to 2.36, SQLite): listed / checked, not restored here
 BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg_dump / pg_restore run
 BK_RESTORE_TRIES = 3       # 2.209.0 E (#1627): pg_restore runs again after a deadlock (it changed nothing)
+# 2.432.0 (#3584): files from this size on are kept once in the shared store (bkstore.py) instead of in every backup;
+# a backup with such files is format 3 (manifest "shared"), one without stays format 2
+BK_STORE = os.path.join(BK_DIR, ".store")
+BK_SHARED_MIN = max(1, _env_int("KALMIDO_BACKUP_SHARED_MIN", 64 * 1024))
 # members: attachments/<task>/<file>; 2.36.1 (#1021): office/<org>/<file> (the logos of the office module, same rules);
 # 2.46.0 (#1605): + attachments/avatars/<file> and attachments/listicons/<file> (pictures of people, groups and lists)
 # 2.48.0 (#1207): + attachments/files/<node>/<file> (the file store) and attachments/lists/<list>/<file> (project files, #410:
@@ -110,6 +120,16 @@ BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
 BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
+# 2.359.2 (#2895): the own industry packs of the instance (office/sheet.py IND_DATA_DIR, /data/packs/industry): flat files
+BK_PACK_RE = re.compile(r"packs/industry/([A-Za-z0-9][A-Za-z0-9_.-]{0,250})")
+BK_PACK_PREFIX = "packs/industry/"
+
+
+def bk_pack_dir():
+    from ..office.sheet import IND_DATA_DIR
+    return IND_DATA_DIR
+
+
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
@@ -137,7 +157,10 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed."),
           # 2.273.0 A (#3050): the way back to the state before failed too
-          "rollback": N_("The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.")}
+          "rollback": N_("The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now."),
+          # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
+          "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
+          "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check or restore it; the download needs the current one.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
 
@@ -250,18 +273,6 @@ def _sha256_file(p):
         for b in iter(lambda: f.read(BK_CHUNK), b""):
             h.update(b)
     return h.hexdigest()
-
-
-def _dir_size(d):
-    n = 0
-    for root, _, files in os.walk(d):
-        for fn in files:
-            try:
-                st = os.lstat(os.path.join(root, fn))
-                n += st.st_size
-            except OSError:
-                pass
-    return n
 
 
 def bk_outside(base, prefix, listed):
@@ -392,7 +403,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
     the dump at this path (the restore's way back)."""
     own = c is None
     c = c or connect()
-    tmp = None
+    tmp = slock = None
     try:
         os.makedirs(BK_DIR, mode=0o700, exist_ok=True)
         encrypt = gsetting(c, "bk_encrypt") == "1" or BK_ENCRYPT_REQUIRED  # 2.152.0 B (#2172)
@@ -401,9 +412,27 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             raise BackupError("encrypt_required")
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
-        need = bk_db_bytes(c) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR) if os.path.isdir(d))
+        # 2.432.0 (#3584): every file is hashed first; only what the shared store does not hold yet needs room (before:
+        # all files again, twice with encryption). The zip holds the database and the small files, so it stays small
+        db_bytes = bk_db_bytes(c)
+        c.rollback()  # (2.281.0 D, #3118: no read transaction stays open while the files are hashed)
+        slock = bks.lock(BK_STORE)  # 2.432.0 (#3584): no clean-up (any process) between the first store file and the refs
+        key = bks.store_key(BK_STORE, pw) if encrypt else None
+        seen, small, new = {}, 0, 0
+        for full, rel in bk_walk()[0]:  # (only the larger files are hashed here; the small ones are read once, below)
+            try:
+                st = os.stat(full)
+                if st.st_size < BK_SHARED_MIN or rel.startswith(BK_PACK_PREFIX):  # 2.359.2 (#2895): packs stay in the zip
+                    small += st.st_size
+                    continue
+                seen[full] = (st.st_size, st.st_mtime_ns, _sha256_file(full))
+            except FileNotFoundError:
+                continue
+            if not os.path.isfile(os.path.join(BK_STORE, bks.rel(key, seen[full][2]))):
+                new += bks.stored_size(key, st.st_size)
+        need = db_bytes * (3 if keep_dump else 2) + small * (2 if encrypt else 1) + (db_bytes if encrypt else 0) + new
         free = shutil.disk_usage(BK_DIR).free
-        if free < need * (2.2 if encrypt else 1.2) + 64 * 1024 * 1024:
+        if free < need * 1.1 + 64 * 1024 * 1024:
             raise BackupError("disk")
         tmp = tempfile.mkdtemp(prefix=".tmp-", dir=BK_DIR)
         dbp = os.path.join(tmp, BK_DUMP)
@@ -412,66 +441,81 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         if keep_dump:
             shutil.copyfile(dbp, keep_dump)
         files, att_bytes = [], 0
+        shared, refs, new = [], set(), 0  # 2.432.0 (#3584): [archive name, size, sha256] in the store, its store paths
         zp = os.path.join(tmp, "backup.zip")
         with zipfile.ZipFile(zp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
             z.write(dbp, BK_DUMP, compress_type=zipfile.ZIP_STORED)  # pg_dump -Fc compresses itself
             files.append([BK_DUMP, os.path.getsize(dbp), _sha256_file(dbp)])
-            skipped = {}  # top folder -> files not matching BK_MEMBER_RE
             missing = []  # 2.273.0 A (#3050): (full path, archive name) of files gone between listing and reading
-            for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
-                if not os.path.isdir(base):
-                    continue
-                for root, dirs, fns in os.walk(base):
-                    dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d))
-                                     and not (root == base and d == ".wikitmp"))  # 2.99.0 (#2182): a wiki export being written
-                    for fn in sorted(fns):
-                        full = os.path.join(root, fn)
-                        rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
-                        if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
-                            continue
-                        if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
-                            if not os.path.islink(full) and os.path.isfile(full):  # 2.79.0 (#476 M8): never silently
-                                top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
-                                skipped[top] = skipped.get(top, 0) + 1
-                            continue
-                        try:
-                            digest, size = _sha256_file(full), os.path.getsize(full)
-                            z.write(full, rel, compress_type=zipfile.ZIP_STORED if size > 64 * 1024 and
-                                    re.search(r"\.(jpe?g|png|gif|webp|avif|heic|mp4|mov|webm|mp3|m4a|ogg|zip|gz|7z|pdf|docx|xlsx|pptx|odt)$", fn, re.I)
-                                    else zipfile.ZIP_DEFLATED)
-                        except FileNotFoundError:  # gone meanwhile (deleted): tried once more below (2.273.0 A, #3050)
-                            missing.append((full, rel))
-                            continue
-                        files.append([rel, size, digest])
-                        att_bytes += size
+
+            def take(full, rel, again=False):
+                """One file into the zip (small) or the store; False = gone meanwhile."""
+                nonlocal att_bytes, new
+                try:
+                    st = os.stat(full)
+                    old = seen.get(full)
+                    # (a small file is hashed here first, as before 2.432: gone after the dump = FileNotFoundError, nothing written)
+                    digest = old[2] if old and old[:2] == (st.st_size, st.st_mtime_ns) and not again else _sha256_file(full)
+                    size = st.st_size
+                    if size >= BK_SHARED_MIN and not rel.startswith(BK_PACK_PREFIX):  # 2.359.2 (#2895): packs stay in the zip
+                        got = bks.put(BK_STORE, key, full, digest, size)
+                        if got is None:  # changed while it was copied: hashed once more
+                            digest = _sha256_file(full)
+                            size = os.path.getsize(full)
+                            got = bks.put(BK_STORE, key, full, digest, size)
+                        if got is None:
+                            return False
+                        shared.append([rel, size, digest])
+                        refs.add(got[0])
+                        new += got[1]
+                    else:  # hashed while written: the manifest names exactly what the zip got
+                        zi = zipfile.ZipInfo.from_file(full, rel)
+                        zi.compress_type, h, size = zipfile.ZIP_DEFLATED, hashlib.sha256(), 0
+                        with open(full, "rb") as f, z.open(zi, "w") as o:
+                            for b in iter(lambda: f.read(BK_CHUNK), b""):
+                                h.update(b)
+                                size += len(b)
+                                o.write(b)
+                        files.append([rel, size, h.hexdigest()])
+                except FileNotFoundError:
+                    return False
+                att_bytes += size
+                return True
+
+            todo, skipped = bk_walk()  # (again: files that came after the hashing above; skipped = top folder -> n)
+            for full, rel in todo:
+                if not take(full, rel):  # gone meanwhile (deleted): tried once more below (2.273.0 A, #3050)
+                    missing.append((full, rel))
             gone = []
             # 2.273.0 A (#3050): a second try of the same path (helps only when a file was replaced in place meanwhile; a deleted or
             # moved one stays missing); what is still missing is named, never silently
             for full, rel in missing:
-                try:
-                    digest, size = _sha256_file(full), os.path.getsize(full)
-                    z.write(full, rel, compress_type=zipfile.ZIP_DEFLATED)
-                except FileNotFoundError:
+                if not take(full, rel, again=True):
                     gone.append(rel)
-                    continue
-                files.append([rel, size, digest])
-                att_bytes += size
             if gone:  # 2.273.0 F1 (#3050): the log gets the count and the folders only, the paths stay in the manifest (admins)
                 tops = sorted({"/".join(r.split("/")[:2]) if r.count("/") > 1 else r.split("/")[0] + "/." for r in gone})
                 print(f"backup: {len(gone)} file(s) vanished while the backup was written (deleted or moved after the database dump),",
                       "folders:", ", ".join(tops), flush=True)
-            meta = {"format": "kalmido-backup", "format_version": 2, "app_version": APP_VERSION, "schema_version": schema,
+            npacks = sum(1 for f in files if f[0].startswith(BK_PACK_PREFIX))
+            meta = {"format": "kalmido-backup", "format_version": 3 if shared else 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
-                    "attachment_files": len(files) - 1, "attachment_bytes": att_bytes,
+                    "attachment_files": len(files) - 1 + len(shared) - npacks,
+                    "attachment_bytes": att_bytes - sum(f[1] for f in files if f[0].startswith(BK_PACK_PREFIX)),
+                    "pack_files": npacks,  # 2.359.2 (#2895)
                     "skipped_files": sum(skipped.values()),  # 2.79.0 (#476 M8)
                     "missing_files": len(gone), "missing_paths": gone[:BK_MISSING_SHOWN]}  # 2.273.0 A (#3050)
+            if shared:  # 2.432.0 (#3584): the files kept once in the store, and which store (the key's salt is no secret)
+                meta.update(shared_files=len(shared), shared_bytes=sum(x[1] for x in shared), store_new_bytes=new,
+                            store="plain" if key is None else key.desc)
             if skipped:  # folder names only (never file names): a new kind of stored file the archive does not know yet
                 print("backup: files outside the known folders were not saved:", json.dumps(skipped, sort_keys=True), flush=True)
-            z.writestr("manifest.json", json.dumps({**meta, "files": files}, ensure_ascii=False))
+            z.writestr("manifest.json", json.dumps({**meta, "files": files, **({"shared": shared} if shared else {})}, ensure_ascii=False))
         if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_ZIP_DELAY"):  # tests only (2.281.0 D, #3118)
             time.sleep(float(os.environ["KALMIDO_TEST_BK_ZIP_DELAY"]))
         name = bk_name(kind, encrypt)
         final = os.path.join(BK_DIR, name)
+        if shared:  # 2.432.0 (#3584): before the backup shows up, so the clean-up never sees it without its references
+            bks.refs_write(BK_STORE, name, refs)
         if encrypt:
             bk_encrypt(zp, final + ".part", pw, meta)
         else:
@@ -486,13 +530,39 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         raise
     except OSError as e:
         raise BackupError("io", aa_oserr(e)) from None
-    except (_pg.Error, zipfile.BadZipFile, ValueError) as e:
+    except (_pg.Error, zipfile.BadZipFile, ValueError, bks.StoreError) as e:
         raise BackupError("io", type(e).__name__) from None
     finally:
+        bks.unlock(slock)
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)
         if own:
             c.close()
+
+
+def bk_walk():
+    """(full path, archive name) of every file a backup takes, sorted, + {top folder: n} of the regular files outside
+    the known folders (2.79.0, #476 M8: never silently). 2.432.0 (#3584): one walk for the hashing and the writing."""
+    out, skipped = [], {}
+    packs = bk_pack_dir()
+    for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/"), (packs, BK_PACK_PREFIX)):  # 2.359.2 (#2895)
+        if not os.path.isdir(base):
+            continue
+        for root, dirs, fns in os.walk(base):
+            dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d))
+                             and not (root == base and d == ".wikitmp"))  # 2.99.0 (#2182): a wiki export being written
+            for fn in sorted(fns):
+                full = os.path.join(root, fn)
+                rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
+                if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
+                    continue
+                if os.path.islink(full) or not os.path.isfile(full) or not (BK_PACK_RE if base is packs else BK_MEMBER_RE).fullmatch(rel):
+                    if not os.path.islink(full) and os.path.isfile(full):
+                        top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
+                        skipped[top] = skipped.get(top, 0) + 1
+                    continue
+                out.append((full, rel))
+    return out, skipped
 
 
 def bk_parse_name(n):
@@ -557,7 +627,11 @@ def bk_public(x):
     return {"name": x["name"], "kind": x["kind"], "encrypted": x["encrypted"], "size": x["size"], "created_at": iso(x["at"]),
             "app_version": m.get("app_version", ""), "schema_version": m.get("schema_version"), "counts": m.get("counts") or {},
             "attachment_files": m.get("attachment_files"), "attachment_bytes": m.get("attachment_bytes"),
+            "pack_files": m.get("pack_files") or 0,  # 2.359.2 (#2895)
             "unreadable": bool(m.get("unreadable")), "missing_files": m.get("missing_files") or 0,  # 2.273.0 A (#3050)
+            # 2.432.0 (#3584): files kept once in the shared store (size = this file only) and what this backup added there
+            "shared_files": m.get("shared_files") or 0, "shared_bytes": m.get("shared_bytes") or 0,
+            "store_new_bytes": m.get("store_new_bytes") or 0,
             # 2.37.0: a backup from before 2.37 (SQLite): listed and checked, restored only through 2.36 + the update
             "legacy": not m.get("unreadable") and m.get("format_version", 1) < 2}
 
@@ -599,7 +673,45 @@ def bk_prune(c):
                 gone.append(x["name"])
             except OSError:
                 pass
+    bk_store_gc(c)  # 2.432.0 (#3584)
     return gone
+
+
+def bk_store_gc(c):
+    """2.432.0 (#3584): a shared file goes once no backup in the folder refers to it any more (caller holds _BK_LOCK).
+    The references come from .store/refs/<backup> (no passphrase needed); a backup that may refer to the store but has
+    no reference file stops the clean-up (nothing goes). Reference files stay while the backup is here or on the off-site
+    target (bko_remote, its names after the last upload). -> (files removed, bytes freed) or None."""
+    if not os.path.isdir(BK_STORE):
+        return None
+    slock = bks.lock(BK_STORE, wait=False)
+    if slock is None:  # a backup is being written (maybe in the worker process): the next clean-up takes it
+        return None
+    try:
+        return _bk_store_gc(c)
+    finally:
+        bks.unlock(slock)
+
+
+def _bk_store_gc(c):
+    items, needed = bk_list(), set()
+    for x in items:
+        r = bks.refs_read(BK_STORE, x["name"])
+        if r is None:
+            m = x["meta"]
+            if m.get("unreadable") or m.get("format_version", 1) >= 3:
+                print("backup: shared store not cleaned up (a backup without its reference file)", flush=True)
+                return None
+            continue
+        needed |= r
+    try:
+        remote = json.loads(gsetting(c, "bko_remote") or "[]")
+    except ValueError:
+        remote = []
+    n, freed = bks.gc(BK_STORE, needed, {x["name"] for x in items} | {str(r) for r in remote if isinstance(r, str)})
+    if n:
+        print(f"backup: shared store: {n} file(s) no backup needs any more removed ({freed // 1048576} MB)", flush=True)
+    return n, freed
 
 
 @bgj_fn("backup")  # 2.193.0 D (#2220): "Back up now" through the queue (the worker runs it)
@@ -737,8 +849,10 @@ def bk_open(path, pw, work):
     return path, None
 
 
-def bk_check_zip(z):
-    """Validates the member list; returns the manifest (with files) or BackupError."""
+def bk_check_zip(z, space=True):
+    """Validates the member list; returns the manifest (with files) or BackupError. space=False: no free space and no
+    version check (the download of a format-3 backup writes and restores nothing). 2.432.0 (#3584): format 3 = + the
+    list "shared" (bkstore.py)."""
     infos = z.infolist()
     if len(infos) > BK_MAX_MEMBERS:
         raise BackupError("members")
@@ -746,7 +860,7 @@ def bk_check_zip(z):
     for i in infos:
         n = i.filename
         m = BK_MEMBER_RE.fullmatch(n)
-        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", ".."))
+        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", "..")) or bool(BK_PACK_RE.fullmatch(n))
         if not ok or n in seen or i.is_dir() or i.flag_bits & 0x1 or i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             raise BackupError("members")
         if (i.external_attr >> 16) & 0o170000 not in (0, 0o100000):  # symlinks / devices (unix mode bits)
@@ -769,15 +883,15 @@ def bk_check_zip(z):
         raise BackupError("format") from None
     if not isinstance(man, dict) or man.get("format") != "kalmido-backup" or not isinstance(man.get("files"), list):
         raise BackupError("format")
-    if man.get("format_version", 1) != (1 if legacy else 2):
+    if man.get("format_version", 1) not in ((1,) if legacy else (2, 3)):
         raise BackupError("format")
     sv = man.get("schema_version")
     if isinstance(sv, bool) or not isinstance(sv, int):
         raise BackupError("format")
-    if sv > SCHEMA_VERSION:
+    if sv > SCHEMA_VERSION and space:
         raise BackupError("schema", sv)
     av = str(man.get("app_version") or "")[:20]
-    if appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
+    if space and appver_newer_minor(av) and not env_bool("KALMIDO_ALLOW_DOWNGRADE", False):  # 2.149.0 D (#2509)
         raise BackupError("newer", av, APP_VERSION)
     listed = {}
     for f in man["files"]:
@@ -786,10 +900,29 @@ def bk_check_zip(z):
         listed[f[0]] = f
     if set(listed) != seen - {"manifest.json"}:
         raise BackupError("hash")
+    shared = man.get("shared") if man.get("format_version") == 3 else None
+    if shared is not None:  # 2.432.0 (#3584): the same rules as for the members, and a known store
+        st = man.get("store")
+        if not isinstance(shared, list) or len(shared) + len(seen) > BK_MAX_MEMBERS or not (st == "plain" or bks.desc_ok(st)):
+            raise BackupError("format")
+        for f in shared:
+            if not (isinstance(f, list) and len(f) == 3 and isinstance(f[0], str) and type(f[1]) is int and f[1] >= 0
+                    and isinstance(f[2], str) and bks.SHA_RE.fullmatch(f[2])):
+                raise BackupError("format")
+            m = BK_MEMBER_RE.fullmatch(f[0])
+            if not m or m.group(3) in (".", "..") or f[0] in listed:
+                raise BackupError("members")
+            listed[f[0]] = f
+            total += f[1]
+            if total > BK_MAX_BYTES:
+                raise BackupError("too_large", BK_MAX_BYTES // 1048576)
+    elif "shared" in man:
+        raise BackupError("format")
     free = shutil.disk_usage(os.path.dirname(os.path.abspath(DB))).free
-    if free < total * 1.1 + 64 * 1024 * 1024:
+    if space and free < total * 1.1 + 64 * 1024 * 1024:
         raise BackupError("disk")
     man["_listed"], man["_total"], man["_legacy"] = listed, total, legacy
+    man["_shared"] = shared or []
     return man
 
 
@@ -1071,9 +1204,9 @@ def bk_scan_dump(dump):
     return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
 
 
-def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
+def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
     """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
-    office_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
+    office_dest, the own industry packs into pack_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
     2.37) is checked (members, checksums); for a restore its tasks.db is extracted (the returned path) for the move tool."""
     zp, _ = bk_open(path, pw, work)
     try:
@@ -1087,6 +1220,10 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
+                    pm = BK_PACK_RE.fullmatch(i.filename)
+                    if pm and pack_dest is not None:  # 2.359.2 (#2895): flat, the name checked by BK_PACK_RE (no / and no leading dot)
+                        bk_extract(z, i, os.path.join(pack_dest, pm.group(1)), man["_listed"])
+                        continue
                     if att_dest is None or m is None:  # verify only (or the tasks.db of an old archive): hash, write nothing
                         want, h, n = man["_listed"][i.filename], hashlib.sha256(), 0
                         with z.open(i) as src:
@@ -1108,6 +1245,28 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
                         raise BackupError("members")
                     os.makedirs(d, mode=0o700 if base is office_dest else 0o755, exist_ok=True)  # 2.39.1 (#1210 N8): office 0700
                     bk_extract(z, i, dest, man["_listed"])
+            if man["_shared"]:  # 2.432.0 (#3584): the files kept once in the store, checked like the members
+                key = bk_store_key(man, pw)
+                miss = bk_shared_missing(man, key)
+                if miss:
+                    raise BackupError("shared_missing", miss)
+                for name, size, sha in man["_shared"]:
+                    m = BK_MEMBER_RE.fullmatch(name)
+                    base = None if att_dest is None else office_dest if m.group(1) == "office" else att_dest
+                    if base is None:
+                        for _ in bk_shared_chunks(key, sha, size):
+                            pass
+                        continue
+                    d = os.path.join(base, m.group(2))
+                    dest = os.path.join(d, m.group(3))
+                    root = os.path.realpath(base) + os.sep
+                    if not os.path.realpath(dest).startswith(root) or not os.path.realpath(d).startswith(root):
+                        raise BackupError("members")
+                    os.makedirs(d, mode=0o700 if base is office_dest else 0o755, exist_ok=True)
+                    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+                    with os.fdopen(fd, "wb") as out:
+                        for b in bk_shared_chunks(key, sha, size):
+                            out.write(b)
     except zipfile.BadZipFile:
         raise BackupError("format") from None
     except (zipfile.LargeZipFile, NotImplementedError, EOFError):
@@ -1119,6 +1278,37 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
         if not is_kalmido_sqlite(dbp):
             raise BackupError("legacy")
     return man, dbp
+
+
+def bk_store_key(man, pw):
+    """2.432.0 (#3584): the store key of a format-3 manifest (None = plain store)."""
+    st = man.get("store")
+    if st == "plain":
+        return None
+    if not pw:
+        raise BackupError("need_passphrase")
+    return bks.key_from_desc(pw, st)
+
+
+def bk_shared_chunks(key, sha, size):
+    """The content of one shared file (bkstore.chunks) with the errors of this module."""
+    try:
+        yield from bks.chunks(BK_STORE, key, sha, size)
+    except bks.StoreError as e:
+        if e.code == "missing":
+            raise BackupError("shared_missing", 1) from None
+        raise BackupError("hash") from None
+
+
+def bk_shared_missing(man, key):
+    """How many shared files of a manifest are not in the store (checked before a download starts)."""
+    n = 0
+    for _, _, sha in man["_shared"]:
+        try:
+            bks.find(BK_STORE, bks.rel(key, sha))
+        except bks.StoreError:
+            n += 1
+    return n
 
 
 def bk_path(name):
@@ -1352,7 +1542,9 @@ def bk_restore(path, pw, admin, via):
     try:
         os.makedirs(att_new, mode=0o755)
         os.makedirs(off_new, mode=0o700)  # 2.39.1 (#1210 N8)
-        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
+        pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
+        os.makedirs(pack_new, mode=0o755)
+        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
@@ -1401,6 +1593,11 @@ def bk_restore(path, pw, admin, via):
                 with _pg.system_ctx(c):  # every session of every organisation ends
                     for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
                         gset(c, k, seal(c, _BK_RESEAL[k], plain[k]) if plain.get(k) else v)  # 2.359.0 (#2894)
+                    # 2.359.2 (#2892): what this instance did not have goes too - a production backup restored on a fresh test
+                    # instance brought its off-site target and credentials along (uploads + keep-N pruning at production's target)
+                    for r in c.execute("SELECT key FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'").fetchall():
+                        if r[0] not in keep:
+                            c.execute("DELETE FROM settings WHERE key=?", (r[0],))
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
@@ -1439,6 +1636,7 @@ def bk_restore(path, pw, admin, via):
                 print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
             else:
                 shutil.rmtree(old, ignore_errors=True)
+        bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal)  # 2.152.0 B (#2172)
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
@@ -1461,6 +1659,36 @@ def bk_restore(path, pw, admin, via):
         shutil.rmtree(off_new, ignore_errors=True)
         _BK.update(running="", started=0.0)
         _BK_LOCK.release()
+
+
+def bk_restore_packs(src):
+    """2.359.2 (#2895): the own industry packs of the backup into the data folder (after the database is back). A pack added
+    since the backup stays; one the backup replaces with other content is kept in packs/industry.pre-restore-<hex>/ (never
+    deleted unseen). Never fails the restore (the log names a failure)."""
+    names = sorted(os.listdir(src)) if os.path.isdir(src) else []
+    if not names:
+        return 0
+    dest = bk_pack_dir()
+    old = dest.rstrip(os.sep) + ".pre-restore-" + secrets.token_hex(4)
+    n = 0
+    try:
+        os.makedirs(dest, mode=0o755, exist_ok=True)
+        for fn in names:
+            d = os.path.join(dest, fn)
+            if os.path.lexists(d) and os.path.isfile(d) and not os.path.islink(d) and _sha256_file(d) == _sha256_file(os.path.join(src, fn)):
+                continue
+            tmp = os.path.join(dest, "." + fn + ".restore")  # first next to it: a failed copy never leaves the pack missing
+            shutil.copyfile(os.path.join(src, fn), tmp)
+            if os.path.lexists(d):
+                os.makedirs(old, mode=0o755, exist_ok=True)
+                shutil.copy2(d, os.path.join(old, fn), follow_symlinks=False)
+            os.replace(tmp, d)
+            n += 1
+    except OSError as e:
+        print("restore: the industry packs could not all be written back:", aa_oserr(e), flush=True)
+    if os.path.isdir(old):
+        print(f"restore: kept {os.path.basename(old)}: industry packs the backup replaced", flush=True)
+    return n
 
 
 def bkr_restore_journal(journal):
@@ -1492,6 +1720,7 @@ def bk_weekly_max():
 
 def bk_state(c):
     items = bk_list()
+    store = bks.usage(BK_STORE)
     return {"env": BK_ON_ENV, "dir": BK_DIR, "on": gsetting(c, "bk_on") == "1", "time": gsetting(c, "bk_time"),
             "keep_daily": _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14), "keep_weekly": _clamp_int(gsetting(c, "bk_keep_weekly"), 0, bk_weekly_max(), 8),
             "encrypt": gsetting(c, "bk_encrypt") == "1", "passphrase_set": bool(bk_passphrase(c)), "passphrase_env": bool(BK_PASS_ENV),
@@ -1499,7 +1728,8 @@ def bk_state(c):
             "last_error_at": gsetting(c, "bk_last_error_at"),
             "running": _BK["running"] or ("manual" if bgj_pending(c, "backup") else ""),  # 2.193.0 D (#2220): also queued / in the worker
             "confirm_word": BK_CONFIRM,
-            "total_bytes": sum(x["size"] for x in items), "free_bytes": aa_disk().get("free"),
+            "total_bytes": sum(x["size"] for x in items) + store[1], "free_bytes": aa_disk().get("free"),
+            "store_files": store[0], "store_bytes": store[1],  # 2.432.0 (#3584): the shared store (one line in the list)
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],
             # 2.152.0 B (#2172): the limits the admin view explains
             "encrypt_required": BK_ENCRYPT_REQUIRED, "keep_weekly_max": bk_weekly_max()}  # 2.306.0 G (#2946): always set
@@ -1618,8 +1848,64 @@ def backups_download(name):
     e = stepup_download(db(), proxy_ok=True)
     if e is not None:
         return e
+    enc = bool(bk_parse_name(name)["encrypted"])
+    if bk_meta(p, enc).get("format_version") == 3:  # 2.432.0 (#3584): put together from the store, a complete file
+        return bk_download_assembled(p, name, enc, bk_passphrase(db()) if enc else "")
     return send_file(p, as_attachment=True, download_name=name, mimetype="application/octet-stream",
                      conditional=False, max_age=0)
+
+
+def bk_download_assembled(p, name, enc, pw):
+    """2.432.0 (#3584): the download of a format-3 backup is ONE complete archive of format 2 (every file inside, as
+    every version can restore it), streamed while it is put together: the shared files come out of the store (checked
+    against their SHA-256), an encrypted backup is encrypted again with the same passphrase. Nothing lands on the disk
+    but the small zip of the backup (decrypted into a work folder that goes at the end)."""
+    work = tempfile.mkdtemp(prefix=".tmp-dl-", dir=BK_DIR)
+    try:
+        head = None
+        if enc:
+            if not pw:
+                raise BackupError("need_passphrase")
+            zp = os.path.join(work, "archive.zip")
+            try:
+                head = bk_decrypt(p, zp, pw)
+            except BackupError as e:
+                raise BackupError("old_passphrase" if e.code == "passphrase" else e.code, *e.args_) from None
+        else:
+            zp = p
+        z = zipfile.ZipFile(zp)
+        man = bk_check_zip(z, space=False)
+        key = bk_store_key(man, pw)
+        miss = bk_shared_missing(man, key)
+        if miss:
+            raise BackupError("shared_missing", miss)
+    except zipfile.BadZipFile:
+        shutil.rmtree(work, ignore_errors=True)
+        raise BackupError("format") from None
+    except BaseException:
+        shutil.rmtree(work, ignore_errors=True)
+        raise
+
+    def gen():
+        pipe = bks.Pipe()
+        try:
+            meta = {k: v for k, v in (head or {}).get("meta", {}).items() if k not in ("store", "shared_files", "shared_bytes", "store_new_bytes")}
+            sink = bks.EncWriter(pipe, pw, {**meta, "format_version": 2}, {k: head[k] for k in ("n", "r", "p")}) if enc else pipe
+            for _ in bks.assemble(z, man, sink, lambda sha, size: bk_shared_chunks(key, sha, size)):
+                b = pipe.drain()
+                if b:
+                    yield b
+            if enc:
+                sink.close()
+            yield pipe.drain()
+        except BackupError as e:  # the stream breaks off: the file is incomplete (a restore of it refuses it)
+            print("backup download broken off:", e.text("en"), flush=True)
+            raise
+        finally:
+            z.close()
+            shutil.rmtree(work, ignore_errors=True)
+    return Response(gen(), mimetype="application/octet-stream", headers={
+        "Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 @app.delete("/api/admin/backups/<name>")
@@ -1630,6 +1916,11 @@ def backups_delete(name):
         raise BackupError("busy")
     os.remove(p)
     _BK["meta"].pop(name, None)
+    if _BK_LOCK.acquire(blocking=False):  # 2.432.0 (#3584): its shared files go when no other backup needs them
+        try:
+            bk_store_gc(db())
+        finally:
+            _BK_LOCK.release()
     return jsonify(bk_state(db()))
 
 
@@ -1648,6 +1939,7 @@ def backups_verify(name):
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
+                   pack_files=man.get("pack_files") or 0,  # 2.359.2 (#2895)
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
@@ -1682,7 +1974,7 @@ def backups_upload():
                 with zipfile.ZipFile(p) as z:
                     man = bk_check_zip(z)
                 meta = {k: v for k, v in man.items() if not k.startswith("_") and k != "files"}
-                meta["format_version"] = 1 if man["_legacy"] else 2
+                meta["format_version"] = 1 if man["_legacy"] else man.get("format_version", 2)  # 2.432.0 (#3584, review N7): 3 stays 3
             except zipfile.BadZipFile:
                 raise BackupError("format") from None
         else:

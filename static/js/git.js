@@ -330,3 +330,52 @@ document.addEventListener('click', e => {
     case 'snip-copy': snipCopy(sid); break;
   }
 }, true);
+
+// ---- 2.390.0 (#3353): ticket keys APP-123. A project's key (lists.ticket_key, owner / project admins in the list dialog)
+// + the task's running number (tasks.ticket_no, given by the server) = "APP-12": in the task row, the task's "…" menu, the
+// search / palette ("APP-12" opens the task) and in texts (comments, description, chat: a link like "#12"). "#12" stays valid.
+const TK_RE = /^[A-Z][A-Z0-9]{1,5}$/;
+const tkOf = t => { const l = t && t.ticket_no ? listById(t.list_id) : null; return l?.ticket_key ? `${l.ticket_key}-${t.ticket_no}` : ''; };
+function tkFind(s) {  // "APP-12" / "app-12" -> the task I see with that key (its current one), else null
+  const m = /^([A-Za-z][A-Za-z0-9]{1,5})-(\d{1,9})$/.exec(String(s || '').trim()); if (!m) return null;
+  const k = m[1].toUpperCase(), n = +m[2];
+  const ls = new Set(S.lists.filter(l => l.ticket_key === k).map(l => l.id)); if (!ls.size) return null;
+  for (const t of S.tasks.values()) if (t.ticket_no === n && ls.has(t.list_id) && !t.deleted_at) return t;
+  return null;
+}
+const tkChip = t => { const k = tkOf(t); return k ? `<span class="tkey" title="${esc(tr('Ticket key'))}">${esc(k)}</span>` : ''; };
+// a key for a project name: the initials of up to four words, else the first three letters (the server's tk_suggest)
+function tkSuggest(name) {
+  const w = String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'S').match(/[A-Za-z0-9]+/g) || [];
+  const ws = w.filter(x => /^[A-Za-z]/.test(x)); const v = ws.length ? ws : w;
+  let k = v.length > 1 ? v.slice(0, 4).map(x => x[0]).join('').toUpperCase() : (v[0] || '').slice(0, 3).toUpperCase();
+  if (k.length < 2 && v.length) k = v[0].slice(0, 3).toUpperCase();
+  return TK_RE.test(k) ? k : 'PRJ';
+}
+// the list dialog: "Ticket key" (projects with ticket types or of type Software, or one that has a key)
+function tk_listRow(l) {
+  if (!l.id || l.is_inbox || !canManage(l)) return l.ticket_key ? `<div class="row tkrow"><label>${tr('Ticket key')}</label><span class="muted">${esc(l.ticket_key)}-1, ${esc(l.ticket_key)}-2, …</span></div>` : '';
+  const show = l.ticket_key || l.tickets || l.ptype === 'software';
+  return `<div class="row tkrow" ${show ? '' : 'hidden'}><label for="l-tkey">${tr('Ticket key')}</label><input id="l-tkey" data-lid="${l.id}" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(l.ticket_key || '')}" placeholder="${esc(tkSuggest(lname(l)))}" aria-describedby="l-tkhint"></div>
+    <div class="shint lhint tkhint" id="l-tkhint" ${show ? '' : 'hidden'}>${esc(tr('Tasks get keys like {0}-12 for commits, branches and links; “#12” keeps working. Empty = none.', l.ticket_key || tkSuggest(lname(l))))}</div>`;
+}
+async function tkSave(inp) {
+  const lid = +inp.dataset.lid, l = listById(lid); if (!l) return;
+  const v = inp.value.trim().toUpperCase(), was = l.ticket_key || '';
+  inp.value = v;
+  if (v === was) return;
+  if (v && !TK_RE.test(v)) { toast(tr('A project key has 2 to 6 capital letters or digits and starts with a letter (e.g. APP)')); inp.value = was; return; }
+  const put = async to => { await api('PATCH', '/api/lists/' + lid, {ticket_key: to}); await load(); render(); return {}; };
+  try { await put(v); } catch { inp.value = was; return; }
+  const nm = qn(lname(l).slice(0, 40));
+  offerUndo(v ? tr('Ticket key of {0}: {1}', nm, v) : tr('Ticket key of {0} removed', nm),
+    histAdd({label: tr('Ticket key of {0}', nm), lids: [lid], undo: () => put(was), redo: () => put(v)}));
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'l-tkey') { tkSave(e.target); return; }
+  if (e.target.id === 'l-tickets' || e.target.id === 'l-ptype') {  // the row shows with ticket types / Software
+    const md = e.target.closest('.modal'), on = $('#l-tickets', md || document)?.checked || $('#l-ptype', md || document)?.value === 'software';
+    $$('.tkrow, .tkhint', md || document).forEach(r => { if (on) r.hidden = false; });
+  }
+});
+document.addEventListener('keydown', e => { if (e.target.id === 'l-tkey' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });

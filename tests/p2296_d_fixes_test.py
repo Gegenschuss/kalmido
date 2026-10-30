@@ -37,7 +37,7 @@ for f in ("de.json", "xx.json"):
     check("überweisen" not in tx["delivery_closing"]["de"] and "transfer" not in tx["delivery_closing"]["en"], f"#3167: {f} delivery closing asks for no payment")
 for lg in ("de", "nl", "fr", "es", "it"):
     d = json.load(open(os.path.join(SRC, "static", "i18n", lg + ".json"), encoding="utf-8"))
-    check(all(k in d for k in ("Goods or services received in full and in good condition.|pack", "the following goods or services have been delivered:|pack",
+    check(all(k in d for k in ("Goods or services received in full and in good condition.|pack", "The following goods or services have been delivered:|pack",
                                "Delivery note closing (German)", "Delivery note closing (English)")), f"#3167: i18n {lg} has the delivery texts")
 import types  # noqa: E402
 
@@ -154,7 +154,7 @@ def heading_color(col):
                           {"kind": "item", "pos": 1, "title": "Leistung", "detail": "", "qty": 1, "qty_text": "1", "unit_text": "Tag", "rate": 100,
                            "rate_text": "100,00 €", "tax_pct": 19, "total": 100, "total_text": "100,00 €"}])
     m["company"] = dict(m["company"], color=col)
-    m["kind"] = "invoice"  # 2.406.0 (#3491): a quotation (look A) prints the heading 2 pt smaller; the colour rule is the same
+    m["kind"] = "delivery"  # 2.406.0 (#3491): look A prints the heading 2 pt smaller; the colour rule is the same; 2.434.0 (#3603): invoices are look A too
     pg = PdfReader(io.BytesIO(pdf.office_pdf(m))).pages[0]
     ops = pg.get_contents().get_data().decode("latin-1")
     hit = re.search(r"BT ([\d.]+) ([\d.]+) ([\d.]+) rg /F2 8\.00 Tf 0\.80 Tc", ops)  # the category heading: 8 pt bold, spaced

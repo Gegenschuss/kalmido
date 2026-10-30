@@ -49,6 +49,7 @@ O = "/api/office"
 D = O + "/docs"
 TEST_IBAN = "DE02120300000000202051"
 PROJECT = "Imagefilm Hafenlichter"
+INV = {}  # 2.408.0 (#3494): the finalised invoice of each office
 
 
 def pdf_text(data):
@@ -65,7 +66,7 @@ for who, S in (("org admin", A), ("freelancer", F)):
     r = S.post(B + D, json={"kind": "invoice", "project_title": PROJECT, "recipient": {"name": "Beispielkunde AG", "lines": ["Marktplatz 2", "54321 Beispielort"]},
                             "service_from": "2026-05-01", "items": [{"title": "Kamera", "qty": 1, "rate": 500}, {"title": "Schnitt", "qty": 2, "rate": 400}]})
     check(r.status_code == 201, f"{who}: invoice draft " + r.text[:160])
-    IID = r.json()["id"]
+    IID = INV[who] = r.json()["id"]
     r = S.post(B + f"{D}/{IID}/finalize")
     check(r.ok and r.json().get("number"), f"{who}: invoice finalised " + r.text[:160])
     rd = S.get(B + f"{D}/{IID}/render").json()
@@ -99,5 +100,25 @@ for who, S in (("org admin", A), ("freelancer", F)):
     check(r.status_code == 201, f"{who}: level 2 reminder with a fee " + r.text[:160])
     rows = S.get(B + f"{D}/{r.json()['id']}/render").json()["totals"]["rows"]
     check(len(rows) == 3 and rows[1][1] == "5,00 €" and rows[-1] == ["Gesamtbetrag", "1.552,00 €"], f"{who}: #3181 with a fee: fee and total stay {rows}")
+
+# ---- 2.408.0 (#3494): the website as an own company field, printed under the e-mail without https:// and the closing slash
+for who, S in (("org admin", A), ("freelancer", F)):
+    old_id = INV[who]
+    r = S.put(B + O + "/settings", json={"company_fields": {"website": "  https://www.beispiel-studio.example/ "}})
+    check(r.ok and r.json()["company_fields"]["website"] == "https://www.beispiel-studio.example/", f"{who}: #3494 the website stored as entered " + r.text[:200])
+    check(S.put(B + O + "/settings", json={"company_fields": {"website": "x" * 201}}).status_code == 400, f"{who}: #3494 more than 200 characters: 400")
+    r = S.post(B + D, json={"kind": "offer", "recipient": {"name": "Beispielkunde AG", "lines": ["Marktplatz 2", "54321 Beispielort"]},
+                            "items": [{"title": "Kamera", "qty": 1, "rate": 500}]})
+    check(r.status_code == 201, f"{who}: #3494 quotation draft " + r.text[:160])
+    QID = r.json()["id"]
+    cl = S.get(B + f"{D}/{QID}/render").json()["company"]["contact_lines"]
+    check(cl[-2:] == ["E-Mail: kontakt@example.com", "www.beispiel-studio.example"], f"{who}: #3494 the website under the e-mail, no label {cl}")
+    t = pdf_text(S.get(B + f"{D}/{QID}/pdf").content)
+    check("www.beispiel-studio.example" in t and "https://" not in t, f"{who}: #3494 the website in the PDF")
+    cl = S.get(B + f"{D}/{old_id}/render").json()["company"]["contact_lines"]
+    check(not any("beispiel-studio" in x for x in cl), f"{who}: #3494 a finalised document keeps its sender snapshot {cl}")
+    S.put(B + O + "/settings", json={"company_fields": {"website": ""}})
+    cl = S.get(B + f"{D}/{QID}/render").json()["company"]["contact_lines"]
+    check(cl[-1] == "E-Mail: kontakt@example.com", f"{who}: #3494 an empty website prints no line {cl}")
 
 sys.exit(done("p2357_b_api"))

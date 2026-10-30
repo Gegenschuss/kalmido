@@ -18,7 +18,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, REVOKED_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, REVOKED_TRIGGER, TICKET_NO_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
 from ..core.i18n import LANGS, tr
 from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -758,6 +758,7 @@ def init_db(guard=True, load=None):
         c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         c.executescript(REVOKED_TRIGGER)  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
+        c.executescript(TICKET_NO_TRIGGER)  # 2.390.0 (#3353): running ticket numbers of projects with a key
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
         from ..core.access import acx_gen_setup

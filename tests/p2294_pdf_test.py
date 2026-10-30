@@ -135,7 +135,8 @@ for kind in ("offer", "invoice"):
     data, pages = render(model(3, kind))
     k, g = sum_gap(pages)
     # 2.406.0 (#3491): a quotation (look A) puts totals + closing at the bottom of the page: at least the wished gap
-    check(len(pages) == 1 and k == 0 and g is not None and (g > pdf.PDF_SUM_GAP - 0.6 if kind == "offer" else abs(g - pdf.PDF_SUM_GAP) < 0.6),
+    # 2.434.0 (#3603): an invoice is look A as well
+    check(len(pages) == 1 and k == 0 and g is not None and g > pdf.PDF_SUM_GAP - 0.6,
           f"{kind}, 3 positions: the wished gap ~11 mm before the totals ({g and round(g / MM, 1)} mm)")
     ig = intro_gap(pages)
     check(ig is not None and abs(ig - INTRO_WISH) < 0.6, f"{kind}: the wished air between intro and table ({ig and round(ig, 1)} pt, want {INTRO_WISH:.1f})")
@@ -155,7 +156,10 @@ for kind in ("offer", "invoice"):
 
 # ---------------------------------------------------------------- 2. every length: never an extra page, the gap shrinks before a break
 squeezed, at_min, multi_wish, worse = [], [], [], []
+FILL = pdf.PDF_SUM_FILL
 for kind in ("offer", "invoice"):
+    # 2.434.0 (#3603): an invoice is look A now; measured without its fill (totals at the page bottom) the #3154 air is checked as before
+    pdf.PDF_SUM_FILL = 0.0 if kind == "invoice" else FILL
     for cl in (1, 2, 3):
         for n in range(1, 46):
             m = model(n, kind, cl)
@@ -182,9 +186,12 @@ for kind in ("offer", "invoice"):
                     multi_wish.append(tag)
             if data[:8] != b"%PDF-1.7" or len(PdfReader(io.BytesIO(data)).pages) != len(pages):
                 worse.append(f"{tag}: the PDF does not open")
+pdf.PDF_SUM_FILL = FILL
 check(not worse, f"never more pages than before, the gap never below the old one ({worse[:4]})")
 check(len(squeezed) >= 1, f"a nearly full page sets the gap between minimum and wish ({squeezed[:4]})")
-check(len(at_min) >= 1, f"a nearly full page sets the minimum ~4 mm instead of a page break ({[a[:2] for a in at_min[:4]]})")
+# 2.434.0 (#3603): look A's closing (one block, no gap to give up) rarely lands exactly on the minimum: within 2 mm above it counts
+near_min = [q for q in squeezed if q[1] < pdf.PDF_SUM_GAP_MIN / MM + 2]
+check(len(at_min) >= 1 or near_min, f"a nearly full page sets the minimum ~4 mm instead of a page break ({[a[:2] for a in at_min[:4]]} {near_min[:3]})")
 check(len(multi_wish) >= 1, f"a multi-page document keeps the wished gap on its last page ({multi_wish[:3]})")
 if at_min:
     shot("p2294-fast-voll", at_min[0][2])

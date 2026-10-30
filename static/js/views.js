@@ -112,6 +112,14 @@ function filterMatch(t, r = {}) {
   if (r.types?.length) c.push(r.types.includes(t.ttype || ''));  // 2.4.0 (#340): '' = no type
   if (r.tags?.length) c.push(r.tags.some(g => hasTag(t, g)));
   for (const [fid, cr] of Object.entries(r.cf || {})) if (cfRuleOn(cr) && fieldById(+fid)) c.push(cfMatch(t, fid, cr));
+  // 2.390.0 B (#3355): assignee (me | none | user id), column, sprint (cur = the list's active one | none = backlog),
+  // milestone (id | none), text in title or notes
+  if (r.who?.length) c.push(r.who.some(w => (w === 'none' ? !t.assignee_id : t.assignee_id === (w === 'me' ? S.me?.id : +w))));
+  if (r.secs?.length) c.push(r.secs.some(s => (s === 'none' ? !t.section_id : t.section_id === +s)));
+  if (r.sprints?.length) c.push(r.sprints.some(s => (s === 'none' ? !t.sprint_id : !!t.sprint_id && spr_active(listById(t.list_id))?.id === t.sprint_id)));
+  if (r.ms?.length) c.push(r.ms.some(m => (m === 'none' ? !t.milestone_id : t.milestone_id === +m)));
+  const q = (r.text || '').trim().toLowerCase();
+  if (q) c.push((t.title || '').toLowerCase().includes(q) || (t.content || '').toLowerCase().includes(q));
   if (!c.length) return true;
   return r.op === 'or' ? c.some(Boolean) : c.every(Boolean);
 }
@@ -276,6 +284,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
 }
 function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
+  if (k === 'projects') return tr('Projects');  // 2.417.0 A (#3559)
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
   if (k.startsWith('who:')) { const id = +k.slice(4); return S.me && id === S.me.id ? tr('My tasks') : tr('Tasks of {0}', personNameAny(id) || '?'); }

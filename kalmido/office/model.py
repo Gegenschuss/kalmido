@@ -80,6 +80,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
                      "producing_on": 0, "raw_on": 0,
                      "portal_docs": 0,  # 2.120.0 B (#2088): sent documents show in the customer portal (office/portaldocs.py)
+                     "client_blocks_off": [],  # 2.435.0 A (#3600): blocks of the client card the office switched off (CLIENT_BLOCKS)
                      "accept_on": 1,  # 2.114.4 B (#2270): quotations print the order confirmation block (per document: docs.accept_on)
                      "sign_offers": 0,  # 2.357.0 C (#3158): quotations / reminders with the signature picture of who finalised them
                      # 2.113.1 (#2251): day rate and factor of "share by amount" (an industry pack's option); None = the
@@ -107,6 +108,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "tax_dates": {},
                      # 2.299.0 C (#3192): the reminder of the bank bookings without a receipt (set only by its own route, office/banknorc.py)
                      "bank_norc": {},
+                     # 2.425.0 B (#3451): the recurring providers of the bank bookings (set only by its own route, office/bankvend.py): days
+                     "bank_vendors": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",
@@ -144,6 +147,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.368.0 (#2979): 1 once the admin chose the document language; until then a pack switch takes it along
                      "lang_set": 0}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
+# 2.435.0 A (#3600): the blocks of the client card an office admin may switch off (static/js/dashboard.js LY_CL_BLOCKS;
+# the details always show)
+CLIENT_BLOCKS = ("persons", "invoices", "month", "lists", "note", "tickets", "gendocs", "letters", "privacy")
 
 
 # ---------------------------------------------------------------- gate + organisation
@@ -507,6 +513,10 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k in ("parts_summary_title_de", "parts_summary_title_en"):
             out[k] = re.sub(r"[\x00-\x1f\x7f]", "", v or "").strip()[:300] if isinstance(v, str) else ""
+        elif k == "client_blocks_off":  # 2.435.0 A (#3600): only known blocks; switching off hides, never deletes
+            if not isinstance(v, list) or any(x not in CLIENT_BLOCKS for x in v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = [x for x in CLIENT_BLOCKS if x in v]
         elif k == "features_off":  # 2.147.0 (#2460): only switchable functions; switching off hides, never deletes
             from .packs import PACK_FEATURES
             if not isinstance(v, list) or any(not isinstance(x, str) or not PACK_FEATURES.get(x, {}).get("switch") for x in v):

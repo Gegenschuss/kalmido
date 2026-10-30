@@ -161,7 +161,7 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   check(await until(() => dsel() === [...od].sort((a, b) => a - b).join(',')), 'documents: the range forwards');
   click(v, card(od[1]), {shiftKey: true});
   check(await until(() => dsel() === String(od[2])), 'documents: Shift-click on a chosen target unchooses the range up to it');
-  click(v, card(od[2]));  // plain: off again, the anchor here
+  click(v, vd.querySelector(`[data-dcchk="${od[2]}"]`));  // the box: off again, the anchor here (2.430.0 (#3582): a plain click opens)
   click(v, card(od[0]), {shiftKey: true});
   check(await until(() => dsel() === [...od].sort((a, b) => a - b).join(',')), 'documents: the range backwards');
   click(v, card(od[1]), {metaKey: true});

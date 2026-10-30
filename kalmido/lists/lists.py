@@ -14,6 +14,7 @@ from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sor
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
@@ -308,6 +309,11 @@ def list_create():
     color, folder = clean_color(b.get("color", "")), clean_folder(b.get("folder", ""))
     if "color" not in b and folder:  # 2.53.0 (#1426): a new list takes the colour of its folder (the nearest one that has one)
         color = lp_folder_color(db(), me(), folder)
+    if "ptype" not in b and folder and not b.get("family"):  # 2.411.0 (#3516): a new list in a folder gets the folder's project type
+        from ..lists.folders import folder_ptype
+        fpt = folder_ptype(db(), me(), folder)  # (ptype "" in the request = chosen: no type; a chosen type goes first)
+        if fpt:
+            b = {**b, "ptype": fpt, "sections": True}
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):
@@ -410,6 +416,8 @@ def list_update(lid):
         from ..accounts.orgs import list_org_set
         from ..tasks.movememo import lmm_snap
         lmm0 = lmm_snap(c, lid)  # 2.273.0 B (#3042): what the change ends, for the way back
+        if role == "owner" and "family" in b and not b["family"]:  # 2.396.0 (#3385): the same body ends "shopping list" etc. (private only) first
+            c.execute("UPDATE lists SET family='' WHERE id=?", (lid,))
         if list_org_set(c, lid, b["org_id"]):  # Denied 403 / 409
             list_own_mark(c, lid, "org_id")  # 2.29.0 (#1030): differs from its folder from now on
         b = {k: v for k, v in b.items() if k != "org_id"}
@@ -437,6 +445,14 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "done_in_section"))
         c.execute("UPDATE lists SET done_in_section=? WHERE id=?", (None if dv in (None, "") else int(dv), lid))
         b = {k: v for k, v in b.items() if k != "done_in_section"}
+    if "ticket_key" in b:  # 2.390.0 (#3353): the project's ticket key APP (owner / list admins; '' / null = none)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and project admins can change this setting"), 403)
+        try:
+            tk_set(c, lid, b["ticket_key"])
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "ticket_key"}
     if "tap_done" in b:  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins; 0 / 1)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change this setting"), 403)
@@ -445,6 +461,15 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "tap_done"))
         c.execute("UPDATE lists SET tap_done=? WHERE id=?", (int(tv), lid))
         b = {k: v for k, v in b.items() if k != "tap_done"}
+    if "props" in b:  # 2.412.0 (#3552): the properties switched by hand against the project type (owner / project admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and project admins can change this setting"), 403)
+        from ..lists.templates import props_clean
+        try:
+            c.execute("UPDATE lists SET props=? WHERE id=?", (props_clean(b["props"]), lid))
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "props"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change the shown fields"), 403)
@@ -472,7 +497,7 @@ def list_update(lid):
     pt_out = {"modules_on": tb_col_on} if tb_col_on is not None else {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:
-            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids"}))
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids", "props"}))  # 2.412.0 (#3552): + props (set above, the undo)
             pt_out["modules_on"] = [*pt_out.get("modules_on", []), *[m for m in (tb_col_on or []) if m not in pt_out.get("modules_on", [])]]
         except BadInput as e:
             return err(str(e))

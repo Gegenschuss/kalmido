@@ -164,7 +164,7 @@ def kp_portal_html(c, who, lg):
 @app.get("/portal/docs/<int:did>/pdf")
 def kp_pdf(did):
     """The PDF of one visible document of the signed-in address (404 for anything else, also without cookie / switched off)."""
-    from .pdfweb import _file_response, _render, epdf_name, epdf_stored
+    from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -180,7 +180,7 @@ def kp_pdf(did):
     except Denied:  # the stored file of a finalised document is gone or changed (logged): no new rendering that could differ
         return pub_gone(lg)
     data = data if data is not None else _render(c, oid, d)[0]
-    resp = _file_response(data, epdf_name(d) + ".pdf", "application/pdf", inline=True)
+    resp = _file_response(epdf_out(c, oid, d, data), epdf_name(d) + ".pdf", "application/pdf", inline=True)  # 2.434.0 (#3619): + terms
     resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp

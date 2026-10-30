@@ -31,6 +31,8 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   retired_orgs (accounts/orgretain.py)  trash    orgs.retain_until retired organisations after their legal period
   agreements (office/agreements.py)     trash    trash             deleted agreements (on reading the list, per organisation)
   suppliers (office/datevimp.py)        trash    trash             deleted DATEV suppliers (on reading / importing, per organisation)
+  bookarch (office/bookarch.py)         trash    10 years (book)   2.414.0 (#3502): archived DATEV years after their legal period,
+                                                                    with receipt images and original files (daily, the watchdog)
   webhooks_in (integrations/hookin.py)  trash    trash             deleted incoming webhooks (on reading a list's webhooks)
     2.272.0 F (#3026, review M4): these three run inside a request; they report only when they deleted something
   fs_orphans (files/fsmove.py)          files    files             stored versions no row names

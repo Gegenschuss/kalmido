@@ -187,7 +187,7 @@ function rf_palItems(q) {
   for (const n of (typeof AB !== 'undefined' && AB.data?.items) || []) if (n.kind !== 'link' && !(n.locked && n.lock_id !== n.id)) add('f:' + n.id, 'Document', n.name, n.kind === 'folder' ? 'folder' : 'file');  // 2.353.0 F (#2758, review M7): no decrypted name of a locked folder into a text
   rf_palAsk(q);
   if (!q) return it.filter(x => x.kind === 'list').slice(0, 12).concat(it.filter(x => x.kind === 'tasks').slice(0, 8));
-  const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+  const nm = q.match(/^#?(\d{1,9})$/), hit = (nm && taskById(+nm[1])) || tkFind(q);  // 2.390.0 (#3353): + "APP-12"
   const hits = it.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)})).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 60);
   return hit ? [{id: 'rf:t:' + hit.id, kind: 'tasks', label: `#${hit.id} ${mdPlain(hit.title)}`, icon: 'hash', fn: () => rf_pick('t:' + hit.id)}, ...hits] : hits;
 }
@@ -274,7 +274,7 @@ function rf_pvHtml(k) {
     if (kids.length) line('sub', tr('{0} of {1} subtasks done', kids.filter(x => x.status).length, kids.length));
     const n = [t.comment_count ? trn('{0} comment', '{0} comments', t.comment_count) : '', t.attachments?.length ? trn('{0} attachment', '{0} attachments', t.attachments.length) : ''].filter(Boolean).join('  ·  ');
     line('comment', n);
-    const d = mdPlain(String(t.content || '')).replace(/\s+/g, ' ').trim().slice(0, 300);
+    const d = mdPlain(String(t.content || '')).replace(/\s+/g, ' ').trim().slice(0, 600);  // 2.408.0 (#3503): twice as much text as before (300 -> 600)
     return head(t.status ? 'done' : 'check', `#${t.id} ${v.name}`, t.status ? 'rfdone' : '') + rows.join('') + (d ? `<div class="rfpvd">${esc(d)}</div>` : '');
   }
   if (k[0] === 'l') {

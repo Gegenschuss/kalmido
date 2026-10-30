@@ -152,8 +152,8 @@
 .ua8bar{display:flex;gap:.5rem;margin:.25rem 0 .5rem}
 .ua8bar input{flex:1;min-width:0}
 .ua8bar select{flex:0 1 auto;max-width:42%}
-.ua8sel{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem;margin-bottom:.5rem;border-radius:.5rem;background:var(--accent-soft)}
-.ua8sel .n{font-weight:600;margin-right:auto}
+/* 2.428.0 A (#3581): the selection bar is the shared floating one (app.css .mselbar); room below the list for it */
+#a-usel:not([hidden])~.ua8pg{padding-bottom:5rem}
 /* 2.88.0 (#1980): the label around the tick box is the touch target (44 x 44 on touch) */
 .ua8hit{display:inline-flex;align-items:center;justify-content:center;flex:none;margin:0 .25rem 0 0;cursor:pointer}
 .ua8chk{width:1.125rem;height:1.125rem;flex:none;margin:0;accent-color:var(--accent)}
@@ -189,13 +189,21 @@
   .ua8pg .iconbtn{min-width:2.75rem;min-height:2.75rem}
   .ogchk input{width:1.5rem;height:1.5rem}
 }
-/* 2.92.0 D (#2010): on the phone the selection bar is fixed above the tab bar, so the first tick no longer pushes the list down */
-@media (max-width:767px) {
-  .ua8sel{position:fixed;left:.5rem;right:.5rem;bottom:calc(var(--tabs-h) + var(--safe-b) + .5rem);z-index:45;margin:0;background:var(--bg3);border:1px solid var(--accent);box-shadow:var(--shadow)}
-}
 /* 2.115.0 B (#2062): active sessions + open organisation invitations: two lines per row (name, details), large buttons */
 .sesrow .n,.oinvrow .n{white-space:normal}
 .sesrow .n small,.oinvrow .n small{display:block}
 @media (pointer:coarse){.sesrow .btn,.oinvrow .btn{min-height:2.75rem}}
 /* 2.364.0 C (#3041): an info button at the right end of a wide switch row keeps its tap area inside the area (no sideways scroll) */
 .spane .featgrid label.wide>.ib:last-child{margin-right:.6875rem}
+/* 2.436.0 (#3620): "Show administration again" under the areas (View as member); the nav is a tab list, so it sits beside it */
+.snmv{position:absolute;left:.5rem;bottom:.625rem;width:11.5rem;display:flex;align-items:center;gap:.625rem;padding:.4375rem .625rem;border-radius:var(--radius);border:1px solid var(--line2);color:var(--text2);font-size:var(--fs-m);text-align:left}
+.snmv:hover{background:var(--bg3);color:var(--text)}
+.snmv svg{color:var(--accent)}
+.sbody:has(.snmv){position:relative}
+.sbody:has(.snmv) .snav{padding-bottom:3.75rem}
+@media (max-width:767px) {
+  .snmv{position:static;width:auto;margin:0 .75rem 1rem;min-height:3rem}
+  .sbody:has(.snmv) .snav{padding-bottom:2px}
+  .smodal.sidx .sbody:has(.snmv) .snav{padding-bottom:1rem}
+  .smodal:not(.sidx) .snmv{display:none}
+}

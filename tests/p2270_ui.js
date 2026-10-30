@@ -107,14 +107,14 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await until(() => d.querySelector('#view .trow'));
   w.eval(`listModal(${L})`); let md = await until(() => d.querySelector('.modal.lmodal'));
   const rowsOrder = [...md.querySelectorAll('.card > .row, .card > .lhdr, .card > .row.lkrow')].map(x => x.className);
-  // 2.352.0 C (#2751 / #2752): no switch "Progress and status" any more; "Used for" for every project, the project rows
-  // in the folding part "Project features"
+  // 2.352.0 C (#2751 / #2752): no switch "Progress and status" any more, the project rows in the folding part
+  // "Project features"; 2.396.0 (#3385): no "Used for"
   check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), '#977: no type switch any more ' + rowsOrder.slice(0, 4));
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#977: "Used for" for a simple list');
+  check(!md.querySelector('.lfamrow') && !md.querySelector('#l-fam'), '2.396.0 (#3385): no "Used for" any more');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'project'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(${L})`); md = await until(() => d.querySelector('.modal.lmodal'));
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: "Used for" too (2.352.0), the project fields');
+  check(!md.querySelector('.lfamrow') && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: no "Used for" (2.396.0, #3385), the project fields');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));

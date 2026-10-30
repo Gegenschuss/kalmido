@@ -226,9 +226,9 @@ check(x["state"] == "accepted" and x["signer_name"] == "Max <b>Muster</b>" and x
 y = Bo.get(B + f"/api/office/docs/{DOC}/signoffs").json()["signoffs"][0]
 check(y["signer_name"] == "Max <b>Muster</b>" and y["signer_email"] is None and y["ip"] is None and y["user_agent"] is None,
       f"a member: no e-mail / address / device {y}")
-# 2.144.8 (#2573) test phase: a signed quotation may be deleted by the admin (not done here: DOC is used below)
+# 2.417.0 C (#2604, #2574): a signed quotation stays again (the test phase rule of 2.144.8 is gone)
 d = A.get(B + f"/api/office/docs/{DOC}").json()
-check(d["can_delete"] is True and d.get("delete_sent") is True, f"a signed quotation: can_delete (test phase), the confirmation says it was sent {d.get('can_delete')} {d.get('delete_sent')}")
+check(d["can_delete"] is False and "delete_sent" not in d, f"a signed quotation: no can_delete {d.get('can_delete')} {d.get('delete_sent')}")
 log = A.get(B + f"/api/office/docs/{DOC}/log").json().get("log") or []
 acts = [e["action"] for e in log]
 check("signoff_accepted" in acts and "signoff_link" in acts and "status" in acts, f"office log {acts}")

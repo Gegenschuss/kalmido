@@ -61,7 +61,7 @@ KINDS = {
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser)"),
+    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser), p2414_api_test.py (the booking archive: lines, receipts, files, runs of another organisation 404)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
@@ -265,6 +265,7 @@ ROUTES = {
     "GET /api/office/letters/{}/thread": "office", "GET /api/office/letters/threads": "office", "GET /api/office/letters/doc/{}": "office",
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
+    "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -489,6 +490,9 @@ ROUTES = {
     "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090): input side accounts, admin only (p2120_c_api_test.py)
     # 2.148.0 D (#2458): the DATEV import, suppliers, opening balances; admin only, another organisation 404 (p2148_d_api_test.py)
     "POST /api/office/datev/import/check": "office", "POST /api/office/datev/import": "office", "POST /api/office/datev/import/{}/undo": "office",
+    "GET /api/office/books/archive": "office", "GET /api/office/books/archive/bookings": "office", "GET /api/office/books/archive/bookings/{}": "office",  # 2.414.0 (#3502)
+    "GET /api/office/books/archive/accounts": "office", "GET /api/office/books/archive/docs/{}": "office", "GET /api/office/books/archive/files/{}": "office",
+    "POST /api/office/books/archive/check": "office", "POST /api/office/books/archive/import": "office", "POST /api/office/books/archive/runs/{}/undo": "office",
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
@@ -822,6 +826,9 @@ ROUTES = {
     "POST /api/v1/tasks/{}/restore": "task", "GET /api/v1/tasks/{}/dependencies": "task",
     "POST /api/v1/tasks/{}/dependencies": "task", "DELETE /api/v1/tasks/{}/dependencies/{}": "task",
     "GET /api/v1/tasks/{}": "task", "PATCH /api/v1/tasks/{}": "task", "DELETE /api/v1/tasks/{}": "task",
+    # 2.407.0 (#3513): "agent is working" on a task - the task's visibility + write role decide (task_visible, like /typing)
+    "GET /api/v1/tasks/{}/working": "task", "POST /api/v1/tasks/{}/working": "task", "PATCH /api/v1/tasks/{}/working": "task",
+    "DELETE /api/v1/tasks/{}/working": "task",
     "POST /api/v1/tasks/{}/snippets": "task",  # 2.35.0 (#1095): append a code snippet (p2350_d_api_test.py: other tenant 404)
     "PUT /api/v1/tasks/{}/waiting": "task", "DELETE /api/v1/tasks/{}/waiting": "task",
     "POST /api/v1/tasks/{}/complete": "task", "POST /api/v1/tasks/{}/reopen": "task",
@@ -941,7 +948,7 @@ ROUTES = {
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
-    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki",
+    "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/search": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
@@ -1019,6 +1026,11 @@ ROUTES = {
     # the upload key's place, the mail note (one's own setting); the folder watcher programs are the same files for everyone (no data)
     "GET /api/docs/scan-keys": "document", "POST /api/docs/scan-keys": "document", "DELETE /api/docs/scan-keys/{}": "document",
     "GET /api/v1/documents/upload-target": "document", "POST /api/docs/mail-notice": "document", "GET /api/docs/folder-watcher/{}": "public",
+    # 2.425.0 C (#3453): receipt fetchers (only one's own; the place checked with the rights at every upload / report,
+    # p2425_c_api_test.py: another person sees, switches and deletes nothing, a stranger's key reaches nothing)
+    "GET /api/docs/fetchers": "document", "POST /api/docs/fetchers": "document", "DELETE /api/docs/fetchers/{}": "document",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "document", "GET /api/v1/fetcher": "document", "PUT /api/v1/fetcher/status": "document",
+    "POST /api/v1/fetcher/documents": "document",
     # 2.154.0 A (#1111): a stack split into documents, the link with an existing task, the documents of a task; the separator
     # sheet is the same PDF for everyone (no data)
     "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",
@@ -1189,6 +1201,7 @@ ROUTES = {
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
     # 2.144.10 A (#2576): delete every trial document of the area one works in, admins only (p214410_a_api_test.py)
     "POST /api/office/trial/delete-all": "office",
+    "GET /api/office/trial": "office",  # 2.417.0 C (#3445): only the count of the office open now (office_ctx; another organisation: its own office, never ours - p2417_c_api)
     # 2.148.0 C (#2472): the procedure documentation of the office area one works in, admins save versions (p2148_c_api_test.py)
     "GET /api/office/procdoc": "office", "PUT /api/office/procdoc": "office", "GET /api/office/procdoc/versions": "office",
     "GET /api/office/procdoc.md": "office", "GET /api/office/procdoc.pdf": "office",
@@ -1208,6 +1221,8 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py: another organisation sees none, 404)
+    "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }
 
 # ---- 1. every route is classified, nothing stale

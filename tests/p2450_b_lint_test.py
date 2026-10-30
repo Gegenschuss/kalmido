@@ -53,6 +53,11 @@ if shutil.which("shellcheck"):
 ps = read("install.ps1")
 check("'secret'" in ps and "Setup code" in ps, "install.ps1 creates secret\\ and shows the setup code")
 check(ps.count("{") == ps.count("}"), "install.ps1: braces balanced")
+# 2.359.2 (#2897): the update backs up PostgreSQL (2.37+) first, like update.sh, and both keep the version of before
+_pg = ps[ps.find("elseif ($Update)"):ps.find("# --- download ---")]
+check("pg_dump -Fc --enable-row-security" in _pg and "app.role=system" in _pg and "'cp'" in _pg and "Fail 'Could not back up the database" in _pg,
+      "#2897: install.ps1 dumps the PostgreSQL database into data\\backups\\ before an update (copied out of the container)")
+check(".kalmido-version.prev" in ps and ".kalmido-version.prev" in sh, "#2897: install.ps1 and install.sh keep the version of before")
 if shutil.which("pwsh"):
     cmd = ("$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile('%s', [ref]$null, [ref]$e); "
            "if ($e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }" % os.path.join(ROOT, "install.ps1"))

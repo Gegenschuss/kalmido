@@ -383,7 +383,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   and published (released / live); never tick it off or report it done before that. Done only in part: comment what is
   left and enter a new version (the project's version field) for the rest at once. Never end work on an unmerged branch:
   merge it, or park it explicitly with the reason as a comment on the task. Name the task in every commit and pull
-  request (`#123`; `fixes #123` completes it on merge) or call the branch `kalmido-<id>`. Before every "done" report
+  request (`#123`, or the task's `key` like `APP-123` when its project has a ticket key; `fixes #123` / `fixes APP-123` completes it on merge) or call the branch `kalmido-<id>` / `app-123-...`. Before every "done" report
   call `list_build_status` (list_id = the project) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published).
@@ -561,7 +561,10 @@ agent account.
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) starts Claude Code with the runtime settings an admin chose in
 Kalmido (*Settings > Agents > (agent) > Runtime*: model, auto-compact, nightly fresh restart, *Reset now*),
-always in a fresh session, restarts it when they change, and stops it while the agent is paused.
+always in a fresh session, restarts it when they change, and stops it while the agent is paused. 2.396.0: it also sets
+the agent's **git author** from the block *Git author* of its settings (`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` and the
+same for the committer; empty fields = `Kalmido <noreply@kalmido.com>`) and `KALMIDO_GIT_COAUTHOR=1` when
+*Append Co-Authored-By* is on. Name and address appear publicly in GitHub with every commit.
 
 **Event mode (2.35.0, recommended).** With `--events` the launcher starts the event runner
 [`mcp/agent_run.py`](../mcp/agent_run.py) (Python 3, already needed for the MCP server). It waits for the agent's events

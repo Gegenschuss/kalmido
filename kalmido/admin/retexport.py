@@ -52,6 +52,8 @@ RX_TABLES = (
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
     ("archive/archive.csv", "office_archive"),
+    ("archive/bookarch.csv", "office_bookarch"),  # 2.414.0 (#3502): the booking archive of past DATEV years (books, 10 years)
+    ("archive/bookarch-accounts.csv", "office_bookarch_accts"),
     ("cashbook/cashbooks.csv", "office_cashbooks"),
     ("cashbook/entries.csv", "office_cash_entries"),
     ("cashbook/closings.csv", "office_cash_closings"),

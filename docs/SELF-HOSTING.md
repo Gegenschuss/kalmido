@@ -58,9 +58,11 @@ next to PostgreSQL 17.
 - **Virus scanner.** The installer and `.env.example` switch the virus scanner ClamAV on (`COMPOSE_PROFILES=localdb,clamav`).
   It needs 1-1.5 GB of memory and up to five minutes on its first start (it downloads its signatures). On a small server
   remove `clamav` from `COMPOSE_PROFILES` and set `KALMIDO_CLAMD=` empty in `.env`; see [Virus scan of uploads](#virus-scan-of-uploads).
-- **Backups take room.** Each automatic backup holds the database and every attachment; with the default retention (14
-  daily, 8 weekly) plan roughly 20 times the size of the data, or lower the retention, encrypt and move the folder
-  (`KALMIDO_BACKUP_DIR`) to another disk.
+- **Backups take room.** Each automatic backup holds the database and the small files; files from 64 KiB on
+  (`KALMIDO_BACKUP_SHARED_MIN`) are kept only once for all backups in the hidden folder `backups/.store` (2.432.0). Plan
+  about the size of the attachments once plus 22 times the database (default retention 14 daily, 8 weekly). When you
+  copy the backup folder somewhere else, copy it **with `.store`** (`rsync -a backups/ …`, not only `*.zip*`): a backup
+  of 2.432 or later needs its shared files. The *Download* button always gives one complete file.
 - **Raspberry Pi.** A Pi 4 or 5 with 4 GB or more and a 64-bit OS (Raspberry Pi OS 64-bit, Debian or Ubuntu arm64)
   runs Kalmido well for a household or a small team. Boot or at least keep `pgdata/` and `data/` on an **SSD** (USB 3
   or NVMe on the Pi 5): PostgreSQL writes constantly in small pieces, which is slow on an SD card and wears it out. A
@@ -357,6 +359,15 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
 - **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
   large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
   transaction may idle 5 minutes. At the start Kalmido waits up to 60 s for the database (`KALMIDO_DB_WAIT`).
+- **A copy of the backup folder elsewhere** (an off-site target, a second machine): put the backup and its shared files
+  (`backups/.store`, or the `kalmido-blob-…` files on the off-site target) into one folder and assemble one complete
+  file from them, then restore it under *Backups > Restore from a file*. Inside the app container:
+
+  ```bash
+  docker compose exec kalmido python3 -I /app/kalmido/admin/bkstore.py assemble /data/backups/kalmido-backup-20261029-023000-auto.zip.enc /data/backups/.store /data/complete.zip.enc --passphrase-file /data/passphrase.txt
+  ```
+
+  Any machine with Python 3.11 and the `cryptography` package can run `bkstore.py` the same way (it needs nothing else).
 - **Backups outside the app** (scripts, a pull from a second machine): use `pg_dump -Fc` with row-level security
   switched on and the system context, otherwise the dump stops or misses rows:
 
@@ -512,6 +523,14 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
+  the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
+  `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the
+  text cache of attachments (`textcache/`, built again), the organisation exports waiting for download (`exports/`) and
+  anything outside the data folder (`.env`, `docker-compose.yml`). A restore keeps the backup settings and the off-site
+  target of the restoring server as they are; a server that had none gets none from the backup (before 2.359.2 a
+  production backup restored on a fresh test server brought the production target and its access data along, and the
+  test server's uploads then thinned out production's copies there).
   2.360: downloading a backup, a restore, downloading an account or organisation export and switching on what opens the
   server (public links, a registration mode, accounts on the first single sign-on) or off the two-factor policy ask for
   the account password (a download: `POST` with `{"password"}` gives a one-time ticket, `GET ?t=<ticket>` the file; signed
@@ -1839,6 +1858,9 @@ stay blocked until you allow them.
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an
   older version; go back to 2.148 or newer first.
+- **Back to 2.413 or older after using the booking archive (2.414.0, #3502).** 2.414 adds new tables only
+  (`office_bookarch*`); older versions ignore them and the archive files (`bka-*` in the office folder). Their import page
+  lists an archive run but cannot undo it - undo it on 2.414 or newer.
 
 ## Run by a hoster: the operator interface
 

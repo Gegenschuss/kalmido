@@ -111,7 +111,8 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     await o.nav(B + '#office/settings'); await ready(ev, '#osc-street'); await sleep(600);
     const s = await ev(`(() => { const r = [...document.querySelectorAll('.ofcco input')].map(e => e.getBoundingClientRect()).filter(b => b.width); return {n: r.length, small: r.filter(b => b.height < 24).length, out: r.filter(b => b.right > window.innerWidth + 1).length, wide: document.documentElement.scrollWidth > window.innerWidth + 1}; })()`);
     // 2.99.0 (#2188): + the company's extra address line (osc-address_extra) -> 15 fields
-    check(s && s.n === 15 && s.small === 0 && s.out === 0 && !s.wide, '390: the company fields fit the phone ' + JSON.stringify(s));
+    // 2.408.0 (#3494): + the website (osc-website) -> 16 fields
+    check(s && s.n === 16 && s.small === 0 && s.out === 0 && !s.wide, '390: the company fields fit the phone ' + JSON.stringify(s));
     await ev(`(() => { document.querySelector('#osc-street').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(400);
     await shot('p2362e-390-company.png');
   }, true);

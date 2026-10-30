@@ -41,6 +41,7 @@ const WS_VIEWS = {
   'static/js/ctfold.js': 'draw',              // 2.351.0 B (#2749): the address book's folder tree shows the shown workspace's entry
   'static/js/collab.js': 'draw',              // 2.145.0 (#2444): the news list's hint rows for the OTHER workspaces (newsElseHtml), drawn with the list
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
+  'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - in the private area only the person's own agents are created
   'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
                                               // 2.172.0 B (#2679): via rd_space; a view drawn for another space loads again (BM.sp)
   'static/js/feeds.js': 'draw',               // 2.172.0 B (#2677): feeds of the shown workspace (rd_space), loads again when it changed (RSS.sp)
@@ -50,7 +51,7 @@ const WS_VIEWS = {
   'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
   'static/js/clients.js': 'helper',           // 2.361 (#2938): wsCur only picks the empty-state text for Private (no view keeping data)
   'static/js/dispo.js': 'helper',             // 2.361 (#2938): wsCur only picks the empty-row text for Private (no view keeping data)
-  'static/js/polls.js': 'helper',             // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
+  'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/tagsview.js': 'draw',
@@ -65,6 +66,7 @@ const WS_VIEWS = {
   'static/js/areas.js': 'draw',               // private-only modules hidden in an organisation's view, the office menu per workspace (#1917)
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
   'static/js/docscan.js': 'draw',             // 2.207.0 A (#2763) / #2773: Settings > Integrations: the scans section loads the shown workspace's settings when drawn
+  'static/js/docfetch.js': 'draw',            // 2.425.0 (#3453): Settings > Integrations: the receipt fetchers of the shown workspace, loaded when drawn
   'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog)
   'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
   'static/js/dashboard.js': 'draw',           // 2.144.0 C (#2418): the start page names overdue tasks of other workspaces (wsCur / wsHidden while drawing)

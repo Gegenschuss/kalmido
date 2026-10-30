@@ -117,11 +117,14 @@ def di_decode(raw):
         return raw.decode("cp1252", errors="replace")
 
 
-def di_parse(raw):
-    """The file -> {category, version, acct_len, fy_start (date | None), cols {key: index}, rows [[...]]}. BadInput (400)
-    with a readable reason on a wrong header, missing columns or too many rows; 413 when too large."""
-    if len(raw) > DI_MAX:
-        raise Denied(413, tr(DI_TOO_BIG, DI_MAX // (1024 * 1024)))
+def di_parse(raw, versions=None, cols=None, need=None, max_bytes=DI_MAX, max_rows=DI_ROWS_MAX):
+    """The file -> {category, version, acct_len, fy_start (date | None), head [...], names [...], cols {key: index}, rows [[...]]}.
+    BadInput (400) with a readable reason on a wrong header, missing columns or too many rows; 413 when too large.
+    2.414.0 (#3502): the booking archive (office/bookarch.py) reads with its own categories (versions {category: range}),
+    columns (cols like DI_COLS), needed columns per category (need {category: keys}) and limits."""
+    versions, cols = versions or DI_VERSIONS, cols or DI_COLS
+    if len(raw) > max_bytes:
+        raise Denied(413, tr(DI_TOO_BIG, max_bytes // (1024 * 1024)))
     text = di_decode(raw)
     try:
         reader = csv.reader(io.StringIO(text, newline=""), delimiter=";", quotechar='"')
@@ -132,8 +135,8 @@ def di_parse(raw):
             if not any(x.strip() for x in r):
                 continue
             rows.append(r)
-            if len(rows) > DI_ROWS_MAX:
-                raise BadInput(tr(DI_TOO_MANY, DI_ROWS_MAX))
+            if len(rows) > max_rows:
+                raise BadInput(tr(DI_TOO_MANY, max_rows))
     except csv.Error:
         raise BadInput(tr(DI_UNREADABLE)) from None
     if not head or head[0].strip().upper() not in ("EXTF", "DTVF"):
@@ -142,10 +145,10 @@ def di_parse(raw):
         cat = int((head[2] if len(head) > 2 else "").strip())
     except ValueError:
         cat = 0
-    if cat not in DI_VERSIONS:
+    if cat not in versions:
         raise BadInput(tr(DI_BAD_CAT))
     ver = (head[4] if len(head) > 4 else "").strip()
-    if not ver.isdigit() or int(ver) not in DI_VERSIONS[cat]:
+    if not ver.isdigit() or int(ver) not in versions[cat]:
         raise BadInput(tr(DI_BAD_VER, ver[:10] or "?"))
     alen = (head[13] if len(head) > 13 else "").strip()
     fy = (head[12] if len(head) > 12 else "").strip()
@@ -156,15 +159,15 @@ def di_parse(raw):
     idx = {}
     for i, n in enumerate(names or []):
         k = _norm(n)
-        for key, aliases in DI_COLS.items():
+        for key, aliases in cols.items():
             if k in aliases and key not in idx:
                 idx[key] = i
-    need = ("account",) if cat == 16 else ("account", "amount", "side", "counter", "day")
-    miss = [k for k in need if k not in idx]
+    want = (need or {}).get(cat) or (("account",) if cat == 16 else ("account", "amount", "side", "counter", "day"))
+    miss = [k for k in want if k not in idx]
     if miss:
         raise BadInput(tr(DI_NO_COLS, ", ".join(miss)))
     return {"category": cat, "version": int(ver), "acct_len": int(alen) if alen.isdigit() and 4 <= int(alen) <= 8 else None,
-            "fy_start": fy_start, "cols": idx, "rows": rows}
+            "fy_start": fy_start, "head": head, "names": names or [], "cols": idx, "rows": rows}
 
 
 def _cell(p, r, key):

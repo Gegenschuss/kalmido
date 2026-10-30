@@ -67,9 +67,10 @@ const FEAT = 'cal,comments,collab,office,clients';
   await until(() => d.querySelector('[data-ofd="send"]'), 60);
   check(!!d.querySelector('[data-ofd="send"]'), 'a finalised quotation has "Send"');
   d.querySelector('[data-ofd="send"]').click();
-  await until(() => d.querySelector('#ofd-s-terms'), 40);
-  const tk = d.querySelector('#ofd-s-terms');
-  check(tk && tk.checked && /Attach terms and conditions/.test(tk.closest('label')?.textContent || ''), 'quotation: "Attach terms and conditions" ticked');
+  // 2.434.0 (#3619): a quotation carries its terms as the last pages of its PDF - a note instead of the tick
+  await until(() => d.querySelector('#ofd-s-terms-in'), 40);
+  const tk = d.querySelector('#ofd-s-terms-in');
+  check(tk && !d.querySelector('#ofd-s-terms') && /last pages of the PDF/.test(tk.textContent || ''), 'quotation: the note "terms are the last pages of the PDF", no tick');
   w.close();
   w = await boot({hash: 'office/offers/' + inv.id}); d = w.document;
   await until(() => d.querySelector('[data-ofd="send"]'), 60);

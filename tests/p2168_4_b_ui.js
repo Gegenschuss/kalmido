@@ -91,10 +91,11 @@ const paths = async () => ((await call('GET', '/api/wiki?space=private')).pages 
   // the phone: a long press (pointer events of a finger) opens it, the click ending the press opens nothing
   const pe = (type, el) => { const x = new w.MouseEvent(type, {bubbles: true, cancelable: true, clientX: 10, clientY: 10}); Object.defineProperty(x, 'pointerType', {value: 'touch'}); el.dispatchEvent(x); return x; };
   pe('pointerdown', deep); await sleep(700); pe('pointerup', deep);
-  check(items(d).includes('Rename…') && items(d).includes('New folder…'), 'a long press opens the folder menu ' + items(d));
+  // 2.428.0 (#3581): a long press selects the folder like everywhere; the menu stays on the right click and the "…"
+  check(await until(() => w.eval('WK.selOn && WK.sel.size === 1')) && !items(d).includes('Rename…'), 'a long press selects the folder, no menu ' + items(d));
   const h0 = w.location.hash, cl = new w.MouseEvent('click', {bubbles: true, cancelable: true}); deep.dispatchEvent(cl);
   check(cl.defaultPrevented && w.location.hash === h0, 'the click ending the long press does not open the folder');
-  shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
+  w.eval('wk_selEnd()'); shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
   // New page here: the dialog starts in the folder
   ctx(w, deep); pick(d, /^New page$/);
   check(await until(() => d.querySelector('#cdlg-in')?.value === 'Docs/Deep/'), '"New page here…" starts in the folder ' + d.querySelector('#cdlg-in')?.value);

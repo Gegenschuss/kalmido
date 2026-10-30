@@ -50,6 +50,7 @@ from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_peop
 
 BW_KINDS = ("food", "drinks")
 BW_RATES = ("19", "7", "0")  # the usual German rates; another rate (0-100) is kept as it is
+BW_FOOD7_FROM = "2026-01-01"  # 2.408.0 (#3521): food in restaurants at 7 % since 01.01.2026 (drinks stay at 19 %)
 BW_CHOICE_KINDS = ("place", "person")
 BW_MAX_GUESTS = 40
 BW_MAX_LINES = 20
@@ -113,7 +114,12 @@ def _person(v, known, name="host"):
     return {"name": n, "extra": " ".join(_text(v.get("extra"), name, 300).split())[:200]}
 
 
-def bw_lines_clean(v):
+def bw_default_rate(kind, date):
+    """2.408.0 (#3521): the default VAT rate of a line without one: food from 01.01.2026 7 %, otherwise (drinks, older meals) 19 %."""
+    return 7 if kind == "food" and str(date or "") >= BW_FOOD7_FROM else 19
+
+
+def bw_lines_clean(v, date=None):
     if v in (None, ""):
         return []
     if not isinstance(v, list) or len(v) > BW_MAX_LINES:
@@ -125,7 +131,7 @@ def bw_lines_clean(v):
         kind = x.get("kind") or "food"
         if kind not in BW_KINDS:
             raise BadInput(tr("Invalid value: {0}", "amounts"))
-        rate = _amount(x.get("rate", 19), "rate", 0, 100)
+        rate = _amount(x.get("rate") if x.get("rate") not in (None, "") else bw_default_rate(kind, date), "rate", 0, 100)
         gross = _amount(x.get("gross"), "amounts", 0, 10 ** 7, allow_none=True)
         if gross is None or gross == 0:
             continue
@@ -163,7 +169,7 @@ def bw_clean(c, oid, uid, b, cur=None):
                 gs.append(p)
         out["guests"] = json.dumps(gs, ensure_ascii=False)
     if "amounts" in b or not cur:
-        out["amounts"] = json.dumps(bw_lines_clean(b.get("amounts")), ensure_ascii=False)
+        out["amounts"] = json.dumps(bw_lines_clean(b.get("amounts"), out.get("date") or cur.get("date")), ensure_ascii=False)
     if "tip" in b or not cur:
         t = _amount(b.get("tip"), "tip", 0, 10 ** 6, allow_none=True)
         out["tip"] = dstr(money(t or dec(0)))

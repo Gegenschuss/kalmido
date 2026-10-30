@@ -160,12 +160,12 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
     await ev(`(() => { closeSide(); return 1; })()`); await sleep(400);
     // the tab "Lists": the drawer starts at Lists
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);
-    await tap(o, '#tabs [data-act="side"]'); await sleep(800);
+    await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(800);  // 2.417.0 (#3559): the tab opens the Projects page now, the drawer at Lists stays
     const gtop = await ev(`(() => { const s = document.querySelector('#side'), g = document.querySelector('#side .sg-lists'); return g ? Math.round(g.getBoundingClientRect().top - s.getBoundingClientRect().top) : -1; })()`);
     // 2.353.0 B (#2776): the phone drawer with its fixed top starts at the top (the project list's head stays in view)
     const fixedTop = await ev(`typeof sbm_on === 'function' && sbm_on()`);
     check(fixedTop ? gtop >= 0 && gtop < await ev('innerHeight') - 60 && await ev(`document.querySelector('#side').scrollTop === 0`)
-      : gtop >= 0 && gtop < 60 && await ev(`document.querySelector('#side').scrollTop > 0`), `${tag}: #1057 the tab "Lists" opens the drawer at Lists (${gtop}${fixedTop ? ', fixed top' : ''})`);
+      : gtop >= 0 && gtop < 60 && await ev(`document.querySelector('#side').scrollTop > 0`), `${tag}: #1057 the drawer opens at Lists (${gtop}${fixedTop ? ', fixed top' : ''})`);
     await shot('p2310c-390-drawer-lists.png');
     await ev(`(() => { closeSide(); return 1; })()`); await sleep(400);
     // the tab "Search": the palette with the focus in its field

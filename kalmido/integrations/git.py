@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
 from ..core.pg import insert_id
@@ -31,7 +31,8 @@ from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
-from ..agents.core import is_agent
+from ..agents.core import agent_row, agent_runtime, git_author_clean, git_author_str, is_agent
+from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -219,13 +220,48 @@ def git_ids(text):
     return {int(x) for x in GIT_HASH_RE.findall(text or "")}
 
 
-def git_branch_id(ref):
+def git_branch_id(ref, hash_ok=True):
+    """The task id in a branch name; hash_ok False (2.390.0, #3353: a project with a key whose repository does not read
+    "#123" any more) only kalmido-<id> / task-<id>, not "<id>-slug" (the branch names Git servers make for their issues)."""
     m = GIT_BRANCH_RE.match(str(ref or "").rsplit("/", 1)[-1])
-    return int(m.group(1) or m.group(2)) if m else None
+    return int(m.group(1) or (m.group(2) if hash_ok else 0) or 0) or None if m else None
 
 
 def git_keys(text):
     return {int(x) for x in GIT_KEY_RE.findall(text or "")}
+
+
+class GitMatch:
+    """2.390.0 (#3353): what a connection's texts name, for the lists lids: "#123" (unless the projects have a key and the
+    connection's switch "Keep reading #number" is off), "APP-123" (current keys and old ones of their tasks) in commits and
+    pull requests, "app-123-..." / "APP-123" in branch names, and the closing keywords before either."""
+
+    def __init__(self, c, r, lids):
+        self.c, self.lids = c, lids
+        keys = r.keys() if hasattr(r, "keys") else ()
+        self.hash_ok = ("hash_ids" not in keys or bool(r["hash_ids"])) or not tk_has_key(c, lids)
+        pre = tk_prefixes(c, lids)
+        self.rx, self.brx = tk_text_re(pre), tk_text_re(pre, branch=True)
+        alt = "|".join(sorted((re.escape(p) for p in pre), key=len, reverse=True))
+        self.krx = re.compile(rf"(?<![\w-])(?i:fix(?:e[sd])?|close[sd]?|resolve[sd]?|erledigt)\s*:?\s+({alt})-(\d{{1,9}})\b") if pre else None
+
+    def _keys(self, pairs):
+        return tk_find(self.c, pairs, self.lids) if pairs else set()
+
+    def named(self, text, branch=None):
+        """The live tasks of the lists that text (+ the branch name) names."""
+        ids = git_ids(text) if self.hash_ok else set()
+        bid = git_branch_id(branch, self.hash_ok) if branch else None
+        pairs = tk_text_pairs(text, self.rx)
+        if branch:
+            pairs |= tk_text_pairs(str(branch).rsplit("/", 1)[-1], self.brx, branch=True)
+        return git_task_ids(self.c, self.lids, ids | ({bid} if bid else set())) | self._keys(pairs)
+
+    def closes(self, text):
+        """The live tasks of the lists that text completes ("fixes #12" / "fixes APP-12")."""
+        ids = git_keys(text) if self.hash_ok else set()
+        pairs = {(p, int(n)) for p, n in self.krx.findall(text or "")} if self.krx else set()
+        return git_task_ids(self.c, self.lids, ids) | self._keys(pairs)
 
 
 def git_task_ids(c, lids, ids):
@@ -261,7 +297,9 @@ def git_public(c, r, manage=False):
          "web_url": f"{web}/{r['owner']}/{r['repo']}", "owner": r["owner"], "repo": r["repo"],
          "full_name": f"{r['owner']}/{r['repo']}", "default_branch": r["default_branch"] or None,
          "status": "error" if r["last_error"] and r["last_error"] != "rate" else "ok" if r["polled_at"] else "new",
-         "error": git_err_text(r["last_error"]) if r["last_error"] else "", "polled_at": r["polled_at"]}
+         "error": git_err_text(r["last_error"]) if r["last_error"] else "", "polled_at": r["polled_at"],
+         "hash_ids": bool(r["hash_ids"]) if "hash_ids" in r.keys() else True,  # 2.390.0 (#3353)
+         "author_name": r["author_name"], "author_email": r["author_email"]}  # 2.396.0 A (#3386): '' = the agent's git author
     if manage:
         d.update(token=bool(r["token"]), hook=bool(r["hook_secret"]), hook_url=f"{PUBLIC_URL.rstrip('/')}/api/hooks/git/{r['id']}")
     return d
@@ -533,13 +571,13 @@ def git_close(c, r, tid, kind, ref, title, url, lids=None):
 def git_take_prs(c, r, items, baseline):
     changed = False
     lid, repo = git_conn_lists(c, r), f"{r['owner']}/{r['repo']}"
+    gm = GitMatch(c, r, lid)
     for raw in (items or [])[:GIT_ITEMS]:
         p = git_pr_of(raw)
         if not p:
             continue
         n = str(p["number"])
-        bid = git_branch_id(p["head_ref"])
-        tids = git_task_ids(c, lid, git_ids(p["title"] + "\n" + p["body"]) | ({bid} if bid else set()))
+        tids = gm.named(p["title"] + "\n" + p["body"], p["head_ref"])  # 2.390.0 (#3353): + APP-123
         tids |= {x[0] for x in c.execute("SELECT task_id FROM git_links WHERE conn_id=? AND kind='pr' AND ref=?", (r["id"], n))}
         if not tids:
             continue
@@ -570,19 +608,20 @@ def git_take_prs(c, r, items, baseline):
             for tid in sorted(tids):
                 changed |= rvw_approved_by_pr(c, tid, f"{repo}#{n} {p['title']}", p["url"])
         if p["state"] == "merged" and _git_after(p["merged_at"], r["created_at"]):
-            for tid in sorted(git_task_ids(c, lid, git_keys(p["title"] + "\n" + p["body"]))):
+            for tid in sorted(gm.closes(p["title"] + "\n" + p["body"])):
                 changed |= git_close(c, r, tid, "pr", n, f"#{n} {p['title']}", p["url"], lid)
     return changed
 
 
 def git_take_commits(c, r, items, branch, default):
     changed = False
-    lid, bid = git_conn_lists(c, r), (None if default else git_branch_id(branch))
+    lid = git_conn_lists(c, r)
+    gm = GitMatch(c, r, lid)  # 2.390.0 (#3353): + APP-123, "#123" only with the switch when the projects have a key
     for raw in (items or [])[:GIT_ITEMS]:
         m = git_commit_of(raw)
         if not m:
             continue
-        tids = git_task_ids(c, lid, git_ids(m["message"]) | ({bid} if bid else set()))
+        tids = gm.named(m["message"], None if default else branch)
         if not tids:
             continue
         first = m["message"].split("\n", 1)[0][:300]
@@ -593,7 +632,7 @@ def git_take_commits(c, r, items, branch, default):
             changed |= bool(c.execute("INSERT INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                                       (tid, r["id"], "commit", m["sha"], iso(now_utc()))).rowcount)
         if default and _git_after(m["at"], r["created_at"]):
-            for tid in sorted(git_task_ids(c, lid, git_keys(m["message"]))):
+            for tid in sorted(gm.closes(m["message"])):
                 changed |= git_close(c, r, tid, "commit", m["sha"], first, m["url"], lid)
     return changed
 
@@ -793,18 +832,33 @@ def git_repos_of_lists(c, ids):
     for lid in ids:  # 2.33.0 (#934): own repositories, else the folder's
         for r in conns.get(lid, ()):
             d = pub.get(r["id"]) or pub.setdefault(r["id"], git_public(c, r))  # a folder repository: once, not per list
-            out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder")})
+            out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder",
+                                                              "author_name", "author_email")})  # 2.396.0 A (#3386)
     return out
 
 
-def git_repo_for_task(c, t):
-    """data.repo of an agent's task event / get_task: the list's first repository + branch suggestion + linked code."""
+def git_author_of(c, r, aid=None):
+    """2.396.0 A (#3386): the git author agent aid commits with in repository r: the project's override per part, else the
+    agent's runtime git_author_name / _email, else the neutral default. (author "Name <mail>", co-author flag, source)."""
+    a = agent_row(c, aid) if aid else None
+    rt = agent_runtime(a) if a else {}
+    name, email = r["author_name"] or rt.get("git_author_name"), r["author_email"] or rt.get("git_author_email")
+    src = "project" if r["author_name"] or r["author_email"] else "agent" if a else "default"
+    return git_author_str(name, email), bool(rt.get("git_coauthor")), src
+
+
+def git_repo_for_task(c, t, aid=None):
+    """data.repo of an agent's task event / get_task: the list's first repository + branch suggestion + linked code.
+    aid (2.396.0 A, #3386): the agent it goes to (None = the caller when it is an agent) for its git author."""
     rows = git_conns_of_list(c, t["list_id"])  # 2.33.0 (#934): also a folder repository
     if not rows:
         return None
     first = git_public(c, rows[0])
     code = git_code_for(c, [t["id"]]).get(t["id"], {"prs": [], "commits": []})
     d = {k: first[k] for k in ("provider", "base_url", "web_url", "owner", "repo", "full_name", "default_branch")}
+    if aid is None and has_request_context() and is_agent(getattr(g, "user", None)):
+        aid = me()
+    d["git_author"], d["git_coauthor"], d["git_author_source"] = git_author_of(c, rows[0], aid)  # 2.396.0 A (#3386)
     # 2.126.0 B (#1978): titles and commit messages are written by anyone with access to the repository
     d.update(api_url=git_urls(rows[0]["provider"], rows[0]["base_url"])[0], branch=f"kalmido-{t['id']}",
              prs=[{**x, "origin": "git", "untrusted": True} for x in code["prs"]],
@@ -992,9 +1046,10 @@ def git_connect(c, lid, provider, base, owner, name, token, folder=None):
     owner, name, dflt = git_repo_name_of(provider, j, owner, name)
     if not git_owner_ok(provider, owner) or not GIT_NAME_RE.fullmatch(name):
         return err(tr(GIT_ERR["parse"]), 502)
-    cid = insert_id(c, """INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at)
-                       VALUES(?,?,?,?,?,?,?,?,0)""", (lid, provider, base, owner, name, dflt,
-                                                       me(), iso(now_utc())))
+    # 2.390.0 (#3353): a new connection reads "#123" only while its projects have no key (hash_ids 0; older ones keep 1)
+    cid = insert_id(c, """INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at,hash_ids)
+                       VALUES(?,?,?,?,?,?,?,?,0,0)""", (lid, provider, base, owner, name, dflt,
+                                                         me(), iso(now_utc())))
     if folder:
         c.execute("INSERT INTO git_folders(conn_id,owner_id,folder,created_at) VALUES(?,?,?,?)", (cid, me(), folder, iso(now_utc())))
     if token:
@@ -1023,11 +1078,19 @@ def git_need_conn(c, cid, manage=True):
 
 @app.patch("/api/repos/<int:cid>")
 def git_update(cid):
-    """{token?: "..." | "" (remove), hook?: "on" (new secret, shown once) | "off"}"""
+    """{token?: "..." | "" (remove), hook?: "on" (new secret, shown once) | "off", hash_ids?: true | false (2.390.0, #3353:
+    a project with a key still reads "#123"), author_name?, author_email? (2.396.0 A, #3386: the git author for AI commits
+    in this repository, '' = the agent's)}"""
     c = db()
     r = git_need_conn(c, cid)
     b = body()
     out = {}
+    if "author_name" in b or "author_email" in b:  # 2.396.0 A (#3386)
+        try:
+            an, am = git_author_clean(b.get("author_name", r["author_name"]), b.get("author_email", r["author_email"]))
+        except BadInput as e:
+            return err(str(e))
+        c.execute("UPDATE git_conns SET author_name=?, author_email=? WHERE id=?", (an, am, cid))
     if "token" in b:
         t = b["token"]
         if t is not None and (not isinstance(t, str) or len(t) > GIT_TOKEN_MAX or any(ch.isspace() for ch in t.strip())):
@@ -1037,6 +1100,10 @@ def git_update(cid):
             return err(git_key_error(), 409)
         c.execute("UPDATE git_conns SET token=?, etags='{}', fails=0, last_error='', next_at=0 WHERE id=?",
                   (git_seal(cid, "token", t) if t else "", cid))
+    if "hash_ids" in b:  # 2.390.0 (#3353)
+        if b["hash_ids"] not in (True, False, 0, 1) or isinstance(b["hash_ids"], float):
+            return err(tr("Invalid value: {0}", "hash_ids"))
+        c.execute("UPDATE git_conns SET hash_ids=? WHERE id=?", (1 if b["hash_ids"] else 0, cid))
     if "hook" in b:
         if b["hook"] not in ("on", "off"):
             return err(tr("Invalid value: {0}", "hook"))

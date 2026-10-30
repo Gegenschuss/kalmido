@@ -1,7 +1,7 @@
-// 2.162.0 part A UI test (#2603), own container (start.sh): test phase - the "More" menu of a finalised, sent invoice offers
-// "Delete" to the admin; the app's own dialog names the number gap and that it was sent, asks for the number and keeps
-// Delete off until the typed number matches (a wrong one: still off); the right number deletes it. Desktop and the phone
-// width (mobile). Invented names only. P2162AUI_NOSTART=1 = the server already runs.
+// 2.162.0 part A UI test (#2603), turned round by 2.417.0 C (#2604): the test phase deletion is gone - the "More" menu of a
+// finalised invoice no longer offers "Delete" to the admin (no "type the number" dialog), "Credit note / cancel" is the way;
+// the row menu of the list neither. Desktop and the phone width (mobile). Invented names only. P2162AUI_NOSTART=1 = the
+// server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -40,33 +40,19 @@ const FEAT = 'clients,office';
     const w = await boot({user: 'alice', hash: 'office/offers/' + inv.id, mobile}), d = w.document;
     w.__dialogs = 'manual';
     check(await open(d), `${who}: the invoice menu button`);
-    check(names(d).includes('Delete'), `${who}: a finalised invoice offers Delete (test phase) ` + names(d).join(' | '));
-    items(d).find(b => b.textContent.trim() === 'Delete')?.click();
-    const md = await until(() => d.querySelector('.modal.cdlg #cdlg-in') && d.querySelector('.modal.cdlg'));
-    check(!!md, `${who}: the app's own dialog with an input (no window.prompt)`);
-    const txt = md?.textContent || '';
-    check(txt.includes(inv.number) && /gap in the office log/.test(txt), `${who}: the dialog names the number and the gap ` + txt.slice(0, 200));
-    check(/Type the number to confirm/.test(txt), `${who}: asks for the number`);
-    const inp = md?.querySelector('#cdlg-in'), yes = md?.querySelector('[data-cd="yes"]');
-    check(yes?.disabled === true, `${who}: Delete is off while nothing is typed`);
-    const type = v => { inp.value = v; inp.dispatchEvent(new w.Event('input', {bubbles: true})); };
-    type(inv.number + '9');
-    check(yes?.disabled === true, `${who}: a wrong number keeps Delete off`);
-    type(inv.number);
-    check(yes?.disabled === false, `${who}: the right number switches Delete on`);
-    md.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-    check(await until(async () => (await fetch(B + 'api/office/docs/' + inv.id, {headers: {...H, Cookie: CK}})).status === 404, 60), `${who}: the invoice is deleted`);
+    check(names(d).length && !names(d).includes('Delete'), `${who}: a finalised invoice offers no Delete (#2604) ` + names(d).join(' | '));
+    check(!!d.querySelector('#view [data-ofd="credit"]'), `${who}: the correction is the button "Credit note / cancel"`);
+    check(!d.querySelector('.modal.cdlg #cdlg-in'), `${who}: no "type the number" dialog`);
     w.close();
   }
-  const log = (await call('GET', '/api/office/log?limit=20')).log || [];
-  check(log.some(x => x.action === 'delete' && x.detail?.testphase && x.detail?.number === I1.number), 'the office log has the test phase delete');
-  // the office log in the settings reads "Invoice X deleted in the test phase"
-  const w = await boot({user: 'alice', hash: 'office/settings'}), d = w.document;
-  const btn = await until(() => d.querySelector('[data-ofc="log"]'), 60);
-  btn?.click();
-  check(await until(() => (d.querySelector('.ofdlog')?.textContent || '').includes('Invoice ' + I1.number + ' deleted in the test phase'), 60),
-    'the office log line: "Invoice X deleted in the test phase" ' + (d.querySelector('.ofdlog')?.textContent || '').slice(0, 200));
+  // the row menu of the invoice list (right click) follows can_delete
+  const w = await boot({user: 'alice', hash: 'office/invoices'}), d = w.document;
+  const row = await until(() => d.querySelector(`.ofdrow[data-id="${I1.id}"]`), 60);
+  check(!!row, 'the invoice row in the list');
+  row?.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
+  check(await until(() => names(d).includes('Open')) && !names(d).includes('Delete'), 'row menu: no Delete ' + names(d).join(' | '));
   w.close();
+  check((await call('DELETE', '/api/office/docs/' + I1.id + '?confirm_number=' + encodeURIComponent(I1.number))).status === 409, 'the server keeps it too (409)');
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);

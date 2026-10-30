@@ -149,7 +149,8 @@ function modalSub(parent, open) {
   };
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
+// 2.359.2 B (#3049): submit(value) = the write behind "OK": the dialog closes once it worked; false / an error keeps it open with its text
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after, submit = null}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
@@ -161,7 +162,15 @@ function askDialog({title, body = '', html = '', ok, danger = false, input = nul
     if (body || html) md.setAttribute('aria-describedby', 'cdlg-b');
     const prev = document.activeElement;
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); try { if (prev && prev.isConnected) prev.focus({preventScroll: true}); } catch { /* gone */ } };
-    md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); fin(input ? $('#cdlg-in', md).value : true); });
+    md.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault(); const v = input ? $('#cdlg-in', md).value : true;
+      if (submit) {
+        if (md._busy) return;
+        md._busy = 1; let r; try { r = await submit(v); } catch { r = false; } md._busy = 0;
+        if (r === false) return;
+      }
+      fin(v);
+    });
     md.addEventListener('click', e => { if (e.target.closest('[data-cd="no"]')) fin(input ? null : false); });
     md.addEventListener('keydown', e => {  // keep Tab inside the dialog
       if (e.key !== 'Tab') return;
@@ -274,7 +283,7 @@ async function setListPtype(id, pt, o = {}) {  // o.post: runs after an undo / r
   for (const k in prev) after[k] = lv(k, x[k]);  // 0 / 1 for the ticket types, as stored (the server's _prev check)
   // list admins: only the type itself (kind / ticket types / view are the owner's settings; they stay switched on)
   const go = (to, from) => async () => {
-    const own = isOwner(listById(id) || l), pick = o => own ? o : {ptype: o.ptype};
+    const own = isOwner(listById(id) || l), pick = o => own ? o : {ptype: o.ptype, ...('props' in o ? {props: o.props} : {})};  // 2.412.0 (#3552): props = owner + admins
     const res = await api('PATCH', '/api/lists/' + id, {...pick(to), _prev: pick(from)});
     return {skipped: (res.conflicts || []).length ? [`${qn(lname(listById(id)) || '')}: ${tr('Project type')}`] : []};
   };
@@ -325,7 +334,7 @@ async function staleDaysSet(lid, sel) {
   try { await optWrite(optSet(() => listById(lid), {stale_days: sd}), () => api('PATCH', `/api/lists/${lid}`, {stale_days: sd})); toast(tr('Saved')); staleLoad(true); }
   catch { const l = listById(lid); sel.value = l?.stale_days == null ? '' : String(l.stale_days); }
 }
-const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
+const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist', 'family'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"; 2.396.0 (#3385): family (the shopping-list offer)
 const LIST_LOCAL = ['name', 'color', 'view', 'dep_shift', 'rate', 'tickets', 'nag', 'day_hours', 'checklist', 'sort_mode', 'done_in_section', 'columns', 'stale_days'];  // 2.41.2 (#1501)
 const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : parseNum(v) ?? NaN) : v ?? '';
 // 2.46.2 (#1659): the list name while it is typed: sidebar and header show it at once (l._live, read by licName); it is
@@ -480,11 +489,11 @@ function bellCustomOf(l) {
   for (const [r] of BELL_ROWS) out[r] = {news: 'news' in (c[r] || {}) ? !!c[r].news : !!m[r]?.news, push: 'push' in (c[r] || {}) ? !!c[r].push : !!m[r]?.push};
   return out;
 }
-async function bellSet(id, mode, custom) {
-  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return;
+async function bellSet(id, mode, custom) {  // 2.359.2 B (#3049): true = saved (or nothing to save)
+  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return true;
   const prev = l.bell || 'default', prevC = l.bell_custom || {};
   let j;
-  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return; }
+  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return false; }
   l.bell = mode; if (j?.custom) l.bell_custom = j.custom;
   renderSide(); render();
   const sel = $('#l-bell'); if (sel) { sel.value = mode; sel.dispatchEvent(new Event('bell-sync')); }
@@ -492,6 +501,7 @@ async function bellSet(id, mode, custom) {
     const r = await api('PUT', `/api/lists/${id}/bell`, prev === 'custom' || custom ? {mode: prev, custom: prevC} : {mode: prev});
     l.bell = prev; l.bell_custom = r?.custom || prevC; renderSide(); render(); const s2 = $('#l-bell'); if (s2) { s2.value = prev; s2.dispatchEvent(new Event('bell-sync')); }
   });
+  return true;
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
@@ -517,8 +527,11 @@ function bellCustomModal(id) {
     if (b.dataset.bcq === 'cancel') { md.remove(); return; }
     const custom = {};
     for (const x of $$('[data-bc]', md)) (custom[x.dataset.bc] ||= {})[x.dataset.ch] = x.checked ? 1 : 0;
-    md.remove();
-    await bellSet(id, 'custom', custom);
+    if (b.disabled) return;
+    b.disabled = true;  // 2.359.2 B (#3049): closed once saved; on an error the ticks stay (api() said why)
+    const ok = await bellSet(id, 'custom', custom);
+    b.disabled = false;
+    if (ok) md.remove();
   });
   setTimeout(() => $('[data-bc]', md)?.focus(), 30);
 }
@@ -833,7 +846,7 @@ function lmSec(k, title, inner, fown = [], open = false) {
 function lmSum(sec) {
   const out = [], lab = el => (el.closest('.row')?.querySelector(':scope > label')?.textContent || '').trim();
   for (const el of sec.querySelectorAll('.lmsecb input, .lmsecb select, .lmsecb .lmsum, .lmsecb #l-e2e-st')) {
-    if (el.closest('[hidden], .members, .emogrid, .pbarea')) continue;
+    if (el.closest('[hidden], .members, .emogrid, .pbarea, .pzlist')) continue;  // 2.412.0 (#3552): .pzlist says its state in .lmsum
     if (el.matches('.lmsum, #l-e2e-st')) { if (el.textContent.trim()) out.push(el.textContent.trim()); continue; }
     if (el.type === 'checkbox') { if (!el.checked) continue; const r = el.closest('.row'), n = r ? r.querySelectorAll('input[type="checkbox"]').length : 0; out.push(n === 1 && lab(el) ? lab(el) : (el.closest('label')?.textContent || '').trim()); continue; }
     if (el.tagName === 'SELECT') { const d = el.dataset.lmdef ?? el.options[0]?.value; if (el.value !== d && el.selectedOptions[0]) out.push(`${lab(el)}: ${el.selectedOptions[0].textContent.trim()}`); continue; }
@@ -909,7 +922,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
-    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
+    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) ? tr('Shared only inside the organisation; its agents may join. Shopping lists and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
     ${listDlgTeamHtml(l, id, 'client')}
@@ -926,7 +939,7 @@ function listModal(id, folder = '', o = {}) {
     ${timeOn() ? '</div>' : ''}`, fown)}
     ${lmSec('show', tr('Display and behaviour'), `
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
-    ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
+    ${''/* 2.396.0 (#3385): the row "Used for" is gone; a list keeps its stored family (shopping mode, aisles); a shopping list offers it in the list itself (render.js hint shop) */}
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><span class="lchks"><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label>${id && !l.is_inbox ? `<label class="chkl ldsxrow"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label>` : ''}</span></div>
@@ -958,12 +971,14 @@ function listModal(id, folder = '', o = {}) {
     ${id ? ptypeRowHtml(l) : ''}
     ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
+    ${tk_listRow(l)}${''/* 2.390.0 (#3353): ticket key (git.js) */}
     ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
     ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
+    ${id && !l.is_inbox ? lmSec('props', tr('Properties'), pz_boxHtml(l), fown) : ''}${''/* 2.412.0 (#3552): the properties of the tasks (props.js) */}
     ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
     ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`);
   lmSecWire(md);
@@ -981,6 +996,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   if (id) ovWire(md, id);  // 2.46.0 (#1603): "Everyone in the organisation"
   if (id) tp_wire(md, id);  // 2.46.4 (#1751): "Tap does not open details"
+  if (id) pz_wire(md, id);  // 2.412.0 (#3552): properties
   if (id) rvw_wire(md, id);  // 2.60.0 C (#1512): review step
   if (id) o3c_wire(md, id);  // 2.83.0 C (#1427): header strip
   $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
@@ -991,7 +1007,7 @@ function listModal(id, folder = '', o = {}) {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),  // 2.352.0 C (#2752): no kind
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: numBody($('#l-dayh', md).value)} : {}), ...($('#l-time', md) ? {time_tracking: $('#l-time', md).checked} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
-      ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
+      ...(listById(id)?.family && $('#l-ws', md)?.value ? {family: ''} : {}),  // 2.396.0 (#3385): into an organisation ends the private list kind, as the row "Used for" did
       ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value,  // members: only their own placement / view
         ...(ladm ? {name: emo + nm, color: $('#l-col button.on', md)?.dataset.c || ''} : {})};  // 2.40.0 (#1431)
@@ -1030,15 +1046,16 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', numDec()) : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
-    if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
     tp_sync(md, x);  // 2.46.4 (#1751)
+    pz_sync(md, x);  // 2.412.0 (#3552)
     const keep = force ? [] : [['l-name', 'name'], ['l-folder', 'folder'], ['l-rate', 'rate'], ['l-dayh', 'day_hours']].filter(([e]) => document.activeElement === $('#' + e, md)).map(([, k]) => k);
     lbase = {...x, ...Object.fromEntries(keep.map(k => [k, lbase[k]]))};  // 2.270.0 A (#3019): a field being typed keeps its base
   };
-  let saving = Promise.resolve();
+  let saving = Promise.resolve(), lbusy = 0;
   const autosave = () => {
     if (!id) return saving;
+    lbusy++;
     saving = saving.then(async () => {
       for (const t of pend.values()) clearTimeout(t);
       pend.clear();
@@ -1054,19 +1071,29 @@ function listModal(id, folder = '', o = {}) {
       if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
       let cfl = null;
       const e = await listPatch(id, {...diff, _prev: prev}, null, {post: lsync, conflicts: c => { cfl = c; }});
-      if (e === false) { lfail = true; lsync(); return; }
+      if (e === false) { lfail = true; return; }  // 2.359.2 B (#3049): the form keeps what was typed (the next save sends it again)
       lfail = false;
       for (const k in diff) lbase[k] = diff[k];
       if (cfl) { for (const c of cfl) lbase[c.field] = c.server; lsync(true); }  // the form shows what stayed
       lsaved(e);
-    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
+    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { lbusy--; if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
     return saving;
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
+  // 2.359.2 B (#3049): the save failed: the dialog stays unless the person discards what is not saved
+  const lDiscard = async () => {
+    toast(tr('Could not save'));
+    if (md._asking) return false;
+    md._asking = true;
+    const ok = await askConfirm(tr('Discard changes?'), tr('Your changes in this dialog are not saved yet.'), {ok: tr('Discard'), danger: true, cancel: tr('Keep editing')});
+    md._asking = false; return ok;
+  };
   if (id) {
     md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
     md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
     onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
+    // 2.359.2 B (#3049): Esc / the backdrop like "Close" when something is not saved yet (else at once, as before)
+    md._close = async () => { if (pend.size || lfail || lbusy) { await autosave(); if (lfail && !await lDiscard()) return; } md.remove(); };
   }
   md.addEventListener('change', e => {
     if (id && e.target.id === 'l-status') { lmStatusSet(id, e.target); return; }  // 2.352.0 C (#2751): the status instead of the switch "Progress and status"
@@ -1076,14 +1103,9 @@ function listModal(id, folder = '', o = {}) {
       if (ptKeys) { ptPend = true; $('#l-pthint', md).textContent = ptypeHint(e.target.value); return; }
       ptypeChange(e.target.value); return;
     }
-    if (e.target.id === 'l-fam' && e.target.value && $('#l-ws', md)?.value) {  // 2.28.0 (#935): "Used for" makes the list private
-      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life projects except trips are private: they cannot belong to an organisation'));  // 2.173.0 A (#2680)
-      const h0 = $('#l-wshint', md); if (h0) h0.textContent = tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
-    }
     if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows
       const org = !!e.target.value;
-      if (org && $('#l-fam', md)?.value) { $('#l-fam', md).value = ''; }  // an organisation's list has no "Used for"
-      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
+      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. Shopping lists and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
       if (id) {  // 2.401.0 (#2924): the server's dry run first; cancelled = the field goes back
         const sel = e.target, to = sel.value ? +sel.value : null, from = listById(id)?.org_id || null;
         wsHold = true;
@@ -1095,8 +1117,7 @@ function listModal(id, folder = '', o = {}) {
       }
       return;
     }
-    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
-    if (!id && e.target.id === 'l-fam' && ['shopping', 'packing'].includes(e.target.value) && $('#l-dab', md)) $('#l-dab', md).checked = true;
+    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
     if (id && e.target.id === 'l-inmine') { mtSet(id, e.target.checked, {post: () => { const x = $('#l-inmine', md); if (x) x.checked = mtShown(id); }}).then(() => lsaved(null)); return; }  // 2.41.0 (#1365)
   });
@@ -1116,6 +1137,7 @@ function listModal(id, folder = '', o = {}) {
   const ptypeChange = v => (ptRun = ptRun.then(() => { const sel = $('#l-ptype', md); if (md.isConnected && sel && sel.value === v) return ptypeChange1(v); }).catch(() => {}));
   const ptypeChange1 = async v => {
     await autosave();
+    if (!await pz_askType(listById(id) || l, v)) { lsync(); return; }  // 2.412.0 (#3552): first what the new type hides
     const sel = $('#l-ptype', md), r = await setListPtype(id, v, {post: () => lsync()});
     if (!md.isConnected) return;
     if (!r) { lsync(); return; }
@@ -1152,6 +1174,7 @@ function listModal(id, folder = '', o = {}) {
     if (b.dataset.m === 'share-open') { await autosave(); if (o.back) { md.remove(); return; } modalSub(md, () => shareModal(id, {back: true})); return; }  // 2.6.0 (K12); 2.46.0 (#1604): back, no stack
     if (b.dataset.m === 'tt-tpl') { await autosave(); ticketTplModal(id); return; }
     if (b.dataset.pt !== undefined) {  // 2.4.0 (#243 / #328): what the new project starts from
+      md._ptUser = 1;  // 2.411.0 (#3516): chosen by hand, a folder change keeps it
       $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
       const tp = b.dataset.pt.startsWith('tpl:');
       $('.ptdates', md).hidden = !tp;
@@ -1193,8 +1216,9 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     const a = b.dataset.m;
-    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open once (the second tap closes it)
-      if (id) { await autosave(); if (lfail && !md._lkeep) { md._lkeep = 1; toast(tr('Could not save')); return; } }
+    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open
+      // 2.359.2 B (#3049): also on the next tap: closing without the save only after "Discard changes?"
+      if (id) { await autosave(); if (lfail && !await lDiscard()) return; }
       md.remove();
     }
     if (a === 'dup') { await autosave(); md.remove(); listDuplicate(id); return; }  // 2.78.0 (#1881)
@@ -1205,7 +1229,7 @@ function listModal(id, folder = '', o = {}) {
         const ni = $('#l-name', md); ni.setAttribute('aria-invalid', 'true'); ni.addEventListener('input', () => ni.removeAttribute('aria-invalid'), {once: true});
         toast(tr('Name missing')); return ni.focus();
       }
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
       const {rate, nag, day_hours: _dh, ...b0} = body;
@@ -1214,11 +1238,14 @@ function listModal(id, folder = '', o = {}) {
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }
       } else {
-        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : b0); } catch { return; }
+        // 2.411.0 (#3516): no type in a folder that has one = chosen so (ptype ""), the server would give it the folder's type
+        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : own && folderPtype(b0.folder) ? {...b0, ptype: ''} : b0); } catch { return; }
       }
-      if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
+      // 2.359.2 B (#3049): the rate / reminder sent after the create: a failure says so, with the list's dialog one tap away
+      const rnFail = (rate || nag) && await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).then(() => false, () => true);
       if ($('#l-ws', md)) LS.set('wsLastProj', $('#l-ws', md).value ? 'org:' + $('#l-ws', md).value : 'private');  // 2.364.0 D (#3033): the next one starts there
       md.remove(); await load(); go('l/' + n.id);
+      if (rnFail) toast(tr('Could not save'), () => listModal(n.id), 10000, tr('Open'));
       modulesOnToast(n.modules_on);
       if (pt === 'software') projectNextSteps(n.id);
       return;
@@ -1246,8 +1273,20 @@ function listModal(id, folder = '', o = {}) {
     const m = e.target.value.match(EMO_RE);
     if (m) { emo = m[1]; $('#l-emo', md).innerHTML = emo; $$('#l-emogrid button', md).forEach(x => x.classList.remove('on')); if (id) later(e.target); }
   });
+  if (!id && !o.ptype && !o.kind) lmFolderPtype(md, folder);  // 2.411.0 (#3516)
   if (!isTouch()) setTimeout(() => $('#l-name', md).focus(), 50);  // 2.13.0: touch: no keyboard popping up on open
   return md;
+}
+// 2.411.0 (#3516): a new project in a folder with a project type (folderPtype) starts as that type with its standard sections,
+// chosen in the dialog (the person can pick another one; once picked by hand a folder change keeps it)
+function lmFolderPtype(md, folder) {
+  if (!md || $('.lhdr', md) || md._ptUser || !$('.ptcards', md)) return;
+  const t = folderPtype(folder), card = $(`.ptcard[data-pt="${t}"]`, md);
+  if (!card) return;
+  $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === card); x.setAttribute('aria-checked', x === card); });
+  $('.ptsecs', md).hidden = !PTYPE_SECS[t]; $('#l-ptsecsl', md).textContent = ptSecsLine(t);
+  if ($('#l-ptsecs', md)) $('#l-ptsecs', md).checked = !!t;
+  if ($('#l-tickets', md)) { $('#l-tickets', md).checked = t === 'software'; $('#l-tickets', md).closest('.row').hidden = !!t; }
 }
 // 2.1.2 (#349): hand a list to another person. j = GET /api/lists/{id}/owner (mode owner | takeover, candidates: active
 // people, members first with their role). Two steps: pick the person, then confirm.

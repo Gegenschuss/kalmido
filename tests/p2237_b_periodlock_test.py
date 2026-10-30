@@ -7,8 +7,9 @@ invented companies and people only (@example.com / .example), the PDFs are made 
    the trash); open months: restored as before
  - splitting a stack (POST /api/docs/<id>/split): a receipt of a locked month -> 409, nothing in the trash; undo
    (POST /api/docs/<id>/unsplit): a part that became a receipt of a locked month -> 409, nothing moved; open: as before
- - test phase deletion of a finalised invoice: an office group with manage (copy of tpl:finance) 403 now; the admin in an
-   open month deletes as before; an invoice dated in a locked month or with a payment in one -> 409, nothing deleted
+ - 2.417.0 C (#2604): the test phase deletion of a finalised invoice is gone - with the number typed it stays (409) for
+   an office group with manage (copy of tpl:finance), the admin in an open month, an invoice dated in a locked month or
+   with a payment in one; nothing deleted
  - a person without an organisation (freelancer-matrix: files, office): every way locked / open in the own personal office
 usage: p2237_b_periodlock_test.py <datadir>      (a fresh container; P2237B_NOSTART=1 = the server already runs)"""
 import base64
@@ -210,15 +211,15 @@ if len(P) == 2:
     check(r.ok and node(S2)[2] is None and node(P[0])[2] is not None and node(P[1])[2] is not None,
           f"open month: undo as before ({r.status_code} {r.text[:120]})")
 
-# ================================================================ 4. test phase deletion of a finalised invoice
+# ================================================================ 4. a finalised invoice stays (2.417.0 C, #2604: no test phase deletion)
 # the freelancer (admin of the personal office)
 FI1, FN1 = invoice(Fr, CLF, "Offen")
 r = delete(Fr, FI1, FN1)
-check(r.ok and gone(FI1), f"freelancer, open month: the invoice goes as before ({r.status_code} {r.text[:160]})")
+check(r.status_code == 409 and not gone(FI1), f"freelancer, open month: the finalised invoice stays (409) ({r.status_code} {r.text[:160]})")
 FI2, FN2 = invoice(Fr, CLF, "Gesperrt")
 sql("UPDATE office_docs SET date=? WHERE id=?", (OLD, FI2))
 r = delete(Fr, FI2, FN2)
-check(r.status_code == 409 and ML in r.text and not gone(FI2), f"freelancer: an invoice of the locked month stays (409) ({r.status_code} {r.text[:160]})")
+check(r.status_code == 409 and not gone(FI2), f"freelancer: an invoice of the locked month stays (409) ({r.status_code} {r.text[:160]})")
 
 # the organisation: Fina in a copy of the finance template (manage on quotes & invoices)
 CL = setup_office(A)
@@ -228,9 +229,9 @@ GF = r.json().get("id")
 check(A.put(B + f"{R}/people/{FINA}", json={"groups": [f"g:{GF}"]}).ok, "Fina into the finance group")
 I1, N1 = invoice(A, CL, "Gruppe")
 r = delete(Fi, I1, N1)
-check(r.status_code == 403 and not gone(I1), f"office group with manage: the test phase deletion 403 ({r.status_code} {r.text[:160]})")
+check(r.status_code in (403, 409) and not gone(I1), f"office group with manage: the finalised invoice stays ({r.status_code} {r.text[:160]})")
 r = delete(A, I1, N1)
-check(r.ok and gone(I1), f"the admin, open month: the invoice goes as before ({r.status_code} {r.text[:160]})")
+check(r.status_code == 409 and not gone(I1), f"the admin, open month: the finalised invoice stays (409) ({r.status_code} {r.text[:160]})")
 I2, N2 = invoice(A, CL, "Gesperrt")
 I3, N3 = invoice(A, CL, "Zahlung gesperrt")
 r = A.post(B + f"{D}/{I3}/payments", json={"date": TD, "amount": "100.00"})
@@ -239,9 +240,9 @@ sql("UPDATE office_docs SET date=? WHERE id=?", (OLD, I2))
 lock(A, "organisation")
 sql("UPDATE office_payments SET date=? WHERE doc_id=?", (OLD, I3))  # a payment booked in the locked month
 r = delete(A, I2, N2)
-check(r.status_code == 409 and ML in r.text and not gone(I2), f"admin: an invoice of the locked month stays (409) ({r.status_code} {r.text[:160]})")
+check(r.status_code == 409 and not gone(I2), f"admin: an invoice of the locked month stays (409) ({r.status_code} {r.text[:160]})")
 r = delete(A, I3, N3)
-check(r.status_code == 409 and ML in r.text and not gone(I3), f"admin: an invoice with a payment of the locked month stays (409) ({r.status_code} {r.text[:160]})")
+check(r.status_code == 409 and not gone(I3), f"admin: an invoice with a payment of the locked month stays (409) ({r.status_code} {r.text[:160]})")
 check(sql("SELECT count(*) FROM office_payments WHERE doc_id=?", (I3,))[0][0] == 1, "its payment stays")
 
 sys.exit(kt.done("p2237_b_periodlock"))

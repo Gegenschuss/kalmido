@@ -640,7 +640,7 @@ def v1_task_batch():
         ch = b.get("changes")
         if not isinstance(ch, dict) or not ch:
             raise BadInput(tr("Nothing to change"))
-        data = v1_task_in(ch, tuple(k for k in V1_TASK_IN if k != "parent_id"))
+        data = v1_task_in(ch, tuple(k for k in V1_TASK_IN if k not in ("parent_id", "reviewer_id")))  # 2.390.0 B (#3355): reviewer one by one
     elif b.get("changes"):
         raise UnknownFields(["changes"])
     c = db()

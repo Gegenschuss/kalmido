@@ -222,7 +222,7 @@
   "texts": {
     "intro": {
       "de": "vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:",
-      "en": "thank you for your enquiry. We are pleased to submit the following quotation:"
+      "en": "Thank you for your enquiry. We are pleased to submit the following quotation:"
     },
     "salutation": {
       "de": "Sehr geehrte Damen und Herren,",
@@ -311,7 +311,7 @@
     ],
     "invoice_intro": {
       "de": "für das oben genannte Projekt erlauben wir uns, Ihnen folgende Leistungen in Rechnung zu stellen:",
-      "en": "regarding the project referenced above, we are pleased to submit the following charges for our services:"
+      "en": "Regarding the project referenced above, we are pleased to submit the following charges for our services:"
     },
     "invoice_closing": {
       "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere Allgemeinen Geschäftsbedingungen.",
@@ -319,7 +319,7 @@
     },
     "delivery_intro": {
       "de": "folgende Waren bzw. Leistungen wurden geliefert bzw. erbracht:",
-      "en": "the following goods or services have been delivered:"
+      "en": "The following goods or services have been delivered:"
     },
     "delivery_closing": {
       "de": "Ware bzw. Leistung vollständig und in einwandfreiem Zustand erhalten.",
@@ -327,7 +327,7 @@
     },
     "credit_intro": {
       "de": "zu der oben genannten Rechnung erteilen wir Ihnen folgende Rechnungskorrektur:",
-      "en": "regarding the invoice referenced above we issue the following invoice correction:"
+      "en": "Regarding the invoice referenced above we issue the following invoice correction:"
     },
     "credit_closing": {
       "de": "Den Korrekturbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
@@ -335,7 +335,7 @@
     },
     "reminder_intro": {
       "de": "sicher ist Ihrer Aufmerksamkeit entgangen, dass folgende Rechnungen noch nicht beglichen sind:",
-      "en": "it may have escaped your attention that the following invoices are still outstanding:"
+      "en": "It may have escaped your attention that the following invoices are still outstanding:"
     },
     "reminder_closing": {
       "de": "Wir bitten Sie darum, den offenen Betrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen.",
@@ -343,7 +343,7 @@
     },
     "reminder_intro_2": {
       "de": "leider konnten wir trotz unserer Zahlungserinnerung bis heute keinen Zahlungseingang für folgende Rechnungen feststellen:",
-      "en": "despite our payment reminder, we have not yet received payment for the following invoices:"
+      "en": "Despite our payment reminder, we have not yet received payment for the following invoices:"
     },
     "reminder_closing_2": {
       "de": "Wir bitten Sie, den offenen Gesamtbetrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen. Sollten Sie die Zahlung inzwischen veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
@@ -351,7 +351,7 @@
     },
     "reminder_intro_3": {
       "de": "trotz unserer Zahlungserinnerung und Mahnung sind folgende Rechnungen weiterhin unbezahlt:",
-      "en": "despite our payment reminder and our reminder notice, the following invoices remain unpaid:"
+      "en": "Despite our payment reminder and our reminder notice, the following invoices remain unpaid:"
     },
     "reminder_closing_3": {
       "de": "Wir fordern Sie hiermit letztmalig auf, den offenen Gesamtbetrag innerhalb von {days} Tagen auf unser oben genanntes Bankkonto zu überweisen. Geht die Zahlung bis dahin nicht ein, werden wir ohne weitere Ankündigung rechtliche Schritte einleiten; die dadurch entstehenden Kosten gehen zu Ihren Lasten.",
@@ -415,6 +415,9 @@
   },
   "features": {
     "books.datev": {
+      "status": "ready"
+    },
+    "docs.delivery": {
       "status": "ready"
     },
     "docs.einvoice": {

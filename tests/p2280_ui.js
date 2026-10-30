@@ -101,10 +101,7 @@ const V = B + 'api/v1';
   // a new list in the shown organisation
   w.eval('listModal()'); let md = await until(() => d.querySelector('.modal.lnew'));
   check(md.querySelector('#l-ws') && md.querySelector('#l-ws').value === String(ORG), '#935: a new list starts in the shown workspace');
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#935: "Used for" is offered for a simple list');
-  change(w, md.querySelector('#l-fam'), 'shopping'); await sleep(50);
-  check(md.querySelector('#l-ws').value === '', '#935: "Used for" makes the list private (the workspace follows)');
-  change(w, md.querySelector('#l-fam'), ''); change(w, md.querySelector('#l-ws'), String(ORG));
+  check(!md.querySelector('.lfamrow'), '2.396.0 (#3385): no "Used for" any more (was #935: it made the list private)');
   md.querySelector('#l-name').value = 'Marketing'; click(w, md.querySelector('[data-m="save"]'));
   const mk = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Marketing'));
   check(mk && mk.org_id === ORG, '#935: created in the organisation ' + (mk && mk.org_id));

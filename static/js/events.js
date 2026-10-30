@@ -161,6 +161,14 @@ function renderKeepField(sel, fn) {
   if (n !== o) n.value = v;
   if (f) { n.focus(); try { n.setSelectionRange(a, b); } catch { /* not a text field */ } }
 }
+// 2.359.2 B (#3049): a quick field (input t holding raw) is emptied only once save() worked; on an error the text stays, also in
+// the field a redraw put in its place (again()); true = saved
+async function keepOnFail(save, t, raw, again) {
+  try { await save(); } catch { const f = again?.() || t; if (f && !f.value.trim()) f.value = raw; return false; } finally { delete t.dataset.qbusy; }  // api() said why
+  const f = again?.() || t; if (f.value === raw) f.value = '';
+  if (f !== t && t.value === raw) t.value = '';
+  return true;
+}
 async function submitQuick(input, extra = {}) {
   if (!Object.keys(extra).length && await msvvQuick(input)) return;  // 2.73.0 C (#661): the target is another server
   const cap = input.id === 'qsheet' && S.quickPreset.capture;  // 2.4.0 (#187): a capture ignores the view (inbox unless ~list)
@@ -188,11 +196,16 @@ async function submitQuick(input, extra = {}) {
   if (d.who && d.noList && !body.list_id) { toast(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   qa2_body(r, body);  // 2.111.0 C (#2057): @person, duration, reminder
-  input.value = ''; S.quick.ignore = new Set(); updateChips(input);
+  // 2.359.2 B (#3049): the text, the images and the sheet stay until the task is saved (a 403/409/500 lost them); a second
+  // Enter while it saves sends nothing twice; text typed meanwhile is not cleared
+  if (input.dataset.qbusy) return;
+  const raw = input.value; let created;
+  input.dataset.qbusy = '1';
+  try { created = await createTask(body); } catch { return; } finally { delete input.dataset.qbusy; }  // api() said why
+  if (input.value === raw) { input.value = ''; S.quick.ignore = new Set(); updateChips(input); }
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
-  const created = await createTask(body);
   if (r.wait && created?.id) { try { putTask(await api('PUT', `/api/tasks/${created.id}/waiting`, {note: r.wait, until: addDays(today(), 7)})); render(); } catch { /* api() said it */ } }  // 2.22.0 (#686)
   if (cap) { captureDone(created, body); return; }
   if (d.open && created?.id) { openDetail(created.id); return; }  // 2.14.0 (#484): "Add and open"
@@ -487,6 +500,7 @@ document.addEventListener('click', async e => {
       {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
@@ -508,6 +522,7 @@ document.addEventListener('click', async e => {
     case 'dep-add': depPicker(id, a.dataset.dir); break;
     case 'wait-on': waitOnMenu(a, id); break;  // 2.25.0 (UX-43)
     case 'dab-on': hintDone('dab'); setDab(id, true); break;  // 2.25.0 (UX-28)
+    case 'shop-on': hintDone('shop'); setShopList(id); break;  // 2.396.0 (#3385)
     case 'dep-rm': {
       const b = +a.dataset.b;
       try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }
@@ -837,20 +852,26 @@ document.addEventListener('keydown', async e => {
       }).catch(() => { const f = $('#d-sub'); if (f && !f.value) f.value = v; });  // not saved: the text comes back (api() showed why)
       return;
     }
+    // 2.359.2 B (#3049): tag, board and matrix fields keep their text until it is saved (a rebuilt field gets it back on an error)
     if (t.id === 'd-tag' && t.value.trim()) {
-      const p = taskById(S.sel); const v = t.value.trim().replace(/^#/, ''); t.value = '';
-      await tagAdd(p, v); $('#d-tag')?.focus(); return;
+      e.preventDefault(); if (t.dataset.qbusy) return;
+      const p = taskById(S.sel); const raw = t.value, v = raw.trim().replace(/^#/, ''); t.dataset.qbusy = '1';
+      const ok = await keepOnFail(() => tagAdd(p, v), t, raw, () => $('#d-tag')); if (ok) $('#d-tag')?.focus(); return;
     }
     if (t.dataset.kadd !== undefined && t.value.trim()) {
+      e.preventDefault(); if (t.dataset.qbusy) return;
       const lid = S.route.key === 'inbox' ? inbox().id : +S.route.key.slice(2);
-      const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask(qa2_body(r, {title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)}));  // 2.138.0 D (#2060): + the swimlane's value
-      [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl)?.focus(); return;
+      const raw = t.value, r = parseQuick(raw.trim()); t.dataset.qbusy = '1';
+      const again = () => [...$$('[data-kadd]')].find(x => x.dataset.kadd === t.dataset.kadd && x.dataset.swl === t.dataset.swl);
+      await keepOnFail(() => createTask(qa2_body(r, {title: r.title, list_id: lid, section_id: t.dataset.kadd ? +t.dataset.kadd : null, due: r.due, due_time: r.due_time, priority: r.priority || 0, tags: r.tags || [], repeat: r.repeat || '', ...swlNew(lid, t.dataset.swl, r)})), t, raw, again);  // 2.138.0 D (#2060): + the swimlane's value
+      again()?.focus(); return;
     }
     if (t.dataset.qadd !== undefined && t.value.trim()) {
-      const r = parseQuick(t.value.trim()); t.value = '';
-      await createTask(qa2_body(r, {title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''}));
-      $(`[data-qadd="${t.dataset.qadd}"]`)?.focus(); return;
+      e.preventDefault(); if (t.dataset.qbusy) return;
+      const raw = t.value, r = parseQuick(raw.trim()); t.dataset.qbusy = '1';
+      const again = () => $(`[data-qadd="${t.dataset.qadd}"]`);
+      await keepOnFail(() => createTask(qa2_body(r, {title: r.title, priority: +t.dataset.qadd, due: r.due, due_time: r.due_time, tags: r.tags || [], list_id: r.list_id || mxList(), repeat: r.repeat || ''})), t, raw, again);
+      again()?.focus(); return;
     }
   }
   if (e.key === 'Escape') {

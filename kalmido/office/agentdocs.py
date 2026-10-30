@@ -569,7 +569,7 @@ def v1_office_pdf(did):
     """The PDF preview of a draft (marked as a draft like a person's preview)."""
     from .docs import doc_row
     from .ledger import ofx_locked
-    from .pdfweb import _file_response, _render, epdf_name
+    from .pdfweb import _file_response, _render, epdf_name, epdf_out
     a = _args(())
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="pdf")
@@ -578,7 +578,7 @@ def v1_office_pdf(did):
         raise Denied(409, tr("Only the preview of a draft"))
     _log_doc(c, did)
     c.commit()
-    return _file_response(_render(c, oid, r)[0], epdf_name(r) + ".pdf", "application/pdf")
+    return _file_response(epdf_out(c, oid, r, _render(c, oid, r)[0]), epdf_name(r) + ".pdf", "application/pdf")  # 2.434.0 (#3619): + terms
 
 
 # ---------------------------------------------------------------- agents: drafts (scope office)

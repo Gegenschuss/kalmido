@@ -1383,6 +1383,16 @@
     for (const o of wkLive()) if (o.id !== not && re.test(o.body || '')) { o.body = o.body.replace(re, '[[' + to); n++; } return n; };
   on('GET', '/api/wiki', q => ({space: 'private', may_write: true, e2e: null, pages: wkLive().sort((a, b) => a.path.localeCompare(b.path)).map(p => wkOut(p, q.get('bodies') === '1'))}));
   on('GET', '/api/wiki/shared', () => ({pages: []}));
+  // 2.371 (#3150): tags and the abfrage block -- the browser's own rules (wktags.js wkt_tags / wkq_run) over the demo's pages
+  const wkAll = () => wkLive().sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1).map(p => wkOut(p, true));
+  on('GET', '/api/wiki/tags', q => {
+    const ps = wkAll().filter(p => !p.template), tg = (q.get('tag') || '').toLowerCase(), has = p => typeof wkt_tags === 'function' ? wkt_tags(p.body) : [];
+    if (tg) return {space: 'private', tag: q.get('tag'), pages: ps.filter(p => has(p).some(([k]) => k === tg)).map(p => ({id: p.id, path: p.path, updated_at: p.updated_at}))};
+    const n = new Map(), sh = new Map();
+    for (const p of ps) for (const [k, t] of has(p)) { n.set(k, (n.get(k) || 0) + 1); if (!sh.has(k)) sh.set(k, t); }
+    return {space: 'private', tags: [...n.keys()].sort((a, b) => n.get(b) - n.get(a) || (a < b ? -1 : 1)).map(k => ({tag: sh.get(k), n: n.get(k)}))};
+  });
+  on('GET', '/api/wiki/query', q => typeof wkq_run === 'function' ? wkq_run(wkq_parse(q.get('q') || ''), wkAll(), +q.get('page')) : {pages: [], tasks: [], total: 0, more: false, errors: []});
   on('GET', '/api/wiki/search', q => { const s = (q.get('q') || '').toLowerCase(); return {pages: wkLive().filter(p => (p.path + ' ' + p.body).toLowerCase().includes(s)).map(p => wkOut(p))}; });
   // 2.126.2 (#2357): the pages that link a table / a file ([[tabelle:id]] / [[datei:id]]), as the server's /api/wiki/refs
   on('GET', '/api/wiki/refs', q => { const k = q.get('sheet') ? 'tabelle' : 'datei', id = +(q.get('sheet') || q.get('file')) || 0; return {pages: wkLive().filter(p => new RegExp('\\[\\[' + k + ':' + id + '\\b').test(p.body || '')).map(p => ({id: p.id, path: p.path}))}; });
