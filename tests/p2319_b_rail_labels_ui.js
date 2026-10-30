@@ -16,7 +16,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2319B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); let j = {}; try { j = await r.json(); } catch { /* no body */ } return {http: r.status, ...j}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const look = async () => { const s = (await call('GET', '/api/state')).settings || {}; try { return JSON.parse(s.look || 'null') || {}; } catch { return {}; } };
 const change = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const icons = d => [...d.querySelectorAll('#srail .srb[data-sbb]')];
@@ -48,7 +48,7 @@ const named = b => { const n = b.querySelector('.srbn')?.textContent || ''; retu
   check(d.documentElement.classList.contains('rail-nolabel'), 'off: the page gets rail-nolabel');
   check(w.localStorage.getItem('tasks.railLabels') === 'false', 'off: kept on the device');
   check(await until(() => icons(d).length > 2 && icons(d).every(named)), 'off: every icon names its area as title and aria-label');
-  check(d.querySelector('#srail .srb.sset')?.getAttribute('aria-label') === 'Settings', 'off: Settings keeps its name for screen readers');
+  check(!d.querySelector('#srail .srb.sset') && !!d.querySelector('#kbar .kbsw[aria-label]'), 'off: the Kalmido menu (with Settings) keeps its name for screen readers'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)
   check(d.querySelectorAll('#srail .srb.on[aria-current="page"]').length === 1, 'off: the open area stays marked');
   check(await until(async () => (await look()).railLabels === false), 'off: saved to the account like the other appearance settings');
   w.close();

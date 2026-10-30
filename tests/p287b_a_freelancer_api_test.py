@@ -31,6 +31,8 @@ D = "2030-03-04"
 ALLOW = {
     # 2.207.0 (#2763): only a scan inbox key reaches it (p2207_a_scan_keys_test.py calls it as the freelancer with one)
     "GET /api/v1/documents/upload-target": "a personal token has no docs:upload (only a scan inbox key has it)",
+    # 2.425.0 (#3453): only a receipt fetcher's own key reaches it (p2425_c_api_test.py calls it as the freelancer with one)
+    "GET /api/v1/fetcher": "a personal token is no receipt fetcher key",
 }
 
 
@@ -193,7 +195,7 @@ IDS["budget"] = bu.get("list_id")
 ok(F.post(B + "/api/life/health", json={"type": "appointment", "title": "Checkup", "who": "Kim", "date": "2030-01-10", "time": "09:30"}),
    "personal: Home & life", (200, 201))
 # freelancer-matrix: own
-ok(F.patch(B + "/api/settings", json={"week_start": 1}), "own: settings")
+ok(F.patch(B + "/api/settings", json={"week_start": "mon"}), "own: settings")
 ok(F.post(B + "/api/account/export", json={}), "own: an account export", (200, 201, 202))
 tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in ("read", "write", "comments", "structure", "delete",
                                                                                   "attachments:read", "attachments:write", "time", "export",

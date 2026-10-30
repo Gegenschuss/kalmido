@@ -373,8 +373,9 @@ button.jcdh{cursor:pointer}
 /* 2.102.0 B (#2204): the key hint next to the send button (the team chat and the agent / job chat) */
 .chcomp .chkh{flex:none;align-self:center;font-size:var(--fs-s);white-space:nowrap}
 /* 2.144.0 A (#2412): Stop while the agent works (next to Send) */
-.chcomp .chstop{flex:none;align-self:center;min-width:2.75rem;min-height:2.75rem;color:var(--danger)}
-.chcomp .chstop[hidden]{display:none}
+/* 2.411.0 (#3446): Stop is the first entry of the ⋯ menu (red); the ⋯ button has a red dot while the answer runs */
+#pop .chmi-stop:not([disabled]),#pop .chmi-stop:not([disabled]) .ml{color:var(--danger)}
+.jcdfbtn.chbusy::before{content:"";position:absolute;top:.5rem;right:.5rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--danger);box-shadow:0 0 0 .125rem var(--bg);pointer-events:none}
 .chcomp .chkh:empty{display:none}
 /* 2.119.0 B (#2302): the hint is a small line under the field (own row), so it also shows in the narrow side panel and split windows */
 .chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}
@@ -471,14 +472,13 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .chath.chh2 .chn::before{content:none}
 .chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:1.25}
 .chath.chh2 .chnm b{flex:0 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chath.chh2 .chl2{display:flex;min-width:0;font-size:var(--fs-xs);line-height:1.25}
+.chath.chh2 .chl2{display:flex;min-width:0;max-width:100%;font-size:var(--fs-xs);line-height:1.25}  /* 2.411.0 (#3529): never wider than the name column, the state ends in … */
 .chath.chh2 .chl2::before{content:none}
 .chath.chh2 .chst{min-width:0;font-size:var(--fs-xs)}
 .chath.chh2 .chqp{font-size:var(--fs-xs)}
 .chath.chh2 > .spacer{flex:0 0 0}
 .chath.chh2 .msbtn{display:none}
-/* the usage ring only near its limit (yellow / red); its numbers are in the ⋯ menu (Usage: …) */
-.chath.chh2 .chring:is(.q-ok,.q-stale){display:none}
+/* 2.407.0 B (#3493): the usage ring is always shown (accent, yellow, red, grey when outdated); its numbers also in the ⋯ menu */
 /* the state's dot turns into a small spinning circle while the agent works (instead of a second sign beside the name) */
 .chath.chh2 .chst .adot.st-working{box-sizing:border-box;width:.625rem;height:.625rem;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);background:none;animation:aspin .9s linear infinite}
 @media (prefers-reduced-motion:reduce){ .chath.chh2 .chst .adot.st-working{animation:none;background:var(--accent);border:0} }

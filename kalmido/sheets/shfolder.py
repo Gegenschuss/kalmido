@@ -29,7 +29,7 @@ from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, Denied
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
 from ..accounts.session import me
@@ -81,7 +81,8 @@ def _protect(c, rid):
 def _on_trash(c, uid, rid, restore):
     """2.199.0 F (#2742, review G3): a folder's trash takes the table into the tables' trash and notes it on the node (fs_log
     'trash', detail "area:<deleted_at>"); coming back it restores only a table that this mark still names (not one its
-    owner deleted on their own before or after) and only for who may write it through its space / project."""
+    owner deleted on their own before or after) and only for who may write it through its space / project -- 2.373.0 (#3335):
+    without that right "stays" (the folder's restore tells the person: the table stays in the tables' trash)."""
     r = _row(c, rid)
     if r is None or bool(r["deleted_at"]) != bool(restore):
         return
@@ -89,8 +90,10 @@ def _on_trash(c, uid, rid, restore):
     if restore:
         m = c.execute("SELECT detail FROM fs_log WHERE node_id=? AND action='trash' AND detail ILIKE 'area:%' ORDER BY id DESC LIMIT 1",
                       (n["id"],)).fetchone() if n is not None else None
-        if not m or m[0] != f"area:{r['deleted_at']}" or not sh_may(c, uid, r, write=True, share=False):
+        if not m or m[0] != f"area:{r['deleted_at']}":
             return
+        if not sh_may(c, uid, r, write=True, share=False):
+            return "stays"
         c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (r["id"],))
     else:
         ts = iso_ms(now_utc())
@@ -179,7 +182,7 @@ def shf_folder_may(c, uid, r, write=False):
 
 def shf_root(c, uid, org_id, create=False):
     """The tables' root folder of workspace org_id (None: uid's own tree); create: make it (needs the right to add at the top)."""
-    return fs_area_root(c, uid, org_id, SHF_AREA, tr("Tables"), create=create)
+    return fs_area_root(c, uid, org_id, SHF_AREA, tr("Tables", lg=lang(c, uid)), create=create)
 
 
 def shf_reached_ids(c, uid):

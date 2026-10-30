@@ -20,7 +20,8 @@ async function wpDraw(md) {
   const sub = await wpSub(), mine = sub && j.subs.find(x => x.endpoint === sub.endpoint);
   const hint = t => `<div class="shint">${t}</div>`;
   let h = '';
-  if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
+  if (shellIOS()) h += hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
+  else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
   else if (!wpSupported()) h += hintK(tr('This browser does not support Web Push'));
   else {
     h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;
@@ -35,9 +36,9 @@ async function wpDraw(md) {
   // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Turn on" / "Send test"
   const now = $('#s-pushnow', md);
   if (now) {
-    const can = wpSupported() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
+    const can = wpSupported() && !shellIOS() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
     now.className = 'pushnow ' + (mine ? 'on' : 'off');
-    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(!wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
+    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(shellIOS() ? tr('Notifications are not available in the iPhone app yet.') : !wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
       + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Turn on')}</button>` : '');
   }
 }
@@ -91,6 +92,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-asst-on': ['assistant_on', N_('Use the assistant'), 'chk'],  // 2.75.0 (#1411)
   's-wkst': ['week_start', N_('First day of the week'), 'sel'], 's-tfmt': ['time_format', N_('Time format'), 'sel'], 's-dord': ['date_order', N_('Date format'), 'sel'],  // 2.368.0 B (#2982)
   's-trd': ['chat_read_receipts', N_('Send read receipts'), 'chk'],  // 2.139.0 A (#2129)
+  's-mview': ['member_view', N_('View as member'), 'chk'],  // 2.436.0 (#3620): core.js mvResp
 };
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -114,7 +116,7 @@ async function setApply(patch, label, o = {}) {
   if (Object.keys(patch).every(k => String(before[k]) === String(patch[k]))) return null;
   // 2.41.2 (#1501): the value counts at once (a view that reads it while the request runs), put back on an error
   // 2.269.0 B (#3014): o.send / o.back = the request body of the change / of its undo (e.g. set_delta: one entry, not the whole value)
-  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
+  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', o.send || patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(o.keep); return false; }  // 2.359.2 B (#3049): o.keep = a typed field that keeps its text
   await setAfter(patch);
   const e = histAdd({label: tr('Changed setting: {0}', label), sett: true, post: settingsSync,
     undo: () => setStep(before, patch, label, o.back), redo: () => setStep(patch, before, label, o.send)});
@@ -125,7 +127,10 @@ async function setStep(to, from, label, wire) {  // one way of a settings step; 
   const body = {}, skip = [];
   // 2.290.0 (#3197): a step sent as single entries (set_delta) needs no whole-value check: the server keeps its own order and
   // entries this client does not know, so the whole value never matches; the delta itself leaves other changes alone
-  for (const k in to) { if (!wire?.set_delta?.[k] && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
+  // 2.358.0 B (#3302): the same for a partial matrix (notify {event: {news|push}}: only this switch, it writes notify +
+  // news_kinds); a reload between save and undo brought the server's order of news_kinds, so the step was skipped
+  const part = k => wire?.set_delta?.[k] || (wire?.notify && typeof wire.notify === 'object' && (k === 'notify' || k === 'news_kinds'));
+  for (const k in to) { if (!part(k) && String(S.settings[k] ?? '') !== String(from[k] ?? '')) skip.push(label); else body[k] = to[k]; }
   if (!Object.keys(body).length) return {skipped: skip, none: true};
   await api('PATCH', '/api/settings', wire && !skip.length ? wire : body);  // 2.269.0 B (#3014)
   Object.assign(S.settings, body);
@@ -136,7 +141,28 @@ async function setAfter(patch) {
   if ('lang' in patch) { await i18nLoad(patch.lang); LS.set('lang', patch.lang); document.documentElement.lang = patch.lang; }
   if ('features' in patch || 'nav_order' in patch) { try { await load(); } catch { /* offline: the local copy is right */ } await route(); return; }  // route: a view whose module went off
   if ('assistant_on' in patch) asst_onSync(patch.assistant_on);  // 2.75.0 (#1411): the entry points follow the switch
+  if ('member_view' in patch) { await mvAfter(); return; }  // 2.436.0 (#3620): the whole view follows (core.js)
   if (Object.keys(patch).some(k => SET_RENDER.includes(k))) render();
+}
+// 2.436.0 (#3620): the person has something "View as member" hides (only then Settings > Account offers it)
+const mvHas = () => !!(S.me?.real_admin || S.me?.is_admin || (S.me?.workspaces || []).some(w => (w.real_role || w.role) === 'admin'));
+// 2.436.0 (#3620): "View as member" (core.js mvResp): the view follows a change of the switch: the account at once, then the state again; an open Settings is drawn anew
+async function mvAfter() {
+  if (MV.me && MV.me.id === S.me?.id) { const raw = {...S.me, is_admin: MV.me.is_admin, workspaces: MV.me.workspaces}; delete raw.real_admin; S.me = mvOn() ? mvMe(raw) : raw; }
+  try { await load(); } catch { /* offline: the account above holds until the next load */ }
+  if (typeof OFC !== 'undefined') OFC.data = {};  // the office's lists follow its menu
+  render();
+  const md = $$('.smodal').pop();
+  if (md) { md._noflush = true; md.remove(); settingsModal(mvOn() || LS.get('settingsSec', 'account') === 'org' ? 'account' : LS.get('settingsSec', 'account')); }
+}
+// the way back (the entry under the settings' areas, the account menu): one click, no question
+async function mvSet(on) {
+  const v = on ? '1' : '0';
+  if ((S.settings?.member_view || '0') === v) return;
+  try { await api('PATCH', '/api/settings', {member_view: v}); } catch { return; }
+  S.settings.member_view = v;
+  await mvAfter();
+  toast(on ? tr('You now see Kalmido like a member. Your rights stay the same.') : tr('Administration is shown again'));
 }
 // local (per device) settings: appearance, tab bar
 function setLocal(label, get, set, to) {
@@ -156,11 +182,11 @@ function setSaved(e) {
   clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('on'); el._e = null; }, 6000);
 }
 // the dialog shows what the settings are now (after an undo / redo or a change on another device)
-function settingsSync() {
+function settingsSync(keep = null) {
   const md = $$('.smodal').pop(); if (!md) return;
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
-    const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
+    const el = $('#' + id, md); if (!el || el === document.activeElement || el === keep) continue;
     if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'show_done_new' || k === 'side_progress' || k === 'person_colors' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' || k === 'side_count' || k === 'side_dots' || k === 'side_share' ? s[k] !== '0' : s[k] === '1';  // 2.56.1 (#1799): side_*
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
@@ -237,6 +263,7 @@ function integrCardsHtml() {
     ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
     ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h'],
     ...(feat('docs') && typeof dsc_integrHtml === 'function' ? [['download', N_('Scans from your computer'), N_('Folder watcher program for Mac and Windows, scan inboxes'), '#s-scan-h']] : []),  // 2.353.0 B (#2773)
+    ...(feat('docs') && feat('office') && typeof fx_html === 'function' ? [['file', N_('Receipt fetcher'), N_('Invoices from portals like Amazon straight into your office'), '#s-fetch-h']] : []),  // 2.425.0 C (#3453): docfetch.js
     ...(feat('docs') && typeof pl_setHtml === 'function' ? [['file', N_('Documents from Paperless-ngx'), N_('Bring the documents of your Paperless-ngx server into Kalmido'), '#s-pl-h']] : [])];  // 2.87.9 (#1936)
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
@@ -774,9 +801,10 @@ function settingsModal(focus) {
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" name="kalmido-settings-search" data-1p-ignore data-lpignore="true" data-bwignore readonly placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
+    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
@@ -801,6 +829,7 @@ function settingsModal(focus) {
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
+  if (focus === 'fetcher') setTimeout(() => $('#s-fetch-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.425.0 C (#3453)
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
@@ -829,7 +858,7 @@ function settingsModal(focus) {
     const v = setVal(el, d[2]);
     if (v === undefined) { settingsSync(); return; }  // not a valid value: back to what is saved
     if (d[2] === 'time' && el.id === 's-allday' && !v) return;
-    await setApply({[d[0]]: v}, tr(d[1]));
+    await setApply({[d[0]]: v}, tr(d[1]), d[2] === 'chk' || d[2] === 'sel' ? {} : {keep: el});  // 2.359.2 B (#3049): a failed save leaves the typed text
     if (d[0] === 'agent_comments') loadNews().then(render).catch(() => {});  // 2.66.1 (#1943): the bell's number depends on it
     if (d[0] === 'tz' || d[0] === 'time_split_midnight') S.tv.key = '';  // 2.125.0 B (#2120): the time report again
     if (d[0] === 'chat_read_receipts' && typeof teamChanged === 'function') teamChanged();  // 2.139.0 A (#2129): "Read by" comes / goes
@@ -1564,7 +1593,7 @@ const SS_AREA = [
       [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags']], [N_('Custom fields'), ['feld', 'felder', 'field', 'fields']],
       [N_('Scans from your computer'), ['scanner', 'scannen', 'scan', 'wächter', 'watcher', 'download', 'mac', 'windows', 'programm', 'program', 'mail', 'e-mail', 'eingang']]]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Office|area'), name: N_('Settings'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => go('office/settings'), root: '#ofc-set',
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
       [N_('Master data file'), ['stammdaten', 'master data'], '', 'company'],
@@ -1575,6 +1604,7 @@ const SS_AREA = [
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
       [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'tax advisor'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'],
+      [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow'], '#cfs-h', 'packs'],
       [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access']]},

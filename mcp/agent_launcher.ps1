@@ -11,6 +11,9 @@ timezone}. This script runs on the agent's host and applies them:
   - restarts it (fresh session) when the model / auto-compact settings change, when an admin presses "Reset now"
     (reset_seq goes up), once a night at nightly_reset (HH:MM in runtime.timezone), and whenever the command exits by
     itself (after KALMIDO_RESTART_DELAY seconds)
+  - git author (2.396.0, #3386): GIT_AUTHOR_NAME / _EMAIL and GIT_COMMITTER_NAME / _EMAIL from runtime.git_author (a
+    project with a repository may name its own: data.repo.git_author of a task), KALMIDO_GIT_COAUTHOR=1 when the agent
+    should append a Co-Authored-By line; an older server without git_author: nothing is set
   - interim summary (2.233.0, #3189: rotate_size / rotate_runs / rotate_idle_min, sent as rotate_tokens etc.): applied per chat
     conversation by mcp/agent_run.py in --events mode; without --events the command runs one session (not applicable)
 It polls GET /api/v1/agent every KALMIDO_POLL seconds (default 60): one small request, no events are consumed.
@@ -120,7 +123,7 @@ function Fetch {
   } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch { }
-    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false; working = $true; resumes = '-'} }
+    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false; working = $true; resumes = '-'; gname = '-'; gmail = '-'; gco = '0'} }
     if ($code -eq 401) { return [pscustomobject]@{revoked = $true} }
     if ($code) { Log "GET /api/v1/agent: HTTP $code" } else { Log "GET /api/v1/agent: $($_.Exception.Message)" }
     return $null
@@ -136,7 +139,10 @@ function Fetch {
   $ws = if ($a.work_style -and $a.work_style.state) { $a.work_style.state } else { $null }
   $wk = -not ($ws -and $ws.working -eq $false)
   $res = if ($ws -and $ws.work_resumes_at) { if ($ws.work_resumes_at -is [datetime]) { $ws.work_resumes_at.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') } else { [string]$ws.work_resumes_at } } else { '-' }
-  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en; working = $wk; resumes = $res}
+  $gname = '-'; $gmail = '-'  # 2.396.0 (#3386): the git author, '-' = not sent (an older server)
+  if ($rt -and $rt.git_author -and ([string]$rt.git_author -match '^([^<>\t\n]+) <([^<>\s]+)>$')) { $gname = $Matches[1].Trim(); $gmail = $Matches[2] }
+  $gco = if ($rt -and $rt.git_coauthor) { '1' } else { '0' }
+  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en; working = $wk; resumes = $res; gname = $gname; gmail = $gmail; gco = $gco}
 }
 
 # kalmido-capability: host_name
@@ -168,11 +174,15 @@ function Start-Agent($s) {
   if ($s.model -ne '-') { $cmdArgs += @('--model', $s.model) }
   $envs = @()
   if ($s.ac -eq '0') { $envs += 'DISABLE_AUTO_COMPACT=1' } elseif ($s.pct -ne '-') { $envs += "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$($s.pct)" }
+  # kalmido-capability: git_author (2.396.0, #3386): the agent's commits carry the git author set in Kalmido
+  if ($s.gname -and $s.gname -ne '-' -and $s.gmail -and $s.gmail -ne '-') {
+    $envs += @("GIT_AUTHOR_NAME=$($s.gname)", "GIT_AUTHOR_EMAIL=$($s.gmail)", "GIT_COMMITTER_NAME=$($s.gname)", "GIT_COMMITTER_EMAIL=$($s.gmail)", "KALMIDO_GIT_COAUTHOR=$($s.gco)")
+  }
   if ($Once) { Write-Output ("env $($envs -join ' ') $($cmdArgs -join ' ')"); return }
   $acs = if ($s.ac -eq '1') { if ($s.pct -ne '-') { "on at $($s.pct)%" } else { 'on at the default %' } } else { 'off' }
   $mn = if ($s.model -eq '-') { 'default' } else { $s.model }
   Log "starting (fresh session): $($cmdArgs[0]), model $mn, auto-compact $acs"
-  Remove-Item Env:DISABLE_AUTO_COMPACT, Env:CLAUDE_AUTOCOMPACT_PCT_OVERRIDE -ErrorAction SilentlyContinue
+  Remove-Item Env:DISABLE_AUTO_COMPACT, Env:CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, Env:KALMIDO_GIT_COAUTHOR, Env:GIT_AUTHOR_NAME, Env:GIT_AUTHOR_EMAIL, Env:GIT_COMMITTER_NAME, Env:GIT_COMMITTER_EMAIL -ErrorAction SilentlyContinue
   foreach ($e in $envs) { $k, $v = $e -split '=', 2; [Environment]::SetEnvironmentVariable($k, $v, 'Process') }
   # resolve the program (claude is claude.cmd / claude.ps1 on Windows): a .ps1 runs through PowerShell, a .cmd / .bat
   # through cmd.exe
@@ -233,7 +243,7 @@ while ($true) {
 $script:Revoked = $false
 $script:Seq = $s.seq
 if ($Once) { Start-Agent $s; exit 0 }
-$sig = "$($s.model)|$($s.ac)|$($s.pct)"
+$sig = "$($s.model)|$($s.ac)|$($s.pct)|$($s.gname)|$($s.gmail)|$($s.gco)"
 # kalmido-capability: standing_rules (2.235.0, #2903: the active standing rules under the rules block, in mcp/agent_run.py)
 # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
 # false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
@@ -259,9 +269,9 @@ try {
     $script:Revoked = $false
     $why = ''
     if ($n.seq -ne $script:Seq) { $why = "reset now ($($script:Seq) -> $($n.seq))" }
-    if (-not $why -and "$($n.model)|$($n.ac)|$($n.pct)" -ne $sig) { $why = 'runtime settings changed' }
+    if (-not $why -and "$($n.model)|$($n.ac)|$($n.pct)|$($n.gname)|$($n.gmail)|$($n.gco)" -ne $sig) { $why = 'runtime settings changed' }
     if (-not $why -and (Nightly-Due $n)) { $why = "nightly fresh restart ($($n.nightly) $($n.tz))" }
-    $script:Seq = $n.seq; $sig = "$($n.model)|$($n.ac)|$($n.pct)"
+    $script:Seq = $n.seq; $sig = "$($n.model)|$($n.ac)|$($n.pct)|$($n.gname)|$($n.gmail)|$($n.gco)"
     if (-not $n.enabled) {
       if ($script:Proc) { Log 'paused in Kalmido: stopping'; Stop-Agent }
       continue

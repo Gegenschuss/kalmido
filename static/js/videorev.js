@@ -40,8 +40,10 @@ function vdr_listHtml(rows, k, id, add) {
 function vdr_redrawTask(tid) {
   if (S.sel !== tid || typeof renderDetail !== 'function') return;
   const a = document.activeElement, id = a?.id, ss = a?.selectionStart, se = a?.selectionEnd;
+  const v = a && /^(INPUT|TEXTAREA)$/.test(a.tagName) ? a.value : null;
   renderDetail();
   const n = id && document.getElementById(id);
+  if (n && n !== a && v != null && n.value !== v) n.value = v;  // 2.359.2 B (#3049): a field rebuilt meanwhile keeps what was typed (the tag field)
   if (n && n !== document.activeElement) { n.focus({preventScroll: true}); try { if (ss != null) n.setSelectionRange(ss, se); } catch (e) { /* not a text field */ } }
 }
 function vdr_redrawView() { if (S.route.mod === 'clients' && typeof ms_clDraw === 'function') ms_clDraw(); else renderView(); }

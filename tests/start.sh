@@ -85,7 +85,8 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_LOGIN_SLOW_S=${KALMIDO_LOGIN_SLOW_S:-0.3} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
   -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)
-for _ in $(seq 1 60); do
+# START_WAIT_S (#3506): an upgrade from an old dump runs every migration at the first start - it may take longer than 30 s
+for _ in $(seq 1 $(( ${START_WAIT_S:-30} * 2 ))); do
   if curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null; then
     docker exec -d "$NAME" python /data/stub_ntfy.py
     sleep 0.7
@@ -93,6 +94,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 0.5
 done
-echo "test container did not come up" >&2
+echo "test container did not come up (${START_WAIT_S:-30} s)" >&2
 docker logs "$NAME" 2>&1 | tail -20 >&2
+docker top "$NAME" 2>&1 | tail -5 >&2
 exit 1

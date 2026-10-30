@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const FEAT = 'cal,comments,collab,agents';
 
@@ -77,7 +77,8 @@ const FEAT = 'cal,comments,collab,agents';
   click(w, brow().querySelector('[data-oa="edit"]')); await until(() => d.querySelector('.olemd'));
   click(w, em().querySelector('#ole-emo'));
   click(w, em().querySelector('#ole-emogrid [data-licon="kalmido"]'));
-  await until(async () => (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(x => x.id === BT)?.icon);
+  // CI of 2.409.0 (#3506): the name loses its emoji in a second request after the picture (PATCH after PUT icon) - wait for both
+  await until(async () => { const x = (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(y => y.id === BT); return x?.icon && x.name === 'Team Nord'; });
   srv = (await call('GET', `/api/orgs/${ORG}/lists`)).lists.find(x => x.id === BT);
   check(srv.icon === '/static/icon.svg', '#1795: a preset picture is set at once');
   check(srv.name === 'Team Nord', '#1795: the picture takes the emoji out of the name (as in the list dialog) ' + srv.name);

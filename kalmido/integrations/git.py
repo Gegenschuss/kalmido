@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
 from ..core.pg import insert_id
@@ -31,7 +31,7 @@ from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
-from ..agents.core import is_agent
+from ..agents.core import agent_row, agent_runtime, git_author_clean, git_author_str, is_agent
 from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
@@ -298,7 +298,8 @@ def git_public(c, r, manage=False):
          "full_name": f"{r['owner']}/{r['repo']}", "default_branch": r["default_branch"] or None,
          "status": "error" if r["last_error"] and r["last_error"] != "rate" else "ok" if r["polled_at"] else "new",
          "error": git_err_text(r["last_error"]) if r["last_error"] else "", "polled_at": r["polled_at"],
-         "hash_ids": bool(r["hash_ids"]) if "hash_ids" in r.keys() else True}  # 2.390.0 (#3353)
+         "hash_ids": bool(r["hash_ids"]) if "hash_ids" in r.keys() else True,  # 2.390.0 (#3353)
+         "author_name": r["author_name"], "author_email": r["author_email"]}  # 2.396.0 A (#3386): '' = the agent's git author
     if manage:
         d.update(token=bool(r["token"]), hook=bool(r["hook_secret"]), hook_url=f"{PUBLIC_URL.rstrip('/')}/api/hooks/git/{r['id']}")
     return d
@@ -831,18 +832,33 @@ def git_repos_of_lists(c, ids):
     for lid in ids:  # 2.33.0 (#934): own repositories, else the folder's
         for r in conns.get(lid, ()):
             d = pub.get(r["id"]) or pub.setdefault(r["id"], git_public(c, r))  # a folder repository: once, not per list
-            out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder")})
+            out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder",
+                                                              "author_name", "author_email")})  # 2.396.0 A (#3386)
     return out
 
 
-def git_repo_for_task(c, t):
-    """data.repo of an agent's task event / get_task: the list's first repository + branch suggestion + linked code."""
+def git_author_of(c, r, aid=None):
+    """2.396.0 A (#3386): the git author agent aid commits with in repository r: the project's override per part, else the
+    agent's runtime git_author_name / _email, else the neutral default. (author "Name <mail>", co-author flag, source)."""
+    a = agent_row(c, aid) if aid else None
+    rt = agent_runtime(a) if a else {}
+    name, email = r["author_name"] or rt.get("git_author_name"), r["author_email"] or rt.get("git_author_email")
+    src = "project" if r["author_name"] or r["author_email"] else "agent" if a else "default"
+    return git_author_str(name, email), bool(rt.get("git_coauthor")), src
+
+
+def git_repo_for_task(c, t, aid=None):
+    """data.repo of an agent's task event / get_task: the list's first repository + branch suggestion + linked code.
+    aid (2.396.0 A, #3386): the agent it goes to (None = the caller when it is an agent) for its git author."""
     rows = git_conns_of_list(c, t["list_id"])  # 2.33.0 (#934): also a folder repository
     if not rows:
         return None
     first = git_public(c, rows[0])
     code = git_code_for(c, [t["id"]]).get(t["id"], {"prs": [], "commits": []})
     d = {k: first[k] for k in ("provider", "base_url", "web_url", "owner", "repo", "full_name", "default_branch")}
+    if aid is None and has_request_context() and is_agent(getattr(g, "user", None)):
+        aid = me()
+    d["git_author"], d["git_coauthor"], d["git_author_source"] = git_author_of(c, rows[0], aid)  # 2.396.0 A (#3386)
     # 2.126.0 B (#1978): titles and commit messages are written by anyone with access to the repository
     d.update(api_url=git_urls(rows[0]["provider"], rows[0]["base_url"])[0], branch=f"kalmido-{t['id']}",
              prs=[{**x, "origin": "git", "untrusted": True} for x in code["prs"]],
@@ -1063,11 +1079,18 @@ def git_need_conn(c, cid, manage=True):
 @app.patch("/api/repos/<int:cid>")
 def git_update(cid):
     """{token?: "..." | "" (remove), hook?: "on" (new secret, shown once) | "off", hash_ids?: true | false (2.390.0, #3353:
-    a project with a key still reads "#123")}"""
+    a project with a key still reads "#123"), author_name?, author_email? (2.396.0 A, #3386: the git author for AI commits
+    in this repository, '' = the agent's)}"""
     c = db()
     r = git_need_conn(c, cid)
     b = body()
     out = {}
+    if "author_name" in b or "author_email" in b:  # 2.396.0 A (#3386)
+        try:
+            an, am = git_author_clean(b.get("author_name", r["author_name"]), b.get("author_email", r["author_email"]))
+        except BadInput as e:
+            return err(str(e))
+        c.execute("UPDATE git_conns SET author_name=?, author_email=? WHERE id=?", (an, am, cid))
     if "token" in b:
         t = b["token"]
         if t is not None and (not isinstance(t, str) or len(t) > GIT_TOKEN_MAX or any(ch.isspace() for ch in t.strip())):

@@ -19,7 +19,17 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   Below each page, *Linked from* lists the pages that link to it. Renaming a page changes the links to it;
   *Rename folder…* in the menu of a page moves every page of its folder (the links follow as well).
 - **Frontmatter.** A leading block of `key: value` lines between `---` lines is shown as small fields above the text.
-- **Templates.** Pages under `Templates/` are offered as the start of a new page.
+- **Templates.** Pages under `Templates/` are offered as the start of a new page (and in the `/` menu while writing).
+  *2.371:* placeholders are filled in when a page starts from a template: `{{datum}}` (or `{{date}}`) today's date,
+  `{{titel}}` (`{{title}}`) the new page's name, `{{ich}}` (`{{me}}`) your name, `{{cursor}}` the place where writing starts.
+  Other `{{…}}` stay as they are. This happens in the browser, so it works the same in an encrypted space.
+- **Embedding a page (2.371).** `![[Page]]` shows another page of the same space inside this one, `![[Page#Heading]]`
+  only its part from that heading to the next heading of the same level. The embedded text is read only, framed, with its
+  name as a link. Only pages you may read are shown (otherwise *Page not available*); a page that would show itself,
+  embeds deeper than three levels and more than 20 embeds on one page stay a link. `/` > *Embed a page* while writing.
+- **Daily notes (2.371).** *Today* next to *New page* opens the page `journal/YYYY-MM-DD` of the space and creates it
+  when it is missing, from the template `Templates/Tagesnotiz` (or `Templates/Daily note`) when there is one. A daily
+  note shows arrows to the previous and next day that has a note and a date field to jump to any day.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **History (2.123.0).** *History* in the menu of a page lists its saved versions with date and person (saves of one
   person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line
@@ -105,6 +115,34 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   through a public link show the source as code.
 - **Source / Preview** (2.382.0). The formatting bar of the editor has a button that switches between the live preview
   (the page drawn while writing) and the plain Markdown source; the page's "…" menu has the same entry.
+
+- **Tags (2.371).** `#word` in the text (starting with a letter: `#project`, `#customer/north`; `#123` stays a task) or
+  `tags: [a, b]` in the frontmatter tag a page. A tag in the text is a link to its list; the panel has the group *Tags*
+  below the folders (on a phone: below the pages), most used first. Case is ignored. The server keeps no tag in plain text:
+  the word index holds a keyed hash per tag, the names are read from the texts in memory when the list is shown. Routes:
+  `GET /api/wiki/tags?space=` (the tags) and `&tag=` (the pages with it).
+- **Live queries (2.371).** A fenced block with the language `abfrage` (or `query`) shows pages of the same space, fresh on
+  every change. One `key: value` per line, nothing else:
+
+  ````
+  ```abfrage
+  tag: project
+  eigenschaft: status = open
+  sortiere: geändert absteigend
+  als: tabelle
+  spalten: status, owner
+  ```
+  ````
+
+  `tag:` every tag named (several lines: all of them) · `ordner:` (folder) that folder and below · `eigenschaft:`
+  (property) a frontmatter value, without `= ...` the key is enough · `zeige:` (show) `seiten` | `aufgaben` (pages |
+  tasks = the open checkboxes `- [ ] ...` of those pages) · `sortiere:` (sort) `name` | `geändert` | `erstellt` | a key,
+  `absteigend` (desc) after it · `grenze:` (limit) default 50, at most 200 · `als:` (as) `liste` | `tabelle` · `spalten:`
+  (columns) of the table.
+
+  The page with the block and the templates are never listed; a line that is not understood is named below the result. The
+  reader sees only pages they may read (through a share only the shared ones). In an encrypted space the browser runs the
+  query over the pages it opened. Route: `GET /api/wiki/query?page=<id>&q=<the block's text>`.
 
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
 the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.

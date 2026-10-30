@@ -81,7 +81,7 @@ dialog names what moves and what stays before anything changes:
 Rights: the right to work in both offices (travel expenses, templates and framework contracts: the admin of both); out of an organisation only
 its office admin or who created the client / draft - a plain member takes only own drafts along and no copies. Agents
 never move office data. Undo takes the whole move back in one step (copies and a newly created client go again, unless the
-target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|office, ids, to:
+target has used that client since). `POST /api/office/move-space` `{what: clients|drafts|travel|templates|meals|contracts|fixed|vehicles|texts|services|equipment|sets|letters|office, ids, to:
 "private"|"org:<id>", dry, copy_issued}` -> `{notes, block, count, move_id}`; `{undo: move_id}` takes it back.
 
 Further areas (2.356.0): fixed costs, vehicles (with their logbook: drives, change log and closed months - a month closed
@@ -90,6 +90,16 @@ equipment move from their dialog (*Move to another workspace…*, the office adm
 old office still uses (an issued invoice's position, a set, a framework contract) stays there archived and is created anew
 in the target; a fixed cost or vehicle that is used there stays. Links into the old office end (a drive's client / trip,
 a device's receipt / contract, a service's role) and come back with the undo.
+
+More in 2.356.1: a client takes its **deals** along (a deal no longer keeps the client in the old office; a deal in the
+trash stays; its quotation stays linked when it moves along, a quotation that stays and a project of another workspace
+are unlinked). **Letter drafts** move one by one from the letter's menu (*Move to another workspace…*, the office admin
+of both sides); sent letters stay for the retention, the client, contact, template and the linked documents of the draft
+are unlinked. A **set** moves with its devices (`what: sets`); a device another set of the old office (or a booking, a
+receipt or contract link) still uses is copied into the target and stays, the set then names the copy. Every link that
+ends comes back with the undo. **Bank accounts with their transactions and the suppliers** never move one by one (booked
+data, the suppliers are the DATEV creditor accounts of the import): they move only with a whole personal office
+(*Transfer into an organisation*).
 
 **Your own part of an organisation's office into your personal office** (2.356.0, e.g. when you leave an office community):
 Settings of the organisation's office, *Transfer into your personal office…* (its admins only), the same dialog with preview
@@ -162,8 +172,8 @@ filters and the client filter). A document opens in its own area (`#office/invoi
 itself, so links from mails, agents and bookmarks keep working. Both areas use the rights of the office area
 *Quotes & invoices* (no new right). In the sidebar each area is its own tree with its own root folder (`GET
 /api/office/docs/tree` = quotations, `?sec=invoices` = the invoice kinds; folders are made the same way). *New quotation*
-and *Empty invoice* create the draft at once; *Trial document (SAMPLE)* sits in the menu next to *New quotation* and in
-*New invoice*, the one-time hint about trial documents shows in the head of a trial document's editor.
+and *Empty invoice* create the draft at once; trial documents come only from the office test mode (since 2.417.0, #3445:
+the menu entry *Trial document (SAMPLE)* and its one-time hint are gone).
 
 *Since 2.351.0 (#3312, #2823):* **Quotes & invoices**, **Documents**, **Correspondence** and **Receipts** open in the
 sidebar like a list: their arrow shows the area's folders (with subfolders and the documents filed in them), then the 20
@@ -211,6 +221,7 @@ The country pack decides which office functions exist at all; the office admin s
 | Function | Key | Germany (`DE`) | Base pack (`XX`) |
 |---|---|---|---|
 | DATEV: booking batch, document inbox, SKR accounts, travel receipts "in DATEV" | `books.datev` | yes | - |
+| Delivery notes / proofs of service: tab, buttons, number series, closing texts (existing ones stay readable; creating one is `404` while off) | `docs.delivery` | yes | - |
 | E-invoice XML on finalising and mailing (ZUGFeRD / Factur-X, XRechnung) | `docs.einvoice` | yes | ZUGFeRD / Factur-X only |
 | VAT return figures (advance return; filing stays with your tax software) | `books.vat_return` | yes | - |
 | Tax dates as recurring tasks | `books.tax_dates` | yes | - |
@@ -1481,7 +1492,8 @@ document is fixed at creation (no later switch) and:
 
 Every document (detail and list) carries `trial`; `GET /api/office/docs?trial=1|0` filters, the list also answers
 `trial_count` (trial documents + trial documents from templates), `first: {offer, invoice}` (true = no real quotation /
-invoice yet: the dialog shows the hint once per person, setting `trial_hint_seen`) and `office_id`.
+invoice yet) and `office_id`; `GET /api/office/trial` (2.417.0, anyone in the office) answers the same three without the
+documents (the test mode section of the settings).
 `GET /api/office/gen-docs` items carry `trial` too (`?trial=1|0`).
 
 Purchase and surplus (2.47): a new position of a service takes the purchase (`cost`) of the service's freelancer role
@@ -1577,15 +1589,20 @@ A trial document
   "Delete trial document?"). A person without an organisation is the admin of the personal office.
 
 The lists mark trial documents with a small tag "Trial", the editor head as well; documents from templates show the same
-tag. As soon as the office has trial documents, the list gets a filter "All / Real only / Trial only" (kept on this
-device) and admins see the line "Delete all trial documents": after a confirmation that names the number, all trial
-documents of the office go for good, with their payments, share links and stored PDFs. Real documents stay.
+tag. Test mode (2.417.0): trial documents come from one switch, "Test mode" in the office settings (section Documents), per
+person and office (user setting `trial_mode`, a list of office ids); off is the default and colleagues notice nothing of
+it. While it is on, a strip "Test mode - documents get a TEST number and the watermark MUSTER" with "Switch off" sits
+above the office, every new quotation, invoice, delivery note and document from a template is a trial one (also "Add
+invoice" of the command palette), and the list has the filter "All / Real only / Trial only" (kept on this device,
+reset when the test mode goes off) and the line "N trial documents". With the test mode off there is neither; existing
+trial documents keep their tag "Trial". Admins find "Delete all N trial documents" in the same settings section: after a
+confirmation that names the number, all trial documents of the office go for good, with their payments, share links and
+stored PDFs. Real documents stay. "New quotation" / "Empty invoice" always create the draft at once, without a dialog.
 
 A real document cannot be turned into a trial one later, nor the other way round.
 
-The first time someone creates a quotation or an invoice in an office that has no real one yet, the create dialog shows a
-hint about "Just to try". It goes away with its X or with "Create" and does not come back for this person and office
-(user setting `trial_hint_seen`).
+Before 2.417 a hint about "Just to try" showed once per person and office (user setting `trial_hint_seen`, kept but no
+longer read).
 
 ## Finalising
 
@@ -1904,8 +1921,10 @@ PDF (the JSON print model stays at `/render` for the API). In the Android app's 
 the PDF button downloads as before. Archive PDFs of the legacy import open inline, `?download=1` downloads them.
 
 DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
-body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF + XML of an invoice or credit note
-there (`datev_sent_at`). No credentials; the booking batch export follows below. Every send is
+body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF of an invoice or credit note
+there (`datev_sent_at`). 2.434 (#3616): like the mail to the client, a ZUGFeRD invoice goes as the PDF alone (its XML is
+embedded as `factur-x.xml`); an XRechnung gets its XML as its own file next to the PDF. `GET /api/office/docs/<id>/xml`
+and the books ZIP keep the XML for both. No credentials; the booking batch export follows below. Every send is
 in the office log (`send`, `datev`), payments as `payment` / `payment_delete`.
 
 DATEV booking batch (2.47.3, #1460): `GET /api/office/datev/extf?from=YYYY-MM-DD&to=YYYY-MM-DD` (admin; default the
@@ -1973,6 +1992,48 @@ Routes (admin, never agents): `POST /api/office/datev/import/check` and `POST /a
 removed for good after 30 days), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
 is in the office log (`import` / `undo`, target `datev_in`).
 
+### Booking archive: past DATEV years, read-only
+
+*Since 2.414.*
+
+Bookkeeping → **Booking archive** (admins; a personal office: its owner; never agents; needs the DATEV function of the country
+pack) keeps the complete DATEV data of past years in one place - to look things up, not to book. **Read DATEV data** takes
+what the tax advisor exports per year, as single files or one ZIP (also a ZIP inside it):
+
+- **Booking batch** (EXTF / DTVF category 21): **every** line, unchanged - account, counter account, debit / credit (a
+  negative amount is turned to the other side), amount, BU key, document date, receipt fields 1 and 2, booking text,
+  Beleglink and every other column of the line by its name (shown in the booking's details). The year is the fiscal year
+  of the batch header. Lines without a readable amount, debit / credit mark or account are named in the preview and stay
+  only in the original file.
+- **Account labels** (category 20) and **debtors / creditors** (category 16): the labels of the ledger accounts and the
+  names of the person accounts. The debtors / creditors also go through the DATEV import above (clients and suppliers get
+  only their empty fields filled) as a run of their own that the archive run undoes with it.
+- **Receipt images** in the format of the DATEV XML interface (`document.xml` + files): linked to the booking whose
+  Beleglink names their GUID (`BEDI "<GUID>"`); PDF, JPEG, PNG and TIFF.
+
+A preview comes first: per year the number of bookings, the debit and credit sums with the control *debit = credit* (a line
+without counter account makes them differ), what each file is, receipts linked / without booking / missing in the ZIP. The
+same file or the same batch content a second time (also re-exported with other bytes) is recognised and left out. **Take
+over** makes one run; **Undo** per run removes everything of it (the list on the archive page and on the import page).
+
+The archive is a world of its own: nothing flows into the income statement (EÜR), the VAT figures, the tax reserve or the
+cash flow, and nothing can be changed. The page shows per year the bookings (filters: account, counter account, either
+side, period, amount, receipt field, text; 200 per page; the debit / credit sums of the matches), the **sums per account**,
+a booking with all its columns and its receipt, the runs with the original files (download). The original files lie
+unchanged in the office's folder with their SHA-256; texts are encrypted at rest like the other office data. The GoBD
+export (*Datenträgerüberlassung*) takes the archive's lines of the chosen period along (`archive_bookings.csv`,
+`archive_accounts.csv`). Retention: 10 years after the end of the archived year (the receipt images too), then deleted
+for good with the retention switch (`KALMIDO_PURGE_TRASH` / `KALMIDO_RETENTION_PURGE`, run `bookarch`; counted while it is
+off). No tax advice: whether the archive replaces the DATEV data access for the retention, your tax advisor clarifies.
+
+Routes (admin, never agents): `GET /api/office/books/archive` (`{years, runs, note}`), `GET
+/api/office/books/archive/bookings?year=` (filters `account`, `counter`, `any`, `from`, `to`, `min`, `max`, `side`, `doc`,
+`q`; `offset`, `limit` up to 500), `GET /api/office/books/archive/bookings/<id>` (with `raw`), `GET
+/api/office/books/archive/accounts?year=`, `GET /api/office/books/archive/docs/<id>`, `GET /api/office/books/archive/files/<id>`,
+`POST /api/office/books/archive/check` and `POST /api/office/books/archive/import` (multipart `file`, several allowed),
+`POST /api/office/books/archive/runs/<run>/undo`. In the office log: `import` / `undo` (target `bookarch`), opening a receipt
+and downloading an original file.
+
 Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
@@ -2020,11 +2081,16 @@ out with. This applies to organisation offices and to the personal office alike.
   quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
   apply, see attachment." - only when terms exist in the document's language (terms in the other language only: no line,
   no attachment). Replacing the terms later does not change a finalised quotation, its line or its attachment.
-- **Sending**: finalised quotations can be mailed too (status `sent`). The send dialog has the tick *Attach terms and
-  conditions* - ticked for quotations, unticked for invoices, credit notes and reminders - when the document's language
-  has terms. The file goes along as `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send" names the state
-  (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The DATEV copy never
-  carries them.
+- **In the quotation PDF** (2.434, #3619): a quotation that prints the line carries the terms pages behind its own pages
+  wherever its PDF goes out - download, preview, mail, approval link, customer portal, the agent API's draft preview.
+  They are joined on output from the frozen print model; nothing stored changes. Terms that
+  cannot be read as a PDF leave the quotation PDF unchanged (a log line, no error).
+- **Sending**: finalised quotations can be mailed too (status `sent`). A quotation goes out as ONE PDF with the terms
+  inside (the send dialog says so instead of offering a tick); only when the terms cannot be joined they go along as their
+  own file as before; `terms: false` in the send body has no effect for a quotation any more. Invoices, credit notes and reminders have the tick *Attach terms and conditions* (unticked) when the
+  document's language has terms. The own file is named `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send"
+  names the state (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The
+  DATEV copy never carries them.
 - **Approval link**: the customer page of a quotation offers the terms for download next to the PDF
   (`/s/q/<token>/terms`, the same rules as the PDF); the decision record (`signoff_accepted` / `signoff_declined`) names
   the state and the confirmation page says "Terms and conditions as of ...". Contracts and order confirmations made from

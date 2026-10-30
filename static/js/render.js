@@ -112,7 +112,7 @@ function tabItem(id) {
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
   if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
-  if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Projects')};  // 2.24.0 (UX-36): opens the drawer
+  if (id === 'lists') return {id, go: sbb_target('tasks'), icon: ic('list', 'l'), label: tr('Projects'), mod: 'tasks', area: 'tasks'};  // 2.417.0 A (#3559): the page kept in Projects, like the other areas (was: the drawer)
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
   return null;
 }
@@ -153,11 +153,12 @@ function renderTabs() {
   // 2.31.0 (#1057): with "Search" in the tab bar the phone has ONE search: no magnifier in the header, no search field in the
   // drawer and no search button next to it (CSS body.tab-search); without the tab they stay, so search is always reachable
   document.body.classList.toggle('tab-search', shown.some(t => t.id === 'search'));
-  $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
+  // 2.417.0 A (#3559): the tab of the area open now leads to the area's start page (tapping it again)
+  $('#tabs').innerHTML = shown.map(t => tabBtn(t.area && t.area === sbb_area() ? {...t, go: sbb_home(t.area)} : t, t.id === on)).join('') +
     (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
   an_tabs();  // 2.46.1 (#1560): the underline of the tab that became active slides in
 }
-const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"
+const sideOpenDrawer = () => { S.sideToLists = true; $('#top [data-act="side"]')?.click(); };  // 2.24.0 (UX-36): "Lists" in "More"; 2.417.0 A (#3559): the tab opens the page now, this stays for the drawer at Lists
 // 2.31.0 (#1057, audit N5): the drawer opened by the tab "Lists" starts at the group Lists (Plan and Views stay above it)
 function sideToLists() {
   const sd = $('#side'), g = $('#side .sg-lists'); if (!sd || !g) return;
@@ -176,7 +177,7 @@ function tabsMore(anchor) {
   const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, {head: tr('Conversations|nav')}, '-', null];
   const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
   menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.go)}))]);
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.area && t.area === sbb_area() ? sbb_home(t.area) : t.go)}))]);  // 2.417.0 A (#3559)
 }
 function counts() {
   const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, byme: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
@@ -224,7 +225,7 @@ const SIDE_AREA_KEYS = ['office', 'ablage', 'wiki', 'sheets', 'time', 'habits', 
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
 const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload & absences'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
+  ['workload', N_('Workload & absences'), wlShown() /* 2.380.2 (#3407) */], ['office', N_('Office & finance'), officeOn()], ['wiki', N_('Knowledge pages'), feat('wiki')], ['sheets', N_('Tables'), feat('sheets')], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()], ['notes', N_('Notes'), sb_notesShown()]].filter(x => x[2]);
 const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? mg_sideEntry(k) : sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
@@ -308,17 +309,50 @@ const sbc_slots = (cls, tip, ag, pe) => `<span class="${cls} sbc-sl" ${tip ? `ro
 const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 // 2.308.0 (#3273): a redraw of the sidebar (a live update, the office's folders that load later) dropped the keyboard focus on
 // the page: the same button gets it back, like the head bar and the view (keepFocus); a closed phone drawer is left alone
+// 2.417.0 A (#3559): what the sidebar's Projects panel and the start page of Projects (viewProjStart) both show, from one place:
+// the projects of the shown workspace, the folders shown, the Plan rows ([key, html], '' = not shown now)
+const sideLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+// 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
+const sideFolderShown = (lists, x) => wsCur() === 'all' || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
+  ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
+  ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+  ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
+  ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
+  ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
+  ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
+  ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
+// 2.417.0 A (#3559): the start page of Projects (#projects): the views of Plan and the filters, then every project grouped by
+// its folders in the sidebar's order (the same lists, folders and hidden entries as the panel), each row opens its page
+function viewProjStart() {
+  const c = counts(), lists = sideLists(), hid = x => sideHidden(x), cnt = n => rsy_sideCnt() && n || '';
+  const row = (key, icon, name, n) => `<button type="button" class="psrow" data-go="${esc(keyToHash(key))}">${icon}<span class="n">${esc(name)}</span><span class="c">${cnt(n)}</span></button>`;
+  const lrow = l => { const em = !l.icon && leadEmoji(l.name); return row('l:' + l.id, `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`, em ? listName(l.name).slice(em.length).trim() : listName(l.name), c.lists[l.id]); };
+  const grp = (cls, head, body) => body ? `<section class="psg ${cls}"><h2 class="pshead">${head}</h2><div class="psrows">${body}</div></section>` : '';
+  const plan = hid('g:focus') ? '' : sidePlan(row, c, false, '').filter(([x, h]) => h && !hid('e:' + x)).map(([, h]) => h).join('');
+  const fil = hid('g:filters') ? '' : S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join('');
+  const walk = f => [f, ...folderSubs(f).filter(x => sideFolderShown(lists, x)).flatMap(walk)];
+  const folders = folderNames().filter(x => !fParent(x) && sideFolderShown(lists, x)).flatMap(walk);
+  const loose = lists.filter(l => !l.folder).map(lrow).join('');
+  const fhead = f => `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
+  const proj = lists.length || folders.length ? grp('ps-lists', esc(tr('Projects')), loose) + folders.map(f => grp('ps-folder', fhead(f), lists.filter(l => l.folder === f).map(lrow).join('') || `<div class="muted psempty">${esc(tr('empty'))}</div>`)).join('')
+    : `<div class="empty">${ic('list')}${esc(tr('No projects yet'))}<br><button type="button" class="btn pri" data-act="list-new">${ic('plus', 's')}<span>${esc(tr('New project'))}</span></button></div>`;
+  const parts = {focus: grp('ps-plan', esc(tr('Plan|nav')), plan), lists: proj, filters: grp('ps-filters', esc(tr('Filters')), fil)};
+  return `<div class="pstart">${sideGroupOrder().filter(g => g in parts).map(g => parts[g]).join('')}</div>`;  // the sidebar's order of the groups
+}
 function renderSide() { return !isMobile() || $('#side')?.classList.contains('open') ? keepFocus($('#side'), renderSide0) : renderSide0(); }
 function renderSide0() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const sbb = sbb_on(), sbm = !sbb && sbm_on(), sbbArea = sbb || sbm ? sbb_area() : 'tasks', tasksP = sbbArea === 'tasks';  // 2.152.2 (#2622): sidebar B, the panel of the page's area; 2.196.0 A (#2737): sbm = the phone's drawer like it
   const row = (key, icon, name, n, extra = '', after = '') =>
-    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${(rsy_sideCnt() || (key === 'today' && c.over)) && n || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
+    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}"${n?.tip && rsy_sideCnt() ? ` title="${esc(n.tip)}" aria-label="${esc(n.tip)}"` : ''}>${(rsy_sideCnt() || (key === 'today' && c.over)) && (n?.v ?? n) || ''}</span>${after}</button>`;  // 2.56.1 (#1799): counts can be off (red Today stays)
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   // 2.45.0 (#1502): on = a folded group holds the open view (its header shows it, like a folded folder)
   // 2.353.0 B (#2777): with the panel header of sidebar B "Projects" is already said (the phone's drawer has none): the group's own label is read out only (visually hidden)
   const head = (g, label, acts = '', n = '', tip = '', on = false) => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'} ${on ? 'sgon' : ''}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span${g === 'lists' && sbb ? ' class="sr"' : ''}>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}${on ? `<span class="sr"> ${esc(tr('contains the open view'))}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
-  const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
+  const lists = sideLists();
+  // 2.407.0 (#3518): a list / folder shows open/total (5/12) once something in it is done; the hint names both, the open number stays first
+  const sideOD = (open, done) => done ? {v: `${open || 0}/${(open || 0) + done}`, tip: tr('{0} open · {1} done', open || 0, done)} : open;
   sbc_res = false; sbc_res = collab() && rsy_sideShr() && (lists.some(l => l.shared) || folderNames().some(f => folderShrHtml(f)));  // 2.56.0 (#1797)
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
@@ -337,23 +371,22 @@ function renderSide0() {
     // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
     // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
     if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
-    return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
+    return row('l:' + l.id, sw, nmOf(l), sideOD(c.lists[l.id], l.progress?.done), `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}${typeof dx_marked === 'function' && dx_marked(l.id) ? ' data-mark="1"' : ''}${wsc_rowAttr(l)}`, o3c_ring(l, !!pg) + shr + pg);  /* 2.53.0 (#1474): workspace stripe; 2.83.0 C (#1427): progress ring (before the symbol columns, they stay last) */  // 2.47.3 (#1727): + marked
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.352.0 E (#2748): a tree of any depth on the sidebar tree (areas.js sbb_treeHtml): a folder's head, then its body (its own
   // lists, then its subfolders, one level deeper); dragging a folder, its menu and the touch hold are the tree's (sidebar.js
   // lf_tree*), a list keeps its own drag (into a folder's head or body). Open / closed stays foldSet / foldClosed (all devices).
   const fempty = f => `<div class="fempty" data-folder="${esc(f)}">${isMobile() ? tr('empty: assign projects in sort mode') : tr('empty: drag a project here')}</div>`;
-  const wsAll = wsCur() === 'all';
-  // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
-  const fShown = x => wsAll || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
+  const fShown = x => sideFolderShown(lists, x);
   const fnode = f => {
     const fl = lists.filter(l => fUnder(l.folder, f)), closed = foldClosed(f) && !S.listReorder;
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
+    const nd = fl.reduce((a, l) => a + (l.progress?.done || 0), 0);  // 2.407.0 (#3518): the folder sums its lists' done tasks too
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the arrow folds
     const mir = fl.some(l => l.mirrored);  // 2.27.0 (#988): the owner arranges a shared folder
-    const after = (S.listReorder ? '' : `<span class="c" ${n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && n || ''}</span>`)
+    const after = (S.listReorder ? '' : `<span class="c" ${nd && rsy_sideCnt() ? `title="${esc(tr('{0} open · {1} done', n, nd))}" aria-label="${esc(tr('{0} open · {1} done', n, nd))}"` : n && rsy_sideCnt() ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${rsy_sideCnt() && (nd ? `${n}/${n + nd}` : n) || ''}</span>`)
       + (rsy_sideShr() ? folderShrHtml(f) : '')  // 2.41.0 (#1428); 2.56.1 (#1799): can be off
       + `<span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>`
       + (S.listReorder ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
@@ -372,14 +405,7 @@ function renderSide0() {
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
-  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
-    ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
-    ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
-    ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
-    ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
-    ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
-    ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
-    ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
+  const plan = sidePlan(row, c, onTasks, k);
   const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
   const planHiddenRows = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x));
   const planHidden = planHiddenRows.length;
@@ -401,7 +427,7 @@ function renderSide0() {
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
     lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
-    workloadOn() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)
+    wlShown() ? mrow('workload', 'chart', tr('Workload & absences')) : '',  // 2.23.0 (#463)  // 2.380.2 (#3407): not in Private
     officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('wiki') ? mrow('wiki', 'book', tr('Knowledge pages')) : '',  // 2.49.0 (#1199)
     feat('sheets') ? mrow('sheets', 'sheet', tr('Tables')) : '',  // 2.89.0 (#1916)
@@ -512,6 +538,7 @@ function renderTop0() {
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)
   let acts = '';
+  if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri" data-act="list-new" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
@@ -955,6 +982,7 @@ function renderView0() {
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
+  else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
   else if (isMindmap()) setHtml(el, vsegHtml(routeList()) + viewMindmap(routeList()));  // 2.49.0 (#1201)
@@ -980,6 +1008,26 @@ function renderView0() {
 }
 
 // ------------------------------------------------------------------ render: task rows
+// 2.407.0 A (#3513): an agent works on the task (its running job, t.working from the server): a pulsing dot with the name,
+// the time of its last update and its last progress line, in the row / board card and the detail. It fades ttl seconds
+// after that update here as on the server: agwArm redraws once the next one is due (no reload)
+let agwT = 0, agwAt = 0;
+function agwArm(end) {
+  if (agwT && agwAt <= end) return;
+  clearTimeout(agwT); agwAt = end;
+  agwT = setTimeout(() => { agwT = 0; viewSafeRender(); if (S.sel && !$('#detail')?.contains(document.activeElement)) renderDetail(); },
+    Math.min(Math.max(end - Date.now(), 0) + 1000, 2 ** 31 - 1));
+}
+function agwOf(t) {
+  const w = t?.working, at = w ? Date.parse(w.at) : NaN, end = at + (w?.ttl || 900) * 1000;
+  if (!w || !(end > Date.now())) return null;
+  agwArm(end);
+  return [w.name || w.agent || tr('Agent'), fmtTimeLoc(fmtHM(new Date(at))), w.text].filter(Boolean).join(' · ');
+}
+function agwChip(t) {
+  const line = agwOf(t);
+  return line ? `<span class="agw" title="${esc(line)}"><i class="agwd" aria-hidden="true"></i><span class="sr">${esc(tr('Agent working'))}: </span><span class="agwt">${esc(line)}</span></span>` : '';
+}
 function taskRow(t, opts = {}) {
   const kids = S.tasks.size ? children(t.id) : [];
   const openKids = kids.filter(k => k.status === 0).length;
@@ -1013,6 +1061,7 @@ function taskRow(t, opts = {}) {
   if (opts.dwell && !opts.trash) { const d = dw_chip(t, opts.dwell); if (d) meta.push(d); }  // 2.410.0 B (#3515): time in the board column
   if (S.route.key === 'stale' && !opts.trash && staleOf(t) && rs('stale')) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
+  if (!opts.trash && t.working) { const w = agwChip(t); if (w) meta.push(w); }  // 2.407.0 A (#3513)
   if (t.pinned && !opts.trash && rs('pin')) meta.push(`<span class="pinm" title="${esc(tr('Pinned'))}">${ic('pin', 's')}<span class="sr">${tr('Pinned')}</span></span>`);
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list') && !(rsyProjToday() && !opts.trash)) { /* 2.56.1 (#1799): the list is switched off */ }
@@ -1043,7 +1092,7 @@ function taskRow(t, opts = {}) {
   if (t.code?.build && !opts.trash && rs('code')) { const h = buildRowHint(t); if (h) meta.push(h); }  // 2.151.0 A (#2558): stale / only on a branch
   if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
-  const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)
+  const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id) && pz_on(t.list_id, 'who');  // 1.10.0: assignee column (own cell, click = assign); 2.412.0 (#3552): the property
   if (ac) who = whoCell(t);
   else if (lc) { /* 2.14.0: the assignee is a column or not shown */ }
   else if (t.assignee_group_id && collab()) {  // 2.10.0 (#441): assigned to a group
@@ -1067,7 +1116,7 @@ function taskRow(t, opts = {}) {
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
-  const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
+  const work = t.status === 0 && t.id > 0 && ((S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id) || !!agwOf(t));  // 2.407.0 A (#3513): + a working job
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
@@ -1078,7 +1127,7 @@ function taskRow(t, opts = {}) {
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
   // titles with and without a number start at the same x
-  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
+  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num') && pz_on(t.list_id, 'ticket')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
   if (gut) meta.unshift(`<span class="mid" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>`);
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
@@ -1351,19 +1400,21 @@ const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee
   ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')]];
 const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
-  const ok = k => k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
+  // 2.412.0 (#3552): a property the project switched off (props.js) is no column either
+  const ok = k => !pz_on(l, PZ_COL[k] || '') ? false : k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
   return [...COLS.filter(([k]) => ok(k)).map(([k, n]) => [k, tr(n)]), ...fieldsOf(l.id).map(f => ['f:' + f.id, f.name])];
 }
 const colCfg = lid => { const l = listById(lid); return l && Array.isArray(l.columns) ? l.columns : null; };
 function listCols(l) {  // the list's own columns that apply right now, or null (default layout)
   const c = l && colCfg(l.id); if (!c) return null;
-  const av = new Set(['id', ...colChoices(l).map(x => x[0])]);
+  const av = new Set([...(pz_on(l, 'ticket') ? ['id'] : []), ...colChoices(l).map(x => x[0])]);
   return c.filter(k => av.has(k));
 }
 function colDefault(l) {  // what the default layout shows: the starting point of "Columns…"
   const fs = fieldsOf(l.id), all = LS.get('fcols.' + l.id, false);
-  return [...(ticketsOn(l.id) || idsOn(l.id) ? ['id'] : []), 'due', ...(acolOn(l.id) ? ['who'] : []), ...(timeOn() && mtTime(l.id) ? ['time'] : []),  // 2.41.0 (#1471): mtTime
-    ...(all ? fs : fs.filter(f => f.pinned)).map(f => 'f:' + f.id), 'progress', ...(depsOn() && isProject(l.id) ? ['deps'] : []), 'tags'];
+  const on = new Set(colChoices(l).map(x => x[0]));  // 2.412.0 (#3552): only what the project's properties show
+  return [...((ticketsOn(l.id) || idsOn(l.id)) && pz_on(l, 'ticket') ? ['id'] : []), 'due', ...(acolOn(l.id) && on.has('who') ? ['who'] : []), ...(timeOn() && mtTime(l.id) && on.has('time') ? ['time'] : []),  // 2.41.0 (#1471): mtTime
+    ...(all ? fs : fs.filter(f => f.pinned)).map(f => 'f:' + f.id), 'progress', ...(depsOn() && isProject(l.id) && on.has('deps') ? ['deps'] : []), ...(on.has('tags') ? ['tags'] : [])];
 }
 const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + ((S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text') : k);
 const lcOvf = i => [2, 3, 5, 7, 10].filter(n => i >= n).map(n => 'o' + n).join(' ');
@@ -1670,18 +1721,25 @@ function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
 }
-// the chips of the docked composer: what the task will get (a chip set here wins over the text)
+// 2.380.2 (#3403): what the text says (!!!, morgen, ~project) wins over a chip picked before; no word in the text = the chip;
+// a chip picked while the text already named the same thing wins (o.win, until the task is added; the word still leaves the title)
+function qovPick(o, r, d) {
+  const w = o.win || {}, txt = (k, v) => v != null && v !== '' && !w[k];
+  return {due: txt('date', r.due) ? r.due : 'due' in o ? o.due : d.due, list_id: (txt('list', r.list_id) && r.list_id) || o.list_id || d.list_id,
+    priority: txt('prio', r.priority) ? r.priority : 'priority' in o ? o.priority : d.priority ?? 0};
+}
+// the chips of the docked composer: what the task will get
 function qdockChips() {
   const box = $('#qdchips'), inp = $('#qinput'); if (!box || !inp) return;
   if (S.qov?.key !== S.route.key) S.qov = {key: S.route.key};
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
-  const due = 'due' in o ? o.due : r.due || d.due, lid = o.list_id || r.list_id || d.list_id || inbox()?.id, pr = 'priority' in o ? o.priority : r.priority ?? d.priority ?? 0;
+  const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
   const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
-  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
+  box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
-    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
+    `<button type="button" class="qdc set ${o.list_id && q.list_id === o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
+    `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o && q.priority === o.priority ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
   msvvQSync(box);  // 2.73.0 C (#661): "→ Server · List" once another server is linked
 }
 const total0 = groups => groups.some(g => g.tasks.length);
@@ -1718,7 +1776,11 @@ function viewListBody() {
   if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Untouched for {0} days or waiting without a follow-up day. Days can be set per project.', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
   if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Not blocked, started, and due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.25.0 (UX-28): a shopping or packing list gets the tip "Show completed at the bottom" once (was in the tour)
-  if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  // 2.396.0 (#3385): the project dialog has no "Used for" any more: a private list named like a shopping list offers the
+  // shopping mode once (aisles, quantities, ticked at the bottom); a packing list keeps the tip below (only ticked at the bottom)
+  const shopHint = !!rl && !ro && isOwner(rl) && famOn() && !rl.family && !rl.org_id && !rl.is_inbox && !isTracked(rl) && /einkauf|shopping|groceries|courses|compra|spesa|boodschap/i.test(rl.name) && !hintSeen('shop');
+  if (shopHint) h += `<div class="onehint" data-hint="shop">${ic('cart', 's')}<span>${esc(tr('Use as a shopping list? Shopping mode with aisles and amounts, ticked items stay at the bottom.'))}</span><button type="button" class="btn sm" data-act="shop-on" data-id="${rl.id}">${tr('Use as a shopping list')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="shop" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  else if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.31.0 (#1052): grouped by date, "All to today" / "Another day…" sit in the head of "Overdue" (no card of their own)
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
   // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after
@@ -1794,7 +1856,8 @@ function viewListBody() {
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
-  const ls = S.lists.filter(l => l.archived).sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
+  const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
+    (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);

@@ -19,7 +19,7 @@ if (!process.env.P255E_NOSTART) {
 }
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
 const TOKEN = 'lm-secret-token-1234';
 for (const f of ['nl.json', 'nl.log']) { try { fs.unlinkSync(path.join(DATA, f)); } catch { /* none */ } }

@@ -24,7 +24,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
 const change = (w, el) => el.dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -142,8 +142,10 @@ const HEAD = `(() => {
     && w.eval(`agentHst({enabled: true, contact_age: 1, status: 'idle'})`) === 'ready', 'states: error / limit = red, waiting = yellow, paused = grey, idle = green');
   check(w.eval(`hdotsHtml([1,2,3,4,5,6,7].map(i => ({id: i, enabled: true, contact_age: 1, status: 'idle', name: 'A' + i})))`).match(/class="hdot /g).length === 4 && /\+3/.test(w.eval(`hdotsHtml([1,2,3,4,5,6,7].map(i => ({id: i, enabled: true, contact_age: 1, status: 'idle', name: 'A' + i})))`)), 'many agents: 4 dots + "+3"');
   click(w, chip); await sleep(200);
-  const mi = [...d.querySelectorAll('#pop .menu-list button')];
-  check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi.map(x => x.textContent.trim()).join(' | '));
+  // 2.360 (#2786): "Agents and jobs" sits on top, then a divider, then every agent
+  const mi0 = [...d.querySelectorAll('#pop .menu-list button')];
+  const mi = mi0[0] && /Agents and jobs/.test(mi0[0].textContent) ? mi0.slice(1) : mi0;
+  check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi0.map(x => x.textContent.trim()).join(' | '));
   const choose = mi.find(x => /Choose the agents shown/.test(x.textContent));
   check(choose, 'menu: "Choose the agents shown…"');
   click(w, choose); await idle(w);

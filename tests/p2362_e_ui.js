@@ -18,7 +18,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status, status: typeof j.status === 'string' ? j.status : r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'cal,comments,collab,office,clients';
 const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}));
 
@@ -111,7 +111,8 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     await o.nav(B + '#office/settings'); await ready(ev, '#osc-street'); await sleep(600);
     const s = await ev(`(() => { const r = [...document.querySelectorAll('.ofcco input')].map(e => e.getBoundingClientRect()).filter(b => b.width); return {n: r.length, small: r.filter(b => b.height < 24).length, out: r.filter(b => b.right > window.innerWidth + 1).length, wide: document.documentElement.scrollWidth > window.innerWidth + 1}; })()`);
     // 2.99.0 (#2188): + the company's extra address line (osc-address_extra) -> 15 fields
-    check(s && s.n === 15 && s.small === 0 && s.out === 0 && !s.wide, '390: the company fields fit the phone ' + JSON.stringify(s));
+    // 2.408.0 (#3494): + the website (osc-website) -> 16 fields
+    check(s && s.n === 16 && s.small === 0 && s.out === 0 && !s.wide, '390: the company fields fit the phone ' + JSON.stringify(s));
     await ev(`(() => { document.querySelector('#osc-street').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(400);
     await shot('p2362e-390-company.png');
   }, true);

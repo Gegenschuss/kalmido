@@ -20,14 +20,14 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P265B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; } return j; };
-const until = async (fn, n = 50) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(100); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 100 : 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const get = async u => (await fetch(B + u)).text();
 // 2.94.1 (#1929): apptbook.js (booking settings) loads with the calendar module
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
 // 2.235.0 (#2891 #2902 #2903): agentcontrol / agentlock / agentrules = the sections of the agent dialog, same group
 const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
-  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'abdocs'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
+  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs'],  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
   polls: ['polls'], formq: ['formq']};  // 2.102.0 C (#2208): scheduling polls and questionnaires load on demand
 

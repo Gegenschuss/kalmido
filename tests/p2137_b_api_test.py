@@ -270,10 +270,14 @@ r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
 check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{GAM}",)), "2.137.1 (#2399): undo removes the document settings it made")
 check(dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{ORG}",)), "the source's document settings stay")
-left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (GAM,))[0]["n"]
+# 2.352.0 A (#2748): a list is a node of the file store (below the area root "Projects"); the undo puts the lists into the
+# trash (2.272.0 C, restorable), their nodes stay with them
+LFN = "(ref_kind='list' OR id IN (SELECT node_id FROM fs_area_roots WHERE area='lists' AND node_id IS NOT NULL))"
+left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND NOT {LFN}" if t == "fs_nodes" else ""), (GAM,))[0]["n"]
         for t in ("fs_nodes", "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
                   "sheet_files", "video_reviews", "video_versions", "video_comments")}
-check(not any(left.values()), f"undo removes every taken-over row {left}")
+check(not any(left.values()), f"undo removes every taken-over row {left} "
+      f"{[dict(r) for r in dbx('SELECT id, kind, name, parent_id, ref_kind, deleted_at FROM fs_nodes WHERE org_id=?', (GAM,))] if left.get('fs_nodes') else ''}")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "and the versions")
 A.delete(B + f"/api/account/import/{iid}")
 
@@ -309,7 +313,7 @@ fv = one("SELECT id, org_id, owner_id FROM video_reviews WHERE owner_id=?", (FID
 check(fv and fv["org_id"] is None, "freelancer: the sign-off is private")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer: still in no organisation")
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not dbx("SELECT 1 FROM fs_nodes WHERE owner_id=?", (FID,)) and not dbx("SELECT 1 FROM sheets WHERE owner_id=?", (FID,)),
+check(r.ok and not dbx(f"SELECT 1 FROM fs_nodes WHERE owner_id=? AND NOT {LFN}", (FID,)) and not dbx("SELECT 1 FROM sheets WHERE owner_id=?", (FID,)),
       "freelancer: undo removes it again")
 check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"u{FID}",)), "2.137.1 (#2399): freelancer: undo removes the private document settings")
 

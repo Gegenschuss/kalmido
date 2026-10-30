@@ -21,7 +21,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const upload = async (url, files, fields = {}) => { const fd = new FormData(); for (const [k, v] of Object.entries(fields)) fd.append(k, v); for (const [n, b] of files) fd.append('file', new Blob([b], {type: 'text/plain'}), n); const r = await fetch(B + url.replace(/^\//, ''), {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -180,7 +180,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
+  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
+  // rsz after a viewport change: the app's resize handlers wait 150 ms (chatbase.js, agentchat.js), then two frames
+  const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
+  const rsz = async ev => { await sleep(400); await frames(ev); };
+  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const VVSIM = `(() => { const vv = window.visualViewport; window.__kb = {h: null, t: 0};
     Object.defineProperty(vv, 'height', {configurable: true, get: () => window.__kb.h ?? innerHeight});
     Object.defineProperty(vv, 'offsetTop', {configurable: true, get: () => window.__kb.t});
@@ -188,18 +193,18 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     return 1; })()`;
 
   // ---- desktop 1440 / 1920, mouse: N1 side by side, N10 pinned on resize, N2 Tab through the band with live updates
-  for (const vw of [1440, 1920]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  for (const vw of [1440, 1920]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}) === 200, vw + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}});
-    await nav(B + '#l/' + P); await ready(ev);
-    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1200);
+    await nav(B + '#l/' + P); await ready(ev, idle);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     const g = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width)}; }; return {main: r('#main'), det: r('#detail'), chat: r('#achat'), yld: document.body.classList.contains('chat-yield')}; })()`);
     check(g.main && g.det && g.chat && !g.yld && g.det.r <= g.chat.l + 1 && g.det.l - g.main.r <= 2 && g.main.w >= 318,  /* 2.209.0 (#2772): short of room the list shrinks to 320 px before the sidebar floats */ `${vw} N1: list | task | chat side by side, nothing under the chat, no gap ` + JSON.stringify(g));
     await shot(`p2132-${vw}-list-task-chat.png`);
     // N10: the panel stays at the bottom when the window gets lower
     await ev(`(() => { closeDetail(); const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(400);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 560}}); await sleep(900);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 560}}); await rsz(ev);
     const pb = await ev(`(() => { const b = document.querySelector('#chat-msgs'); return {gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight), h: b.clientHeight}; })()`);
     check(pb.gap <= 4, `${vw} N10: the chat panel stays at the bottom when the window gets lower ` + JSON.stringify(pb));
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}}); await sleep(600);
@@ -208,19 +213,19 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // N1 at 1100: 2.290.0 C (#3163): with a task open below 1200 px the sidebar's panel folds into the drawer, so list | task |
     // chat fit side by side again (the list keeps its 320 px)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1100, height: 800}}); await sleep(500);
-    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1000);
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1000);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     const g11 = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width)}; }; return {main: r('#main'), det: r('#detail'), chat: r('#achat'), yld: document.body.classList.contains('chat-yield')}; })()`);
     check(g11.yld || (g11.main && g11.det && g11.chat && g11.det.r <= g11.chat.l + 1 && g11.main.w >= 318), '1100 N1: list | task | chat side by side (the panel folded) or the task in the chat\'s place ' + JSON.stringify(g11));
     await ev(`(() => { closeDetail(); chatClose(); return 1; })()`); await sleep(400);
     // N1 at 1000: no room for all three: the task replaces the chat, its chat button brings the chat back
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 800}}); await sleep(500);
-    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1000);
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1000);
+    await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     const y = await ev(`(() => { const c = document.querySelector('#achat'), b = document.querySelector('#detail .dchatb'), d = document.querySelector('#detail').getBoundingClientRect(); return {yld: document.body.classList.contains('chat-yield'), chatHidden: getComputedStyle(c).display === 'none', btn: !!b && getComputedStyle(b).display !== 'none', detR: Math.round(d.right), vw: innerWidth}; })()`);
     check(y.yld && y.chatHidden && y.btn && y.detR <= y.vw + 1, '1000 N1: the task takes the chat\'s place, the chat button is in its header ' + JSON.stringify(y));
     await shot('p2132-1000-task-instead-of-chat.png');
-    await ev(`(() => { document.querySelector('#detail .dchatb').click(); return 1; })()`); await sleep(700);
+    await ev(`(() => { document.querySelector('#detail .dchatb').click(); return 1; })()`); await settle(ev, idle);
     const y2 = await ev(`(() => ({sel: S.sel, chat: getComputedStyle(document.querySelector('#achat')).display !== 'none', focus: document.activeElement?.id}))()`);
     check(!y2.sel && y2.chat && y2.focus === 'chat-in', '1000 N1: back to the chat, its box has the focus ' + JSON.stringify(y2));
     await ev(`(() => { chatClose(); return 1; })()`);
@@ -228,7 +233,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // N2: Tab through the agent band while the agent's status changes (live re-renders): the focus walks on. 2.31.0
     // (#1052): Today shows the band only when something needs me, so this runs in the project list (band always there)
     const J2 = (await tcall('POST', '/agent/jobs', TOK, {title: 'Approve me', state: 'waiting'})).id;
-    await nav(B + '#l/' + P); await ready(ev); await sleep(800);
+    await nav(B + '#l/' + P); await ready(ev, idle);
     await ev(`(() => { document.querySelector('#view .agband .agb-tog').focus(); return 1; })()`);
     const seen = [];
     const id = () => ev(`(() => { const a = document.activeElement; return a ? (a.dataset.act || a.id || a.tagName) + ':' + (a.dataset.jid || a.dataset.aid || '') + ':' + [...document.querySelectorAll('button, a, input')].indexOf(a) : '-'; })()`);
@@ -242,8 +247,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await tcall('PATCH', `/agent/jobs/${J2}`, TOK, {state: 'done'});
     await tcall('PUT', '/agent/status', TOK, {status: 'idle'});
     // F1: Kanban cards of a long column never run into each other
-    await nav(B + '#l/' + P); await ready(ev);
-    await ev(`setListView(listById(${P}), 'kanban').then(() => 1)`); await sleep(1200);
+    await nav(B + '#l/' + P); await ready(ev, idle);
+    await ev(`setListView(listById(${P}), 'kanban').then(() => 1)`); await settle(ev, idle);
     const ov = await ev(`(() => { const col = document.querySelector('#view .kcol .kcards'); const r = [...col.children].map(x => x.getBoundingClientRect()); let bad = 0; for (let i = 1; i < r.length; i++) if (r[i].top < r[i - 1].bottom - 1) bad++; return {n: r.length, bad, two: r.some(x => x.height > 50)}; })()`);
     check(ov.n >= 20 && ov.bad === 0, 'F1: Kanban: cards of a long column do not overlap ' + JSON.stringify(ov));
     await shot('p2132-1440-kanban.png');
@@ -252,46 +257,46 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ---- Fold 904 touch, dark, French: N3 fold / unfold with a half-typed quick add, F3 matrix at 904 x 680, F2 numbers
   await call('PATCH', '/api/settings', {lang: 'fr'});
-  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     check(await ffLogin({ev, nav}, 'dark', {[`tasks.ids.${P}`]: 'true'}) === 200, 'Fold: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
-    await nav(B + '#today'); await ready(ev);
+    await nav(B + '#today'); await ready(ev, idle);
     const q0 = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return false; q.focus(); q.value = 'Half typed task'; q.dispatchEvent(new Event('input', {bubbles: true})); q.setSelectionRange(4, 4); return true; })()`);
     check(q0, 'Fold 904: the "Add task" box is there');
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await sleep(1200);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await rsz(ev);
     const q1 = await ev(`(() => { const s = document.querySelector('#qsheet'); return {sheet: !!s, val: s && s.value, focus: document.activeElement?.id, caret: s && s.selectionStart}; })()`);
     check(q1.sheet && q1.val === 'Half typed task' && q1.focus === 'qsheet', 'N3: folding: the half-typed text moves into the phone\'s quick sheet with the focus ' + JSON.stringify(q1));
     await shot('p2132-fold-folded-quick.png');
     await ev(`(() => { const s = document.querySelector('#qsheet'); s.value += ' and more'; s.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await sleep(1200);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await rsz(ev);
     const q2 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet'), focus: document.activeElement?.id}; })()`);
     check(q2.val === 'Half typed task and more' && !q2.sheet && q2.focus === 'qinput', 'N3: unfolding: the text is back in the box, the sheet closed, focus kept ' + JSON.stringify(q2));
     await ev(`(() => { const q = document.querySelector('#qinput'); q.value = ''; q.blur(); return 1; })()`);
     // N3 inside the phone layout: a tablet / Fold portrait (720 px, docked box) folded to 390 never crosses 767 px (2.364.0 #3040: the computer layout from 768 px, was 880)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await sleep(900);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev);
     const q3 = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return false; q.focus(); q.value = 'Docked draft'; q.dispatchEvent(new Event('input', {bubbles: true})); return true; })()`);
     if (q3) {
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await sleep(1200);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await rsz(ev);
       const q4 = await ev(`(() => { const s = document.querySelector('#qsheet'); return {sheet: !!s, val: s && s.value, focus: document.activeElement?.id}; })()`);
       check(q4.sheet && q4.val === 'Docked draft' && q4.focus === 'qsheet', 'N3: 720 (docked box) -> 390: the text moves into the quick sheet ' + JSON.stringify(q4));
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await sleep(1200);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev);
       const q5 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet')}; })()`);
       check(q5.val === 'Docked draft' && !q5.sheet, 'N3: 390 -> 720: back in the docked box ' + JSON.stringify(q5));
       // a keyboard (only the height changes) never moves it
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 500}}); await sleep(900);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 500}}); await rsz(ev);
       check(!(await ev(`!!document.querySelector('#qsheet')`)), 'N3: a keyboard (height only) never moves the text into the sheet');
       await ev(`(() => { const q = document.querySelector('#qinput'); if (q) { q.value = ''; q.blur(); } return 1; })()`);
     } else console.log('p2132_ui: no docked box at 720 x 904 (viewport rule), 720 -> 390 part skipped');
     // F3: the matrix at 904 x 680 in French: all quadrants on screen, no horizontal scroll
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 680}});
-    await nav(B + '#matrix'); await ready(ev); await sleep(500);
+    await nav(B + '#matrix'); await ready(ev, idle);
     const mx = await ev(`(() => { const v = document.querySelector('#view'), q = [...document.querySelectorAll('#view .quad')].map(x => x.getBoundingClientRect()); const vr = v.getBoundingClientRect(); return {n: q.length, over: v.scrollWidth - v.clientWidth, right: Math.round(Math.max(...q.map(x => x.right))), vr: Math.round(vr.right)}; })()`);
     check(mx.n === 4 && mx.over <= 1 && mx.right <= mx.vr, 'F3: matrix 904 x 680 (fr): the quadrants fit, no horizontal scroll ' + JSON.stringify(mx));
     await shot('p2132-fold-matrix-fr.png');
     // F2: the task number in a Kanban card is a compact label, not a 3rem column
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
-    await nav(B + '#l/' + P); await ready(ev);
-    await ev(`setListView(listById(${P}), 'kanban').then(() => 1)`); await sleep(1000);
+    await nav(B + '#l/' + P); await ready(ev, idle);
+    await ev(`setListView(listById(${P}), 'kanban').then(() => 1)`); await settle(ev, idle);
     const gw = await ev(`(() => { const g = document.querySelector('#view .kcards .tgut'); if (!g) return null; const r = g.getBoundingClientRect(), t = g.parentElement.querySelector('.tmain, .ttl').getBoundingClientRect(); return {w: Math.round(r.width), gap: Math.round(t.left - r.right)}; })()`);
     check(gw && gw.w < 40 && gw.gap <= 12, 'F2: the number in a card is compact ' + JSON.stringify(gw));
     await ev(`setListView(listById(${P}), 'list').then(() => 1)`); await sleep(300);
@@ -301,13 +306,13 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await call('PATCH', '/api/settings', {chat_kbd_agent: false});  // 2.351.1: N9 is the switch off (2.235.0 D, #2899: phones close the keyboard after sending by default)
   // ---- phones 390 / 428 touch, German: N8 iOS keyboard pushes the page, N9 pill + Send keep the keyboard, F8, F11, F13,
   // helper texts, N5 round circles at 75 %
-  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     const vh = vw === 390 ? 844 : 926;
     check(await ffLogin({ev, nav}) === 200, vw + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     const tap = (x, y) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
-    await nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
+    await nav(B + '#agents/' + AG); await ready(ev, idle);
     await ev(VVSIM);
     const ci = await rect('#chat-in'); await tap(ci.x, ci.y); await sleep(300);
     await ev(`__setKb(${Math.round(vh * .6)}, 260)`); await sleep(700);
@@ -324,15 +329,24 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const pl = await rect('#chat-new'); await tap(pl.x, pl.y); await sleep(400);
     check(await ev(`document.activeElement.id`) === 'chat-in', `${vw} N9: a tap on "New message ↓" keeps the keyboard (focus in the box)`);
     await ev(`(() => { const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Hello'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
-    const sb = await rect('[data-act="chat-send"]'); await tap(sb.x, sb.y); await sleep(1500);
-    const af = await ev(`(() => ({focus: document.activeElement.id, val: document.querySelector('#chat-in').value, last: [...document.querySelectorAll('#chat-msgs .cmsg.me')].pop()?.textContent || ''}))()`);
-    check(af.focus === 'chat-in' && af.val === '' && /Hello/.test(af.last), `${vw} N9: Send sends and keeps the keyboard ` + JSON.stringify(af));
+    const sb = await rect('[data-act="chat-send"]'); await tap(sb.x, sb.y); await settle(ev, idle);
+    // 2.358.0 C (#2782): until the sent state is there instead of 1.5 s
+    const AF = `(() => ({focus: document.activeElement.id, val: document.querySelector('#chat-in').value, last: [...document.querySelectorAll('#chat-msgs .cmsg.me')].pop()?.textContent || ''}))()`;
+    // Sammelzug 2.376: the switch is off for this test (2.351.1, PATCH chat_kbd_agent above), so Send keeps the keyboard; the
+    // default (on, the keyboard closes) needs a touch device - isTouch() is false in this browser
+    let af = await until(async () => { const x = await ev(AF); return x.focus === 'chat-in' && x.val === '' && /Hello/.test(x.last) && x; }) || await ev(AF);
+    check(af.focus === 'chat-in' && af.val === '' && /Hello/.test(af.last), `${vw} N9: Send sends and keeps the keyboard (switch off) ` + JSON.stringify(af));
+    // ... and again with the setting off in the page as well (N9)
+    await ev(`(() => { S.settings.chat_kbd_agent = '0'; const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Hello again'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    const sb2 = await rect('[data-act="chat-send"]'); await tap(sb2.x, sb2.y); await settle(ev, idle);
+    af = await until(async () => { const x = await ev(AF); return x.focus === 'chat-in' && x.val === '' && /Hello again/.test(x.last) && x; }) || await ev(AF);
+    check(af.focus === 'chat-in' && af.val === '' && /Hello again/.test(af.last), `${vw} N9: with "close the keyboard" off Send sends and keeps the keyboard ` + JSON.stringify(af));
     await ev(`(() => { document.activeElement.blur(); __setKb(null, 0); return 1; })()`); await sleep(500);
     check(!(await ev(`document.querySelector('.chview').classList.contains('vvfix')`)), `${vw} N8: keyboard down: the chat is back in the page`);
     if (vw !== 390) return;
     // F8: offline while a task is open: said in the task's header
-    await nav(B + '#l/' + P); await ready(ev);
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(900);
+    await nav(B + '#l/' + P); await ready(ev, idle);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     // offline for the app (the 4 s change check must not switch it back to online in between)
     await ev(`(() => { Object.defineProperty(OUT, 'online', {configurable: true, get: () => false, set() {}}); staleDraw(); return 1; })()`); await sleep(200);
     const of = await ev(`(() => { const s = document.querySelector('#stale'); const r = s && s.getBoundingClientRect(); return {inHead: !!s && !!s.closest('#detail .dtop'), vis: !!r && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight, txt: s ? s.textContent : ''}; })()`);
@@ -346,7 +360,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
       const w = document.createElement('button'); w.className = 'whob'; document.body.appendChild(w); const a = getComputedStyle(w, '::after'); const ins = parseFloat(a.top); w.remove(); return {stpill: h, whob: ins}; })()`);
     check(t11.stpill >= 43.5 && t11.whob <= -9.5, '390 F11: "Set status" 44 px high, assignee pictures with a 44 px hit area ' + JSON.stringify(t11));
     // F13 + helper texts: Settings on the phone
-    await ev(`(() => { settingsModal('integr'); return 1; })()`); await sleep(1200);
+    await ev(`(() => { settingsModal('integr'); return 1; })()`); await settle(ev, idle);
     // 2.32.0 (#1060) replaces F13: inside an area a phone shows no strip of area tabs (and so no "More ›"); ‹ goes back to the
     // list of areas, the header names the area
     const sn = await ev(`(() => { const b = document.querySelector('.snmore'), n = document.querySelector('.smodal .snav'); return {more: !!b && getComputedStyle(b).display !== 'none', nav: getComputedStyle(n).display, back: getComputedStyle(document.querySelector('.smodal .sback')).display, h: document.querySelector('.smodal .shdr h3').textContent}; })()`);
@@ -357,7 +371,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const ni = await ev(CNT);
     check(ni <= 4, '390 helper texts: Integrations has at most 4 inline texts (was 9): ' + ni);
     await shot('p2132-390-settings-integr.png');
-    await ev(`(() => { document.querySelector('.snav [data-sec="users"]').click(); return 1; })()`); await sleep(1500);
+    await ev(`(() => { document.querySelector('.snav [data-sec="users"]').click(); return 1; })()`); await settle(ev, idle);
     const nu = await ev(CNT);
     check(nu <= 4, '390 helper texts: Administration has at most 4 inline texts (was 8): ' + nu);
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);

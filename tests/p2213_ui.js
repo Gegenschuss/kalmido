@@ -5,7 +5,7 @@
 //   ONE plus; Send is a round icon button without text (its name stays in aria-label)
 // - the plus opens a menu with the tools as labelled rows (44 px high, inside the window), a second tap, a tap elsewhere,
 //   a chosen tool and Esc close it; the attach row still opens the file picker
-// - while the agent works: Stop (round, 44 px) takes Send's place as long as the box is empty, typed text brings Send back
+// - (2.411.0 #3446: Stop is no button in the box any more, it is the first entry of the header's ⋯ menu)
 // - the voice message bar covers the whole team chat row (not the plus menu)
 // - desktop 1280 px: the chat panel: icon Send, the box >= 60 % (2.350.0 #2793; before: Send with its text)
 const fs = require('fs');
@@ -116,18 +116,12 @@ window.__menu = sel => { const c = document.querySelector(sel), m = c?.querySele
       await ev(`(() => { window.__picked = 0; const f = document.querySelector('#chat-file'); f.click = () => { window.__picked++; }; return 1; })()`);
       await tap(ev, '.chcomp:has(#chat-in) .chtools [data-act="chat-attach"]');
       check(await ev(`window.__picked`) === 1 && !(await ev(`__menu('.chcomp:has(#chat-in)')`)).open, `${w}: the attach row opens the file picker and closes the menu`);
-      // while the agent works: Stop at the left edge (2.290.0 B #3146), Send stays
-      await ev(`(() => { const b = document.querySelector('#chat-stop'); b.hidden = false; return 1; })()`);
-      m = await ev(`__row('.chcomp:has(#chat-in)')`);
-      const st = await ev(`(() => { const b = document.querySelector('#chat-stop').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })()`);
-      // 2.290.0 B (#3146): Stop sits at the left edge, Send stays; the box needs a little less room share
-      check(m && m.send && st[0] >= 43.5 && st[1] >= 43.5 && m.ratio >= 0.45, `${w}: working: Stop (44 px) at the left, Send stays, the box >= 45 % ` + JSON.stringify({m, st}));
-      await shot(`p2213-${w}-agent-working.png`);
+      // 2.411.0 (#3446): Stop is no button in the box any more (the first entry of the header's ⋯ menu); typed text keeps Send
+      check(!(await ev(`!!document.querySelector('#chat-stop, .chcomp .chstop')`)), `${w}: no Stop button in the box (#3446)`);
       await setVal(ev, '#chat-in', 'one more thing');
       m = await ev(`__row('.chcomp:has(#chat-in)')`);
-      check(m && m.send && !m.small.length && !m.out.length, `${w}: working + typed: Send back beside Stop ` + JSON.stringify(m));
+      check(m && m.send && !m.small.length && !m.out.length, `${w}: typed: Send stays, nothing small or outside ` + JSON.stringify(m));
       await setVal(ev, '#chat-in', '');
-      await ev(`(() => { document.querySelector('#chat-stop').hidden = true; return 1; })()`);
 
       // ================= team chat
       await nav(B + '#team/' + RID);

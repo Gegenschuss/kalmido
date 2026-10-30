@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces'}});  // KMT_NOSTART=1: a running app
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const ptr = (w, el, type, extra = {}) => {  // jsdom has no PointerEvent: a MouseEvent with pointerType
   const e = new w.MouseEvent(type, {bubbles: true, cancelable: true, button: 0, clientX: 10, clientY: 10});
   Object.defineProperty(e, 'pointerType', {value: extra.pointerType || 'mouse'}); el.dispatchEvent(e);
@@ -91,7 +91,10 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   const card = d.querySelector('#view .msclcard');
   check(/Client/.test(card.querySelector('.mstag-cl')?.textContent || '') && card.querySelector('.mscav'), '#1734: the card carries the tag Client and the briefcase');
   check(/Hourly rate/.test(card.textContent) && /90/.test(card.textContent) && /20 h/.test(card.textContent) && /Max Example/.test(card.querySelector('.msclks')?.textContent || ''), '#1734: rate, budget, contact persons on the card');
-  check(!!card.querySelector('[data-act="client-edit"]') && !!card.querySelector('.cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
+  // 2.435.0 (#3600): the block Time tracking starts folded: open it at its title (kept per person)
+  card.querySelector('[data-mscl="fold"][data-k="month"]')?.click();
+  await until(() => d.querySelector('#view .msclcard .cldetail .sttiles'), 40);
+  check(!!d.querySelector('#view .msclcard [data-act="client-edit"]') && !!d.querySelector('#view .msclcard .cldetail .sttiles'), '#1734: Edit (the full dialog) and the hours on the card');
   // search
   typeIn(w, d.querySelector('#mscl-q'), 'beta'); await sleep(250);
   check(d.querySelectorAll('#view .msclients .ctrow').length === 1, '#1734: the search narrows the list');

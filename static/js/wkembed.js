@@ -35,8 +35,8 @@ async function wem_ask(p) {
     Object.assign(w.files, r.files || {}); Object.assign(w.links, r.links || {});
   } catch { /* offline / no access: everything stays a placeholder */ }
   files.forEach(id => w.got.add('f' + id)); links.forEach(x => w.got.add('l' + x.toLowerCase()));
-  if (S.route.mod === 'wiki' && WK.pg === p && !WK.edit) viewSafeRender();
-  else if (WK.pg === p && WK.edit && typeof wklv_redraw === 'function') wklv_redraw();  // 2.350.0 B (#3147): the live preview's blocks
+  if (S.route.mod === 'wiki' && (WK.pg === p || p._emb) && !WK.edit) viewSafeRender();  // 2.371.2 (#3151): + an embedded page
+  else if ((WK.pg === p || p._emb) && WK.edit && typeof wklv_redraw === 'function') wklv_redraw();  // 2.350.0 B (#3147): the live preview's blocks
 }
 // ---- rendering (wiki.js wk_render: wem_cut before the Markdown, wem_put after it, wem_link for [[datei:…]] / [[tabelle:…]])
 const wem_cut = (src, out) => src.replace(WEM_EMBED_RE, (_, bang, label, id) => { out.push({img: !!bang, label, id}); return `⁣WEM${out.length - 1}⁣`; });
@@ -85,6 +85,7 @@ function wem_cbAll(body) {
 const wem_mayTick = p => WK.idx[p.space]?.mayWrite !== false;  // the page's own rule for "Edit" (wiki.js wk_pageHtml)
 const wem_tidDone = L => !!L.tid && taskById(L.tid)?.status === 2;
 function wem_tickHtml(p, h) {
+  if (p._emb) return h;  // 2.371.2 (#3151): an embedded page stays read only (its ticks would count the other page's lines)
   const all = wem_cbAll(p.body), re = /<li class="cb (?:on)?">(<input type="checkbox" disabled ?(?:checked)?>)/g;
   if (!all.length || (h.match(re) || []).length !== all.length) return h;  // the drawing does not match the text: stays read only
   const may = wem_mayTick(p);
@@ -141,7 +142,7 @@ document.addEventListener('contextmenu', e => {
 });
 const wem_mayTask = p => WK.idx[p.space]?.mayWrite !== false && S.me?.kind !== 'agent' && typeof createTask === 'function';
 function wem_cbHtml(p, h) {
-  if (!wem_mayTask(p)) return h;
+  if (!wem_mayTask(p) || p._emb) return h;  // 2.371.2 (#3151): not in an embedded page
   const ls = wem_cbLines(p.body), n = (h.match(/<li class="cb ">/g) || []).length;
   if (!ls.length || n !== ls.length) return h;  // the drawing does not match the text (a table, a quote): no buttons
   let k = 0;
@@ -426,3 +427,59 @@ document.addEventListener('drop', e => {
   const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length) return;
   e.preventDefault(); wem_upload(WK.pg, fs);
 });
+// ---- 2.371.2 (#3151): ![[Page]] / ![[Page#Heading]] shows another page of the same space (or its part from that heading to
+// the next heading of the same level) inside this one, read only. Only pages of the space's index count (what the reader
+// sees there), the text comes from the page's own route (GET /api/wiki/pages/<id>, its rights; a locked space opens it
+// here): one may not see it = "Page not available". A page shown inside itself, deeper than WEM_PG_DEPTH or more than
+// WEM_PG_MAX embeds in one page stay a link. ![[pic.png]] of an import that found no file is looked up as a page.
+const WEM_PG = new Map(), WEM_PG_DEPTH = 3, WEM_PG_MAX = 20;
+/** @param {number} id */
+function wem_pgLoad(id) {
+  const x = WEM_PG.get(id) || {p: null, v: -1, err: '', busy: false, parts: {}};
+  WEM_PG.set(id, x);
+  if (x.busy || x.v === S.v) return x;
+  x.busy = true;
+  (async () => {
+    try {
+      let q; try { q = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(q); }
+      catch (e) { if (!(e instanceof Offline) || !(q = await wko_page(id))) throw e; }  // offline: the page from the copy (wiki.js wk_loadPage)
+      q._emb = true; x.p = q; x.parts = {}; x.err = '';
+    } catch (e) { x.p = null; x.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : tr('Page not available'); }
+    finally { x.v = S.v; x.busy = false; }
+    if (S.route.mod !== 'wiki') return;
+    if (!WK.edit) viewSafeRender(); else if (typeof wklv_redraw === 'function') wklv_redraw();
+  })();
+  return x;
+}
+// the part of a text from the heading "head" (case ignored) to the next heading of the same or a higher level; null = none
+/** @param {string} body @param {string} head */
+function wem_pgPart(body, head) {
+  const ls = String(body || '').split(/\r?\n/), want = head.trim().toLowerCase();
+  let fence = false, from = -1, lvl = 0;
+  for (let i = 0; i < ls.length; i++) {
+    if (/^\s{0,3}(`{3,}|~{3,})/.test(ls[i])) { fence = !fence; continue; }
+    const m = fence ? null : /^\s{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(ls[i]); if (!m) continue;
+    if (from >= 0 && m[1].length <= lvl) return ls.slice(from, i).join('\n');
+    if (from < 0 && m[2].trim().toLowerCase() === want) { from = i; lvl = m[1].length; }
+  }
+  return from >= 0 ? ls.slice(from).join('\n') : null;
+}
+/** @param {any} p the page that embeds @param {{path: string, part: string, label: string, pg: any}} e @param {any} ctx */
+function wem_pgHtml(p, e, ctx) {
+  const pg = e.pg, name = e.label || (pg ? wk_base(pg.path) : e.path) + (e.part ? ' › ' + e.part : '');
+  const box = (inner, cls = '') => `<section class="wempg ${cls}" aria-label="${esc(name)}"><div class="wempgh">${pg ? `<a href="#wiki/${pg.id}" class="wklink">${ic('note', 's')}<span>${esc(name)}</span></a>` : `<span>${ic('note', 's')}<span>${esc(name)}</span></span>`}</div>${inner}</section>`;
+  const note = t => box(`<p class="muted wempgn">${esc(t)}</p>`, 'wempgna');
+  if (!pg) return note(tr('Page not available'));
+  ctx.n = (ctx.n || 0) + 1;
+  if (ctx.seen.has(pg.id)) return note(tr('This page is already shown here.'));
+  if (ctx.d >= WEM_PG_DEPTH || ctx.n > WEM_PG_MAX) return box('', 'wempgl');
+  const x = wem_pgLoad(pg.id);
+  if (!x.p) return note(x.v === -1 || x.busy && !x.err ? tr('Loading…') : x.err);
+  if (x.p._wke) return note(tr('Page not available'));  // a locked space not opened here
+  const k = e.part.trim().toLowerCase();
+  if (!(k in x.parts)) { const b = k ? wem_pgPart(wk_bodyStrip(x.p.body), e.part) : wk_bodyStrip(x.p.body); x.parts[k] = b == null ? null : Object.assign({}, x.p, {body: b, _emb: true}); }
+  const q = x.parts[k];
+  if (!q) return note(tr('Section not found: {0}', e.part));
+  if (!q.body.trim()) return note(tr('Empty page.'));
+  return box(`<div class="wempgb">${wk_render(q, {seen: new Set([...ctx.seen, pg.id]), d: ctx.d + 1})}</div>`);
+}

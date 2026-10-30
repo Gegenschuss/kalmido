@@ -33,7 +33,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 DBF = os.path.join(DATA, "tasks.db")
-from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def sha(p):
@@ -92,13 +92,6 @@ def psql(sql):
 
 def tables():
     return int(psql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'") or 0)
-
-
-def sess(user="alice", pw="password123"):
-    s = requests.Session()
-    s.headers.update(H)
-    r = s.post(B + "/api/auth/login", json={"username": user, "password": pw})
-    return s if r.ok and r.json().get("ok") else None
 
 
 def report():
@@ -185,7 +178,7 @@ check(meta.get("sha256") == hb, "(b) kalmido_meta.sqlite_migrated knows the file
 check(psql("SELECT is_identity FROM information_schema.columns WHERE table_name='list_members' AND column_name='id'") == "YES"
       and psql("SELECT COUNT(DISTINCT id) FROM list_members") == str(want["list_members"]), "(b) list_members.id assigned")
 nid = psql("SELECT MAX(id) FROM tasks")
-A = sess()
+A = sess("alice", soft=True, json_ok=True)
 check(A is not None, "(b) alice signs in with her old password")
 if A:
     r = A.get(B + "/api/state")
@@ -214,7 +207,7 @@ if A:
 # ================================================================== (d) the second start
 subprocess.run(["docker", "restart", CT], capture_output=True)
 check(wait_up(120), "(d) second start")
-check(logs().count("migrate-sqlite: moving") == 1 and sess() is not None, "(d) nothing moved again, data there")
+check(logs().count("migrate-sqlite: moving") == 1 and sess("alice", soft=True, json_ok=True) is not None, "(d) nothing moved again, data there")
 mig = glob.glob(DBF + ".migrated-*")[0]
 subprocess.run(["cp", mig, DBF])
 subprocess.run(["docker", "restart", CT], capture_output=True)
@@ -263,13 +256,13 @@ with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         files.append([n, len(d), hashlib.sha256(d).hexdigest()])
     z.writestr("manifest.json", json.dumps({"format": "kalmido-backup", "format_version": 1, "app_version": "2.36.2", "schema_version": 2,
                                             "created_at": "2026-01-01T00:00:00+00:00", "kind": "manual", "counts": {}, "files": files}))
-A = sess()
+A = sess("alice", soft=True, json_ok=True)
 up = A.post(B + "/api/admin/backups/upload", data=buf.getvalue(), headers={"Content-Type": "application/octet-stream"}) if A else None
 check(up is not None and up.ok and up.json().get("legacy") is True, "(f) old archive uploaded, marked legacy " + (up.text[:200] if up is not None else ""))
 if up is not None and up.ok:
     r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "upload": up.json()["upload"]})
     check(r.ok and r.json().get("ok"), "(f) the restore of the old archive runs the move " + r.text[:300])
-    A2 = sess()
+    A2 = sess("alice", soft=True, json_ok=True)
     st = A2.get(B + "/api/state").json() if A2 else {}
     check(any(t["id"] == 1 and t["title"] == "Aus dem alten Backup" for t in st.get("tasks", [])), "(f) the data of the old backup is there")
     check(open(os.path.join(DATA, "attachments", "1", "a.txt"), "rb").read() == att, "(f) its files are there")

@@ -16,6 +16,7 @@ from .orgimport import OiFix, OiT, _oid, _txt, tr  # noqa: F401
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.278.0 B (#3094)
 from .acctimport import umz_billed  # 2.278.0 B (#3094)
+from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -63,6 +64,15 @@ def _time_person(c, run, src, d, ctx):
     return _person("user_id")(c, run, src, d, ctx)
 
 
+def _legacy(prefix):
+    """2.362.0 (#3090): prep part of a browser ciphertext bound to the old task / person ids: their AAD as legacy_aad, so its
+    author opens it again on this server (sealed anew on the next save)."""
+    def fn(c, run, src, d, ctx):
+        d["legacy_aad"] = umz_legacy_aad(prefix, None, src.get("task_id"), src.get("user_id"))
+        return d
+    return fn
+
+
 def _chain(*fns):
     def fn(c, run, src, d, ctx):
         for f in fns:
@@ -75,13 +85,51 @@ def _chain(*fns):
 
 # ---------------------------------------------------------------- chat
 def _room(c, run, src, d, ctx):
-    """A list's channel: one per list (the app makes it on first use; a channel already there is used)."""
+    """A list's channel: one per list (the app makes it on first use; a channel already there is used). 2.362.0 (#3092): a
+    channel of the organisation becomes one of the target (into the private space: one of the own space, invited only), the
+    importing person its first member; no other kind comes with an export."""
+    if src.get("kind") == "channel":
+        d.update(kind="channel", list_id=None, org_id=run.org, is_open=1 if run.org and src.get("is_open") else 0,
+                 name=_txt(src.get("name"), 80).strip() or tr("Channel"), created_by=ctx.uid)
+        return d
     lid = d.get("list_id")
+    if src.get("kind") != "list" or not lid:
+        if src.get("kind") == "list":
+            run.warning(N_("Not taken over because the entry it belongs to is missing: {0}"), tr("Team chat"))
+        return False
     r = c.execute("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
     if r:
         run.put("tchat_rooms", src.get("id"), r[0])
         return False
     d["kind"] = "list"
+    return d
+
+
+def _room_after(c, run, src, nid, ctx):
+    """2.362.0 (#3092): the importing person is the first member of an imported channel (it would be invisible to them)."""
+    if src.get("kind") == "channel":
+        c.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                  (nid, ctx.uid, ctx.uid, iso(now_utc())))
+
+
+def _room_member(c, run, src, d, ctx):
+    """2.362.0 (#3092): a member of a channel (the importing person is one already: _room_after)."""
+    return False if d.get("user_id") == ctx.uid else d
+
+
+def _chat_file(c, run, src, d, ctx):
+    """2.362.0 (#3092): a file / voice message of a team chat message, sealed with the key of its conversation's space (the
+    target: collab/teamchan.py tcx_space), a list channel's file row without organisation like in the app."""
+    import os
+    from .orgexport import _safe_part
+    rk = c.execute("SELECT kind FROM tchat_rooms WHERE id=?", (d["room_id"],)).fetchone()
+    name = str(src.get("name") or "file")
+    got = ctx.file(f"files/tchat/{_oid(src.get('id')) or 0}-{_safe_part(src.get('name'))}", os.path.join("tchat", str(d["room_id"])), name,
+                   mime=str(src.get("mime") or ""))
+    if not got or not rk:
+        return None
+    d["path"], d["size"] = got
+    d["org_id"] = None if rk[0] == "list" else run.org
     return d
 
 
@@ -161,6 +209,18 @@ def _mbx(c, run, src, d, ctx):
         return False
     d.update(v)
     run.warning(N_("Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on."))
+    return d
+
+
+def _nl_hash(c, run, src, d, ctx):
+    """2.362.0 (#3096): a row of the suppression list / consent log in the target's workspace (an address already suppressed
+    there stays as it is)."""
+    h = _txt(src.get("email_hash"), 64).lower()
+    if len(h) != 64 or any(x not in "0123456789abcdef" for x in h):
+        return False
+    d["ws"], d["email_hash"] = (f"o{run.org}" if run.org else f"u{ctx.uid}"), h
+    if ctx.spec.table == "nl_suppress" and c.execute("SELECT 1 FROM nl_suppress WHERE ws=? AND email_hash=?", (d["ws"], h)).fetchone():
+        return False
     return d
 
 
@@ -279,6 +339,16 @@ def _activity(c, run, src, d, ctx):
     return d
 
 
+def _mail_link(c, run, src, d, ctx):
+    """2.362.0 (#3096): a task / event made from a filed e-mail (both must have come along)."""
+    kind = _txt(src.get("kind"), 20)
+    new = run.m({"task": "tasks", "event": "events"}.get(kind, ""), src.get("ref_id")) if kind in ("task", "event") else None
+    if not new:
+        return False
+    d["kind"], d["ref_id"] = kind, new
+    return d
+
+
 # ---------------------------------------------------------------- time, notes, shares
 def _time(c, run, src, d, ctx):
     if not src.get("end"):  # a running timer stays where it runs
@@ -345,6 +415,8 @@ SPECS = [
         need=("task_id", "form_id"), space=(), rid=False, label=N_("Forms")),
     OiT("lists/playbooks.json", "playbooks", refs={"list_id": "lists"}, need=("list_id",), people={"author_id": "null"}, space=(),
         label=N_("Playbooks")),
+    # 2.362.0 (#3096): section templates of the organisation (into the private space: the importing person's own)
+    OiT("lists/section_templates.json", "section_templates", people={"user_id": "me"}, enc=False, label=N_("Section templates")),
     OiT("lists/sprints.json", "sprints", refs={"list_id": "lists"}, need=("list_id",), people={"created_by": "null"}, space=(),
         label=N_("Sprints")),
     OiT("lists/rules.json", "list_rules", refs={"list_id": "lists", "target_list_id": "lists"}, need=("list_id",),
@@ -363,9 +435,9 @@ SPECS = [
     OiT("tasks/history.json", "activity", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "null"}, space=(),
         label=N_("History"), prep=_activity),
     OiT("tasks/encrypted_notes.json", "task_enc_notes", refs={"task_id": "tasks"}, need=("task_id",), space=(), rid=False, enc=False,
-        people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_person("user_id")),
+        people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_chain(_person("user_id"), _legacy("kalmido-note:v1"))),  # 2.362.0 (#3090)
     OiT("tasks/locked_notes.json", "task_note_locks", refs={"task_id": "tasks"}, need=("task_id",), space=(), rid=False, enc=False,
-        people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_person("user_id")),
+        people={"user_id": "null"}, label=N_("Encrypted notes"), prep=_chain(_person("user_id"), _legacy("kalmido-locknote:v1"))),
     # 2.278.0 B (#3094): billed_doc_id -> the new invoice (office_docs come first, oi_office); billed_at kept
     OiT("time_entries.json", "time_entries", refs={"task_id": "tasks", "list_id": "lists", "billed_doc_id": "office_docs"}, people={"user_id": "null"},
         space=(), label=N_("Time entries"), prep=_chain(_time, _time_person, _billed)),
@@ -374,16 +446,24 @@ SPECS = [
     OiT("comments/reactions.json", "comment_reactions", refs={"comment_id": "comments"}, need=("comment_id",),
         people={"user_id": "need"}, space=(), rid=False, label=N_("Reactions")),
     # chat
-    OiT("chat/channels.json", "tchat_rooms", refs={"list_id": "lists"}, need=("list_id",), space=(), prep=_room),
+    # 2.362.0 (#3092): + the organisation's channels with their members and the files of the messages
+    OiT("chat/channels.json", "tchat_rooms", refs={"list_id": "lists"}, people={"created_by": "null"}, space=(), label=N_("Team chat"),
+        prep=_room, after=_room_after),
+    OiT("chat/members.json", "tchat_members", refs={"room_id": "tchat_rooms"}, need=("room_id",), people={"user_id": "member", "added_by": "null"},
+        space=(), rid=False, label=N_("Team chat"), prep=_room_member),
     # 2.278.0 B (#3094): thread_of (the thread's first message) mapped like reply_to, never the old id
     OiT("chat/messages.json", "tchat_msgs", refs={"room_id": "tchat_rooms", "task_id": "tasks"}, need=("room_id",),
         people={"user_id": "null", "pinned_by": "null"}, late={"reply_to": "tchat_msgs", "thread_of": "tchat_msgs"}, space=(), enc=False, label=N_("Team chat"),
         prep=_msg),
     OiT("chat/reactions.json", "tchat_rx", refs={"message_id": "tchat_msgs"}, need=("message_id",), people={"user_id": "need"},
         space=(), rid=False, label=N_("Team chat")),
+    OiT("chat/files.json", "tchat_files", refs={"message_id": "tchat_msgs", "room_id": "tchat_rooms"}, need=("message_id", "room_id"),
+        people={"user_id": "null"}, space=(), enc=False, label=N_("Team chat"), prep=_chat_file),
     # shares of calendars and address books (only with ticked people)
     OiT("calendars/members.json", "ev_cal_members", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
         rid=False, prep=_not_me),
+    OiT("books/contact_tasks.json", "contact_tasks", refs={"contact_id": "contacts", "task_id": "tasks"}, need=("contact_id", "task_id"),
+        people={"added_by": "null"}, space=(), rid=False, label=N_("Contacts")),  # 2.362.0 (#3096)
     OiT("books/members.json", "book_members", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
         rid=False, prep=_not_me),
     # newsletter
@@ -391,6 +471,8 @@ SPECS = [
     OiT("newsletter/segments.json", "nl_segments", refs={"conn_id": "nl_conns"}, need=("conn_id",), label=N_("Newsletter"), prep=_nl_seg),
     OiT("newsletter/members.json", "nl_members", refs={"seg_id": "nl_segments"}, need=("seg_id",), rid=False, label=N_("Newsletter")),
     OiT("newsletter/runs.json", "nl_runs", refs={"conn_id": "nl_conns"}, need=("conn_id",), people={"by_id": "null"}, label=N_("Newsletter")),
+    OiT("newsletter/suppressed.json", "nl_suppress", fixed={"ws": ""}, enc=False, label=N_("Newsletter"), prep=_nl_hash),  # 2.362.0 (#3096)
+    OiT("newsletter/consent_log.json", "nl_consent_log", fixed={"ws": ""}, enc=False, label=N_("Newsletter"), prep=_nl_hash),
     # absences, bookings, vacation accounts, filed e-mails
     OiT("hub/absences.json", "hub_absences", people={"user_id": "null", "created_by": "null", "decided_by": "null"}, private="office",
         label=N_("Absences and bookings"), prep=_person("user_id", member=True)),
@@ -400,6 +482,8 @@ SPECS = [
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
         people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("Absences and bookings"), prep=_mail, after=_mail_index),
+    OiT("hub/mail_links.json", "hub_mail_links", refs={"mail_id": "hub_mails"}, need=("mail_id",), people={"created_by": "null"},
+        fixed={"ref_id": 0}, label=N_("E-mails"), prep=_mail_link),  # 2.362.0 (#3096)
     # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)
     OiT("hub/mailbox.json", "hub_mailboxes", people={"created_by": "null"}, label=N_("Mailbox"), prep=_mbx),
 ]

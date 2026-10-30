@@ -127,15 +127,15 @@ def body_size(pages):
     return next((t["size"] for p in pages for t in p["texts"] if t["s"] == "Leistung 1"), None)
 
 
-inv = pdfcheck.layout(pdf.office_pdf(model()))
-check(body_size(inv) == 9.6, f"#3491: an invoice keeps 9.6 pt body text ({body_size(inv)})")
+inv = pdfcheck.layout(pdf.office_pdf(model(kind="delivery", title="Lieferschein")))  # 2.434.0 (#3603): invoices are look A too, a delivery note is not
+check(body_size(inv) == 9.6, f"#3491: a delivery note keeps 9.6 pt body text ({body_size(inv)})")
 d = pdf.office_pdf(offer())
 q = pdfcheck.layout(d)
 check(body_size(q) == 7.6, f"#3491: a quotation prints 2 pt smaller (9.6 -> 7.6 pt: {body_size(q)})")
 check(min(t["size"] for p in q for t in p["texts"]) >= 6.0, "#3491: no text of the quotation below 6 pt")
-inv2 = pdfcheck.layout(pdf.office_pdf(model()))
+inv2 = pdfcheck.layout(pdf.office_pdf(model(kind="delivery", title="Lieferschein")))
 check(body_size(inv2) == 9.6 and [t["x"] for t in inv2[0]["texts"]] == [t["x"] for t in inv[0]["texts"]],
-      "#3491: an invoice right after a quotation is laid out exactly as before (no smaller widths remembered)")
+      "#3491: a delivery note right after a quotation is laid out exactly as before (no smaller widths remembered)")
 check(not pdfcheck.problems(d), f"#3491: the short quotation is clean {pdfcheck.problems(d)[:3]}")
 # short quotation with rights: one page, the appendix on it, no reference lines
 check(len(q) == 1 and find(q, "RECHTE"), f"#3491: a short quotation with rights fits on one page ({len(q)} pages)")

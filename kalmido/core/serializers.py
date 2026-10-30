@@ -1,5 +1,7 @@
 """JSON shapes of database rows (tasks, lists, users ...) as the web client and the API see them."""
 import os
+import re
+from datetime import timedelta
 from flask import g, has_request_context
 
 from ..core.config import ATT_DIR
@@ -7,7 +9,7 @@ from ..core.i18n import tr
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
-from ..core.db import iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
 
@@ -66,6 +68,30 @@ def tags_for(c, ids=None, uid=None):
 
 
 ST_NOTE_MAX = 200  # 2.280.0 A (#3108): a longer note is not in the start state (lean_notes)
+WK_TTL = 900     # 2.407.0 A (#3513): an agent's "working" on a task fades after this many seconds without an update
+WK_TEXT_MAX = 200  # its progress line as the rows show it
+
+
+def wk_for(c, ids):
+    """2.407.0 A (#3513): {task id: {agent_id, agent, name, text, at, ttl}} = an agent works on the task now: its newest
+    running job of the task (not a proposal / approval job) updated within WK_TTL; text = the job log's last line. Read
+    only (the caller filtered the tasks by what the viewer sees); a job past WK_TTL simply drops out, no clean-up needed."""
+    if not ids:
+        return {}
+    cut = now_utc() - timedelta(seconds=WK_TTL)
+    out = {}
+    for r in c.execute("""SELECT DISTINCT ON (j.task_id) j.task_id, j.agent_id, j.updated_at, j.name, RIGHT(j.log, 1000) AS tail,
+                                 u.display_name, u.username
+                          FROM agent_jobs j JOIN users u ON u.id=j.agent_id
+                          WHERE j.state='running' AND j.kind IS NULL AND COALESCE(j.approval, '')='' AND j.updated_at>=?
+                          AND j.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY j.task_id, j.updated_at DESC, j.id DESC""",
+                       (iso(cut), st_ids(sorted(ids)))):
+        line = next((x for x in reversed((r["tail"] or "").splitlines()) if x.strip()), "")
+        line = re.sub(r"^\d{1,2}:\d{2}\s+", "", " ".join(line.split()))  # a host's own "11:04 " in front (agent_job.py): the time is shown anyway
+        out[r["task_id"]] = {"agent_id": r["agent_id"], "agent": r["display_name"] or r["username"], "name": r["name"] or None,
+                             "text": line[:WK_TEXT_MAX - 1] + "…" if len(line) > WK_TEXT_MAX else line, "at": r["updated_at"],
+                             "ttl": WK_TTL}
+    return out
 
 
 def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
@@ -177,6 +203,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     from ..collab.notelock import ln_locked_ids
     lockn = ln_locked_ids(c, ids)  # 2.48.0 (#1642): tasks whose note is locked with a password (never its content)
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
+    wk = wk_for(c, ids - ctx) if uid else {}  # 2.407.0 A (#3513): an agent works on it now
     out = []
     for r in rows:
         d = task_dict(r, tags, full_snips)
@@ -210,6 +237,8 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
             d["people"] = ppl[r["id"]]
         if r["id"] in aiu and r["id"] not in ctx:
             d["ai_usage"] = aiu[r["id"]]
+        if r["id"] in wk:
+            d["working"] = wk[r["id"]]
         if r["id"] in ctx:
             d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={},
                      blockers=[], blocked=0, blocking=0, context=True)

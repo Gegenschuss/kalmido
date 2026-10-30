@@ -18,7 +18,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return Array.isArray(j) ? j : {...j, status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, k) => w.document.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,comments';
@@ -60,7 +60,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   const more = () => d.querySelector('#side .sg-more');
   check(more()?.querySelector('.sgh.closed') && more().querySelector('.sgfold[hidden] .srow[data-go="trash"]') && /3/.test(more().querySelector('.sgh .c')?.textContent || ''), '#1502: More folded on a new device, its number = 3 entries');
   // 2.161.2 (#2607): the small mark at the bottom is gone (the brand on top opens Start from its menu)
-  check(!d.querySelector('#side .sfoot') && [...d.querySelectorAll('#srail .srfoot > *')].map(x => x.dataset.act || x.dataset.go).join() === 'settings' && d.querySelector('#kbar .kbacct'), '#1502: Settings alone at the bottom of the bar, the account in the head bar');  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
+  check(!d.querySelector('#side .sfoot') && !d.querySelector('#srail .srfoot') && d.querySelector('#kbar .kbacct'), '#1502: nothing at the bottom of the bar, the account in the head bar'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
   check(more().querySelector(':scope > .srow[data-go="all"]') && more().querySelector(':scope > .srow[data-go="done"]') && JSON.parse(w.__store['tasks.sideOpenG'] || '[]').includes('more'), '#1502: opened, remembered per device');
   click(w, more().querySelector('[data-act="side-group"]')); await sleep(150);
@@ -81,7 +81,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   // the sidebar settings know the group (sort / hide)
   check(w.eval('sideGroupOrder().includes("more")') && w.eval('tr(SIDE_NAMES.more)') === 'More', '#1502: More in the sidebar settings');
   await call('PATCH', '/api/settings', {sidebar: JSON.stringify({order: ['views', 'areas', 'lists', 'focus'], hidden: ['g:more']})}); await w.eval('load().then(render)'); await sleep(400);
-  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#srail .sset'), '#1503 #1502: an own order stays, More can be hidden');  // 2.152.2 (#2622): Settings in the bar
+  check(w.eval('sideGroupOrder().slice(0, 4).join()') === 'views,areas,lists,focus' && !more() && d.querySelector('#kbar .kbsw'), '#1503 #1502: an own order stays, More can be hidden'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.2 (#2622): Settings in the bar
   await call('PATCH', '/api/settings', {sidebar: ''});
   w.close();
   // a used device: More open, unless every group was folded; an open Tags group stays open

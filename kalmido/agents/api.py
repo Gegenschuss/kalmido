@@ -24,6 +24,8 @@ from ..agents.core import (
 )
 from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
+from ..agents.steps import redact, step_clean, steps_job_log  # 2.407.0 A (#3513)
+from ..core.serializers import wk_for  # 2.407.0 A (#3513)
 from ..agents.workstyle import ws_public
 from ..agents.control import ctl_public  # 2.235.0 A (#2891)
 from ..agents.datalock import dl_public  # 2.235.0 B (#2902)
@@ -401,8 +403,9 @@ def v1_agent_job_update(jid):
     f = v1_job_in(c, aid, b, False)
     log = j["log"] or ""
     if "log" in b:
-        log = b["log"]
+        log = redact(b["log"])[0] if isinstance(b["log"], str) else b["log"]  # 2.407.0 (#3513): the last line shows on the task
     if b.get("append_log"):
+        b["append_log"] = redact(b["append_log"])[0] if isinstance(b["append_log"], str) else b["append_log"]
         log = (log + ("\n" if log else "") + b["append_log"])
     f["log"] = log[-JOB_LOG_MAX:]
     f["updated_at"] = iso(now_utc())
@@ -416,3 +419,133 @@ def v1_agent_job_update(jid):
         bump(c)  # a log line alone does not make every client reload
     c.commit()
     return jsonify(job_dict(c, j2))
+
+
+# ---------------------------------------------------------------- 2.407.0 A (#3513): "agent is working" on a task
+# An agent marks a task it works on: a pulsing dot with its name, the time and its last progress line in the list, on the
+# board card and in the detail. It is the agent's running job of that task (agent_jobs: no new table): POST starts it or
+# adds a progress line, PATCH only updates, DELETE ends it. Without an update for WK_TTL (15 min) the mark fades on its own
+# (the read leaves it out). Only an agent that may change the task (write role in its list); people see the mark exactly
+# on the tasks they see (load_tasks). The path counts as the tasks area: other windows take it with the delta, no reload.
+def wk_job(c, aid, tid):
+    return c.execute("""SELECT * FROM agent_jobs WHERE agent_id=? AND task_id=? AND state='running' AND kind IS NULL
+                        AND COALESCE(approval, '')='' ORDER BY updated_at DESC, id DESC LIMIT 1""", (aid, tid)).fetchone()
+
+
+def wk_pick(c, aid, tid, b):
+    """job_id: that running job of the agent on this task (a host running several jobs on one task, agent_job.py); else
+    the newest one (None = POST starts one)."""
+    if b.get("job_id") in (None, ""):
+        return wk_job(c, aid, tid)
+    j = c.execute("""SELECT * FROM agent_jobs WHERE id=? AND agent_id=? AND task_id=? AND state='running' AND kind IS NULL
+                     AND COALESCE(approval, '')=''""", (as_int(b["job_id"], "job_id", 1), aid, tid)).fetchone()
+    if not j:
+        raise Denied(404)
+    return j
+
+
+def wk_need(c, tid):
+    aid = need_agent()
+    if not task_visible(c, tid, aid, full=True):
+        raise Denied(404)
+    if not task_visible(c, tid, aid, write=True):
+        raise Denied(403, tr("You cannot change this task"))
+    return aid
+
+
+def wk_out(c, tid, j, code=200):
+    return jsonify(working=wk_for(c, {tid}).get(tid), job=job_dict(c, j) if j else None), code
+
+
+@app.get("/api/v1/tasks/<int:tid>/working")
+@v1_view
+def v1_task_working_get(tid):
+    v1_args(())
+    aid = need_agent()
+    c = db()
+    if not task_visible(c, tid, aid, full=True):
+        raise Denied(404)
+    return wk_out(c, tid, wk_job(c, aid, tid))
+
+
+def wk_text(b):
+    if b.get("text") in (None, ""):
+        return ""
+    return step_clean(b["text"])[0]  # one line, secrets out (people read it on the task)
+
+
+def wk_set(c, aid, tid, b, j):
+    if "title" in b and not isinstance(b["title"], str):
+        raise BadInput(tr("Invalid value: {0}", "title"))
+    text, ts = wk_text(b), iso(now_utc())
+    if j:
+        log = (j["log"] or "") + ("\n" if j["log"] and text else "") + text
+        c.execute("UPDATE agent_jobs SET log=?, updated_at=? WHERE id=?", (log[-JOB_LOG_MAX:], ts, j["id"]))
+        if text:  # 2.407.0 (#3513, review): like append_log, the line is a heading of the job's history (the person's job chat)
+            steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (j["id"],)).fetchone(), text)
+        jid, code = j["id"], 200
+    else:
+        try:
+            name = f8f_job_name_in(b.get("name"))
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "name"))
+        title = (b.get("title") or "").strip() or c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()[0] or f"#{tid}"
+        jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,title,state,log,created_at,updated_at,name)
+                              VALUES(?,?,?,'running',?,?,?,?)""", (aid, tid, title[:JOB_TITLE_MAX], text, ts, ts, name))
+        c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
+                     WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
+        code = 201
+    bump(c)  # the tasks area: the windows that show the task take it with the delta
+    c.commit()
+    return wk_out(c, tid, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), code)
+
+
+@app.post("/api/v1/tasks/<int:tid>/working")
+@v1_view
+def v1_task_working_set(tid):
+    """{text?, title?, name?, job_id?} -- start working on the task (or, while working, add a progress line)."""
+    v1_args(())
+    c = db()
+    aid = wk_need(c, tid)
+    b = v1_json()
+    unknown = [k for k in b if k not in ("text", "title", "name", "job_id")]
+    if unknown:
+        raise UnknownFields(unknown)
+    return wk_set(c, aid, tid, b, wk_pick(c, aid, tid, b))
+
+
+@app.patch("/api/v1/tasks/<int:tid>/working")
+@v1_view
+def v1_task_working_update(tid):
+    """{text?, job_id?} -- a new progress line (or none: only "still working"); 404 when the agent does not work on the task."""
+    v1_args(())
+    c = db()
+    aid = wk_need(c, tid)
+    b = v1_json()
+    unknown = [k for k in b if k not in ("text", "job_id")]
+    if unknown:
+        raise UnknownFields(unknown)
+    j = wk_pick(c, aid, tid, b)
+    if not j:
+        raise Denied(404)
+    return wk_set(c, aid, tid, b, j)
+
+
+@app.delete("/api/v1/tasks/<int:tid>/working")
+@v1_view
+def v1_task_working_end(tid):
+    """?state=done|failed|stopped (default done), ?job_id= (only that job, else all of the agent on the task) -- stop working
+    on the task: the mark disappears at once."""
+    a = v1_args(("state", "job_id"))
+    c = db()
+    aid = wk_need(c, tid)
+    st = a.get("state") or "done"
+    if st not in ("done", "failed", "stopped"):
+        raise BadInput(tr("Invalid value: {0}", "state"))
+    one = wk_pick(c, aid, tid, a) if a.get("job_id") not in (None, "") else None  # 2.407.0 (#3513, review): ?job_id= ends only that job
+    n = c.execute(f"""UPDATE agent_jobs SET state=?, updated_at=? WHERE agent_id=? AND task_id=? AND state='running' AND kind IS NULL
+                     AND COALESCE(approval, '')=''{' AND id=?' if one else ''}""", (st, iso(now_utc()), aid, tid, *((one["id"],) if one else ()))).rowcount
+    if n:
+        bump(c)
+    c.commit()
+    return jsonify(working=wk_for(c, {tid}).get(tid), ended=n)

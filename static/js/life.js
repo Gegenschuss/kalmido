@@ -282,7 +282,7 @@ async function lf_tripCost(lid) {
   const l = listById(lid); if (!l) return;
   let j; try { j = await api('POST', `/api/life/trips/${lid}/expenses`, {}); } catch { return; }  // api() said it
   const ws = wsOf(l);
-  if (wsOn() && wsCur() !== ws && wsOptions().includes(ws)) await wsSet(ws);  // the office of the trip's space
+  if (wsOn() && wsCur() !== ws && wsOptions().includes(ws)) await wsSet(ws, {keep: true});  // the office of the trip's space (2.397.0, #3404: no kept view in between)
   LF_COST[lid] = j.trip_id;  // 2.173.1 A (#2714)
   window.lf_rkOpen = {trip: j.trip_id, office: j.office_id};  // office_travel.js opens it once that office is loaded
   go('office/travel');

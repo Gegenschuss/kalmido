@@ -19,7 +19,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'collab,progress,comments';
 const settings = async () => (await call('GET', '/api/state')).settings;
 
@@ -183,7 +183,8 @@ const settings = async () => (await call('GET', '/api/state')).settings;
       check(m.dot === m.icol && m.icol !== m.text /* 2.53.0 (#1426): the colour is the nearest palette tone now, not the stored #7048e8 */, `${tag}: the whole icon in the list colour, no separate dot ` + JSON.stringify([m.icol, m.dot]));
       check(m.onRow && m.active !== m.text && m.activeCr >= 3, `${tag}: the open list's icon keeps its colour and stays readable ` + JSON.stringify([m.active, m.activeCr]));
       check(m.bar > 0 && m.bar <= 1.01, `${tag}: the progress bar is 1 px ` + m.bar);
-      check(m.fhFs < m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head is smaller and grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
+      // 2.424.0 (#3572): one sidebar row rule (#3492, 2.406) - the folder head has the rows' size now, it stays grey
+      check(m.fhFs === m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head has the rows' size and is grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
       // a real mouse over the row (WebDriver BiDi pointer), then the keyboard: Tab focus inside the sidebar
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: m.hov.x, y: m.hov.y, duration: 0}]}]}); await sleep(400);
       const op1 = await ev(`+getComputedStyle(document.querySelector('#side .srow[data-list="${CART}"] .shr:not(.bellm)')).opacity`);

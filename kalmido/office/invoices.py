@@ -53,9 +53,6 @@ INV_TAX_ON = N_("{0} on {1}|tax line with its taxable amount")  # 2.296.0 B (#31
 INV_MAIL_WHAT = {"offer": N_("the document|mail, quotation"), "invoice": N_("the document|mail, invoice"),
                  "credit": N_("the document|mail, credit note"), "reminder": N_("the document|mail, reminder"),
                  "delivery": N_("the document|mail, delivery note")}
-# 2.162.0 A (#2603): test phase - an admin may delete a finalised / sent invoice (typing its number; with its payments,
-# credit notes, reminders, see office/invdelete.py). False = exactly the rule before: finalised or sent invoices stay.
-INVOICE_DELETE_TESTPHASE = True  # #2604: vor Launch auf False
 
 
 def _j(s, default):
@@ -924,7 +921,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["service_period_text"] = (fmt_date(sf, pack) if sf == st or not st else (fmt_date(st, pack) if not sf else f"{fmt_date(sf, pack)} – {fmt_date(st, pack)}")) if (sf or st) else ""
     snd = _j(r["sender"], {}) if ofx_locked(r) else {}
     fields = snd.get("fields") if snd else ofx_company(c, oid)
-    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "address_extra", "zip", "city", "country", "email", "phone", "tax_number", "vat_id",
+    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "address_extra", "zip", "city", "country", "email", "website", "phone", "tax_number", "vat_id",
                                                                    "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}  # 2.99.0 D (#2188): + address_extra (BT-36)
     rec = _j(r["recipient_snapshot"], {}) if ofx_locked(r) and r["recipient_snapshot"] else {}
     if not rec and r["client_id"]:
@@ -1071,7 +1068,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["valid_until"] = ""
     m["valid_until_text"] = ""
     from .abschlag import abs_render
-    abs_render(r, m, L, lang)  # 2.120.0 A (#2087): progress / final title, cash discount line
+    abs_render(r, m, L, lang, pack)  # 2.120.0 A (#2087): progress / final title, cash discount line
     return m
 
 

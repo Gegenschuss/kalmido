@@ -6,7 +6,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json(); };
-const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = new Date(y, m - 1, d + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
@@ -177,8 +177,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const lt2 = (await call('GET', '/api/templates')).templates.find(x => x.id === lt.id);
   check(lt2.data.sections.join() === 'Later' && lt2.data.tasks.some(n => n.title === 'New idea' && n.section === 0 && n.children[0].title === 'step one'), 'outline edit: section + subtask');
   check(lt2.data.tasks.find(n => n.title === 'Weekly review')?.repeat === 'FREQ=WEEKLY', 'outline edit keeps attributes of unchanged lines');
-  w.prompt = () => 'From kit';
-  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(700);
+  // 2.352.0 B (#2752): every list template is relative - using it opens the project dialog (name, start)
+  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(400);
+  const tum = d.querySelector('.tumodal');
+  if (tum) { tum.querySelector('#tu-name').value = 'From kit'; tum.querySelector('[data-m="ok"]').click(); await sleep(700); }
   check(/^#l\/\d+/.test(w.location.hash) && w.eval('routeList()?.name') === 'From kit', 'new list from template opened');
   // settings > data lists templates
   w.eval(`settingsModal('templates')`);  // CI 2.376.2: the list comes from GET /api/templates - wait for it, not a fixed 500 ms

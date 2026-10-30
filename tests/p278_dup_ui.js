@@ -36,7 +36,7 @@ const FEAT = 'comments,collab,progress';
 
   await firefox(async o => {
     const {cmd, ev, ctx, nav, shot} = o;
-    const until = async (expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+    const until = (expr, n) => require('./boot').until(() => ev(expr).catch(() => null), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
     const ffLogin = async user => {
       await nav(B + 'static/icon.svg');
       await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
@@ -78,7 +78,8 @@ const FEAT = 'comments,collab,progress';
     check(await until(`!!document.querySelector('#view .trow')`, 60), 'phone: list rendered');
     await ev(`(() => { listModal(${L}); return 1; })()`);
     check(await until(`!!document.querySelector('.modal [data-m="dup"]')`), 'list dialog: the Duplicate button');
-    const foot = await ev(`(() => { const f = document.querySelector('.modal [data-m="dup"]').closest('.foot'); return {sw: f.scrollWidth, cw: f.clientWidth, tpl: !!f.querySelector('[data-m="tpl"]')}; })()`);
+    // 2.352.0 (#2751): "Save as template" and "Duplicate" sit in the project dialog's part Actions (was the foot)
+    const foot = await ev(`(() => { const f = document.querySelector('.modal [data-m="dup"]').closest('.foot, .lacts'); return {sw: f.scrollWidth, cw: f.clientWidth, tpl: !!f.querySelector('[data-m="tpl"]')}; })()`);
     check(foot.tpl && foot.sw <= foot.cw + 1, 'phone: the foot with "Save as template" and "Duplicate" fits ' + JSON.stringify(foot));
     await sleep(600); await shot('p278-listdialog-phone.png');
     await ev(`(() => { document.querySelector('.modal [data-m="dup"]').click(); return 1; })()`);

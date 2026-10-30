@@ -43,11 +43,15 @@ def au_billed(c, oid, ids):
         return {}
     # 2.121.0 review N4: a receipt moved here from another office after its billing stays billed (never twice), without the
     # other office's document details
-    rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind, d.org_id FROM rc_receipts r JOIN office_docs d "
-                     f"ON d.id=r.billed_doc_id WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))})",
+    # 2.362.0 (#3131): billed_at without a document = billed before an organisation import whose invoice did not come along
+    # (admin/oi_store.py _receipt): billed, invoice missing; a document deleted later still frees its receipts (billed_doc_id kept)
+    rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind, d.org_id FROM rc_receipts r LEFT JOIN office_docs d "
+                     f"ON d.id=r.billed_doc_id WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))}) "
+                     f"AND (d.id IS NOT NULL OR (r.billed_doc_id IS NULL AND r.billed_at IS NOT NULL AND r.billed_at != ''))",
                      [bk_ws(c, oid)] + ids).fetchall()
     return {r["node_id"]: ({"doc_id": r["doc_id"], "number": r["number"], "kind": r["kind"], "billed_at": r["billed_at"]} if r["org_id"] == oid
-                           else {"doc_id": None, "number": None, "kind": None, "billed_at": r["billed_at"]}) for r in rows}
+                           else {"doc_id": None, "number": None, "kind": None, "billed_at": r["billed_at"],
+                                 **({"missing": 1} if r["doc_id"] is None else {})}) for r in rows}
 
 
 def au_title(x, lg):

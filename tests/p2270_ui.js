@@ -26,7 +26,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
@@ -107,14 +107,14 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   await until(() => d.querySelector('#view .trow'));
   w.eval(`listModal(${L})`); let md = await until(() => d.querySelector('.modal.lmodal'));
   const rowsOrder = [...md.querySelectorAll('.card > .row, .card > .lhdr, .card > .row.lkrow')].map(x => x.className);
-  // 2.352.0 C (#2751 / #2752): no switch "Progress and status" any more; "Used for" for every project, the project rows
-  // in the folding part "Project features"
+  // 2.352.0 C (#2751 / #2752): no switch "Progress and status" any more, the project rows in the folding part
+  // "Project features"; 2.396.0 (#3385): no "Used for"
   check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), '#977: no type switch any more ' + rowsOrder.slice(0, 4));
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden, '#977: "Used for" for a simple list');
+  check(!md.querySelector('.lfamrow') && !md.querySelector('#l-fam'), '2.396.0 (#3385): no "Used for" any more');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'project'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(${L})`); md = await until(() => d.querySelector('.modal.lmodal'));
-  check(md.querySelector('.lfamrow') && !md.querySelector('.lfamrow').hidden && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: "Used for" too (2.352.0), the project fields');
+  check(!md.querySelector('.lfamrow') && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: no "Used for" (2.396.0, #3385), the project fields');
   md.remove();
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await sleep(300);
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));

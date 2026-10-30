@@ -9,7 +9,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 if (!process.env.P255A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const click = (w, el) => el?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const WAIT = +process.env.P255A_WAIT || 2500;  // a slow machine: more time for the client to load
-const until = async (fn, ms = 10000) => { const t = Date.now(); while (Date.now() - t < ms) { if (fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

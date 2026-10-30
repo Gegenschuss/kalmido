@@ -37,7 +37,7 @@ H = {"X-Requested-With": "kalmido"}
 FEAT = "cal,comments,office,clients"
 O, D = "/api/office", "/api/office/docs"
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
-ALL = {"books.datev", "docs.einvoice", "books.vat_return", "books.tax_dates", "books.export_csv", "books.gobd"}
+ALL = {"books.datev", "docs.delivery", "docs.einvoice", "books.vat_return", "books.tax_dates", "books.export_csv", "books.gobd"}
 
 
 def dbx(sql, args=(), write=False):

@@ -1409,6 +1409,25 @@ characters, no digits or colons, no plain words such as `Release` or `Fix` (else
 2.306.0 (#2875): with `task_id`, `user_id` must be a person who sees the task and may address the agent in its list (else 400);
 `task_title` / `list_id` of a job are only filled for a viewer who sees the task.
 
+2.407.0 (#3513): **"Agent is working" at a task.** While you work on a task, people see a pulsing dot with your name (or
+the job's `name`), the time of your last update and your last progress line at the task: in the list row, on the board
+card and in the task detail (e.g. `Holston · 11:04 · Column added`), live in every open window.
+
+```
+POST   /api/v1/tasks/{id}/working   {"text": "Column added", "title": "…" (start only), "name": "Holston" (start only)}
+PATCH  /api/v1/tasks/{id}/working   {"text": "next line"}          -> 404 when you do not work on the task
+DELETE /api/v1/tasks/{id}/working?state=done | failed | stopped    -> the dot disappears at once
+GET    /api/v1/tasks/{id}/working                                 -> {working, job}
+```
+
+The first `POST` starts it (201), every further `POST` adds the next progress line (200); MCP `set_working` / `end_working`.
+It is your running job of that task (`GET /agent/jobs`): a job you already run with `task_id` (`POST /agent/jobs`) shows the
+same way. Without an update for 15 minutes the dot fades on its own (send a line at least that often, or `PATCH` without
+`text` to say "still working"). Needs the scope `tasks:write` and write access to the task's list (a task you cannot see:
+404, one you only read: 403). `text` is one line of prose: the server folds it and replaces recognisable secrets; the
+rows show up to 200 characters. `working` in the answer (and on the task in the app) is `{agent_id, agent, name, text, at,
+ttl}` or `null`.
+
 **Chat.** Every person has their own conversation with an agent, stored in Kalmido. Each message a person sends is a `chat` event.
 
 ```
@@ -2386,6 +2405,7 @@ agent accordingly.
 | Interim summary (2.233.0) | when a host that keeps a chat conversation going (`--resume`) ends it with a short summary and starts a fresh one: at a session size *small / medium / large*, after so many runs (10-500), after so many minutes of pause (5-1440, 0 = never; a pause counts only from the small size on). Defaults = the former fixed values. Saves cost; the new conversation can forget details | `rotate_size` (`"small"`, `"medium"`, `"large"`), `rotate_runs` (default 60), `rotate_idle_min` (default 45); read-only, always filled in: `rotate_mb` (0.4 / 0.8 / 1.5, the session file in MB), `rotate_tokens` (80000 / 150000 / 250000 context tokens), `rotate_idle_mb` (0.4) |
 | Reset now (button) | restart with a fresh session right away | `reset_seq` goes up by one, event `reset` |
 | Permissions (2.29.0) | how the host handles actions outside the agent's allow list: *Ask first* (every such action asks the person in the chat), *Auto* (the host's own safety check decides; risky actions stay blocked), empty = the host's default | `permission_mode` (`"ask"`, `"auto"`, `""`) |
+| Git author (2.396.0) | name and e-mail address the host sets as git author for the agent's commits (both appear publicly in GitHub with every commit); empty = the neutral default `Kalmido <noreply@kalmido.com>`, each part on its own. *Append Co-Authored-By*: whether the agent adds a `Co-Authored-By:` line to its commit messages (off by default). A project with a connected repository can override name / e-mail for AI commits in that repository (see [Coding agents in a team](#coding-agents-in-a-team)) | `git_author_name` (string, max 100, no `<` `>` or line breaks; `""`), `git_author_email` (a valid e-mail address or `""`; 400 otherwise), `git_coauthor` (bool, default `false`); read-only, always filled in: `git_author` (`"Name <mail>"` with the defaults filled in) |
 | Permission questions go to (2.312.0) | a team agent: the person who answers its permission questions, chosen from the active people it reaches in a shared project (as for a chat with it); *As set up on its computer* = `KALMIDO_PERM_USER` of its env file (the one-command setup writes the person who made the code). A personal agent always asks its owner | `perm_user` (account id or `null`); `GET /api/v1/agent` also carries `perm_user_id` |
 
 2.29.0: the permission mode shows as a small badge in the agent's chat header (*Auto* / *Ask first*). The owner of a
@@ -2404,7 +2424,9 @@ reaches the agent (else `null`); the event runner (`mcp/agent_run.py`, both laun
 GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true, "autocompact_pct": 70,
                                         "nightly_reset": "04:00", "reset_seq": 3, "timezone": "Europe/Berlin",
                                         "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
-                                        "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4}}
+                                        "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
+                                        "git_author_name": "", "git_author_email": "", "git_coauthor": false,
+                                        "git_author": "Kalmido <noreply@kalmido.com>"}}
 PATCH /api/admin/agents/{id}  {"runtime": {"model": "opus", "autocompact_pct": 80}}   (admins; only the given keys change)
 POST  /api/admin/agents/{id}/reset                                                     (admins; 409 while paused)
 ```
@@ -2425,6 +2447,10 @@ Changing the settings sends the event `runtime_changed`, *Reset now* the event `
    `rotate_mb`), `rotate_runs` or a pause of `rotate_idle_min` minutes (0 = never) above `rotate_idle_mb`, and starts a
    new day at `nightly_reset`. [`mcp/agent_run.py`](../mcp/agent_run.py) does this in event mode; its
    `KALMIDO_SESSION_*` variables apply only with an older Kalmido that sends no `rotate_*` values.
+6. (2.396.0) starts the agent with the git author of `git_author` (`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` and
+   `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL`), sets `KALMIDO_GIT_COAUTHOR=1` when `git_coauthor` is on, and restarts
+   it when they change; without `git_author` (an older Kalmido) it sets nothing. A task's `repo.git_author` (the
+   project's override, else the agent's value) wins for commits in that repository.
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) is a reference launcher for Claude Code that does exactly this
 (2.7.2: [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) is the same for Windows and macOS, see [Set up an agent](#set-up-an-agent)). It
@@ -3127,8 +3153,9 @@ Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week)
 stands; people who may chat with the agent (everyone it shares a project with) see a small **ring right of its name** in
 the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
 agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
-24 hours turns the ring grey; without any report there is no ring. 2.350.0 (#3317): in the header the ring shows only from
-yellow on; below that it and every window sit in the chat header's "…" menu ("Usage: …"). Hover, keyboard focus or a tap lists every window
+24 hours turns the ring grey; without any report there is no ring. 2.407.0 (#3493): the ring is always shown (2.350.0
+showed it only from yellow on); every window also sits in the chat header's "…" menu ("Usage: …"). Each person can hide the
+ring with *Show usage* (the "…" menu or *Chat settings*, for all their chats); the "…" menu keeps the numbers. Hover, keyboard focus or a tap lists every window
 with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
 whose reset time has passed counts as 0 %.
 
@@ -3149,6 +3176,13 @@ read earlier, e.g. from a file a status line wrote: the ring greys out 24 h afte
 report replaces the previous one: send all windows each time. Report after
 every run or job (more often is fine; people's apps reload only when something visible changes). `GET /api/v1/agent`
 and the agents list carry the same object as `quota`. MCP: `report_plan_usage`, `get_plan_usage`, `clear_plan_usage`.
+
+**Agents with an API key instead of a plan (2.407.0, #3493).** An agent that reports no plan quota but costs
+(`cost_usd` in `POST /api/v1/agent/usage`) fills the ring with its costs against its own cost limit in Kalmido (the usage
+limits with metric `cost`, monthly or daily; the hard limit, else the soft one) -- same colours. Without a cost limit there
+is no ring; the "…" menu reads *Costs this month: $x* (and today). An agent that reports both: the plan quota fills the
+ring, the costs are added to its list. The agents list people get carries `cost`: `null`, or `{period, pct}` (`pct` null
+without a cost limit) and, for the owner of a personal agent and instance admins only, `today`, `month` and `limit` in USD.
 
 **Claude Code.** Its status line command gets the session data as JSON on stdin; for Pro / Max plans (and behind a
 gateway with spend limits) it contains `rate_limits` after the first answer of the session:
@@ -3297,7 +3331,11 @@ Kalmido's part:
 
 - The `assigned` event (every task event in such a project) and `GET /api/v1/tasks/{id}` carry `repo`: `provider`,
   `web_url`, `api_url`, `owner`, `repo`, `full_name`, `default_branch`, a suggested `branch` (`kalmido-<id>`), the
-  linked pull requests `prs` (state, CI) and `commits`. A branch named like that, or `#<id>` in a commit or pull request,
+  linked pull requests `prs` (state, CI) and `commits`. 2.396.0: `git_author` (`"Name <mail>"`: the git author for the
+  agent's commits in this repository), `git_coauthor` (bool) and `git_author_source` (`project` = set at the repository,
+  `agent` = the agent's runtime setting, `default`). The project owner / project admins set the override in the project
+  settings under *Repository > More > Git author for AI commits* (`PATCH /api/repos/{id} {"author_name", "author_email"}`,
+  empty = the agent's own); `GET /api/lists/{id}/repos` and the lists' `repos` carry `author_name` / `author_email`. A branch named like that, or `#<id>` in a commit or pull request,
   links them to the task; the panel shows them under *Code*.
 - When the pull request is ready, the agent posts a comment with the structured field
   `{"kind": "merge_request", "pr_url": "…/pull/12", "summary": "…"}` (MCP `request_merge_approval`; only agents, only
@@ -3337,7 +3375,8 @@ You are the coding agent of the Kalmido project "<project>". You work through th
 ## Working a ticket
 1. `set_status(working, "<short plan>", task_id)`, read the task with `get_task` (notes, comments, `repo`).
 2. Branch from `repo.default_branch` with the name `repo.branch` (`kalmido-<id>`). Never commit to the
-   default branch, never force-push shared branches.
+   default branch, never force-push shared branches. Commit as `repo.git_author` (`git -c user.name=… -c user.email=…`);
+   add a `Co-Authored-By:` line only when `repo.git_coauthor` is true.
 3. Keep pull requests small: one ticket, one pull request. Mention `#<id>` in the title; `fixes #<id>` in the
    description only when merging it really finishes the task.
 4. Run the tests. Open the pull request with your own credentials, then `request_merge_approval(task_id, pr_url,
@@ -3466,7 +3505,7 @@ with the scope it needs). The tools:
   `preview`
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `create_job`, `get_job`, `update_job`, `set_working` / `end_working` (2.407.0), `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
@@ -3490,7 +3529,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
@@ -3512,7 +3551,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
-`set_waiting`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
+`set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
