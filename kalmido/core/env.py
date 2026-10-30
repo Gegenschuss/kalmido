@@ -283,6 +283,7 @@ VARS = (
     _v("KALMIDO_SUPPORT_EMAIL", "", "Support address shown when the storage is full.", "hosting"),
     _v("KALMIDO_UPLOAD_HOURLY_MB", "1024", "Uploads per person and hour in MB (0 = no limit); over it uploads get 429.", "hosting"),  # 2.281.0 E (#3117)
     _v("KALMIDO_SUPPORT_URL", "", "Support page shown in Settings > Help.", "hosting"),
+    _v("KALMIDO_PRIVACY_EMAIL", "", "Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it.", "hosting"),  # 2.360.2 D (#2561)
     _v("KALMIDO_PRIVACY_URL", "", "Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins.", "hosting"),  # 2.306.0 B (#2887)
     _v("KALMIDO_IMPRINT_URL", "", "Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement.", "hosting"),  # 2.306.0 B (#2887)
     _v("KALMIDO_OPERATOR_TOKEN_FILE", "", "File with the token of the hosting operator interface (empty = off).", "hosting"),
