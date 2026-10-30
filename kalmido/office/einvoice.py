@@ -896,7 +896,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
 
 def ein_ubl_check(xml_bytes):
     """The Peppol points the EN 16931 Schematron does not cover (list of strings, empty = fine): CustomizationID /
-    ProfileID of Peppol BIS 3.0, both electronic addresses with a scheme, BT-10 or BT-13, one note, one tax total with
+    ProfileID of Peppol BIS 3.0, both electronic addresses with a scheme (in the Peppol profile not EM), BT-10 or BT-13, one note, one tax total with
     subtotals, every amount with a currency, no empty element."""
     out = []
     try:
@@ -908,6 +908,7 @@ def ein_ubl_check(xml_bytes):
     def tx(path):
         x = root.find(path, q)
         return (x.text or "").strip() if x is not None else ""
+    peppol = tx("cbc:CustomizationID") == UBL_PROFILES["peppol"]
     if not tx("cbc:CustomizationID").startswith("urn:cen.eu:en16931:2017"):
         out.append("BT-24 CustomizationID")
     if tx("cbc:ProfileID") != EIN_PROCESS:
@@ -916,6 +917,8 @@ def ein_ubl_check(xml_bytes):
         el = root.find(path, q)
         if el is None or not (el.text or "").strip() or not el.get("schemeID"):
             out.append(f"{who} electronic address with scheme missing (PEPPOL-EN16931-R020 / R010)")
+        elif peppol and el.get("schemeID") == "EM":  # 2.446.0 (#3783): the e-mail fallback is not in the Peppol EAS list (XRechnung allows it)
+            out.append(f"{who} electronic address: scheme EM is not in the Peppol list (PEPPOL-EN16931-CL008)")
     if not tx("cbc:BuyerReference") and not tx("cac:OrderReference/cbc:ID"):
         out.append("BT-10 buyer reference or BT-13 order reference missing (PEPPOL-EN16931-R003)")
     if len(root.findall("cbc:Note", q)) > 1:
