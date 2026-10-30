@@ -7951,7 +7951,6 @@
   "Only people and agents of the same workspace can get a share": "Si può condividere solo con persone e agenti dello stesso spazio",
   "{0} share with a person or agent ends": ["{0} condivisione con una persona o un agente termina", "{0} condivisioni con persone o agenti terminano"],
   "Only people and agents of this workspace": "Solo persone e agenti di questo spazio",
-  "If the address belongs to a person who can get the table, it is shared with them now.": "Se l’indirizzo appartiene a una persona che può ricevere la tabella, ora è condivisa con lei.",
   "table|palette kind": "tabella",
   "Main account": "Conto principale",
   "Balance (optional)": "Saldo (facoltativo)",
@@ -11541,7 +11540,6 @@
   "Resend": "Invia di nuovo",
   "Invitation withdrawn": "Invito ritirato",
   "Withdraw the invitation for {0}?": "Ritirare l'invito per {0}?",
-  "The link stops working and the account, never used, is deleted.": "Il link smette di funzionare e l'account, mai usato, viene eliminato.",
   "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.": "Senza account, ne viene creato uno nuovo in questa organizzazione e la persona riceve un'e-mail per scegliere una password. Con un account, la persona viene aggiunta.",
   "Organisation admins may invite new people by e-mail": "Gli admin delle organizzazioni possono invitare nuove persone via e-mail",
   "They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.": "Ricevono un account in quell'organizzazione e un'e-mail per scegliere una password. Disattivato: solo gli admin del server creano account.",
@@ -15254,5 +15252,7 @@
   "Mark the old quotation as superseded?": "Segnare il vecchio preventivo come sostituito?",
   "Yes, {0} no longer counts": "Sì, {0} non conta più",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi.",
-  "This quotation was superseded": "Questo preventivo è stato sostituito"
+  "This quotation was superseded": "Questo preventivo è stato sostituito",
+  "Invited. With an account at this address, the person sees the table once they may get it.": "Invito registrato. Con un account a questo indirizzo, la persona vedrà la tabella appena potrà riceverla.",
+  "The invitation stops working.": "L'invito non funzionerà più."
 }

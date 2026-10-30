@@ -1264,14 +1264,18 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
             # with the role the admin confirmed; until then nothing of the organisation is shared with it
             if run.org and run.kind == "org" and not umz_in_org(c, run.org, hit["id"]):
                 ojn_invite(c, run.org, hit["id"], umz_role(pick.get("role") or p.get("role")), by=uid)
+                run.created.setdefault("org_joins", []).append([run.org, hit["id"]])  # 2.360.2 M (#2561): the undo withdraws it
                 target, state = None, "org_invited"
                 run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
         elif not hit and pick.get("invite") and can_invite:
             if not em or umz_email_hash(em, salt) != h:
                 state = "mismatch"  # review M1: the typed address is not the one of the file -- nobody is invited
             else:
-                target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
+                target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60), umz_role(pick.get("role") or p.get("role")))
                 state = "invited" if target else "failed"
+                if target and run.org:  # 2.360.2 M (#2561): like an existing account: nothing shared before the person accepts
+                    target, state = None, "org_invited"
+                    run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
         n = 0
         if target:
             for old, role in lists.items():
@@ -1307,8 +1311,9 @@ def umz_fix_people(c, run, uid, names):
             run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
 
 
-def umz_invite(c, run, uid, email, name):
-    """A new account for a missing person (instance admin) and the invitation link by e-mail (#697)."""
+def umz_invite(c, run, uid, email, name, role="member"):
+    """A new account for a missing person (instance admin) and the invitation link by e-mail (#697). 2.360.2 M (#2561): into an
+    organisation only by accepting an invitation (org_joins, in the admins' list of open invitations), in the confirmed role."""
     from ..accounts.invite import invite_new
     if c.execute("SELECT 1 FROM users WHERE lower(email)=?", (email,)).fetchone():
         return None  # the address exists but the admin does not see it: never a second account
@@ -1323,9 +1328,9 @@ def umz_invite(c, run, uid, email, name):
     c.execute("UPDATE users SET email=? WHERE id=?", (email, nid))
     uset(c, nid, "lang", usettings(c, uid).get("lang") or "en")
     if run.org:
-        from ..accounts.orgs import org_member_add
-        with system_ctx(c):  # the organisation's admin places the invited person in it (structure)
-            org_member_add(c, run.org, nid, "member")
+        with system_ctx(c):  # the organisation's admin invites a person who is no member (structure)
+            ojn_invite(c, run.org, nid, role, by=uid)
+        run.created.setdefault("org_joins", []).append([run.org, nid])
     try:
         invite_new(c, nid, uid, send=True)
     except Denied:
@@ -1403,6 +1408,8 @@ def umz_run(uid, iid, opts):
                 if o in people:
                     names[people[o]] = _txt(p.get("name"), 100)
             umz_fix_people(c, run, uid, names)
+            if iid_db and run.created.get("org_joins"):  # 2.360.2 M (#2561): made by the sharing, after the import was recorded
+                c.execute("UPDATE imports SET created=? WHERE id=?", (json.dumps(run.created), iid_db))
             bump(c)
             c.commit()
         finally:
@@ -1714,6 +1721,8 @@ def umz_undo(c, uid, r):
     for k, v in (cr.get("settings") or {}).items():
         if k in UMZ_SETTINGS and isinstance(v, dict) and cur.get(k) == v.get("new"):
             uset(c, uid, k, v.get("old") if v.get("old") is not None else "")
+    for oid, who in cr.get("org_joins") or []:  # 2.360.2 M (#2561): an invitation not accepted yet goes with the import
+        c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=? AND created_by=?", (int(oid), int(who), uid))
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), r["id"]))
     bump(c)
     c.commit()

@@ -7931,7 +7931,6 @@
   "Only people and agents of the same workspace can get a share": "Teilen geht nur mit Personen und Agenten desselben Arbeitsbereichs",
   "{0} share with a person or agent ends": ["Für {0} Fall endet das Teilen mit einer Person oder einem Agenten", "Für {0} Fälle endet das Teilen mit Personen oder Agenten"],
   "Only people and agents of this workspace": "Nur Personen und Agenten dieses Arbeitsbereichs",
-  "If the address belongs to a person who can get the table, it is shared with them now.": "Gehört die Adresse zu einer Person, die die Tabelle bekommen darf, ist sie jetzt mit ihr geteilt.",
   "table|palette kind": "Tabelle",
   "Main account": "Hauptkonto",
   "Balance (optional)": "Kontostand (optional)",
@@ -11517,7 +11516,6 @@
   "Resend": "Erneut senden",
   "Invitation withdrawn": "Einladung zurückgezogen",
   "Withdraw the invitation for {0}?": "Einladung für {0} zurückziehen?",
-  "The link stops working and the account, never used, is deleted.": "Der Link funktioniert nicht mehr und das nie benutzte Konto wird gelöscht.",
   "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.": "Ohne Konto wird in dieser Organisation ein neues angelegt und die Person bekommt eine E-Mail, um ein Passwort zu wählen. Mit Konto wird die Person hinzugefügt.",
   "Organisation admins may invite new people by e-mail": "Admins der Organisation dürfen neue Personen per E-Mail einladen",
   "They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.": "Sie bekommen ein Konto in dieser Organisation und eine E-Mail, um ein Passwort zu wählen. Aus: nur Admins des Servers legen Konten an.",
@@ -15254,5 +15252,7 @@
   "Mark the old quotation as superseded?": "Altes Angebot als ersetzt markieren?",
   "Yes, {0} no longer counts": "Ja, {0} zählt nicht mehr",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig.",
-  "This quotation was superseded": "Dieses Angebot wurde ersetzt"
+  "This quotation was superseded": "Dieses Angebot wurde ersetzt",
+  "Invited. With an account at this address, the person sees the table once they may get it.": "Eingeladen. Mit einem Konto zu dieser Adresse sieht die Person die Tabelle, sobald sie sie bekommen darf.",
+  "The invitation stops working.": "Die Einladung gilt dann nicht mehr."
 }

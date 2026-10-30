@@ -3948,6 +3948,11 @@ MIGRATIONS = [
     # 2.437.0 B (#3621): the quotation this one replaces (set by duplicating with "mark the old one as superseded"); NULL = none, a
     # supplement stays without. Older versions ignore it
     ("office_docs", "replaces_id", "ALTER TABLE office_docs ADD COLUMN IF NOT EXISTS replaces_id BIGINT REFERENCES office_docs(id) ON DELETE SET NULL"),
+    # 2.360.2 M (#2561): a table shared by address: the sealed address + its keyed hash, user_id NULL until an account of that
+    # address may take the row (sheets/shshare.py). Older versions never see these rows (they join users) and write none
+    ("sheet_shares", "email_seal", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_seal TEXT NOT NULL DEFAULT ''"),
+    ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_key TEXT NOT NULL DEFAULT ''"),
+    ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ALTER COLUMN user_id DROP NOT NULL"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -3974,6 +3979,8 @@ CREATE INDEX IF NOT EXISTS ix2281_list_notepads_agent_id ON list_notepads(agent_
 CREATE INDEX IF NOT EXISTS ix2281_lists_deleted_by ON lists(deleted_by) WHERE deleted_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_office_deals_lead_client_id ON office_deals(lead_client_id) WHERE lead_client_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_office_docs_list_id ON office_docs(list_id) WHERE list_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS sheet_shares_email ON sheet_shares(sheet_id, email_key) WHERE email_key!='';  -- 2.360.2 M (#2561)
+CREATE INDEX IF NOT EXISTS sheet_shares_open ON sheet_shares(email_key) WHERE user_id IS NULL;
 CREATE INDEX IF NOT EXISTS ix2437_office_docs_replaces_id ON office_docs(replaces_id) WHERE replaces_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_office_drives_corrects_id ON office_drives(corrects_id) WHERE corrects_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_office_equipment_agreement_id ON office_equipment(agreement_id) WHERE agreement_id IS NOT NULL;

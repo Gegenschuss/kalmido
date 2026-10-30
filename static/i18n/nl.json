@@ -7951,7 +7951,6 @@
   "Only people and agents of the same workspace can get a share": "Delen kan alleen met mensen en agenten van dezelfde werkruimte",
   "{0} share with a person or agent ends": ["{0} deling met een persoon of agent eindigt", "{0} delingen met mensen of agenten eindigen"],
   "Only people and agents of this workspace": "Alleen mensen en agenten van deze werkruimte",
-  "If the address belongs to a person who can get the table, it is shared with them now.": "Als het adres hoort bij iemand die de tabel mag krijgen, is die nu met die persoon gedeeld.",
   "table|palette kind": "tabel",
   "Main account": "Hoofdrekening",
   "Balance (optional)": "Saldo (optioneel)",
@@ -11541,7 +11540,6 @@
   "Resend": "Opnieuw sturen",
   "Invitation withdrawn": "Uitnodiging ingetrokken",
   "Withdraw the invitation for {0}?": "Uitnodiging voor {0} intrekken?",
-  "The link stops working and the account, never used, is deleted.": "De link werkt niet meer en het nooit gebruikte account wordt verwijderd.",
   "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.": "Zonder account wordt er een nieuw aangemaakt in deze organisatie en krijgt de persoon een e-mail om een wachtwoord te kiezen. Met een account wordt de persoon toegevoegd.",
   "Organisation admins may invite new people by e-mail": "Organisatiebeheerders mogen nieuwe mensen per e-mail uitnodigen",
   "They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.": "Ze krijgen een account in die organisatie en een e-mail om een wachtwoord te kiezen. Uit: alleen beheerders van de server maken accounts aan.",
@@ -15254,5 +15252,7 @@
   "Mark the old quotation as superseded?": "Oude offerte als vervangen markeren?",
   "Yes, {0} no longer counts": "Ja, {0} telt niet meer",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig.",
-  "This quotation was superseded": "Deze offerte is vervangen"
+  "This quotation was superseded": "Deze offerte is vervangen",
+  "Invited. With an account at this address, the person sees the table once they may get it.": "Uitgenodigd. Met een account op dit adres ziet de persoon de tabel zodra die hem mag krijgen.",
+  "The invitation stops working.": "De uitnodiging werkt dan niet meer."
 }

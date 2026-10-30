@@ -7951,7 +7951,6 @@
   "Only people and agents of the same workspace can get a share": "Solo se puede compartir con personas y agentes del mismo espacio",
   "{0} share with a person or agent ends": ["{0} uso compartido con una persona o un agente termina", "{0} usos compartidos con personas o agentes terminan"],
   "Only people and agents of this workspace": "Solo personas y agentes de este espacio",
-  "If the address belongs to a person who can get the table, it is shared with them now.": "Si la dirección pertenece a una persona que puede recibir la tabla, ya está compartida con ella.",
   "table|palette kind": "tabla",
   "Main account": "Cuenta principal",
   "Balance (optional)": "Saldo (opcional)",
@@ -11541,7 +11540,6 @@
   "Resend": "Reenviar",
   "Invitation withdrawn": "Invitación retirada",
   "Withdraw the invitation for {0}?": "¿Retirar la invitación de {0}?",
-  "The link stops working and the account, never used, is deleted.": "El enlace deja de funcionar y se elimina la cuenta, que nunca se usó.",
   "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.": "Sin cuenta, se crea una nueva en esta organización y la persona recibe un correo para elegir una contraseña. Con cuenta, se añade a la persona.",
   "Organisation admins may invite new people by e-mail": "Los administradores de organizaciones pueden invitar a personas nuevas por correo",
   "They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.": "Reciben una cuenta en esa organización y un correo para elegir una contraseña. Desactivado: solo los administradores del servidor crean cuentas.",
@@ -15254,5 +15252,7 @@
   "Mark the old quotation as superseded?": "¿Marcar el presupuesto anterior como sustituido?",
   "Yes, {0} no longer counts": "Sí, {0} ya no cuenta",
   "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes.",
-  "This quotation was superseded": "Este presupuesto fue reemplazado"
+  "This quotation was superseded": "Este presupuesto fue reemplazado",
+  "Invited. With an account at this address, the person sees the table once they may get it.": "Invitación registrada. Con una cuenta en esta dirección, la persona verá la tabla en cuanto pueda recibirla.",
+  "The invitation stops working.": "La invitación dejará de funcionar."
 }

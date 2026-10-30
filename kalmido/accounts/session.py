@@ -147,6 +147,7 @@ app.wsgi_app = proxy_mw(app.wsgi_app)
 # ---- maintenance gate (restore of a backup). Every request and every background tick is an "active holder"; a
 # restore switches maintenance on, waits until it is the only holder left, swaps the data and switches it off.
 # Meanwhile new requests get 503 (except the health check and static files) and background threads wait.
+_PROXY_SHS = {}  # 2.360.2 M (#2561): account id -> when a proxy sign-in looks for tables shared with its address again
 _BG_TURN = {"f": None}  # 2.102.0 D (#1997): admin/worker.py wrk_turn -- a background loop runs in one process at a time
 
 
@@ -262,6 +263,10 @@ def authenticate():
         u = c.execute("SELECT * FROM users WHERE lower(proxy_login)=lower(?)", (val,)).fetchone()
         if u and not u["disabled"] and not is_agent(u):
             g.user, g.auth_via = u, "proxy"
+            if u["email"] and time.monotonic() > _PROXY_SHS.get(u["id"], 0):  # 2.360.2 M (#2561): no sign-in step with a proxy
+                _PROXY_SHS[u["id"]] = time.monotonic() + 3600
+                _shs_signin(c, u)
+                c.commit()
         else:
             g.auth_error, g.proxy_login = ("disabled" if u else "no_account"), val
     if not g.user and not g.auth_error:
@@ -479,6 +484,13 @@ def _rate_fail(keys):
     return out
 
 
+def _shs_signin(c, u):
+    """2.360.2 M (#2561): tables shared with the address of the account that signs in (sheets/shshare.py)."""
+    from ..sheets.shshare import shs_redeem
+    if u:
+        shs_redeem(c, u)
+
+
 def start_session(c, uid, remember, via="password"):
     """A new session (always a new random token: a login never adopts a token the browser brought along).
     via: password | 2fa | passkey | oidc | link (sign-in link) | restore (the admin after a backup restore)."""
@@ -492,6 +504,7 @@ def start_session(c, uid, remember, via="password"):
                ses_ua() if has_request_context() else ""))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
+    _shs_signin(c, c.execute("SELECT id, email, kind FROM users WHERE id=?", (uid,)).fetchone())
     from flask import has_request_context
     from ..notify.sev import sev_login
     sev_login(c, uid, client_ip() if has_request_context() else "", via)  # 2.36.2 (#1133): an admin from a new address
