@@ -276,6 +276,9 @@ the Caddyfile (or nginx configuration) instead.
 **Compression (2.65).** Kalmido compresses its JSON answers itself (gzip, from 1 KB on) when the client accepts it; with
 many tasks the start state shrinks to about a twentieth. A proxy that compresses too (Caddy `encode`, nginx `gzip`) sees the
 `Content-Encoding` header and leaves those answers alone, so it can stay on for the static files.
+Since 2.442 the Docker image also carries its scripts and styles packed ahead of time (gzip and brotli) and sends them by
+`Accept-Encoding`, so the first load is about a third of the size without any proxy setting. The nginx and Traefik examples
+in `examples/` compress the rest as well.
 
 **Two host names (internal and single sign-on).** Links in mails, push messages and calendar feeds use `PUBLIC_URL`,
 so set it to the name people should open. Logging out of Kalmido does not log you out of the sign-on portal. Point API

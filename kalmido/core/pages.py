@@ -72,6 +72,7 @@ def headers(resp):
 # ---------------------------------------------------------------- 2.149.0 B (#2505 #2506): content hashes of static files
 
 _SHASH, _SHASH_LOCK = {}, threading.Lock()
+ST_PACK_DIR = os.path.join(app.root_path, "static_packed")  # 2.442.0 (#2808): tools/pack_static.py, in the Docker image
 _ASSET_RE = re.compile(r'(<(?:script|link)\b[^>]*?\b(?:src|href)="/static/)([\w./-]+\.(?:js|css))"')
 _SW_LISTS_RE = re.compile(r"const (?:SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)
 
@@ -121,17 +122,47 @@ def st_asset(rel):
     return _SHASH[path][1]
 
 
+def st_packed(h):
+    """2.442.0 (#2808): (bytes, encoding) of the copy tools/pack_static.py packed for content hash h when the browser takes it;
+    None: no such copy (not built in a Docker image, a file changed since, too small) or a Range request (ranges of the plain file)."""
+    if "Range" in request.headers:
+        return None
+    for enc, ext in (("br", ".br"), ("gzip", ".gz")):
+        if request.accept_encodings[enc] > 0:
+            try:
+                with open(os.path.join(ST_PACK_DIR, h + ext), "rb") as f:
+                    return f.read(), enc
+            except OSError:
+                pass
+    return None
+
+
 def st_static(filename):
     """2.191.0 B (#1824): the /static/ route; .js / .css without comments (ETag = content hash, 304 on If-None-Match),
-    everything else as before through flask's own sender."""
-    hit = st_asset(filename) if filename.endswith((".js", ".css")) else None
-    if not hit or hit[0] is None:
-        return app.send_static_file(filename)
-    r = Response(hit[0], mimetype=mimetypes.guess_type(filename)[0] or "application/octet-stream")
-    r.cache_control.no_cache = True
-    r.set_etag(hit[1])
-    r.last_modified = hit[2]
-    return r.make_conditional(request, accept_ranges=True, complete_length=len(hit[0]))  # F1: Range = 206 as before
+    everything else as before through flask's own sender. 2.442.0 (#2808): .js / .css go out packed ahead of time when
+    there is a copy (st_packed; its own ETag, a proxy leaves an answer with a Content-Encoding alone)."""
+    asset = filename.endswith((".js", ".css"))
+    hit = st_asset(filename) if asset else None
+    packed = st_packed(hit[1]) if hit else None
+    mt = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    if packed:
+        r = Response(packed[0], mimetype=mt)
+        r.headers["Content-Encoding"] = packed[1]
+        r.cache_control.no_cache = True
+        r.set_etag(f"{hit[1]}-{packed[1]}")
+        r.last_modified = hit[2]
+        r = r.make_conditional(request)
+    elif not hit or hit[0] is None:
+        r = app.send_static_file(filename)
+    else:
+        r = Response(hit[0], mimetype=mt)
+        r.cache_control.no_cache = True
+        r.set_etag(hit[1])
+        r.last_modified = hit[2]
+        r = r.make_conditional(request, accept_ranges=True, complete_length=len(hit[0]))  # F1: Range = 206 as before
+    if asset:
+        r.vary.add("Accept-Encoding")
+    return r
 
 
 app.view_functions["static"] = st_static
