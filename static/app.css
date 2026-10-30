@@ -2272,6 +2272,7 @@ button.tvr-task:hover{color:var(--accent)}
    the agent chat), a long name stays on one line */
 .tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
+@media (max-width:767px){ .tcrhead .msbtn{display:none} }  /* 2.446.0 (#3334): in the ⋯ menu, the hidden button anchors the search bar */
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:var(--fs-m);max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
@@ -2280,7 +2281,7 @@ button.tvr-task:hover{color:var(--accent)}
 .chnew{position:relative;z-index:2;align-self:center;display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;margin:-3.25rem 0 .5rem;padding:0 1rem;border:1px solid var(--line2);border-radius:99rem;background:var(--bg2);color:var(--accent);font:inherit;font-size:var(--fs-s);font-weight:600;box-shadow:var(--shadow);cursor:pointer}
 .chnew.hidden{display:none}
 /* 2.12.2 (#453 N4): phone chat with the keyboard up: all the room for the messages (height set by chatFit()) */
-body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
+body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote,body.kb-open .cwsw{display:none}
 @media (max-width:767px){.achip .act{max-width:34vw}.agview{padding:.5rem .75rem 7rem}.chview{height:calc(100dvh - 7.5rem)}}
 .rx.rxplus{padding:0 .375rem}.rx.rxplus .i{width:.75rem;height:.75rem}
 .rxpick{padding:.5rem;display:flex;flex-direction:column;gap:.5rem;max-width:17rem}
@@ -4098,6 +4099,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .tcroom{display:flex;flex-direction:column;min-width:0;min-height:0}
 .tcroom.tcnone{align-items:center;justify-content:center}
 .tcrhead{display:flex;align-items:center;gap:.625rem;padding:.5rem .75rem;border-bottom:1px solid var(--line);min-height:3.25rem}
+@media (max-width:767px){ .tcrhead{padding-block:.25rem} }  /* 2.446.0 (#3334): 44 px buttons in at most 56 px, like the agent chat */
 .tcrt{display:flex;flex-direction:column;min-width:0}
 .tcrt .muted{font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tcmsgs{flex:1;min-height:0}

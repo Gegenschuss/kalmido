@@ -87,6 +87,19 @@ function o3b_splitBtn(room, rid) {
   if (!rid || room?.kind !== 'list' || typeof cw_split !== 'function' || (typeof cw_ren !== 'undefined' && cw_ren === 't:' + rid)) return '';
   return `<button type="button" class="iconbtn" data-act="tc-split" data-rid="${+rid}" title="${esc(tr('Open in split window'))}" aria-label="${esc(tr('Open in split window'))}">${ic('panel', 's')}</button>`;
 }
+// 2.446.0 (#3334): the header on the phone is one row like the agent chat's (2.350.0 A): right only the ⋯ menu; search,
+// project, split window, settings, encryption and mute sit in it. The search button stays hidden as the anchor of the search bar.
+function tc_headItems() {
+  if (!isMobile()) return [];
+  const rid = S.tc.rid, room = S.tc.room, e2e = room?.kind === 'dm' && !!globalThis.crypto?.subtle;
+  return [{label: tr('Search in this chat'), icon: 'search', fn: () => msSearchToggle('t', rid)},
+    ...room?.kind === 'list' ? [{label: tr('Open the project'), icon: 'list', fn: () => go('l/' + room.list_id)}] : [],
+    ...o3b_splitBtn(room, rid) ? [{label: tr('Open in split window'), icon: 'panel', fn: () => cw_split('t:' + rid)}] : [],
+    ...tcx_isX(room) ? [{label: room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'), icon: 'gear', fn: () => tcx_settings()}] : [],
+    ...e2e ? [{label: tr('Encrypted conversation'), icon: 'lock', on: !!room.e2e, fn: () => e2eDmToggle()}] : [],
+    ...e2e && room.e2e ? [{label: tr('Safety number'), icon: 'key', fn: () => e2eSafetyDlg()}] : [],
+    {label: tr('Mute|button'), icon: room?.muted ? 'belloff' : 'bell', on: !!room?.muted, fn: () => tcMute()}];
+}
 function tcRoomHtml() {
   if (S.tc.th && !tth_wide()) return tth_html();  // 2.139.0 A (#2127): phones and the chat panel: the thread full size
   const rid = S.tc.rid, r = (S.tc.rooms || []).find(x => x.id === rid), room = S.tc.room;
@@ -94,11 +107,11 @@ function tcRoomHtml() {
   // 2.139.0 B (#2128): the microphone takes room in the composer: the placeholder's name gets shorter beside it
   // 2.147.2 (#2523): the touch button "Insert reference" takes the same room again: the name gets shorter once more ("Web…" beside the microphone)
   const rfb = typeof rf_btnHtml === 'function' ? rf_btnHtml('tc-in') : '';
-  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', cut = isMobile() ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
+  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', ph = isMobile(), cut = ph ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
-    <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
-    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}${isTouch() ? `<button type="button" class="iconbtn" data-act="tc-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+    <span class="spacer"></span>${msgSearchBtn('t', rid)}${!ph && room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
+    ${ph ? '' : `${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}`}${isTouch() ? `<button type="button" class="iconbtn" data-act="tc-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}${ph ? '' : `<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>`}${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() /* 2.266.0 (#2970) */ : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(name.length > cut ? tr('Message to {0}', name.slice(0, cut - 1).trimEnd() + '…') : tr('Message to {0}…', name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
@@ -299,7 +312,7 @@ document.addEventListener('click', e => {
   else if (act === 'tc-edit-save') tcEditSave(+a.dataset.mid);
   else if (act === 'tc-edit-cancel') { S.tc.edit = null; S.tc.editTh = false; tcPatch(); }
   else if (act === 'tc-mute') tcMute();
-  else if (act === 'tc-more') menu(a, kbd_item('team'));  // 2.380 E (#3449)
+  else if (act === 'tc-more') menu(a, [...tc_headItems(), ...kbd_item('team')]);  // 2.380 E (#3449); 2.446.0 (#3334): the phone's header
   else if (act === 'tc-new') tcNewMenu(a);
   else if (act === 'tc-list') go('l/' + a.dataset.id);
   else if (act === 'tc-split') cw_split('t:' + +a.dataset.rid);  // 2.83.0 (#1774)

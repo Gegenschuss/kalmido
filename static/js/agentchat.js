@@ -972,7 +972,8 @@ function chatPatch(o = {}) {
 // keyboard, the tab bar); with the keyboard up (body.kb-open) the tab bar and the note go, and a chat that was at the
 // bottom stays at the bottom, so the newest message is right above the input
 function chatFit() {
-  const v = $('#view .chview');
+  const v = $('#view .chview'), t = !v && chatFull() && $('#view .tcview.inroom');
+  if (t) { tcFit(t); return; }
   if (!v || !chatFull()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; chatKeepBottom(); return; }
   const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight, box = $('#chat-msgs');
   const kb = !!vv && editFocused() && v.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
@@ -987,9 +988,18 @@ function chatFit() {
   if (v.style.height !== h) v.style.height = h;
   if (box && S.chat.pin !== false) box.scrollTop = box.scrollHeight;
 }
+// 2.446.0 (#3334): the team chat on the phone: the same body.kb-open, its layout fills the rest by itself (body.in-team). In
+// landscape the keyboard left no room for the messages; a conversation that was at the bottom stays there
+function tcFit(t) {
+  const vv = window.visualViewport, kb = !!vv && editFocused() && t.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
+  const was = document.body.classList.contains('kb-open'), box = $('#tc-msgs');
+  document.body.classList.toggle('kb-open', kb);
+  if (kb && !was && box && box.scrollHeight - box.scrollTop - box.clientHeight < 80 + (S.vvMax || innerHeight) - vv.height) box.scrollTop = box.scrollHeight;
+}
+const chatFitIn = id => id === 'chat-in' || id === 'tc-in' || id === 'tth-in';
 window.addEventListener('resize', () => chatFit());
-document.addEventListener('focusin', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
-document.addEventListener('focusout', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
+document.addEventListener('focusin', e => { if (chatFitIn(e.target.id)) setTimeout(chatFit, 0); });
+document.addEventListener('focusout', e => { if (chatFitIn(e.target.id)) setTimeout(chatFit, 0); });
 // 2.13.2 (#478 N10): the side panel too stays at the bottom when its height changes (a smaller window, an iPad keyboard,
 // the box growing while typing) as long as it was at the bottom
 function chatKeepBottom() { const b = $('#chat-msgs'); if (b && S.chat.pin !== false) b.scrollTop = b.scrollHeight; }
