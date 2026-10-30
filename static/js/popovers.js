@@ -904,6 +904,12 @@ function sortMenu(anchor) {
 const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
 // 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
 const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
+// 2.396.0 (#3385): the hint "Use as a shopping list?" (render.js): list kind shopping + ticked at the bottom, one undo step
+async function setShopList(id) {
+  if (!listById(id)) return;
+  const e = await listPatch(id, {family: 'shopping', checklist: true}, tr('Use as a shopping list'));
+  if (e) offerUndo(tr('Now a shopping list'), e);
+}
 async function setDab(id, on) {
   const l = listById(id); if (!l) return;
   const e = await listPatch(id, {checklist: on}, tr('Show completed at the bottom'));

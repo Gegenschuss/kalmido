@@ -3834,6 +3834,10 @@ MIGRATIONS = [
     # 2.412.0 (#3552): the properties of a project switched on / off by hand against its type's cut (JSON {key: 0 | 1}, only
     # the deviations; '' = as the project type, lists/templates.py PTYPE_PROPS_OFF). Display only; older versions ignore it
     ("lists", "props", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS props TEXT NOT NULL DEFAULT ''"),
+    # 2.396.0 A (#3386): the git author for AI commits in this repository ('' = the agent's runtime git_author_name / _email,
+    # integrations/git.py git_author_of). Older versions ignore them
+    ("git_conns", "author_name", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS author_name TEXT NOT NULL DEFAULT ''"),
+    ("git_conns", "author_email", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS author_email TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

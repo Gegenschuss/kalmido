@@ -2405,6 +2405,7 @@ agent accordingly.
 | Interim summary (2.233.0) | when a host that keeps a chat conversation going (`--resume`) ends it with a short summary and starts a fresh one: at a session size *small / medium / large*, after so many runs (10-500), after so many minutes of pause (5-1440, 0 = never; a pause counts only from the small size on). Defaults = the former fixed values. Saves cost; the new conversation can forget details | `rotate_size` (`"small"`, `"medium"`, `"large"`), `rotate_runs` (default 60), `rotate_idle_min` (default 45); read-only, always filled in: `rotate_mb` (0.4 / 0.8 / 1.5, the session file in MB), `rotate_tokens` (80000 / 150000 / 250000 context tokens), `rotate_idle_mb` (0.4) |
 | Reset now (button) | restart with a fresh session right away | `reset_seq` goes up by one, event `reset` |
 | Permissions (2.29.0) | how the host handles actions outside the agent's allow list: *Ask first* (every such action asks the person in the chat), *Auto* (the host's own safety check decides; risky actions stay blocked), empty = the host's default | `permission_mode` (`"ask"`, `"auto"`, `""`) |
+| Git author (2.396.0) | name and e-mail address the host sets as git author for the agent's commits (both appear publicly in GitHub with every commit); empty = the neutral default `Kalmido <noreply@kalmido.com>`, each part on its own. *Append Co-Authored-By*: whether the agent adds a `Co-Authored-By:` line to its commit messages (off by default). A project with a connected repository can override name / e-mail for AI commits in that repository (see [Coding agents in a team](#coding-agents-in-a-team)) | `git_author_name` (string, max 100, no `<` `>` or line breaks; `""`), `git_author_email` (a valid e-mail address or `""`; 400 otherwise), `git_coauthor` (bool, default `false`); read-only, always filled in: `git_author` (`"Name <mail>"` with the defaults filled in) |
 | Permission questions go to (2.312.0) | a team agent: the person who answers its permission questions, chosen from the active people it reaches in a shared project (as for a chat with it); *As set up on its computer* = `KALMIDO_PERM_USER` of its env file (the one-command setup writes the person who made the code). A personal agent always asks its owner | `perm_user` (account id or `null`); `GET /api/v1/agent` also carries `perm_user_id` |
 
 2.29.0: the permission mode shows as a small badge in the agent's chat header (*Auto* / *Ask first*). The owner of a
@@ -2423,7 +2424,9 @@ reaches the agent (else `null`); the event runner (`mcp/agent_run.py`, both laun
 GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true, "autocompact_pct": 70,
                                         "nightly_reset": "04:00", "reset_seq": 3, "timezone": "Europe/Berlin",
                                         "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
-                                        "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4}}
+                                        "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
+                                        "git_author_name": "", "git_author_email": "", "git_coauthor": false,
+                                        "git_author": "Kalmido <noreply@kalmido.com>"}}
 PATCH /api/admin/agents/{id}  {"runtime": {"model": "opus", "autocompact_pct": 80}}   (admins; only the given keys change)
 POST  /api/admin/agents/{id}/reset                                                     (admins; 409 while paused)
 ```
@@ -2444,6 +2447,10 @@ Changing the settings sends the event `runtime_changed`, *Reset now* the event `
    `rotate_mb`), `rotate_runs` or a pause of `rotate_idle_min` minutes (0 = never) above `rotate_idle_mb`, and starts a
    new day at `nightly_reset`. [`mcp/agent_run.py`](../mcp/agent_run.py) does this in event mode; its
    `KALMIDO_SESSION_*` variables apply only with an older Kalmido that sends no `rotate_*` values.
+6. (2.396.0) starts the agent with the git author of `git_author` (`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` and
+   `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL`), sets `KALMIDO_GIT_COAUTHOR=1` when `git_coauthor` is on, and restarts
+   it when they change; without `git_author` (an older Kalmido) it sets nothing. A task's `repo.git_author` (the
+   project's override, else the agent's value) wins for commits in that repository.
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) is a reference launcher for Claude Code that does exactly this
 (2.7.2: [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) is the same for Windows and macOS, see [Set up an agent](#set-up-an-agent)). It
@@ -3324,7 +3331,11 @@ Kalmido's part:
 
 - The `assigned` event (every task event in such a project) and `GET /api/v1/tasks/{id}` carry `repo`: `provider`,
   `web_url`, `api_url`, `owner`, `repo`, `full_name`, `default_branch`, a suggested `branch` (`kalmido-<id>`), the
-  linked pull requests `prs` (state, CI) and `commits`. A branch named like that, or `#<id>` in a commit or pull request,
+  linked pull requests `prs` (state, CI) and `commits`. 2.396.0: `git_author` (`"Name <mail>"`: the git author for the
+  agent's commits in this repository), `git_coauthor` (bool) and `git_author_source` (`project` = set at the repository,
+  `agent` = the agent's runtime setting, `default`). The project owner / project admins set the override in the project
+  settings under *Repository > More > Git author for AI commits* (`PATCH /api/repos/{id} {"author_name", "author_email"}`,
+  empty = the agent's own); `GET /api/lists/{id}/repos` and the lists' `repos` carry `author_name` / `author_email`. A branch named like that, or `#<id>` in a commit or pull request,
   links them to the task; the panel shows them under *Code*.
 - When the pull request is ready, the agent posts a comment with the structured field
   `{"kind": "merge_request", "pr_url": "…/pull/12", "summary": "…"}` (MCP `request_merge_approval`; only agents, only
@@ -3364,7 +3375,8 @@ You are the coding agent of the Kalmido project "<project>". You work through th
 ## Working a ticket
 1. `set_status(working, "<short plan>", task_id)`, read the task with `get_task` (notes, comments, `repo`).
 2. Branch from `repo.default_branch` with the name `repo.branch` (`kalmido-<id>`). Never commit to the
-   default branch, never force-push shared branches.
+   default branch, never force-push shared branches. Commit as `repo.git_author` (`git -c user.name=… -c user.email=…`);
+   add a `Co-Authored-By:` line only when `repo.git_coauthor` is true.
 3. Keep pull requests small: one ticket, one pull request. Mention `#<id>` in the title; `fixes #<id>` in the
    description only when merging it really finishes the task.
 4. Run the tests. Open the pull request with your own credentials, then `request_merge_approval(task_id, pr_url,

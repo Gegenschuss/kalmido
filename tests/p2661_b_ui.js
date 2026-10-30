@@ -41,6 +41,7 @@ const WS_VIEWS = {
   'static/js/ctfold.js': 'draw',              // 2.351.0 B (#2749): the address book's folder tree shows the shown workspace's entry
   'static/js/collab.js': 'draw',              // 2.145.0 (#2444): the news list's hint rows for the OTHER workspaces (newsElseHtml), drawn with the list
   'static/js/agents.js': 'draw',              // agents of the workspace (p2280_ui)
+  'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - in the private area only the person's own agents are created
   'static/js/bookmarks.js': 'draw',           // 2.97.0 (#1950): bookmarks load the shown workspace (bm_sp) unless one is picked in the view
                                               // 2.172.0 B (#2679): via rd_space; a view drawn for another space loads again (BM.sp)
   'static/js/feeds.js': 'draw',               // 2.172.0 B (#2677): feeds of the shown workspace (rd_space), loads again when it changed (RSS.sp)

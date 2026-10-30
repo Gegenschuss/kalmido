@@ -453,7 +453,8 @@ def t_tidy(api, a):
 TOOLS = [
     ("get_agent", "Who am I: the agent's user, enabled state, status, job counts, the latest event cursor and runtime (the "
                   "settings an admin chose for the agent's host: model, autocompact, autocompact_pct, nightly_reset HH:MM in "
-                  "timezone, reset_seq raised by 'Reset now'). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
+                  "timezone, reset_seq raised by 'Reset now'; 2.396.0: git_author 'Name <mail>' to commit as, git_coauthor = add "
+                  "a Co-Authored-By line; a task's repo.git_author wins in its repository). 2.236.0 (#2904-#2911): work_style = how your owner wants you to work and "
                   "report (budget, work window, quiet window, max_parallel, priority_rule, report style, push, results_to, next_step) "
                   "with state {working, work_resumes_at, quiet, quiet_until, timezone}; read it at the start and on work_style_changed. "
                   "2.235.0 (#2903): rules = your ACTIVE standing rules [{id, text, created_at, source}] (see get_rules / add_rule). "

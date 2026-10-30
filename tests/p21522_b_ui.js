@@ -19,7 +19,8 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const lastModal = d => [...d.querySelectorAll('.modal')].pop();
-const flip = (w, el, on) => { el.checked = on; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
+// 2.396.0 (#3385): the switch is the choice List | Project (radios): "off" picks List
+const flip = (w, el, on) => { const t = el.type === 'radio' && !on ? el.closest('.lkseg').querySelector('#l-kindl') : el; t.checked = el.type === 'radio' ? true : on; t.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(l => l.id === id)?.kind || 'list';
 
 (async () => {
@@ -48,6 +49,7 @@ const kindOf = async id => ((await call('GET', '/api/state')).lists || []).find(
   check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), 'new: no switch Progress and status (2.352.0)');
   check(!md.querySelector('#l-kindl') && !md.querySelector('.lkseg') && !/Simple list/.test(md.textContent), 'the type segment Simple list | Project is gone');
   check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#lm-sec-proj:not([open]) .lptype'), 'plain new project: the Start from cards folded');
+  check(!/Used for/.test(md.textContent) && !md.querySelector('#l-fam'), 'no "Used for" any more (2.396.0, #3385)');
   md.remove();
   w.eval(`listModal(null, '', {kind: 'project'})`); await sleep(250);
   md = lastModal(d);

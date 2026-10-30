@@ -325,7 +325,7 @@ async function staleDaysSet(lid, sel) {
   try { await optWrite(optSet(() => listById(lid), {stale_days: sd}), () => api('PATCH', `/api/lists/${lid}`, {stale_days: sd})); toast(tr('Saved')); staleLoad(true); }
   catch { const l = listById(lid); sel.value = l?.stale_days == null ? '' : String(l.stale_days); }
 }
-const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
+const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist', 'family'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"; 2.396.0 (#3385): family (the shopping-list offer)
 const LIST_LOCAL = ['name', 'color', 'view', 'dep_shift', 'rate', 'tickets', 'nag', 'day_hours', 'checklist', 'sort_mode', 'done_in_section', 'columns', 'stale_days'];  // 2.41.2 (#1501)
 const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : parseNum(v) ?? NaN) : v ?? '';
 // 2.46.2 (#1659): the list name while it is typed: sidebar and header show it at once (l._live, read by licName); it is
@@ -909,7 +909,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     <div class="lfolderhint" id="l-fhint" role="note" ${folderHintHtml(l, id, folder) ? '' : 'hidden'}>${folderHintHtml(l, id, folder)}</div>
     ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
-    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
+    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true))) ? tr('Shared only inside the organisation; its agents may join. Shopping lists and Home & life are private only.') + lwsBack(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder, true)), id ? l.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
     ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this project (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${id ? ovRowHtml(l) : ''}
     ${listDlgTeamHtml(l, id, 'client')}
@@ -926,7 +926,7 @@ function listModal(id, folder = '', o = {}) {
     ${timeOn() ? '</div>' : ''}`, fown)}
     ${lmSec('show', tr('Display and behaviour'), `
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
-    ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
+    ${''/* 2.396.0 (#3385): the row "Used for" is gone; a list keeps its stored family (shopping mode, aisles); a shopping list offers it in the list itself (render.js hint shop) */}
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><span class="lchks"><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label>${id && !l.is_inbox ? `<label class="chkl ldsxrow"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label>` : ''}</span></div>
@@ -994,7 +994,7 @@ function listModal(id, folder = '', o = {}) {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),  // 2.352.0 C (#2752): no kind
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: numBody($('#l-dayh', md).value)} : {}), ...($('#l-time', md) ? {time_tracking: $('#l-time', md).checked} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
-      ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
+      ...(listById(id)?.family && $('#l-ws', md)?.value ? {family: ''} : {}),  // 2.396.0 (#3385): into an organisation ends the private list kind, as the row "Used for" did
       ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value,  // members: only their own placement / view
         ...(ladm ? {name: emo + nm, color: $('#l-col button.on', md)?.dataset.c || ''} : {})};  // 2.40.0 (#1431)
@@ -1033,7 +1033,6 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', numDec()) : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
-    if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
     if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
     tp_sync(md, x);  // 2.46.4 (#1751)
     pz_sync(md, x);  // 2.412.0 (#3552)
@@ -1080,14 +1079,9 @@ function listModal(id, folder = '', o = {}) {
       if (ptKeys) { ptPend = true; $('#l-pthint', md).textContent = ptypeHint(e.target.value); return; }
       ptypeChange(e.target.value); return;
     }
-    if (e.target.id === 'l-fam' && e.target.value && $('#l-ws', md)?.value) {  // 2.28.0 (#935): "Used for" makes the list private
-      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life projects except trips are private: they cannot belong to an organisation'));  // 2.173.0 A (#2680)
-      const h0 = $('#l-wshint', md); if (h0) h0.textContent = tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
-    }
     if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows
       const org = !!e.target.value;
-      if (org && $('#l-fam', md)?.value) { $('#l-fam', md).value = ''; }  // an organisation's list has no "Used for"
-      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
+      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. Shopping lists and Home & life are private only.') + lwsBack(+e.target.value, id ? listById(id)?.org_id : null) : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
       if (id) {  // 2.401.0 (#2924): the server's dry run first; cancelled = the field goes back
         const sel = e.target, to = sel.value ? +sel.value : null, from = listById(id)?.org_id || null;
         wsHold = true;
@@ -1099,8 +1093,7 @@ function listModal(id, folder = '', o = {}) {
       }
       return;
     }
-    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
-    if (!id && e.target.id === 'l-fam' && ['shopping', 'packing'].includes(e.target.value) && $('#l-dab', md)) $('#l-dab', md).checked = true;
+    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-time'].includes(e.target.id)) { if (e.target.id === 'l-time' && $('.ltimex', md)) $('.ltimex', md).hidden = !e.target.checked; autosave(); return; }  // 2.41.0 (#1471): l-time
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
     if (id && e.target.id === 'l-inmine') { mtSet(id, e.target.checked, {post: () => { const x = $('#l-inmine', md); if (x) x.checked = mtShown(id); }}).then(() => lsaved(null)); return; }  // 2.41.0 (#1365)
   });
@@ -1211,7 +1204,7 @@ function listModal(id, folder = '', o = {}) {
         const ni = $('#l-name', md); ni.setAttribute('aria-invalid', 'true'); ni.addEventListener('input', () => ni.removeAttribute('aria-invalid'), {once: true});
         toast(tr('Name missing')); return ni.focus();
       }
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Basket') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: numBody($('#l-rate', md).value)} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [body.folder]}}});  // 2.269.0 B (#3014)
       const {rate, nag, day_hours: _dh, ...b0} = body;

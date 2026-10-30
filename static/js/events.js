@@ -509,6 +509,7 @@ document.addEventListener('click', async e => {
     case 'dep-add': depPicker(id, a.dataset.dir); break;
     case 'wait-on': waitOnMenu(a, id); break;  // 2.25.0 (UX-43)
     case 'dab-on': hintDone('dab'); setDab(id, true); break;  // 2.25.0 (UX-28)
+    case 'shop-on': hintDone('shop'); setShopList(id); break;  // 2.396.0 (#3385)
     case 'dep-rm': {
       const b = +a.dataset.b;
       try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }

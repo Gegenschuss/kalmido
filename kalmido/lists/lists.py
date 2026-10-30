@@ -416,6 +416,8 @@ def list_update(lid):
         from ..accounts.orgs import list_org_set
         from ..tasks.movememo import lmm_snap
         lmm0 = lmm_snap(c, lid)  # 2.273.0 B (#3042): what the change ends, for the way back
+        if role == "owner" and "family" in b and not b["family"]:  # 2.396.0 (#3385): the same body ends "shopping list" etc. (private only) first
+            c.execute("UPDATE lists SET family='' WHERE id=?", (lid,))
         if list_org_set(c, lid, b["org_id"]):  # Denied 403 / 409
             list_own_mark(c, lid, "org_id")  # 2.29.0 (#1030): differs from its folder from now on
         b = {k: v for k, v in b.items() if k != "org_id"}
