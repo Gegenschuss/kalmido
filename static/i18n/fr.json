@@ -15118,5 +15118,19 @@
   "{0} invites you to {1}.": "{0} t’invite à rejoindre {1}.",
   "You are invited to {0}.": "Tu es invité à rejoindre {0}.",
   "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner : dans le logiciel de numérisation, configure un profil qui enregistre en PDF dans ce dossier (pas besoin qu’il soit consultable, Kalmido reconnaît le texte lui-même).",
-  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner : dans le logiciel de numérisation, choisis « Envoyer par e-mail » et envoie à cette adresse."
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner : dans le logiciel de numérisation, choisis « Envoyer par e-mail » et envoie à cette adresse.",
+  "Customize": "Personnaliser",
+  "Edit menu": "Modifier le menu",
+  "Hide from menu": "Masquer du menu",
+  "Navigation": "Navigation",
+  "The menus of the areas and the tab bar": "Les menus des domaines et la barre d'onglets",
+  "Menus": "Menus",
+  "The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.": "L'ordre et les entrées de chaque menu, pour vous sur tous les appareils. Moins masque une entrée (la recherche la trouve toujours), Plus la rétablit, glissez par la poignée.",
+  "Drag, or use the arrow keys": "Glissez ou utilisez les flèches",
+  "Hidden points stay where they are: the search still finds them, nothing is deleted.": "Les entrées masquées restent là : la recherche les trouve toujours, rien n'est supprimé.",
+  "Nothing in the menu": "Rien dans le menu",
+  "Nothing hidden": "Rien de masqué",
+  "Menu order changed": "Ordre du menu modifié",
+  "Menu points in this organisation": "Entrées de menu dans cette organisation",
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Désactivée, une entrée n'apparaît dans le menu d'aucun membre de cette organisation, même pas sous Masqués ; chaque membre organise les autres."
 }

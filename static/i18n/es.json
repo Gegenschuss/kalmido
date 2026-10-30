@@ -15118,5 +15118,19 @@
   "{0} invites you to {1}.": "{0} te invita a {1}.",
   "You are invited to {0}.": "Estás invitado a {0}.",
   "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Escáner: en el software de escaneo configura un perfil que guarde en PDF en esta carpeta (no hace falta que sea consultable, Kalmido reconoce el texto por sí mismo).",
-  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Escáner: en el software de escaneo elige «Enviar por correo electrónico» y envía a esta dirección."
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Escáner: en el software de escaneo elige «Enviar por correo electrónico» y envía a esta dirección.",
+  "Customize": "Personalizar",
+  "Edit menu": "Editar menú",
+  "Hide from menu": "Ocultar del menú",
+  "Navigation": "Navegación",
+  "The menus of the areas and the tab bar": "Los menús de las áreas y la barra de pestañas",
+  "Menus": "Menús",
+  "The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.": "El orden y los puntos de cada menú, para ti en todos los dispositivos. Menos oculta un punto (la búsqueda lo sigue encontrando), Más lo recupera, arrastra por el asa.",
+  "Drag, or use the arrow keys": "Arrastra o usa las flechas",
+  "Hidden points stay where they are: the search still finds them, nothing is deleted.": "Los puntos ocultos siguen ahí: la búsqueda los encuentra, no se borra nada.",
+  "Nothing in the menu": "Nada en el menú",
+  "Nothing hidden": "Nada oculto",
+  "Menu order changed": "Orden del menú cambiado",
+  "Menu points in this organisation": "Puntos de menú en esta organización",
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Desactivado, un punto no aparece en el menú de ningún miembro de esta organización, ni siquiera en Ocultos; cada miembro ordena los demás."
 }

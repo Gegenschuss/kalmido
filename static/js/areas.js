@@ -32,7 +32,7 @@ const mg_feats = id => (mg_area(id)?.[3] || []).flatMap(p => p[4]());
 const mg_allOn = id => { const f = new Set(pma_full()), ks = mg_feats(id).filter(k => f.has(k)); return ks.length > 0 && ks.every(k => feat(k)); };
 // the tab the area opens with: the one last used on this device (LS mgTab), else its first switched-on part
 function mg_target(id) {
-  const ps = mg_partsShown(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];  // 2.173.0 A (#2680): an organisation's view: its parts only
+  const ps = (a => [...mg_partsMenu(a), ...mg_partsShown(a)])(mg_area(id)), last = (LS.get('mgTab', {}) || {})[id];  // 2.173.0 A (#2680): an organisation's view: its parts only; 2.418.0 (#3560): the menu's first
   if (id === 'office' && !isMobile() && ps.some(p => p[0] === 'office')) return ofm_entry().go;  // 2.161.2 (#2616)
   return (ps.find(p => p[0] === last) || ps[0] || mg_parts(mg_area(id))[0] || [id])[0];  // 2.353.0 D (#2759): only a part without an entry on: that one
 }
@@ -49,7 +49,7 @@ function mg_tabsHtml(mod) {
   const a = mg_areaOf(mod); if (!a || S.me?.kid) return '';
   mg_seen(mod);
   if (a[0] === 'office') { setTimeout(ofr_after, 0); return ofm_menuHtml(mod); }  // 2.87.9 (#1917): the office menu (a phone's; a computer: ofr_wrap, the points in the panel of sidebar B)
-  const sb = sbb_on(), ps = mg_partsShown(a).filter(p => !sb || p[0] === mod || !sideHidden('e:' + p[0]));  // 2.224.0 A (#2817): a part hidden in the sidebar settings is no tab either
+  const sb = sbb_on(), ps = mg_partsMenu(a);  // 2.224.0 A (#2817): a part hidden in the sidebar settings is no tab either; 2.418.0 (#3560): on a phone too (the menu's order, hidden points out)
   if (ps.length < 2 || sb && !sbb_noPan(a[0])) return '';  // 2.152.2 (#2618): a computer: the parts are in the panel of sidebar B (2.224.0 A #2817: areas without a panel keep their tabs)
   return `<div class="seg mgtabs" role="tablist" aria-label="${esc(tr(mg_nameKey(a)))}" data-mgtabs="${a[0]}">${ps.map(([m, i, n]) => `<button type="button" role="tab" data-go="${m}" aria-selected="${m === mod}" class="${m === mod ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(mg_partName(m, n)))}</span>${m === 'time' && S.timer || m === 'pomo' && S.pomo ? '<span class="recdot"></span>' : ''}</button>`).join('')}</div>`;
 }
@@ -135,8 +135,60 @@ const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
-// 2.380 F (#3411): no "More" any more -- every point allowed is shown; a point of Money nobody needs is switched off under
-// Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
+// points of Money not used yet (2.276.0 A, #3039: they waited behind "More"); 2.418.0 (#3560): they start under "Hidden" of
+// the menu's editor instead (nav_defHid), until used or brought back by hand
+// 2.380 F (#3411): a point of Money nobody needs is switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
+const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
+// ---- 2.418.0 (#3560): each person arranges the menus of the areas (navmenu.js draws the editor): the order, the points
+// hidden (only not in the menu: data, function and rights stay, the search finds them) and the points that start hidden but
+// were brought back. User setting nav_menus, json {area: {order, hidden, shown}} (accounts/navmenus.py), the same on phone
+// and computer. An organisation's admins switch points off for all members (orgs.nav_off "<area>:<key>"): those are not in
+// the menu, not even under Hidden. The point open now always shows.
+const NAV = {s: null, o: {}, edit: null};  // edit = the area whose menu is being arranged in place (panel / office start page)
+function nav_pref(area) {
+  const s = S.settings?.nav_menus || '{}';
+  if (s !== NAV.s) { NAV.s = s; try { const o = JSON.parse(s); NAV.o = o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { NAV.o = {}; } }
+  const m = NAV.o[area] || {};
+  return {order: Array.isArray(m.order) ? m.order : [], hidden: new Set(m.hidden || []), shown: new Set(m.shown || [])};
+}
+const nav_orgOff = (area, key) => { const w = typeof wsCur === 'function' ? wsCur() : ''; return w.startsWith('org:') && (wsOrg(w.slice(4))?.nav_off || []).includes(area + ':' + key); };
+const nav_defHid = (area, key) => { if (area !== 'office' || !OFM_LATER[key]) return false; const u = ofm_used(); return !!u && !OFM_LATER[key](u); };
+// hidden by the person: by hand, or starting hidden and not brought back; the parts hidden in the old sidebar settings
+// (sidebar "e:<part>", before 2.418.0) count as hidden too until shown again
+const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && (nav_defHid(area, key) || area !== 'office' && sideHidden('e:' + key)); };
+const nav_open = (area, key) => area === 'office' ? S.route?.mod === 'office' && S.route.tab === key || S.route?.mod === key && key !== 'office' : S.route?.mod === key;
+// the menus that can be arranged (the editor: navmenu.js, loaded on the first use)
+const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
+const nav_canEdit = id => NAV_AREAS.includes(id) && !S.me?.kid && !!S.settings;
+// a computer: "Customize" as the last row of the area's panel; a phone: a pen on top of the area's menu
+const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customize'))}</span></button>` : '';
+const nav_penHtml = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<div class="navpen"><button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button></div>` : '';
+// the editor in place of the menu (its script first loads, then the panel / page draws again)
+const nav_editSlot = id => typeof nav_edHtml === 'function' ? nav_edHtml(id) : (loadModule('navmenu').then(() => { renderSide(); if (id === 'office' && S.route.mod === 'office') renderView(); }, () => {}), `<p class="muted navedl0">${esc(tr('Loading…'))}</p>`);
+function nav_edit(id, on = true) {
+  NAV.edit = on ? id : null;
+  const go = () => { renderSide(); if (S.route.mod === 'office' && id === 'office') renderView(); setTimeout(() => $(on ? '.naved [data-act="nav-done"]' : `[data-act="nav-edit"][data-area="${id}"]`)?.focus({preventScroll: true}), 0); };
+  if (on && typeof nav_edHtml !== 'function') loadModule('navmenu').then(go, () => {}); else go();
+}
+// a computer: right-click on a point of a panel = "Hide from menu" / "Customize" (navmenu.js nav_rowMenu)
+document.addEventListener('contextmenu', e => {
+  const b = e.target.closest?.('#side [data-navk]'); if (!b || isMobile() || !nav_canEdit(b.dataset.navk.split(':')[0])) return;
+  e.preventDefault(); e.stopPropagation();
+  loadModule('navmenu').then(() => nav_rowMenu(b), () => {});
+}, true);
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="nav-edit"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); nav_edit(b.dataset.area);
+}, true);
+// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0) move once into the setting
+function nav_legacy() {
+  const all = LS.get('ofmAll', false), seen = LS.get('ofmSeen', null); if (!all && !seen || !S.settings) return;
+  LS.del('ofmAll'); LS.del('ofmSeen');
+  const ks = Object.keys(OFM_LATER).filter(k => all || (seen || []).includes(k)), p = nav_pref('office');
+  if (ks.length && !p.shown.size && !p.hidden.size) { NAV.o.office = {...(NAV.o.office || {}), shown: ks}; const v = JSON.stringify(NAV.o); S.settings.nav_menus = v; api('PATCH', '/api/settings', {nav_menus: v}).catch(() => {}); }
+}
+// the person's order: named keys first in that order, the others after them in their usual order (rank)
+const nav_sort = (area, xs, key = x => x.key, rank = () => 0) => { const o = nav_pref(area).order, r = x => { const n = o.indexOf(key(x)); return n < 0 ? o.length + rank(x) : n; }; return xs.map((x, i) => [x, i]).sort((a, b) => r(a[0]) - r(b[0]) || a[1] - b[1]).map(a => a[0]); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
 // ([5], else Administration) once the office is loaded, so a new office part is never out of reach
 const ofm_all = () => typeof OFC_TABS === 'undefined' ? OFM_ITEMS : [...OFM_ITEMS, ...OFC_TABS.filter(t => !OFM_ITEMS.some(i => i.key === t[0]))
@@ -147,7 +199,11 @@ const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'cont
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
-const ofm_items = () => ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i)).sort((a, b) => ofr_rank(a) - ofr_rank(b));
+// 2.418.0 (#3560): every point that may show (switched on, the country pack, the rights, not off in the organisation), in
+// the person's order; ofm_items = those in the menu, ofm_hidden = those under "Hidden" of the editor
+const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
+const ofm_items = () => ofm_avail().filter(i => !nav_hid('office', i.key) || nav_open('office', i.key));
+const ofm_hidden = () => ofm_avail().filter(i => nav_hid('office', i.key) && !nav_open('office', i.key));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
@@ -228,11 +284,13 @@ function ofm_startHtml() {
   const its = ofm_items();
   const fig = (ofm_lv() ? ofm_lv().kpi && ofm_lv().kpi !== 'none' : ofm_adm()) && typeof kp_tile === 'function' ? kp_tile(c => `<section class="ofmfig">${c}</section>`) : '';
   const row = i => `<button type="button" class="oflr" data-go="${i.go}" data-ofm="${i.key}">${ic(i.icon)}<span>${esc(tr(i.name))}</span>${ic('chev', 's')}</button>`;
-  // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded)
+  // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded); 2.418.0 (#3560): no "More" any more, the
+  // menu's editor (pen on top, navmenu.js) hides and brings back points
+  if (NAV.edit === 'office') return `<div class="ofmstart">${nav_editSlot('office')}</div>`;
   const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
   const norc = typeof bnr_startHtml === 'function' && ofm_adm() ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
-  return `<div class="ofmstart">${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
+  return `<div class="ofmstart">${nav_penHtml('office')}${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
 // so an arrangement from before 2.44.0 that hid both still hides the area, and 2.43.1 reads what this one writes)
@@ -302,7 +360,9 @@ const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org
 // 2.353.0 D (#2759): parts without an own entry in the navigation (tabs, panel, menus): Documents is a saved filter of the
 // file store now (abdocs.js); its route #docs, its switch and its old links stay
 const MG_NONAV = new Set(['docs']);
-const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]) && !MG_NONAV.has(p[0]));
+const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]) && !MG_NONAV.has(p[0]) && !nav_orgOff(a[0], p[0]));  // 2.418.0 (#3560): + off in the organisation
+// 2.418.0 (#3560): the parts in the area's menu (panel, tabs): the person's order, without the hidden ones (the open one stays)
+const mg_partsMenu = a => nav_sort(a[0], mg_partsShown(a), p => p[0]).filter(p => !nav_hid(a[0], p[0]) || nav_open(a[0], p[0]));
 const O3A_LIFE_NAME = N_('Travel & contacts|area');
 // 2.364.0 B (#3018): with Office & finance off the area is called and drawn like its first part on (Contacts, else Clients)
 const mg_ofOff = a => a?.[0] === 'office' && !officeOn() && mg_parts(a).length > 0;
@@ -584,7 +644,7 @@ function sbb_officeHtml() {
   const its = ofm_items(), here = sbb_area() === 'office', cur = here ? ofm_cur(S.route.mod) : '';
   return OFM_GROUPS.map(g => {
     const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
-    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}"`)).join('')}</div>`;
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}" data-navk="office:${i.key}"`)).join('')}</div>`;
   }).join('')  // 2.351.0 A (#3312): a document area opens as a tree (office_tree.js: its folders, 20 newest, More…); no group "Folders"
     + (typeof ctf_panelHtml === 'function' ? ctf_panelHtml() : '');  // 2.351.0 B (#2749): the address book's folders (ctfold.js, on its page)
 }
@@ -754,14 +814,21 @@ document.addEventListener('click', e => {
   sbb_foldSet(g, !sbb_folded(g)); renderSide();  // 2.276.0 A (#3039): was the toggle in sbbFold
   $(`#side [data-act="sbb-group"][data-g="${CSS.escape(g)}"]`)?.focus({preventScroll: true});
 });
-// 2.276.0 A (#3039): the phone's start page folds Money (same choice as the panel); 2.380 F (#3411): "More" is gone
+// 2.276.0 A (#3039): the phone's start page folds Money (same choice as the panel)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="ofm-group"]'); if (!b) return;
   sbb_foldSet('office:money', !sbb_folded('office:money'));
   renderSide(); if (b.closest('#view')) renderView();
   $('#view [data-act="ofm-group"]')?.focus({preventScroll: true});
 });
+// 2.418.0 (#3560): the menus that can be arranged: the editor in place while it is open, else a pen on top (phone) or
+// "Customize" as the last row (computer)
 function sbb_panelHtml(id) {
+  if (!NAV_AREAS.includes(id) || sbb_noPan(id)) return sbb_panelHtml0(id);
+  if (NAV.edit === id) return nav_editSlot(id);
+  const h = sbb_panelHtml0(id); return h && nav_penHtml(id) + h + nav_editBtn(id);
+}
+function sbb_panelHtml0(id) {
   const d = sbb_def(id); if (!d) return '';
   const title = '';  // 2.152.3 A (#2619): the area's name sits in the panel's head (sbb_headHtml)
   if (sbb_noPan(id)) return '';  // 2.224.0 A (#2817): no panel on a computer
@@ -773,10 +840,10 @@ function sbb_panelHtml(id) {
   if (id === 'ablage') return title + (SBB_LAST.ablage = ab_panelHtml());  // 2.152.3 B (#2621): ablage.js
   // 2.152.2 (#2618): time, review, home, file store: their parts as entries (hidden ones per part stay hidden, unless open)
   const a = mg_area(id);
-  if (a) return title + `<div class="sgroup sbbp">${mg_partsShown(a).filter(p => p[0] === S.route.mod || !sideHidden('e:' + p[0])).map(p => {
+  if (a) return title + `<div class="sgroup sbbp">${mg_partsMenu(a).map(p => {
     const after = p[0] === 'time' && S.timer || p[0] === 'pomo' && S.pomo ? '<span class="c"><span class="recdot"></span></span>'
       : p[0] === 'family' ? (n => n ? `<span class="c nunread">${n}</span>` : '')((S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)) : '';
-    return sbb_row(p[0], p[1], tr(mg_partName(p[0], p[2])), p[0] === S.route.mod, `data-sbbpart="${p[0]}"`, after);
+    return sbb_row(p[0], p[1], tr(mg_partName(p[0], p[2])), p[0] === S.route.mod, `data-sbbpart="${p[0]}" data-navk="${id}:${p[0]}"`, after);
   }).join('')}</div>`;
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
@@ -859,6 +926,7 @@ function wsa_orgPaneDraw(box) {
     sec.innerHTML = `<h4>${tr('Areas in this organisation')}</h4><div class="shint keep">${esc(tr('Switched off, an area disappears for every member in this organisation and cannot be opened there; nothing is deleted.') + (adm ? '' : ' ' + tr('Only an admin of the organisation can change this.')))}</div>`
       + `<div class="wsa-orgrows">${WSA_ORG.map(id => `<label class="chkl"><input type="checkbox" data-wsaorg="${id}" ${o.areas_off.includes(id) ? '' : 'checked'} ${adm ? '' : 'disabled'}> ${esc(tr(wsa_name(id, ws)))}</label>`).join('')}</div>`;
     det.appendChild(sec);
+    loadModule('navmenu').then(() => nav_orgDraw(sec, o), () => {});  // 2.418.0 (#3560): the menu points of the organisation
     if (!adm) continue;
     sec.addEventListener('change', async e => {
       const cb = e.target.closest('input[data-wsaorg]'); if (!cb) return;

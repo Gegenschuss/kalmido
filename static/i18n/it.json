@@ -15118,5 +15118,19 @@
   "{0} invites you to {1}.": "{0} ti invita in {1}.",
   "You are invited to {0}.": "Sei invitato in {0}.",
   "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner: nel software di scansione imposta un profilo che salvi in PDF in questa cartella (non serve che sia ricercabile, Kalmido riconosce il testo da solo).",
-  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: nel software di scansione scegli «Invia per e-mail» e invia a questo indirizzo."
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: nel software di scansione scegli «Invia per e-mail» e invia a questo indirizzo.",
+  "Customize": "Personalizza",
+  "Edit menu": "Modifica menu",
+  "Hide from menu": "Nascondi dal menu",
+  "Navigation": "Navigazione",
+  "The menus of the areas and the tab bar": "I menu delle aree e la barra delle schede",
+  "Menus": "Menu",
+  "The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.": "L'ordine e le voci di ogni menu, per te su ogni dispositivo. Meno nasconde una voce (la ricerca la trova ancora), Più la riporta, trascina dalla maniglia.",
+  "Drag, or use the arrow keys": "Trascina o usa le frecce",
+  "Hidden points stay where they are: the search still finds them, nothing is deleted.": "Le voci nascoste restano dove sono: la ricerca le trova ancora, nulla viene eliminato.",
+  "Nothing in the menu": "Niente nel menu",
+  "Nothing hidden": "Niente di nascosto",
+  "Menu order changed": "Ordine del menu cambiato",
+  "Menu points in this organisation": "Voci di menu in questa organizzazione",
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Disattivata, una voce non è nel menu di nessun membro in questa organizzazione, nemmeno tra le nascoste; ogni membro ordina le altre."
 }

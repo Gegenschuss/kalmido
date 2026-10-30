@@ -82,7 +82,9 @@ const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p
 // 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
 // come in only when someone pins them (Settings > Appearance > Tab bar, or "Customize tab bar" under "More")
 const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
-const tabIds = () => mg_tabIds(LS.get('tabbar', null)) || tabDefault();  // 2.44.0 (#1187): old module tabs -> their area
+// 2.418.0 (#3560): the order of the person (setting nav_menus "tabbar", the same on every phone); before the first change
+// there the device's own (LS tabbar)
+const tabIds = () => { const o = nav_pref('tabbar').order; return mg_tabIds(o.length ? o.filter(x => x !== 'none') : LS.get('tabbar', null)) || tabDefault(); };  // 2.44.0 (#1187): old module tabs -> their area
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
   if (kind === 'a') return mg_tabItem(id);  // 2.44.0 (#1187)

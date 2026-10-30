@@ -121,7 +121,7 @@ function ab_panelHtml() {
   // 2.353.0 D (#2759): Documents = the saved filters "Documents" (every recognised file) and "To review" below the folders
   const rv = typeof DC !== 'undefined' && DC.review ? `<span class="c">${DC.review}</span>` : '';
   const docs = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Saved filters'))}">${sbb_row('docs', 'file', tr('Documents'), r.mod === 'docs' && !r.review, 'data-sbbpart="docs"')}${r.mod === 'docs' && typeof dc_panelTree === 'function' ? dc_panelTree() : '' /* 2.199.0 B (#2742): the documents' folders while the filter is open */}${sbb_row('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}</div>`;
-  return `<div class="sgroup sbbp">${mg_parts(a).filter(p => p[0] === r.mod || !sideHidden('e:' + p[0])).map(p => p[0] === 'ablage' ? files() : p[0] === 'docs' ? docs() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;
+  return `<div class="sgroup sbbp">${nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]).map(p => p[0] === 'ablage' ? files() : p[0] === 'docs' ? docs() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;  // 2.418.0 (#3560): the menu's order and hidden parts
 }
 // 2.199.0 A (#2742): the panel's folders are dragged into another folder (move) or before / after one (sort by hand), and
 // have the menu of a row (right-click, long press, context key)

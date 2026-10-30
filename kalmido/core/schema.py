@@ -3847,6 +3847,9 @@ MIGRATIONS = [
     # by an admin of the server, and it does not make the server an organisation's server for open registration. Older
     # versions ignore it (such a company then counts like one the server's admin created)
     ("orgs", "self_made", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS self_made BIGINT NOT NULL DEFAULT 0"),
+    # 2.418.0 (#3560): the menu points the organisation's admins switched off for its members (csv "<area>:<key>",
+    # accounts/navmenus.py; '' = all on). Older versions ignore it
+    ("orgs", "nav_off", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS nav_off TEXT NOT NULL DEFAULT ''"),
     # 2.371.3 (#3152): the default reading style of the organisation's / the person's private knowledge space (wiki/wkstyle.py
     # WIKI_STYLES; '' = Clear). Older versions ignore it
     ("orgs", "wiki_style", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS wiki_style TEXT NOT NULL DEFAULT ''"),
@@ -4348,6 +4351,9 @@ USER_DEFAULTS = {
     # 2.409.0 (#3490): the areas I switched off per workspace, json {"private" | "org:<id>": [area id]} (accounts/wsareas.py);
     # below the module switches ("features" off = off everywhere) and the admins' choice of an organisation
     "ws_areas_off": "{}",
+    # 2.418.0 (#3560): my arrangement of the areas' menus and the phone's tab bar, json {area: {order, hidden, shown}}
+    # (accounts/navmenus.py); hidden = only not in the menu. '' / {} = the default order, unused office points hidden
+    "nav_menus": "{}",
     # 2.143.0 D (#2155): the appearance of all devices, json {LOOK_KEYS key: value}; '' = never saved (the first device uploads its own)
     "look": "",
     # 2.57.0 A (#1798): the sidebar's favourites of every kind in the person's order, json list of keys: "l:<list id>" (the

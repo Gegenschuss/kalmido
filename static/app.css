@@ -8657,3 +8657,4 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .cfst svg{flex:none}
 .cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){.cfst .cfst-l{display:none}}
+.navpen{display:flex;justify-content:flex-end;padding:0 .25rem}  /* 2.418.0 (#3560): the pen on top of a phone's area menu */

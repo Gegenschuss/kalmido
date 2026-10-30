@@ -101,6 +101,7 @@ ORDER = (
     "accounts.users",
     "accounts.orgs",
     "accounts.wsareas",  # 2.409.0 (#3490): areas on / off per workspace (a before_request gate)
+    "accounts.navmenus",  # 2.418.0 (#3560): the person's menus of the areas (setting nav_menus, orgs.nav_off)
     "accounts.orgroles",  # 2.143.0 A (#2151): organisation roles guest / read-only / accounting
     "accounts.spacemove",  # 2.96.0 (#1941): the shared rules of moving data between the private space and an organisation (no routes)
     "accounts.orgout",  # 2.148.1 B (#2483): data leaves an organisation only through its admin (no routes)

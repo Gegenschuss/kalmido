@@ -158,12 +158,22 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 **Quotes & invoices** for everybody; the Pipeline becomes the start only once the office has an inquiry or a lead. The
 group **Money** stays folded until the office holds its first invoice or receipt (a fold or unfold by hand is kept per
 device). Cash flow, Figures, Travel expenses, Entertainment receipts and Subscriptions & tools appear once there is
-something in them; until then **Show more** at the end of Money lists them (and keeps them shown on this device), a
-direct link or a point opened once keeps working. The signal is `used` in `GET /api/office/settings` (existence checks
+something in them; until then they wait under **Hidden** of the menu's editor (2.418.0, #3560; before that behind
+**Show more**), a direct link keeps working and the open point always shows. The signal is `used` in `GET /api/office/settings` (existence checks
 only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Receipts** (`#office/receipts`, for everybody
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.418.0 (#3560):* every person arranges the office menu (and the menus of Home, Reading, Time, Review and the
+file store, and the phone's tab bar) with one editor: on a computer **Customize** at the end of the area's panel (or a
+right-click on a point: *Hide from menu*), on a phone the pen on top of the menu, and all of them at once under
+**Settings > Navigation**. Each row has a Minus (hide) and a grip (drag; on the grip the arrow keys move it), hidden
+points stay under **Hidden** with a Plus. Hiding only takes a point out of the menu: its data, function and rights stay
+and the search still finds it. The arrangement is the person's and the same on phone and computer (user setting
+`nav_menus`). In an organisation its admins switch menu points off for every member (Settings > Workspaces >
+*Menu points in this organisation*, `orgs.nav_off`); those are not in any member's menu there, not even under Hidden.
+Without an organisation the person is the own admin and arranges everything.
 
 *Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
 has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
@@ -235,8 +245,8 @@ The country pack decides which office functions exist at all; the office admin s
 | Subscriptions & tools | `money.subs` | yes | yes |
 
 *Since 2.380:* the five points of Money are offered by every country pack. Switched off, the point leaves the sidebar and
-the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: every
-point a person may open is shown.
+the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: what a
+person may open is in the menu or under **Hidden** of the menu's editor (2.418.0, #3560).
 
 - **Off only hides.** Nothing is deleted: the DATEV address and booking settings, tax date settings and stored XML files
   stay; switching on again brings everything back. The server checks too: the routes of a function that is off answer

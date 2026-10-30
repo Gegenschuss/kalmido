@@ -15118,5 +15118,19 @@
   "{0} invites you to {1}.": "{0} lädt dich zu {1} ein.",
   "You are invited to {0}.": "Du bist zu {0} eingeladen.",
   "Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).": "Scanner: in der Scan-Software ein Profil so einstellen, dass es als PDF in diesen Ordner speichert (durchsuchbar ist nicht nötig, Kalmido erkennt den Text selbst).",
-  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: in der Scan-Software „Per E-Mail senden“ wählen und an diese Adresse schicken."
+  "Scanner: in the scan software choose “Send by e-mail” and send to this address.": "Scanner: in der Scan-Software „Per E-Mail senden“ wählen und an diese Adresse schicken.",
+  "Customize": "Anpassen",
+  "Edit menu": "Menü bearbeiten",
+  "Hide from menu": "Im Menü ausblenden",
+  "Navigation": "Navigation",
+  "The menus of the areas and the tab bar": "Die Menüs der Bereiche und die Leiste unten",
+  "Menus": "Menüs",
+  "The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.": "Reihenfolge und Punkte jedes Menüs, für dich auf allen Geräten. Minus blendet einen Punkt aus (die Suche findet ihn weiter), Plus holt ihn zurück, am Griff ziehen ordnet um.",
+  "Drag, or use the arrow keys": "Ziehen oder Pfeiltasten nutzen",
+  "Hidden points stay where they are: the search still finds them, nothing is deleted.": "Ausgeblendete Punkte bleiben, wo sie sind: die Suche findet sie weiter, nichts wird gelöscht.",
+  "Nothing in the menu": "Nichts im Menü",
+  "Nothing hidden": "Nichts ausgeblendet",
+  "Menu order changed": "Reihenfolge im Menü geändert",
+  "Menu points in this organisation": "Menüpunkte in dieser Organisation",
+  "Switched off, a point is in no member’s menu in this organisation, not even under Hidden; each member arranges the others.": "Abgeschaltet steht ein Punkt in dieser Organisation bei niemandem im Menü, auch nicht unter Ausgeblendet; die übrigen ordnet jedes Mitglied selbst."
 }
