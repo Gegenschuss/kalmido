@@ -92,7 +92,7 @@ def run(S, who):
 
     # ---------------------------------------------------------------- #3597 corrections in the invoice series
     st = S.get(B + O + "/settings").json()["settings"]
-    ok(st.get("credit_shared") == 0 and st.get("credit_scheme") == "GS-{yyyy}-{seq:03}", f"#3597: off for a new office, own scheme: {st.get('credit_shared')} {st.get('credit_scheme')}")
+    ok(st.get("credit_shared") == 0 and st.get("credit_scheme") == "RK-{yyyy}-{seq:03}", f"#3597: off for a new office, own scheme: {st.get('credit_shared')} {st.get('credit_scheme')}")
     r = S.put(B + O + "/settings", json={"credit_shared": 1})
     st = r.json().get("settings", {})
     ok(r.ok and st.get("credit_shared") == 1 and st.get("credit_scheme") == "{seq}_{kuerzel}_{isodate}_RK",

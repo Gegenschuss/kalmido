@@ -426,7 +426,7 @@ def _credit_shared_switch(c, oid, out, cur, b):
     corrections' own counter continues above every number the shared counter gave (a counter never goes back). Numbers
     already given stay; the change goes into the office log with the settings' diff."""
     if out.get("credit_shared"):
-        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "GS-{yyyy}-{seq:03}"
+        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "RK-{yyyy}-{seq:03}"
         if (b.get("credit_scheme") in (None, cur.get("credit_scheme"))) and out.get("credit_scheme") in ("", dflt):  # (the whole form sends it unchanged)
             out["credit_scheme"] = office_scheme_clean(credit_rk_scheme(out.get("invoice_scheme") or ""), FE_SCHEME_NAMES["credit_scheme"], offer=False)
         return
