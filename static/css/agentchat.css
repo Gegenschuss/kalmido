@@ -13,7 +13,7 @@
 /* 2.380 F (#3381): the line above the first message not seen yet */
 .chunread{display:flex;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--accent);font-size:var(--fs-xs);font-weight:600}
 .chunread::before,.chunread::after{content:"";flex:1;border-top:1px solid currentColor;opacity:.5}
-.cnotice{align-self:center;max-width:90%;padding:.125rem .75rem;text-align:center;font-size:var(--fs-xs);line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.cnotice{align-self:center;max-width:90%;padding:.125rem .75rem;text-align:center;font-size:var(--fs-xs);line-height:var(--lh);color:var(--muted);overflow-wrap:anywhere}
 .cnotice a{color:inherit;text-decoration:underline dotted;text-underline-offset:.15em;display:inline-block;min-height:1.5rem;padding:.125rem 0}
 .aiuctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.5rem}
 .aiuctl select{max-width:16rem}
@@ -87,7 +87,7 @@
 .aiuk{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.375rem}
 .aiuk span{display:flex;flex-direction:column;min-width:0}
 .aiuk small{font-size:var(--fs-xs)}
-.aiuk b{font-size:1.0625rem;font-weight:600}
+.aiuk b{font-size:var(--fs-l);font-weight:600}
 .aiulim{display:flex;flex-direction:column;gap:.25rem}
 .aiulim small{font-size:var(--fs-xs)}
 .aiub.warn i{background:var(--p3)}
@@ -143,7 +143,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .chcomp .chclip,.chcomp .mtgbtn{flex:none;min-width:2.75rem;min-height:2.75rem;justify-content:center;padding:0}
 .chcomp .chclip:disabled,.chcomp .mtgbtn:disabled{opacity:.4}
 /* 2.99.0 B (#2185): own small label for the width grip, left of it (a native title covered the send button) */
-#griptip{position:fixed;z-index:60;max-width:16rem;padding:.25rem .5rem;border-radius:var(--radius);background:var(--text);color:var(--bg);font-size:.75rem;line-height:1.3;pointer-events:none;transform:translateX(-100%)}
+#griptip{position:fixed;z-index:60;max-width:16rem;padding:.25rem .5rem;border-radius:var(--radius);background:var(--text);color:var(--bg);font-size:var(--fs-s);line-height:var(--lh-tight);pointer-events:none;transform:translateX(-100%)}
 #griptip.hidden{display:none}
 @media (hover:none){#griptip{display:none}}
 .shdest{display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem}
@@ -186,7 +186,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 }
 .chsteps{padding:0 .25rem .25rem}
 .chsteps.hidden{display:none}
-.chstepl{display:flex;flex-direction:column;gap:.125rem;width:100%;min-height:1.5rem;text-align:left;background:none;border:0;padding:.125rem 0;margin:0;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1.35;cursor:pointer}
+.chstepl{display:flex;flex-direction:column;gap:.125rem;width:100%;min-height:1.5rem;text-align:left;background:none;border:0;padding:.125rem 0;margin:0;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:var(--lh-tight);cursor:pointer}
 .chstepl:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-s)}
 .chstep{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:chstepin .3s ease}
 .chstep+.chstep{opacity:.7}
@@ -194,13 +194,13 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
   .chstep{animation:none}
 }
 .chstepon{font-size:var(--fs-xs);color:var(--muted)}
-.csteps{display:flex;flex-direction:column;gap:.125rem;margin:0 0 .25rem;max-width:100%;color:var(--muted);font-size:var(--fs-xs);line-height:1.35;overflow-wrap:anywhere}
+.csteps{display:flex;flex-direction:column;gap:.125rem;margin:0 0 .25rem;max-width:100%;color:var(--muted);font-size:var(--fs-xs);line-height:var(--lh-tight);overflow-wrap:anywhere}
 .chl2{display:flex;align-items:center;gap:.375rem;min-width:0}
 .chl2 .chst{flex:0 1 auto}
 .chmodel{flex:none;max-width:55%;color:var(--muted);font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chmodel::before{content:"·";margin-right:.375rem}
 .chring{width:1.25rem;height:1.25rem;margin-left:.375rem;cursor:pointer;color:var(--accent)}
-.chring svg{width:1.125rem;height:1.125rem;display:block}
+.chring svg{width:var(--ic-l);height:var(--ic-l);display:block}
 .chring circle{fill:none;stroke-width:2.5}
 .chring .rbg{stroke:var(--line2)}
 .chring .rfg{stroke:currentColor;stroke-linecap:round}
@@ -216,7 +216,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .chqp::before{content:"·";margin-right:.375rem;color:var(--muted)}
 .jobv{margin-top:.375rem;font-size:var(--fs-s)}
 .jobv>summary{cursor:pointer;color:var(--text2);min-height:1.5rem}
-.jvb{display:flex;flex-direction:column;gap:.125rem;margin-top:.25rem;color:var(--muted);font-size:var(--fs-xs);line-height:1.4;max-height:24rem;overflow:auto;overflow-wrap:anywhere}
+.jvb{display:flex;flex-direction:column;gap:.125rem;margin-top:.25rem;color:var(--muted);font-size:var(--fs-xs);line-height:var(--lh);max-height:24rem;overflow:auto;overflow-wrap:anywhere}
 .jvh{display:flex;gap:.5rem;margin-top:.375rem;color:var(--text2)}
 .jvh time{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
 .jvs{padding-left:3rem}
@@ -245,7 +245,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .apvpins{display:flex;flex-direction:column;gap:.25rem;padding:.375rem .75rem;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));max-height:40%;overflow-y:auto;overscroll-behavior:contain}
 .apvpins[hidden]{display:none}
 .apvpin{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;border-left:.1875rem solid var(--accent);padding-left:.5rem}
-.apvgo{display:inline-flex;align-items:center;gap:.3rem;flex:1 1 12rem;min-width:0;min-height:2.75rem;padding:0;border:0;background:none;color:var(--text);font:inherit;font-size:.8125rem;text-align:left;cursor:pointer}
+.apvgo{display:inline-flex;align-items:center;gap:.375rem;flex:1 1 12rem;min-width:0;min-height:2.75rem;padding:0;border:0;background:none;color:var(--text);font:inherit;font-size:var(--fs-m);text-align:left;cursor:pointer}
 .apvgo b{color:var(--accent);font-size:var(--fs-xs);white-space:nowrap}
 .apvgo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .apvpin .cchoices{margin:0}
@@ -326,7 +326,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
   .chath .chnm .chmode[data-short]::before{content:attr(data-short)}
   .chath .chnm button.chmode[data-short]::before{content:attr(data-short) "\a0\25BE"}
 }}
-.ainscmd{width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-s);line-height:1.4;resize:vertical;word-break:break-all;margin:.25rem 0}
+.ainscmd{width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-s);line-height:var(--lh);resize:vertical;word-break:break-all;margin:.25rem 0}
 .ainscmd.off{opacity:.45;text-decoration:line-through}
 .ainsbar{gap:.5rem;align-items:center}
 .ainsm .n small{display:block;overflow:hidden;text-overflow:ellipsis}
@@ -353,7 +353,7 @@ button.jcdh{cursor:pointer}
 .jcddot{flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--jcol)}
 .jcdt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .jcdv{flex:none;font-size:var(--fs-xs);color:var(--muted)}
-.jcdst{flex:none;padding:0 .4375rem;border-radius:62.5rem;font-size:var(--fs-xs);line-height:1.5;background:var(--bg3);color:var(--muted)}
+.jcdst{flex:none;padding:0 .4375rem;border-radius:62.5rem;font-size:var(--fs-xs);line-height:var(--lh);background:var(--bg3);color:var(--muted)}
 .jcdst.st-running{background:color-mix(in srgb,var(--accent) 16%,var(--bg3));color:var(--accent)}
 .jcdst.st-failed,.jcdst.st-stopped{background:color-mix(in srgb,var(--danger) 14%,var(--bg3));color:var(--danger)}
 .jcdt time{flex:none;margin-left:auto;font-size:var(--fs-xs);color:var(--muted)}
@@ -382,7 +382,7 @@ button.jcdh{cursor:pointer}
 .chcomp .chkh:empty{display:none}
 /* 2.119.0 B (#2302): the hint is a small line under the field (own row), so it also shows in the narrow side panel and split windows */
 .chcomp:has(> .chkh:not(:empty)){flex-wrap:wrap}
-.chcomp > .chkh:not(:empty){flex:0 0 100%;order:9;margin-top:-.25rem;text-align:right;font-size:.6875rem}
+.chcomp > .chkh:not(:empty){flex:0 0 100%;order:9;margin-top:-.25rem;text-align:right;font-size:var(--fs-xs)}
 /* 2.144.0 B (#2411): the agent's own colour on the chat header and the input box (a stripe, not a fill); #2417: cut long messages */
 /* 2.174.0 A (#2681): the colour bar on top is gone; the workspace stands as a name in the header */
 .chws{display:flex;align-items:center;gap:.375rem;flex:0 1 auto;min-width:0;max-width:12rem;color:var(--text2);font-size:var(--fs-s)}
@@ -470,12 +470,12 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 /* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */
 .chath.chh2{gap:.5rem;padding:.375rem .5rem .375rem .75rem;min-height:0}
-.chath.chh2 .avatar{width:1.75rem;height:1.75rem;font-size:.6875rem}
+.chath.chh2 .avatar{width:1.75rem;height:1.75rem;font-size:var(--fs-xs)}
 .chath.chh2 .chn{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;text-align:left;flex:1 1 auto;min-width:0;row-gap:0;column-gap:0}
 .chath.chh2 .chn::before{content:none}
-.chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:1.25}
+.chath.chh2 .chnm{display:flex;align-items:center;min-width:0;line-height:var(--lh-tight)}
 .chath.chh2 .chnm b{flex:0 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chath.chh2 .chl2{display:flex;min-width:0;max-width:100%;font-size:var(--fs-xs);line-height:1.25}  /* 2.411.0 (#3529): never wider than the name column, the state ends in … */
+.chath.chh2 .chl2{display:flex;min-width:0;max-width:100%;font-size:var(--fs-xs);line-height:var(--lh-tight)}  /* 2.411.0 (#3529): never wider than the name column, the state ends in … */
 .chath.chh2 .chl2::before{content:none}
 .chath.chh2 .chst{min-width:0;font-size:var(--fs-xs)}
 .chath.chh2 .chqp{font-size:var(--fs-xs)}

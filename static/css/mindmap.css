@@ -11,8 +11,8 @@
 .mmline.done{opacity:.3}
 .mmnode{cursor:pointer}
 .mmnode rect{fill:var(--bg2);stroke:var(--line2);stroke-width:1}
-.mmnode .mmt{fill:var(--text);font:.875rem system-ui,-apple-system,"Segoe UI",sans-serif}
-.mmnode .mmm{fill:var(--muted);font-size:.6875rem}
+.mmnode .mmt{fill:var(--text);font:var(--fs-b) system-ui,-apple-system,"Segoe UI",sans-serif}
+.mmnode .mmm{fill:var(--muted);font-size:var(--fs-xs)}
 .mmnode.root rect{fill:var(--accent);stroke:var(--accent)}
 .mmnode.root .mmt{fill:#fff;font-weight:700}
 .mmnode.sec .mmt{font-weight:700}
@@ -22,7 +22,7 @@
 .mmnode.drop rect{stroke:var(--accent);stroke-dasharray:4 3;stroke-width:2.5}
 .mmnode.lift rect{stroke:var(--accent);stroke-width:3;fill:var(--accent-soft)}
 .mmfold circle{fill:var(--accent)}
-.mmfold text{fill:#fff;font-size:.625rem}
+.mmfold text{fill:#fff;font-size:var(--fs-xxs)}
 .mmedit{position:absolute;z-index:3;padding:0 .5rem;border:2px solid var(--accent);border-radius:.5625rem;background:var(--bg);color:var(--text)}
 .mmhint{font-size:var(--fs-xs);margin:0}
 .mmoutline,.mmoutline ul{list-style:none;margin:0;padding:0}
@@ -31,7 +31,7 @@
 .mmtog{width:1.75rem;flex:none}
 .mmblock{overflow:auto;max-width:100%;padding:.5rem 0}
 /* 2.156.0 A (#1948): the properties of a branch (second line), the peek below the selected one, the outline */
-.mmnode .mmp{fill:var(--muted);font:.6875rem system-ui,-apple-system,"Segoe UI",sans-serif}
+.mmnode .mmp{fill:var(--muted);font:var(--fs-xs) system-ui,-apple-system,"Segoe UI",sans-serif}
 .mmnode .mmpi{color:var(--muted);stroke-width:1.8}
 .mmpd.p5{fill:var(--p5);background:var(--p5)}.mmpd.p3{fill:var(--p3);background:var(--p3)}.mmpd.p1{fill:var(--p1);background:var(--p1)}
 .mmbar .iconbtn.on{color:var(--accent);background:var(--accent-soft)}

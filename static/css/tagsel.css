@@ -18,7 +18,7 @@
 .tsflt .tsrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
 .tsflt .tsrow label{display:inline-flex;align-items:center;gap:.375rem;min-height:2.25rem}
 .abtags{display:flex;gap:.25rem;flex:0 1 auto;min-width:0;max-width:40%;overflow:hidden}
-.abtag{flex:none;max-width:9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 .4rem;border-radius:99rem;background:var(--bg3);font-size:var(--fs-xs);color:var(--text)}
+.abtag{flex:none;max-width:9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 .375rem;border-radius:99rem;background:var(--bg3);font-size:var(--fs-xs);color:var(--text)}
 .abpathl{font-size:var(--fs-xs)}
 .abdtags{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .ablist.abselon,.dc-grid.dc-selon{-webkit-user-select:none;user-select:none}

@@ -18,9 +18,9 @@
 .rssitem.read .rsst b{font-weight:500;color:var(--text2)}
 .rsst a{color:inherit;text-decoration:none}
 .rsst a:hover b,.rsst a:focus-visible b{text-decoration:underline}
-.rsst b{display:block;line-height:1.35}
-.rssmeta{display:block;font-size:.8125rem;margin-top:.125rem}
-.rsssum{margin:.375rem 0 0;color:var(--text2);font-size:.875rem;line-height:1.45;overflow-wrap:anywhere}
+.rsst b{display:block;line-height:var(--lh-tight)}
+.rssmeta{display:block;font-size:var(--fs-m);margin-top:.125rem}
+.rsssum{margin:.375rem 0 0;color:var(--text2);font-size:var(--fs-b);line-height:var(--lh);overflow-wrap:anywhere}
 .rssacts{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.625rem}
 .rssacts .btn{min-height:2.5rem}
 .rssacts .btn[aria-pressed="true"]{color:var(--accent)}
