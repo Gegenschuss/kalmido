@@ -18,15 +18,15 @@ from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import write_lock
-from ..docs.ingest import docs_ingest, docs_kick
+from ..docs.ingest import docs_kick
 from ..docs.store import doc_open, label_name
 from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role
-from ..files.upsafe import h6d_read
 from .bank import _clean, _name_hit, _norm
 from .books import bk_receipt_set_paid, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_writable, cl_day)
 from .model import office_settings
+from .rcsubmit import rsb_ingest
 
 CL_DAYS = 10  # +- days around a position that count as "date close"
 CL_SCAN = 5000  # newest documents looked at
@@ -318,7 +318,6 @@ def cl_unmatch(lid):
 def cl_upload(lid):
     """Multipart file: the receipt of this position, uploaded by the holder or the bookkeeping: a document of the office's
     documents space, a receipt, matched at once (the person has chosen the position). 201 {line, statement, node_id, fresh}."""
-    from ..admin.hosting import QuotaExceeded
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
@@ -331,9 +330,7 @@ def cl_upload(lid):
     ws = bk_ws(c, oid)
     info = {}
     try:
-        nid = docs_ingest(c, uid, None if ws[0] == "u" else oid, f.filename or "receipt.jpg", h6d_read(f), f.mimetype, "upload", dedup=True, info=info)
-    except QuotaExceeded:
-        raise BadInput(tr("{0}: no space left in your storage", f.filename or "")) from None
+        nid = rsb_ingest(c, uid, None if ws[0] == "u" else oid, f, f.filename or "receipt.jpg", info)
     except ValueError as e:
         raise BadInput(str(e)) from None
     if not info.get("dup"):

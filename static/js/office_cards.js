@@ -5,7 +5,7 @@
 // needed" or "Private". The bookkeeping sees every card, a holder with an account only their own. Every step has its undo.
 // Server: kalmido/office/cards.py, cardlines.py, cardnorc.py (reminder).
 const CC = {oid: null, data: null, loading: false, err: null, card: null, stmts: null, sid: null, sheet: null, pick: null, cand: null, q: '', bank: null, rem: null, remLoading: false};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['cards', 'card', N_('Credit cards'), 0, () => ccHtml(), 'money']);
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any} */ (['cards', 'card', N_('Credit cards'), 0, () => ccHtml(), 'money']));
 const CC_KIND = {fee: N_('Fee'), credit: N_('Money back')};
 
 async function ccLoad() {
