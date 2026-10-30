@@ -28,3 +28,6 @@ p2200_a_wiki_tree_ui 2026-11-13 #3715 rot in der Vorprüfung über 1767415e, zwe
 p2223_a_tour_ui 2026-11-13 #3716 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p285_b_ui 2026-11-13 #3717 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p297_c_ui 2026-11-13 #3718 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
+demo 2026-11-13 #3743 rot in der Vorprüfung über c7578a58, zweimal grün auf dem Mac c7578a58efc1 (#1814): red 30.10.2026 16:33; green Mac 20261030-163344-1934178-s1, Mac 20261030-164058-1982367-s6 (same code)
+p2440_d_ui 2026-11-13 #3744 rot in der Vorprüfung über c7578a58, zweimal grün auf dem Mac c7578a58efc1 (#1814): red 30.10.2026 16:33; green Mac 20261030-163344-1934178-s1, Mac 20261030-164058-1982367-s6 (same code)
+p271_ui 2026-11-13 #3745 rot in der Vorprüfung über c7578a58, zweimal grün auf dem Mac c7578a58efc1 (#1814): red 30.10.2026 16:33; green Mac 20261030-163344-1934178-s1, Mac 20261030-164058-1982367-s6 (same code)
