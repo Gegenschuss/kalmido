@@ -53,9 +53,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   click(w, d.querySelector('#view .mgtabs [data-go="pomo"]'));  // 2.224.0 (#2817)
   await until(() => w.eval('S.route.mod') === 'pomo');
   check(tabs() === 'time,pomo*' && d.querySelector('#srail [data-sbb="time"].on'), 'the focus timer entry: the area icon stays lit');  // 2.152.2 (#2622)
-  check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'the area remembers its last page');  // 2.152.2 (#2622)
+  // 2.417 (#3559): the area keeps its last page (sbb_target); the button of the OPEN area leads to its start page
+  check(w.eval(`sbb_target('time')`) === 'pomo' && d.querySelector('#srail [data-sbb="time"]').dataset.go === 'time', 'the area remembers its last page');  // 2.152.2 (#2622)
   w.eval(`go('review')`); await until(() => w.eval('S.route.mod') === 'review');
   check(tabs() === 'review*,stats', 'Review: Review & journal and Statistics ' + tabs());
+  check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'another area open: the Time button leads back to its last page');  // 2.417 (#3559)
   w.eval(`go('life')`); await until(() => w.eval('S.route.mod') === 'life');
   check(sideTabs() === 'life*,family', 'Home: Home & life and Family ' + sideTabs());  // 2.224.0 (#2817): Home keeps its panel
   w.eval(`go('contacts')`); await until(() => w.eval('S.route.mod') === 'contacts');
