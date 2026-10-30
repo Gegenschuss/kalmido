@@ -15139,5 +15139,6 @@
   "Superseded": "Vervangen",
   "Mark the old quotation as superseded?": "Oude offerte als vervangen markeren?",
   "Yes, {0} no longer counts": "Ja, {0} telt niet meer",
-  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig."
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig.",
+  "This quotation was superseded": "Deze offerte is vervangen"
 }

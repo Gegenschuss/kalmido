@@ -15139,5 +15139,6 @@
   "Superseded": "Sostituito",
   "Mark the old quotation as superseded?": "Segnare il vecchio preventivo come sostituito?",
   "Yes, {0} no longer counts": "Sì, {0} non conta più",
-  "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi."
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi.",
+  "This quotation was superseded": "Questo preventivo è stato sostituito"
 }

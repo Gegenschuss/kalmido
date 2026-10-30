@@ -1347,13 +1347,15 @@ def inv_offer_invoice(c, oid, uid, r, b, parts_mode=None, parts_title=None):
 def inv_from_offer_post(did):
     """An invoice draft from quotation did (every quotation line becomes a position; rights, framework contract, recipient,
     project, language, currency, rate and PO number are taken over; source_doc_id). 201 the invoice.
-    2.149.0 A (#2521): from every status on purpose (#2235: the app asks first, no block); the agents' route needs an
+    2.149.0 A (#2521): from every status but superseded on purpose (#2235: the app asks first, no block); the agents' route needs an
     accepted quotation."""
     from .docs import doc_row
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
+    if r["status"] == "superseded":  # 2.437.0 (#3621): it counts nowhere; the newer quotation is the one to invoice
+        raise Denied(409, tr("This quotation was superseded"))
     b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
     b = b if isinstance(b, dict) else {}
     ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the invoice made the first time

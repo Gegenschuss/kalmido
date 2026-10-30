@@ -83,6 +83,7 @@ def run(S, who):
     check(q1 not in planned() and q1 not in bought(), f"{who}: superseded: not in the cash flow, no purchase")
     check(q1 in [x["id"] for x in G(f"{D}?kind=offer&status=superseded")["docs"]], f"{who}: the list filter finds it")
     check("superseded" in old["statuses"], f"{who}: listed among the statuses")
+    check(P(f"{D}/{q1}/invoice", json={}).status_code == 409, f"{who}: no invoice from a superseded quotation")
     r = P(f"{D}/{q1}/duplicate", json={"replaces": True, "client_ref": f"{who}-dup-1"})
     check(r.ok and r.json()["id"] == q2, f"{who}: the same request again is the same copy")
     r = P(f"{D}/{q1}/duplicate", json={"replaces": True})

@@ -15139,5 +15139,6 @@
   "Superseded": "Remplacé",
   "Mark the old quotation as superseded?": "Marquer l'ancien devis comme remplacé ?",
   "Yes, {0} no longer counts": "Oui, {0} ne compte plus",
-  "For a supplement with only the new items, untick this: both quotations stay valid.": "Pour un avenant ne contenant que les nouvelles lignes, décochez cette case : les deux devis restent valables."
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Pour un avenant ne contenant que les nouvelles lignes, décochez cette case : les deux devis restent valables.",
+  "This quotation was superseded": "Ce devis a été remplacé"
 }

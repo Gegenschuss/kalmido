@@ -15139,5 +15139,6 @@
   "Superseded": "Sustituido",
   "Mark the old quotation as superseded?": "¿Marcar el presupuesto anterior como sustituido?",
   "Yes, {0} no longer counts": "Sí, {0} ya no cuenta",
-  "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes."
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes.",
+  "This quotation was superseded": "Este presupuesto fue reemplazado"
 }

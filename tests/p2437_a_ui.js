@@ -55,7 +55,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ---- #3626
   const dbl = async (o, id, what, shotName, withDetail) => {
-    // the detail pane narrows the list (the columns move under the title) - Moritz' case; open another task first
+    // the detail pane narrows the list (the columns move under the title); open another task first
     if (withDetail) { await o.ev(`openDetail(${T[0] === id ? T[1] : T[0]})`); await sleep(700); }
     // a real double click with the mouse (BiDi), on the title text
     const pt = await o.ev(`(() => { const t = document.querySelector('#view .trow[data-id="${id}"] .ttl'); if (!t) return null; t.scrollIntoView({block: 'center'}); const b = t.getBoundingClientRect(); return {x: Math.round(b.left + 20), y: Math.round(b.top + b.height / 2)}; })()`);

@@ -15139,5 +15139,6 @@
   "Superseded": "Ersetzt",
   "Mark the old quotation as superseded?": "Altes Angebot als ersetzt markieren?",
   "Yes, {0} no longer counts": "Ja, {0} zählt nicht mehr",
-  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig."
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig.",
+  "This quotation was superseded": "Dieses Angebot wurde ersetzt"
 }
