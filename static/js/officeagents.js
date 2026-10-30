@@ -25,13 +25,15 @@ function oa_switchDraw(box, j) {
   box.hidden = false;
   box.innerHTML = `<div class="row"><label>${tr('Office & finance')}</label><label class="chkl"><input type="checkbox" id="oa-sw" ${j.office_drafts ? 'checked' : ''} ${j.can_set ? '' : 'disabled'}> ${tr('May draft office documents')}</label></div>
     <div class="shint keep">${tr('Quotations, invoices and reminders as drafts and payment suggestions; never finalise, send, delete or book. Also needs the permission “Office drafts”.')}${j.can_set ? '' : ' ' + tr('Only an admin of its office can switch this.')}</div>
-    ${j.office_drafts && !j.agents_read ? `<div class="shint keep warn">${tr('Off in the office settings: “Agents may read office data”.')}</div>` : ''}`;
+    ${j.office_drafts && !j.agents_read ? `<div class="shint keep warn">${tr('Off in the office settings: “Agents may read office data”.')}</div>` : ''}
+    <div class="shint keep">${esc(j.agents_read ? tr('The office lets agents read its data.') : tr('The office does not let agents read its data yet.'))} <button type="button" class="linkbtn" data-setgo="biz-agents">${esc(tr('Settings › Company & office › {0}', tr('Access')))}</button></div>`;  // 2.365.2 D (#2789): both halves know each other
 }
 
 // ---- the privacy switch of the office area (office.js settings form)
 const oa_settingsHtml = (s, dis) => `<h3>${tr('Agents')}</h3>
   <div class="row"><label></label><label class="chkl"><input type="checkbox" id="os-agents-read" ${s.agents_read ? 'checked' : ''} ${dis}> ${tr('Agents may read office data')}</label></div>
-  <div class="shint keep">${tr('Client and price data go to the AI model of the connected agent. Each agent also needs its own switch “May draft office documents”; every access is in the access log.')}</div>`;
+  <div class="shint keep">${tr('Client and price data go to the AI model of the connected agent. Each agent also needs its own switch “May draft office documents”; every access is in the access log.')}</div>
+  <div class="shint keep">${esc(tr('The switch of each agent: Settings > Agents > the agent > Permissions.'))} <button type="button" class="linkbtn" data-setgo="agents">${esc(tr('Settings › Agents'))}</button></div>`;  // 2.365.2 D (#2789)
 const oa_settingsBody = form => ($('#os-agents-read', form) ? {agents_read: $('#os-agents-read', form).checked ? 1 : 0} : {});
 
 // ---- the access log (office.js ofcLogHtml): the filter "Agents" and the names of what an agent did

@@ -299,6 +299,9 @@ APP_ONLY = [
      "kinds through the table tools (a file cell read only: its name and id)",
      ("=GET /api/sheets/{}/people", "=POST /api/sheets/{}/files", "=GET /api/sheets/{}/files/{}", "=GET /api/sheets/{}/files/{}/{}",
       "=POST /api/sheets/{}/fixed", "=GET /api/sheets/{}/history", "=GET /api/sheets/{}/cells/{}/history")),
+    ("2.429.0 (#3580): the file store's collections \"From <area>\" are a view of the web app (files of knowledge pages, tables, "
+     "projects in one read-only list); agents read the same files through the areas' own tools (wiki, sheets, project files)",
+     ("=GET /api/files/collections/{}",)),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",

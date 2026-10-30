@@ -98,7 +98,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= Settings > Modules (U04, U05, U06)
   w.eval(`settingsModal('layout')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): + Organisation for a server admin
+  // 2.418.0 (#3560): the new section Navigation (Settings > Navigation) after Appearance
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'nav', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): + Organisation for a server admin
   check(md.querySelector('.snav .on')?.dataset.sec === 'modules', 'old link "layout" opens Modules');
   const mp = md.querySelector('[data-pane="modules"]');
   const rows = [...mp.querySelectorAll('[data-modrow]')];

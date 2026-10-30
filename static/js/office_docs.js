@@ -1032,12 +1032,15 @@ async function ofdSendDialog(d) {
   let ms = {smtp: true, datev_email: ''}, tm = null;
   try { ms = await api('GET', '/api/office/mail-status'); } catch {}
   try { tm = await api('GET', `/api/office/docs/${d.id}/terms`); } catch {}  // 2.113.2 (#2253): the terms of the document's language
-  const cl = (S.clients || []).find(c => c.id === d.client_id);
-  const to = cl?.billing?.email_invoice || cl?.email || '';
+  // 2.433.0 (#3599): invoices / reminders to the e-mail for invoices with the contact persons for invoices in copy,
+  // quotations to the default contact person with the e-mail for invoices in copy (server: fk_send_rcpts)
+  let rc = {to: '', cc: []};
+  try { if (d.client_id) rc = await api('GET', `/api/office/docs/${d.id}/recipients`); } catch {}
+  const to = rc.to || '', cc = (rc.cc || []).join(', ');
   // 2.40.0 (#1368 point 10): plain words for people who do not run the server; without mail the button downloads the PDF
   const hint = !ms.smtp ? `<p class="ofdwarn">${esc(tr('E-mail sending is not set up: download the PDF and send it yourself.') + (S.me?.is_admin ? ' (KALMIDO_SMTP_HOST)' : ''))}</p>` : '';
   ofdDlg(tr('Send {0}', d.number || ''), hint + ofdF('s-to', tr('To|mail recipient'), `<input id="ofd-s-to" type="email" value="${esc(to)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
-    + ofdF('s-cc', tr('Copy to'), `<input id="ofd-s-cc" type="email" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
+    + ofdF('s-cc', tr('Copy to'), `<input id="ofd-s-cc" type="email" multiple value="${esc(cc)}" maxlength="1000" placeholder="${esc(tr('several: separated by commas'))}" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-subject', tr('Subject'), `<input id="ofd-s-subject" value="${esc(`${ofdKindName(d.kind, true)} ${d.number || ''}`)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-text', tr('Text'), `<textarea id="ofd-s-text" rows="4" maxlength="8000" placeholder="${esc(tr('empty = the standard text'))}" ${ms.smtp ? '' : 'disabled'}></textarea>`)
     + (d.timesheet_ok ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-ts"> ${tr('Attach the timesheet')}</label></div>` : '')  // 2.120.0 D (#2089)

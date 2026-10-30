@@ -42,6 +42,7 @@ ODL_LEGAL = (
     # 2.152.0 (#2167, review A6): the cash book and the bank statements are books (10 years), approved entertainment receipts receipts
     ("cash", "book", "SELECT substr(day, 1, 4) FROM office_cash_entries WHERE org_id=?"),
     ("bank", "book", "SELECT substr(day, 1, 4) FROM office_bank_tx WHERE org_id=?"),
+    ("cards", "book", "SELECT substr(day, 1, 4) FROM office_cc_lines WHERE org_id=?"),  # 2.444.0 (#3447): statements and their positions, as the bank
     ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
     # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
     ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), created_at), 1, 4) FROM office_letters "
@@ -113,6 +114,7 @@ ODL_MORE_SKIP = frozenset((
     "office_sub_reminders", "office_contract_files", "office_trip_items", "office_trip_purposes", "office_meal_files",
     "office_meal_choices", "office_meal_log", "office_letter_links", "office_drive_log", "office_drive_closed",
     "office_archive_log", "office_cash_closings", "office_cash_log", "office_bank_imports", "office_bank_balances",
+    "office_cc_cards", "office_cc_statements",  # 2.444.0 (#3447): their positions carry the years
     "office_cf_start", "office_cf_adjust", "office_cf_actual", "office_peppol_sends", "office_procdocs", "video_versions",
     "video_comments", "sheet_shares", "sheet_files", "wiki_files", "wiki_shares", "wiki_versions", "tchat_files",
     "hub_mail_links", "rc_suggest", "pl_imported", "pl_uploads", "doc_meta", "doc_field_values", "doc_mail", "nl_runs",

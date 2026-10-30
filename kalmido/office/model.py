@@ -8,6 +8,7 @@ accounts never get in (403 before any data is read). Org admins manage settings 
 master data and write documents (see docs.py); foreign ids are 404, never 403 with content."""
 import json
 import re
+import unicodedata
 from datetime import date
 
 from flask import g, has_request_context, request
@@ -36,7 +37,7 @@ INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in 
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
 TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate
+SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|kuerzel|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate; 2.433.0 (#3604): kuerzel
 NAME_MAX = 200
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
@@ -74,6 +75,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.38.0 (#1021, F1): invoices -- number schemes per kind (defaults from the pack), payment terms, reminders,
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
                      "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "delivery_scheme": "", "payment_days": 14, "reminder_fee": 0,
+                     "credit_shared": 0,  # 2.433.0 (#3597): 1 = invoice corrections count with the invoices' counter (own scheme, num_kind)
                      "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
                      "invoice_closing_de": "", "invoice_closing_en": "", "delivery_closing_de": "", "delivery_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
                      # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
@@ -110,6 +112,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "bank_norc": {},
                      # 2.425.0 B (#3451): the recurring providers of the bank bookings (set only by its own route, office/bankvend.py): days
                      "bank_vendors": {},
+                     # 2.444.0 (#3447): the reminder of the card positions without a receipt (set only by its own route, office/cardnorc.py)
+                     "card_norc": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",
@@ -302,7 +306,8 @@ def pb_info(c, uid, oid):
     from ..accounts.orgs import instance_mode, user_orgs
     orgs = user_orgs(c, uid)
     u = getattr(g, "user", None) if has_request_context() else None
-    move = {"can_move": 1 if u is not None and u["is_admin"] and instance_mode(c) == "workspaces" else 0}  # POST /api/office/move
+    # POST /api/office/move; 2.422.0 (#2937): the owner herself too (a company of her own), no kid account
+    move = {"can_move": 1 if u is not None and not u["kid"] and instance_mode(c) == "workspaces" else 0}
     # 2.137.0 D (#1981): the organisations the person is an admin of (POST /api/office/move/org takes the office into one)
     from ..accounts.orgs import org_role
     adm = [o for o in orgs if org_role(c, uid, o) == "admin"]
@@ -408,6 +413,39 @@ def _id_or_none(c, v, table, oid, name):
     return i
 
 
+def credit_rk_scheme(inv):
+    """2.433.0 (#3597): the correction scheme suggested for a shared counter: the invoice scheme with _RK instead of its _R
+    (673_TNP_..._R -> ..._RK), else with _RK appended."""
+    return inv[:-1] + "RK" if re.search(r"[-_./ ]R$", inv) else inv + "_RK"
+
+
+def _credit_shared_switch(c, oid, out, cur, b):
+    """2.433.0 (#3597): switching the shared counter of invoice corrections. On: a correction scheme still at the pack's
+    value (and not sent in the same body) becomes the invoice scheme with _RK, so both series stay apart by name. Off: the
+    corrections' own counter continues above every number the shared counter gave (a counter never goes back). Numbers
+    already given stay; the change goes into the office log with the settings' diff."""
+    if out.get("credit_shared"):
+        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "GS-{yyyy}-{seq:03}"
+        if (b.get("credit_scheme") in (None, cur.get("credit_scheme"))) and out.get("credit_scheme") in ("", dflt):  # (the whole form sends it unchanged)
+            out["credit_scheme"] = office_scheme_clean(credit_rk_scheme(out.get("invoice_scheme") or ""), FE_SCHEME_NAMES["credit_scheme"], offer=False)
+        return
+    write_lock(c, f"office_num_{int(oid)}")  # 2.433.0 (#3597 review): the lock of every counter write (docs._assign_number)
+    c.execute("INSERT INTO office_numbers(org_id, kind, period, last) SELECT org_id, 'credit', period, last FROM office_numbers WHERE org_id=? AND kind='invoice' "
+              "ON CONFLICT(org_id, kind, period) DO UPDATE SET last=GREATEST(office_numbers.last, excluded.last)", (oid,))
+
+
+def num_kind(s, kind):
+    """2.433.0 (#3597): the counter (office_numbers.kind) a document kind counts with: invoice corrections the invoices'
+    one while credit_shared is on, every other kind its own."""
+    return "invoice" if kind == "credit" and s.get("credit_shared") else kind
+
+
+def num_scheme(s, kind):
+    """The scheme whose year decides the counter's period of kind (num_kind): a shared counter has the invoices' period."""
+    k = num_kind(s, kind)
+    return s.get(k + "_scheme") or s.get("offer_scheme") or ""
+
+
 def _pack_switch(out, cur, b):
     """2.368.0 (#2979): choosing another pack takes along the document language the admin never chose and the number schemes
     that still hold the old pack's values; values set by hand -- or sent in the same body -- stay."""
@@ -505,7 +543,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = v
         elif k == "dunning_grace_days":  # 2.147.1 B (#2054)
             out[k] = int(_num(v, k, 0, 90))
-        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers"):  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
+        elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers", "credit_shared"):  # 2.433.0 (#3597): credit_shared  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
@@ -572,6 +610,13 @@ def office_settings_clean(c, oid, b, cur):
                 if f in v:
                     out[k][f] = _id_or_none(c, v[f], "office_texts", oid, k)
     _home_clean(c, oid, b, cur, out)
+    if out.get("credit_shared") != (cur.get("credit_shared") or 0):
+        _credit_shared_switch(c, oid, out, cur, b)
+    if out.get("credit_shared"):  # 2.433.0 (#3597 review): one counter needs one kind of period and two different schemes
+        if office_scheme_period(out.get("credit_scheme") or "") != office_scheme_period(out.get("invoice_scheme") or ""):
+            raise BadInput(tr("Invoice corrections count in the invoice series: both schemes need a year, or neither"))
+        if (out.get("credit_scheme") or "") == (out.get("invoice_scheme") or ""):
+            raise BadInput(tr("Invoice corrections count in the invoice series: their scheme must differ from the invoice scheme (e.g. _RK)"))
     return out
 
 
@@ -659,10 +704,10 @@ def office_scheme_clean(v, name=None, offer=True):
     if "{" in rest or "}" in rest:
         m = re.search(r"\{[^{}]*\}?", rest)
         if offer:  # 2.118.0 A (#2265): + {version}
-            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
-        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {isodate} {initials}"), m.group(0) if m else "{")
+            bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials} {version}"), m.group(0) if m else "{")
+        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {kuerzel} {date} {isodate} {initials}"), m.group(0) if m else "{")
     if sum(m.group(1) in SCHEME_TEXT for m in SCHEME_RE.finditer(v)) > 4:  # 2.306.0 (#2875 review N8): onc_parse reads four text blocks at most
-        bad(N_("A number can hold four text building blocks at most (project, client, initials)"))
+        bad(N_("A number can hold four text building blocks at most (project, client, short code, initials)"))
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
         bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
     return v
@@ -674,7 +719,7 @@ def office_scheme_period(scheme, d=None):
     return str(d.year) if ("{yyyy}" in scheme or "{yy}" in scheme) else ""
 
 
-def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1):
+def office_number_format(scheme, seq, d=None, project="", client="", initials="", version=1, kuerzel=""):
     d = d or local_now().date()
 
     def rep(m):
@@ -690,6 +735,8 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
             return _slug(project)
         if t == "client":
             return _slug(client)
+        if t == "kuerzel":  # 2.433.0 (#3604): the client's short code (client_short_code)
+            return kuerzel if CLIENT_CODE_RE.fullmatch(kuerzel or "") else ""
         if t == "date":
             return d.strftime("%Y%m%d")
         if t == "isodate":  # 2.138.2 A (#2391): the date with hyphens, 2026-04-15
@@ -706,7 +753,7 @@ def office_number_format(scheme, seq, d=None, project="", client="", initials=""
 # 2.144.9 (#2575): a block without a value (no project / client / initials) is left out together with one separator next to
 # it: "{project}-KV{seq:2}-{initials}" without a project gives "KV02-M", not "-KV02-M"; no double or trailing separators.
 # Numbers already given stay as they are (nothing is renumbered).
-SCHEME_TEXT = ("project", "client", "initials")
+SCHEME_TEXT = ("project", "client", "kuerzel", "initials")  # 2.433.0 (#3604): kuerzel
 SCHEME_KEYS = ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme", "delivery_scheme")
 ONC_LONG = N_("Number schemes with more than four text building blocks: {0}. Numbering no longer continues from the numbers given under them; shorten them in Office > Settings ({1}).")
 
@@ -766,15 +813,31 @@ def scheme_variants(scheme):
     return out + [scheme] + old
 
 
+# 2.433.0 (#3604): a client's short code (clients.short_code, 2-6 capitals / digits, e.g. TNP) for the block {kuerzel};
+# without one the first three letters of the client's name in capitals, umlauts written out (Müller -> MUE)
+CLIENT_CODE_RE = re.compile(r"[A-Z0-9]{1,6}")
+_CODE_UML = str.maketrans({"Ä": "AE", "Ö": "OE", "Ü": "UE", "ä": "AE", "ö": "OE", "ü": "UE", "ß": "SS"})
+
+
+def client_short_code(code="", name=""):
+    """The text of {kuerzel}: the client's own code, else the first three letters of its name ('' without a name)."""
+    code = (code or "").strip().upper()
+    if re.fullmatch(r"[A-Z0-9]{2,6}", code):
+        return code
+    letters = re.sub(r"[^A-Z]", "", unicodedata.normalize("NFKD", (name or "").translate(_CODE_UML)).upper())
+    return letters[:3]
+
+
 def _slug(s):
     s = re.sub(r"[^\w\-]+", "-", (s or "").strip(), flags=re.UNICODE).strip("-")
     return s[:40]
 
 
-def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, **ctx):
+def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, pscheme=None, **ctx):
     """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period).
-    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next)."""
-    period = office_scheme_period(scheme, d)
+    2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next).
+    2.433.0 (#3597): pscheme = the scheme whose year gives the period (a shared counter: the invoices'), default scheme."""
+    period = office_scheme_period(pscheme or scheme, d)
     if peek:
         r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
         seq = (r["last"] if r else start) + 1
@@ -858,7 +921,7 @@ def onc_parse(scheme, num):
                 pat += r"(\d+)"
                 names.append("version" if t == "version" else "seq")
             else:
-                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}"}.get(t, r".{1,40}?")
+                pat += {"yyyy": r"\d{4}", "yy": r"\d{2}", "date": r"\d{8}", "isodate": r"\d{4}-\d{2}-\d{2}", "kuerzel": r"[A-Z0-9]{1,6}"}.get(t, r".{1,40}?")
             pos = m.end()
         pat += re.escape(sv[pos:])
         m = re.fullmatch(pat, num or "")
@@ -889,8 +952,8 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
 
 def onc_next(c, oid, s, r, scheme, d=None, peek=False, **ctx):
     """office_number_next for document row r: a quotation counts per organisation, client or project (settings s)."""
-    if r["kind"] != "offer":
-        return office_number_next(c, oid, r["kind"], scheme, d, peek, **ctx)
+    if r["kind"] != "offer":  # 2.433.0 (#3597): an invoice correction may count with the invoices (num_kind)
+        return office_number_next(c, oid, num_kind(s, r["kind"]), scheme, d, peek, pscheme=num_scheme(s, r["kind"]), **ctx)
     key = onc_key(s, r) or "offer"
     start = 0
     if key != "offer" and not c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?",

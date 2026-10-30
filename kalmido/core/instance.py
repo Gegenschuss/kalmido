@@ -180,7 +180,8 @@ def admin_settings():
            "public_links": gsetting(c, "public_links") != "0"}
     if ((b.get("twofa_required") is False and eff["twofa_required"]) or (b.get("oidc_autocreate") is True and not eff["oidc_autocreate"])
             or (b.get("public_links") is True and not eff["public_links"])
-            or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))):
+            or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))
+            or (b.get("signup_private") is True and gsetting(c, "signup_private") != "1")):  # 2.422.0 (#2937)
         e = oidc_reauth(c, b)
         if e:
             return e

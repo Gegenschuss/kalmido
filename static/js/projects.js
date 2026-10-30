@@ -556,12 +556,17 @@ function fieldEditor(f, t, ro) {
 function numIn(v) {
   const n = parseNum(v); return n == null ? String(v ?? '').trim() : String(n);
 }
-async function saveField(el) {
-  const t = taskById(S.sel), fid = +el.dataset.cf, f = fieldById(fid); if (!t || !f) return;
-  if (!canEdit(t)) { roToast(); renderDetail(); return; }
+// the value a custom field's input stands for (what saveField sends)
+function cf_val(el, f) {
   let v = f.type === 'checkbox' ? (el.checked ? '1' : null) : (el.value || '').trim() || null;
   if (v && f.type === 'url' && !/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v)) v = 'https://' + v;
   if (v && (f.type === 'number' || f.type === 'currency')) v = numIn(v);  // 2.156.0 B (#2069): + currency
+  return v;
+}
+async function saveField(el) {
+  const t = taskById(S.sel), fid = +el.dataset.cf, f = fieldById(fid); if (!t || !f) return;
+  if (!canEdit(t)) { roToast(); renderDetail(); return; }
+  const v = cf_val(el, f);
   if (f.type === 'select') { const o = selOpt(f, v); el.classList.toggle('fill', !!lrSelFill(o)); el.style.cssText = o && lrSelFill(o) ? `--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}` : ''; }  // #1193
   if ((t.fields?.[fid] ?? null) === v) return;
   try { await patchTask(t.id, {fields: {[fid]: v}}); } catch {
@@ -572,6 +577,24 @@ async function saveField(el) {
     if (n && n.tagName === el.tagName && n.type === el.type) { n.value = typed; n.addEventListener('blur', () => saveField(n), {once: true}); }
   }
 }
+// 2.422.0 A (#3468): a custom field typed in but never left (it saves on "change"): the page going away puts the value into the
+// queue and out with keepalive (core.js outKeep), like the title / description; a locked list's field (the queue holds no plain
+// text) asks before the page closes instead
+function cf_typing() {
+  const el = document.activeElement;
+  if (!el?.matches?.('#detail [data-cf]') || el.type === 'checkbox' || el.tagName === 'SELECT' || el.readOnly || el.disabled) return null;
+  const t = taskById(S.sel), f = fieldById(+el.dataset.cf); if (!t || !f || !canEdit(t)) return null;
+  const v = cf_val(el, f);
+  return (t.fields?.[f.id] ?? null) === v ? null : {t, f, v, locked: typeof le2eOn === 'function' && le2eOn(t.list_id)};
+}
+// after every script ran (the one-file demo bundle loads formguard.js later)
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof fgPending === 'function') fgPending(() => {
+    const c = cf_typing(); if (!c || c.locked) return;
+    outKeep('PATCH', '/api/tasks/' + c.t.id, {fields: {[c.f.id]: c.v}});
+    c.t.fields = {...c.t.fields, [c.f.id]: c.v};
+  }, () => !!cf_typing()?.locked);
+});
 function fieldModal(lid, f, done) {
   const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}])), stages: !!f?.options?.stages};  // 2.410.0 A (#3514): + stages
   const md = modal(`<h3>${edit ? tr('Edit field') : tr('New field')}</h3>

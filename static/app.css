@@ -298,7 +298,7 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 .subadd input{flex:1;background:transparent;border:0;padding:.1875rem 0}
 .tagedit{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .tagpill{display:inline-flex;align-items:center;gap:.25rem;padding:1px .25rem 1px .4375rem;border-radius:var(--r-s);border:1px solid var(--line2);color:var(--text2);font:var(--fs-s) var(--mono)}
-.tagpill button{color:inherit;opacity:.7;display:inline-flex}
+.tagpill button{color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;min-height:1.5rem;margin:-.25rem 0}
 .tagedit input{background:transparent;border:0;padding:.25rem 2px;width:7.5rem;font-family:var(--mono);font-size:var(--fs-s)}
 .dfoot{display:flex;align-items:center;gap:.25rem;padding:.5rem .75rem;border-top:1px solid var(--line);color:var(--muted);font:var(--fs-xs) var(--mono);position:sticky;bottom:0;background:var(--bg2)}
 .fields{display:grid;grid-template-columns:auto 1fr;gap:.5rem .875rem;align-items:center;font-size:var(--fs-m)}
@@ -507,6 +507,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 /* ---------- pomodoro ---------- */
 .pomo{display:flex;flex-direction:column;align-items:center;padding-top:.625rem}
 .pomo .seg{margin-bottom:1.125rem}
+.pomoset{align-self:flex-end;margin-bottom:.5rem}
 .ring{position:relative;width:min(17.5rem,72vw);aspect-ratio:1}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:3}
@@ -945,6 +946,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .authscreen form{display:flex;flex-direction:column;gap:.625rem}
 .authscreen form .btn{margin-top:.25rem;padding:.625rem .875rem}
 .authscreen .aerr{color:var(--danger);font-size:var(--fs-m);min-height:1em}
+.authscreen .invby{margin:0 0 .5rem;font-weight:500}  /* 2.365.0 (#2802): who invites, into which organisation */
 /* website link (module "links") */
 .meta a.lnk{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);text-decoration:none;max-width:10.625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta a.lnk:hover{color:var(--accent)}
@@ -1379,7 +1381,23 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 /* v1.0: first-run setup, step 2 */
 .authscreen .setupcard{width:min(38rem,100%);max-height:calc(100dvh - 2rem);overflow:auto}
 .authscreen .setupcard h3{margin:.875rem 0 .375rem;font-size:var(--fs-h)}
-.authscreen #su-lang{align-self:flex-start}
+/* 2.365.0 (#2802): the language is a small menu in the card's top right corner (was a row of six buttons on top) */
+.authscreen .setupcard{position:relative}
+.sulang{position:absolute;top:1rem;right:1rem;z-index:3}
+.sulang>summary{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);cursor:pointer;list-style:none;font-size:var(--fs-s);color:var(--text2);background:var(--bg2)}
+.sulang>summary::-webkit-details-marker{display:none}
+.sulang .sulangs{position:absolute;right:0;top:calc(100% + .25rem);display:flex;flex-direction:column;min-width:10rem;padding:.25rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:var(--shadow,0 .5rem 1.5rem rgba(0,0,0,.15))}
+.sulang .sulangs button{text-align:left;padding:.5rem .75rem;min-height:2.75rem;border-radius:var(--radius);color:var(--text)}
+.sulang .sulangs button.on{color:var(--accent);font-weight:600}
+.sulang .sulangs button:hover{background:var(--bg3)}
+/* 2.365.0 (#2802) phone: one scroll bar (the page, not the card in it), the card starts at the top (it was cut off when centred),
+   the start tiles in one column below 400 px (titles were cut) */
+@media (max-width:560px){
+  .modal.modal.authscreen.authscreen:has(.setupcard){place-items:start center;align-items:start;align-content:start;overflow-y:auto;overscroll-behavior:contain}  /* doubled classes: above :root[data-theme] .modal.authscreen (0,4,0) */
+  .modal.authscreen .setupcard{max-height:none;overflow:visible}
+  .modal.authscreen .setupcard .sufoot{bottom:0}
+}
+@media (max-width:399px){ .sustarts.ptcards{grid-template-columns:1fr} }
 .suse-main,.suse-list{display:flex;flex-direction:column;gap:.375rem;margin:0 0 .625rem}
 .suse{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem .625rem;border-radius:var(--radius);cursor:pointer}
 .suse-main .suse{background:var(--bg3)}
@@ -2389,6 +2407,23 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 /* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
    (Chrome reveals the caret 9rem above the bottom edge, the sticky box moves along, the next letter scrolls again) */
 #detail:has(.dbot :focus){scroll-padding-bottom:0}
+/* 2.365.0 (#2824) phone: the task's bottom bar above the comment field (detail.js thumb): date + Today / Tomorrow, project,
+   Complete on the right edge (thumb reach); it steps aside while a comment is typed (the keyboard needs the room) */
+.dthumb{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.375rem .75rem;border-top:1px solid var(--line);background:var(--bg2);container:dthumb / inline-size}
+.dthumb .dchip{flex:1 1 0;min-width:0;min-height:2.75rem;overflow:hidden;justify-content:flex-start;border:1px solid var(--line)}
+.dthumb .dchip .dct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dq{flex:none;min-width:2.75rem;min-height:2.75rem;justify-content:center;border:1px solid var(--line);color:var(--muted)}
+.dthumb .dq.on{border-color:var(--accent);color:var(--accent)}
+.dthumb .dql{display:none}
+.dthumb .dtbr{display:none}
+.dthumb .dtproj{display:inline-flex;align-items:center;gap:.375rem;flex:1 1 0;min-width:2.75rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);color:var(--text2);font-size:var(--fs-s)}
+.dthumb .dtpn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dtdone{flex:none;min-height:2.75rem;gap:.375rem;padding:0 1rem}
+.dthumb .dtdone.on{color:var(--accent);border-color:var(--accent)}
+/* a narrow phone: two rows - the date with its quick buttons, then the project and Complete (the date is never cut short) */
+@container dthumb (max-width:35.99rem){ .dthumb .dtbr{display:block;flex:0 0 100%;height:0} }
+@container dthumb (min-width:36rem){ .dthumb .dtproj{flex:0 1 auto;max-width:14rem} .dthumb .dq[data-d="0"] .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} .dthumb .dq[data-d="0"]{padding:0 .625rem} }
+#detail .dbot:has(.dcomp :focus) .dthumb{display:none}
 .meta .crd{opacity:.75}
 /* 2.0.8 (#321) Settings > AI colleague: lists at a glance */
 .aitbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
@@ -3830,6 +3865,19 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   @container lrows (max-width:52rem){ .lc.o5{display:none} }
   @container lrows (max-width:44rem){ .lc.o3{display:none} }
 }
+/* 2.427.0 B (#3551): the field strip above the rows wherever .lchead is hidden (phones < 600 px, narrow list containers on wider
+   screens; tablets 600-767 px keep the column titles): names swipe sideways, 44 px targets, "Fields" stays at the right end */
+.lcbar{display:none;align-items:center;margin-bottom:2px;border-bottom:1px solid var(--line);font:500 var(--fs-xs)/var(--lh-tight) var(--mono);color:var(--muted)}
+@media (max-width:599px){ .lcbar{display:flex} }
+@media (min-width:768px){ @container lrows (max-width:48rem){ .lcbar{display:flex} } }
+.lcbar .lcbs{display:flex;flex:1;min-width:0;gap:.125rem;padding-left:.25rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.lcbar .lcbs::-webkit-scrollbar{display:none}
+.lcbar button{display:inline-flex;align-items:center;gap:.25rem;flex:none;min-height:2.75rem;min-width:2.75rem;justify-content:center;padding:0 .5rem;border:0;border-radius:var(--r-s);background:none;color:inherit;font:inherit;white-space:nowrap;cursor:pointer}
+.lcbar .lcbn.sorted{color:var(--text)}
+.lcbar .lcsa{display:inline-flex;color:var(--accent)}.lcbar .lcsa .cup{transform:rotate(180deg)}
+.lcbar .lcbf{border-left:1px solid var(--line);border-radius:0;color:var(--text2);font-family:var(--sans)}
+@media (hover:hover){ .lcbar button:hover{color:var(--text)} }
+.lcbar button:focus{outline:none}.lcbar button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* 2.14.0 (#484): quick add: paper clip + "Add and open" next to Send */
 .qadd .qbtn{flex:none;padding:.375rem;border-radius:.4375rem;color:var(--muted)}
 .qadd .qbtn:hover{color:var(--accent);background:var(--bg4)}
@@ -4953,6 +5001,7 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.380 F (#3435): a section of the task panel folds by its heading (detail.js dfWrap); folded = the heading and its short line */
 .dfold>h5{display:flex;align-items:center;gap:.25rem;cursor:pointer}
 .dfold>h5 .dfbtn{width:1.5rem;height:1.5rem;min-width:0;margin-left:-.375rem;flex:none}
+@media (pointer:coarse){ .dfold>h5 .dfbtn{width:2.75rem;height:2.75rem;margin:0 -.625rem 0 -1rem;justify-content:center} }  /* #3506 main red, p260_ui + p2210_ui: the chevron and the heading stay where they are, the button itself is 44 px on touch */
 .dfold>h5 .dfbtn .fcar{width:.75rem;height:.75rem;transition:transform .15s}
 .dfold.dfolded>h5 .dfbtn .fcar{transform:rotate(-90deg)}
 .dfold.dfolded>:not(h5){display:none}
@@ -6460,6 +6509,11 @@ html.mini-chat .tcview{grid-template-columns:minmax(0,1fr);border:0;border-radiu
 html.mini-chat body.in-team #view{display:flex;flex-direction:column;overflow:hidden}
 html.mini-chat body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
 html.mini-chat body.in-team .tcview{flex:1;height:auto}
+/* 2.365.0 (#3319) the window is the chat: header, history and composer use its whole width at any size (no 44rem column);
+   only a single bubble stays readable (at most 75 % of the width, about 900 px of text), own ones right, the agent's left */
+html.mini-chat .chview,html.mini-chat body.in-chat .chview{max-width:none;margin:0}
+html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left:.75rem;padding-right:.75rem}
+@media (min-width:40rem){ html.mini-chat .cmsg{max-width:min(75%,56rem)} }  /* a narrow window keeps the usual 88 % */
 /* 2.46.2 C (#1712) never red text on the accent fill: pri + danger reads like danger solid */
 .btn.pri.danger{background:var(--danger);border-color:var(--danger);color:var(--danger-ink)}
 /* 2.46.2 C (#1651) hidden username field before the account password so managers pair the right login */
@@ -6719,6 +6773,10 @@ button.lnph:hover{border-color:var(--accent)}
 .abempty{padding:2rem 1rem}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:var(--fs-m)}
 .abhint{font-size:var(--fs-b);margin-top:.75rem}
+/* 2.429.0 (#3580): a collection "From <area>": its files grouped by their object (page, project, folder) */
+.abcollg{margin-top:1rem}
+.abcollh{margin:0 0 .25rem;font-size:var(--fs-b);font-weight:600;color:var(--muted)}
+.abcollnote{margin-top:0}
 /* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
 .fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:.5rem;font-size:var(--fs-b);color:var(--muted)}
 .fslbar>span{flex:1 1 14rem}
@@ -7114,6 +7172,8 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
 .cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
 .cmsg.agc.apv .cbub{background:transparent}
+/* 2.438.0 A (#3322): a thin edge in the agent's colour (25 %) on its tinted bubbles; no colour chosen = no edge */
+:root:not([data-chat-agent]) .cmsg.agc:not(.jobm):not(.apv) .cbub:not(.del):not(.tcedit){box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--agcol,transparent) 25%,transparent)}
 /* 2.233.0 C (#3196): chat bubble colour of people / agents (settings > Appearance > Chat); icons.js applyLook sets data-chat-human /
    data-chat-agent + the palette's two tones; no attribute = "Default" = the rules above. Text stays var(--text) on a light tint (contrast). */
 :root{--chat-h:var(--chat-h-d,var(--accent));--chat-a:var(--chat-a-d,var(--accent))}
@@ -7208,7 +7268,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .nwl-imp-sum { margin: .375rem 0; }
 .nwl-imp-err { list-style: none; margin: .25rem 0; padding: 0; max-height: 10rem; overflow: auto; font-size: var(--fs-b); }
 .nwl-imp-err li { padding: .125rem 0; }
-.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .45rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
+.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .4375rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .375rem; }
 .nwl-segs li { display: flex; align-items: center; gap: .375rem; padding: .5rem .625rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }
 .nwl-sn { flex: 1; min-width: 0; }
@@ -8605,3 +8665,4 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .cfst svg{flex:none}
 .cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){.cfst .cfst-l{display:none}}
+.navpen{display:flex;justify-content:flex-end;padding:0 .25rem}  /* 2.418.0 (#3560): the pen on top of a phone's area menu */

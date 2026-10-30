@@ -153,7 +153,9 @@ const FEAT = 'cal,comments,collab,office,clients';
     // the client card
     await ev(`(() => { clientModal(null); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal.cldlg .clbill')`);
-    check(await ev(`(() => { const d = document.querySelector('.modal.cldlg .clbill'); d.open = true; return ['clb-buyer_reference', 'clb-email_invoice', 'clb-payment_terms_days'].every(id => !!d.querySelector('label[for="' + id + '"] .ib')); })()`), '#1382: (i) at buyer reference, invoice e-mail and payment terms of the client card');
+    // 2.433.0 (#3599): the invoice e-mail sits next to E-mail (also when adding), no longer in the folded billing details
+    check(await ev(`(() => { const m = document.querySelector('.modal.cldlg'), d = m.querySelector('.clbill'); d.open = true; return ['clb-buyer_reference', 'clb-payment_terms_days'].every(id => !!d.querySelector('label[for="' + id + '"] .ib'))
+      && !!m.querySelector('label[for="clb-email_invoice"] .ib') && !d.querySelector('#clb-email_invoice') && !m.querySelector('#cl-more #clb-email_invoice'); })()`), '#1382: (i) at buyer reference, invoice e-mail and payment terms of the client card (#3599: the invoice e-mail above, visible when adding)');
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); FG.d = {}; return 1; })()`);
   }, false);
 

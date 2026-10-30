@@ -33,6 +33,7 @@ document.addEventListener('click', async e => {
   const prev = (S.colors || {})[aid || S.me.id] || '';
   try { await api('PATCH', aid ? `/api/agents/${aid}/color` : '/api/me', {color: c}); } catch { return; }  // the error is shown
   (S.colors ||= {})[aid || S.me.id] = c;
+  if (aid) for (const el of document.querySelectorAll(`[data-agid="${aid}"]`)) el.style.setProperty('--agcol', c);  // 2.438.0 A (#3322): bubbles take the new colour at once
   if (aid && prev && prev !== c && typeof histAdd === 'function') {  // 2.83.0 (#1775): one undo step for an agent's colour
     const put = v => async () => { await api('PATCH', `/api/agents/${aid}/color`, {color: v}); S.colors[aid] = v; render(); return {}; };
     offerUndo(tr('Saved'), histAdd({label: tr('Colour changed'), undo: put(prev), redo: put(c)}));
@@ -519,6 +520,7 @@ async function inviteScreen(tok) {
   } else {
     el.innerHTML = `<div class="card">${logo}
       <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
+      ${info.kind === 'invite' && (info.invited_by || info.org_name) ? `<p class="invby">${esc(info.invited_by ? tr('{0} invites you to {1}.', info.invited_by, info.org_name || APP_NAME) : tr('You are invited to {0}.', info.org_name))}</p>` : ''}${''/* 2.365.0 (#2802): who invites, into which organisation */}
       <p class="muted">${esc(info.kind === 'reset' ? tr('Choose a new password for “{0}”.', info.username) : tr('Choose your own password to finish your account.'))}</p>
       <form id="inv-form" autocomplete="on">
         <label class="aulab" for="inv-user">${tr('Username')}</label><input id="inv-user" name="username" autocomplete="username" readonly value="${esc(info.username)}">
@@ -783,28 +785,35 @@ async function authPasskey(errEl, remember) {
 const SIGNUP_UI = [['off', N_('Off: only admins add people')], ['domain', N_('Only addresses of certain e-mail domains')], ['approval', N_('Anyone, after an admin approves')], ['open', N_('Anyone with a confirmed e-mail address')]];
 function signupAdminHtml(a) {
   const mode = a.signup_mode || 'off', org = !!a.has_orgs;  // 2.46.0 (#1592): any server with an organisation
-  const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org ? 'disabled' : '';
+  const priv = !!a.signup_private;  // 2.422.0 (#2937): private accounts register without an invitation (a server with an organisation)
+  const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org && !priv ? 'disabled' : '';
   return `<h4 id="s-signup-h">${tr('Registration on the login page')}</h4>
     <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
     <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
     <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to projects: share projects with them. Never an admin or a child account.'),
-      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
+      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org && !priv ? tr('This server has organisations: open registration is not possible (only their e-mail domains or with approval).') : ''].filter(Boolean).join(' '))}</div>
+    ${org ? `<label class="wide"><input type="checkbox" id="s-spriv" ${priv ? 'checked' : ''}><span>${tr('Private accounts register without an invitation')}<small class="muted">${tr('Then “Anyone with a confirmed e-mail address” works here too: such an account stays private and never joins an organisation by its address; a company’s admin invites the person. Off by default.')}</small></span></label>` : ''}
     <label class="wide"><input type="checkbox" id="s-oinv" ${a.org_invites !== false ? 'checked' : ''}><span>${tr('Organisation admins may invite new people by e-mail')}<small class="muted">${tr('They get an account in that organisation and an e-mail to choose a password. Off: only admins of the server create accounts.')}</small></span></label>`;  // 2.115.0 B (#2062)
 }
 document.addEventListener('change', async e => {
-  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv') return;
+  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom' && id !== 's-oinv' && id !== 's-spriv') return;
   try {
-    const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv
-    let j; try { j = await (id === 's-signup' ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
-      if (!x.data?.password_needed) { if (id === 's-signup') toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+    const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : id === 's-spriv' ? {signup_private: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv; 2.422.0 (#2937): + s-spriv
+    const ask = id === 's-signup' || id === 's-spriv';
+    let j; try { j = await (ask ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
+      if (!x.data?.password_needed) { if (ask) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
       j = await api('PATCH', '/api/admin/settings', {...b, password: p.password});
     }
     if (j && j.version) S.about = j;
     const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
     if (id === 's-sdom') e.target.value = S.about?.signup_domains || '';
+    if (id === 's-spriv') { const o = $('#s-signup option[value="open"]'); if (o && S.about?.mail_out) o.disabled = !S.about?.signup_private; }  // 2.422.0 (#2937)
     toast(tr('Saved'));
-  } catch { if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off'; }
+  } catch {
+    if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off';
+    if (id === 's-spriv') e.target.checked = !!S.about?.signup_private;
+  }
 });
 // the form "Create account" on the login page (#711)
 // 2.49.0 (#1531): "Forgot your password?": e-mail address or user name -> a one-time link by mail (the answer is always the same)
@@ -1171,7 +1180,7 @@ async function setupChoices(el, logo) {
   const suPriv = () => modPrivHtml(['a:life', 'a:review'].filter(x => picked.has(x)).flatMap(x => MG_SU_AREA[x]));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
-      <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
+      ${''/* 2.365.0 (#2802): the language as a small menu top right (it took half a phone screen; the browser's language is preselected) */}<details class="sulang" id="su-lang"><summary title="${esc(tr('Language'))}">${ic('globe', 's')}<span>${langName(langs.find(L => L.code === lang) || {code: lang, name: lang})}</span></summary><div class="sulangs">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}" aria-pressed="${L.code === lang}">${langName(L)}</button>`).join('')}</div></details>
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${isOn(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${isOn(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b> <small class="muted">${tr(p.desc)}</small>${SU_ADDS[k] ? ` <small class="suadds">${esc(tr('Adds: {0}', SU_ADDS[k]().join(', ')))}</small>` : ''}</button>`).join('')}</div>

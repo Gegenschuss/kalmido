@@ -63,8 +63,7 @@ function lbListHtml() {
 }
 function lbReportHtml() {
   const r = LB.rep, y = lbYear();
-  const rate = `<div class="row lgb-rate"><label for="lgb-rate">${tr('Mileage allowance per business km in {0}', r.year)}</label><input id="lgb-rate" inputmode="decimal" class="numin" value="${esc(fmtNum(+r.km_rate, 2))}">
-    <button class="btn sm" data-lgb="rate">${tr('Save')}</button></div>`;
+  const rate = ofcSetLink('tax', tr('Mileage allowance per business km in {0}: {1}', r.year, fmtNum(+r.km_rate, 2)));  // 2.365.2 D (#2789): set in Settings > Company & office > Bank & taxes
   const cards = r.vehicles.map(v => `<div class="lgb-card"><h4>${esc(v.name)}${v.plate ? ` <span class="muted">${esc(v.plate)}</span>` : ''}</h4>
     <p class="muted">${esc(v.kind === 'private' ? tr('Private car used for business') : tr('Company car'))} · ${esc(trn('{0} drive', '{0} drives', v.drives))}</p>
     <dl class="lgb-dl"><dt>${tr('km total')}</dt><dd>${lbKm(v.km_total)}</dd><dt>${tr('Business')}</dt><dd>${lbKm(v.km_business)}</dd>
@@ -258,7 +257,6 @@ document.addEventListener('click', e => {
   else if (a === 'vnew') lbVehModal(null);
   else if (a === 'vedit') { const v = lbVeh(LB.vid); if (v) lbVehModal(v); }
   else if (a === 'view') { LB.view = b.dataset.v; ofcDraw(); }
-  else if (a === 'rate') lbSaveRate();
   else if (a === 'close') lbCloseModal();  // 2.152.0 C (#2169)
   else return;
   e.preventDefault();
@@ -268,11 +266,29 @@ document.addEventListener('change', e => {
   if (x.id === 'lgb-year') { RK.year = x.value; RK.data = null; lbReload(); }
   else if (x.id === 'lgb-veh') { LB.vid = +x.value; lbReload(); }
 });
-async function lbSaveRate() {
-  const el = $('#lgb-rate'), n = ofcNum(el?.value), old = LB.rep?.km_rate, year = LB.rep?.year || +lbYear();  // 2.93.0 B (#1928 review): rate per year
-  if (n == null || n < 0) { toast(tr('Invalid value: {0}', tr('Mileage allowance per business km'))); return; }
-  try {
-    await api('PUT', '/api/office/logbook/settings', {km_rate: String(n), year}); lbReload(true);
-    toast(tr('Saved'), async () => { await api('PUT', '/api/office/logbook/settings', {km_rate: old, year}); lbReload(true); });
-  } catch (x) { toast(x.message || ''); }
+// 2.365.2 D (#2789): the mileage allowance per year lives in Settings > Company & office > Bank & taxes (was the row under the
+// year report); saved on change, one undo step. 2.93.0 B (#1928 review): per year, a new rate never changes earlier years.
+const lb_rateOf = y => { const s = OFC.info?.settings || {}, v = (s.km_rates || {})[String(y)]; return v != null && v !== '' ? v : s.km_rate || '0.30'; };
+function lb_rateSetHtml() {
+  if (ofr_grp() && ofr_lvOf('logbook') !== 'manage') return '';  // 2.187.1 B (#2735): the rate needs "manage"
+  const y0 = new Date().getFullYear(), y = LB.rateY || y0;
+  return `<section class="lgb-rset" aria-labelledby="lgb-rh"><h3 id="lgb-rh">${tr('Mileage allowance')}</h3>
+    <div class="row"><label for="lgb-ry">${tr('Year')}</label>${ofcSel('lgb-ry', y, [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(x => [x, String(x)]))}</div>
+    ${ofcRowF('lgb-rate', tr('Mileage allowance per business km in {0}', y), `<span class="lacts"><input id="lgb-rate" inputmode="decimal" class="numin" value="${esc(fmtNum(+lb_rateOf(y), 2))}"><span class="muted">${ofcSym(ofcHome())}</span></span>`, tr('For a private car used for business (logbook); goes into the income/expense statement.'))}</section>`;
 }
+async function lb_ratePut(year, km_rate) {
+  const j = await api('PUT', '/api/office/logbook/settings', {km_rate, year});
+  const s = OFC.info?.settings; if (s) s.km_rates = Object.assign({}, s.km_rates, {[String(j.year)]: j.km_rate});
+  lbReload(true);
+}
+async function lbSaveRate(el) {
+  const n = ofcNum(el.value), year = LB.rateY || new Date().getFullYear(), old = lb_rateOf(year);
+  if (n == null || n < 0) { toast(tr('Invalid value: {0}', tr('Mileage allowance per business km'))); el.value = fmtNum(+old, 2); return; }
+  if (+n === +old) return;
+  try { await lb_ratePut(year, String(n)); } catch (x) { toast(x.message || ''); return; }
+  toast(tr('Saved'), () => lb_ratePut(year, old));
+}
+document.addEventListener('change', e => {
+  const x = e.target; if (!x.closest?.('.lgb-rset')) return;
+  if (x.id === 'lgb-ry') { LB.rateY = +x.value; ofcDraw(); } else if (x.id === 'lgb-rate') lbSaveRate(x);
+});

@@ -5,7 +5,7 @@
 // Save / Discard. data-fg-live = a form that saves each field on "change" itself (the document editor): only the field
 // being typed in is kept, until its change event. Closing or reloading the page with a draft asks first (beforeunload).
 // Dialogs use fgModal(md): Cancel / Esc / the backdrop ask "Discard changes?" when something was changed (modalGuard).
-const FG = {d: {}, watch: []};
+const FG = {d: {}, watch: [], pend: []};
 const fgField = el => /^(INPUT|SELECT|TEXTAREA)$/.test(el?.tagName) && el.type !== 'file' && el.type !== 'button' && el.type !== 'submit' && !el.closest('[data-fg-skip]');
 // a field's name across redraws: its id, else its name, else its data-* attributes (positions: data-i + data-k)
 const fgKey = el => el.id || el.name || [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join('&');
@@ -14,10 +14,17 @@ const fgDef = el => el.type === 'checkbox' || el.type === 'radio' ? el.defaultCh
   : el.tagName === 'SELECT' ? ([...el.options].find(o => o.defaultSelected) || el.options[0])?.value ?? '' : el.defaultValue;
 const fgFields = root => [...root.querySelectorAll('input,select,textarea')].filter(fgField);
 const fgDirty = key => !!FG.d[key] && Object.keys(FG.d[key].f).length > 0;
-const fgAny = () => Object.keys(FG.d).some(fgDirty) || FG.watch.some(fn => { try { return fn(); } catch { return false; } });
+const fgAny = () => Object.keys(FG.d).some(fgDirty) || [...FG.watch, ...FG.pend.map(p => p.ask)].some(fn => { try { return !!fn?.(); } catch { return false; } });
 function fgDone(key) { delete FG.d[key]; for (const f of document.querySelectorAll('[data-fg]')) if (f.dataset.fg === key) fgBar(f); }
 // another module with its own unsaved state (the import preview) adds a check for beforeunload
 const fgWatch = fn => { FG.watch.push(fn); };
+// 2.422.0 A (#3468): a save still waiting (a debounce, a field typed in but never left): send() puts it out at once in a way
+// that outlives the page (core.js keepSend / outKeep) and runs at pagehide; ask() = true while something waits that is not
+// safe that way (no queue behind it): closing / reloading asks first. Returns the function that ends the registration.
+function fgPending(send, ask) {
+  const p = {send, ask}; FG.pend.push(p);
+  return () => { FG.pend = FG.pend.filter(x => x !== p); };
+}
 
 function fgNote(t, live) {
   const form = t.closest?.('[data-fg]'); if (!form || !fgField(t)) return;
@@ -89,3 +96,4 @@ function fgModal(md) {
 }
 
 window.addEventListener('beforeunload', e => { if (fgAny()) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('pagehide', () => { for (const p of FG.pend) { try { p.send(); } catch { /* the next one still goes */ } } });

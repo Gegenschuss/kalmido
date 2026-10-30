@@ -1,4 +1,4 @@
-// 2.207.0 B (#2763): Kalmido folder watcher - watches folders on this computer (e.g. where a ScanSnap saves its scans)
+// 2.207.0 B (#2763): Kalmido folder watcher - watches folders on this computer (e.g. where a scanner saves its scans)
 // and uploads every finished file into Kalmido with an upload-only key. One file per platform, standard library only.
 //
 //	kalmido-folder-watcher                  start (or open the page of the running instance) and open the page

@@ -39,7 +39,8 @@ KINDS = {
     "files": ("matrix", SUITE + ", p2353_a_lockfolder_test.py, p2353_a_scanlock_test.py (2.353.0: a locked private folder, scans refused there), p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
                          "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0); "
-                         "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0)"),
+                         "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0); "
+                         "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private space (2.429.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
                        "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private space; "
@@ -238,6 +239,7 @@ ROUTES = {
     "GET /api/tasks/{}/docs": "files", "GET /api/docs/split-sheet.pdf": "files",
     "GET /api/docs": "files", "GET /api/docs/settings": "files", "GET /api/docs/{}": "files", "GET /api/docs/{}/file": "files",
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
+    "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",
     "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
     "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
@@ -423,7 +425,7 @@ ROUTES = {
     "POST /api/clients/{}/anonymize": "office",  # 2.223.3 B (#2878): p22233_b_privacy_test.py (a person without organisation)
     # 2.113.2 (#2253): terms and conditions as PDF (p2113c_a_api_test.py, freelancer-matrix: office)
     "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
-    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",
+    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office", "GET /api/office/docs/{}/recipients": "office",  # 2.433.0 (#3599)
     "DELETE /api/office/packs/installed/{}/{}": "office", "DELETE /api/office/trips/{}": "office",
     "DELETE /api/office/trips/{}/items/{}": "office", "DELETE /api/office/{}/{}": "office", "DELETE /api/paperless": "office",
     "DELETE /api/paperless/zip": "office", "DELETE /api/v1/clients/{}": "office", "GET /api/clients": "office",
@@ -550,7 +552,8 @@ ROUTES = {
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
     "GET /api/me/app-passwords": "own", "GET /api/me/mail": "own", "GET /api/me/share/httpshortcuts.zip": "own",
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",
-    "GET /api/me/webhooks": "own", "GET /api/me/webhooks/{}/log": "own", "GET /api/orgs": "own", "GET /api/push/subs": "own",
+    "GET /api/me/webhooks": "own", "GET /api/me/webhooks/{}/log": "own", "GET /api/orgs": "own", "POST /api/orgs": "own",  # 2.422.0 (#2937): p2422_orgself_test.py (a)
+    "GET /api/push/subs": "own",
     "GET /api/push/vapid": "own", "GET /api/v1/me": "own", "GET /api/v1/me/app-passwords": "own",
     "GET /api/v1/me/storage": "own", "PATCH /api/me": "own", "PATCH /api/me/tokens/{}": "own",
     "PATCH /api/me/webhooks/{}": "own", "PATCH /api/settings": "own", "PATCH /api/v1/me/notifications": "own",
@@ -1005,6 +1008,16 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/{}": "office", "DELETE /api/office/cards/{}": "office",
+    "POST /api/office/cards/{}/restore": "office", "GET /api/office/cards/{}/statements": "office", "POST /api/office/cards/{}/statements": "office",
+    "GET /api/office/cards/statements/{}": "office", "GET /api/office/cards/statements/{}/file": "office", "PATCH /api/office/cards/statements/{}": "office",
+    "DELETE /api/office/cards/statements/{}": "office", "POST /api/office/cards/statements/{}/restore": "office",
+    "POST /api/office/cards/statements/{}/confirm": "office", "POST /api/office/cards/statements/{}/reopen": "office",
+    "GET /api/office/cards/statements/{}/bank": "office", "POST /api/office/cards/statements/{}/lines": "office",
+    "PATCH /api/office/cards/lines/{}": "office", "DELETE /api/office/cards/lines/{}": "office", "GET /api/office/cards/lines/{}/candidates": "office",
+    "POST /api/office/cards/lines/{}/match": "office", "POST /api/office/cards/lines/{}/unmatch": "office", "POST /api/office/cards/lines/{}/upload": "office",
+    "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }

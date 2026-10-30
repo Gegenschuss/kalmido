@@ -17,6 +17,7 @@ from ..accounts.login import login_log_ip, login_log_who  # 2.239.0 B (#2888)
 from ..accounts.login import finish_login, pend_cookie, pend_new
 from ..core.access import Denied
 from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
+from ..core.pg import system_ctx
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 
 
@@ -168,8 +169,21 @@ def invite_check():
         _rate_fail(keys)
         return err(tr("This link is invalid or has expired. Ask for a new one."), 404)
     r, u = hit
+    # 2.365.0 (#2802): an invitation names who invites and into which organisation (two names, for the holder of a valid link)
+    by_name = org_name = ""
+    if (r["kind"] or "invite") == "invite":
+        with system_ctx(c):  # the inviting admin and the organisation are outside the (anonymous) request's context
+            by = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
+            # the organisation of the invitation first, then one the inviting person belongs to, then the oldest (review 2.365)
+            o = c.execute("SELECT o.name FROM org_members m JOIN orgs o ON o.id=m.org_id "
+                          "LEFT JOIN org_invites i ON i.user_id=m.user_id AND i.org_id=m.org_id "
+                          "LEFT JOIN org_members b ON b.org_id=m.org_id AND b.user_id=? "
+                          "WHERE m.user_id=? AND o.personal_of IS NULL AND o.retired_at IS NULL "
+                          "ORDER BY (i.org_id IS NULL), (b.user_id IS NULL), m.org_id LIMIT 1", (r["created_by"], u["id"])).fetchone()
+        by_name = (by["display_name"] or by["username"]) if by else ""
+        org_name = o["name"] if o else ""
     return jsonify(username=u["username"], display_name=u["display_name"] or u["username"], kind=r["kind"],
-                   lang=usettings(c, u["id"]).get("lang") or "en", min_password=MIN_PASSWORD)
+                   lang=usettings(c, u["id"]).get("lang") or "en", min_password=MIN_PASSWORD, invited_by=by_name, org_name=org_name)
 
 
 @app.post("/api/auth/invite/accept")

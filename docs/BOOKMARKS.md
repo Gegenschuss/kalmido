@@ -60,7 +60,7 @@ the module **Read later** (*Settings > Modules > Reading > Read later*, off by d
 
 ## Karakeep
 
-With a Karakeep connection (*Home & life* > *Read later* > *Karakeep…*) links you save in Karakeep come in as private
+With a Karakeep connection (*Settings* > *Integrations* > *Karakeep*; *Read later* > *Karakeep…* leads there) links you save in Karakeep come in as private
 bookmarks (with Karakeep's title, description and picture when it has them); notes and files from Karakeep stay tasks of
 your *Read later* list. Archiving a bookmark that came from Karakeep archives it there at the next fetch, like a ticked task.
 A bookmark comes in once: deleting it in Kalmido does not bring it back.

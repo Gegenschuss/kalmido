@@ -87,12 +87,16 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await key(ev, 'ArrowDown') === 'offers' && await key(ev, 'ArrowDown') === '' && await ev(`document.activeElement?.dataset?.k === 'of:a:offers'`), '#2180: ArrowDown = the next point');
     check(await key(ev, 'ArrowUp') === 'offers' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
     // 2.351.0 (#3312): no group "Folders" any more (the document areas are trees): End = the last point of the panel
-    check(await key(ev, 'End') === 'settings', '#2180: End = the panel\'s last button (the last point)');
+    // 2.418.0 (#3560): "Customize" (the menu's editor) is the panel's last button now, the last point right before it
+    check(await key(ev, 'End') === '' && await ev(`document.activeElement?.dataset?.act === 'nav-edit'`) && await key(ev, 'ArrowUp') === 'settings', '#2180: End = the panel\'s last button (Customize), the last point before it');
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
     // Settings: General | Templates (services and text blocks; their old routes lead there)
     await click(ev, '#side [data-ofm="settings"]');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
+    // 2.365.2 (#2789): the menu point opens Settings > Company & office; the page office/settings stays for old links
+    check(await ready(ev, `!!document.querySelector('.smodal .snav [data-sec="biz"][aria-selected="true"]') && !!document.querySelector('.smodal #s-biz #ofc-set')`, 60), '#2789: the menu point Settings opens Settings > Company & office');
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); location.hash = '#office/settings'; return 1; })()`);
     check(await ready(ev, `location.hash === '#office/settings' && !!document.querySelector('.office .ofrseg [data-go="office/settings"][aria-selected="true"]') && !!document.querySelector('#ofc-set')`, 60), '#2180: Settings opens on General');
     check(await ev(`!document.querySelector('#side [data-ofm="services"],#side [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     await click(ev, '.office .ofrseg [aria-selected="false"]');

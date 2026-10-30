@@ -91,13 +91,14 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await ready(ev, `!document.querySelector('.modal')`);
     check(await ev(`!!document.querySelector('a[href^="/api/office/cashbook.csv"]') && !!document.querySelector('a[href^="/api/office/cashbook.pdf"]')`), 'CSV and PDF links');
     // the cash boxes
-    await ev(`(() => { document.querySelector('[data-cb="view"][data-v="books"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.cb-bk input[data-cbf="name"]')`), 'the cash boxes');
+    // 2.365.2 D (#2789): set in Settings > Company & office > Bank & taxes; the cash book's bar links there
+    await ev(`(() => { document.querySelector('.cb-bar [data-setgo="biz-tax"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.smodal #s-biz .cb-bk input[data-cbf="name"]')`), 'the cash boxes');
     check(await ev(`document.querySelector('.cb-bk input[data-cbf="opening"]').disabled`), 'the opening balance is fixed after the closing');
     await ev(`(() => { const i = document.querySelector('.cb-bk input[data-cbf="name"]'); i.value = 'Ladenkasse'; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `${api('/api/office/cashbooks')}.then(j => j.books[0].name === 'Ladenkasse')`), 'a rename saves on its own');
-    await ev(`(() => { document.querySelector('[data-cb="view"][data-v="entries"]').click(); return 1; })()`);
-    await ready(ev, `!!document.querySelector('#cb-quick')`);
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.smodal') && !!document.querySelector('#cb-quick')`);
     // phone
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

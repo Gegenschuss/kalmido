@@ -58,7 +58,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   // 2.280.0 F (#3108): the reference card of a task whose long note is not loaded: from the local task (no fetch, offline the title)
   check(w.eval(`rf_get('t:${TL2}')?.name`) === 'Long note two', '#3108 F a reference card takes the local task (was: fetched, "…" offline)');
   // 2.280.0 F (#3108): the print view loads the notes at most 6 at a time
-  w.eval(`window.__rf0 = rawFetch; window.__cur = 0; window.__max = 0; rawFetch = async (...a) => { __cur++; __max = Math.max(__max, __cur); try { return await __rf0(...a); } finally { __cur--; } }`);
+  w.eval(`window.__rf0 = rawFetch; window.__cur = 0; window.__max = 0; rawFetch = async (...a) => { if (!${JSON.stringify(MANY)}.some(id => a[1].includes('/tasks/' + id))) return __rf0(...a); __cur++; __max = Math.max(__max, __cur); try { return await __rf0(...a); } finally { __cur--; } }`);  // #3506: only the notes - the 4 s poll made it 7 in a full run
   const pr = await w.eval(`tkNotesLoad(${JSON.stringify(MANY)}).then(r => r.map(x => x.status))`);
   w.eval(`rawFetch = __rf0`);
   check(pr.length === 8 && pr.every(x => x === 'fulfilled') && w.eval(`__max`) <= 6, `#3108 F notes for printing: all loaded, at most 6 at once ${JSON.stringify(pr)} max ${w.eval('__max')}`);

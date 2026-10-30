@@ -28,7 +28,8 @@ from .model import office_gate, office_need_feature, office_org, office_settings
 
 BX_COLS = ("type", "date", "number", "counterparty", "text", "category", "tax_pct", "net", "tax", "gross", "currency", "file")
 BX_DAYS_MAX = 3 * 366  # one export covers at most three years
-BX_TYPES = {"invoice": N_("Invoice"), "credit": N_("Credit note"), "payment": N_("Payment"), "receipt": N_("Receipt"), "travel": N_("Travel expenses")}
+BX_TYPES = {"invoice": N_("Invoice"), "credit": N_("Credit note"), "payment": N_("Payment"), "receipt": N_("Receipt"), "travel": N_("Travel expenses"),
+            "card": N_("Credit card")}  # 2.444.0 (#3447): positions of the statements (the total leaves the bank account, office/cardnorc.py)
 
 
 def _ctx():
@@ -123,6 +124,8 @@ def bx_rows(c, oid, frm, to, gaps=None):
                 rows.append({"type": "travel", "date": day, "number": "", "counterparty": "", "text": it["text"] or tr_.get("purpose") or "",
                              "category": rk_cat_label(it["category"] or "other"), "tax_pct": "", "net": -a, "tax": "", "gross": -a,
                              "currency": home, "file": ""})
+    from .cardnorc import cc_bk_rows
+    rows += cc_bk_rows(c, oid, frm, to)  # 2.444.0 (#3447)
     rows.sort(key=lambda x: (x["date"] or "", list(BX_TYPES).index(x["type"]), x["number"]))
     return rows, docs, recs
 
@@ -183,8 +186,9 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
     from ..files.bulk import ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique
     from ..files.store import fs_read
     from .pdfweb import epdf_doc_files
-    if len(docs) * 2 + len(recs) + 2 > ABM_ZIP_MAX_FILES:  # + the list and missing.txt
-        raise Denied(413, abm_too_big(len(docs) * 2 + len(recs) + 2, 0))
+    cards = [r for r in rows if r.get("_node")]  # 2.444.0 (#3447): the statements' PDFs and the receipts of the positions
+    if len(docs) * 2 + len(recs) + len(cards) + 2 > ABM_ZIP_MAX_FILES:  # + the list and missing.txt
+        raise Denied(413, abm_too_big(len(docs) * 2 + len(recs) + len(cards) + 2, 0))
     fd, path = tempfile.mkstemp(prefix="kalmido-books-", suffix=".zip")
     if not ABM_BUSY.acquire(blocking=False):
         os.close(fd)
@@ -193,7 +197,7 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
     size, cap = 0, ABM_ZIP_MAX_MB * 1024 * 1024
     try:
         with os.fdopen(fd, "wb") as f, zipfile.ZipFile(f, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
-            taken = {"documents": set(), "receipts": set()}
+            taken = {"documents": set(), "receipts": set(), "cards": set()}
             missing = []
             for did, r, mine in docs:
                 try:
@@ -226,6 +230,23 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
                 if size > cap:
                     raise Denied(413, abm_too_big(0, size))
                 z.writestr(row["file"], data)
+            done = {}
+            for row in cards:  # 2.444.0 (#3447): one file once, however many rows point at it
+                nid = row["_node"]
+                if nid not in done:
+                    try:
+                        data = fs_read(c, nid)
+                    except (OSError, Denied):
+                        missing.append((tr(BX_TYPES["card"]), row["number"]))
+                        done[nid] = ""
+                        continue
+                    n = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+                    done[nid] = "cards/" + abm_unique(_zip_part(f"{row['date'] or ''} {(n['name'] if n else '') or nid}"), taken["cards"])
+                    size += len(data)
+                    if size > cap:
+                        raise Denied(413, abm_too_big(0, size))
+                    z.writestr(done[nid], data)
+                row["file"] = done[nid]
             z.writestr(stem + ".csv", bx_csv(c, oid, rows).encode("utf-8"))
             note = bk_gaps_text(gaps or {}, missing)
             if note:

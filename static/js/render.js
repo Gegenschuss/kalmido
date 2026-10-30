@@ -82,7 +82,9 @@ const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p
 // 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
 // come in only when someone pins them (Settings > Appearance > Tab bar, or "Customize tab bar" under "More")
 const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
-const tabIds = () => mg_tabIds(LS.get('tabbar', null)) || tabDefault();  // 2.44.0 (#1187): old module tabs -> their area
+// 2.418.0 (#3560): the order of the person (setting nav_menus "tabbar", the same on every phone); before the first change
+// there the device's own (LS tabbar)
+const tabIds = () => { const o = nav_pref('tabbar').order; return mg_tabIds(o.length ? o.filter(x => x !== 'none') : LS.get('tabbar', null)) || tabDefault(); };  // 2.44.0 (#1187): old module tabs -> their area
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
   if (kind === 'a') return mg_tabItem(id);  // 2.44.0 (#1187)
@@ -1541,6 +1543,17 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
     const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the project sort', n)) : tr('Sort by {0}', n);
     return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }
+// 2.427.0 B (#3551): phones / narrow containers (where .lchead is hidden): the shown fields as a swipeable strip of names
+// above the rows (the sorted one with its arrow), a tap opens the column menu (lcMenu) at the name; "Fields" at the end
+// opens "Shown fields" (colModal). No widths here; list view only, not in an archived list or the overview
+function lcBar(l, lc) {
+  const ks = lc.filter(k => k !== 'id');
+  if (!ks.length || l.archived || isOverview()) return '';
+  const cur = sortMode();
+  return `<div class="lcbar" data-lid="${l.id}" role="toolbar" aria-label="${esc(tr('Shown fields'))}"><div class="lcbs">${ks.map(k => { const n = colName(l, k), on = colSorts(k).includes(cur), dir = on ? sortDir(cur) : '';
+    return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div><button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button></div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('.lcbar .lcbn[data-k]'); if (!b) return; e.preventDefault(); lcMenu(b); });
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
 document.addEventListener('click', e => {
   const b = e.target.closest?.('.lchead [data-colsort]'); if (!b) return;
@@ -1562,7 +1575,7 @@ document.addEventListener('contextmenu', e => {
 // 2.39.1 (#1327): the same menu from the small arrow in the column title (hover / focus)
 document.addEventListener('click', e => { const b = e.target.closest?.('.lchead [data-colmenu]'); if (!b) return; e.preventDefault(); e.stopPropagation(); lcMenu(b.closest('.lc')); }, true);
 function lcMenu(c) {
-  const l = listById(+c.closest('.lchead').dataset.lid); if (!l) return;
+  const l = listById(+c.closest('.lchead,.lcbar').dataset.lid); if (!l) return;  // 2.427.0 B (#3551): + the phone strip
   const k = c.dataset.k, p = colSorts(k), cur = sortMode(), lc = listCols(l) || [];
   const dirName = m => sortDir(m) === 'ascending' ? tr('Sort ascending') : tr('Sort descending');
   const pick = m => { LS.del('sortback.' + S.route.key); sortSet(m); };
@@ -1792,7 +1805,7 @@ function viewListBody() {
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared project.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
-  if (lc && total0(groups)) h += lcHead(rl, lc);
+  if (lc && total0(groups)) h += lcHead(rl, lc) + lcBar(rl, lc);  // 2.427.0 B (#3551): + the strip for narrow layouts
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
   const flowDeps = flow && depsOn() && (() => {

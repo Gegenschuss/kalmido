@@ -10,9 +10,12 @@ function toastPlace(el) {
   // 2.46.4 (#1755): with a real keyboard the visible area ends where the keyboard starts (visual viewport, in layout
   // coordinates); the message sits above the lowest input field there (the comment field), else right above the keyboard
   const vv = window.visualViewport, kb = typeof kbReal === 'function' && kbReal();
-  const vis = kb ? Math.round(vv.offsetTop + vv.height) : innerHeight;
+  // 2.365.0 (#2824): measured against the layout viewport (position:fixed counts from its bottom), not innerHeight, which
+  // follows the visible area on some phones while the keyboard is up (the message then sat in the middle of the list)
+  const lay = document.documentElement.clientHeight || innerHeight;
+  const vis = kb ? Math.round(vv.offsetTop + vv.height) : lay;
   let top = vis;
-  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)']) {
+  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)', '#detail .dthumb']) {  // 2.365.0 (#2824): + the phone's task bar
     const e = $(s); if (!e || !e.offsetWidth) continue;
     const r = e.getBoundingClientRect(); if (r.top > vis * .5 && r.top < top && r.bottom > vis - 160) top = r.top;
   }
@@ -32,8 +35,8 @@ function toastPlace(el) {
   // 2.46.4 (#1755): a sheet taller than 70 % no longer sends the message to the top (over the header / the content): it stays at the bottom
   const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? an_rect(sh) : null;  // 2.46.1 (#1558): an_rect = where the sheet will be, not where its entry animation is now
   el.classList.remove('totop');
-  if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
-  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  if (sr && sr.top >= lay * .3) top = Math.min(top, sr.top);
+  el.style.bottom = top < lay ? Math.round(lay - top + 12) + 'px' : '';
   // 2.92.0 D (#2009): on the phone the message never covers the quotation editor's "In the cash flow" choice: it goes to the top
   const cf = $('.cf8sec .seg');
   if (cf && cf.offsetWidth && (isMobile() || isTouch())) {
@@ -41,6 +44,8 @@ function toastPlace(el) {
     if (a.bottom > b.top && a.top < b.bottom) { el.classList.add('totop'); el.style.bottom = ''; }
   }
 }
+// 2.365.0 (#2824): a message already shown follows the keyboard (it opens, closes, the visible area scrolls): right above it
+if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => { const el = $('#toast'); if (el && !el.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(el)); });
 // 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
 // text is set a moment after clearing it, so the same message twice is read twice
 let announceT;
@@ -346,6 +351,8 @@ document.addEventListener('click', async e => {
     // back preview already shows it; route() used to close it right away = a short flash)
     if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
     S.viaDrawer = g.closest('#side') ? g.dataset.go : null;  // 2.354.0 C (#3013): an area opened from the drawer does not light up "More"
+    // 2.365.2 (#2789): the office menu's Settings open Settings > Company & office (a person without the settings keeps the page "My rights")
+    if (g.dataset.ofm === 'settings' && !(typeof ofr_grp === 'function' && ofr_grp() && ofr_lvOf('settings') === 'none')) { if ($('#side.open')) closeSide(); settingsModal('biz'); return; }
     go(g.dataset.go); return;
   }
   const qc = e.target.closest('.qchip:not([data-act])');  // 2.36.2 (#1138): a chip with its own action (the list of "Tasks of X") is no parser chip
@@ -594,7 +601,13 @@ document.addEventListener('click', async e => {
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-edit': { const t = taskById(S.sel); if (!canEdit(t)) break; if (tlkIs(t)) tlkToast(t); else editContent(); break; }  // 2.40.0 (#1203): the pen
     case 'md-more': { const open = !LS.get('mdOpen', false); LS.set('mdOpen', open); const m = $('#d-md'); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }  // 2.101.0 (#2157): for all tasks
-    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) { tl.style.scrollMarginTop = ($('#detail .dtop')?.offsetHeight || 0) + 'px'; tl.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
+    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) {
+      // 2.365.0 (#2824): the panel scrolls itself to the heading right below its sticky header (scrollIntoView with a scroll
+      // margin went to the panel's end on the phone with the bottom bar: the heading sat under the header)
+      const de = $('#detail'), hh = $('#detail .dtop')?.offsetHeight || 0, behavior = reducedMotion() ? 'auto' : 'smooth';
+      if (de && de.scrollHeight > de.clientHeight && de.contains(tl)) de.scrollTo({top: Math.max(0, Math.round(tl.getBoundingClientRect().top - de.getBoundingClientRect().top + de.scrollTop - hh)), behavior});
+      else { tl.style.scrollMarginTop = hh + 'px'; tl.scrollIntoView({block: 'start', behavior}); }
+    } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
@@ -778,6 +791,8 @@ document.addEventListener('click', async e => {
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
+    case 'lt-sigset': ltSigSettings(); break;  // 2.365.2 C (#2789): from Settings > Account  // lazy-ok: the button sits in Settings > Account (acctset.js loads with it)
+    case 'mod-settings': settingsModal(a.dataset.sec); break;  // 2.365.2 C (#2789): module -> its Settings area
     case 'tvg-add': entryModal(null, {task_id: id || null, date: a.dataset.d}); break;  // 2.34.0 (#269): a day without tracked time
     case 'tvg-x': tvgDismiss(); break;
   }
@@ -1006,3 +1021,13 @@ document.addEventListener('click', e => {
   const fs = S.qfiles[b.dataset.in] || []; fs.splice(+b.dataset.i, 1);
   const inp = document.getElementById(b.dataset.in); if (inp) { qFilesDraw(inp); inp.focus(); }
 }, true);
+// 2.365.2 D (#2789): a link to Settings from a module, a dialog or another settings area (data-setgo="biz-tax" = a part of
+// Company & office, "agents" = an area, "#office/import" = a page): the dialog around it closes (asking first when it holds
+// unsaved input), an open Settings dialog makes room for the new one
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-setgo]'); if (!a) return;
+  e.preventDefault();
+  const m = a.closest('.modal'); if (m && !m.classList.contains('smodal')) modalClose(m);
+  const sm = $('.smodal'); if (sm) { sm._noflush = true; sm.remove(); }
+  const to = a.dataset.setgo; if (to.startsWith('#')) location.hash = to; else settingsModal(to);
+});

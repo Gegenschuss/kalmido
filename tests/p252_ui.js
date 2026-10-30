@@ -183,8 +183,9 @@ async function firefox(fn) {
       await shot(`p252-head-${W}.png`);
       // K06 / K22: the panel (2.15.1, #636: on a phone the date and Today / Tomorrow may get a second row)
       await ev(`openDetail(${T})`); await sleep(700);
-      const dp = await ev(`(() => { const d = document.getElementById('detail'), c = d.querySelector('.dtop .chk').getBoundingClientRect(), x = d.querySelector('.dtop .dchip').getBoundingClientRect(), t = d.querySelector('.dtop .dchip .dct');
-        return {sw: d.scrollWidth, cw: d.clientWidth, gap: x.top >= c.bottom - 1 ? 99 : x.left - c.right, clipped: t.scrollWidth > t.clientWidth + 1, ell: getComputedStyle(t).textOverflow, out: [...d.querySelectorAll('.dtop > *')].filter(e => e.offsetWidth && e.getBoundingClientRect().right > d.getBoundingClientRect().left + d.clientWidth + 0.5).length}; })()`);
+      // 2.365.0 (#2824): on a phone Complete and the date sit in the bottom bar (.dthumb), Complete right of the date
+      const dp = await ev(`(() => { const d = document.getElementById('detail'), bar = d.querySelector('.dthumb'), c = d.querySelector('.dtop .chk, .dthumb .dtdone').getBoundingClientRect(), x = d.querySelector(':is(.dtop, .dthumb) .dchip').getBoundingClientRect(), t = d.querySelector(':is(.dtop, .dthumb) .dchip .dct');
+        return {sw: d.scrollWidth, cw: d.clientWidth, bar: !!bar, gap: bar ? (c.top >= x.bottom - 1 ? 99 : c.left - x.right) : x.top >= c.bottom - 1 ? 99 : x.left - c.right, clipped: t.scrollWidth > t.clientWidth + 1, ell: getComputedStyle(t).textOverflow, out: [...d.querySelectorAll('.dtop > *, .dthumb > *')].filter(e => e.offsetWidth && e.getBoundingClientRect().right > d.getBoundingClientRect().left + d.clientWidth + 0.5).length}; })()`);
       check(dp.sw <= dp.cw && dp.gap >= 0 && dp.out === 0 && (!dp.clipped || dp.ell === 'ellipsis'), `${W}px: panel without sideways scroll, checkbox clear of the date ${JSON.stringify(dp)}`);
       await shot(`p252-panel-${W}.png`);
       await ev(`closeDetail ? closeDetail() : null`).catch(() => {});

@@ -189,7 +189,10 @@ function browser() {
   br.db.set('s:org:9999', {k: 's:org:9999', sp: 'org:9999', uid: st0.me.id, pages: [{id: 1, path: 'Old', body: 'old'}]});
   br.db.set('s:private-other', {k: 's:private-other', sp: 'private', uid: 999999, pages: []});
   // 2.280.0 C (#3114): the tidying runs at the first space opened in a session (no start sync any more)
-  await w.eval(`WKO.swept = null; wk_load('private', true)`);
+  // 2.438.0 (#3625): a load of this space may still run (a redraw after the flush above) and wk_load then returns without
+  // syncing: WKO.swept stayed null and the check ran before any tidying. Asked again until the tidying really started
+  await w.eval(`WKO.swept = null; 1`);
+  await until(() => w.eval(`wk_load('private', true); !!WKO.swept`), 40);
   await w.eval(`WKO.swept`);
   check(!br.db.has('s:org:9999') && !br.db.has('s:private-other') && br.db.has('s:private'), 'sync: a space no longer mine and another account\'s record leave the copy');
   // review: my own text sent twice (the first answer got lost) is no conflict

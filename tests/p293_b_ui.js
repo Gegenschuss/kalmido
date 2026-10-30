@@ -81,8 +81,14 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `document.querySelectorAll('.lgb-card').length === 1 && /36\\.00/.test(document.querySelector('.lgb-card').textContent) && /100 %/.test(document.querySelector('.lgb-card').textContent)`),
       'the year report: 120 business km x 0.30 = 36.00, share 100 % ' + await ev(`document.querySelector('.lgb-card')?.textContent`));
     check(await ev(`!!document.querySelector('a[href^="/api/office/logbook.csv"]') && !!document.querySelector('a[href^="/api/office/logbook.pdf"]')`), 'CSV and PDF links');
-    await ev(`(() => { document.querySelector('#lgb-rate').value = '0.35'; document.querySelector('[data-lgb="rate"]').click(); return 1; })()`);
-    check(await ready(ev, `/42\\.00/.test(document.querySelector('.lgb-card')?.textContent || '')`), 'a new rate: 120 x 0.35 = 42.00');
+    // 2.365.2 D (#2789): the rate is set in Settings > Company & office > Bank & taxes; the report links there
+    check(await ev(`!document.querySelector('.office #lgb-rate') && /: 0[.,]3/.test(document.querySelector('.office [data-setgo="biz-tax"]')?.closest('p')?.textContent || '')`), 'the report names the rate and links to it ' + await ev(`document.querySelector('.office .ofcsetl')?.textContent`));
+    await ev(`(() => { document.querySelector('.office [data-setgo="biz-tax"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.smodal .lgb-rset #lgb-rate')`, 60), 'Settings > Company & office has the rate');
+    await ev(`(() => { const i = document.querySelector('.smodal #lgb-rate'); i.value = '0.35'; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ready(ev, `${api('/api/office/settings')}.then(j => j.settings.km_rates[String(new Date().getFullYear())] === '0.35')`), 'the rate of this year saved on change');
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.smodal') && /42\\.00/.test(document.querySelector('.lgb-card')?.textContent || '')`), 'a new rate: 120 x 0.35 = 42.00');
     await shot('p293-b-report.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

@@ -11,7 +11,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval('settingsModal()'); await sleep(400);
   let md = d.querySelector('.modal.smodal');
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): a server admin always has Organisation (People, Agents, Data)
+  // 2.418.0 (#3560): the new section Navigation (Settings > Navigation) after Appearance
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'nav', 'modules', 'notify', 'integr', 'docs', 'access', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);  // 2.39.1 (#1188): Settings > Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): a server admin always has Organisation (People, Agents, Data)
   check(md.querySelector('.snav .on')?.dataset.sec === 'general', 'default section: General');
   check(md.querySelectorAll('.spane:not(.hidden)').length === 1, 'exactly one pane visible');
   for (const k of secs) {
@@ -21,7 +22,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   }
   await sleep(300);
   check(md.querySelectorAll('#a-users .mrow').length >= 4, 'users pane lists users');
-  check(md.querySelector('[data-pane="look"] #s-tabbar') && md.querySelector('[data-pane="look"] .devtag'), 'per-device groups tagged (appearance + tab bar)');
+  // 2.418.0 (#3560): the tab bar is the person's (setting nav_menus), no "This device" tag any more; Settings > Navigation is a section
+  check(md.querySelector('[data-pane="look"] #s-tabbar') && !md.querySelector('[data-pane="look"] #s-tabbar-h .devtag') && md.querySelector('[data-pane="nav"] #s-navmenus'), 'tab bar under Appearance (per person), Navigation section');
   // 2.152.2 (#2624): project instead of list
   check(md.querySelector('[data-pane="modules"] [data-feat="collab"]') && /Share projects, assign tasks, @mentions/.test(md.querySelector('[data-pane="modules"]').textContent) && md.querySelector('[data-pane="modules"] [data-feat="comments"]'), 'collab switch with explanation under Modules');
   check(md.querySelector('[data-pane="modules"] #s-collaball')?.checked === true, 'admin: instance switch shown next to it (Modules), on');
@@ -58,9 +60,10 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const hit = tp.querySelector('[data-tabadd="s:tomorrow"]');
   check(hit && !tp.querySelector('[data-tabadd="m:tasks"]'), 'tab sheet: the search finds the smart list at once, across sections');
   click(w, hit); await sleep(50);
-  check(JSON.stringify(w.eval(`LS.get('tabbar')`)).includes('s:tomorrow') && !d.querySelector('.modal.tapick'), 'tab bar applies immediately, the sheet closes');
+  // 2.418.0 (#3560): kept in the setting nav_menus (the same on every phone), no longer in the device's LS tabbar
+  check(w.eval(`tabIds()`).includes('s:tomorrow') && /s:tomorrow/.test(w.eval(`S.settings.nav_menus`)) && !d.querySelector('.modal.tapick'), 'tab bar applies immediately (per person), the sheet closes');
   click(w, md.querySelector('[data-m="tab-reset"]')); await sleep(50);
-  check(w.eval(`LS.get('tabbar', null)`) === null, 'tab bar back to default');
+  check(w.eval(`LS.get('tabbar', null)`) === null && JSON.stringify(w.eval(`tabIds()`)) === JSON.stringify(w.eval(`tabDefault()`)) && !/tabbar/.test(w.eval(`S.settings.nav_menus`)), 'tab bar back to default');
   md.remove();
   // 1.5: every setting saves itself (no "Save", no "unsaved changes")
   w.eval(`settingsModal('notify')`); await sleep(300); md = d.querySelector('.smodal');
@@ -88,7 +91,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({user: 'bob', mobile: true}); d = w.document;
   w.eval('settingsModal()'); await sleep(400); md = d.querySelector('.smodal');
   const bsecs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(!bsecs.includes('users') && bsecs.includes('ai') && !bsecs.includes('org') && bsecs.length === 10, 'non-admin: no Administration section (2.22.0 #739: a new person has the module Agents, so its page) ' + bsecs.join());  // 2.39.1 (#1188): + Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access
+  check(!bsecs.includes('users') && bsecs.includes('ai') && !bsecs.includes('org') && bsecs.includes('nav') && bsecs.length === 12 /* 2.418.0 (#3560): + Navigation */, 'non-admin: no Administration section (2.22.0 #739: a new person has the module Agents, so its page) ' + bsecs.join());  // 2.39.1 (#1188): + Organisation  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access
   const txt = md.textContent;
   check(/Allgemein/.test(txt) && /Benachrichtigungen/.test(txt) && /Integrationen/.test(txt) && /Hilfe/.test(txt) && /Dieses Gerät/.test(txt), 'German section labels');
   for (const k of bsecs) click(w, md.querySelector(`.snav [data-sec="${k}"]`));

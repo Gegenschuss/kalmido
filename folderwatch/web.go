@@ -45,7 +45,7 @@ func (p *Page) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Content-Security-Policy", pageCSP)
 	h.Set("X-Frame-Options", "DENY")
-	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Referrer-Policy", "same-origin") // 2.427.0 (#3576): no-referrer made browsers send "Origin: null" on form POSTs
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	if r.URL.Path == "/hello" && r.Method == http.MethodGet && r.Host == "127.0.0.1:"+strconv.Itoa(p.port) {
@@ -135,11 +135,17 @@ func (p *Page) secretOK(s string) bool {
 }
 
 // sameOrigin: a browser sends Origin / Sec-Fetch-Site with a form POST; both must point at this page.
+// 2.427.0 (#3576): "Origin: null" (pages served with an older no-referrer policy) only counts with Sec-Fetch-Site same-origin.
 func (p *Page) sameOrigin(r *http.Request) bool {
-	if o := r.Header.Get("Origin"); o != "" && o != "http://127.0.0.1:"+strconv.Itoa(p.port) {
+	s := r.Header.Get("Sec-Fetch-Site")
+	if o := r.Header.Get("Origin"); o == "null" {
+		if s != "same-origin" {
+			return false
+		}
+	} else if o != "" && o != "http://127.0.0.1:"+strconv.Itoa(p.port) {
 		return false
 	}
-	if s := r.Header.Get("Sec-Fetch-Site"); s != "" && s != "same-origin" && s != "none" {
+	if s != "" && s != "same-origin" && s != "none" {
 		return false
 	}
 	return true

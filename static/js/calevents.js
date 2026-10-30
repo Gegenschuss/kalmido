@@ -410,7 +410,7 @@ async function evCalsModal() {
     const b = e.target.closest('[data-evc]'); if (!b) return;
     if (b.dataset.evc === 'close') md.remove();
     if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
-    if (b.dataset.evc === 'phone') { md.remove(); davGuide(); }
+    if (b.dataset.evc === 'phone') { md.remove(); settingsModal('caldav'); }  // 2.365.2 B (#2789): the steps live in Settings > Integrations
     if (b.dataset.evc === 'booking') { md.remove(); apbOpen(); }  // 2.94.0 B (#1929): apptbook.js (lazy module calendar)
     if (b.dataset.evc === 'subs') { md.remove(); settingsModal('calendars'); }
     if (b.dataset.evc === 'new') {

@@ -319,6 +319,7 @@ function palAll() {
     if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
     if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
     if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
+    if ((k === 'biz' && !officeOn()) || (k === 'docs' && !feat('docs'))) continue;  // 2.365.2 (#2789)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   pg_settingParts(add);
@@ -374,7 +375,7 @@ function pg_actions(add) {
 function pg_settingParts(add) {
   if (!S.me) return;
   const adm = !!S.me.is_admin, parts = [
-    [N_('Language'), 'general', '#s-lang-h', 'sliders', 1], [N_('Sidebar'), 'sidebar', '#s-side-h', 'sliders', 1], [N_('Tab bar'), 'tabbar', '#s-tabbar-h', 'sliders', 1],
+    [N_('Language'), 'general', '#s-lang-h', 'sliders', 1], [N_('Sidebar'), 'sidebar', '#s-side-h', 'sliders', 1], [N_('Tab bar'), 'tabbar', '#s-tabbar-h', 'sliders', 1], [N_('Navigation'), 'nav', '#s-nav-h', 'menu', 1],  // 2.418.0 (#3560)
     [N_('Storage'), 'account', '#s-storage-h', 'user', 1], [N_('Two-factor authentication'), 'account', '#s-2fa-h', 'key', 1],
     [N_('API tokens'), 'tokens', '#s-toks', 'key', !!S.api?.enabled], [N_('Calendar subscription'), 'ical', '#s-ical-h', 'link', 1],
     [N_('Templates'), 'templates', '#s-tpl-h', 'download', 1], [N_('Members'), 'org', '#og-mh', 'users', lmOrgPaneOn()], [N_('Groups'), 'groups', '#s-groups-h', 'users', adm]];
@@ -563,7 +564,10 @@ function tourSteps() {
   if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'), sel: '#top .menu', r: rect('#top .menu')}
+  // 2.365.0 (#2802): the phone's own wording: the Basket is in the bar at the bottom (the ring went to the menu at the top)
+  const vis = q => $$(q).find(e => e.offsetWidth || e.offsetHeight);
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: vis('#tabs [data-go="inbox"]') ? N_('New tasks without a project land in the Basket, down in the bar. Today, Tomorrow and Next 7 days collect from all projects.') : N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
+    sel: '#tabs [data-go="inbox"], #top .menu', r: rect(() => vis('#tabs [data-go="inbox"]') || $('#top .menu'))}
     : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   const org = tourOrg(), wsEl = () => $$('[data-act="ws-menu"]').find(e => e.getBoundingClientRect().width) || null;
@@ -577,8 +581,12 @@ function tourSteps() {
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
   s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
+  // 2.365.0 (#2802): one step for what the start switched on: the office (Office & finance), else the team (Team, Software)
+  const ofc = officeOn() && vis('#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]');
+  if (ofc) s.push({id: 'office', sel: '#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]', t: N_('Office|area'), d: N_('Here you create clients and quotations.'), r: () => ofc.getBoundingClientRect()});
+  else if (collab() && !S.me?.kid) s.push({id: 'team', t: N_('Work as a team'), d: N_('Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.')});
   if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
-  return s.slice(0, 6);
+  return s.slice(0, 7);  // 2.365.0 (#2802): 7 with the step of the chosen start
 }
 // 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic
 // start (tour still pending) runs at most once per session and only in Projects: a link with a target (#cal, #office,

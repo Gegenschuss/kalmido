@@ -97,7 +97,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#d-tl .cm'));
   const kids = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className);
   check(kids.indexOf('d-more') >= 0 && kids.indexOf('d-tl') === kids.length - 1 && kids.indexOf('d-more') < kids.indexOf('d-tl'), '#957: "More details" above, the comments last ' + kids.join('|').slice(0, 200));
-  check(/1 tag/.test(d.querySelector('#d-more .dmsum')?.textContent || ''), '#957: the folded details say what they hold ' + d.querySelector('#d-more summary')?.textContent);
+  // 2.380 F (#3435): a section with content stands on its own above "More details", which holds only the empty ones
+  check(!d.querySelector('#d-more .tagpill') && [...d.querySelectorAll('#detail .dsec .tagpill')].some(x => /outside/.test(x.textContent)), '#957 #3435: the tag stands above the folded details');
   check(d.querySelector('#d-md.clamp') && w.getComputedStyle(d.querySelector('#d-md')).maxHeight !== 'none', '#994: a 12-line description still folds');
   w.eval('closeDetail()');
   w.close();

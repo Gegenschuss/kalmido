@@ -29,9 +29,7 @@ function abc_group() {
   const pad = '<span class="abchid abcsw" aria-hidden="true"></span>';
   const row = (k, on, name, hint) => `<div class="cvxrow abcrow" style="--cc:var(--muted)"><i class="cevdot"></i><span class="evcn">${esc(name)}${hint ? `<span class="muted"> · ${esc(hint)}</span>` : ''}</span>${sw(k, on, tr('Show {0} in my calendar', name))}${pad}${pad}<span class="iconbtn abchid" aria-hidden="true">${ic('dots')}</span></div>`;
   const team = (S.me?.workspaces || []).length > 0;
-  const sel = ABC.info?.states ? `<div class="row abcst"><label for="abc-state">${tr('Holidays of')}</label><select id="abc-state" data-sheet-ico="cal">
-      <option value="">${esc(ABC.info.area ? tr('As my organisation ({0})', st[ABC.info.area] || ABC.info.area) : tr('None'))}</option>
-      ${Object.entries(st).map(([k, v]) => `<option value="${esc(k)}" ${k === ABC.info.own ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>` : '';
+  const sel = ABC.info?.states ? `<div class="row abcst"><label>${tr('Holidays of')}</label><button type="button" class="linkbtn" data-act="mod-settings" data-sec="general">${esc(ABC.info.own ? st[ABC.info.own] || ABC.info.own : ABC.info.area ? tr('As my organisation ({0})', st[ABC.info.area] || ABC.info.area) : tr('None'))} · ${tr('Change in Settings > General')}</button></div>` : '';  // 2.365.2 C (#2789): the picker moved to Settings > General > Working week
   const fbv = S.settings.freebusy_share || 'org';
   const fbo = [['org', tr('Only calendars of my organisations')], ['all', tr('All my calendars')], ['off', tr('To nobody')]];
   const fb = team ? `<div class="row abcst"><label for="abc-fb">${tr('Show my free / busy times')}</label><select id="abc-fb" data-sheet-ico="cal">
