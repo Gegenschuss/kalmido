@@ -4535,7 +4535,7 @@ GLOBAL_DEFAULTS = {
     # automatic backups (see "backups"; KALMIDO_BACKUPS=0 turns the feature off)
     "bk_on": "0", "bk_time": "03:30", "bk_keep_daily": "14", "bk_keep_weekly": "8",
     "bk_encrypt": "0", "bk_pass": "",            # passphrase sealed with the server key; never sent to a client
-    "bk_last_day": "", "bk_last_ok": "", "bk_last_name": "", "bk_last_error": "", "bk_last_error_at": "",
+    "bk_last_day": "", "bk_last_ok": "", "bk_last_name": "", "bk_last_error": "", "bk_last_error_at": "", "bk_tools_problem": "",
     "bk_enabled_at": "",
     "public_links": "1",        # admin: public read-only links of lists (KALMIDO_PUBLIC_LINKS=0 turns them off for good)
     "org_encrypt": "1",         # 2.42.0 (#828): admin: encrypt organisation data at rest (needs KALMIDO_SECRET_KEY; 0 = nothing new)

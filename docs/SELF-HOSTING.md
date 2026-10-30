@@ -1940,6 +1940,11 @@ stay blocked until you allow them.
 - **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
   restore it"); older backups restore as before. The same `KALMIDO_ALLOW_DOWNGRADE=1` lets a newer backup through.
   The database schema number in the backup (`schema_version`) stays a second, independent guard.
+- **A newer PostgreSQL (#2945).** `pg_dump` refuses a server of a newer major version, so `postgresql-client` has to move
+  along with the server: the image carries version 17. Before every backup Kalmido compares the major versions of
+  `pg_dump` and the server. Is `pg_dump` older, the backup stops with a clear message instead of failing later,
+  *Settings > Administration* names it and the admins get an alert. Upgrade the database server only together with a
+  Kalmido image that has the matching client (`postgresql-client-<major>` in the `Dockerfile`).
 - **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an

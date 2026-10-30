@@ -15401,5 +15401,7 @@
   "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "El CSV cuenta los comentarios y adjuntos, pero no los contiene. Para tenerlo todo, usa la exportación de la cuenta.",
   "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Se copia todo salvo comentarios y tiempos, también los archivos. Los miembros y los accesos compartidos no: las asignaciones solo se mantienen si la persona puede ver la copia.",
   "Not copied: {0}": "No copiado: {0}",
-  "Hold the handle, then drag it.": "Mantén pulsada el asa y arrastra."
+  "Hold the handle, then drag it.": "Mantén pulsada el asa y arrastra.",
+  "No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md).": "No se puede crear ninguna copia de seguridad: pg_dump {0} rechaza el PostgreSQL {1} más reciente de este servidor. Usa una imagen de Kalmido con postgresql-client {1} (ver SELF-HOSTING.md).",
+  "Backups are not possible": "No se pueden crear copias de seguridad"
 }

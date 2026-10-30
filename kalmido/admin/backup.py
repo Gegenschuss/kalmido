@@ -147,6 +147,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "objects": N_("The database in the backup contains unexpected objects or statements and was refused."),
           "legacy": N_("This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update."),
           "tools": N_("The database tools (pg_dump / pg_restore) are missing on this server."),
+          # 2.359.3 (#2945)
+          "tools_version": N_("No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md)."),
           "passphrase": N_("Wrong passphrase, or the encrypted backup is damaged."),
           "need_passphrase": N_("This backup is encrypted: enter its passphrase."),
           "no_passphrase": N_("Encryption needs a passphrase (at least 10 characters)."),
@@ -341,6 +343,44 @@ def _pg_tool(name):
     return exe
 
 
+def bk_tools_majors(c):
+    """2.359.3 (#2945): (major of pg_dump, major of the server); None for what cannot be told (pg_dump then speaks for itself)."""
+    txt = os.environ.get("KALMIDO_TEST_PG_DUMP_VERSION", "") if os.environ.get("KALMIDO_TEST") == "1" else ""  # tests only
+    try:
+        txt = txt or subprocess.run([_pg_tool("pg_dump"), "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                    timeout=15, check=False, env={"PATH": os.environ.get("PATH", "")}).stdout
+    except (BackupError, OSError, subprocess.TimeoutExpired):
+        txt = ""
+    m = re.search(r"(?:^|\s)(\d{1,3})(?:\.\d+|\s|$)", txt or "")
+    try:
+        num = int(c.execute("SHOW server_version_num").fetchone()[0])
+    except Exception:  # noqa: BLE001 -- no answer: the dump names the problem
+        c.rollback()
+        num = 0
+    return int(m.group(1)) if m else None, num // 10000 or None
+
+
+def bk_tools_check(c):
+    """2.359.3 (#2945): pg_dump refuses a server of a newer major version: BackupError before anything is written."""
+    tool, server = bk_tools_majors(c)
+    if tool and server and tool < server:
+        raise BackupError("tools_version", str(tool), str(server))
+
+
+def bk_tools_note():
+    """2.359.3 (#2945): once per instance start: Admin > Server names the problem before the next backup fails."""
+    c = connect()
+    try:
+        tool, server = bk_tools_majors(c)
+        bad = bool(tool and server and tool < server)
+        gset(c, "bk_tools_problem", f"{tool}|{server}" if bad else "")
+        c.commit()
+    finally:
+        c.close()
+    if bad:
+        aa_now("storage", "backup:tools_version", BK_ERR["tools_version"], [str(tool), str(server)])
+
+
 def _pg_errline(raw, tool):
     """First meaningful line of a tool's stderr (short; libpq never prints the password)."""
     for ln in (raw or b"").decode("utf-8", "replace").splitlines():
@@ -414,6 +454,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             raise BackupError("encrypt_required")
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
+        bk_tools_check(c)  # 2.359.3 (#2945)
         # 2.432.0 (#3584): every file is hashed first; only what the shared store does not hold yet needs room (before:
         # all files again, twice with encryption). The zip holds the database and the small files, so it stays small
         db_bytes = bk_db_bytes(c)
@@ -735,7 +776,7 @@ def bk_run(kind):
                 c.commit()  # a SET survives only a committed transaction
             name = bk_create(kind, c)
             bk_prune(c)
-            for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", "")):
+            for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", ""), ("bk_tools_problem", "")):
                 gset(c, k, v)
             c.commit()
         except BackupError:
@@ -750,6 +791,8 @@ def bk_run(kind):
             c.rollback()
             gset(c, "bk_last_error", e.text("en"))
             gset(c, "bk_last_error_at", iso(now_utc()))
+            if e.code == "tools_version":  # 2.359.3 (#2945): Admin > Server (about: backup_tools_problem)
+                gset(c, "bk_tools_problem", "|".join(str(x) for x in e.args_))
             c.commit()
         except Exception:  # noqa: BLE001 -- no database: the alert below still goes out (log + admin alert queue)
             pass

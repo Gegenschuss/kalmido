@@ -15401,5 +15401,7 @@
   "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "De CSV telt opmerkingen en bijlagen, maar bevat ze niet. Gebruik voor alles de accountexport.",
   "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Alles behalve opmerkingen en tijden gaat mee, ook bestanden. Leden en delingen niet: toewijzingen blijven alleen als de persoon de kopie mag zien.",
   "Not copied: {0}": "Niet gekopieerd: {0}",
-  "Hold the handle, then drag it.": "Houd de greep ingedrukt en sleep."
+  "Hold the handle, then drag it.": "Houd de greep ingedrukt en sleep.",
+  "No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md).": "Geen back-up mogelijk: pg_dump {0} weigert de nieuwere PostgreSQL {1} van deze server. Gebruik een Kalmido-image met postgresql-client {1} (zie SELF-HOSTING.md).",
+  "Backups are not possible": "Back-ups zijn niet mogelijk"
 }
