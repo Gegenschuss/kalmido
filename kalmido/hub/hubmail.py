@@ -36,7 +36,7 @@ from ..core.config import app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list, reading_sql
+from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
 from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
@@ -143,30 +143,32 @@ def hbm_node_ok(c, uid, mail_id):
     return bool(m) and hbm_can(c, uid, m)
 
 
-def hbm_node_mail_ids(c, uid):
-    """2.148.1 D (#2488): the ids of the hub mails with filed nodes that uid may read (files/store.py fs_visible_sql_c)."""
-    from ..core.access import vis_sql
+def hbm_node_sql(c, uid):
+    """2.360.2 L (#2561): a subquery (no parameters) of the ids of the hub mails with filed nodes that uid may read
+    (files/store.py _mail_hidden) -- hbm_can in SQL, so a large mailbox never becomes a literal list. Only the role of a
+    list stays in Python, once per list: it knows data locks and hidden life areas that vis_sql does not."""
     from ..team.clients import client_rows
     if _kid(c, uid):  # 2.352.0 G (#2752, review M5): see hbm_node_ok
-        return set()
-    cids = [int(r["id"]) for r in client_rows(c, uid)]
-    cl = f" OR (m.list_id IS NULL AND m.client_id IN ({','.join(map(str, cids))}))" if cids else ""
-    # 2.148.1 G (#2488): only the columns hbm_can reads (no bodies on every file view)
-    rows = c.execute(f"""SELECT m.id, m.list_id, m.client_id, m.owner_id, m.org_id FROM hub_mails m WHERE (m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)
-                         AND (m.list_id IN {vis_sql()} OR (m.list_id IS NULL AND m.client_id IS NULL AND m.owner_id=?){cl})""",
-                     (uid, uid, uid)).fetchall()
-    roles, out = {}, set()
-    for m in rows:
-        if m["list_id"]:  # hbm_can's list case, the list read once
-            if m["list_id"] not in roles:
-                l = _list_row(c, m["list_id"])
-                roles[m["list_id"]] = ((l["org_id"] or None) if l else -1, bool(l) and bool(list_role(c, m["list_id"], uid)))
-            lorg, ok = roles[m["list_id"]]
-            if ok and lorg == (m["org_id"] or None):
-                out.add(m["id"])
-        elif hbm_can(c, uid, m):
-            out.add(m["id"])
-    return out
+        return "SELECT 0 WHERE FALSE"
+    filed = "(m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)"
+    lids = [r[0] for r in c.execute(f"SELECT DISTINCT m.list_id FROM hub_mails m WHERE {filed} AND m.list_id IN {vis_sql()}", (uid, uid))]
+    lids = sorted(int(x) for x, role in list_roles(c, uid, lids).items() if role)
+    cids = sorted(int(r["id"]) for r in client_rows(c, uid))
+    orgs = sorted(int(x) for x in acx_of(c, uid).org_ids)
+    w = [f"(m.list_id IS NULL AND m.client_id IS NULL AND m.owner_id={int(uid)} AND "
+         f"(COALESCE(m.org_id, 0)=0{' OR m.org_id IN (' + ','.join(map(str, orgs)) + ')' if orgs else ''}))"]
+    if lids:
+        w.append(f"(m.list_id IN ({','.join(map(str, lids))}) AND EXISTS (SELECT 1 FROM lists l WHERE l.id=m.list_id "
+                 "AND COALESCE(l.org_id, 0)=COALESCE(m.org_id, 0)))")
+    if cids:
+        w.append(f"(m.list_id IS NULL AND m.client_id IN ({','.join(map(str, cids))}) AND EXISTS (SELECT 1 FROM clients k "
+                 "WHERE k.id=m.client_id AND COALESCE(k.org_id, 0)=COALESCE(m.org_id, 0)))")
+    return f"SELECT m.id FROM hub_mails m WHERE {filed} AND ({' OR '.join(w)})"
+
+
+def hbm_node_mail_ids(c, uid):
+    """2.148.1 D (#2488): the same as a set."""
+    return {r[0] for r in c.execute(hbm_node_sql(c, uid))}
 
 
 def _need_mail(c, mid, write=False, deleted=False):

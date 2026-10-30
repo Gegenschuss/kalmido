@@ -15254,5 +15254,7 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig.",
   "This quotation was superseded": "Deze offerte is vervangen",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Uitgenodigd. Met een account op dit adres ziet de persoon de tabel zodra die hem mag krijgen.",
-  "The invitation stops working.": "De uitnodiging werkt dan niet meer."
+  "The invitation stops working.": "De uitnodiging werkt dan niet meer.",
+  "The table is full (at most {0} MB)": "De tabel is vol (maximaal {0} MB)",
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Je boekingspagina heeft vandaag de grens van {0} bevestigingsmails bereikt. Boeken kan morgen weer."
 }

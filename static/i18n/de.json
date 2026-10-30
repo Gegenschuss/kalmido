@@ -15254,5 +15254,7 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig.",
   "This quotation was superseded": "Dieses Angebot wurde ersetzt",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Eingeladen. Mit einem Konto zu dieser Adresse sieht die Person die Tabelle, sobald sie sie bekommen darf.",
-  "The invitation stops working.": "Die Einladung gilt dann nicht mehr."
+  "The invitation stops working.": "Die Einladung gilt dann nicht mehr.",
+  "The table is full (at most {0} MB)": "Die Tabelle ist voll (höchstens {0} MB)",
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Deine Buchungsseite hat heute ihre Grenze von {0} Bestätigungsmails erreicht. Weitere Buchungen gehen ab morgen wieder."
 }

@@ -315,10 +315,11 @@ def lt_image_in(v):
     from .pdf import pdf_image_object
     if not pdf_image_object(data):
         raise BadInput(tr("Please choose a PNG or JPEG picture"))
-    from ..files.scan import sc_scan  # 2.153.0: virus scan like every upload (2.148.1 E, #2496)
+    from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.153.0: virus scan like every upload (2.148.1 E, #2496)
     from ..files.upsafe import UploadRefused
     try:
-        sc_scan("signature.png" if mime == "image/png" else "signature.jpg", data)
+        if sc_needs_retry(sc_scan("signature.png" if mime == "image/png" else "signature.jpg", data), data):
+            raise BadInput(tr(SC_RETRY_TEXT))  # 2.360.2 L (#2561): no later scan for this picture, so checked now
     except UploadRefused as e:
         raise BadInput(str(e)) from None
     return base64.b64encode(data).decode("ascii"), mime

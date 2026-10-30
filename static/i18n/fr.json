@@ -15254,5 +15254,7 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Pour un avenant ne contenant que les nouvelles lignes, décochez cette case : les deux devis restent valables.",
   "This quotation was superseded": "Ce devis a été remplacé",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Invitation enregistrée. Avec un compte à cette adresse, la personne verra le tableau dès qu'elle pourra le recevoir.",
-  "The invitation stops working.": "L'invitation ne fonctionnera plus."
+  "The invitation stops working.": "L'invitation ne fonctionnera plus.",
+  "The table is full (at most {0} MB)": "Le tableau est plein ({0} Mo au maximum)",
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Votre page de réservation a atteint aujourd'hui sa limite de {0} e-mails de confirmation. Les réservations reprennent demain."
 }

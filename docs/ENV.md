@@ -81,7 +81,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_NO_SECRET_KEY` | `0` | Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only. |
 | `KALMIDO_ORGCRYPT_DELAY` | `(empty)` | Seconds before the background encryption pass starts after a start (default: 300). |
 | `KALMIDO_ORGCRYPT_PAUSE` | `0.2` | Seconds between two portions of the background encryption pass. |
-| `KALMIDO_ORGCRYPT_ROT_SETTLE` | `5` | Seconds the key rotation waits after the switch to the new key. |
+| `KALMIDO_ORGCRYPT_ROT_SETTLE` | `30` | Longest wait in seconds of a key rotation for running writers after it locked writes. |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link in a short time that raise a security alert. |
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
@@ -321,6 +321,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 |---|---|---|
 | `KALMIDO_PEPPOL_STORECOVE_URL` | `(empty)` | Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0). |
 | `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
+| `KALMIDO_SHEET_MB_MAX` | `200` | Tests: size in MB of the inputs over all sheets of one table (2.360.2). |
 | `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
 | `KALMIDO_TEST_BK_IDLE_TX_MS` | `(empty)` | Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118). |

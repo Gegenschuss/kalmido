@@ -108,11 +108,12 @@ class OiCtx:
         self.c, self.run, self.uid, self.man, self.zf, self.files, self.data, self.who = c, run, uid, man, zf, files, data, who
         self.spec, self.space = spec, space
 
-    def file(self, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True):
+    def file(self, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True, strict=False):
         """The archive file `path` written sealed below base/sub (quota counted, new content scanned like an upload).
         -> (relative path below base, size) or None (missing / refused: a warning is recorded). seal=False: in plain, for
-        files the app itself keeps plain (2.137.0 A: the office logos, read by the PDF renderer)."""
-        return oi_file(self, path, sub, name, space=self.space if space is None else space, base=base, check=check, mime=mime, seal=seal)
+        files the app itself keeps plain (2.137.0 A: the office logos, read by the PDF renderer). strict: refused too when the
+        scanner cannot check it now (2.360.2 L, #2561: a letterhead goes out with every document, no later scan)."""
+        return oi_file(self, path, sub, name, space=self.space if space is None else space, base=base, check=check, mime=mime, seal=seal, strict=strict)
 
 
 def oi_space(c, run, spec):
@@ -169,8 +170,9 @@ def oi_drop_empty_pb(c, run, uid):
     return bool(n)
 
 
-def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True):
+def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True, strict=False):
     from ..admin.hosting import QuotaExceeded, quota_guard
+    from ..files.scan import sc_needs_retry
     from ..files.upsafe import up_check, UploadRefused
     from ..tasks.attachments import safe_name
     from .acctimport import _file_bytes
@@ -191,6 +193,8 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
     if check:
         try:
             raw, _m, _i = up_check(c, name, raw, mime or "application/octet-stream", ctx.uid, space if space and space > 0 else None, "att")
+            if strict and sc_needs_retry(_i.get("scan"), raw):  # 2.360.2 L (#2561): a file without a later scan of its own
+                raise UploadRefused(name)
         except UploadRefused:
             run.warning(N_("A file could not be taken over: {0}"), name)
             return None

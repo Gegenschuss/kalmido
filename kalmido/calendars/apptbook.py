@@ -878,6 +878,17 @@ def apb_pub_book(slug, tid, slot):
     return apb_msg(c, p, lg, tr("Almost done: please check your e-mail", lg=lg), [tr("We sent you a link. Your booking counts once you confirm it there (within 30 minutes).", lg=lg)])
 
 
+def apb_limit_note(c, uid, day):
+    """2.360.2 L (#2561): the page's mails of today are used up: a News item for its owner, at most once a day on all
+    processes (like team/portal.py pt_limit_note: no push, no mail). Caller commits."""
+    if not c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET day=excluded.day
+                        WHERE mail_counts.day<>excluded.day RETURNING k""", (f"apbn:{uid}", day)).fetchone():
+        return
+    with system_ctx(c):  # the owner's own notice; the public page has no person signed in, the notice names no customer
+        c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (uid, "apblimit", None, None, None, None, json.dumps({"limit": APB_MAIL_DAY}), iso(now_utc())))
+
+
 def apb_mail_quota(c, uid):
     """2.148.1 D (#2485): True and counted if the booking page of uid may send one more confirmation mail today. A quota of
     its own (APB_MAIL_DAY), apart from the owner's daily mail budget, so strangers cannot use that up."""
@@ -885,6 +896,7 @@ def apb_mail_quota(c, uid):
     k = f"apb:{uid}"
     r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
     if r and r[1] == day and r[0] >= APB_MAIL_DAY:
+        apb_limit_note(c, uid, day)  # 2.360.2 L (#2561)
         return False
     c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                  n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))

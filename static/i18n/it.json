@@ -15254,5 +15254,7 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi.",
   "This quotation was superseded": "Questo preventivo è stato sostituito",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Invito registrato. Con un account a questo indirizzo, la persona vedrà la tabella appena potrà riceverla.",
-  "The invitation stops working.": "L'invito non funzionerà più."
+  "The invitation stops working.": "L'invito non funzionerà più.",
+  "The table is full (at most {0} MB)": "La tabella è piena (al massimo {0} MB)",
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "La tua pagina di prenotazione ha raggiunto oggi il limite di {0} e-mail di conferma. Le prenotazioni riprendono domani."
 }
