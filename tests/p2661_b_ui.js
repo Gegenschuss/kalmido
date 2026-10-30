@@ -104,7 +104,8 @@ function scan() {
   const found = scan();
   const missing = found.filter(f => !(f in WS_VIEWS));
   check(found.length > 10 && !missing.length, 'guard: views with a workspace link without an entry in WS_VIEWS (add them with a check): ' + missing.join(', '));
-  const stale = Object.keys(WS_VIEWS).filter(f => !found.includes(f));
+  const NOT_ON_TRAIN = ['static/js/acctset.js'];  // 2.365.2 C (#2789) sits in main, the live train does not have it yet: drop this once it is live
+  const stale = Object.keys(WS_VIEWS).filter(f => !found.includes(f) && !NOT_ON_TRAIN.includes(f));
   check(!stale.length, 'guard: entries whose file has no workspace link any more (remove them): ' + stale.join(', '));
   const CHECKED = new Set();
 

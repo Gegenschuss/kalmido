@@ -520,7 +520,7 @@ function wk_dgNeed(src, ims) {
 function wk_render(p, ctx = {seen: new Set([p.id]), d: 0}) {
   if (typeof wem_cut !== 'function') { ld_later('wiki'); return `<p class="muted">${esc(tr('Loading…'))}</p>`; }  // 2.200.0 (#2747): the page can draw before wkembed.js arrived (tree / panel)
   const mms = [], fls = [], ems = [], tcs = [], ims = [], qs = [];  // 2.123.0 C (#2103): ems = files of the file store (wkembed.js); 2.376 (#3294): tcs = ```seiten blocks; 2.382.0 (#3153): ims = inline formulas; 2.371 (#3150): qs = ```abfrage blocks
-  const src = wem_cut(wka_cut(wk_dgCut(wk_bodyStrip(p.body), ims).replace(/^```mindmap[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm, (_, t) => { mms.push(t); return `\nMM${mms.length - 1}\n`; })
+  const src = wem_cut(wka_cut(wk_dgCut(wk_bodyStrip(p.body), ims).replace(/^```mindmap[ \t]*\r?\n([\s\S]*?)^```[ \t]*$/gm, (_, t) => { mms.push(t); return `\n\uE0F0MM${mms.length - 1}\uE0F1\n`; })
     .replace(WKT_RE, (_, t) => { tcs.push(t); return `\n\n\u2063WKT${tcs.length - 1}\u2063\n\n`; })
     .replace(typeof WKQ_RE === 'undefined' ? /(?!)/ : WKQ_RE, (_, t) => { qs.push(t); return `\n\n\u2063WKQ${qs.length - 1}\u2063\n\n`; }), fls), ems);
   wk_dgNeed(src, ims);

@@ -2336,7 +2336,7 @@ TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read")  # 2.200.0 C (#1781)
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
 TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
-TOOL_SCOPES["tasks:write"] += ("review_task",)
+TOOL_SCOPES["tasks:write"] += ("review_task", "set_working", "end_working")  # 2.407.0 (#3513): the working mark writes to the task
 TOOL_SCOPES["files:read"] += ("list_documents", "get_document")
 TOOL_SCOPES["files:write"] += ("update_document",)
 TOOL_SCOPES["agent"] += ("confirm_abort",)
