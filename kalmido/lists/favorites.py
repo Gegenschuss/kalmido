@@ -171,8 +171,7 @@ def fv2_targets():
     """The person's favourites that live on the server: {items: {key: {name, label, to, ws}}, gone: [key]}. A key is checked here
     each time with the rights of the object's own area, so nothing of a target the person cannot read (any more) leaves."""
     import json
-    from ..agents.core import is_agent
-    if is_agent(g.user):
+    if g.user["kind"] == "agent":
         raise Denied(403, tr("Favourites are a personal setting of a person"))
     c, uid = db(), me()
     try:
