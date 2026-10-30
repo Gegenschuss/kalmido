@@ -116,7 +116,7 @@ def _card_public(c, oid, r):
 def _card_fields(c, oid, b, cur=None):
     """The fields of a card out of body b (cur: a PATCH keeps what is not named)."""
     cur = cur or {}
-    v = {k: cur.get(k) for k in ("holder_id", "holder_name", "provider", "last4", "account")}
+    v = {"holder_id": cur.get("holder_id"), **{k: cur.get(k) or "" for k in ("holder_name", "provider", "last4", "account")}}
     if "holder_id" in b:
         h = b["holder_id"]
         if h is not None and (isinstance(h, bool) or not isinstance(h, int) or h not in {p["id"] for p in _members(c, oid)}):
