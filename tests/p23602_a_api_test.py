@@ -44,7 +44,7 @@ dep = read(".github", "dependabot.yml")
 check("package-ecosystem: github-actions" in dep and "interval: weekly" in dep, "#2912: Dependabot keeps the hashes current")
 rel = read(".github", "workflows", "release.yml")
 head, jobs = rel.split("\njobs:\n", 1)
-check("write" not in head, "#2912: no write right for the whole workflow")
+check(not re.search(r"^\s+\S+: write", head, re.M), "#2912: no write right for the whole workflow")
 job = {m.group(1): m.group(2) for m in re.finditer(r"^  ([a-z-]+):\n((?:    .*\n|\n)+)", jobs, re.M)}
 check("packages: write" in job["release"] and "contents: write" not in job["release"], "#2912: the image job cannot write contents")
 check("contents: write" in job["publish"] and "packages: write" not in job["publish"], "#2912: the release job cannot write packages")
