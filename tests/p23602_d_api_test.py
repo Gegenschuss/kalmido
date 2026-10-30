@@ -9,7 +9,7 @@
  4 privacy link, contact and imprint on public pages
  5 one export log row per person, list and day
  6 one way, once: old approval log entries lose e-mail, address and device, sealed ones too; unreadable ones stay
-freelancer-matrix: privacy (account export, orphaned approvals, public pages)
+freelancer-matrix: own
 usage: p23602_d_api_test.py <datadir>"""
 import base64
 import io
