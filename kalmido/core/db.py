@@ -373,7 +373,7 @@ def startup_guard():
         try:
             has_tables = table_exists(c, "users")
             meta = dict(c.execute("SELECT key, value FROM kalmido_meta WHERE key IN ('schema_version','app_version',"
-                                  "'app_version_prev')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
+                                  "'app_version_prev','back_floor','back_floor_how')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
             r = (meta["schema_version"],) if "schema_version" in meta else None
         finally:
             c.close()
@@ -389,7 +389,7 @@ def startup_guard():
         print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
               "image.", flush=True)
         raise DataDirError(3)
-    appver_guard(meta.get("app_version"), meta.get("app_version_prev"))
+    appver_guard(meta.get("app_version"), meta.get("app_version_prev"), meta.get("back_floor"), meta.get("back_floor_how"))
     if has_tables:
         secret_new_guard()
     from ..admin.migrate import mig_startup
@@ -426,21 +426,41 @@ def appver_newer_minor(other, mine=None):
     return bool(o and m and o[:2] > m[:2])
 
 
-def appver_check(stored, prev, mine=None):
+# 2.359.3 (#2896): format limits: (version, what to run on a newer version before going back below it). From a limit on data
+# has a form older versions cannot read. A database keeps the highest one in kalmido_meta (back_floor, back_floor_how; only ever
+# raised), so an image of the future, which does not know the limit yet, refuses to start and can still name the step. A
+# release that adds a limit adds a line here and in docs/UPGRADING.md. Limits below 2.149 stand only there: those images
+# have no start check at all.
+BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),)
+
+
+def appver_check(stored, prev, mine=None, floor=None):
     """2.149.0 D (#2509): may this image start on a database stamped with app_version stored (the newest version that
     ran on it) and app_version_prev prev (the version that ran before the last upgrade)? "ok", "back" (the one step
     back to the previous version: the automatic rollback of an update, an operator who keeps the previous image) or
     "newer" (an older image on a database a newer minor already ran on: refused unless KALMIDO_ALLOW_DOWNGRADE).
-    Patches of one minor never block each other."""
+    Patches of one minor never block each other. 2.359.3 (#2896): "format": this image is older than the database's format
+    limit floor; that comes first, the one step back does not pass it."""
+    p, m, f = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine), appver_parse(floor)
+    if f and m and m < f:
+        return "format"
     if not appver_newer_minor(stored, mine):
         return "ok"
-    p, m = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine)
     return "back" if p and m and m[:2] >= p[:2] else "newer"  # any patch of the previous minor
 
 
-def appver_guard(stored, prev):
-    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer"."""
-    v = appver_check(stored, prev)
+def appver_guard(stored, prev, floor=None, how=None):
+    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer" and "format"."""
+    v = appver_check(stored, prev, floor=floor)
+    if v == "format":
+        if env_bool("KALMIDO_ALLOW_DOWNGRADE", False):
+            print(f"WARNING: this database has a format limit at Kalmido {floor}, this image is {APP_VERSION}; starting anyway "
+                  "(KALMIDO_ALLOW_DOWNGRADE). Older code may not read its data: go back to a newer image soon.", flush=True)
+            return
+        print(f"FATAL: this database has a format limit at Kalmido {floor}; this image ({APP_VERSION}) is older and cannot read "
+              f"all of its data. Before going back: {how or 'see docs/UPGRADING.md'}. Start the image of {floor} or newer. "
+              "Emergency only: KALMIDO_ALLOW_DOWNGRADE=1.", flush=True)
+        raise DataDirError(3)
     if v == "back":
         print(f"note: this database last ran Kalmido {stored}; starting {APP_VERSION} (the version before it) as a step back. "
               "Its newer columns and tables stay untouched.", flush=True)
@@ -609,6 +629,18 @@ def secret_need_guard(new):
           "own volume (the image uses /secret/kalmido.key when a volume is mounted at /secret). Without a key organisation "
           "data is not encrypted; to start like that anyway set KALMIDO_NO_SECRET_KEY=1.", flush=True)
     raise DataDirError(3)
+
+
+def back_floor_stamp(c):
+    """2.359.3 (#2896): after a successful start (inside the init transaction): the highest format limit into kalmido_meta.
+    Only ever raised, also after a restore of an older backup."""
+    v, how = max(BACK_LIMITS, key=lambda x: appver_parse(x[0]))
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='back_floor'").fetchone()
+    have = appver_parse(r[0]) if r else None
+    if have and have >= appver_parse(v):
+        return
+    for k, x in (("back_floor", v), ("back_floor_how", how)):
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, x))
 
 
 def data_dir_check():
@@ -1199,6 +1231,7 @@ def init_db(guard=True, load=None):
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
         appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
+        back_floor_stamp(c)  # 2.359.3 (#2896)
         if guard or load is None:
             skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database
         clk("stamps")

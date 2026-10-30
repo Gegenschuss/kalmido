@@ -38,6 +38,7 @@ addresses and paths to your setup.
 - [Trash period of tasks (2.116)](#trash-period-of-tasks)
 - [Outgoing connections (2.223.3)](#outgoing-connections)
 - [Production updates](#production-updates)
+  - [Back to the previous version](#back-to-the-previous-version)
   - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore)
 - [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
@@ -1927,9 +1928,38 @@ stay blocked until you allow them.
 - **Pin the version** (`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:<version>`, not `latest`), so an update happens when
   you decide.
 - **A safe order:** backup, then pull and start, then check `GET /api/health` and a few counts (users, projects, tasks,
-  attachments) against the values before. If anything is off, roll back automatically to the previous version and the
-  backup.
+  attachments) against the values before. If anything is off, go back by hand, no tool does it for you: see
+  [Back to the previous version](#back-to-the-previous-version).
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
+
+- **Read [UPGRADING.md](UPGRADING.md) first:** it lists every version that needs a step from you.
+
+### Back to the previous version
+
+*Since 2.359.3 (#2896).* Note the version you run before an update (Settings > Help). The installer keeps it in
+`.kalmido-version.prev` and names it at the end of `update.sh`. Which way to take:
+
+- **Only the image** is enough for every patch of the same minor and for **one step back** to the version that ran before
+  the last upgrade. The data stays as it is, also what was entered since; newer columns and tables are left alone. Check
+  the [format limits](UPGRADING.md#format-limits-going-back) first.
+
+  ```bash
+  KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh
+  ```
+
+  With your own `.env`: set `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`, then `docker compose up -d`.
+- **The database copy as well** when you go further back, or when the update damaged data: `update.sh` writes one to
+  `data/backups/kalmido-*.dump` before every update (the last 10 stay). **Everything entered since is lost.** The copy
+  holds no attachments: files added since stay unused in the folder, files removed since do not come back. For those
+  restore an in-app backup instead (*Back up now* before the update), on the version that made it.
+
+  ```bash
+  docker compose stop kalmido
+  docker compose exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < data/backups/kalmido-YYYYMMDD.dump
+  ```
+
+  Then set the old version as above and start it.
+- **Never below 2.149,** see [UPGRADING.md](UPGRADING.md#format-limits-going-back).
 
 ### Update, downgrade and restore
 
@@ -1940,10 +1970,12 @@ stay blocked until you allow them.
   (`app_version_prev`). Going back changes neither, so the next upgrade works as before.
 - **Downgrade guard.** An image of an older minor version (2.148 on a database 2.150 ran on) refuses to start with a
   clear message: older code does not know newer columns and data and could damage them. Allowed are every patch of the
-  same minor (2.150.0 on 2.150.3 and back) and **one step back** to the version that ran before the last upgrade (the
-  automatic rollback of an update, or keeping the previous image as above). In an emergency `KALMIDO_ALLOW_DOWNGRADE=1`
+  same minor (2.150.0 on 2.150.3 and back) and **one step back** to the version that ran before the last upgrade
+  (keeping the previous image as above). In an emergency `KALMIDO_ALLOW_DOWNGRADE=1`
   starts anyway; go back to the newer image soon. The first version with the guard is 2.149: a database is stamped on
   its first start with it.
+- **Format limits (2.359.3, #2896).** The guard also knows the [format limits](UPGRADING.md#format-limits-going-back): an
+  image below the limit of its database refuses to start and names the step, even as the one step back.
 - **Installer.** The first start after an update migrates the database, which can take minutes on a big one; the
   installer keeps waiting (up to 30 minutes) while the container runs and stops at once when it exits.
 - **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
