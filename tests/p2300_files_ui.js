@@ -95,7 +95,8 @@ const SAFE_JS = `(() => {
   };
   const ready = async (ev, sel = '#top h1', n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector(${JSON.stringify(sel)})`).catch(() => false)); i++) await sleep(300); await sleep(600); };
   const waitFor = async (ev, expr, n = 30) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(200); } return false; };
-  const openTile = (ev, scope, name) => ev(`(() => { const a = [...document.querySelectorAll(${JSON.stringify(scope + ' a[data-tview]')})].find(x => x.title === ${JSON.stringify(name)}); if (!a) return false; a.click(); return true; })()`);
+  // #3506: the tile can come later than its section under load (red only in a full run): wait for the tile itself
+  const openTile = (ev, scope, name) => { const tile = `[...document.querySelectorAll(${JSON.stringify(scope + ' a[data-tview]')})].find(x => x.title === ${JSON.stringify(name)})`; return waitFor(ev, `!!${tile}`).then(ok => ok && ev(`(() => { ${tile}.click(); return true; })()`)); };
 
   for (const th of ['light', 'dark']) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = '1440 ' + th;
