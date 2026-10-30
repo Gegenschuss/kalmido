@@ -2224,5 +2224,7 @@ fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2365_2_c_ui node p2365_2_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.435.0 A (#3600): the client card blocks fold (open / folded with the number, kept per person), the office switches blocks off; freelancer-matrix: office
 fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.437.0 (#3729): init_db names its steps and milliseconds in the start log
+fresh; run p2437_l_start "$PY" p2437_l_start_test.py "$KALMIDO_TEST_DATA"
 # 2.431.0 A (#3593): the task header keeps every icon whole; its words fall away step by step
 fresh; run p2431_a_ui node p2431_a_ui.js "$KALMIDO_TEST_DATA"

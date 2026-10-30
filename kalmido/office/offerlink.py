@@ -68,6 +68,15 @@ def oil_doc_extra(c, oid, r, d):
         d["source_offer"] = oil_source_offer(c, oid, r)
     elif r["kind"] == "offer":
         d["offer_invoices"] = oil_offer_invoices(c, oid, r["id"])
+        d["replaces"], d["replaced_by"] = oil_replace_links(c, oid, r)
+
+
+def oil_replace_links(c, oid, r):
+    """2.437.0 B (#3621): (the quotation r replaces or None, the quotations that replace r, oldest first) as {id, number, status, status_text, list_id}."""
+    rows = c.execute("SELECT id, number, status, list_id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR replaces_id=?) ORDER BY id",
+                     (oid, r["replaces_id"] or 0, r["id"])).fetchall()
+    out = [{"id": x["id"], "number": x["number"] or "", "status": x["status"], "status_text": tr(STATUS_TXT.get(x["status"], x["status"])), "list_id": x["list_id"]} for x in rows]
+    return next((x for x in out if x["id"] == r["replaces_id"]), None), [x for x in out if x["id"] != r["replaces_id"]]
 
 
 def oil_agent_filter(d, sees):
@@ -76,6 +85,10 @@ def oil_agent_filter(d, sees):
     so = d.get("source_offer")
     if so:
         d["source_offer"] = {k: v for k, v in so.items() if k != "list_id"} if sees({"list_id": so["list_id"], "kind": "offer"}) else None
+    if d.get("replaces"):  # 2.437.0 B (#3621)
+        d["replaces"] = {k: v for k, v in d["replaces"].items() if k != "list_id"} if sees({"list_id": d["replaces"]["list_id"], "kind": "offer"}) else None
+    if d.get("replaced_by") is not None:
+        d["replaced_by"] = [{k: v for k, v in x.items() if k != "list_id"} for x in d["replaced_by"] if sees({"list_id": x["list_id"], "kind": "offer"})]
     if d.get("offer_invoices") is not None:
         d["offer_invoices"] = [{k: v for k, v in x.items() if k != "list_id"} for x in d["offer_invoices"] if sees({"list_id": x["list_id"], "kind": "invoice"})]
 

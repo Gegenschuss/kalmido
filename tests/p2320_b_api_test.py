@@ -128,6 +128,14 @@ check(ag["host"]["model"] == "Opus 5.5", "#1079: a status without the fields kee
 for bad in ({"permission_mode": "yolo"}, {"host_permission_mode": 1}, {"model": "<b>x</b>"}, {"model": "x" * 81}, {"modell": "x"}):
     r = requests.put(V + "/agent/status", headers=CLH, json={"status": "working", **bad})
     check(r.status_code == 400, "#1079: refused " + str(bad)[:60] + " " + str(r.status_code))
+# 2.437.0 (#2931): the computer fixed the mode: reported, kept by a status without it, a false takes it back
+requests.put(V + "/agent/status", headers=CLH, json={"status": "working", "permission_fixed": True})
+check({a["id"]: a for a in A.get(B + "/api/agents").json()["agents"]}[CL]["host"].get("permission_fixed") is True, "#2931: the fixed mode reaches the person")
+requests.put(V + "/agent/status", headers=CLH, json={"status": "working"})
+check({a["id"]: a for a in A.get(B + "/api/agents").json()["agents"]}[CL]["host"].get("permission_fixed") is True, "#2931: a status without it keeps it")
+requests.put(V + "/agent/status", headers=CLH, json={"status": "working", "permission_fixed": False})
+check({a["id"]: a for a in A.get(B + "/api/agents").json()["agents"]}[CL]["host"].get("permission_fixed") is False, "#2931: false takes it back")
+check(requests.put(V + "/agent/status", headers=CLH, json={"status": "working", "permission_fixed": "yes"}).status_code == 400, "#2931: only a boolean")
 A.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"model": "sonnet"}})
 ag = {a["id"]: a for a in A.get(B + "/api/agents").json()["agents"]}[CL]
 check(ag.get("runtime_model") == "sonnet", "#1079: the wished model next to the running one " + repr(ag.get("runtime_model")))

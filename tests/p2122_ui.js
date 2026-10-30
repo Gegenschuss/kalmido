@@ -81,17 +81,17 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('my new message');
     const mrow = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`);
-    check(mrow && /Sent/.test(mrow.textContent), `${tag}: my message, Sent`);
+    check(mrow && /Sent/.test(mrow.querySelector('.cdlv')?.getAttribute('aria-label') || '')  /* 2.437.0 (#3318) */, `${tag}: my message, Sent`);
     await tcall('GET', `/agent/chats?since=${mine.id - 1}`, TOK);
     await w.eval('chatLoad()'); await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('delivered');
-    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`)?.textContent || ''), `${tag}: Delivered in place`);
+    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"] .cdlv`)?.getAttribute('aria-label') || '')  /* 2.437.0 (#3318) */, `${tag}: Delivered in place`);
     // the agent types and works
     await tcall('POST', '/agent/typing', TOK, {chat_user_id: ME});
     await tcall('PUT', '/agent/status', TOK, {status: 'working', text: 'thinking'});
     await w.eval('agentPoll()'); await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('typing + working');
-    check(!d.querySelector('#chat-typing').classList.contains('hidden'), `${tag}: typing dots`);
+    check(d.querySelector('#chat-typing').childElementCount > 0, `${tag}: typing dots`);
     // its answer
     const ans = await say('Here you go ' + tag);
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)

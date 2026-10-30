@@ -457,10 +457,12 @@ function trd_pick(list) {
   return null;
 }
 function trd_lineHtml(m, th) {
-  const rb = m.read_by, U = S.tc.users;
-  if (S.tc.room?.kind === 'dm') return `<div class="trdline" role="status">${ic('check', 's')}<span>${tr('Read|receipt')}</span></div>`;
+  const rb = m.read_by;
+  // 2.437.0 A (#3318): two ticks in the accent colour (+ the count in a group); the words only as title / aria-label
+  const two = `<span class="cdlv on" aria-hidden="true">${ic('check', 's')}${ic('check', 's')}</span>`;
+  if (S.tc.room?.kind === 'dm') { const w = tr('Read|receipt'); return `<div class="trdline" role="img" title="${esc(w)}" aria-label="${esc(w)}">${two}</div>`; }
   const txt = tr('Read by {0}', rb.count);
-  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}"><span class="tthav" aria-hidden="true">${rb.users.slice(0, 3).map(u => av(u, uname(u, U), 'avatar')).join('')}</span><span>${esc(txt)}</span></button>`;
+  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}" aria-label="${esc(txt)}">${two}<span>${rb.count}</span></button>`;
 }
 async function trd_show(mid, inTh) {
   const m = (inTh ? tth_all() : S.tc.msgs).find(x => x.id === mid), rb = m?.read_by; if (!rb) return;

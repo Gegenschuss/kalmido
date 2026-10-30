@@ -491,7 +491,7 @@ SPECS = [
     OiT("office/contract_files.json", "office_contract_files", refs={"contract_id": "office_contracts"}, need=("contract_id",),
         people=_P, private="office", prep=_p_contract_file),
     OiT("office/documents.json", "office_docs", refs={"client_id": "clients", "contract_id": "office_contracts", "contact_id": "office_client_contacts",
-        "list_id": "lists"}, late={"version_of": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
+        "list_id": "lists"}, late={"version_of": "office_docs", "replaces_id": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
         "series_id": "office_inv_series"}, people={**_P, "locked_by": "null", "agent_id": "null"}, private="office", prep=_p_doc, after=_a_doc),
     OiT("office/document_parts.json", "office_doc_parts", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_part),
     OiT("office/document_items.json", "office_doc_items", refs={"doc_id": "office_docs", "service_id": "office_services",

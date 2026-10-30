@@ -15244,5 +15244,17 @@
   "Enter the total of the statement first": "Inserisci prima il totale dell’estratto",
   "Statement read, but its total was not found: please enter it": "Estratto letto, ma totale non trovato: inseriscilo",
   "Menu points": "Voci di menu",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Una voce disattivata qui scompare per tutti in questo ufficio. Non viene eliminato nulla: riattivandola torna tutto."
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Una voce disattivata qui scompare per tutti in questo ufficio. Non viene eliminato nulla: riattivandola torna tutto.",
+  "Set on its computer": "Impostato sul suo computer",
+  "Replaced by": "Sostituito da",
+  "Replaces": "Sostituisce",
+  "Superseded": "Sostituito",
+  "Mark the old quotation as superseded?": "Segnare il vecchio preventivo come sostituito?",
+  "Yes, {0} no longer counts": "Sì, {0} non conta più",
+  "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi.",
+  "This quotation was superseded": "Questo preventivo è stato sostituito",
+  "Hide on Today": "Nascondi in Oggi",
+  "Show on Today": "Mostra in Oggi",
+  "“{0}” is hidden on Today": "«{0}» è nascosto in Oggi",
+  "“{0}” is shown on Today": "«{0}» è mostrato in Oggi"
 }

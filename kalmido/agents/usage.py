@@ -935,7 +935,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         online=nul("boolean", description="false: no event poll for 5 minutes; null: unknown (webhook, never polled)"),
         last_poll_at=nul("string"), typing={"type": "number", "description": "Seconds left of its typing signal to you in the chat"},
         host={"type": "object", "description": "2.32.0 (#1079): what the host last reported (PUT /agent/status): model, permission_mode, "
-                                              "host_permission_mode, at"},
+                                              "host_permission_mode, permission_fixed, at"},
         quota=nul("object", description="2.33.0 (#1045): its plan usage as last reported (PUT /agent/quota; null = never): windows "
                   "[{key, label, percent, resets_at, reset_passed}], main (index), limit, at, stale (older than 24 h), level ok | warn | over, "
                   "percent (the main window), paused_until (the main window's reset when over the limit)"),
@@ -1007,7 +1007,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                   "permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
                                                                                       "2.32.0: the permission mode the current run really uses"},
                                                                   "host_permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
-                                                                                           "2.32.0: the host's own default (shown as \"Host default (Auto)\")"}}})},
+                                                                                           "2.32.0: the host's own default (shown as \"Host default (Auto)\")"},
+                                                                  "permission_fixed": {"type": "boolean", "description":
+                                                                                       "2.437.0: the computer set the mode; the switch in the chat header is locked"}}})},
         # 2.33.0 (#1045): the usage ring
         "/agent/quota": {
             "put": op("2.33.0 (#1045): report your plan usage (e.g. the 5-hour and weekly windows of a Claude plan); people who chat with "

@@ -1359,7 +1359,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
-`host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
+`host_permission_mode` (its own default when the person chose "Host default"), and 2.437.0 `permission_fixed` (true: the
+computer set the mode, Kalmido's switch does not reach it). Kalmido keeps the last values with the
 agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
 "Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
 "Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
@@ -1853,6 +1854,7 @@ expect files there.
 |---|---|---|
 | The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
+| 2.443.0: by tag (every node has `tags: [{id, name}]`; `tag=1,7;3` = ids, `;` separates tags, `tag_mode=all` = every one, `not_tag=`; with `parent_id` its children, without: all you see at any depth, at most 500) | `GET /api/v1/files?tag=<ids>` | `list_files` with `tag` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
 | Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |
@@ -2101,7 +2103,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`; 2.437: status `superseded` = replaced by a newer quotation, it counts nowhere and cannot be accepted any more; `replaces` / `replaced_by` name the quotations) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
@@ -2420,6 +2422,9 @@ agent accordingly.
 personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
 or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
 host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
+2.437.0: this holds unless the computer fixed the mode: `--permission-mode` in the agent's command, or
+`KALMIDO_PERMISSION_MODE`, win over the switch; the same goes for a command that is not Claude Code. The host then reports
+`permission_fixed: true`, and the switch shows "Set on its computer" and is locked.
 
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
@@ -2514,7 +2519,9 @@ as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, defaul
 person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
-values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
+values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call).
+2.443.0: both launchers stop alike: TERM / INT end the command and all it started (KILL after 30 s; Windows `taskkill /T`,
+`/F` after 30 s), a command that cannot start or an error in one round never ends the launcher. The list of these capabilities is
 [`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the
 two launchers lacks one.
 

@@ -5,6 +5,8 @@ import os
 import re
 import secrets
 import tempfile
+import threading
+import time
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
@@ -721,6 +723,39 @@ def mig_flags_sync(c, before=None):
     return flags
 
 
+# 2.437.0 (#3729): how long each step of init_db takes, in the start log. Names and milliseconds only, never content; every line
+# carries "migrations" because the operator's start log keeps only lines with such words. A step in progress cannot report
+# itself, so a timer says which step finished last when a start is killed (a failed update rolls back without any other trace).
+class StartClock:
+    SLOW_S, WATCH_S = 1.0, 30.0
+
+    def __init__(self):
+        self.t0 = self.t = time.monotonic()
+        self.last, self.quick, self.quick_s = "begin", 0, 0.0
+        self.end = threading.Event()
+        threading.Thread(target=self.watch, daemon=True, name="start-clock").start()
+
+    def __call__(self, name):
+        now = time.monotonic()
+        d, self.t, self.last = now - self.t, now, name
+        if d >= self.SLOW_S:
+            print(f"migrations: start step {name} {round(d * 1000)} ms", flush=True)
+        else:
+            self.quick, self.quick_s = self.quick + 1, self.quick_s + d
+
+    def watch(self):
+        while not self.end.wait(self.WATCH_S):
+            print(f"migrations: start still running, {round(time.monotonic() - self.t)} s since step {self.last}", flush=True)
+
+    def done(self):
+        self.end.set()
+        print(f"migrations: start total {round((time.monotonic() - self.t0) * 1000)} ms, "
+              f"{self.quick} step(s) under 1 s took {round(self.quick_s * 1000)} ms", flush=True)
+
+
+START_CLOCK = None  # 2.437.0 (#3729): set while init_db runs: a one-shot's flag (gset migr_*) ends its step
+
+
 def init_db(guard=True, load=None):
     """load: admin/migrate.py -- load(c) copies an old SQLite database inside this transaction, after the tables and columns
     exist and before the one-shot data migrations, triggers, indexes and row-level security."""
@@ -729,6 +764,7 @@ def init_db(guard=True, load=None):
     from ..lists.projects import ms_migrate
     from ..notify.push import _b64u, _vapid_load
     from ..agents.core import tidy_agent_of
+    global START_CLOCK
     if guard:  # 2.149.0 D (#2510): a clear message for a data folder without write access
         data_dir_check()
         tmp_sweep()
@@ -739,21 +775,27 @@ def init_db(guard=True, load=None):
     # 2.37.0 (#1150): one transaction for the schema, the additive migrations and the one-shot data migrations (Postgres has
     # transactional DDL); an advisory lock keeps two starting containers apart (was BEGIN IMMEDIATE)
     c = connect_direct(DATABASE_URL)
+    clk = START_CLOCK = StartClock()
     try:
         c.execute("SET LOCAL statement_timeout = 0")  # big migrations / index builds (and waiting for another starting container)
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
         c.executescript(ix_skip_present(SCHEMA, ix_have(c)))  # 2.183.0 B (#2666): only the missing indexes
+        clk("schema")
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
+        clk("mig_apply")
         from ..office.signoff import sig_fk_migrate
         sig_fk_migrate(c)  # 2.148.1 C (#2493): video approval records stay when their review goes
+        clk("sig_fk_migrate")
         if load is not None:
             load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
+            clk("load")
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
         # 2.352.0 A (#2748): not a row only a folder's share gives (frole)
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL AND frole IS NULL")
+        clk("list_members_own_role")
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(TIME_TITLE_TRIGGER)
@@ -761,39 +803,54 @@ def init_db(guard=True, load=None):
         c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         c.executescript(REVOKED_TRIGGER)  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
         c.executescript(TICKET_NO_TRIGGER)  # 2.390.0 (#3353): running ticket numbers of projects with a key
+        clk("triggers")
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
+        clk("dl_setup")
         from ..core.access import acx_gen_setup
         acx_gen_setup(c)  # 2.149.0 C (#2508): membership changes renew the generation the access-context cache checks
+        clk("acx_gen_setup")
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
+        clk("ml_setup")
         # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
         c.executescript(SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0)))
+        clk("sec_at_trigger")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";"):
             m = _IX_LINE.search(stmt + ";")
             if stmt.strip() and not (m and m.group(1).lower() in have_ix):
                 c.execute(stmt)
+        clk("indexes")
         from ..life.rss import p2172b_feed_unique
         p2172b_feed_unique(c)  # 2.172.0 B (#2677): one followed feed per address and space (was 2.122.4 A, #1906: per person)
+        clk("feed_unique")
         from ..core.tokenhash import tkh_migrate
         tkh_migrate(c)  # 2.138.0 C (#1907): plain upload / calendar tokens become hashes
+        clk("tkh_migrate")
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
+        clk("ofx_migrate")
         from ..office.cashbook import cb_log_fk_migrate
         cb_log_fk_migrate(c)  # 2.144.11 (#2354): cash book log lines outlive their entry (SET NULL, was CASCADE)
+        clk("cb_log_fk_migrate")
         from ..office.contacts_cl import fk_migrate
         fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
+        clk("contact_fk_migrate")
         from ..office.model import fe_office_rules_migrate
         fe_office_rules_migrate(c)  # 2.40.0 (#1379): producing / raw data stay on where they are used
+        clk("fe_office_rules_migrate")
         from ..office.costs import ek_producing_migrate
         ek_producing_migrate(c)  # 2.47.0 (#1645): producing per document, older documents keep how they compute
+        clk("ek_producing_migrate")
         for k, v in GLOBAL_DEFAULTS.items():
             c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill
         quota_backfill(c)  # 2.24.0 (#910): who uploaded the files from before
+        clk("quota_backfill")
         from ..accounts.colors import ac_assign
         ac_assign(c)  # 2.47.1 (#1721): the accounts from before get their fixed colour (agents first)
+        clk("ac_assign")
         _COLLAB_ALL["on"] = gsetting(c, "collab_all") != "0"
         _TIME_ALL["on"] = gsetting(c, "time_all") != "0"
         # migration of a single-user install: its data belongs to the bootstrap admin
@@ -816,6 +873,7 @@ def init_db(guard=True, load=None):
             if NTFY_TOPIC:  # env topic seeds the first admin's topic when it is still empty
                 c.execute("UPDATE user_settings SET value=? WHERE user_id=? AND key='ntfy_topic' AND value=''",
                           (NTFY_TOPIC, first))
+        clk("adopt_orphans")
         # list types (package D2, once): checklists stay checklists; lists that already hold project data (time entries,
         # dependencies, custom fields or values, a project status; time only from 5 minutes tracked in total, so a
         # misclicked timer of a few seconds does not turn a household list into a project) become projects; the rest: list
@@ -887,9 +945,12 @@ def init_db(guard=True, load=None):
             gset(c, "migr_orgs2220", "1")
         from ..accounts.orgs import instance_sync, ws_migrate
         instance_sync(c)  # 2.46.0 (#1592): only the hint on a former mode setting
+        clk("instance_sync")
         ws_migrate(c)  # 2.28.0 (#935), once: every list and agent gets its workspace
+        clk("ws_migrate")
         from ..accounts.tenancy import ws_migrate_objs
         ws_migrate_objs(c)  # 2.30.0 (#1036), once: every calendar and address book gets its workspace
+        clk("ws_migrate_objs")
         if gsetting(c, "migr_listen2300") != "1":  # 2.30.0 (#1034), once: "listens in" keeps who listened before
             from ..agents.core import listen_migrate
             n = listen_migrate(c)
@@ -947,6 +1008,7 @@ def init_db(guard=True, load=None):
             gset(c, "migr_notiftpl2330", "1")
             if nl or nf:
                 print("notification templates: shared lists", nl, "and folders", nf, "kept on \"all\" (#927)", flush=True)
+        clk("before_users")
         for (uid,) in c.execute("SELECT id FROM users ORDER BY id").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():
@@ -990,6 +1052,7 @@ def init_db(guard=True, load=None):
                 uset(c, uid, "features_rev", "11")
         # 2.15.0 (#479), once: fine scopes. Old read tokens could download files (now attachments:read), old agents had
         # read + write (stored "write" = every scope but admin-read, so they keep what they could do)
+        clk("users")
         if gsetting(c, "migr_scopes215") != "1":
             n = c.execute("""UPDATE api_tokens SET scopes=scopes || ',attachments:read'
                              WHERE ',' || scopes || ',' NOT ILIKE '%,write,%' AND ',' || scopes || ',' NOT ILIKE '%,attachments:read,%'""").rowcount
@@ -1039,12 +1102,14 @@ def init_db(guard=True, load=None):
         # rows exist (no flag): a restored backup from before 2.18.0 brings them back and is migrated again
         c.execute("CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
         n = ms_migrate(c)
+        clk("ms_migrate")
         if n:
             print("milestones:", n, "milestones of project overviews became milestone tasks", flush=True)
         # 2.41.0 (#1420): a folder's default agent (folder_props) is also its first agent in folder_agents; every start
         # (a 2.40 that ran on this database after a rollback may have changed it), additive only
         from ..lists.foldershare import sh_folder_agents_sync
         n = sh_folder_agents_sync(c)
+        clk("folder_agents_sync")
         if n:
             print("folders: took over", n, "folder agent(s)", flush=True)
         if gsetting(c, "migr_auditfix") != "1":  # security audit 2026-09-28, one-shot
@@ -1055,6 +1120,7 @@ def init_db(guard=True, load=None):
         # 2.97.0 B (#1951): clients with only a free address get street / postcode / city split from it (idempotent)
         from ..team.clients import cdn_backfill
         n = cdn_backfill(c)
+        clk("cdn_backfill")
         if n:
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
         if gsetting(c, "migr_upg2103") != "1":  # 2.152.0 A (#2164): time entries / direct messages outlive an account
@@ -1090,12 +1156,16 @@ def init_db(guard=True, load=None):
                 print("agency projects:", len(ids), "empty field(s) \"Client\" removed", flush=True)
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
+        clk("fk_ensure")
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
+        clk("msg_index_init")
         from ..tasks.ftsearch import fts_index_init
         fts_index_init(c)  # 2.116.0 B (#2065): full-text search of tasks + comments (GIN indexes over kalmido_fold)
+        clk("fts_index_init")
         from .rls import apply as rls_apply, OFF_HELP
         rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
+        clk("rls_apply")
         if not rls_on and guard:  # 2.37.0 (review W2-2): several organisations rely on it -> no start without it
             from ..accounts.orgs import INSTANCE_ENV
             # 2.46.0 (#1592): needed with several organisations (or the mode workspaces set explicitly, as before)
@@ -1103,18 +1173,23 @@ def init_db(guard=True, load=None):
                 print(f"FATAL: {OFF_HELP} Several organisations need it. Refusing to start.", flush=True)
                 raise DataDirError(3)
         mig_flags_sync(c, flags0)  # 2.102.0 D (#1996): the one-shots of this start into the table
+        clk("mig_flags_sync")
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
         appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
         if guard or load is None:
             skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database
+        clk("stamps")
         c.commit()
+        clk("commit")
     except Exception:
         c.rollback()
         raise
     finally:
         c.close()
+        START_CLOCK = None
+        clk.done()
     if not rls_on:  # 2.37.0 (review W2-2): single organisation / shared: it starts, but the admins hear it at every start
         from ..notify.alerts import aa_now
         from .i18n import N_
@@ -1248,6 +1323,8 @@ def gsetting(c, key):
 def gset(c, key, value):
     c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
               (key, str(value)))
+    if START_CLOCK and key.startswith("migr_"):
+        START_CLOCK(key)
 
 
 def usettings(c, uid):

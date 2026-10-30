@@ -815,7 +815,8 @@ Two tabs for the admins of the office area (a personal office: its owner; member
   *Create quotation* makes a draft with the office's own quotation code (client and name taken over), binds it to the
   deal and moves an inquiry to *Quotation sent*. When the quotation's status becomes *accepted* - by hand or by the
   client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
-  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. *Create project* (a won deal)
+  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. When a quotation that replaces
+  another one is accepted, the deal of the old one moves to it (2.437). *Create project* (a won deal)
   makes a project (type "Agency") named like the deal, in the office's workspace (a personal office: private),
   with the deal's client. Every change is one undo step; a deleted deal can be restored.
 - **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
@@ -880,11 +881,20 @@ service (else its start, else their date); a sent one is marked **open quotation
 share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the
 chain; a copy given to another client is a quotation of its own). Per chain one version counts:
 
-- **Automatic** (default): the newest sent or accepted version; drafts and declined versions never count.
+- **Automatic** (default): the newest sent or accepted version; drafts, declined and superseded versions never count.
 - **Yes**: when a version of the chain says yes, exactly the yes versions count (several are possible).
 - **No**: this version never counts.
 - Once a finalised invoice exists for any version of the chain, the whole chain is left out (the invoice is in the plan
   itself); a draft invoice does not take it out yet. Before 2.88 only the invoiced part was taken off.
+
+**Superseded** (2.437): "Duplicate" on a sent or accepted quotation asks *Mark the old quotation as superseded?* (ticked by
+default). Yes: the old quotation gets the status *Superseded* at once and the copy carries `replaces_id`; both show the link
+to each other (*Replaced by* / *Replaces*). A copy that replaces a quotation still sent or accepted (set back by hand)
+supersedes it again the moment it is accepted, by hand or by the client. Unticked = a supplement with only the new items: no
+reference, both quotations may be accepted. A superseded quotation counts nowhere (cash flow, purchases, invoice picker) like
+a declined one, its approval link is void, the client portal keeps showing it as superseded; there is no rejection rate it
+could fall into. Deleting the draft of the copy gives the old quotation its status back. By hand the status can be set from
+sent or accepted, and back. Freelancers without an organisation have the same in their personal office.
 
 The choice **In the cash flow** sits in the quotation (also when it is sent or finalised: it is planning, not printed and
 not part of the approval) with a line which version counts; everyone who may edit the area's quotations may change it, one
