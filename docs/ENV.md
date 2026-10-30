@@ -306,6 +306,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses. |
 | `KALMIDO_IMPRINT_URL` | `(empty)` | Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement. |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
+| `KALMIDO_PRIVACY_EMAIL` | `(empty)` | Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it. |
 | `KALMIDO_PRIVACY_URL` | `(empty)` | Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins. |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |

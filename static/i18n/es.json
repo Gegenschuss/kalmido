@@ -14135,7 +14135,6 @@
   "Imprint": "Aviso legal",
   "Privacy and imprint": "Privacidad y aviso legal",
   "Privacy statement": "Política de privacidad",
-  "Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Enlaces en la página de inicio de sesión y en Ayuda, p. ej. a tu política de privacidad. Vacío = sin enlace (o el valor de la configuración del servidor).",
   "For a child under 16, a parent decides: create the account only with the consent of a parent or guardian. Keep its data to what the child needs.": "Para un menor de 16 años deciden los padres: crea la cuenta solo con el consentimiento de un padre, una madre o un tutor. Guarda solo lo que el menor necesita.",
   "Health data is specially protected. Only you see it, unless you share a list.": "Los datos de salud están especialmente protegidos. Solo tú los ves, salvo que compartas una lista.",
   "Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.": "Las entradas del diario y del estado de ánimo pueden ser datos de salud y están especialmente protegidas. Solo tú las ves; el cifrado de tu espacio privado también las protege en el servidor.",
@@ -15256,5 +15255,13 @@
   "Invited. With an account at this address, the person sees the table once they may get it.": "Invitación registrada. Con una cuenta en esta dirección, la persona verá la tabla en cuanto pueda recibirla.",
   "The invitation stops working.": "La invitación dejará de funcionar.",
   "The table is full (at most {0} MB)": "La tabla está llena ({0} MB como máximo)",
-  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Tu página de reservas ha alcanzado hoy su límite de {0} correos de confirmación. Se podrá reservar de nuevo mañana."
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Tu página de reservas ha alcanzado hoy su límite de {0} correos de confirmación. Se podrá reservar de nuevo mañana.",
+  "{0} monthly timesheet of an organisation stays, without the name.": ["{0} parte mensual de una organización se conserva, sin el nombre.", "{0} partes mensuales de una organización se conservan, sin el nombre."],
+  "Approvals of deleted videos": "Aprobaciones de vídeos eliminados",
+  "This record is kept until {0} by law": "Este registro se conserva por ley hasta {0}",
+  "approval record of a deleted video deleted": "registro de aprobación de un vídeo eliminado borrado",
+  "Polls": "Encuestas",
+  "Holiday allowance": "Saldo de vacaciones",
+  "Privacy contact": "Contacto de privacidad",
+  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Enlaces en la página de inicio de sesión, en Ayuda y en páginas públicas (formularios, portal, aprobaciones, reservas), p. ej. a tu política de privacidad. Vacío = sin enlace (o el valor de la configuración del servidor)."
 }

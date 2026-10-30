@@ -379,9 +379,10 @@ check(dbx("SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=? AND action='e
       "#2492: the export of an organisation's list is in its list history")
 # 2.148.1 H (#2492, review): the ZIP exports of the same lists are noted, too
 for kind in ("todoist", "markdown"):
-    n0 = dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0]
+    # 2.360.2 (#2561): one row per person, list and day: the earlier rows of today go first
+    dbx("DELETE FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))
     r = A.get(B + f"/api/export/{kind}.zip")
-    check(r.ok and dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0] == n0 + 1,
+    check(r.ok and dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0] == 1,
           f"#2492: the {kind} ZIP export of an organisation's list is in its list history")
 # parallel imports: the one slot of this server is taken -> 429
 code = "import time, app\nfrom kalmido.core.config import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\nc = connect_direct(DATABASE_URL)\n" \

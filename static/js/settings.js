@@ -585,8 +585,9 @@ function hostHtml(hint) {
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
-    ${hint(tr('Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    ${hint(tr('Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
     <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
+    <div class="row"><label for="s-privmail">${tr('Privacy contact')}</label><input id="s-privmail" type="email" value="${esc(a.privacy_email || '')}" placeholder="${esc(a.privacy_email_env || 'privacy@example.com')}" autocomplete="off"></div>
     <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
     ${hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))}
@@ -620,6 +621,7 @@ function hostWire(md) {
     if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
     if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
     if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
+    if (id === 's-privmail') { hostSave(md, {privacy_email: e.target.value.trim()}, tr('Saved')); return; }  // 2.360.2 D (#2561)
     if (id === 's-privacy' || id === 's-imprint') { hostSave(md, {[id === 's-privacy' ? 'privacy_url' : 'imprint_url']: e.target.value.trim()}, tr('Saved')); return; }  // 2.306.0 B (#2887)
     if (id === 's-maillim') { const v = +e.target.value; if (!(v >= 1 && v <= 1000)) { toast(tr('Invalid value: {0}', tr('E-mails per day'))); e.target.value = S.about?.mail_day_limit || 30; return; } hostSave(md, {mail_day_limit: v}, tr('Saved')); }
   });

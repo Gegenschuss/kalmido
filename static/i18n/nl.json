@@ -14135,7 +14135,6 @@
   "Imprint": "Colofon",
   "Privacy and imprint": "Privacy en colofon",
   "Privacy statement": "Privacyverklaring",
-  "Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Links op de inlogpagina en onder Help, bijv. naar je privacyverklaring. Leeg = geen link (of de waarde uit de serverconfiguratie).",
   "For a child under 16, a parent decides: create the account only with the consent of a parent or guardian. Keep its data to what the child needs.": "Bij een kind onder de 16 beslissen de ouders: maak het account alleen aan met toestemming van een ouder of voogd. Bewaar alleen wat het kind nodig heeft.",
   "Health data is specially protected. Only you see it, unless you share a list.": "Gezondheidsgegevens zijn extra beschermd. Alleen jij ziet ze, tenzij je een lijst deelt.",
   "Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.": "Dagboek- en stemmingsnotities kunnen gezondheidsgegevens zijn en zijn extra beschermd. Alleen jij ziet ze; de versleuteling van je privéruimte beschermt ze ook op de server.",
@@ -15256,5 +15255,13 @@
   "Invited. With an account at this address, the person sees the table once they may get it.": "Uitgenodigd. Met een account op dit adres ziet de persoon de tabel zodra die hem mag krijgen.",
   "The invitation stops working.": "De uitnodiging werkt dan niet meer.",
   "The table is full (at most {0} MB)": "De tabel is vol (maximaal {0} MB)",
-  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Je boekingspagina heeft vandaag de grens van {0} bevestigingsmails bereikt. Boeken kan morgen weer."
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Je boekingspagina heeft vandaag de grens van {0} bevestigingsmails bereikt. Boeken kan morgen weer.",
+  "{0} monthly timesheet of an organisation stays, without the name.": ["{0} maandstaat van een organisatie blijft, zonder de naam.", "{0} maandstaten van een organisatie blijven, zonder de naam."],
+  "Approvals of deleted videos": "Goedkeuringen van verwijderde video's",
+  "This record is kept until {0} by law": "Dit bewijs blijft wettelijk bewaard tot {0}",
+  "approval record of a deleted video deleted": "goedkeuringsbewijs van een verwijderde video gewist",
+  "Polls": "Peilingen",
+  "Holiday allowance": "Vakantiesaldo",
+  "Privacy contact": "Contact voor privacy",
+  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Links op de inlogpagina, onder Help en op openbare pagina's (formulieren, portaal, goedkeuringen, boekingen), bijv. naar je privacyverklaring. Leeg = geen link (of de waarde uit de serverconfiguratie)."
 }
